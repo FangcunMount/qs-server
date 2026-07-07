@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-// AssessmentModel is the draft-model aggregate for backend configuration.
+// AssessmentModel 是draft-model aggregate 用于 backend 配置。
 type AssessmentModel struct {
 	ID             string
 	Code           string
@@ -29,7 +29,7 @@ type AssessmentModel struct {
 	ArchivedAt     *time.Time
 }
 
-// NewAssessmentModelInput carries fields required to create a draft model.
+// NewAssessmentModelInput 携带字段 required 到 create draft model。
 type NewAssessmentModelInput struct {
 	Code           string
 	Kind           identity.Kind
@@ -43,7 +43,7 @@ type NewAssessmentModelInput struct {
 	Now            time.Time
 }
 
-// NewAssessmentModel creates a draft assessment model with default product channel.
+// NewAssessmentModel 创建draft assessment model 使用 默认 产品通道。
 func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error) {
 	if input.Code == "" {
 		return nil, fmt.Errorf("%w: code is required", ErrInvalidArgument)
@@ -109,7 +109,7 @@ func (m *AssessmentModel) touch(now time.Time) {
 	m.Version++
 }
 
-// UpdateBasicInfo updates editable metadata on a draft model.
+// UpdateBasicInfo updates editable 元数据 on draft model。
 func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind identity.SubKind, algorithm identity.Algorithm, productChannel identity.ProductChannel, category string, tags []string, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
@@ -138,7 +138,7 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind ide
 	return nil
 }
 
-// BindQuestionnaire attaches a questionnaire version to the draft model.
+// BindQuestionnaire attaches 问卷版本 到 draft model。
 func (m *AssessmentModel) BindQuestionnaire(binding QuestionnaireBinding, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
@@ -154,7 +154,7 @@ func (m *AssessmentModel) BindQuestionnaire(binding QuestionnaireBinding, now ti
 	return nil
 }
 
-// UpdateDefinition replaces the draft definition payload.
+// UpdateDefinition replaces draft definition 载荷。
 func (m *AssessmentModel) UpdateDefinition(payload DefinitionPayload, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
@@ -167,7 +167,7 @@ func (m *AssessmentModel) UpdateDefinition(payload DefinitionPayload, now time.T
 	return nil
 }
 
-// MarkPublished transitions the model to published status.
+// MarkPublished transitions model 到 published 状态。
 func (m *AssessmentModel) MarkPublished(now time.Time) error {
 	if m == nil {
 		return fmt.Errorf("%w: model is nil", ErrInvalidArgument)
@@ -184,7 +184,7 @@ func (m *AssessmentModel) MarkPublished(now time.Time) error {
 	return nil
 }
 
-// MarkUnpublished transitions a published model back to draft.
+// MarkUnpublished transitions 已发布模型 back 到 draft。
 func (m *AssessmentModel) MarkUnpublished(now time.Time) error {
 	if m == nil {
 		return fmt.Errorf("%w: model is nil", ErrInvalidArgument)
@@ -204,7 +204,7 @@ func (m *AssessmentModel) MarkUnpublished(now time.Time) error {
 	return nil
 }
 
-// MarkArchived transitions the model to archived status.
+// MarkArchived transitions model 到 archived 状态。
 func (m *AssessmentModel) MarkArchived(now time.Time) error {
 	if m == nil {
 		return fmt.Errorf("%w: model is nil", ErrInvalidArgument)

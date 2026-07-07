@@ -8,12 +8,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DescriptorProjector maps an execution path to legacy evaluator descriptors for wiring.
+// DescriptorProjector 映射执行路径 到 旧版 evaluator 描述符 用于 装配。
 type DescriptorProjector func(path modelcatalog.ExecutionPath) []evaldomain.ModelDescriptor
 
 var runtimeMaterializationOrder = materializationOrder()
 
-// ExecutionPathsFromRegistry returns registered execution paths in stable materialization order.
+// ExecutionPathsFromRegistry 返回已注册 执行路径 in 稳定 物化 order。
 func ExecutionPathsFromRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ([]modelcatalog.ExecutionPath, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("runtime descriptor registry is nil")
@@ -34,7 +34,7 @@ func ExecutionPathsFromRegistry(registry *evalpipeline.RuntimeDescriptorRegistry
 	return paths, nil
 }
 
-// EvaluationDescriptorsFromRegistry projects registered execution paths into evaluator descriptors.
+// EvaluationDescriptorsFromRegistry 投影已注册 执行路径 为 evaluator 描述符。
 func EvaluationDescriptorsFromRegistry(
 	registry *evalpipeline.RuntimeDescriptorRegistry,
 	project DescriptorProjector,
@@ -53,7 +53,7 @@ func EvaluationDescriptorsFromRegistry(
 	return descs, nil
 }
 
-// FilterExecutablePaths keeps only paths backed by runtime-executable model capabilities.
+// FilterExecutablePaths 保留仅 paths 基于 运行时-可执行 model 能力。
 func FilterExecutablePaths(paths []modelcatalog.ExecutionPath) []modelcatalog.ExecutionPath {
 	executable := make(map[modelcatalog.ExecutionPath]bool)
 	for _, cap := range modelcatalog.ModelFamilyCapabilities() {

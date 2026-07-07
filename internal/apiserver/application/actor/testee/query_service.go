@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// queryService 受试者查询服务实现
+// 查询Service 受试者查询服务实现
 // 行为者：所有需要查询受试者信息的用户
 type queryService struct {
 	reader actorreadmodel.TesteeReader

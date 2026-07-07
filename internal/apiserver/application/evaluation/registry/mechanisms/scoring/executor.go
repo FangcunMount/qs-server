@@ -13,7 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
-// Executor runs factor-scoring evaluations.
+// Executor 运行因子计分 评估s。
 type Executor struct {
 	validator InputValidator
 	handler   *domainfactor_scoring.Handler
@@ -21,7 +21,7 @@ type Executor struct {
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
-// NewExecutor creates a factor-scoring evaluation executor.
+// NewExecutor 创建因子计分 评估 executor。
 func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return NewExecutorWithDeps(
 		DefaultInputValidator{},
@@ -29,7 +29,7 @@ func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	)
 }
 
-// NewExecutorWithDeps creates an executor with replaceable dependencies (tests).
+// NewExecutorWithDeps 创建executor 使用 replaceable dependencies (tests)。
 func NewExecutorWithDeps(validator InputValidator, handler *domainfactor_scoring.Handler) *Executor {
 	if validator == nil {
 		validator = DefaultInputValidator{}

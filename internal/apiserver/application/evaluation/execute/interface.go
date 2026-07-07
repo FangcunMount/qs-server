@@ -34,9 +34,9 @@ type Service interface {
 // Evaluator 执行某一类评估模型的评估。
 type Evaluator interface {
 	ExecutionIdentity() evaluation.ExecutionIdentity
-	// Key is deprecated; use ExecutionIdentity().
+	// Key 是deprecated; 使用 Execution身份()。
 	Key() evaluation.ExecutionIdentity
-	// Execute 执行评估模型并返回 canonical outcome。
+	// Execute 执行评估模型并返回 canonical 结果。
 	Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 

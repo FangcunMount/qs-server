@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// ScoreNodesFromFactors translates catalog factor snapshots into calculation ScoreNodes.
+// ScoreNodesFromFactors translates 目录 因子快照 为 计算 ScoreNodes。
 func ScoreNodesFromFactors(factors []factor.FactorSnapshot) []calculation.ScoreNode {
 	if len(factors) == 0 {
 		return nil

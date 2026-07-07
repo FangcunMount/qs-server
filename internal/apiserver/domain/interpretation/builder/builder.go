@@ -1,4 +1,4 @@
-// Package builder owns mechanism-oriented report builders and registries.
+// Package builder 负责面向机制 报告构建器 和 注册表。
 package builder
 
 import (
@@ -8,10 +8,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ReportBuilder composes an InterpretReport from mechanism-neutral input.
+// ReportBuilder composes InterpretReport 从 机制无关 input。
 type ReportBuilder = domainreport.ReportBuilder
 
-// MechanismFamily identifies which report builder mechanism to use.
+// MechanismFamily 标识which 报告构建器 机制 到 use。
 type MechanismFamily = modelcatalog.AlgorithmFamily
 
 const (
@@ -21,28 +21,28 @@ const (
 	MechanismTaskPerformance      = modelcatalog.AlgorithmFamilyTaskPerformance
 )
 
-// FactorScoringBuilder builds score-range reports.
+// FactorScoringBuilder 构建score-range reports。
 func FactorScoringBuilder(composer ReportBuilder, input reportscore.ScaleReportInput) (*domainreport.InterpretReport, error) {
 	return reportscore.BuildScaleReport(composer, input)
 }
 
-// TypologyBuilder builds factor-classification reports via mechanism templates.
+// TypologyBuilder 构建因子-分类 reports via 机制 templates。
 var (
 	BuildPersonalityTypeReport = typology.BuildPersonalityTypeReport
 	BuildTraitProfileReport    = typology.BuildTraitProfileReport
 )
 
-// Registry resolves mechanism builders by algorithm family.
+// Registry 解析机制 builders 按 算法家族。
 type Registry struct {
 	byFamily map[MechanismFamily]ReportBuilder
 }
 
-// NewRegistry creates an empty mechanism builder registry.
+// NewRegistry 创建空 机制 builder 注册表。
 func NewRegistry() *Registry {
 	return &Registry{byFamily: make(map[MechanismFamily]ReportBuilder)}
 }
 
-// Register adds a builder for a mechanism family.
+// Register 添加builder 用于 机制家族。
 func (r *Registry) Register(family MechanismFamily, builder ReportBuilder) {
 	if r == nil {
 		return
@@ -50,7 +50,7 @@ func (r *Registry) Register(family MechanismFamily, builder ReportBuilder) {
 	r.byFamily[family] = builder
 }
 
-// Resolve returns the builder for a mechanism family.
+// Resolve 返回builder 用于 机制家族。
 func (r *Registry) Resolve(family MechanismFamily) (ReportBuilder, bool) {
 	if r == nil {
 		return nil, false

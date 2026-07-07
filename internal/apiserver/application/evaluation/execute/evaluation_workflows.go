@@ -84,7 +84,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 	return &loadedAssessment{assessment: a}, nil
 }
 
-// LoadForInterpretation loads an assessment ready for report generation.
+// LoadForInterpretation 加载assessment ready 用于 报告生成。
 func (l assessmentLoader) LoadForInterpretation(ctx context.Context, assessmentID uint64) (*loadedAssessment, error) {
 	log := logger.L(ctx)
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))

@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// PublishedSnapshotFromInput builds a routing snapshot from the resolved evaluation input.
+// PublishedSnapshotFromInput 构建路由 快照 从 resolved 评估输入。
 func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcatalog.PublishedModelSnapshot, bool) {
 	if input == nil {
 		return modelcatalog.PublishedModelSnapshot{}, false

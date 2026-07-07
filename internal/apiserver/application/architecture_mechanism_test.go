@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// transitionalAssessmentCodePackages lists algorithm-specific extension packages allowed
-// during migration to mechanism-oriented organization. Do not add new entries.
+// transitionalAssessment编码包 lists 算法-特定 extension 包 allowed。
+// 在 迁移 到 面向机制 organization. Do 不 add new entries。
 var transitionalAssessmentCodePackages = map[string]string{}
 
-// transitionalModelFamilyPackages lists model-family packages allowed during migration.
-// Evaluation and interpretation domain cores must not add new entries here.
+// transitional模型家族包 lists model-家族 包 allowed 在 迁移。
+// Evaluation 和 interpretation 领域 cores 不得 add new entries here。
 var transitionalModelFamilyPackages = map[string]string{
 	"internal/apiserver/application/evaluation/personality": "transitional: factor_classification re-export only (empty)",
 }

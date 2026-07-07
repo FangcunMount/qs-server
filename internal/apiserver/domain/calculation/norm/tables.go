@@ -5,13 +5,13 @@ import (
 	"math"
 )
 
-// Subject carries demographics used for norm-band selection.
+// Subject 携带人口学信息 用于 常模区间选择。
 type Subject struct {
 	AgeMonths int
 	Gender    string
 }
 
-// NormTables holds norm configuration for factor_norm lookups.
+// NormTables 保存常模 配置 用于 因子_常模 lookups。
 type NormTables struct {
 	FormVariant      string
 	NormTableVersion string
@@ -58,7 +58,7 @@ type NormScore struct {
 	Percentile float64
 }
 
-// LookupNormScore resolves raw score to T-score and percentile using configured tables.
+// LookupNormScore 解析原始分 到 T 分 和 百分位 using 配置化 tables。
 func LookupNormScore(tables *NormTables, factorCode string, rawScore float64, subject Subject) (NormScore, bool) {
 	if tables == nil {
 		return NormScore{}, false
@@ -76,7 +76,7 @@ func LookupNormScore(tables *NormTables, factorCode string, rawScore float64, su
 	return NormScore{}, false
 }
 
-// InterpretTScore maps a T-score to clinical interpretation for a factor.
+// InterpretTScore 映射T 分 到 临床解释 用于 因子。
 func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (level, conclusion, suggestion string, ok bool) {
 	if tables == nil {
 		return "", "", "", false
@@ -145,7 +145,7 @@ func bandMatchesSubject(band NormBand, subject Subject) bool {
 }
 
 func percentileFromTScore(tScore float64) float64 {
-	// Approximate normal CDF for T ~ N(50,10).
+	// Approximate 正态 CDF 用于 T ~ N(50,10)。
 	z := (tScore - 50) / 10
 	return roundScore(normalCDF(z) * 100)
 }
@@ -158,7 +158,7 @@ func roundScore(v float64) float64 {
 	return math.Round(v*10) / 10
 }
 
-// ValidateTables returns an error when norm tables are structurally invalid.
+// ValidateTables 返回error when 常模表 是 结构无效。
 func ValidateTables(tables *NormTables) error {
 	if tables == nil {
 		return fmt.Errorf("norm tables are nil")

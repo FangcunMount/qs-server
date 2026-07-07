@@ -7,7 +7,7 @@ import (
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 )
 
-// Service generates and persists interpretation reports from scoring outcomes.
+// Service 生成并持久化解释报告s 从 计分结果。
 type Service interface {
 	GenerateAndPersist(ctx context.Context, outcome evaloutcome.Outcome) error
 }
@@ -16,7 +16,7 @@ type service struct {
 	writer interpretationreporting.Writer
 }
 
-// NewService creates an interpretation orchestrator backed by a report writer.
+// NewService 创建interpretation orchestrator 基于 report writer。
 func NewService(writer interpretationreporting.Writer) Service {
 	return &service{writer: writer}
 }

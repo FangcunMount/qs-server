@@ -4,14 +4,14 @@ import (
 	"fmt"
 )
 
-// FactorGraph is a directed acyclic hierarchy of personality factors.
+// FactorGraph 是directed acyclic 层级 of personality 因子。
 type FactorGraph struct {
 	Factors   map[FactorID]PersonalityFactor
 	LeafSpecs map[FactorID]LeafScoringSpec
 	Roots     []FactorID
 }
 
-// Validate checks graph invariants: known children, leaf specs, and acyclicity.
+// Validate 检查graph invariants: known 子节点, 叶子 specs, 和 acyclicity。
 func (g FactorGraph) Validate() error {
 	if len(g.Factors) == 0 {
 		return fmt.Errorf("factor graph is empty")
@@ -112,7 +112,7 @@ func detectCycle(g FactorGraph) error {
 	return nil
 }
 
-// TopologicalOrder returns children-before-parents evaluation order.
+// TopologicalOrder 返回子节点-在之前-父节点s 评估 order。
 func (g FactorGraph) TopologicalOrder() ([]FactorID, error) {
 	if err := g.Validate(); err != nil {
 		return nil, err

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// MBTIPersonalityTypeTemplate returns the presentation template for MBTI reports.
+// MBTIPersonalityTypeTemplate 返回呈现 template 用于 MBTI reports。
 func MBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	maxScore := 40.0
 	return PersonalityTypeReportTemplate{
@@ -19,7 +19,7 @@ func MBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	}
 }
 
-// SBTIPersonalityTypeTemplate returns the presentation template for SBTI reports.
+// SBTIPersonalityTypeTemplate 返回呈现 template 用于 SBTI reports。
 func SBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	maxScore := 6.0
 	return PersonalityTypeReportTemplate{
@@ -43,7 +43,7 @@ func SBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	}
 }
 
-// BigFiveTraitProfileTemplate returns the presentation template for Big Five reports.
+// BigFiveTraitProfileTemplate 返回呈现 template 用于 Big Five reports。
 func BigFiveTraitProfileTemplate() TraitProfileReportTemplate {
 	return TraitProfileReportTemplate{
 		Kind:             "bigfive",

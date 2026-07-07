@@ -9,7 +9,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PersonalityModelQueryService exposes C-side personality model catalog reads.
+// PersonalityModelQueryService 暴露C 端 人格模型 目录 reads。
 type PersonalityModelQueryService interface {
 	GetPublishedByCode(ctx context.Context, code string) (*shared.PersonalityModelResult, error)
 	ListPublished(ctx context.Context, dto shared.ListPersonalityModelsDTO) (*shared.PersonalityModelSummaryListResult, error)

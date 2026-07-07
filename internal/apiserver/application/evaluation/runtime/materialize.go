@@ -34,7 +34,7 @@ func init() {
 	}
 }
 
-// WiringDeps groups shared runtime materialization dependencies.
+// WiringDeps 分组共享 运行时 物化依赖。
 type WiringDeps struct {
 	ScaleReportBuilder report.ReportBuilder
 	ScaleScorer        portruleengine.ScaleFactorScorer
@@ -47,7 +47,7 @@ type wiringSession struct {
 	typologyReportBuilder *factorclassification.ReportBuilder
 }
 
-// MaterializeFamilyEvaluators builds one evaluator per algorithm family from materialization specs.
+// MaterializeFamilyEvaluators 构建一个evaluator per 算法家族 从 物化 specs。
 func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFamily]execute.Evaluator, error) {
 	var sharedConfigured *factorclassification.Executor
 	session := wiringSession{typologyExecutor: &sharedConfigured}
@@ -63,7 +63,7 @@ func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFam
 	return out, nil
 }
 
-// MaterializeLegacyEvaluators builds typology legacy alias evaluators for EvaluatorKey fallback.
+// MaterializeLegacyEvaluators 构建类型学 旧别名 evaluators 用于 Evaluator键 fallback。
 func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
 	var sharedConfigured *factorclassification.Executor
 	session := wiringSession{typologyExecutor: &sharedConfigured}
@@ -99,7 +99,7 @@ func modelKindForExecutionPath(path modelcatalog.ExecutionPath) evaldomain.Model
 	}
 }
 
-// MaterializeEvaluators builds evaluators from descriptors.
+// MaterializeEvaluators 构建evaluators 从 描述符。
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
 	var sharedConfigured *factorclassification.Executor
 	session := wiringSession{typologyExecutor: &sharedConfigured}
@@ -114,7 +114,7 @@ func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) 
 	return evaluators, nil
 }
 
-// MaterializeScoreProjectors builds score projectors for descriptor-backed scale-like runtimes.
+// MaterializeScoreProjectors 构建score 投影器 用于 描述符-backed scale-like 运行时s。
 func MaterializeScoreProjectors(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ScoreProjector, error) {
 	if deps.ScoreRepo == nil {
 		return nil, fmt.Errorf("score repository is required")
@@ -147,7 +147,7 @@ func materializeScoreProjector(desc evaldomain.ModelDescriptor, deps WiringDeps)
 	return factory(deps)
 }
 
-// MaterializeReportBuilders builds report builders from descriptors.
+// MaterializeReportBuilders 构建报告构建器 从 描述符。
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
 	var sharedConfigured factorclassification.ReportBuilder
 	session := wiringSession{typologyReportBuilder: &sharedConfigured}

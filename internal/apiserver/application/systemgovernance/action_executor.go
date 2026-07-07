@@ -11,18 +11,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// ActionExecutor runs enabled governance actions.
+// ActionExecutor 运行enabled governance actions。
 type ActionExecutor struct {
 	registry   *ActionRegistry
 	governance statisticsApp.GovernanceFacade
 }
 
-// NewActionExecutor creates an action executor.
+// NewActionExecutor 创建action executor。
 func NewActionExecutor(registry *ActionRegistry, governance statisticsApp.GovernanceFacade) *ActionExecutor {
 	return &ActionExecutor{registry: registry, governance: governance}
 }
 
-// Run executes one enabled action.
+// Run 执行一个enabled action。
 func (e *ActionExecutor) Run(
 	ctx context.Context,
 	orgID int64,

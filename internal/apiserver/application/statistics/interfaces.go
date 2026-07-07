@@ -54,7 +54,7 @@ type PeriodicStatsService interface {
 	GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*statistics.TesteePeriodicStatisticsResponse, error)
 }
 
-// GovernanceFacade 统计治理入口 facade。
+// GovernanceFacade 统计治理入口 门面。
 type GovernanceFacade interface {
 	TriggerStatisticsWarmup(ctx context.Context, orgID int64, action string)
 	HandleRepairComplete(ctx context.Context, protectedOrgID int64, req RepairCompleteRequest) error

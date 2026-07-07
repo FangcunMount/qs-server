@@ -18,7 +18,7 @@ type CreateAssessmentDTO struct {
 	ScaleVersion         *string // 量表解释模型版本（可选）
 	ModelKind            *string // 通用解释模型类型（可选）
 	ModelSubKind         *string // v2 子形态（typology 等）
-	ModelAlgorithm       *string // v2 算法（mbti/sbti/scale_default 等）
+	ModelAlgorithm       *string // v2 算法（mbti/sbti/scale_默认 等）
 	ModelCode            *string // 通用解释模型编码（可选）
 	ModelVersion         *string // 通用解释模型版本（可选）
 	ModelTitle           *string // 通用解释模型标题（可选）

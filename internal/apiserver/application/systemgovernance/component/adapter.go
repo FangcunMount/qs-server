@@ -16,27 +16,27 @@ import (
 
 const defaultComponentTimeout = 3 * time.Second
 
-// ResilienceResult holds one component resilience payload with fetch metadata.
+// ResilienceResult 保存一个组件 resilience 载荷 使用 fetch 元数据。
 type ResilienceResult struct {
 	Available bool                             `json:"available"`
 	Reason    string                           `json:"reason,omitempty"`
 	Snapshot  *resilienceplane.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
-// CacheResult holds one component cache/redis payload with fetch metadata.
+// CacheResult 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。
 type CacheResult struct {
 	Available bool                           `json:"available"`
 	Reason    string                         `json:"reason,omitempty"`
 	Snapshot  *observability.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
-// Adapter fetches remote component governance snapshots.
+// Adapter fetches remote 组件 governance 快照。
 type Adapter struct {
 	components map[string]*options.GovernanceComponentOptions
 	http       *http.Client
 }
 
-// NewAdapter builds a component governance adapter.
+// NewAdapter 构建组件 governance adapter。
 func NewAdapter(opts map[string]*options.GovernanceComponentOptions) *Adapter {
 	if len(opts) == 0 {
 		return &Adapter{components: map[string]*options.GovernanceComponentOptions{}}
@@ -55,7 +55,7 @@ func NewAdapter(opts map[string]*options.GovernanceComponentOptions) *Adapter {
 	}
 }
 
-// FetchResilience loads resilience snapshots for configured components.
+// FetchResilience 加载resilience 快照 用于 配置化 组件。
 func (a *Adapter) FetchResilience(ctx context.Context) map[string]ResilienceResult {
 	result := make(map[string]ResilienceResult)
 	if a == nil {
@@ -85,7 +85,7 @@ func (a *Adapter) FetchResilience(ctx context.Context) map[string]ResilienceResu
 	return result
 }
 
-// FetchCache loads cache/redis snapshots when configured.
+// FetchCache 加载缓存/redis 快照 when 配置化。
 func (a *Adapter) FetchCache(ctx context.Context) map[string]CacheResult {
 	result := make(map[string]CacheResult)
 	if a == nil {

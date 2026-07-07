@@ -1,6 +1,6 @@
 package typology
 
-// MBTILegacyModel is the read-only ruleset.mbti.v1 payload shape used during migration.
+// MBTILegacyModel 是只读 ruleset.mbti.v1 载荷 结构 用于 迁移。
 type MBTILegacyModel struct {
 	Code                 string                         `json:"code"`
 	Version              string                         `json:"version"`

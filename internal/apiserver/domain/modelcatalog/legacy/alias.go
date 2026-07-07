@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-// RuleSetKind is kept as a compatibility name while callers migrate to Kind.
+// RuleSetKind 是kept 作为 兼容性 name while callers migrate 到 类型。
 type RuleSetKind = identity.Kind
 
 const (
@@ -14,7 +14,7 @@ const (
 	RuleSetKindSBTI  = RuleSetKind(KindSBTIMigration)
 )
 
-// Definition is kept as a compatibility name while callers migrate to ModelDefinition.
+// Definition 是kept 作为 兼容性 name while callers migrate 到 ModelDefinition。
 type Definition struct {
 	Kind    identity.Kind
 	Code    string
@@ -23,10 +23,10 @@ type Definition struct {
 	Status  string
 }
 
-// RuleSetDefinition is kept as a compatibility name while callers migrate to Definition.
+// RuleSetDefinition 是kept 作为 兼容性 name while callers migrate 到 Definition。
 type RuleSetDefinition = Definition
 
-// Snapshot is the v1 envelope kept for migration readers.
+// Snapshot 是v1 envelope kept 用于 迁移 读取器。
 type Snapshot struct {
 	SchemaVersion string
 	PayloadFormat string
@@ -37,7 +37,7 @@ type Snapshot struct {
 	Payload       []byte
 }
 
-// RuleSetSnapshot is kept as a compatibility name while callers migrate to Snapshot.
+// RuleSetSnapshot 是kept 作为 兼容性 name while callers migrate 到 快照。
 type RuleSetSnapshot = Snapshot
 
 const RuleSetSchemaVersionV1 = catalog.SchemaVersionV1

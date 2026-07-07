@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-// Client queries Prometheus HTTP API.
+// Client 查询Prometheus HTTP API。
 type Client struct {
 	baseURL string
 	http    *http.Client
 }
 
-// NewClient creates a Prometheus query client.
+// NewClient 创建Prometheus 查询 client。
 func NewClient(baseURL string, timeout time.Duration) *Client {
 	if timeout <= 0 {
 		timeout = 3 * time.Second
@@ -44,7 +44,7 @@ type queryResponse struct {
 	ErrorType string `json:"errorType"`
 }
 
-// QueryInstant executes an instant PromQL query at evaluation time.
+// QueryInstant 执行instant PromQL 查询 at 评估 time。
 func (c *Client) QueryInstant(ctx context.Context, query string, evalAt time.Time) (float64, bool, error) {
 	if c == nil || c.baseURL == "" {
 		return 0, false, fmt.Errorf("prometheus client unavailable")

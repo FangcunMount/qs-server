@@ -5,13 +5,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// Module describes a typology algorithm alias exposed to evaluation wiring.
+// Module 描述类型学算法 别名 exposed 到 评估 装配。
 type Module struct {
 	Algorithm     modelcatalog.Algorithm
 	CategoryLabel string
 }
 
-// Descriptor returns the evaluation registry entry for this module.
+// Descriptor 返回评估 注册表条目 用于 这个module。
 func (m Module) Descriptor() evaldomain.ModelDescriptor {
 	return evaldomain.ModelDescriptor{
 		Kind:      evaldomain.ModelKindTypology,
@@ -19,7 +19,7 @@ func (m Module) Descriptor() evaldomain.ModelDescriptor {
 	}
 }
 
-// ModuleDescriptors projects registered typology modules into evaluation descriptors.
+// ModuleDescriptors 投影已注册 类型学 modules 为 评估 描述符。
 func ModuleDescriptors(modules []Module) []evaldomain.ModelDescriptor {
 	out := make([]evaldomain.ModelDescriptor, 0, len(modules))
 	for _, module := range modules {
@@ -31,7 +31,7 @@ func ModuleDescriptors(modules []Module) []evaldomain.ModelDescriptor {
 	return out
 }
 
-// ConfiguredTypologyDescriptor returns the generic configured typology routing descriptor.
+// ConfiguredTypologyDescriptor 返回通用 配置化 类型学 路由 描述符。
 func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
 	return evaldomain.ModelDescriptor{
 		Kind:      evaldomain.ModelKindTypology,
@@ -39,7 +39,7 @@ func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
 	}
 }
 
-// DefaultTypologyDescriptors returns the single configured typology routing descriptor.
+// 默认TypologyDescriptors 返回单一 配置化 类型学 路由 描述符。
 func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 	return []evaldomain.ModelDescriptor{ConfiguredTypologyDescriptor()}
 }

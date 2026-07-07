@@ -30,26 +30,26 @@ func NewLifecycleService(
 	return lifecycle.NewService(repo, questionnaireCatalog, eventPublisher, listCache, serviceOpts...)
 }
 
-// WithQuestionnairePublisher injects the questionnaire publisher used during scale publication.
+// WithQuestionnairePublisher 注入问卷 发布器 用于 scale 发布。
 func WithQuestionnairePublisher(publisher lifecycle.QuestionnairePublisher) lifecycle.ServiceOption {
 	return lifecycle.WithQuestionnairePublisher(publisher)
 }
 
-// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+// WithCacheSignalNotifier 注入best-effort 缓存 in校验 notifier。
 func WithCacheSignalNotifier(notifier lifecycle.CacheSignalNotifier) lifecycle.ServiceOption {
 	return lifecycle.WithCacheSignalNotifier(notifier)
 }
 
-// WithRuleSetPublisher injects the interpretation model sync port.
+// WithRuleSetPublisher 注入interpretation model 同步端口。
 func WithRuleSetPublisher(publisher lifecycle.RuleSetPublisher) lifecycle.ServiceOption {
 	return lifecycle.WithRuleSetPublisher(publisher)
 }
 
-// QuestionnairePublisherFunc adapts a function to the scale lifecycle's
-// questionnaire publication port.
+// QuestionnairePublisherFunc 适配函数 到 scale lifecycle's。
+// 问卷 发布 port。
 type QuestionnairePublisherFunc func(ctx context.Context, code string) (string, error)
 
-// PublishQuestionnaire implements lifecycle.QuestionnairePublisher.
+// PublishQuestionnaire implements lifecycle.问卷发布器。
 func (f QuestionnairePublisherFunc) PublishQuestionnaire(ctx context.Context, code string) (string, error) {
 	return f(ctx, code)
 }

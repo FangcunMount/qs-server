@@ -29,7 +29,7 @@ func hasAnyResourceAction(s *Snapshot, resource string, actions []string) bool {
 	return false
 }
 
-// SnapshotViewFromSnapshot projects a request authz snapshot into the Security Control Plane model.
+// SnapshotViewFromSnapshot 投影请求 authz 快照 为 安全控制平面模型。
 func SnapshotViewFromSnapshot(s *Snapshot) securityplane.AuthzSnapshotView {
 	if s == nil {
 		return securityplane.AuthzSnapshotView{}
@@ -50,7 +50,7 @@ func SnapshotViewFromSnapshot(s *Snapshot) securityplane.AuthzSnapshotView {
 	}
 }
 
-// DecideCapability explains whether an IAM snapshot satisfies one capability.
+// DecideCapability explains 是否 IAM 快照 satisfies 一个能力。
 func DecideCapability(s *Snapshot, c Capability) securityplane.CapabilityDecision {
 	if s == nil {
 		return securityplane.CapabilityDecision{
@@ -84,7 +84,7 @@ func DecideCapability(s *Snapshot, c Capability) securityplane.CapabilityDecisio
 	}
 }
 
-// DecideAnyCapability explains whether an IAM snapshot satisfies at least one capability.
+// DecideAnyCapability explains 是否 IAM 快照 satisfies at least 一个能力。
 func DecideAnyCapability(s *Snapshot, capabilities ...Capability) securityplane.CapabilityDecision {
 	if s == nil {
 		return securityplane.CapabilityDecision{

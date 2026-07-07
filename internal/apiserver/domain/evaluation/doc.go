@@ -1,7 +1,7 @@
-// Package evaluation owns the assessment lifecycle and mechanism-oriented execution routing.
+// Package evaluation 负责测评生命周期 和 面向机制 执行路由。
 //
-// Shared answer/questionnaire snapshots live in evaluation/input.
-// Runtime descriptor routing lives in evaluation/pipeline.
-// Configured typology adapters live in evaluation/factor_classification/adapter/configured.
-// Assessment lifecycle and persistence belong to evaluation/assessment.
+// Shared answer/问卷 快照 位于 评估/input。
+// Runtime 描述符 路由 位于 评估/pipeline。
+// Configured 类型学 adapters 位于 评估/因子_分类/adapter/配置化。
+// Assessment lifecycle 和 持久化 属于 评估/assessment。
 package evaluation

@@ -1,6 +1,6 @@
 package trait
 
-// DecisionKind selects how a profile vector becomes an outcome.
+// DecisionKind 选择如何画像 vector 转成 结果。
 type DecisionKind string
 
 const (
@@ -9,7 +9,7 @@ const (
 	DecisionKindTraitProfile    DecisionKind = "trait_profile"
 )
 
-// PoleSpec resolves a dimension raw score into a pole letter.
+// PoleSpec 解析维度 原始分 为 pole letter。
 type PoleSpec struct {
 	FactorID     FactorID
 	LeftPole     string
@@ -18,14 +18,14 @@ type PoleSpec struct {
 	MaxDeviation float64
 }
 
-// PatternCandidate is one selectable typology outcome.
+// PatternCandidate 是一个selectable 类型学 结果。
 type PatternCandidate struct {
 	Code    string
 	Label   string
 	Pattern map[FactorID]string
 }
 
-// DecisionSpec describes how to derive an outcome from a profile vector.
+// DecisionSpec 描述如何 derive 结果 从 画像 vector。
 type DecisionSpec struct {
 	Kind              DecisionKind
 	Poles             []PoleSpec
@@ -36,13 +36,13 @@ type DecisionSpec struct {
 	FallbackCode      string
 }
 
-// LevelRule maps raw factor scores to discrete levels for pattern matching.
+// LevelRule 映射原始 因子 分数 到 离散等级 用于 模式匹配。
 type LevelRule struct {
 	LowMax  float64
 	HighMin float64
 }
 
-// OutcomeCandidate is the selected personality outcome before mapping to AssessmentOutcome.
+// OutcomeCandidate 是选中 personality 结果 在之前 mapping 到 AssessmentOutcome。
 type OutcomeCandidate struct {
 	Code        string
 	Label       string

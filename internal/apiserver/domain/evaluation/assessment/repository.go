@@ -2,7 +2,7 @@ package assessment
 
 import "context"
 
-// ==================== Assessment Repository ====================
+// === Assessment 仓储 ===
 
 // Repository 测评仓储接口（出站端口）
 type Repository interface {
@@ -23,7 +23,7 @@ type Repository interface {
 	FindByAnswerSheetID(ctx context.Context, answerSheetID AnswerSheetRef) (*Assessment, error)
 }
 
-// ==================== AssessmentScore Repository ====================
+// === AssessmentScore 仓储 ===
 
 // ScoreRepository 测评得分仓储接口
 type ScoreRepository interface {

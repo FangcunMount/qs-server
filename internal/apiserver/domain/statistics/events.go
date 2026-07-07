@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// BehaviorAggregateType is re-exported from the neutral footprint integration
-// event kernel; footprint events are shared contracts, not statistics-private.
+// BehaviorAggregateType 是re-exported 从 中性 footprint integration。
+// event kernel; footprint events 是 共享 contracts, 不 statistics-private。
 const BehaviorAggregateType = footprintevent.AggregateType
 
 const (
@@ -42,9 +42,9 @@ type FootprintAnswerSheetSubmittedEvent = event.Event[FootprintAnswerSheetSubmit
 type FootprintAssessmentCreatedEvent = event.Event[FootprintAssessmentCreatedData]
 type FootprintReportGeneratedEvent = event.Event[FootprintReportGeneratedData]
 
-// The constructors below delegate to the neutral footprintevent kernel so that
-// existing statistics consumers keep a stable API while the schema is owned by
-// the shared kernel.
+// The constructors below delegate 到 中性 footprintevent kernel so that。
+// existing statistics 消费rs keep 稳定 API while schema 是 owned 按。
+// 共享 kernel。
 
 func NewFootprintEntryOpenedEvent(orgID int64, clinicianID, entryID uint64, occurredAt time.Time) FootprintEntryOpenedEvent {
 	return footprintevent.NewFootprintEntryOpenedEvent(orgID, clinicianID, entryID, occurredAt)

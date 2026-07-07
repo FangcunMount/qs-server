@@ -9,7 +9,7 @@ import (
 	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/task_performance"
 )
 
-// Snapshot is a published cognitive execution payload (default.v1 or spm.v1).
+// Snapshot 是published cognitive 执行载荷 (默认.v1 或 spm.v1)。
 type Snapshot struct {
 	Code                 string
 	Version              string
@@ -21,7 +21,7 @@ type Snapshot struct {
 	SPM                  *SPMProfile
 }
 
-// SPMProfile carries SPM-specific configuration beyond score_range scoring.
+// SPMProfile 携带SPM-特定 配置 beyond score_range 计分。
 type SPMProfile struct {
 	TimeLimitSeconds int
 	ItemSetCodes     []string
@@ -44,12 +44,12 @@ type spmExtension struct {
 	NormTableVersion string   `json:"norm_table_version,omitempty"`
 }
 
-// ParseDefinitionPayload decodes a cognitive payload body into a runtime snapshot.
+// ParseDefinitionPayload de编码 cognitive 载荷 body 为 运行时 快照。
 func ParseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// ParsePublishedPayload decodes a published snapshot using its payload format label.
+// ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
 func ParsePublishedPayload(payloadFormat, modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	switch payloadFormat {
 	case "", "assessmentmodel.cognitive.default.v1", "assessmentmodel.cognitive.spm.v1":
@@ -92,7 +92,7 @@ func (s *Snapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
 }
 
-// ToScaleSnapshot projects cognitive factors into the scale execution shape.
+// ToScaleSnapshot 投影cognitive 因子 为 scale execution 结构。
 func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil

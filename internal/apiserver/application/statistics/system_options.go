@@ -18,7 +18,7 @@ type SystemStatisticsOptions struct {
 	LoadTimeout time.Duration
 }
 
-// ToLoadGuardPolicy 映射为 loadguard 策略配置。
+// ToLoadGuardPolicy 映射为 load守卫 策略配置。
 func (o SystemStatisticsOptions) ToLoadGuardPolicy() loadguard.Policy {
 	return loadguard.Policy{
 		Singleflight: o.ServiceSingleflight,

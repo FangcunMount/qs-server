@@ -178,7 +178,7 @@ func (ft FactorType) IsValid() bool {
 	return ft == FactorTypePrimary || ft == FactorTypeMultilevel
 }
 
-// ParseFactorType maps persisted/API factor type aliases to the current domain vocabulary.
+// ParseFactorType 映射persisted/API 因子 类型别名 到 当前 领域 vocabulary。
 func ParseFactorType(raw string) FactorType {
 	switch strings.TrimSpace(raw) {
 	case "", FactorTypePrimary.String(), "first_grade":
@@ -353,7 +353,7 @@ func (p *ScoringParams) Clone() *ScoringParams {
 type Category string
 
 const (
-	// CategoryADHD ADHD
+	// CategoryADHD ADHD 主类。
 	CategoryADHD Category = "adhd"
 	// CategoryTicDisorder 抽动障碍
 	CategoryTicDisorder Category = "td"

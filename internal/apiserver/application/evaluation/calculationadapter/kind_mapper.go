@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// CalculationKindFromAssessment maps assessment dimension kinds to calculation kinds.
+// CalculationKindFromAssessment 映射assessment 维度 类型 到 计算 类型。
 func CalculationKindFromAssessment(kind assessment.DimensionKind) calculation.DimensionKind {
 	switch kind {
 	case assessment.DimensionKindFactor:
@@ -23,7 +23,7 @@ func CalculationKindFromAssessment(kind assessment.DimensionKind) calculation.Di
 	}
 }
 
-// AssessmentKindFromCalculation maps calculation dimension kinds to assessment kinds.
+// AssessmentKindFromCalculation 映射计算 维度 类型 到 assessment 类型。
 func AssessmentKindFromCalculation(kind calculation.DimensionKind) assessment.DimensionKind {
 	switch kind {
 	case calculation.DimensionKindFactor:

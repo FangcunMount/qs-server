@@ -1,6 +1,6 @@
 package catalog
 
-// ModelStatus is the lifecycle status of a draft assessment model.
+// ModelStatus 是lifecycle 状态 of draft assessment model。
 type ModelStatus string
 
 const (

@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ExecutionPathForMechanismFamily maps an algorithm family to its materialization path.
+// ExecutionPathForMechanismFamily 映射算法家族 到 its 物化路径。
 func ExecutionPathForMechanismFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, bool) {
 	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
@@ -22,7 +22,7 @@ func ExecutionPathForMechanismFamily(family modelcatalog.AlgorithmFamily) (model
 	}
 }
 
-// ExecutionPathForReportBuilder resolves the execution path for a report builder.
+// ExecutionPathForReportBuilder 解析执行路径 用于 报告构建器。
 func ExecutionPathForReportBuilder(builder ReportBuilder) (modelcatalog.ExecutionPath, error) {
 	if builder == nil {
 		return "", fmt.Errorf("interpretation report builder is nil")
@@ -35,7 +35,7 @@ func ExecutionPathForReportBuilder(builder ReportBuilder) (modelcatalog.Executio
 	return "", fmt.Errorf("unsupported report builder execution path")
 }
 
-// ExecutionPathForScoreProjector resolves the execution path for a score projector.
+// ExecutionPathForScoreProjector 解析执行路径 用于 score 投影器。
 func ExecutionPathForScoreProjector(projector ScoreProjector) (modelcatalog.ExecutionPath, error) {
 	if projector == nil {
 		return "", fmt.Errorf("interpretation score projector is nil")

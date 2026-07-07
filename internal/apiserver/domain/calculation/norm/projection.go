@@ -4,14 +4,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-// Projection applies norm/T-score tables on top of raw dimension scores.
+// Projection 应用常模/T 分 tables 基于 原始 维度分。
 type Projection struct {
 	Tables               *NormTables
 	Subject              Subject
 	PrimaryDimensionCode string
 }
 
-// Apply enriches a calculation result with norm-derived scores and levels.
+// Apply 补充计算结果 使用 常模推导的分数和等级。
 func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 	if result == nil {
 		return result
@@ -61,7 +61,7 @@ func primaryDimension(dimensions []calculation.DimensionResult, configuredCode s
 			}
 		}
 	}
-	// Deprecated: legacy fallback when primary_dimension_code is not configured on publish.
+	// Deprecated: 发布时未配置 primary_dimension_code 时的旧版兜底。
 	for i := range dimensions {
 		if dimensions[i].Code == "total" || dimensions[i].Code == "gec" {
 			return &dimensions[i]

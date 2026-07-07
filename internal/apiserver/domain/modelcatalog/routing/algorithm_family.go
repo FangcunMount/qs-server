@@ -4,16 +4,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-// AlgorithmFamily groups execution semantics for runtime, payload, and reporting.
-// It is always derived from identity or DecisionKind and is never persisted.
+// AlgorithmFamily 分组执行语义 用于 运行时, 载荷, 和 reporting。
+// 它是always 派生 从 身份 或 判定类型 和 是 never persisted。
 //
-// Package name vs enum (dual layer):
+// 包名与枚举值（双层）：
 //
-//	Go package          AlgorithmFamily
-//	scoring             factor_scoring
-//	typology            factor_classification
-//	norming             factor_norm
-//	task_performance    task_performance
+// Go 包 算法家族。
+// 计分 因子_计分。
+// 类型学 因子_分类。
+// 常模ing 因子_常模。
+// task_performance task_performance。
 //
 // See docs/02-业务模块/mechanism-oriented-migration.md §包名与 AlgorithmFamily 对照表.
 type AlgorithmFamily string
@@ -39,7 +39,7 @@ func (f AlgorithmFamily) IsValid() bool {
 	}
 }
 
-// AlgorithmFamilyFromDecisionKind maps a published decision strategy to its execution family.
+// AlgorithmFamilyFromDecisionKind 映射published 判定策略 到 its 执行家族。
 func AlgorithmFamilyFromDecisionKind(decision identity.DecisionKind) (AlgorithmFamily, bool) {
 	switch decision {
 	case identity.DecisionKindScoreRange, identity.DecisionKind("score_range_interpretation"):
@@ -55,7 +55,7 @@ func AlgorithmFamilyFromDecisionKind(decision identity.DecisionKind) (AlgorithmF
 	}
 }
 
-// DecisionKindForIdentity mirrors publish-builder decision selection for draft identity.
+// DecisionKindForIdentity mirrors publish-builder decision 选择 用于 draft 身份。
 func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (identity.DecisionKind, bool) {
 	switch kind {
 	case identity.KindScale:
@@ -83,7 +83,7 @@ func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algor
 	}
 }
 
-// AlgorithmFamilyFromIdentity derives the execution family from draft model identity.
+// AlgorithmFamilyFromIdentity 推导执行家族 从 draft 模型身份。
 func AlgorithmFamilyFromIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (AlgorithmFamily, bool) {
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)
 	if !ok {
@@ -92,7 +92,7 @@ func AlgorithmFamilyFromIdentity(kind identity.Kind, subKind identity.SubKind, a
 	return AlgorithmFamilyFromDecisionKind(decision)
 }
 
-// AllAlgorithmFamilies returns supported algorithm family values for API options.
+// AllAlgorithmFamilies 返回supported 算法家族 values 用于 API 选项。
 func AllAlgorithmFamilies() []AlgorithmFamily {
 	return []AlgorithmFamily{
 		AlgorithmFamilyFactorScoring,

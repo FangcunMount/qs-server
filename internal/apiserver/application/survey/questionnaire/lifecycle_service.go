@@ -28,10 +28,10 @@ type lifecycleService struct {
 	cacheSignalNotifier CacheSignalNotifier
 }
 
-// LifecycleServiceOption configures questionnaire lifecycle service collaborators.
+// LifecycleServiceOption 配置问卷 lifecycle service 协作者。
 type LifecycleServiceOption func(*lifecycleService)
 
-// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+// WithCacheSignalNotifier 注入best-effort 缓存 in校验 notifier。
 func WithCacheSignalNotifier(notifier CacheSignalNotifier) LifecycleServiceOption {
 	return func(s *lifecycleService) {
 		s.cacheSignalNotifier = notifier

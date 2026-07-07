@@ -2,7 +2,7 @@ package runtime
 
 import evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 
-// DefaultRuntimeDescriptorRegistry registers mechanism descriptors aligned with materialize factories.
+// 默认RuntimeDescriptorRegistry registers 机制 描述符 aligned 使用 materialize 因子ies。
 func DefaultRuntimeDescriptorRegistry() (*evalpipeline.RuntimeDescriptorRegistry, error) {
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	descs, err := runtimeDescriptorsFromSpecs(defaultPathMaterializations())

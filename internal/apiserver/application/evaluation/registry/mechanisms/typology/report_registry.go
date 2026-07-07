@@ -11,17 +11,17 @@ import (
 
 type reportBuilderFunc func(evaloutcome.Outcome) (*domainReport.InterpretReport, error)
 
-// ReportAdapterRegistry resolves report builders by report adapter key.
+// ReportAdapterRegistry 解析报告构建器 按 报告适配器 键。
 type ReportAdapterRegistry struct {
 	adapters map[modeltypology.ReportAdapterKey]reportBuilderFunc
 }
 
-// DefaultReportAdapterRegistry returns the built-in typology report adapters.
+// 默认ReportAdapterRegistry 返回内置 类型学 报告适配器。
 func DefaultReportAdapterRegistry() ReportAdapterRegistry {
 	return NewReportAdapterRegistry()
 }
 
-// NewReportAdapterRegistry returns the built-in typology report adapters.
+// NewReportAdapterRegistry 返回内置 类型学 报告适配器。
 func NewReportAdapterRegistry() ReportAdapterRegistry {
 	return ReportAdapterRegistry{
 		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
@@ -31,12 +31,12 @@ func NewReportAdapterRegistry() ReportAdapterRegistry {
 	}
 }
 
-// Len reports how many report builders are registered.
+// Len 报告数量 报告构建器 是 已注册。
 func (r ReportAdapterRegistry) Len() int {
 	return len(r.adapters)
 }
 
-// Register returns a registry copy with an additional or overridden report builder.
+// Register 返回注册表副本 使用 额外 或 覆盖 报告构建器。
 func (r ReportAdapterRegistry) Register(key modeltypology.ReportAdapterKey, builder reportBuilderFunc) ReportAdapterRegistry {
 	next := ReportAdapterRegistry{adapters: make(map[modeltypology.ReportAdapterKey]reportBuilderFunc, len(r.adapters)+1)}
 	for k, v := range r.adapters {
@@ -70,7 +70,7 @@ func (r ReportAdapterRegistry) buildByAdapter(
 	return builder(outcome)
 }
 
-// buildTypologyReportAdapter returns a report builder for a fixed adapter key.
+// build类型学ReportAdapter returns 报告构建器 用于 固定适配器键。
 func buildTypologyReportAdapter(adapterKey modeltypology.ReportAdapterKey) reportBuilderFunc {
 	return func(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 		return buildTypologyReport(adapterKey, outcome)

@@ -6,31 +6,31 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// QuestionnaireSnapshot is the minimal questionnaire shape needed to validate a runtime spec.
+// QuestionnaireSnapshot 是minimal 问卷 结构 needed 到 有效ate 运行时规格。
 type QuestionnaireSnapshot struct {
 	Code      string
 	Version   string
 	Questions []QuestionSnapshot
 }
 
-// QuestionSnapshot is the minimal question shape needed to validate references.
+// QuestionSnapshot 是minimal question 结构 needed 到 有效ate references。
 type QuestionSnapshot struct {
 	Code        string
 	OptionCodes []string
 }
 
-// ValidateRuntimeSpecForPublish performs the strong validation gate used before publishing.
+// ValidateRuntimeSpecForPublish performs strong 校验 gate 用于之前 发布。
 func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []modelcatalog.DomainValidationIssue {
 	return ValidateRuntimeSpecForPublishWithContext(spec, questionnaire, RuntimeSpecValidationContext{})
 }
 
-// RuntimeSpecValidationContext carries payload-level metadata needed by publish validation.
+// RuntimeSpecValidationContext 携带载荷-等级 元数据 needed 按 publish 校验。
 type RuntimeSpecValidationContext struct {
 	Algorithm modelcatalog.Algorithm
 	Outcomes  []Outcome
 }
 
-// ValidateRuntimeSpecForPublishWithContext performs the strong validation gate used before publishing.
+// ValidateRuntimeSpecForPublishWithContext performs strong 校验 gate 用于之前 发布。
 func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []modelcatalog.DomainValidationIssue {
 	validator := runtimeSpecValidator{
 		questions: map[string]map[string]struct{}{},

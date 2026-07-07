@@ -17,7 +17,7 @@ func newRepositoryScaleCatalog(repo scaledefinition.Repository) ScaleCatalog {
 	return repositoryScaleCatalog{repo: repo}
 }
 
-// NewRepositoryScaleCatalog adapts the legacy scale repository to the narrow plan catalog.
+// NewRepositoryScaleCatalog 适配旧版 scale 仓储 到 nar行 plan 目录。
 func NewRepositoryScaleCatalog(repo scaledefinition.Repository) ScaleCatalog {
 	return newRepositoryScaleCatalog(repo)
 }

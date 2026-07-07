@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
-// ModelFamilyCapability captures domain execution and lifecycle guards for a model family.
+// ModelFamilyCapability 记录领域 execution 和 lifecycle 守卫 用于 模型家族。
 type ModelFamilyCapability struct {
 	Kind                      identity.Kind
 	Role                      CapabilityRole
@@ -78,14 +78,14 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 	},
 }
 
-// DefaultFamilyCapabilities returns domain-only model family capabilities.
+// 默认FamilyCapabilities 返回领域-仅 模型家族 能力。
 func DefaultFamilyCapabilities() []ModelFamilyCapability {
 	out := make([]ModelFamilyCapability, len(defaultFamilyCapabilities))
 	copy(out, defaultFamilyCapabilities)
 	return out
 }
 
-// FamilyCapabilityByKind resolves a model-family capability.
+// FamilyCapabilityByKind 解析model-家族 能力。
 func FamilyCapabilityByKind(kind identity.Kind) (ModelFamilyCapability, bool) {
 	for _, cap := range defaultFamilyCapabilities {
 		if cap.Kind == kind {

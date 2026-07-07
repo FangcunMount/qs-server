@@ -16,7 +16,7 @@ var (
 	// ErrPlanNotActive 计划不是活跃状态
 	ErrPlanNotActive = errors.New("plan is not active")
 
-	// ErrPlanNotPaused 计划不是暂停状态
+	// ErrPlanNotPa使用 计划不是暂停状态
 	ErrPlanNotPaused = errors.New("plan is not paused")
 
 	// ErrPlanTerminal 计划已处于终态

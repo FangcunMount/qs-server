@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// MechanismReportBuilderKey routes report builders by execution mechanism, not assessment code.
+// MechanismReportBuilderKey 路由报告构建器 按 执行机制, 不 测评编码。
 type MechanismReportBuilderKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
@@ -16,14 +16,14 @@ func (k MechanismReportBuilderKey) String() string {
 	return k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType)
 }
 
-// MechanismKeyedReportBuilder exposes mechanism routing metadata for a report builder.
-// MechanismKey is the primary routing key; Key remains for legacy characterization.
+// MechanismKeyedReportBuilder 暴露机制 路由 元数据 用于 报告构建器。
+// MechanismKey 是主 路由 键; 键 保持 用于 旧版 表征。
 type MechanismKeyedReportBuilder interface {
 	ReportBuilder
 	MechanismKey() MechanismReportBuilderKey
 }
 
-// MultiMechanismKeyedReportBuilder registers additional decision-granularity mechanism keys.
+// MultiMechanismKeyedReportBuilder registers 额外 decision-granularity 机制键。
 type MultiMechanismKeyedReportBuilder interface {
 	MechanismKeyedReportBuilder
 	MechanismKeys() []MechanismReportBuilderKey
@@ -77,25 +77,25 @@ func (TaskPerformanceScoreProjector) MechanismKey() MechanismReportBuilderKey {
 	}
 }
 
-// MechanismKeyedScoreProjector exposes mechanism routing metadata for a score projector.
+// MechanismKeyedScoreProjector 暴露机制 路由 元数据 用于 score 投影器。
 type MechanismKeyedScoreProjector interface {
 	ScoreProjector
 	MechanismKey() MechanismReportBuilderKey
 }
 
-// MultiMechanismKeyedScoreProjector registers additional decision-granularity mechanism keys.
+// MultiMechanismKeyedScoreProjector registers 额外 decision-granularity 机制键。
 type MultiMechanismKeyedScoreProjector interface {
 	MechanismKeyedScoreProjector
 	MechanismKeys() []MechanismReportBuilderKey
 }
 
-// MechanismKeyedEventAssembler exposes mechanism routing metadata for an event assembler.
+// MechanismKeyedEventAssembler 暴露机制 路由 元数据 用于 事件组装器。
 type MechanismKeyedEventAssembler interface {
 	EventAssembler
 	MechanismKey() MechanismReportBuilderKey
 }
 
-// MultiMechanismKeyedEventAssembler registers additional decision-granularity mechanism keys.
+// MultiMechanismKeyedEventAssembler registers 额外 decision-granularity 机制键。
 type MultiMechanismKeyedEventAssembler interface {
 	MechanismKeyedEventAssembler
 	MechanismKeys() []MechanismReportBuilderKey

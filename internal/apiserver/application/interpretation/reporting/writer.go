@@ -25,7 +25,7 @@ type writer struct {
 	reportStatus    *reportstatus.Reporter
 }
 
-// NewWriter creates the interpretation writer used after scoring completes.
+// NewWriter 创建解释写入器 用于之后 计分 completes。
 func NewWriter(
 	assessmentRepo assessment.Repository,
 	scoreProjectors ScoreProjectorRegistry,
@@ -45,7 +45,7 @@ func NewWriter(
 	)
 }
 
-// NewWriterWithEventAssemblers allows explicit event assembler registration in tests.
+// NewWriterWithEventAssemblers 允许显式 事件组装器 registration in tests。
 func NewWriterWithEventAssemblers(
 	assessmentRepo assessment.Repository,
 	scoreProjectors ScoreProjectorRegistry,
@@ -184,7 +184,7 @@ func ensureOutcomeCanApplyEvaluation(outcome evaloutcome.Outcome) error {
 	return nil
 }
 
-// ResolveOutcomeKey resolves the evaluator key from an outcome.
+// ResolveOutcomeKey 解析评估器键 从 结果。
 func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.ExecutionIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		return outcome.Execution.ModelRef.EvaluatorKey()

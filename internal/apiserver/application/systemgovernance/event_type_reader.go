@@ -7,7 +7,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
-// ReadEventTypes loads per-event-type backlog rows.
+// ReadEventTypes 加载按事件类型 积压 行。
 func ReadEventTypes(ctx context.Context, sources []EventTypeStatusSource, now time.Time) []EventTypeStatusGroup {
 	groups := make([]EventTypeStatusGroup, 0, len(sources))
 	for _, source := range sources {

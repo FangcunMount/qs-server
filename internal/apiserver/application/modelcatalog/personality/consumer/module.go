@@ -6,15 +6,15 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PersonalityModelQueryService is the C-side personality model catalog query port.
+// PersonalityModelQueryService 是C 端 人格模型 目录 查询端口。
 type PersonalityModelQueryService = query.PersonalityModelQueryService
 
-// NewQueryService creates the personality model query service.
+// NewQueryService 创建人格模型 查询服务。
 func NewQueryService(lister port.PublishedModelLister) PersonalityModelQueryService {
 	return query.NewQueryService(lister)
 }
 
-// NewQueryServiceWithAlgorithmLister creates the query service with dynamic category support.
+// NewQueryServiceWithAlgorithmLister 创建查询服务 使用 动态分类支持。
 func NewQueryServiceWithAlgorithmLister(
 	lister port.PublishedModelLister,
 	algorithmLister port.PublishedAlgorithmLister,

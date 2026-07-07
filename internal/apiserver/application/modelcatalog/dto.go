@@ -9,7 +9,7 @@ import (
 
 const (
 	KindPersonality = "personality"
-	// KindBehaviorAbility is the API product-channel kind for aggregating behavioral_rating and cognitive lists.
+	// KindBehaviorAbility 是API 产品通道类型 用于 aggregating behavioral_rating 和 cognitive lists。
 	KindBehaviorAbility                = domain.APIKindBehaviorAbility
 	KindBehavioralRating               = string(domain.KindBehavioralRating)
 	KindMedicalScale                   = "medical_scale"
@@ -39,7 +39,7 @@ type ListModelsDTO struct {
 	Algorithm string
 	Page      int
 	PageSize  int
-	// ModelFamily filters behavior_ability channel listing to one execution family.
+	// ModelFamily filters behavior_ability channel listing 到 一个执行家族。
 	ModelFamily string
 }
 
@@ -142,9 +142,9 @@ type ValidationIssue struct {
 
 type ValidationResult struct {
 	Passed bool              `json:"passed"`
-	Valid  bool              `json:"valid"` // deprecated: mirror Passed for backward compatibility
+	Valid  bool              `json:"valid"` // Deprecated: mirror Passed 用于 向后兼容。
 	Issues []ValidationIssue `json:"issues"`
-	Errors []string          `json:"errors"` // deprecated: derived from Issues for backward compatibility
+	Errors []string          `json:"errors"` // Deprecated: 派生 从 Issues 用于 向后兼容。
 }
 
 func NewValidationResult(issues []ValidationIssue) *ValidationResult {

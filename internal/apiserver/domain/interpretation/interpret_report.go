@@ -142,7 +142,7 @@ func (r *InterpretReport) FindDimensionByCode(code DimensionCode) (*DimensionInt
 	return nil, false
 }
 
-// FindDimension is deprecated; use FindDimensionByCode.
+// FindDimension 是deprecated; 使用 Find维度By编码。
 func (r *InterpretReport) FindDimension(factorCode FactorCode) (*DimensionInterpret, bool) {
 	return r.FindDimensionByCode(NewDimensionCode(factorCode.String()))
 }
@@ -157,7 +157,7 @@ func (r *InterpretReport) GetHighSeverityDimensions() []DimensionInterpret {
 	return result
 }
 
-// GetHighRiskDimensions is deprecated; use GetHighSeverityDimensions.
+// GetHighRiskDimensions 是deprecated; 使用 GetHighSeverity维度。
 func (r *InterpretReport) GetHighRiskDimensions() []DimensionInterpret {
 	return r.GetHighSeverityDimensions()
 }

@@ -376,7 +376,7 @@ func (m *MedicalScale) FactorCount() int {
 	return len(m.factors)
 }
 
-// findFactorByCode 根据因子编码查找因子（仅供 domain 包内部使用）。
+// findFactorByCode 根据因子编码查找因子（仅供 领域包内部使用）。
 // 外部调用方请使用 FindFactorSnapshotByCode 以避免越权修改内部状态。
 func (m *MedicalScale) findFactorByCode(factorCode FactorCode) (*Factor, bool) {
 	for _, f := range m.factors {

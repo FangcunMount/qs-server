@@ -6,12 +6,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
-// ErrWriterNotConfigured reports a missing interpretation writer dependency.
+// ErrWriterNotConfigured 报告缺失 解释写入器 dependency。
 func ErrWriterNotConfigured() error {
 	return evalerrors.ModuleNotConfigured("interpretation writer is not configured")
 }
 
-// NewInterpretationWriter creates a writer for the interpretation phase after scoring.
+// NewInterpretationWriter 创建writer 用于 interpretation phase 在之后 计分。
 func NewInterpretationWriter(
 	assessmentRepo assessment.Repository,
 	scoreProjectors ScoreProjectorRegistry,

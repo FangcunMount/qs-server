@@ -2,7 +2,7 @@ package evaluation
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// ExecutionIdentity routes execution to a concrete evaluator implementation.
+// ExecutionIdentity 路由execution 到 concrete evaluator 实现。
 type ExecutionIdentity struct {
 	Kind      modelcatalog.Kind
 	SubKind   modelcatalog.SubKind
@@ -35,7 +35,7 @@ var (
 	}
 )
 
-// PersonalityTypologyIdentity builds the execution routing identity for a typology algorithm.
+// PersonalityTypologyIdentity 构建执行路由身份 用于 类型学算法。
 func PersonalityTypologyIdentity(algorithm modelcatalog.Algorithm) ExecutionIdentity {
 	return ExecutionIdentity{
 		Kind:      modelcatalog.KindPersonality,
@@ -55,7 +55,7 @@ func (id ExecutionIdentity) IsZero() bool {
 	return id.Kind == "" && id.SubKind == "" && id.Algorithm == ""
 }
 
-// IsPersonalityTypologyLegacyIdentity reports whether identity is a built-in typology algorithm alias.
+// IsPersonalityTypologyLegacyIdentity 报告是否 身份 是 内置 类型学算法 别名。
 func (id ExecutionIdentity) IsPersonalityTypologyLegacyIdentity() bool {
 	if id.Kind != modelcatalog.KindPersonality || id.SubKind != modelcatalog.SubKindTypology {
 		return false
@@ -68,7 +68,7 @@ func (id ExecutionIdentity) IsPersonalityTypologyLegacyIdentity() bool {
 	}
 }
 
-// PersonalityTypologyLegacyIdentities returns built-in typology algorithm routing identities.
+// PersonalityTypologyLegacyIdentities 返回内置 类型学算法 路由身份。
 func PersonalityTypologyLegacyIdentities() []ExecutionIdentity {
 	return []ExecutionIdentity{
 		ExecutionIdentityMBTI,
@@ -77,7 +77,7 @@ func PersonalityTypologyLegacyIdentities() []ExecutionIdentity {
 	}
 }
 
-// ResolvePersonalityTypologyExecutorIdentity maps legacy typology identities to the configured runtime identity.
+// ResolvePersonalityTypologyExecutorIdentity 映射旧版 类型学 身份 到 配置化运行时 身份。
 func ResolvePersonalityTypologyExecutorIdentity(id ExecutionIdentity) ExecutionIdentity {
 	if id == ExecutionIdentityPersonalityTypology || id.IsPersonalityTypologyLegacyIdentity() {
 		return ExecutionIdentityPersonalityTypology
@@ -85,7 +85,7 @@ func ResolvePersonalityTypologyExecutorIdentity(id ExecutionIdentity) ExecutionI
 	return id
 }
 
-// ResolveBehavioralRatingExecutorIdentity maps algorithm-specific identities to the configured runtime executor.
+// ResolveBehavioralRatingExecutorIdentity 映射算法-特定 身份 到 配置化运行时 executor。
 func ResolveBehavioralRatingExecutorIdentity(id ExecutionIdentity) ExecutionIdentity {
 	switch id.Kind {
 	case modelcatalog.KindBehavioralRating:
@@ -103,7 +103,7 @@ func ExecutionIdentityFromLegacyKind(kind modelcatalog.Kind) (ExecutionIdentity,
 	return ExecutionIdentity{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}, true
 }
 
-// ModelDescriptorFromIdentity maps a routing identity to its runtime descriptor.
+// ModelDescriptorFromIdentity 映射路由身份 到 its 运行时描述符。
 func ModelDescriptorFromIdentity(id ExecutionIdentity) ModelDescriptor {
 	switch {
 	case id == ExecutionIdentityScaleDefault:

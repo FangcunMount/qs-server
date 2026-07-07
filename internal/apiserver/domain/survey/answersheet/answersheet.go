@@ -152,9 +152,9 @@ func ReconstructWithSubmissionContext(
 	}
 }
 
-// =========================
+// ===  ===
 // 领域对象方法（充血模型）
-// =========================
+// ===  ===
 
 // ID 答卷标识（仅暴露必要的标识信息）
 func (a *AnswerSheet) ID() meta.ID {
@@ -223,7 +223,7 @@ func (a *AnswerSheet) UpdateScores(scoredSheet *ScoredAnswerSheet) error {
 	}
 
 	// 构建答案映射（按题目编码）
-	answerMap := make(map[string]int) // question_code -> index
+	answerMap := make(map[string]int) // question_code -> index 映射索引
 	for i, ans := range a.answers {
 		answerMap[ans.QuestionCode()] = i
 	}

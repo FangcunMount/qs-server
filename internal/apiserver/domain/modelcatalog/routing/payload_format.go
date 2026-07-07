@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	// v2 production payload formats.
+	// v2 production 载荷格式。
 	PayloadFormatAssessmentScaleV1         = "assessmentmodel.scale.v1"
 	PayloadFormatPersonalityTypologyV1     = "assessmentmodel.personality.typology.v1"
 	PayloadFormatBehavioralRatingDefaultV1 = "assessmentmodel.behavioral_rating.default.v1"
@@ -16,7 +16,7 @@ const (
 	PayloadFormatCognitiveDefaultV1        = "assessmentmodel.cognitive.default.v1"
 	PayloadFormatCognitiveSPMV1            = "assessmentmodel.cognitive.spm.v1"
 
-	// Legacy read-only payload formats (migration / outbox drain).
+	// Legacy 只读 载荷格式 (迁移 / outbox drain)。
 	PayloadFormatScaleV1 = "ruleset.scale.v1"
 	PayloadFormatMBTIV1  = "ruleset.mbti.v1"
 	PayloadFormatSBTIV1  = "ruleset.sbti.v1"
@@ -36,8 +36,8 @@ func IsScalePayloadFormat(format string) bool {
 	}
 }
 
-// IsMBTIPayloadFormat reports legacy MBTI payload formats only.
-// v2 typology payloads must be distinguished by AlgorithmFromTypologyPayload.
+// IsMBTIPayloadFormat 报告旧版 MBTI 载荷格式 仅。
+// v2 类型学载荷 必须 be distinguished 按 算法From类型学载荷。
 func IsMBTIPayloadFormat(format string) bool {
 	switch format {
 	case PayloadFormatMBTIV1, PayloadFormatMBTIV1Legacy:
@@ -47,8 +47,8 @@ func IsMBTIPayloadFormat(format string) bool {
 	}
 }
 
-// IsSBTIPayloadFormat reports legacy SBTI payload formats only.
-// v2 typology payloads must be distinguished by AlgorithmFromTypologyPayload.
+// IsSBTIPayloadFormat 报告旧版 SBTI 载荷格式 仅。
+// v2 类型学载荷 必须 be distinguished 按 算法From类型学载荷。
 func IsSBTIPayloadFormat(format string) bool {
 	switch format {
 	case PayloadFormatSBTIV1, PayloadFormatSBTIV1Legacy:
@@ -66,7 +66,7 @@ type typologyAlgorithmEnvelope struct {
 	Algorithm identity.Algorithm `json:"algorithm"`
 }
 
-// AlgorithmFromTypologyPayload reads the algorithm identity from a v2 typology payload.
+// AlgorithmFromTypologyPayload reads 算法 身份 从 v2 类型学载荷。
 func AlgorithmFromTypologyPayload(payload []byte) (identity.Algorithm, error) {
 	var envelope typologyAlgorithmEnvelope
 	if err := json.Unmarshal(payload, &envelope); err != nil {
@@ -78,7 +78,7 @@ func AlgorithmFromTypologyPayload(payload []byte) (identity.Algorithm, error) {
 	return envelope.Algorithm, nil
 }
 
-// PayloadFormatForBehavioralRating resolves the published payload format for a behavioral_rating algorithm.
+// PayloadFormatForBehavioralRating 解析published 载荷格式 用于 behavioral_rating 算法。
 func PayloadFormatForBehavioralRating(algorithm identity.Algorithm) string {
 	switch algorithm {
 	case identity.AlgorithmBrief2:
@@ -90,7 +90,7 @@ func PayloadFormatForBehavioralRating(algorithm identity.Algorithm) string {
 	}
 }
 
-// PayloadFormatForCognitive resolves the published payload format for a cognitive algorithm.
+// PayloadFormatForCognitive 解析published 载荷格式 用于 cognitive 算法。
 func PayloadFormatForCognitive(algorithm identity.Algorithm) string {
 	switch algorithm {
 	case identity.AlgorithmSPM:
@@ -100,7 +100,7 @@ func PayloadFormatForCognitive(algorithm identity.Algorithm) string {
 	}
 }
 
-// IsBehavioralRatingPayloadFormat reports whether format is a supported behavioral_rating payload.
+// IsBehavioralRatingPayloadFormat 报告是否 格式 是 supported behavioral_rating 载荷。
 func IsBehavioralRatingPayloadFormat(format string) bool {
 	switch format {
 	case PayloadFormatBehavioralRatingDefaultV1, PayloadFormatBehavioralRatingBrief2V1:
@@ -110,7 +110,7 @@ func IsBehavioralRatingPayloadFormat(format string) bool {
 	}
 }
 
-// IsCognitivePayloadFormat reports whether format is a supported cognitive payload.
+// IsCognitivePayloadFormat 报告是否 格式 是 supported cognitive 载荷。
 func IsCognitivePayloadFormat(format string) bool {
 	switch format {
 	case PayloadFormatCognitiveDefaultV1, PayloadFormatCognitiveSPMV1:
@@ -120,7 +120,7 @@ func IsCognitivePayloadFormat(format string) bool {
 	}
 }
 
-// DraftPayloadFormatForModel returns the draft/publish payload format for a model family and algorithm.
+// DraftPayloadFormatForModel 返回draft/publish 载荷格式 用于 模型家族 和 算法。
 func DraftPayloadFormatForModel(kind identity.Kind, algorithm identity.Algorithm) string {
 	switch kind {
 	case identity.KindBehavioralRating:

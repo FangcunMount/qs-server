@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
-// CatalogOperations captures lifecycle guards for one API kind.
+// CatalogOperations 记录lifecycle 守卫 用于 一个API 类型。
 type CatalogOperations struct {
 	CreateSupported           bool
 	ListSupported             bool
@@ -19,7 +19,7 @@ type CatalogOperations struct {
 	ExecutionPath             routing.ExecutionPath
 }
 
-// Allows reports whether the operation is permitted for this API kind.
+// Allows 报告是否 操作 是 permitted 用于 这个API 类型。
 func (o CatalogOperations) Allows(op capability.CatalogOperation) bool {
 	switch op {
 	case capability.CatalogOpCreate:
@@ -43,7 +43,7 @@ func (o CatalogOperations) Allows(op capability.CatalogOperation) bool {
 	}
 }
 
-// RegisteredOption is the application registry entry for one catalog API kind.
+// RegisteredOption 是应用层注册表条目 用于 一个目录 API 类型。
 type RegisteredOption struct {
 	Kind           identity.Kind
 	Role           capability.CapabilityRole
@@ -53,20 +53,20 @@ type RegisteredOption struct {
 	Operations     CatalogOperations
 }
 
-// Registry resolves catalog options and operation policy by API kind.
+// Registry 解析目录选项 和 操作策略 按 API 类型。
 type Registry struct {
 	byAPIKind map[string]RegisteredOption
 	ordered   []RegisteredOption
 }
 
-// DefaultRegistry returns the process-wide catalog option registry.
+// 默认Registry 返回进程-wide 目录选项注册表。
 func DefaultRegistry() *Registry {
 	return defaultRegistry
 }
 
 var defaultRegistry = NewRegistryFromDomain()
 
-// NewRegistryFromDomain materializes options from domain catalog defaults once at startup.
+// NewRegistryFromDomain 物化选项 从 领域 目录默认值 在启动时一次性。
 func NewRegistryFromDomain() *Registry {
 	presentation := capability.DefaultCatalogOptions()
 	optionsByKind := make(map[identity.Kind]capability.CatalogOption, len(presentation))
@@ -108,7 +108,7 @@ func NewRegistryFromDomain() *Registry {
 	return &Registry{byAPIKind: byAPIKind, ordered: ordered}
 }
 
-// ByAPIKind resolves one registry entry.
+// ByAPIKind 解析一个注册表条目。
 func (r *Registry) ByAPIKind(apiKind string) (RegisteredOption, bool) {
 	if r == nil {
 		return RegisteredOption{}, false
@@ -117,7 +117,7 @@ func (r *Registry) ByAPIKind(apiKind string) (RegisteredOption, bool) {
 	return entry, ok
 }
 
-// Allows reports whether an API kind supports an operation.
+// Allows 报告是否 API 类型 supports 操作。
 func (r *Registry) Allows(apiKind string, op capability.CatalogOperation) bool {
 	entry, ok := r.ByAPIKind(apiKind)
 	if !ok {
@@ -126,7 +126,7 @@ func (r *Registry) Allows(apiKind string, op capability.CatalogOperation) bool {
 	return entry.Operations.Allows(op)
 }
 
-// ByKind resolves one registry entry by canonical model family kind.
+// ByKind 解析一个注册表条目 按 规范模型家族类型。
 func (r *Registry) ByKind(kind identity.Kind) (RegisteredOption, bool) {
 	if r == nil {
 		return RegisteredOption{}, false
@@ -139,7 +139,7 @@ func (r *Registry) ByKind(kind identity.Kind) (RegisteredOption, bool) {
 	return RegisteredOption{}, false
 }
 
-// PresentationOptions returns API-facing catalog options for model families.
+// PresentationOptions 返回API-facing 目录选项 用于 模型家族。
 func (r *Registry) PresentationOptions() []capability.CatalogOption {
 	if r == nil {
 		return nil
@@ -161,12 +161,12 @@ func (r *Registry) PresentationOptions() []capability.CatalogOption {
 	return out
 }
 
-// IsProductChannel reports whether the API kind is a product aggregation slot.
+// IsProductChannel 报告是否 API 类型 是 产品聚合槽位。
 func (o RegisteredOption) IsProductChannel() bool {
 	return o.Role == capability.CapabilityRoleProductChannel
 }
 
-// ProductChannelKind returns the domain kind when the entry is a product channel.
+// ProductChannelKind 返回领域类型 when entry 是 产品通道。
 func (o RegisteredOption) ProductChannelKind() identity.Kind {
 	if o.IsProductChannel() {
 		return o.Kind

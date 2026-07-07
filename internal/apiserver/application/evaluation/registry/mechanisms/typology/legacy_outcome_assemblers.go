@@ -6,7 +6,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// RegisterLegacyOutcomeAdapters returns a registry copy with characterization-only legacy outcome adapters.
+// RegisterLegacyOutcomeAdapters 返回注册表副本 使用 仅用于表征 旧版 结果 adapters。
 func RegisterLegacyOutcomeAdapters(registry OutcomeAdapterRegistry) OutcomeAdapterRegistry {
 	return registry.
 		Register(modeltypology.DetailAdapterMBTI, assemblePersonalityTypeFromMBTI).

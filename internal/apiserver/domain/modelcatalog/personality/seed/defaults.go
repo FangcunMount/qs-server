@@ -1,7 +1,7 @@
 package seed
 
-// Embedded personality typology seed model identities.
-// Values mirror infra/ruleset/seed/*.json and must stay in sync with seed data.
+// Embedded personality 类型学 seed model 身份。
+// Values mirror infra/ruleset/seed/*.json 和 必须 stay in sync 使用 seed data。
 const (
 	MBTIModelCode          = "MBTI_OEJTS"
 	MBTIModelVersion       = "2.0.1"

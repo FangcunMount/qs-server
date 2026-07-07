@@ -43,7 +43,7 @@ func NewDimensionInterpret(
 	}
 }
 
-// NewNeutralDimensionInterpret creates a dimension interpret with explicit neutral metadata.
+// NewNeutralDimensionInterpret 创建维度 interpret 使用 显式 中性 元数据。
 func NewNeutralDimensionInterpret(
 	code DimensionCode,
 	kind DimensionKind,
@@ -83,31 +83,31 @@ func severityFromRiskLevel(risk RiskLevel) string {
 	return string(risk)
 }
 
-// Code returns the neutral dimension code.
+// Code 返回中性 维度 编码。
 func (d DimensionInterpret) Code() DimensionCode {
 	return d.code
 }
 
-// Kind returns the neutral dimension kind.
+// Kind 返回中性 维度 类型。
 func (d DimensionInterpret) Kind() DimensionKind {
 	return d.kind
 }
 
-// Name returns the neutral dimension display name.
+// Name 返回中性 维度 display name。
 func (d DimensionInterpret) Name() string {
 	return d.factorName
 }
 
 // FactorCode 获取因子编码
 //
-// Deprecated: use Code().
+// Deprecated: 使用 Code()。
 func (d DimensionInterpret) FactorCode() FactorCode {
 	return d.factorCode
 }
 
 // FactorName 获取因子名称
 //
-// Deprecated: use Name().
+// Deprecated: 使用 Name()。
 func (d DimensionInterpret) FactorName() string {
 	return d.factorName
 }
@@ -119,12 +119,12 @@ func (d DimensionInterpret) RawScore() float64 {
 
 // RiskLevel 获取风险等级
 //
-// Deprecated: use Severity() for neutral semantics; RiskLevel is scale-legacy only.
+// Deprecated: 使用 Severity() 表达中性语义；RiskLevel 仅用于旧量表兼容。
 func (d DimensionInterpret) RiskLevel() RiskLevel {
 	return d.riskLevel
 }
 
-// Severity returns the neutral severity label.
+// Severity 返回中性 severity label。
 func (d DimensionInterpret) Severity() string {
 	if d.severity != "" {
 		return d.severity
@@ -147,27 +147,27 @@ func (d DimensionInterpret) MaxScore() *float64 {
 	return d.maxScore
 }
 
-// Role returns the catalog factor role when present.
+// Role 返回目录 因子 角色 when 存在。
 func (d DimensionInterpret) Role() string {
 	return d.role
 }
 
-// ParentCode returns the parent factor code in a hierarchy tree.
+// ParentCode 返回父节点 因子 编码 in 层级 tree。
 func (d DimensionInterpret) ParentCode() string {
 	return d.parentCode
 }
 
-// HierarchyLevel returns tree depth; 1 is root.
+// HierarchyLevel 返回tree depth; 1 是 根。
 func (d DimensionInterpret) HierarchyLevel() int {
 	return d.hierarchyLevel
 }
 
-// SortOrder returns sibling ordering within the same parent.
+// SortOrder 返回sibling ordering 在 same 父节点。
 func (d DimensionInterpret) SortOrder() int {
 	return d.sortOrder
 }
 
-// WithHierarchy returns a copy annotated with factor tree metadata.
+// WithHierarchy 返回copy annotated 使用 因子 tree 元数据。
 func (d DimensionInterpret) WithHierarchy(role, parentCode string, hierarchyLevel, sortOrder int) DimensionInterpret {
 	d.role = role
 	d.parentCode = parentCode
@@ -181,7 +181,7 @@ func (d DimensionInterpret) IsHighRisk() bool {
 	return IsHighRisk(d.riskLevel)
 }
 
-// IsHighSeverity reports whether the dimension has elevated severity.
+// IsHighSeverity 报告是否 维度 has elevated severity。
 func (d DimensionInterpret) IsHighSeverity() bool {
 	if IsHighSeverity(d.Severity()) {
 		return true

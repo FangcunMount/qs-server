@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-// LegacyKindMapping resolves deprecated flat kinds to v2 identity triples.
+// LegacyKindMapping 解析deprecated flat 类型 到 v2 身份 triples。
 func LegacyKindMapping(kind identity.Kind) (identity.Kind, identity.SubKind, identity.Algorithm, bool) {
 	mappedKind, subKind, algorithm, ok := KindMapping(string(kind))
 	if !ok {
@@ -14,7 +14,7 @@ func LegacyKindMapping(kind identity.Kind) (identity.Kind, identity.SubKind, ide
 	return identity.Kind(mappedKind), identity.SubKind(subKind), identity.Algorithm(algorithm), true
 }
 
-// ModelDefinitionFromLegacy builds a v2 definition from a v1 envelope definition.
+// ModelDefinitionFromLegacy 构建v2 definition 从 v1 envelope definition。
 func ModelDefinitionFromLegacy(def Definition, decision identity.DecisionKind) catalog.ModelDefinition {
 	if kind, subKind, algorithm, ok := LegacyKindMapping(def.Kind); ok {
 		return catalog.ModelDefinition{
@@ -36,7 +36,7 @@ func ModelDefinitionFromLegacy(def Definition, decision identity.DecisionKind) c
 	}
 }
 
-// PublishedFromLegacy converts a v1 snapshot envelope to v2.
+// PublishedFromLegacy 转换v1 快照 envelope 到 v2。
 func PublishedFromLegacy(snapshot *Snapshot) *catalog.PublishedModelSnapshot {
 	if snapshot == nil {
 		return nil
@@ -56,7 +56,7 @@ func PublishedFromLegacy(snapshot *Snapshot) *catalog.PublishedModelSnapshot {
 	}
 }
 
-// LegacyFromPublished converts a v2 snapshot to the v1 envelope for migration readers.
+// LegacyFromPublished 转换v2 快照 到 v1 envelope 用于 迁移 读取器。
 func LegacyFromPublished(snapshot *catalog.PublishedModelSnapshot) *Snapshot {
 	if snapshot == nil {
 		return nil

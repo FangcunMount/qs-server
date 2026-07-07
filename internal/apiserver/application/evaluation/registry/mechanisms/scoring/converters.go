@@ -16,7 +16,7 @@ func evaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) domainfa
 	}
 }
 
-// CloneInputWithScaleSnapshot clones an input snapshot with a scale payload substituted.
+// CloneInputWithScaleSnapshot clones input 快照 使用 scale 载荷 substituted。
 func CloneInputWithScaleSnapshot(input *evaluationinput.InputSnapshot, scaleSnapshot *scalesnapshot.ScaleSnapshot) *evaluationinput.InputSnapshot {
 	if input == nil {
 		return nil

@@ -114,7 +114,7 @@ func reportLevelFromOutcomeLevel(level *assessment.OutcomeResultLevel) *domainre
 	}
 }
 
-// AttachReportOutcomeSummary decorates a report with model/score/level from the outcome.
+// AttachReportOutcomeSummary decorates report 使用 model/score/等级 从 结果。
 func AttachReportOutcomeSummary(outcome evaloutcome.Outcome, report *domainreport.InterpretReport) *domainreport.InterpretReport {
 	return attachOutcomeSummary(outcome, report)
 }

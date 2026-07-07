@@ -10,18 +10,18 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// Evaluator scores typology payloads through the configured runtime pipeline.
+// Evaluator 计算类型学载荷 通过 配置化运行时 pipeline。
 type Evaluator struct {
 	rules   specialrule.Engine
 	details DetailAssemblerRegistry
 }
 
-// NewEvaluator returns a configured personality evaluator with built-in detail assemblers.
+// NewEvaluator 返回配置化人格评估器 使用 内置 明细组装器。
 func NewEvaluator() Evaluator {
 	return NewEvaluatorWithDetails(DefaultDetailAssemblerRegistry())
 }
 
-// NewEvaluatorWithDetails returns a configured evaluator that resolves detail assembly through registry.
+// NewEvaluatorWithDetails 返回配置化 evaluator that resolves 明细组装 通过 注册表。
 func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	return Evaluator{
 		rules:   specialrule.Engine{},
@@ -29,7 +29,7 @@ func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	}
 }
 
-// Score evaluates a typology payload and returns a scoring result.
+// Score 评估类型学载荷 和 returns 计分结果。
 func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.AnswerSheet) (evaluationtypology.ScoringResult, error) {
 	if payload == nil {
 		return evaluationtypology.ScoringResult{}, fmt.Errorf("typology payload is required")

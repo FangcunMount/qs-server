@@ -6,8 +6,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ToRuntimeSpec returns the execution spec for a typology payload.
-// Explicit Payload.Runtime takes precedence; legacy fields fill only missing sections.
+// ToRuntimeSpec 返回执行规格 用于 类型学载荷。
+// Explicit 载荷.运行时 takes precedence; 旧版 字段 fill 仅 缺失 sections。
 func (p *Payload) ToRuntimeSpec() (*RuntimeSpec, error) {
 	if p == nil {
 		return nil, fmt.Errorf("typology payload is required")

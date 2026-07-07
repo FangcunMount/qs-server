@@ -1,5 +1,5 @@
-// Package mechanisms hosts evaluation runtime implementations organized by algorithm mechanism.
+// Package mechanisms 承载评估执行time 实现s organized 按 算法 机制。
 //
-// External wiring must go through application/evaluation/registry; only registry and runtime
-// may import these packages directly.
+// External 装配 必须 go 通过 application/评估/注册表; 仅 注册表 和 运行时。
+// 可以导入 这些包 直接。
 package mechanisms

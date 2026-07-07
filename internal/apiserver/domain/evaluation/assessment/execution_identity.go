@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ExecutionIdentity returns the execution routing identity for this model reference.
+// ExecutionIdentity 返回执行路由身份 用于 这个模型引用。
 func (r EvaluationModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	if r.algorithm != "" {
 		kind := modelcatalog.Kind(r.kind)
@@ -36,7 +36,7 @@ func (r EvaluationModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	}
 }
 
-// EvaluatorKey is deprecated; use ExecutionIdentity.
+// EvaluatorKey 是deprecated; 使用 Execution身份。
 func (r EvaluationModelRef) EvaluatorKey() evaldomain.ExecutionIdentity {
 	return r.ExecutionIdentity()
 }

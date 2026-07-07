@@ -7,7 +7,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// DetailInput carries the scored state required to assemble a typed detail payload.
+// DetailInput 携带scored 状态 required 到 assemble typed 明细载荷。
 type DetailInput struct {
 	Payload   *modeltypology.Payload
 	Spec      *modeltypology.RuntimeSpec
@@ -18,7 +18,7 @@ type DetailInput struct {
 	Adapter   modeltypology.DetailAdapterKey
 }
 
-// SelectedOutcome is the configured-runtime view of a chosen model outcome.
+// SelectedOutcome 是配置化-运行时 视图 of 选中 model 结果。
 type SelectedOutcome struct {
 	Code       string
 	Similarity float64
@@ -26,7 +26,7 @@ type SelectedOutcome struct {
 	Dimensions []DimensionLevel
 }
 
-// DimensionLevel is an intermediate SBTI dimension score used by detail assembly.
+// DimensionLevel 是intermediate SBTI 维度分 供 明细组装。
 type DimensionLevel struct {
 	Code     string
 	Name     string
@@ -37,17 +37,17 @@ type DimensionLevel struct {
 
 type detailAssemblerFunc func(DetailInput) (any, error)
 
-// DetailAssemblerRegistry resolves detail assemblers by adapter key.
+// DetailAssemblerRegistry 解析明细组装器 按 adapter 键。
 type DetailAssemblerRegistry struct {
 	assemblers map[modeltypology.DetailAdapterKey]detailAssemblerFunc
 }
 
-// DefaultDetailAssemblerRegistry returns the built-in typology detail assemblers.
+// 默认DetailAssemblerRegistry 返回内置 类型学明细组装器。
 func DefaultDetailAssemblerRegistry() DetailAssemblerRegistry {
 	return NewDetailAssemblerRegistry()
 }
 
-// NewDetailAssemblerRegistry returns the built-in typology detail assemblers.
+// NewDetailAssemblerRegistry 返回内置 类型学明细组装器。
 func NewDetailAssemblerRegistry() DetailAssemblerRegistry {
 	return DetailAssemblerRegistry{
 		assemblers: map[modeltypology.DetailAdapterKey]detailAssemblerFunc{
@@ -57,12 +57,12 @@ func NewDetailAssemblerRegistry() DetailAssemblerRegistry {
 	}
 }
 
-// Len reports how many detail assemblers are registered.
+// Len 报告数量 明细组装器 是 已注册。
 func (r DetailAssemblerRegistry) Len() int {
 	return len(r.assemblers)
 }
 
-// Register returns a registry copy with an additional or overridden detail assembler.
+// Register 返回注册表副本 使用 额外 或 覆盖 明细组装器。
 func (r DetailAssemblerRegistry) Register(key modeltypology.DetailAdapterKey, assembler detailAssemblerFunc) DetailAssemblerRegistry {
 	next := DetailAssemblerRegistry{assemblers: make(map[modeltypology.DetailAdapterKey]detailAssemblerFunc, len(r.assemblers)+1)}
 	for k, v := range r.assemblers {

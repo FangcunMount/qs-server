@@ -10,13 +10,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
-// Summary reports Prometheus availability for governance views.
+// Summary 报告Prometheus availability 用于 governance 视图。
 type Summary struct {
 	Available bool
 	Reason    string
 }
 
-// MetricResult is one near-window metric observation.
+// MetricResult 是一个近窗口 指标观测。
 type MetricResult struct {
 	Name      string
 	Window    string
@@ -26,7 +26,7 @@ type MetricResult struct {
 	Reason    string
 }
 
-// QuerySpec describes one bounded PromQL query and how to present the result.
+// QuerySpec 描述一个有界 PromQL 查询 和 如何 存在 结果。
 type QuerySpec struct {
 	Name   string
 	Query  string
@@ -34,13 +34,13 @@ type QuerySpec struct {
 	Unit   string
 }
 
-// Adapter loads near-window metrics via PromQL.
+// Adapter 加载近窗口 metrics via PromQL。
 type Adapter struct {
 	enabled bool
 	client  *Client
 }
 
-// NewAdapter builds a metrics adapter from governance options.
+// NewAdapter 构建metrics adapter 从 governance 选项。
 func NewAdapter(opts *options.SystemGovernancePrometheusOptions) *Adapter {
 	if opts == nil || !opts.Enabled || strings.TrimSpace(opts.BaseURL) == "" {
 		return &Adapter{}
@@ -51,7 +51,7 @@ func NewAdapter(opts *options.SystemGovernancePrometheusOptions) *Adapter {
 	}
 }
 
-// Probe checks Prometheus availability without failing the caller.
+// Probe 检查Prometheus availability 不使用 failing caller。
 func (a *Adapter) Probe(ctx context.Context, evalAt time.Time) Summary {
 	if a == nil || !a.enabled || a.client == nil {
 		return Summary{
@@ -69,7 +69,7 @@ func (a *Adapter) Probe(ctx context.Context, evalAt time.Time) Summary {
 	return Summary{Available: true}
 }
 
-// Query executes one explicit PromQL query.
+// Query 执行一个显式 PromQL 查询。
 func (a *Adapter) Query(ctx context.Context, spec QuerySpec, evalAt time.Time) MetricResult {
 	result := MetricResult{
 		Name:   spec.Name,
@@ -96,7 +96,7 @@ func (a *Adapter) Query(ctx context.Context, spec QuerySpec, evalAt time.Time) M
 	return result
 }
 
-// CounterIncreaseQuery builds a near-window counter increase query.
+// CounterIncreaseQuery 构建近窗口 counter increase 查询。
 func CounterIncreaseQuery(name, metric, window string, labels map[string]string) QuerySpec {
 	return QuerySpec{
 		Name:   name,
@@ -106,7 +106,7 @@ func CounterIncreaseQuery(name, metric, window string, labels map[string]string)
 	}
 }
 
-// GaugeQuery wraps an instant gauge query.
+// GaugeQuery 包装即时仪表查询。
 func GaugeQuery(name, promQL, window, unit string) QuerySpec {
 	return QuerySpec{
 		Name:   name,
@@ -116,7 +116,7 @@ func GaugeQuery(name, promQL, window, unit string) QuerySpec {
 	}
 }
 
-// InstantGaugeQuery builds a sum() instant gauge query with a bounded label selector.
+// InstantGaugeQuery 构建sum() 即时仪表查询 使用 有界标签选择器。
 func InstantGaugeQuery(name, metric, window, unit string, labels map[string]string) QuerySpec {
 	return QuerySpec{
 		Name:   name,

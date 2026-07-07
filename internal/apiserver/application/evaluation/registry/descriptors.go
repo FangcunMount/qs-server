@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
+// 默认EvaluationDescriptors 返回运行时描述符 用于 全部能力-backed 执行路径。
 func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
 	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {

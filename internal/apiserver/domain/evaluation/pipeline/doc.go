@@ -1,2 +1,2 @@
-// Package pipeline owns evaluation runtime descriptors and mechanism-oriented routing.
+// Package pipeline 负责评估 运行时描述符 和 面向机制 路由。
 package pipeline

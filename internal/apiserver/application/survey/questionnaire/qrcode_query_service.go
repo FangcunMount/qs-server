@@ -7,12 +7,12 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// QuestionnaireQRCodeGenerator is the narrow QR-code capability consumed by survey.
+// QuestionnaireQRCodeGenerator 是nar行 二维码 能力 消费d 按 survey。
 type QuestionnaireQRCodeGenerator interface {
 	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
 }
 
-// QuestionnaireQRCodeQueryService resolves questionnaire QR-code requests.
+// QuestionnaireQRCodeQueryService 解析问卷 二维码 请求。
 type QuestionnaireQRCodeQueryService interface {
 	GetQRCode(ctx context.Context, code, version string) (string, error)
 }
@@ -22,7 +22,7 @@ type questionnaireQRCodeQueryService struct {
 	generator QuestionnaireQRCodeGenerator
 }
 
-// NewQRCodeQueryService creates a questionnaire QR-code use case.
+// NewQRCodeQueryService 创建问卷 二维码 用例。
 func NewQRCodeQueryService(query QuestionnaireQueryService, generator QuestionnaireQRCodeGenerator) QuestionnaireQRCodeQueryService {
 	return &questionnaireQRCodeQueryService{query: query, generator: generator}
 }

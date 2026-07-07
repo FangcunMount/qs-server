@@ -5,7 +5,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// MatchResult is returned when a special rule fires.
+// MatchResult 是returned when special rule fires。
 type MatchResult struct {
 	OutcomeCode    string
 	Trigger        string
@@ -13,7 +13,7 @@ type MatchResult struct {
 	ReplaceOutcome bool
 }
 
-// EvaluationContext carries rule inputs for one special-rule phase.
+// EvaluationContext 携带rule inputs 用于 一个special-rule phase。
 type EvaluationContext struct {
 	Payload    *modeltypology.Payload
 	Answers    []evaluationinput.Answer
@@ -23,12 +23,12 @@ type EvaluationContext struct {
 
 type strategyFunc func(modeltypology.SpecialRuleSpec, EvaluationContext) (MatchResult, bool)
 
-// StrategyRegistry resolves special-rule strategies by rule kind.
+// StrategyRegistry 解析special-rule strategies 按 rule 类型。
 type StrategyRegistry struct {
 	strategies map[modeltypology.SpecialRuleKind]strategyFunc
 }
 
-// DefaultStrategyRegistry returns the built-in special-rule strategies.
+// 默认StrategyRegistry 返回内置 special-rule strategies。
 func DefaultStrategyRegistry() StrategyRegistry {
 	return StrategyRegistry{
 		strategies: map[modeltypology.SpecialRuleKind]strategyFunc{
@@ -38,12 +38,12 @@ func DefaultStrategyRegistry() StrategyRegistry {
 	}
 }
 
-// Engine evaluates configurable special rules against answers and scoring outcomes.
+// Engine 评估配置urable special rules 针对 answers 和 计分结果。
 type Engine struct {
 	strategies StrategyRegistry
 }
 
-// ApplyBeforeScore checks answer_match rules and returns a match when answers trigger a special outcome.
+// ApplyBeforeScore 检查answer_match rules 和 returns match when answers trigger special 结果。
 func (e Engine) ApplyBeforeScore(
 	rules []modeltypology.SpecialRuleSpec,
 	payload *modeltypology.Payload,
@@ -55,7 +55,7 @@ func (e Engine) ApplyBeforeScore(
 	})
 }
 
-// ApplyAfterDecision checks fallback_threshold rules when similarity falls below the configured threshold.
+// ApplyAfterDecision 检查fallback_threshold rules when similarity falls below 配置化 threshold。
 func (e Engine) ApplyAfterDecision(
 	rules []modeltypology.SpecialRuleSpec,
 	decision modeltypology.PersonalityDecisionSpec,

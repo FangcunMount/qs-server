@@ -2,7 +2,7 @@ package evaluation
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// ModelKind distinguishes scale vs personality typology descriptors.
+// ModelKind 区分scale 与 personality 类型学描述符。
 type ModelKind string
 
 const (
@@ -12,13 +12,13 @@ const (
 	ModelKindCognitive        ModelKind = "cognitive"
 )
 
-// ModelDescriptor is the canonical registration entry for an evaluation model.
+// ModelDescriptor 是规范 registration entry 用于 评估 model。
 type ModelDescriptor struct {
 	Kind      ModelKind
 	Algorithm modelcatalog.Algorithm
 }
 
-// ExecutionIdentity derives the routing identity for a runtime descriptor.
+// ExecutionIdentity 推导路由身份 用于 运行时描述符。
 func (d ModelDescriptor) ExecutionIdentity() ExecutionIdentity {
 	switch d.Kind {
 	case ModelKindScale:
@@ -37,7 +37,7 @@ func (d ModelDescriptor) ExecutionIdentity() ExecutionIdentity {
 	}
 }
 
-// CognitiveModelDescriptor returns the built-in cognitive runtime descriptor.
+// CognitiveModelDescriptor 返回内置 cognitive 运行时描述符。
 func CognitiveModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{
 		Kind:      ModelKindCognitive,
@@ -45,7 +45,7 @@ func CognitiveModelDescriptor() ModelDescriptor {
 	}
 }
 
-// BehavioralRatingModelDescriptor returns the built-in behavioral_rating runtime descriptor.
+// BehavioralRatingModelDescriptor 返回内置 behavioral_rating 运行时描述符。
 func BehavioralRatingModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{
 		Kind:      ModelKindBehavioralRating,
@@ -53,18 +53,18 @@ func BehavioralRatingModelDescriptor() ModelDescriptor {
 	}
 }
 
-// ScaleModelDescriptor returns the built-in scale evaluation descriptor.
+// ScaleModelDescriptor 返回内置 scale 评估 描述符。
 func ScaleModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{Kind: ModelKindScale}
 }
 
-// DefaultModelDescriptors returns built-in scale descriptors only.
-// Typology descriptors are owned by application typology.DefaultModules() at composition root.
+// 默认ModelDescriptors 返回内置 scale 描述符 仅。
+// Typology 描述符 是 owned 按 application 类型学.默认Modules() at 组合根。
 func DefaultModelDescriptors() []ModelDescriptor {
 	return []ModelDescriptor{ScaleModelDescriptor()}
 }
 
-// TypologyAlgorithms returns typology algorithms from descriptors.
+// TypologyAlgorithms 返回类型学算法 从 描述符。
 func TypologyAlgorithms(descs []ModelDescriptor) []modelcatalog.Algorithm {
 	out := make([]modelcatalog.Algorithm, 0, len(descs))
 	for _, desc := range descs {

@@ -73,7 +73,7 @@ func (s *protectedQueryService) ListAssessments(ctx context.Context, scope Prote
 	return s.managementService.List(ctx, scopedDTO)
 }
 
-// GetAssessmentOutcome 获取 outcome 测评投影。
+// GetAssessmentOutcome 获取 结果 测评投影。
 func (s *protectedQueryService) GetAssessmentOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentOutcomeResult, error) {
 	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (s *protectedQueryService) GetAssessmentOutcome(ctx context.Context, scope 
 	return assessmentRowToOutcomeResult(*row)
 }
 
-// ListAssessmentsOutcome 查询 outcome 测评列表。
+// ListAssessmentsOutcome 查询 结果 测评列表。
 func (s *protectedQueryService) ListAssessmentsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentOutcomeListResult, error) {
 	if s.assessmentReader == nil {
 		return nil, evalerrors.ModuleNotConfigured("assessment read model is not configured")
@@ -192,7 +192,7 @@ func (s *protectedQueryService) GetReport(ctx context.Context, scope ProtectedQu
 	return s.reportQueryService.GetByAssessmentID(ctx, assessmentCtx.AssessmentID)
 }
 
-// GetReportOutcome 获取 outcome 测评报告。
+// GetReportOutcome 获取 结果 测评报告。
 func (s *protectedQueryService) GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error) {
 	if s.reportQueryService == nil {
 		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
@@ -221,7 +221,7 @@ func (s *protectedQueryService) ListReports(ctx context.Context, scope Protected
 	return s.reportQueryService.ListByTesteeID(ctx, scopedDTO)
 }
 
-// ListReportsOutcome 查询 outcome 测评报告列表。
+// ListReportsOutcome 查询 结果 测评报告列表。
 func (s *protectedQueryService) ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
 	if s.reportQueryService == nil {
 		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
@@ -249,7 +249,7 @@ func (s *protectedQueryService) WaitReport(ctx context.Context, scope ProtectedQ
 	return s.waitService.WaitReport(ctx, assessmentID), nil
 }
 
-// ListAssessmentRuns lists evaluation runs for one accessible assessment.
+// ListAssessmentRuns 列出评估执行 用于 一个accessible assessment。
 func (s *protectedQueryService) ListAssessmentRuns(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64, limit int) (*AssessmentRunListResult, error) {
 	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func (s *protectedQueryService) ListAssessmentRuns(ctx context.Context, scope Pr
 	return assessmentRunListFromQuery(result), nil
 }
 
-// GetLatestAssessmentRun returns the latest run for one accessible assessment.
+// GetLatestAssessmentRun 返回最新 run 用于 一个accessible assessment。
 func (s *protectedQueryService) GetLatestAssessmentRun(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentRunResult, error) {
 	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
 		return nil, err

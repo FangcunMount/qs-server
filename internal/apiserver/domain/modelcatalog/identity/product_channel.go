@@ -2,7 +2,7 @@ package identity
 
 import "fmt"
 
-// ProductChannel classifies an assessment model for product-facing taxonomy.
+// ProductChannel 划分assessment model 用于 product-facing 分类体系。
 type ProductChannel string
 
 const (
@@ -32,9 +32,9 @@ func (pc ProductChannel) IsValid() bool {
 	}
 }
 
-// DefaultProductChannelFor derives the default product channel from a model family kind.
-// This is a UI/create-form default only; it is not a domain constraint.
-// Use ResolveProductChannel with an explicit channel when product taxonomy matters.
+// 默认ProductChannelFor 推导默认 产品通道 从 模型家族 类型。
+// 这是UI/创建表单 默认 仅; 它是 不 领域 constraint。
+// 使用 ResolveProductChannel 使用 显式 channel when product 分类体系 matters。
 func DefaultProductChannelFor(kind Kind) ProductChannel {
 	switch kind {
 	case KindScale:
@@ -52,7 +52,7 @@ func DefaultProductChannelFor(kind Kind) ProductChannel {
 	}
 }
 
-// ResolveProductChannel returns the explicit channel when set, otherwise the kind default.
+// ResolveProductChannel 返回显式 channel when set, otherwise 类型 默认。
 func ResolveProductChannel(kind Kind, channel ProductChannel) ProductChannel {
 	if channel != "" {
 		return channel
@@ -60,7 +60,7 @@ func ResolveProductChannel(kind Kind, channel ProductChannel) ProductChannel {
 	return DefaultProductChannelFor(kind)
 }
 
-// CompleteProductChannel validates an optional product channel and applies kind defaults.
+// CompleteProductChannel 校验可选 产品通道 和 applies 类型 默认s。
 func CompleteProductChannel(kind Kind, channel ProductChannel) (ProductChannel, error) {
 	resolved := ResolveProductChannel(kind, channel)
 	if resolved == "" {
@@ -72,7 +72,7 @@ func CompleteProductChannel(kind Kind, channel ProductChannel) (ProductChannel, 
 	return resolved, nil
 }
 
-// AllProductChannels returns the supported product channel values for API options.
+// AllProductChannels 返回supported 产品通道 values 用于 API 选项。
 func AllProductChannels() []ProductChannel {
 	return []ProductChannel{
 		ProductChannelMedicalScale,

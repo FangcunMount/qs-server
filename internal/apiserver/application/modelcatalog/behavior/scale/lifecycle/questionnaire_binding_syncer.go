@@ -8,7 +8,7 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// QuestionnaireBindingSyncer updates scale questionnaire-version projection after questionnaire publication.
+// QuestionnaireBindingSyncer updates scale 问卷-version 投影 在之后 问卷 发布。
 type QuestionnaireBindingSyncer struct {
 	repo questionnaireBindingSyncRepository
 }
@@ -18,12 +18,12 @@ type questionnaireBindingSyncRepository interface {
 	Update(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
-// NewQuestionnaireBindingSyncer creates a survey-facing scale binding syncer.
+// NewQuestionnaireBindingSyncer 创建survey-facing scale binding syncer。
 func NewQuestionnaireBindingSyncer(repo questionnaireBindingSyncRepository) *QuestionnaireBindingSyncer {
 	return &QuestionnaireBindingSyncer{repo: repo}
 }
 
-// SyncQuestionnaireVersion synchronizes a bound scale to the newly published questionnaire version.
+// SyncQuestionnaireVersion synchronizes bound scale 到 newly published 问卷版本。
 func (s *QuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
 	if s == nil {
 		return nil

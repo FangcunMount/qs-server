@@ -1,6 +1,6 @@
 package assessment
 
-// DimensionKind classifies a dimension result independent of scale factor semantics.
+// DimensionKind 划分维度结果 独立于 scale 因子 semantics。
 type DimensionKind string
 
 const (
@@ -11,7 +11,7 @@ const (
 	DimensionKindAbility DimensionKind = "ability"
 )
 
-// OutcomeScoreKind classifies a primary or dimension score value.
+// OutcomeScoreKind 划分主 或 维度分 value。
 type OutcomeScoreKind string
 
 const (
@@ -21,7 +21,7 @@ const (
 	OutcomeScoreKindPercentile   OutcomeScoreKind = "percentile"
 )
 
-// ProfileKind classifies a profile result independent of model family.
+// ProfileKind 划分画像结果 独立于 模型家族。
 type ProfileKind string
 
 const (
@@ -30,7 +30,7 @@ const (
 	ProfileKindAbilityProfile   ProfileKind = "ability_profile"
 )
 
-// ProfileResult records portrait-style results such as personality type or ability profile.
+// ProfileResult 记录portrait-style 结果s such 作为 人格类型 或 ability 画像。
 type ProfileResult struct {
 	Kind        ProfileKind
 	Code        string
@@ -42,7 +42,7 @@ type ProfileResult struct {
 	Suggestions []string
 }
 
-// OutcomeScoreValue is the canonical score representation on an assessment outcome.
+// OutcomeScoreValue 是规范 score re呈现 on 测评结果。
 type OutcomeScoreValue struct {
 	Kind  OutcomeScoreKind
 	Value float64
@@ -50,14 +50,14 @@ type OutcomeScoreValue struct {
 	Max   *float64
 }
 
-// OutcomeResultLevel is the canonical level representation on an assessment outcome.
+// OutcomeResultLevel 是规范 等级 re呈现 on 测评结果。
 type OutcomeResultLevel struct {
 	Code     string
 	Label    string
 	Severity string
 }
 
-// DimensionResult records one scored dimension on an assessment outcome.
+// DimensionResult 记录一个scored 维度 on 测评结果。
 type DimensionResult struct {
 	Code           string
 	Name           string
@@ -73,7 +73,7 @@ type DimensionResult struct {
 	Suggestion     string
 }
 
-// ValidityResult records optional validity checks for an assessment outcome.
+// ValidityResult 记录可选 有效ity checks 用于 测评结果。
 type ValidityResult struct {
 	Code    string
 	Label   string
@@ -81,7 +81,7 @@ type ValidityResult struct {
 	Message string
 }
 
-// AssessmentOutcome is the canonical execution result for all model families.
+// AssessmentOutcome 是规范 执行结果 用于 全部模型家族。
 type AssessmentOutcome struct {
 	ModelRef   EvaluationModelRef
 	Summary    ResultSummary
@@ -93,7 +93,7 @@ type AssessmentOutcome struct {
 	Validity   []ValidityResult
 }
 
-// NewAssessmentOutcome creates a canonical assessment outcome.
+// NewAssessmentOutcome 创建规范 测评结果。
 func NewAssessmentOutcome(
 	modelRef EvaluationModelRef,
 	summary ResultSummary,
@@ -111,9 +111,9 @@ func NewAssessmentOutcome(
 	}
 }
 
-// AssessmentOutcomeFromEvaluationResult adapts a legacy evaluation result.
+// AssessmentOutcomeFromEvaluationResult 适配旧版 评估 结果。
 //
-// Deprecated: characterization and ApplyEvaluation adapter only; application write paths must use AssessmentOutcome directly.
+// Deprecated: 仅用于表征和 ApplyEvaluation 适配；应用写路径必须直接使用 AssessmentOutcome。
 func AssessmentOutcomeFromEvaluationResult(result *EvaluationResult) *AssessmentOutcome {
 	if result == nil {
 		return nil
@@ -142,7 +142,7 @@ func AssessmentOutcomeFromEvaluationResult(result *EvaluationResult) *Assessment
 	return outcome
 }
 
-// ToEvaluationResult projects the outcome into the legacy write model.
+// ToEvaluationResult 投影结果 为 旧写模型。
 func (o *AssessmentOutcome) ToEvaluationResult() *EvaluationResult {
 	if o == nil {
 		return nil

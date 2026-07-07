@@ -2,7 +2,7 @@ package snapshot
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 
-// ExecutionEnvelope carries non-factor metadata for scale-like execution.
+// ExecutionEnvelope 携带non-因子 元数据 用于 scale-like execution。
 type ExecutionEnvelope struct {
 	ID                   uint64
 	Code                 string
@@ -13,7 +13,7 @@ type ExecutionEnvelope struct {
 	Status               string
 }
 
-// InterpretRuleFromScoreRange projects a canonical rule into scale execution shape.
+// InterpretRuleFromScoreRange 投影规范 rule 为 scale execution 结构。
 func InterpretRuleFromScoreRange(r factor.ScoreRangeRule) InterpretRuleSnapshot {
 	return InterpretRuleSnapshot{
 		Min:        r.MinScore,
@@ -24,7 +24,7 @@ func InterpretRuleFromScoreRange(r factor.ScoreRangeRule) InterpretRuleSnapshot 
 	}
 }
 
-// ScoreRangeFromInterpretRule adapts a scale execution rule into canonical form.
+// ScoreRangeFromInterpretRule 适配scale execution rule 为 规范 form。
 func ScoreRangeFromInterpretRule(rule InterpretRuleSnapshot) factor.ScoreRangeRule {
 	return factor.ScoreRangeRule{
 		MinScore:   rule.Min,
@@ -35,7 +35,7 @@ func ScoreRangeFromInterpretRule(rule InterpretRuleSnapshot) factor.ScoreRangeRu
 	}
 }
 
-// FactorFromCanonical projects one canonical factor into scale execution shape.
+// FactorFromCanonical 投影一个规范 因子 为 scale execution 结构。
 func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	rules := make([]InterpretRuleSnapshot, 0, len(f.InterpretRules))
 	for _, rule := range f.InterpretRules {
@@ -57,7 +57,7 @@ func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	}
 }
 
-// Canonical adapts a scale execution factor into canonical catalog form.
+// Canonical 适配scale execution 因子 为 规范 目录 form。
 func (f FactorSnapshot) Canonical() factor.FactorSnapshot {
 	rules := make([]factor.ScoreRangeRule, 0, len(f.InterpretRules))
 	for _, rule := range f.InterpretRules {
@@ -86,12 +86,12 @@ func (f FactorSnapshot) Canonical() factor.FactorSnapshot {
 	}
 }
 
-// FactorSnapshotFromCanonical materializes a scale execution factor from canonical form.
+// FactorSnapshotFromCanonical 物化scale execution 因子 从 规范 form。
 func FactorSnapshotFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	return FactorFromCanonical(f)
 }
 
-// FactorsFromCanonical projects canonical factors into scale execution factors.
+// FactorsFromCanonical 投影规范 因子 为 scale execution 因子。
 func FactorsFromCanonical(factors []factor.FactorSnapshot) []FactorSnapshot {
 	out := make([]FactorSnapshot, 0, len(factors))
 	for _, item := range factors {
@@ -100,7 +100,7 @@ func FactorsFromCanonical(factors []factor.FactorSnapshot) []FactorSnapshot {
 	return out
 }
 
-// BuildFromModelFactors materializes a scale snapshot from common family snapshot metadata.
+// BuildFromModelFactors 物化scale 快照 从 common 家族 快照 元数据。
 func BuildFromModelFactors(code, version, title, questionnaireCode, questionnaireVersion, status string, factors []factor.FactorSnapshot) *ScaleSnapshot {
 	return BuildFromCanonicalFactors(ExecutionEnvelope{
 		Code:                 code,
@@ -112,7 +112,7 @@ func BuildFromModelFactors(code, version, title, questionnaireCode, questionnair
 	}, factors)
 }
 
-// BuildFromCanonicalFactors materializes a scale execution snapshot from canonical factors.
+// BuildFromCanonicalFactors 物化scale execution 快照 从 规范 因子。
 func BuildFromCanonicalFactors(env ExecutionEnvelope, factors []factor.FactorSnapshot) *ScaleSnapshot {
 	if env.Code == "" && len(factors) == 0 {
 		return nil

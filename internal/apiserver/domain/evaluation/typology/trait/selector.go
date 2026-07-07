@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// SelectOutcome applies the decision spec to a scored profile vector.
+// SelectOutcome 应用decision spec 到 scored 画像 vector。
 func SelectOutcome(vector ProfileVector, spec DecisionSpec) (OutcomeCandidate, error) {
 	switch spec.Kind {
 	case DecisionKindPoleComposition:
@@ -53,7 +53,7 @@ func selectPoleComposition(vector ProfileVector, spec DecisionSpec) (OutcomeCand
 	}, nil
 }
 
-// ResolvePole maps a raw factor score to a pole preference and strength.
+// ResolvePole 映射原始 因子 score 到 pole preference 和 strength。
 func ResolvePole(pole PoleSpec, raw float64) (preference string, strength float64) {
 	threshold := pole.Threshold
 	if threshold == 0 {
@@ -66,7 +66,7 @@ func ResolvePole(pole PoleSpec, raw float64) (preference string, strength float6
 	return preference, PoleStrength(raw, pole)
 }
 
-// PoleStrength computes preference strength using pole deviation metadata.
+// PoleStrength 计算preference strength using pole deviation 元数据。
 func PoleStrength(raw float64, pole PoleSpec) float64 {
 	threshold := pole.Threshold
 	if threshold == 0 {
@@ -86,7 +86,7 @@ func PoleStrength(raw float64, pole PoleSpec) float64 {
 	return strength
 }
 
-// LevelForScore maps a raw score to L/M/H using the configured level rule.
+// LevelForScore 映射原始分 到 L/M/H using 配置化 等级 rule。
 func LevelForScore(raw float64, rule LevelRule) string {
 	lowMax := rule.LowMax
 	if lowMax == 0 {

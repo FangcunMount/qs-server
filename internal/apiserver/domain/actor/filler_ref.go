@@ -29,7 +29,7 @@ func (f FillerType) String() string {
 // FillerRef 填写人引用（值对象）
 // 用于记录"谁操作填写"的元数据
 type FillerRef struct {
-	userID     int64      // IAM.UserID
+	userID     int64      // IAM.UserID 标识。
 	fillerType FillerType // 填写类型
 }
 

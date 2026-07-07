@@ -14,7 +14,7 @@ const (
 	maxFailedRunLimit         = 200
 )
 
-// Service reads persisted evaluation runs.
+// Service reads persisted 评估执行。
 type Service interface {
 	ListByAssessmentID(ctx context.Context, assessmentID uint64, limit int) (*RunListResult, error)
 	FindLatestByAssessmentID(ctx context.Context, assessmentID uint64) (*RunResult, error)
@@ -25,7 +25,7 @@ type service struct {
 	runRepo evaluationrun.Repository
 }
 
-// NewService creates an evaluation run query service.
+// NewService 创建评估执行 查询服务。
 func NewService(runRepo evaluationrun.Repository) Service {
 	return &service{runRepo: runRepo}
 }

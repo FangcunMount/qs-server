@@ -2,7 +2,7 @@ package typology
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// LegacyOutcomeMappingFromAlgorithm derives outcome mapping from a legacy algorithm identifier.
+// LegacyOutcomeMappingFromAlgorithm 推导结果 mapping 从 旧版 算法 identifier。
 func LegacyOutcomeMappingFromAlgorithm(algorithm modelcatalog.Algorithm) OutcomeMappingSpec {
 	switch algorithm {
 	case modelcatalog.AlgorithmBigFive:
@@ -26,7 +26,7 @@ func LegacyOutcomeMappingFromAlgorithm(algorithm modelcatalog.Algorithm) Outcome
 	}
 }
 
-// LegacyReportSpecFromPayload derives report spec from a legacy payload algorithm field.
+// LegacyReportSpecFromPayload 推导report spec 从 旧版 载荷 算法 field。
 func LegacyReportSpecFromPayload(p *Payload) ReportSpec {
 	if p == nil {
 		return ReportSpec{}
@@ -34,7 +34,7 @@ func LegacyReportSpecFromPayload(p *Payload) ReportSpec {
 	return LegacyReportSpecFromAlgorithm(p.Algorithm)
 }
 
-// LegacyReportSpecFromAlgorithm derives report spec from a legacy algorithm identifier.
+// LegacyReportSpecFromAlgorithm 推导report spec 从 旧版 算法 identifier。
 func LegacyReportSpecFromAlgorithm(algorithm modelcatalog.Algorithm) ReportSpec {
 	switch algorithm {
 	case modelcatalog.AlgorithmBigFive:

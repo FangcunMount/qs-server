@@ -1,6 +1,6 @@
 package factor
 
-// FactorRole classifies the business semantics of a model dimension.
+// FactorRole 划分business semantics of model 维度。
 type FactorRole string
 
 const (

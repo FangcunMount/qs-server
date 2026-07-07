@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// ID identifies one evaluation run within an assessment lifecycle.
+// ID 标识一个评估执行 在 测评生命周期。
 type ID string
 
 func (id ID) String() string { return string(id) }
 
-// EvaluationRun records one evaluation execution attempt for an assessment.
+// EvaluationRun 记录一个评估执行 尝试 用于 assessment。
 type EvaluationRun struct {
 	RunID        ID
 	AssessmentID uint64
@@ -22,12 +22,12 @@ type EvaluationRun struct {
 	FinishedAt   *time.Time
 }
 
-// NewEvaluationRun creates the first in-memory run for an assessment execution.
+// NewEvaluationRun 创建首个 in-memory run 用于 测评执行。
 func NewEvaluationRun(assessmentID uint64) EvaluationRun {
 	return NewEvaluationRunWithAttempt(assessmentID, 1)
 }
 
-// NewEvaluationRunWithAttempt creates a run for a specific attempt number.
+// NewEvaluationRunWithAttempt 创建run 用于 特定 尝试序号。
 func NewEvaluationRunWithAttempt(assessmentID uint64, attemptNo int) EvaluationRun {
 	if attemptNo < 1 {
 		attemptNo = 1
@@ -39,12 +39,12 @@ func NewEvaluationRunWithAttempt(assessmentID uint64, attemptNo int) EvaluationR
 	}
 }
 
-// NextEvaluationRun creates the next attempt after a failed retryable run.
+// NextEvaluationRun 创建下一个 尝试 在之后 失败 可重试 run。
 func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
 	return NewEvaluationRunWithAttempt(latest.AssessmentID, latest.Attempt.Number+1)
 }
 
-// Start marks the run as actively executing.
+// Start 标记run 作为 活跃ly executing。
 func (r *EvaluationRun) Start(now time.Time) {
 	if r == nil {
 		return
@@ -53,7 +53,7 @@ func (r *EvaluationRun) Start(now time.Time) {
 	r.StartedAt = now
 }
 
-// Succeed marks the run as completed successfully.
+// Succeed 标记run 作为 completed 成功ly。
 func (r *EvaluationRun) Succeed(now time.Time) {
 	if r == nil {
 		return
@@ -62,7 +62,7 @@ func (r *EvaluationRun) Succeed(now time.Time) {
 	r.FinishedAt = &now
 }
 
-// Fail marks the run as failed with retry metadata.
+// Fail 标记run 作为 失败 使用 重试元数据。
 func (r *EvaluationRun) Fail(now time.Time, failure Failure) {
 	if r == nil {
 		return
@@ -72,7 +72,7 @@ func (r *EvaluationRun) Fail(now time.Time, failure Failure) {
 	r.FinishedAt = &now
 }
 
-// Retryable reports whether the latest failure can be retried.
+// Retryable 报告是否 最新 失败 can be retried。
 func (r EvaluationRun) Retryable() bool {
 	return r.Failure != nil && r.Failure.Retryable
 }

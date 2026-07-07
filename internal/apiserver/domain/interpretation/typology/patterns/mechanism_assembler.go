@@ -8,7 +8,7 @@ import (
 	reportfactorclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology"
 )
 
-// PersonalityTypeReportTemplate carries presentation labels for mechanism-oriented reports.
+// PersonalityTypeReportTemplate 携带呈现 labels 用于 面向机制 reports。
 type PersonalityTypeReportTemplate struct {
 	Kind                 string
 	DefaultModelName     string
@@ -18,7 +18,7 @@ type PersonalityTypeReportTemplate struct {
 	ConclusionSuffix     func(detail PersonalityTypeReportDetail) string
 }
 
-// TraitProfileReportTemplate carries presentation labels for trait-profile reports.
+// TraitProfileReportTemplate 携带呈现 labels 用于 trait-画像 reports。
 type TraitProfileReportTemplate struct {
 	Kind             string
 	DefaultModelName string
@@ -28,7 +28,7 @@ type TraitProfileReportTemplate struct {
 	ConclusionTitle  string
 }
 
-// BuildPersonalityTypeReport assembles a personality-type report from mechanism-neutral detail.
+// BuildPersonalityTypeReport 组装personality-type report 从 机制无关 detail。
 func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl PersonalityTypeReportTemplate) (*domainreport.InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")
@@ -76,7 +76,7 @@ func mechanismConclusionSuffix(tmpl PersonalityTypeReportTemplate, detail Person
 	return ""
 }
 
-// BuildTraitProfileReport assembles a trait-profile report from mechanism-neutral detail.
+// BuildTraitProfileReport 组装trait-画像 report 从 机制无关 detail。
 func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileReportTemplate) (*domainreport.InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")

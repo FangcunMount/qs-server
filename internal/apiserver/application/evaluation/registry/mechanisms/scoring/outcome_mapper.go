@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// ToAssessmentOutcome maps a scale interpretation result into the canonical domain outcome.
+// ToAssessmentOutcome 映射scale interpretation 结果 为 规范 领域结果。
 func ToAssessmentOutcome(
 	result *domainfactor_scoring.ScaleInterpretationResult,
 	a *assessment.Assessment,

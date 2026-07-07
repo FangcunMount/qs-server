@@ -11,12 +11,12 @@ import (
 
 const EventTypeInterpretedOutcome = EventTypeInterpreted
 
-// AssessmentInterpretedOutcomeData is the outcome-enriched interpreted event payload.
+// AssessmentInterpretedOutcomeData 是结果-enriched interpreted 事件载荷。
 type AssessmentInterpretedOutcomeData = eventoutcome.AssessmentInterpretedPayload
 
 type AssessmentInterpretedOutcomeEvent = event.Event[AssessmentInterpretedOutcomeData]
 
-// NewAssessmentInterpretedOutcomeEvent creates an outcome-enriched interpreted event.
+// NewAssessmentInterpretedOutcomeEvent 创建结果-enriched interpreted event。
 func NewAssessmentInterpretedOutcomeEvent(
 	orgID int64,
 	assessmentID ID,

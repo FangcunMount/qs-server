@@ -1,6 +1,6 @@
 package interpretation
 
-// FinalizeInterpretReport synchronizes v2 outcome summary fields with legacy report fields.
+// FinalizeInterpretReport synchronizes v2 结果 summary 字段 使用 旧版 report 字段。
 func FinalizeInterpretReport(r *InterpretReport) {
 	if r == nil {
 		return
@@ -32,7 +32,7 @@ func FinalizeInterpretReport(r *InterpretReport) {
 	}
 }
 
-// AttachOutcomeSummary binds v2 model identity and outcome summary onto a report.
+// AttachOutcomeSummary binds v2 模型身份 和 结果 summary onto report。
 func AttachOutcomeSummary(
 	r *InterpretReport,
 	model ModelIdentity,

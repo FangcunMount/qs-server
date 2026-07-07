@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
-// CacheWarmupProjection is the diagnostic cache governance view.
+// CacheWarmupProjection 是diagnostic 缓存 governance 视图。
 type CacheWarmupProjection struct {
 	FamilyRows  []CacheFamilyRow
 	WarmupKinds []CacheWarmupKind
@@ -18,7 +18,7 @@ type CacheWarmupProjection struct {
 	Signals     []Signal
 }
 
-// CacheWarmupEvaluator turns cache runtime snapshots into operator-facing rows and signals.
+// CacheWarmupEvaluator 将缓存 运行时 快照转换为operator-facing 行 和 信号。
 type CacheWarmupEvaluator struct {
 	evidence MetricEvidenceReader
 }

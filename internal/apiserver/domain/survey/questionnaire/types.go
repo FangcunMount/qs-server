@@ -66,7 +66,7 @@ func NormalizeQuestionnaireType(value string) QuestionnaireType {
 	return TypeSurvey
 }
 
-// DefaultQuestionnaireType 默认问卷类型
+// 默认QuestionnaireType 默认问卷类型
 func DefaultQuestionnaireType() QuestionnaireType {
 	return TypeSurvey
 }

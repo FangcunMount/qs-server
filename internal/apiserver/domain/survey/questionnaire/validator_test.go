@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// ===================== Helper Functions =====================
+// === 测试辅助函数 ===
 
 // createValidQuestionnaire 创建一个有效的问卷用于测试
 func createValidQuestionnaire(code, title string) *Questionnaire {
@@ -60,7 +60,7 @@ func createTextQuestion(code, stem string) Question {
 	return question
 }
 
-// ===================== TestValidator_ValidateForPublish =====================
+// === Test有效ator_有效ateForPublish ===
 
 func TestValidator_ValidateForPublish(t *testing.T) {
 	tests := []struct {
@@ -234,7 +234,7 @@ func TestValidator_ValidateForPublish(t *testing.T) {
 	}
 }
 
-// ===================== TestValidator_ValidateBasicInfo =====================
+// === Test有效ator_有效ateBasicInfo ===
 
 func TestValidator_ValidateBasicInfo(t *testing.T) {
 	tests := []struct {
@@ -297,7 +297,7 @@ func TestValidator_ValidateBasicInfo(t *testing.T) {
 	}
 }
 
-// ===================== TestValidator_ValidateQuestion =====================
+// === Test有效ator_有效ateQuestion ===
 
 func TestValidator_ValidateQuestion(t *testing.T) {
 	tests := []struct {
@@ -376,7 +376,7 @@ func TestValidator_ValidateQuestion(t *testing.T) {
 	}
 }
 
-// ===================== TestValidator_ValidateQuestions =====================
+// === Test有效ator_有效ateQuestions ===
 
 func TestValidator_ValidateQuestions(t *testing.T) {
 	tests := []struct {
@@ -427,7 +427,7 @@ func TestValidator_ValidateQuestions(t *testing.T) {
 	}
 }
 
-// ===================== TestToError =====================
+// === TestToError ===
 
 func TestToError(t *testing.T) {
 	tests := []struct {
@@ -484,7 +484,7 @@ func TestToError(t *testing.T) {
 	}
 }
 
-// ===================== TestLifecycle_Publish_WithValidation =====================
+// === TestLifecycle_Publish_With校验 ===
 
 func TestLifecycle_Publish_WithValidation(t *testing.T) {
 	t.Run("发布有效问卷", func(t *testing.T) {
@@ -536,7 +536,7 @@ func TestLifecycle_Publish_WithValidation(t *testing.T) {
 	})
 }
 
-// ===================== TestCanBePublished_WithValidator =====================
+// === TestCanBePublished_With有效ator ===
 
 func TestCanBePublished_WithValidator(t *testing.T) {
 	t.Run("有效问卷可以发布", func(t *testing.T) {
@@ -583,7 +583,7 @@ func TestCanBePublished_WithValidator(t *testing.T) {
 	})
 }
 
-// ===================== Helper Functions =====================
+// === 测试辅助函数 ===
 
 func containsString(s, substr string) bool {
 	if len(s) < len(substr) {

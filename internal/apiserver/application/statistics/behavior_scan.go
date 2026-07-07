@@ -27,7 +27,7 @@ type scanBatchResult struct {
 	lastSeenTime *time.Time
 }
 
-// NewBehaviorJourneyScanService creates the background scan projector.
+// NewBehaviorJourneyScanService 创建background scan 投影器。
 func NewBehaviorJourneyScanService(
 	runner transactionRunner,
 	repo BehaviorJourneyScanRepository,

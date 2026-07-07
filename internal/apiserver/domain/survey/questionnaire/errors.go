@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ErrorKind classifies questionnaire domain failures without depending on API error codes.
+// ErrorKind 划分问卷 领域失败 不使用 取决 依赖 API 错误码。
 type ErrorKind string
 
 const (
@@ -21,7 +21,7 @@ const (
 	ErrorKindOptionEmpty      ErrorKind = "option_empty"
 )
 
-// DomainError is a domain-native error that application services map to API codes.
+// DomainError 是领域-native error that 应用服务s 映射到 API 编码。
 type DomainError struct {
 	kind    ErrorKind
 	message string
@@ -63,7 +63,7 @@ func (e *DomainError) Kind() ErrorKind {
 	return e.kind
 }
 
-// ErrorKindOf returns the first questionnaire domain error kind in an error chain.
+// ErrorKindOf 返回首个 问卷 领域 error 类型 在错误链中。
 func ErrorKindOf(err error) (ErrorKind, bool) {
 	var domainErr *DomainError
 	if !stderrors.As(err, &domainErr) {

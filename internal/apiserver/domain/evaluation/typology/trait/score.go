@@ -7,20 +7,20 @@ import (
 	"strings"
 )
 
-// FactorScore is the scored value of one factor.
+// FactorScore 是scored value of 一个因子。
 type FactorScore struct {
 	FactorID FactorID
 	Code     string
 	Raw      float64
 }
 
-// ProfileVector is the scored factor profile before outcome selection.
+// ProfileVector 是scored 因子 画像 在之前 结果 选择。
 type ProfileVector struct {
 	Scores  map[FactorID]FactorScore
 	Ordered []FactorScore
 }
 
-// ScoreGraph scores all factors in topological order from an answer sheet.
+// ScoreGraph 计算所有 因子 in topological order 从 答卷。
 func ScoreGraph(g FactorGraph, sheet *evaluationinput.AnswerSheet) (ProfileVector, error) {
 	if sheet == nil {
 		return ProfileVector{}, fmt.Errorf("answer sheet is required")

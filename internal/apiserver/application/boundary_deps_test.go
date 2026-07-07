@@ -11,7 +11,7 @@ import (
 const apiserverImportBase = "github.com/FangcunMount/qs-server/internal/apiserver/"
 
 // forbiddenModuleEdges 表达《docs/02-业务模块/01-模块边界与依赖关系》中禁止的反向依赖方向。
-// 仅扫描 domain/application/infra 生产代码；组合根 container/modules/* 允许跨模块装配，故不在范围内。
+// 仅扫描 领域/application/infra 生产代码；组合根 container/modules/* 允许跨模块装配，故不在范围内。
 var forbiddenModuleEdges = []struct{ from, to string }{
 	{"survey", "evaluation"},
 	{"survey", "interpretation"},
@@ -69,7 +69,7 @@ func TestForbiddenCrossModuleImports(t *testing.T) {
 		scanEdge(e.from, e.to)
 	}
 
-	// 规则 6：statistics 是读侧投影，不得反向依赖核心写模型(domain/application)。infra 读侧复用另议，不在此扫描。
+	// 规则 6：statistics 是读侧投影，不得反向依赖核心写模型(领域/application)。infra 读侧复用另议，不在此扫描。
 	var writeModelTargets []string
 	for _, m := range []string{"survey", "evaluation", "interpretation", "plan"} {
 		writeModelTargets = append(writeModelTargets,
@@ -115,7 +115,7 @@ func moduleLayerDirs(m string) []string {
 	}
 }
 
-// moduleImportPrefixes 返回某业务模块各层的 import 路径前缀，用于判定目标依赖。
+// moduleImportPrefixes 返回某业务模块各层的 导入 路径前缀，用于判定目标依赖。
 func moduleImportPrefixes(m string) []string {
 	return []string{
 		apiserverImportBase + "domain/" + m,

@@ -2,11 +2,11 @@ package assessment
 
 import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 
-// EventModelIdentity is the wire projection of model identity on assessment events.
+// EventModelIdentity 是线缆投影 of 模型身份 on 测评事件。
 type EventModelIdentity = eventoutcome.ModelIdentity
 
-// EventScoreValue is the wire projection of primary score on assessment events.
+// EventScoreValue 是线缆投影 of 主 score on 测评事件。
 type EventScoreValue = eventoutcome.ScoreValue
 
-// EventResultLevel is the wire projection of outcome level on assessment events.
+// EventResultLevel 是线缆投影 of 结果 等级 on 测评事件。
 type EventResultLevel = eventoutcome.ResultLevel

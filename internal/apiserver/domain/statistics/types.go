@@ -101,6 +101,6 @@ type PlanStatistics struct {
 	// 近窗口任务趋势，默认由计划日投影提供
 	Activity    PlanTaskActivityStatistics    `json:"activity"`
 	Fulfillment PlanTaskFulfillmentStatistics `json:"fulfillment"`
-	Window      PlanTaskWindow                `json:"window"` // Deprecated: use activity.window.
-	Trend       PlanTaskTrend                 `json:"trend"`  // Deprecated: use activity.trend.
+	Window      PlanTaskWindow                `json:"window"` // Deprecated: 使用 activity.窗口。
+	Trend       PlanTaskTrend                 `json:"trend"`  // Deprecated: 使用 activity.trend。
 }

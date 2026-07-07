@@ -1,6 +1,6 @@
 package factor
 
-// ScoringStrategy names how question scores aggregate into a factor raw score.
+// ScoringStrategy 命名如何 question 分数 aggregate 为 因子 原始分。
 type ScoringStrategy string
 
 const (
@@ -14,7 +14,7 @@ const (
 
 func (s ScoringStrategy) String() string { return string(s) }
 
-// ScoringParams carries strategy-specific parameters.
+// ScoringParams 携带strategy-特定 parameters。
 type ScoringParams struct {
 	CntOptionContents []string
 }

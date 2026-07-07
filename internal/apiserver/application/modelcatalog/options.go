@@ -2,8 +2,8 @@ package modelcatalog
 
 import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// ModelCatalogOption is an application-facing model-catalog kind option.
-// It includes API/UI metadata and legacy product-channel slots.
+// ModelCatalogOption 是application-facing model-目录 类型 选项。
+// It includes API/UI 元数据 和 旧版 product-channel slots。
 type ModelCatalogOption struct {
 	APIKind        string
 	DisplayName    string
@@ -13,7 +13,7 @@ type ModelCatalogOption struct {
 	PreviewEnabled bool
 }
 
-// ModelCatalogOptions returns API kind options from the catalog option registry.
+// ModelCatalogOptions 返回API 类型 选项 从 目录选项注册表。
 func ModelCatalogOptions() []ModelCatalogOption {
 	presentation := catalogRegistry.PresentationOptions()
 	options := make([]ModelCatalogOption, 0, len(presentation))

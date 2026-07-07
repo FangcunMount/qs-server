@@ -22,7 +22,7 @@ type staticSource struct {
 	events []event.DomainEvent
 }
 
-// Collect 将一组事件包装为共享发布 helper 可消费的 Source。
+// Collect 将一组事件包装为共享发布 辅助函数 可消费的 Source。
 func Collect(events ...event.DomainEvent) Source {
 	return &staticSource{events: events}
 }

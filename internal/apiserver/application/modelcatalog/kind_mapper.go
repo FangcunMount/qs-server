@@ -4,7 +4,7 @@ import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/model
 
 const AlgorithmCustomTypology = "custom_typology"
 
-// APIKindToDomainKind maps external API kind values to canonical domain kinds.
+// APIKindToDomainKind 映射外部 API 类型值 到 规范领域类型。
 func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	switch kind {
 	case KindPersonality:
@@ -22,7 +22,7 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	}
 }
 
-// DomainKindToAPIKind maps canonical domain kinds to the external API contract.
+// DomainKindToAPIKind 映射规范领域类型 到 外部 API 契约。
 func DomainKindToAPIKind(kind domain.Kind) string {
 	if entry, ok := catalogRegistry.ByKind(kind); ok && entry.APIKind != "" {
 		return entry.APIKind
@@ -43,7 +43,7 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 	}
 }
 
-// APIPayloadFormatToDomain normalizes API payload formats to canonical domain formats.
+// APIPayloadFormatToDomain 归一化API 载荷格式 到 规范领域格式。
 func APIPayloadFormatToDomain(format string) string {
 	switch format {
 	case PayloadFormatMedicalScaleV1:
@@ -53,7 +53,7 @@ func APIPayloadFormatToDomain(format string) string {
 	}
 }
 
-// DomainPayloadFormatToAPI maps canonical domain payload formats back to API values.
+// DomainPayloadFormatToAPI 映射规范 领域载荷格式 back 到 API 值。
 func DomainPayloadFormatToAPI(kind string, format string) string {
 	switch format {
 	case domain.PayloadFormatAssessmentScaleV1:

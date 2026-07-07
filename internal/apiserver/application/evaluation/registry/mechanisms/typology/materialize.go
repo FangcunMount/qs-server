@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// MaterializeEvaluator builds or reuses the configured typology executor for a descriptor.
+// MaterializeEvaluator 构建或 reuses 配置化 类型学 executor 用于 描述符。
 func MaterializeEvaluator(
 	desc evaldomain.ModelDescriptor,
 	registry ModuleRegistry,
@@ -31,7 +31,7 @@ func MaterializeEvaluator(
 	return *shared, nil
 }
 
-// MaterializeReportBuilder builds or reuses the configured typology report builder for a descriptor.
+// MaterializeReportBuilder 构建或 reuses 配置化 类型学 报告构建器 用于 描述符。
 func MaterializeReportBuilder(
 	desc evaldomain.ModelDescriptor,
 	registry ModuleRegistry,

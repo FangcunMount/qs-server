@@ -32,7 +32,7 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 	return reportRowToResult(*row), nil
 }
 
-// GetOutcomeByAssessmentID 根据测评ID获取 outcome 报告投影。
+// GetOutcomeByAssessmentID 根据测评ID获取 结果 报告投影。
 func (s *reportQueryService) GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportOutcomeResult, error) {
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
@@ -68,7 +68,7 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	}, nil
 }
 
-// ListOutcomeByTesteeID 获取受试者的 outcome 报告列表。
+// ListOutcomeByTesteeID 获取受试者的 结果 报告列表。
 func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 	if s.reader == nil {

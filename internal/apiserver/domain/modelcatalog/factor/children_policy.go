@@ -1,6 +1,6 @@
 package factor
 
-// ChildrenAggregationStrategy names how a parent factor derives its score from children.
+// ChildrenAggregationStrategy 命名如何 父节点 因子 从中推导分数： 子节点。
 type ChildrenAggregationStrategy string
 
 const (
@@ -24,8 +24,8 @@ func (s ChildrenAggregationStrategy) IsValid() bool {
 	}
 }
 
-// ChildrenPolicy describes how a composite parent derives scores from child factors.
-// Only factors with role=index (composite index) are required to define this in publish validation.
+// ChildrenPolicy 描述如何复合 父节点 从中推导分数： 子节点 因子。
+// Only 因子 使用 角色=index (复合 index) 是 required 到 define 这个in publish 校验。
 type ChildrenPolicy struct {
 	Strategy ChildrenAggregationStrategy
 	Children []string

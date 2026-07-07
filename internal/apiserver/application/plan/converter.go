@@ -98,7 +98,7 @@ type TaskListResult struct {
 }
 
 // TaskWindowResult 任务窗口结果。
-// 使用 has_more 表达是否存在下一页，避免 process 路径依赖 COUNT(*)。
+// 使用 has_more 表达是否存在下一页，避免 进程 路径依赖 COUNT(*)。
 type TaskWindowResult struct {
 	Items    []*TaskResult // 当前窗口内的任务
 	Page     int           // 当前页码

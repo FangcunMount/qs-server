@@ -13,17 +13,17 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// ReportDurableSaver persists reports and stages interpretation events atomically.
+// ReportDurableSaver 持久化reports 和 stages interpretation events atomically。
 type ReportDurableSaver interface {
 	SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error
 }
 
-// ReportDurableWriter persists report records inside a transaction.
+// ReportDurableWriter 持久化report records inside transaction。
 type ReportDurableWriter interface {
 	SaveReportRecord(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID) error
 }
 
-// ReportEventStager stages domain events into the outbox inside a transaction.
+// ReportEventStager 暂存领域事件 为 outbox inside transaction。
 type ReportEventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
@@ -35,7 +35,7 @@ type transactionalReportDurableSaver struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 }
 
-// NewTransactionalReportDurableSaver creates a saver that writes report + outbox in one transaction.
+// NewTransactionalReportDurableSaver 创建saver that writes report + outbox in 一个transaction。
 func NewTransactionalReportDurableSaver(
 	runner apptransaction.Runner,
 	writer ReportDurableWriter,

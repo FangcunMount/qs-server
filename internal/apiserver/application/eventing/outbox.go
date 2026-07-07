@@ -21,13 +21,13 @@ const (
 	maxPublishedMarkBatchSize    = 100
 )
 
-// PendingOutboxEvent keeps the application-facing alias for the shared outbox contract.
+// PendingOutboxEvent 保留application-facing 别名 用于 共享 outbox 契约。
 type PendingOutboxEvent = outboxport.PendingEvent
 
-// OutboxStore keeps the application-facing alias for the shared outbox contract.
+// OutboxStore 保留application-facing 别名 用于 共享 outbox 契约。
 type OutboxStore = outboxport.Store
 
-// OutboxStatusReader keeps the application-facing alias for read-only outbox status.
+// OutboxStatusReader 保留application-facing 别名 用于 只读 outbox 状态。
 type OutboxStatusReader = outboxport.StatusReader
 
 type OutboxStatusReporter interface {
@@ -47,7 +47,7 @@ func (f OutboxBeforePublishFunc) BeforePublish(ctx context.Context, pending Pend
 	return f(ctx, pending)
 }
 
-// OutboxRelay dispatches due outbox events.
+// OutboxRelay 分发due outbox 事件。
 type OutboxRelay interface {
 	DispatchDue(ctx context.Context) error
 }
@@ -72,7 +72,7 @@ type relayPublishResult struct {
 	err       error
 }
 
-// NewOutboxRelay creates a generic relay for outbox-backed events.
+// NewOutboxRelay 创建通用中继器 用于 outbox 支撑的事件。
 func NewOutboxRelay(name string, store OutboxStore, publisher event.EventPublisher) OutboxRelay {
 	return NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:      name,

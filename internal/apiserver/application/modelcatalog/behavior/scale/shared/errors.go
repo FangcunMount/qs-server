@@ -6,7 +6,7 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// WrapScaleDomainError maps domain scale errors to application-layer error codes.
+// WrapScaleDomainError 映射领域 scale errors 到 application-layer error 编码。
 func WrapScaleDomainError(err error, fallbackCode int, format string, args ...interface{}) error {
 	if err == nil {
 		return nil

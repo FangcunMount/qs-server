@@ -9,7 +9,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PersonalityEvaluationModelValidator ensures personality assessments pin a published snapshot.
+// PersonalityEvaluationModelValidator ensures personality assessments pin 已发布快照。
 type PersonalityEvaluationModelValidator struct {
 	reader port.PublishedModelReader
 }

@@ -9,7 +9,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// BuildPublishedSnapshot materializes a v2 published snapshot from a draft personality model.
+// BuildPublishedSnapshot 物化v2 已发布快照 从 draft 人格模型。
 func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedModelSnapshot, error) {
 	if model == nil {
 		return nil, fmt.Errorf("assessment model is nil")
@@ -57,13 +57,13 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	}, nil
 }
 
-// RuntimeSpecFromModel decodes the draft model definition into the runtime execution spec.
+// RuntimeSpecFromModel de编码 草稿模型定义 为 运行时 执行规格。
 func RuntimeSpecFromModel(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, error) {
 	_, runtime, err := PayloadAndRuntimeSpecFromModel(model)
 	return runtime, err
 }
 
-// PayloadAndRuntimeSpecFromModel decodes the draft model definition and preserves payload-level metadata.
+// PayloadAndRuntimeSpecFromModel de编码 草稿模型定义 和 preserves 载荷-等级 元数据。
 func PayloadAndRuntimeSpecFromModel(model *domain.AssessmentModel) (*modeltypology.Payload, *modeltypology.RuntimeSpec, error) {
 	if model == nil {
 		return nil, nil, fmt.Errorf("assessment model is nil")

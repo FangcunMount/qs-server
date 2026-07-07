@@ -4,14 +4,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// MetadataContext carries task_performance metadata without embedding norm table bodies.
-// Execution-layer scoring (answer key, ability level) awaits a second task_performance model.
+// MetadataContext 携带task_performance 元数据 不使用 embedding 常模表 bodies。
+// 执行层 计分 (answer 键, ability 等级) 等待 second task_performance model。
 type MetadataContext struct {
 	NormTableVersion string
 	ItemSetCodes     []string
 }
 
-// ApplyNormMetadata annotates canonical factors with task-set roles and norm references.
+// ApplyNormMetadata 标注规范 因子 使用 task-set 角色 和 常模 references。
 func ApplyNormMetadata(factors []factor.FactorSnapshot, ctx MetadataContext) []factor.FactorSnapshot {
 	if len(factors) == 0 {
 		return factors

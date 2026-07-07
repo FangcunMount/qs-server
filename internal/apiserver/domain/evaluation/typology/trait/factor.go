@@ -1,9 +1,9 @@
 package trait
 
-// FactorID identifies a node in a personality factor graph.
+// FactorID 标识node in personality 因子图。
 type FactorID string
 
-// FactorKind distinguishes leaf factors (from answers) and composite factors.
+// FactorKind 区分叶子 因子 (从 answers) 和 复合 因子。
 type FactorKind string
 
 const (
@@ -11,7 +11,7 @@ const (
 	FactorKindComposite FactorKind = "composite"
 )
 
-// AggregationMethod defines how composite factors combine child scores.
+// AggregationMethod 定义如何复合 因子 组合子节点 分数。
 type AggregationMethod string
 
 const (
@@ -20,31 +20,31 @@ const (
 	AggregationWeightedAvg AggregationMethod = "weighted_avg"
 )
 
-// OptionScoringPolicy controls how option-mapped answers are scored.
+// OptionScoringPolicy 控制如何选项-mapped answers 是 scored。
 type OptionScoringPolicy string
 
 const (
-	// OptionScoringStrict requires a known option key in OptionScores.
+	// OptionScoringStrict requires known 选项键 in 选项cores。
 	OptionScoringStrict OptionScoringPolicy = "strict"
-	// OptionScoringCompat falls back to answer.Score when option key is unknown.
+	// OptionScoringCompat falls back 到 answer.Score when 选项键 是 unknown。
 	OptionScoringCompat OptionScoringPolicy = "compat"
 )
 
-// AnswerContribution maps a questionnaire item to a leaf factor score.
+// AnswerContribution 映射问卷题目 到 叶子 因子 score。
 type AnswerContribution struct {
 	QuestionCode string
 	Sign         float64
 	OptionScores map[string]float64
 }
 
-// LeafScoringSpec scores a leaf factor from answer values.
+// LeafScoringSpec 分数 叶子 因子 从 答案值。
 type LeafScoringSpec struct {
 	Constant      float64
 	Contributions []AnswerContribution
 	OptionScoring OptionScoringPolicy
 }
 
-// PersonalityFactor is a node in the factor hierarchy.
+// PersonalityFactor 是node in 因子 层级。
 type PersonalityFactor struct {
 	ID          FactorID
 	Code        string

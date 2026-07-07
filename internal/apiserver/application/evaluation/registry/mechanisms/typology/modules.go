@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DefaultModules returns algorithm alias entries for the configured typology runtime.
+// 默认Modules 返回算法别名 entries 用于 配置化 类型学 运行时。
 func DefaultModules() []Module {
 	modules := make([]Module, 0, len(typologylegacy.DefaultAlgorithmAliases()))
 	for _, algorithm := range typologylegacy.DefaultAlgorithmAliases() {
@@ -19,22 +19,22 @@ func DefaultModules() []Module {
 	return modules
 }
 
-// AllModules returns all built-in typology modules.
+// AllModules 返回全部内置 类型学 modules。
 func AllModules() []Module {
 	return DefaultModules()
 }
 
-// DefaultAlgorithms returns algorithms registered by DefaultModules.
+// 默认Algorithms 返回算法s 已注册 按 默认Modules。
 func DefaultAlgorithms() []modelcatalog.Algorithm {
 	return typologylegacy.DefaultAlgorithmAliases()
 }
 
-// CategoryLabelFor resolves the display label for a typology algorithm.
+// CategoryLabelFor 解析display label 用于 类型学算法。
 func CategoryLabelFor(algorithm modelcatalog.Algorithm) string {
 	return typologylegacy.CategoryLabelFor(algorithm)
 }
 
-// DefaultModuleRegistry builds the default typology module registry.
+// 默认ModuleRegistry 构建默认 类型学 module 注册表。
 func DefaultModuleRegistry() (ModuleRegistry, error) {
 	return DefaultPersonalityRuntimeRegistry().AsModuleRegistry(), nil
 }

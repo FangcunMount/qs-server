@@ -1,11 +1,11 @@
 package factor
 
-// ScoringParamsPayload is the shared JSON shape for strategy-specific scoring params.
+// ScoringParamsPayload 是共享 JSON 结构 用于 strategy-特定 计分 params。
 type ScoringParamsPayload struct {
 	CntOptionContents []string `json:"cnt_option_contents,omitempty"`
 }
 
-// DimensionRule is the shared draft/published payload dimension shape.
+// DimensionRule 是共享 draft/published 载荷 维度 结构。
 type DimensionRule struct {
 	Code            string                 `json:"code"`
 	Title           string                 `json:"title"`
@@ -22,20 +22,20 @@ type DimensionRule struct {
 	ChildrenPolicy  *ChildrenPolicyPayload `json:"children_policy,omitempty"`
 }
 
-// ChildrenPolicyPayload is the JSON shape for parent factor derivation rules.
+// ChildrenPolicyPayload 是JSON 结构 用于 父节点 因子 derivation rules。
 type ChildrenPolicyPayload struct {
 	Strategy string             `json:"strategy"`
 	Children []string           `json:"children"`
 	Weights  map[string]float64 `json:"weights,omitempty"`
 }
 
-// InterpretRule groups score ranges for one dimension code.
+// InterpretRule 分组score ranges 用于 一个维度 编码。
 type InterpretRule struct {
 	DimensionCode string           `json:"dimension_code"`
 	Ranges        []ScoreRangeRule `json:"ranges"`
 }
 
-// ParseFactorsFromDefinitionBody materializes canonical factors from shared payload parts.
+// ParseFactorsFromDefinitionBody 物化规范 因子 从 共享 载荷 parts。
 func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []FactorSnapshot {
 	rulesByDimension := make(map[string][]ScoreRangeRule, len(interpretRules))
 	for _, rule := range interpretRules {

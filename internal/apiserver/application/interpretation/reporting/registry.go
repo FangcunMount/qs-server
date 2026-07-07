@@ -12,7 +12,7 @@ type reportBuilderKey struct {
 	reportType domainReport.ReportType
 }
 
-// ReportBuilderRegistry resolves report builders by evaluator key and report type.
+// ReportBuilderRegistry 解析报告构建器 按 评估器键 和 report type。
 type ReportBuilderRegistry interface {
 	Resolve(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error)
 	ResolveByMechanism(key MechanismReportBuilderKey) (ReportBuilder, error)
@@ -23,7 +23,7 @@ type mutableReportBuilderRegistry struct {
 	mechanismItems map[MechanismReportBuilderKey]ReportBuilder
 }
 
-// NewReportBuilderRegistry creates a registry from the given builders.
+// NewReportBuilderRegistry 创建注册表 从 given builders。
 func NewReportBuilderRegistry(builders ...ReportBuilder) (*mutableReportBuilderRegistry, error) {
 	registry := &mutableReportBuilderRegistry{
 		items:          make(map[reportBuilderKey]ReportBuilder),

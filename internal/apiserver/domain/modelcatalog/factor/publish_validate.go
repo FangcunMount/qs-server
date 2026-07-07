@@ -2,7 +2,7 @@ package factor
 
 import "fmt"
 
-// ValidateDefinitionBodyForPublish checks shared factor definition invariants before publish.
+// ValidateDefinitionBodyForPublish 检查共享 因子 definition invariants 在之前 publish。
 func ValidateDefinitionBodyForPublish(body DefinitionBody) []HierarchyIssue {
 	if len(body.Dimensions) == 0 {
 		return []HierarchyIssue{{
@@ -18,7 +18,7 @@ func ValidateDefinitionBodyForPublish(body DefinitionBody) []HierarchyIssue {
 	return issues
 }
 
-// ValidateDefinitionBodyJSONForPublish decodes and validates a shared factor definition payload.
+// ValidateDefinitionBodyJSONForPublish de编码 和 有效ates 共享 因子 definition 载荷。
 func ValidateDefinitionBodyJSONForPublish(payload []byte) ([]HierarchyIssue, error) {
 	body, err := ParseDefinitionBodyJSON(payload)
 	if err != nil {

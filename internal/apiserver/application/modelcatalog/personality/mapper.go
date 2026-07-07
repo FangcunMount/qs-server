@@ -43,7 +43,7 @@ func definitionFromModel(model *domain.AssessmentModel) *DefinitionResult {
 	}
 }
 
-// normalizeDefinitionPayloadForAPI returns the operating editor payload shape.
+// 正态izeDefinition载荷ForAPI returns operating editor 载荷 结构。
 func normalizeDefinitionPayloadForAPI(model *domain.AssessmentModel) []byte {
 	raw := append([]byte(nil), model.Definition.Data...)
 	if len(raw) == 0 {

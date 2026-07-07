@@ -11,7 +11,7 @@ import (
 
 const pendingOldestAgeWarning = 5 * time.Minute
 
-// EventDrainProjection is the diagnostic view derived from event/outbox status.
+// EventDrainProjection 是诊断视图 派生 从 事件/outbox 状态。
 type EventDrainProjection struct {
 	Summary       EventDrainSummary
 	OutboxRows    []EventOutboxRow
@@ -19,7 +19,7 @@ type EventDrainProjection struct {
 	Signals       []Signal
 }
 
-// EventDrainEvaluator turns raw outbox snapshots into operator-facing signals and rows.
+// EventDrainEvaluator 将原始 outbox 快照转换为面向操作方的信号和行。
 type EventDrainEvaluator struct {
 	evidence MetricEvidenceReader
 }

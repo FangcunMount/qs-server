@@ -14,7 +14,7 @@ type waiterCompletionNotifier struct {
 	waiterRegistry evaluationwaiter.Notifier
 }
 
-// NewWaiterCompletionNotifier notifies assessment waiters after interpretation completes.
+// NewWaiterCompletionNotifier notifies assessment waiters 在之后 interpretation completes。
 func NewWaiterCompletionNotifier(waiterRegistry evaluationwaiter.Notifier) CompletionNotifier {
 	return waiterCompletionNotifier{waiterRegistry: waiterRegistry}
 }

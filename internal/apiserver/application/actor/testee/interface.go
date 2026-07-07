@@ -110,7 +110,7 @@ type TesteeBackendQueryService interface {
 	ListTesteesWithGuardians(ctx context.Context, dto ListTesteeDTO) (*TesteeBackendListResult, error)
 }
 
-// ============= DTOs =============
+// === DTO ===
 
 // RegisterTesteeDTO 注册受试者 DTO
 type RegisterTesteeDTO struct {
@@ -180,12 +180,12 @@ type TesteeListResult struct {
 	Limit      int             // 限制数量
 }
 
-// ============= Backend DTOs =============
+// === 后端 DTOs ===
 
 // GuardianInfo 监护人信息
 type GuardianInfo struct {
 	Name     string // 姓名
-	Relation string // 关系（如：father, mother, guardian）
+	Relation string // 关系（如：father, mother, 守卫ian）
 	Phone    string // 电话
 }
 

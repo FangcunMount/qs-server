@@ -12,7 +12,7 @@ type scaleQRCodeQueryService struct {
 	generator ports.ScaleQRCodeGenerator
 }
 
-// NewQRCodeQueryService creates a scale QR-code use case.
+// NewQRCodeQueryService 创建scale 二维码 用例。
 func NewQRCodeQueryService(generator ports.ScaleQRCodeGenerator) ports.ScaleQRCodeQueryService {
 	return &scaleQRCodeQueryService{generator: generator}
 }

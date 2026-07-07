@@ -2,7 +2,7 @@ package patterns
 
 import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 
-// PersonalityDimensionResult is a model-neutral scored factor shown in a personality type result.
+// PersonalityDimensionResult 是model-中性 scored 因子 shown in 人格类型结果。
 type PersonalityDimensionResult struct {
 	Code       string  `json:"code"`
 	Name       string  `json:"name"`
@@ -15,7 +15,7 @@ type PersonalityDimensionResult struct {
 	Level      string  `json:"level,omitempty"`
 }
 
-// PersonalityTypeDetail is the generic detail payload for configured personality type runtimes.
+// PersonalityTypeDetail 是通用明细载荷 用于 配置化 人格类型 运行时s。
 type PersonalityTypeDetail struct {
 	TypeCode       string                       `json:"type_code"`
 	TypeName       string                       `json:"type_name"`
@@ -37,14 +37,14 @@ type PersonalityTypeDetail struct {
 	Commentary     string                       `json:"commentary,omitempty"`
 }
 
-// TraitProfileFactorResult is one scored factor in a generic trait-profile result.
+// TraitProfileFactorResult 是一个scored 因子 in 通用特质画像结果。
 type TraitProfileFactorResult struct {
 	Code     string  `json:"code"`
 	Name     string  `json:"name"`
 	RawScore float64 `json:"raw_score"`
 }
 
-// TraitProfileDetail is the generic detail payload for configured trait-profile runtimes.
+// TraitProfileDetail 是通用明细载荷 用于 配置化 trait-画像 运行时s。
 type TraitProfileDetail struct {
 	Traits []TraitProfileFactorResult `json:"traits"`
 	Source modeltypology.Source       `json:"source,omitempty"`

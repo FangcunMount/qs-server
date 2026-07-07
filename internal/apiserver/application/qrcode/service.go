@@ -156,9 +156,9 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 		scene,
 		s.config.PagePath,
 		430,   // 默认宽度
-		false, // autoColor
-		nil,   // lineColor
-		false, // isHyaline
+		false, // 自动配色
+		nil,   // 线条颜色
+		false, // 是否透明
 	)
 	if err != nil {
 		l.Errorw("生成问卷小程序码失败",
@@ -249,9 +249,9 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 		scene,
 		s.config.PagePath,
 		430,   // 默认宽度
-		false, // autoColor
-		nil,   // lineColor
-		false, // isHyaline
+		false, // 自动配色
+		nil,   // 线条颜色
+		false, // 是否透明
 	)
 	if err != nil {
 		l.Errorw("生成量表小程序码失败",

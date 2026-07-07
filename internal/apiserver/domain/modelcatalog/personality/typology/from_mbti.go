@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// FromMBTI converts a legacy MBTI payload to unified typology form.
+// FromMBTI 转换旧版 MBTI 载荷 到 unified 类型学 form。
 func FromMBTI(model *MBTILegacyModel) *Payload {
 	if model == nil {
 		return nil
@@ -69,7 +69,7 @@ func FromMBTI(model *MBTILegacyModel) *Payload {
 	}
 }
 
-// ToMBTI converts a typology payload back to legacy MBTI form.
+// ToMBTI 转换类型学载荷 back 到 旧版 MBTI form。
 func ToMBTI(payload *Payload) (*MBTILegacyModel, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")

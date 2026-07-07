@@ -11,15 +11,15 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// EventAssembler stages interpretation success events for outbox persistence.
+// EventAssembler 暂存解释成功事件 用于 outbox 持久化。
 type EventAssembler interface {
 	ExecutionIdentity() evaluation.ExecutionIdentity
-	// Key is deprecated; use ExecutionIdentity().
+	// Key 是deprecated; 使用 Execution身份()。
 	Key() evaluation.ExecutionIdentity
 	BuildSuccessEvents(outcome evaloutcome.Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent
 }
 
-// EventAssemblerRegistry resolves event assemblers by evaluator key or mechanism key.
+// EventAssemblerRegistry 解析事件组装器 按 评估器键 或 机制键。
 type EventAssemblerRegistry interface {
 	Resolve(key evaluation.ExecutionIdentity) EventAssembler
 	ResolveByMechanism(key MechanismReportBuilderKey) EventAssembler
@@ -30,7 +30,7 @@ type mutableEventAssemblerRegistry struct {
 	mechanismItems map[MechanismReportBuilderKey]EventAssembler
 }
 
-// NewEventAssemblerRegistry creates a registry from the given assemblers.
+// NewEventAssemblerRegistry 创建注册表 从 given assemblers。
 func NewEventAssemblerRegistry(assemblers ...EventAssembler) (*mutableEventAssemblerRegistry, error) {
 	registry := &mutableEventAssemblerRegistry{
 		items:          make(map[evaluation.ExecutionIdentity]EventAssembler),
@@ -106,7 +106,7 @@ func (r *mutableEventAssemblerRegistry) ResolveByMechanism(key MechanismReportBu
 	return GenericEventAssembler{}
 }
 
-// GenericEventAssembler is the default event assembler for all evaluator keys.
+// GenericEventAssembler 是默认 事件组装器 用于 全部评估器键。
 type GenericEventAssembler struct{}
 
 func (GenericEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
@@ -132,7 +132,7 @@ func (GenericEventAssembler) BuildSuccessEvents(outcome evaloutcome.Outcome, rpt
 	return events
 }
 
-// ScaleEventAssembler is kept for explicit scale registration in tests.
+// ScaleEventAssembler 是kept 用于 显式 scale registration in tests。
 type ScaleEventAssembler struct{}
 
 func (ScaleEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {

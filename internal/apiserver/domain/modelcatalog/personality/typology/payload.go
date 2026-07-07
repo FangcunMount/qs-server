@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// Payload is the unified personality typology model payload.
+// Payload 是unified personality 类型学 model 载荷。
 type Payload struct {
 	Code                 string                 `json:"code"`
 	Version              string                 `json:"version"`
@@ -25,7 +25,7 @@ type Payload struct {
 	Runtime              *RuntimeSpec           `json:"runtime,omitempty"`
 }
 
-// HasExplicitRuntime reports whether the payload carries an author-defined runtime spec.
+// HasExplicitRuntime 报告是否 载荷 携带 作者定义 运行时规格。
 func (p *Payload) HasExplicitRuntime() bool {
 	return p != nil && p.Runtime != nil
 }

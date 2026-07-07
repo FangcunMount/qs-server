@@ -1,6 +1,6 @@
 package run
 
-// FailureKind classifies why an evaluation attempt failed.
+// FailureKind 划分why 评估 尝试 失败。
 type FailureKind string
 
 const (
@@ -12,7 +12,7 @@ const (
 
 func (k FailureKind) String() string { return string(k) }
 
-// Failure captures a terminal execution failure for one attempt.
+// Failure 记录终态执行失败 用于 一个尝试。
 type Failure struct {
 	Kind      FailureKind
 	Message   string

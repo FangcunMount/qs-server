@@ -8,7 +8,7 @@ import (
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 )
 
-// ApplyFactorProjections enriches a raw scale outcome with composite rollup and norm projection.
+// ApplyFactorProjections 补充原始 scale 结果 使用 复合 rollup 和 常模 投影。
 func ApplyFactorProjections(
 	outcome *assessment.AssessmentOutcome,
 	snapshot *behavioralsnapshot.Snapshot,

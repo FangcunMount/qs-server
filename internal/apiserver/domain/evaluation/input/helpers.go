@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
-// AnswerValueKey normalizes a raw answer value into a stable option key.
+// AnswerValueKey 归一化原始 answer value 为 稳定 选项键。
 func AnswerValueKey(raw any) string {
 	switch value := raw.(type) {
 	case []string:
@@ -31,7 +31,7 @@ func AnswerValueKey(raw any) string {
 	}
 }
 
-// StringSet builds a case-insensitive lookup set from string values.
+// StringSet 构建case-insensitive lookup set 从 string values。
 func StringSet(values []string) map[string]bool {
 	set := make(map[string]bool, len(values)*2)
 	for _, value := range values {
@@ -42,7 +42,7 @@ func StringSet(values []string) map[string]bool {
 	return set
 }
 
-// AbsInt returns the absolute value of an integer.
+// AbsInt 返回absolute value of integer。
 func AbsInt(value int) int {
 	if value < 0 {
 		return -value

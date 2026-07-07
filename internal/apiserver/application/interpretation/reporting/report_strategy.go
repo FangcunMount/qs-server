@@ -5,7 +5,7 @@ import (
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
-// OutcomeReportType selects the report type for an evaluation outcome.
+// OutcomeReportType 选择report type 用于 评估 结果。
 func OutcomeReportType(_ evaloutcome.Outcome) domainReport.ReportType {
 	return domainReport.ResolveReportType()
 }

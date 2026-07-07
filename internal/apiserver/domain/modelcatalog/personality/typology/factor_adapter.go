@@ -6,8 +6,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// CanonicalFactorsFromGraph projects typology factor graph config into canonical catalog factors.
-// The adapter is read-only: typology runtime keeps owning graph execution semantics.
+// CanonicalFactorsFromGraph 投影类型学 因子图 配置 为 规范 目录 因子。
+// The adapter 是 只读: 类型学 运行时 keeps owning 图执行语义。
 func CanonicalFactorsFromGraph(fg FactorGraphSpec) []factor.FactorSnapshot {
 	if fg.HasExplicitFactorGraph() {
 		return canonicalFactorsFromExplicitGraph(fg)
@@ -15,7 +15,7 @@ func CanonicalFactorsFromGraph(fg FactorGraphSpec) []factor.FactorSnapshot {
 	return canonicalFactorsFromLegacyLayout(fg)
 }
 
-// CanonicalFactors projects a runtime spec into canonical catalog factors.
+// CanonicalFactors 投影运行时规格 为 规范 目录 因子。
 func (s *RuntimeSpec) CanonicalFactors() []factor.FactorSnapshot {
 	if s == nil {
 		return nil
@@ -23,7 +23,7 @@ func (s *RuntimeSpec) CanonicalFactors() []factor.FactorSnapshot {
 	return CanonicalFactorsFromGraph(s.FactorGraph)
 }
 
-// CanonicalFactors resolves runtime spec and projects typology config into canonical factors.
+// CanonicalFactors 解析运行时规格 和 投影 类型学 配置 为 规范 因子。
 func (p *Payload) CanonicalFactors() ([]factor.FactorSnapshot, error) {
 	spec, err := p.ToRuntimeSpec()
 	if err != nil {

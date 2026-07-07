@@ -1,7 +1,7 @@
 package legacy
 
 const (
-	// APIKindBehaviorAbility is the external API kind for the behavior-ability product channel.
-	// It aggregates behavioral_rating and cognitive model families in list APIs only.
+	// APIKindBehaviorAbility 是外部 API 类型 用于 behavior-ability 产品通道。
+	// It 聚合 behavioral_rating 和 cognitive 模型家族 in list APIs 仅。
 	APIKindBehaviorAbility = "behavior_ability"
 )

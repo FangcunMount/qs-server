@@ -6,7 +6,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
 
-// RunResult is the application read model for one evaluation run attempt.
+// RunResult 是application 读模型 用于 一个评估执行 尝试。
 type RunResult struct {
 	RunID        string
 	AssessmentID uint64
@@ -20,18 +20,18 @@ type RunResult struct {
 	TraceID      string
 }
 
-// RunListResult is a bounded list of runs for one assessment.
+// RunListResult 是有界 list of runs 用于 一个assessment。
 type RunListResult struct {
 	Items []*RunResult
 }
 
-// RetryableFailedRunResult includes org scope for operating queries.
+// RetryableFailedRunResult includes org scope 用于 operating 查询。
 type RetryableFailedRunResult struct {
 	RunResult
 	OrgID int64
 }
 
-// RetryableFailedListResult is a cursor page of retryable failed runs.
+// RetryableFailedListResult 是cursor page of 可重试 失败 runs。
 type RetryableFailedListResult struct {
 	Items      []*RetryableFailedRunResult
 	NextCursor uint64

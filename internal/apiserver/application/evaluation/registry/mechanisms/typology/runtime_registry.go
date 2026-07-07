@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// PersonalityRuntimeRegistry resolves typology execution capabilities by evaluator key and algorithm alias.
+// PersonalityRuntimeRegistry 解析类型学 execution 能力 按 评估器键 和 算法别名。
 type PersonalityRuntimeRegistry struct {
 	assembler      OutcomeAssembler
 	reportRegistry ReportAdapterRegistry
@@ -18,19 +18,19 @@ type PersonalityRuntimeRegistry struct {
 	aliases        map[modelcatalog.Algorithm]configuredadapter.Adapter
 }
 
-// DefaultPersonalityRuntimeRegistry builds the default configured typology runtime.
+// 默认PersonalityRuntimeRegistry 构建默认 配置化 类型学 运行时。
 func DefaultPersonalityRuntimeRegistry() PersonalityRuntimeRegistry {
 	return NewPersonalityRuntimeRegistry(
 		typologylegacy.DefaultAlgorithmAliases()...,
 	)
 }
 
-// NewPersonalityRuntimeRegistry registers algorithm aliases over the configured runtime.
+// NewPersonalityRuntimeRegistry registers 算法别名 over 配置化运行时。
 func NewPersonalityRuntimeRegistry(algorithms ...modelcatalog.Algorithm) PersonalityRuntimeRegistry {
 	return NewPersonalityRuntimeRegistryWith(PersonalityRuntimeOptions{}, algorithms...)
 }
 
-// NewPersonalityRuntimeRegistryWith registers algorithm aliases with injectable adapter registries.
+// NewPersonalityRuntimeRegistryWith registers 算法别名 使用 injectable adapter 注册表。
 func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithms ...modelcatalog.Algorithm) PersonalityRuntimeRegistry {
 	opts = resolvePersonalityRuntimeOptions(opts)
 	evaluator := personalityconfigured.NewEvaluatorWithDetails(opts.DetailRegistry)
@@ -90,7 +90,7 @@ func (r PersonalityRuntimeRegistry) Len() int {
 	return len(r.aliases)
 }
 
-// AsModuleRegistry adapts the runtime registry to the legacy module registry API.
+// AsModuleRegistry 适配运行时 注册表 到 旧版 module 注册表 API。
 func (r PersonalityRuntimeRegistry) AsModuleRegistry() ModuleRegistry {
 	return ModuleRegistry{runtime: r}
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// ResolvedExecution captures runtime descriptor routing and the legacy execution identity.
+// ResolvedExecution 记录运行时描述符 路由 和 旧版 执行身份。
 type ResolvedExecution struct {
 	DescriptorKey     evalpipeline.RuntimeDescriptorKey
 	Descriptor        evalpipeline.RuntimeDescriptor
@@ -19,14 +19,14 @@ type ResolvedExecution struct {
 	UsedDescriptor    bool
 }
 
-// RuntimeResolver routes evaluation execution through runtime descriptors with EvaluatorKey fallback.
+// RuntimeResolver 路由评估执行 通过 运行时描述符 使用 Evaluator键 fallback。
 type RuntimeResolver struct {
 	descriptors      *evalpipeline.RuntimeDescriptorRegistry
 	evaluators       EvaluatorRegistry
 	familyEvaluators map[modelcatalog.AlgorithmFamily]Evaluator
 }
 
-// NewRuntimeResolver creates a resolver backed by descriptor and evaluator registries.
+// NewRuntimeResolver 创建resolver 基于 描述符 和 evaluator 注册表。
 func NewRuntimeResolver(
 	descriptors *evalpipeline.RuntimeDescriptorRegistry,
 	evaluators EvaluatorRegistry,
@@ -39,7 +39,7 @@ func NewRuntimeResolver(
 	}
 }
 
-// ResolveExecution selects the runtime descriptor and evaluator key for one evaluation.
+// ResolveExecution 选择运行时描述符 和 评估器键 用于 一个评估。
 func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *evaluationinput.InputSnapshot) (ResolvedExecution, error) {
 	if r == nil || r.evaluators == nil {
 		return ResolvedExecution{}, fmt.Errorf("evaluation runtime resolver is not configured")
@@ -74,7 +74,7 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	return resolved, nil
 }
 
-// Execute runs evaluation using the descriptor-primary path with EvaluatorKey dispatch.
+// Execute 运行评估 using 描述符-主 path 使用 Evaluator键 分发。
 func (r *RuntimeResolver) Execute(
 	ctx context.Context,
 	a *assessment.Assessment,

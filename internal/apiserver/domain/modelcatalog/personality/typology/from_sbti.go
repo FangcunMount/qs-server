@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// FromSBTI converts a legacy SBTI payload to unified typology form.
+// FromSBTI 转换旧版 SBTI 载荷 到 unified 类型学 form。
 func FromSBTI(model *SBTILegacyModel) *Payload {
 	if model == nil {
 		return nil
@@ -102,7 +102,7 @@ func outcomeFromSBTILegacy(outcome SBTILegacyOutcome) Outcome {
 	}
 }
 
-// ToSBTI converts a typology payload back to legacy SBTI form.
+// ToSBTI 转换类型学载荷 back 到 旧版 SBTI form。
 func ToSBTI(payload *Payload) (*SBTILegacyModel, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")

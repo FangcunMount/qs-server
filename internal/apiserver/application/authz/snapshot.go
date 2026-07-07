@@ -61,7 +61,7 @@ func (s *Snapshot) hasRole(name string) bool {
 	return false
 }
 
-// RoleNames returns a defensive copy of the role list for projection-oriented callers.
+// RoleNames 返回defensive copy of 角色列表 用于 投影-oriented callers。
 func (s *Snapshot) RoleNames() []string {
 	if s == nil {
 		return nil

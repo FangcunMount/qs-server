@@ -14,7 +14,7 @@ type mutableScoreProjectorRegistry struct {
 	mechanismItems map[MechanismReportBuilderKey]ScoreProjector
 }
 
-// NewScoreProjectorRegistry creates a score projector registry from the given projectors.
+// NewScoreProjectorRegistry 创建score 投影器 注册表 从 given 投影器。
 func NewScoreProjectorRegistry(projectors ...ScoreProjector) (ScoreProjectorRegistry, error) {
 	registry := &mutableScoreProjectorRegistry{
 		items:          make(map[evaluation.ExecutionIdentity]ScoreProjector),

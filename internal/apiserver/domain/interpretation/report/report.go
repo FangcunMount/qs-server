@@ -1,4 +1,4 @@
-// Package report owns the interpretation report aggregate and section structure.
+// Package report 负责解释报告 aggregate 和 section structure。
 package report
 
 import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -28,14 +28,14 @@ var (
 	IsHighRisk                 = domainreport.IsHighRisk
 )
 
-// Section is a logical report section independent of assessment code.
+// Section 是logical report section 独立于 测评编码。
 type Section struct {
 	Title   string
 	Content string
 	Blocks  []Block
 }
 
-// Block is a renderable report block within a section.
+// Block 是renderable report block 在 section。
 type Block struct {
 	Kind    string
 	Payload any

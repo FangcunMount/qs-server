@@ -113,7 +113,7 @@ type AnalyticsPendingEvent struct {
 	AttemptCount int64
 }
 
-// StatisticsJourneyRepository 维护统计旅程日聚合和 projector runtime 状态。
+// StatisticsJourneyRepository 维护统计旅程日聚合和 投影器 运行时 状态。
 type StatisticsJourneyRepository interface {
 	ApplyStatisticsJourneyMutation(ctx context.Context, mutation StatisticsJourneyMutation) error
 	ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation StatisticsJourneyMutation) error

@@ -11,7 +11,7 @@ type familyRuntime struct {
 	families map[cachemodel.Family]bool
 }
 
-// NewFamilyRuntime creates the minimal runtime view required by cache governance.
+// NewFamilyRuntime 创建minimal 运行时 视图 required 按 缓存 governance。
 func NewFamilyRuntime(families map[cachemodel.Family]bool) FamilyRuntime {
 	runtime := &familyRuntime{families: make(map[cachemodel.Family]bool, len(families))}
 	for family, allow := range families {

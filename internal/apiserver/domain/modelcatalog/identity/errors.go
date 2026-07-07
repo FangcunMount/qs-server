@@ -2,5 +2,5 @@ package identity
 
 import stderrors "errors"
 
-// ErrInvalidArgument marks invalid identity or product-channel input.
+// ErrInvalidArgument 标记无效 身份 或 product-channel input。
 var ErrInvalidArgument = stderrors.New("assessment model invalid argument")

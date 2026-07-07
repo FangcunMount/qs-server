@@ -64,7 +64,7 @@ func (l *PlanLifecycle) Activate(_ context.Context, plan *AssessmentPlan) error 
 	return nil
 }
 
-// Pause 暂停计划（将活跃状态的计划变更为暂停状态）
+// Pa使用 暂停计划（将活跃状态的计划变更为暂停状态）
 // 业务规则：暂停时，取消所有未执行的任务（pending 和 opened 状态）
 func (l *PlanLifecycle) Pause(ctx context.Context, plan *AssessmentPlan) ([]*AssessmentTask, error) {
 	planID := plan.GetID().String()

@@ -2,7 +2,7 @@ package calculation
 
 import "strconv"
 
-// Issue codes for ScoreNode validation.
+// Issue 编码 用于 ScoreNode 校验。
 const (
 	IssueScoreNodeEmptyCode          = "score_node_empty_code"
 	IssueScoreNodeDuplicateCode      = "score_node_duplicate_code"
@@ -14,8 +14,8 @@ const (
 	IssueResultDimensionDuplicate    = "result_dimension_duplicate_code"
 )
 
-// ValidateScoreNodes checks calculation ScoreNode inputs for structural integrity.
-// Missing weights on weighted_sum nodes emit IssueScoreNodeMissingWeight warnings only.
+// ValidateScoreNodes 检查计算 ScoreNode 输入 用于 结构完整性。
+// Missing weights on weighted_sum 节点 emit IssueScoreNode缺失Weight warnings 仅。
 func ValidateScoreNodes(nodes []ScoreNode) []Issue {
 	if len(nodes) == 0 {
 		return nil
@@ -73,7 +73,7 @@ func ValidateScoreNodes(nodes []ScoreNode) []Issue {
 	return issues
 }
 
-// ValidateResult checks a calculation result for duplicate or empty dimension codes.
+// ValidateResult 检查计算结果 用于 duplicate 或 空 维度 编码。
 func ValidateResult(result *Result) []Issue {
 	if result == nil {
 		return nil

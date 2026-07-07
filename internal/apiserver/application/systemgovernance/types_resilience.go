@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
-// ResilienceView aggregates resilience snapshots across components.
+// ResilienceView 聚合 resilience 快照 across 组件。
 type ResilienceView struct {
 	GeneratedAt      time.Time                      `json:"generated_at"`
 	Window           string                         `json:"window"`
@@ -19,14 +19,14 @@ type ResilienceView struct {
 	CapabilityRows   []ResilienceCapabilityRow      `json:"capability_rows,omitempty"`
 }
 
-// ComponentResilience holds one component resilience payload with fetch metadata.
+// ComponentResilience 保存一个组件 resilience 载荷 使用 fetch 元数据。
 type ComponentResilience struct {
 	Available bool                             `json:"available"`
 	Reason    string                           `json:"reason,omitempty"`
 	Snapshot  *resilienceplane.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
-// ResilienceSummary summarizes pressure-protection health across components.
+// ResilienceSummary 汇总压力保护健康度 across 组件。
 type ResilienceSummary struct {
 	ComponentCount             int     `json:"component_count"`
 	UnavailableComponentCount  int     `json:"unavailable_component_count"`
@@ -42,7 +42,7 @@ type ResilienceSummary struct {
 	DegradedCapabilityCount    int     `json:"degraded_capability_count"`
 }
 
-// ResilienceQueueRow is a UI-ready submit/worker queue pressure row.
+// ResilienceQueueRow 是面向 UI submit/worker queue pressure 行。
 type ResilienceQueueRow struct {
 	Component         string           `json:"component"`
 	Name              string           `json:"name"`
@@ -57,7 +57,7 @@ type ResilienceQueueRow struct {
 	MetricEvidence    []MetricEvidence `json:"metric_evidence,omitempty"`
 }
 
-// ResilienceBackpressureRow is a UI-ready downstream backpressure row.
+// ResilienceBackpressureRow 是面向 UI d负责tream backpressure 行。
 type ResilienceBackpressureRow struct {
 	Component      string           `json:"component"`
 	Name           string           `json:"name"`
@@ -74,7 +74,7 @@ type ResilienceBackpressureRow struct {
 	MetricEvidence []MetricEvidence `json:"metric_evidence,omitempty"`
 }
 
-// ResilienceCapabilityRow is a UI-ready non-queue resilience capability row.
+// ResilienceCapabilityRow 是面向 UI non-queue resilience 能力 行。
 type ResilienceCapabilityRow struct {
 	Component  string   `json:"component"`
 	Kind       string   `json:"kind"`

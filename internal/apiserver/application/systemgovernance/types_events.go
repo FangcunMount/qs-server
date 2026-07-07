@@ -7,7 +7,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
-// EventsView exposes event/outbox governance detail.
+// EventsView 暴露event/outbox governance detail。
 type EventsView struct {
 	GeneratedAt time.Time                   `json:"generated_at"`
 	Window      string                      `json:"window"`
@@ -20,14 +20,14 @@ type EventsView struct {
 	TypeRows    []EventTypeRow              `json:"event_type_rows,omitempty"`
 }
 
-// EventTypeStatusGroup groups per-event-type backlog rows for one outbox store.
+// EventTypeStatusGroup 分组按事件类型 积压 行 用于 一个outbox 存储。
 type EventTypeStatusGroup struct {
 	Store   string                             `json:"store"`
 	Buckets []outboxport.EventTypeStatusBucket `json:"buckets"`
 	Error   string                             `json:"error,omitempty"`
 }
 
-// EventDrainSummary summarizes outbox drain health for the workbench.
+// EventDrainSummary 汇总outbox drain 健康度 用于 workbench。
 type EventDrainSummary struct {
 	OutboxCount             int     `json:"outbox_count"`
 	DegradedReaderCount     int     `json:"degraded_reader_count"`
@@ -38,7 +38,7 @@ type EventDrainSummary struct {
 	ReaderErrorCount        int     `json:"reader_error_count"`
 }
 
-// EventOutboxRow is a UI-ready outbox drain row derived from status buckets.
+// EventOutboxRow 是面向 UI outbox drain 行 派生 从 状态 buckets。
 type EventOutboxRow struct {
 	Name                    string           `json:"name"`
 	Store                   string           `json:"store"`
@@ -52,7 +52,7 @@ type EventOutboxRow struct {
 	MetricEvidence          []MetricEvidence `json:"metric_evidence,omitempty"`
 }
 
-// EventTypeRow is a UI-ready event type backlog row.
+// EventTypeRow 是面向 UI 事件类型积压 行。
 type EventTypeRow struct {
 	Store            string           `json:"store"`
 	EventType        string           `json:"event_type"`
@@ -65,7 +65,7 @@ type EventTypeRow struct {
 	MetricEvidence   []MetricEvidence `json:"metric_evidence,omitempty"`
 }
 
-// EventTypeStatusSource exposes per-event-type backlog for one outbox store.
+// EventTypeStatusSource 暴露按事件类型 积压 用于 一个outbox 存储。
 type EventTypeStatusSource struct {
 	Store  string
 	Reader outboxport.EventTypeStatusReader

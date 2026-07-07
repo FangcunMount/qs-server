@@ -6,17 +6,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// RegisteredEvaluatorPaths returns execution paths with evaluator factories in stable order.
+// RegisteredEvaluatorPaths 返回执行路径 使用 evaluator 因子ies 按稳定顺序。
 func RegisteredEvaluatorPaths() ([]modelcatalog.ExecutionPath, error) {
 	return pathsInMaterializationOrder(keysOf(evaluatorFactories))
 }
 
-// RegisteredReportBuilderPaths returns execution paths with report builder factories in stable order.
+// RegisteredReportBuilderPaths 返回执行路径 使用 报告构建器 因子ies 按稳定顺序。
 func RegisteredReportBuilderPaths() ([]modelcatalog.ExecutionPath, error) {
 	return pathsInMaterializationOrder(keysOf(reportBuilderFactories))
 }
 
-// RegisteredScoreProjectorPaths returns execution paths with score projector factories in stable order.
+// RegisteredScoreProjectorPaths 返回执行路径 使用 score 投影器 因子ies 按稳定顺序。
 func RegisteredScoreProjectorPaths() ([]modelcatalog.ExecutionPath, error) {
 	return pathsInMaterializationOrder(keysOf(scoreProjectorFactories))
 }

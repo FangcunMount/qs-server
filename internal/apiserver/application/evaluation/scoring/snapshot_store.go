@@ -9,14 +9,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// ScoringSnapshotStore persists canonical scoring outcomes between async phases.
+// ScoringSnapshotStore 持久化规范 计分结果 between 异步 phases。
 type ScoringSnapshotStore interface {
 	Save(ctx context.Context, assessmentID uint64, outcome *assessment.AssessmentOutcome) error
 	Load(ctx context.Context, assessmentID uint64) (*assessment.AssessmentOutcome, error)
 	Delete(ctx context.Context, assessmentID uint64) error
 }
 
-// MemoryScoringSnapshotStore is an in-process snapshot store for tests.
+// MemoryScoringSnapshotStore 是in-进程 快照 store 用于 tests。
 type MemoryScoringSnapshotStore struct {
 	mu    sync.RWMutex
 	items map[uint64][]byte

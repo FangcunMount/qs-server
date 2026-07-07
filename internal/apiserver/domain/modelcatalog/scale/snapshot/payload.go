@@ -2,7 +2,7 @@ package snapshot
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 
-// ScaleSnapshot 已发布量表规则集 payload（ruleset.scale.v1）。
+// ScaleSnapshot 已发布量表规则集 载荷（ruleset.scale.v1）。
 type ScaleSnapshot struct {
 	ID                   uint64
 	Code                 string
@@ -30,7 +30,7 @@ func (s *ScaleSnapshot) FindFactor(code string) (*FactorSnapshot, bool) {
 	return nil, false
 }
 
-// CanonicalFactors projects scale execution factors into canonical catalog form.
+// CanonicalFactors 投影scale execution 因子 为 规范 目录 form。
 func (s *ScaleSnapshot) CanonicalFactors() []factor.FactorSnapshot {
 	if s == nil {
 		return nil

@@ -182,7 +182,7 @@ func IsHighRisk(r RiskLevel) bool {
 	return r == RiskLevelHigh || r == RiskLevelSevere
 }
 
-// IsRiskLevelCode reports whether code is a legacy scale risk-level value.
+// IsRiskLevelCode 报告是否 编码 是 旧量表风险等级值。
 func IsRiskLevelCode(code string) bool {
 	switch RiskLevel(code) {
 	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:

@@ -7,12 +7,12 @@ import (
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
-// BehaviorJourneyScanService projects behavior journey statistics from fact tables.
+// BehaviorJourneyScanService 投影behavior journey statistics 从 fact tables。
 type BehaviorJourneyScanService interface {
 	ScanDue(ctx context.Context, input BehaviorJourneyScanInput) (BehaviorJourneyScanResult, error)
 }
 
-// BehaviorJourneyScanInput controls one scan invocation.
+// BehaviorJourneyScanInput 控制一个scan invocation。
 type BehaviorJourneyScanInput struct {
 	OrgIDs       []int64
 	Sources      []string
@@ -23,13 +23,13 @@ type BehaviorJourneyScanInput struct {
 	WindowRecalc bool
 }
 
-// BehaviorJourneyScanResult summarizes one scan invocation.
+// BehaviorJourneyScanResult 汇总一个scan invocation。
 type BehaviorJourneyScanResult struct {
 	SourceResults []BehaviorJourneyScanSourceResult
 	RecalcResults []BehaviorJourneyScanRecalcResult
 }
 
-// BehaviorJourneyScanRecalcResult summarizes journey daily window recalculation for one org.
+// BehaviorJourneyScanRecalcResult 汇总journey daily 窗口 re计算 用于 一个org。
 type BehaviorJourneyScanRecalcResult struct {
 	OrgID     int64
 	StartDate time.Time
@@ -37,7 +37,7 @@ type BehaviorJourneyScanRecalcResult struct {
 	Error     string
 }
 
-// BehaviorJourneyScanSourceResult summarizes one source/org scan batch.
+// BehaviorJourneyScanSourceResult 汇总一个来源/org scan batch。
 type BehaviorJourneyScanSourceResult struct {
 	SourceName  string
 	OrgID       int64
@@ -49,7 +49,7 @@ type BehaviorJourneyScanSourceResult struct {
 	Error       string
 }
 
-// BehaviorJourneyScanRepository loads scan facts and persists watermarks/projections.
+// BehaviorJourneyScanRepository 加载scan 事实 和 persists watermarks/投影。
 type BehaviorJourneyScanRepository interface {
 	BehaviorJourneyRepository
 	LoadScanWatermark(ctx context.Context, orgID int64, sourceName string) (*domainStatistics.ScanWatermark, error)
@@ -60,12 +60,12 @@ type BehaviorJourneyScanRepository interface {
 	RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error
 }
 
-// ReportScanSource lists generated reports from durable stores.
+// ReportScanSource 列出generated reports 从 持久化 stores。
 type ReportScanSource interface {
 	ListReportGeneratedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.ReportGeneratedFact, error)
 }
 
-// AnswerSheetScanSource lists submitted answer sheets from Mongo.
+// AnswerSheetScanSource 列出submitted 答卷 从 Mongo。
 type AnswerSheetScanSource interface {
 	ListSubmittedAnswerSheetFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.AnswerSheetSubmittedFact, error)
 }

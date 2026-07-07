@@ -1,6 +1,6 @@
 package typology
 
-// SBTILegacyModel is the read-only ruleset.sbti.v1 payload shape used during migration.
+// SBTILegacyModel 是只读 ruleset.sbti.v1 载荷 结构 用于 迁移。
 type SBTILegacyModel struct {
 	Code                        string                         `json:"code"`
 	Version                     string                         `json:"version"`

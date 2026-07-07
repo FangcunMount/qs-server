@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// ReadyIndex is a best-effort Redis ZSet scheduler for pending outbox events.
+// ReadyIndex 是best-effort Redis ZSet 调度器 用于 待处理 outbox 事件。
 type ReadyIndex interface {
 	Enqueue(ctx context.Context, eventType, eventID string, nextAttemptAt, createdAt time.Time) error
 	Remove(ctx context.Context, eventType, eventID string) error
@@ -15,7 +15,7 @@ type ReadyIndex interface {
 	ClaimDueIDs(ctx context.Context, bucket string, limit int, now time.Time) ([]string, error)
 }
 
-// PostCommitReadyIndexer backfills the ready index after outbox rows are committed.
+// PostCommitReadyIndexer 回填就绪索引 在之后 outbox 行 是 已提交。
 type PostCommitReadyIndexer struct {
 	index ReadyIndex
 }

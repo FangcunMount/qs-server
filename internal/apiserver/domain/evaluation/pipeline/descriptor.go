@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// RuntimeDescriptorKey routes evaluation execution by mechanism, not assessment code.
+// RuntimeDescriptorKey 路由评估执行 按 机制, 不 测评编码。
 type RuntimeDescriptorKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
@@ -29,27 +29,27 @@ func (k RuntimeDescriptorKey) String() string {
 	return strings.Join(parts, "/")
 }
 
-// CalculationInput is the mechanism-neutral input passed into a calculator.
+// CalculationInput 是机制无关 input passed 为 计算器。
 type CalculationInput struct {
 	Snapshot modelcatalog.PublishedModelSnapshot
 }
 
-// Calculator runs the calculation stage for a published model snapshot.
+// Calculator 运行计算 stage 用于 已发布模型快照。
 type Calculator interface {
 	Calculate(ctx context.Context, input CalculationInput) (any, error)
 }
 
-// InputAssembler adapts a published snapshot into calculation input.
+// InputAssembler 适配已发布快照 为 计算输入。
 type InputAssembler interface {
 	Assemble(snapshot modelcatalog.PublishedModelSnapshot) (CalculationInput, error)
 }
 
-// OutcomeAssembler adapts calculation output into the canonical assessment outcome.
+// OutcomeAssembler 适配计算输出 为 规范 测评结果。
 type OutcomeAssembler interface {
 	Assemble(result any) (any, error)
 }
 
-// RuntimeDescriptor binds mechanism identity to execution collaborators.
+// RuntimeDescriptor binds 机制身份 到 execution 协作者。
 type RuntimeDescriptor struct {
 	Key              RuntimeDescriptorKey
 	AlgorithmFamily  modelcatalog.AlgorithmFamily
@@ -61,7 +61,7 @@ type RuntimeDescriptor struct {
 	OutcomeAssembler OutcomeAssembler
 }
 
-// EvaluationPipeline executes one evaluation for a published model snapshot.
+// EvaluationPipeline 执行一个评估 用于 已发布模型快照。
 type EvaluationPipeline interface {
 	Supports(snapshot modelcatalog.PublishedModelSnapshot) bool
 	Execute(ctx context.Context, snapshot modelcatalog.PublishedModelSnapshot) (any, error)

@@ -1,14 +1,14 @@
 package factor
 
-// HierarchyMeta carries optional parent/ordering metadata for multi-level factor trees.
-// Level is usually derived from ParentCode during validation; payload may omit it.
+// HierarchyMeta 携带可选 父节点/ordering 元数据 用于 multi-等级 因子 trees。
+// Level 是usually 派生 从 Parent编码 在 校验; 载荷 may omit it。
 type HierarchyMeta struct {
 	ParentCode string
 	SortOrder  int
 	Level      int
 }
 
-// ScorableRole reports whether a factor role participates in scoring pipelines.
+// ScorableRole 报告是否 因子 角色 participates in 计分 pipelines。
 func ScorableRole(role FactorRole) bool {
 	switch role.Resolved() {
 	case FactorRoleDimension, FactorRoleTotal, FactorRoleIndex,
@@ -19,12 +19,12 @@ func ScorableRole(role FactorRole) bool {
 	}
 }
 
-// RequiresChildrenPolicy reports whether publish validation must require ChildrenPolicy.
+// RequiresChildrenPolicy 报告是否 publish 校验 必须 require 子节点策略。
 func RequiresChildrenPolicy(role FactorRole) bool {
 	return role.Resolved() == FactorRoleIndex
 }
 
-// BindsQuestions reports whether a role may carry question_codes.
+// BindsQuestions 报告是否 角色 may 携带 question_编码。
 func BindsQuestions(role FactorRole) bool {
 	switch role.Resolved() {
 	case FactorRoleDimension, FactorRoleTotal, FactorRoleValidity,
@@ -35,7 +35,7 @@ func BindsQuestions(role FactorRole) bool {
 	}
 }
 
-// Resolved normalizes empty role to dimension.
+// Resolved 归一化空 角色 到 维度。
 func (r FactorRole) Resolved() FactorRole {
 	if r == "" {
 		return FactorRoleDimension
@@ -43,7 +43,7 @@ func (r FactorRole) Resolved() FactorRole {
 	return r
 }
 
-// IndexByCode builds a lookup map for hierarchy validation and tree materialization.
+// IndexByCode 构建lookup 映射 用于 层级 校验 和 tree 物化。
 func IndexByCode(factors []FactorSnapshot) map[string]FactorSnapshot {
 	index := make(map[string]FactorSnapshot, len(factors))
 	for _, factor := range factors {
@@ -52,8 +52,8 @@ func IndexByCode(factors []FactorSnapshot) map[string]FactorSnapshot {
 	return index
 }
 
-// InferParentCodesFromChildrenPolicy fills empty ParentCode from index ChildrenPolicy edges,
-// then derives hierarchy levels.
+// InferParentCodesFromChildrenPolicy fills 空 Parent编码 从 index 子节点策略 edges,。
+// then derives 层级 等级。
 func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapshot {
 	if len(factors) == 0 {
 		return nil
@@ -76,7 +76,7 @@ func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapsh
 	return DeriveLevels(out)
 }
 
-// DeriveLevels fills Level from ParentCode when missing. Returns a copy with derived levels.
+// DeriveLevels fills 等级 从 Parent编码 when 缺失. Returns copy 使用 派生 等级。
 func DeriveLevels(factors []FactorSnapshot) []FactorSnapshot {
 	if len(factors) == 0 {
 		return nil

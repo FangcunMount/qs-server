@@ -1,6 +1,6 @@
 package factor
 
-// FactorSnapshot is the canonical published-model dimension definition.
+// FactorSnapshot 是规范 published-model 维度 definition。
 type FactorSnapshot struct {
 	Code            string
 	Title           string
@@ -19,7 +19,7 @@ type FactorSnapshot struct {
 	ChildrenPolicy  *ChildrenPolicy
 }
 
-// ResolvedRole returns the explicit role or derives one from legacy flags.
+// ResolvedRole 返回显式 角色 或 derives 一个from 旧版 flags。
 func (f FactorSnapshot) ResolvedRole() FactorRole {
 	if f.Role != "" {
 		return f.Role

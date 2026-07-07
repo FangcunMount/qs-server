@@ -8,7 +8,7 @@ import (
 
 const DefaultWindow = "5m"
 
-// ParseWindow normalizes a governance metrics window such as 5m or 1h.
+// ParseWindow 归一化governance metrics 窗口 such 作为 5m 或 1h。
 func ParseWindow(raw string) (time.Duration, string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

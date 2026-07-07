@@ -2,7 +2,7 @@ package assessment
 
 import "time"
 
-// AssessmentRunResult is the protected query view of one evaluation run.
+// AssessmentRunResult 是protected 查询 视图 of 一个评估执行。
 type AssessmentRunResult struct {
 	RunID        string
 	AssessmentID uint64
@@ -16,7 +16,7 @@ type AssessmentRunResult struct {
 	TraceID      string
 }
 
-// AssessmentRunListResult lists evaluation runs for one assessment.
+// AssessmentRunListResult 列出评估执行 用于 一个assessment。
 type AssessmentRunListResult struct {
 	Items []*AssessmentRunResult
 }

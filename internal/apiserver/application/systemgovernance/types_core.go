@@ -2,7 +2,7 @@ package systemgovernance
 
 import "time"
 
-// Domain identifies a governance concern area.
+// Domain 标识治理关注域。
 type Domain string
 
 const (
@@ -12,7 +12,7 @@ const (
 	DomainActions    Domain = "actions"
 )
 
-// Severity ranks diagnostic signals.
+// Severity ranks diagnostic 信号。
 type Severity string
 
 const (
@@ -21,7 +21,7 @@ const (
 	SeverityCritical Severity = "critical"
 )
 
-// Signal is a bounded diagnostic item for the governance workbench.
+// Signal 是有界 diagnostic 题目 用于 governance workbench。
 type Signal struct {
 	ID             string                 `json:"id"`
 	Domain         Domain                 `json:"domain"`
@@ -34,7 +34,7 @@ type Signal struct {
 	ActionIDs      []string               `json:"action_ids,omitempty"`
 }
 
-// MetricEvidence carries a single near-window metric observation.
+// MetricEvidence 携带单一 近窗口 指标观测。
 type MetricEvidence struct {
 	Name      string   `json:"name"`
 	Window    string   `json:"window"`
@@ -44,13 +44,13 @@ type MetricEvidence struct {
 	Reason    string   `json:"reason,omitempty"`
 }
 
-// MetricsSummary aggregates Prometheus availability for a view.
+// MetricsSummary 聚合 Prometheus availability 用于 视图。
 type MetricsSummary struct {
 	Available bool   `json:"available"`
 	Reason    string `json:"reason,omitempty"`
 }
 
-// OverviewResponse is the top-level governance workbench snapshot.
+// OverviewResponse 是top-等级 governance workbench 快照。
 type OverviewResponse struct {
 	GeneratedAt     time.Time                `json:"generated_at"`
 	Window          string                   `json:"window"`
@@ -60,7 +60,7 @@ type OverviewResponse struct {
 	Domains         map[Domain]DomainSummary `json:"domains"`
 }
 
-// DomainSummary summarizes one domain in the overview.
+// DomainSummary 汇总一个领域 in 概览。
 type DomainSummary struct {
 	Severity    Severity `json:"severity"`
 	SignalCount int      `json:"signal_count"`

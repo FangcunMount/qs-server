@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// ApplyNormProjection applies norm/T-score tables on top of raw scale scoring.
+// ApplyNormProjection 应用常模/T 分 tables 基于 原始 scale 计分。
 func ApplyNormProjection(
 	outcome *assessment.AssessmentOutcome,
 	snapshot *behavioralsnapshot.Snapshot,
@@ -41,7 +41,7 @@ func enrichNormCalcResult(
 	}.Apply(calcResult)
 }
 
-// NormSubjectFromInput extracts norm lookup subject metadata from an input snapshot.
+// NormSubjectFromInput extracts 常模 lookup subject 元数据 从 input 快照。
 func NormSubjectFromInput(input *evaluationinput.InputSnapshot) calcnorm.Subject {
 	if input == nil || input.NormSubject == nil {
 		return calcnorm.Subject{}

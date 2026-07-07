@@ -75,7 +75,7 @@ func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 	}
 }
 
-// WithRuntimeDescriptorRegistry configures descriptor-primary evaluation routing.
+// WithRuntimeDescriptorRegistry 配置描述符优先的评估路由。
 func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ServiceOption {
 	return func(s *service) {
 		s.descriptorRegistry = registry
@@ -83,7 +83,7 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 	}
 }
 
-// WithFamilyEvaluators configures descriptor-primary family dispatch.
+// WithFamilyEvaluators 配置描述符优先的家族分发。
 func WithFamilyEvaluators(family map[modelcatalog.AlgorithmFamily]Evaluator) ServiceOption {
 	return func(s *service) {
 		s.familyEvaluators = family
@@ -104,35 +104,35 @@ func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
 	}
 }
 
-// WithRunRepository configures evaluation run persistence.
+// WithRunRepository 配置评估执行 持久化。
 func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
 	return func(s *service) {
 		s.runRepo = repo
 	}
 }
 
-// WithScoringWriter configures the scoring outcome writer for split-phase evaluation.
+// WithScoringWriter 配置计分结果写入器 用于 分阶段 评估。
 func WithScoringWriter(writer evaluationscoring.Writer) ServiceOption {
 	return func(s *service) {
 		s.scoringWriter = writer
 	}
 }
 
-// WithInterpretationService configures the interpretation report generation service.
+// WithInterpretationService 配置解释报告生成服务。
 func WithInterpretationService(svc interpretationapp.Service) ServiceOption {
 	return func(s *service) {
 		s.interpretationService = svc
 	}
 }
 
-// WithAsyncInterpretation enables split-phase evaluation (scoring event + async report).
+// WithAsyncInterpretation 启用分阶段 评估 (计分事件 + 异步 report)。
 func WithAsyncInterpretation(enabled bool) ServiceOption {
 	return func(s *service) {
 		s.asyncInterpretation = enabled
 	}
 }
 
-// WithScoringSnapshotStore configures durable scoring snapshots for async report generation.
+// WithScoringSnapshotStore 配置持久化计分快照 用于 异步报告生成。
 func WithScoringSnapshotStore(store evaluationscoring.ScoringSnapshotStore) ServiceOption {
 	return func(s *service) {
 		s.scoringSnapshotStore = store
@@ -308,7 +308,7 @@ func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaloutc
 	return s.interpretationService.GenerateAndPersist(ctx, outcome)
 }
 
-// GenerateReport generates and persists the interpretation report for an evaluated assessment.
+// GenerateReport 生成并持久化解释报告 用于 已完成评估的测评。
 func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error {
 	l := logger.L(ctx)
 	if assessmentID == 0 {

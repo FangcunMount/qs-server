@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// Writer persists scoring outcomes and transitions Assessment to evaluated.
+// Writer 持久化计分结果 和 transitions Assessment 到 evaluated。
 type Writer interface {
 	Write(ctx context.Context, outcome evaloutcome.Outcome) error
 }
@@ -22,7 +22,7 @@ type writer struct {
 	snapshotStore   ScoringSnapshotStore
 }
 
-// NewWriter creates a scoring outcome writer.
+// NewWriter 创建计分结果写入器。
 func NewWriter(
 	assessmentRepo assessment.Repository,
 	scoreProjectors interpretationreporting.ScoreProjectorRegistry,

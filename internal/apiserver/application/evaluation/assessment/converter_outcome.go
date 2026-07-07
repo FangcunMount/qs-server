@@ -192,22 +192,22 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// RowToOutcomeResult exports read-model row conversion for transport layers.
+// RowToOutcomeResult exports 读模型 行 conversion 用于 transport layers。
 func RowToOutcomeResult(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
 	return assessmentRowToOutcomeResult(row)
 }
 
-// RowsToOutcomeResults exports batch read-model row conversion for transport layers.
+// RowsToOutcomeResults exports batch 读模型 行 conversion 用于 transport layers。
 func RowsToOutcomeResults(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
 	return assessmentRowsToOutcomeResults(rows)
 }
 
-// Deprecated: use RowToOutcomeResult.
+// Deprecated: 使用 RowToOutcomeResult。
 func RowToV2Result(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
 	return RowToOutcomeResult(row)
 }
 
-// Deprecated: use RowsToOutcomeResults.
+// Deprecated: 使用 RowsToOutcomeResults。
 func RowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
 	return RowsToOutcomeResults(rows)
 }

@@ -36,9 +36,9 @@ func WithTaskSchedulerScope(ctx context.Context, planID string, testeeIDs []stri
 	return context.WithValue(ctx, taskSchedulerScopeKey{}, scope)
 }
 
-// WithTaskSchedulerPlannedAtLowerBound limits automatic scheduling to tasks at
-// or after lowerBound. It is intended for the built-in scheduler so historical
-// backfilled pending tasks are not opened immediately.
+// WithTaskSchedulerPlannedAtLowerBound limits automatic scheduling 到 tasks at。
+// 或 在之后 lowerBound. 它是 intended 用于 内置 scheduler so historical。
+// backfilled 待处理 tasks 是 不 opened immediately。
 func WithTaskSchedulerPlannedAtLowerBound(ctx context.Context, lowerBound time.Time) context.Context {
 	if lowerBound.IsZero() {
 		return ctx
@@ -62,8 +62,8 @@ func taskSchedulerScopeFromContext(ctx context.Context) *TaskSchedulerScope {
 	return scope
 }
 
-// TaskSchedulerPlannedAtLowerBoundFromContext returns the optional lower bound
-// used by automatic scheduling.
+// TaskSchedulerPlannedAtLowerBoundFromContext 返回可选 lower bound。
+// 供 automatic scheduling。
 func TaskSchedulerPlannedAtLowerBoundFromContext(ctx context.Context) (time.Time, bool) {
 	if ctx == nil {
 		return time.Time{}, false

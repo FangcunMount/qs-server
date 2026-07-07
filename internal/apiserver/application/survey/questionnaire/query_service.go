@@ -14,7 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-// queryService 问卷查询服务实现
+// 查询Service 问卷查询服务实现
 // 行为者：所有用户
 type queryService struct {
 	repo        questionnaire.Repository

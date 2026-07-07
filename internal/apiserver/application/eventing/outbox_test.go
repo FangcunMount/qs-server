@@ -266,8 +266,8 @@ func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 	if err := relay.DispatchDue(context.Background()); err != nil {
 		t.Fatalf("DispatchDue: %v", err)
 	}
-	// Characterization baseline (pre worker-pool refactor): one goroutine per pending
-	// event, with semaphore limiting concurrent publishes.
+	// Characterization 基线 (pre worker-pool re因子): 一个goroutine per 待处理。
+	// event, 使用 信号量 限制 并发 发布。
 	if publisher.maxInflight > 3 {
 		t.Fatalf("max inflight publishes = %d, want <= 3", publisher.maxInflight)
 	}

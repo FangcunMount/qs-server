@@ -8,13 +8,13 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// MechanismCanonicalEventAssembler stages success events for one mechanism family.
+// MechanismCanonicalEventAssembler 暂存成功事件 用于 一个机制家族。
 type MechanismCanonicalEventAssembler struct {
 	mechanism MechanismReportBuilderKey
 	legacyKey evaluation.ExecutionIdentity
 }
 
-// NewMechanismCanonicalEventAssembler registers a mechanism-keyed event assembler.
+// NewMechanismCanonicalEventAssembler registers 按机制键 事件组装器。
 func NewMechanismCanonicalEventAssembler(mechanism MechanismReportBuilderKey, legacyKey evaluation.ExecutionIdentity) MechanismCanonicalEventAssembler {
 	return MechanismCanonicalEventAssembler{mechanism: mechanism, legacyKey: legacyKey}
 }
@@ -35,7 +35,7 @@ func (a MechanismCanonicalEventAssembler) BuildSuccessEvents(outcome evaloutcome
 	return (GenericEventAssembler{}).BuildSuccessEvents(outcome, rpt)
 }
 
-// TypologyMechanismEventAssembler stages typology success events for all decision-granularity keys.
+// TypologyMechanismEventAssembler 暂存类型学 成功事件 用于 全部判定粒度键。
 type TypologyMechanismEventAssembler struct{}
 
 func (TypologyMechanismEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
@@ -79,7 +79,7 @@ func typologyMechanismEventKeys() []MechanismReportBuilderKey {
 	}
 }
 
-// DefaultMechanismEventAssemblers returns canonical mechanism-keyed event assemblers.
+// 默认MechanismEventAssemblers 返回规范 按机制键 事件组装器。
 func DefaultMechanismEventAssemblers() []EventAssembler {
 	return []EventAssembler{
 		NewMechanismCanonicalEventAssembler(MechanismReportBuilderKey{

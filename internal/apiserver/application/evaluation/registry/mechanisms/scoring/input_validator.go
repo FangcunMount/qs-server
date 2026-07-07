@@ -7,18 +7,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// ExecutionInput is the validated input for a factor-scoring evaluation run.
+// ExecutionInput 是有效ated input 用于 因子计分 评估执行。
 type ExecutionInput struct {
 	Assessment *assessment.Assessment
 	Input      *evaluationinput.InputSnapshot
 }
 
-// InputValidator validates factor-scoring execution input.
+// InputValidator 校验因子计分 execution input。
 type InputValidator interface {
 	Validate(input ExecutionInput) error
 }
 
-// DefaultInputValidator is the production input validator for factor-scoring runs.
+// 默认InputValidator 是production input 有效ator 用于 因子计分 runs。
 type DefaultInputValidator struct{}
 
 func (DefaultInputValidator) Validate(input ExecutionInput) error {

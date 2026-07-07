@@ -1,12 +1,12 @@
-// Package calculation executes scoring and projection rules against model inputs.
+// Package calculation 针对模型输入执行计分和投影规则。
 //
-// Boundaries:
-//   - ModelCatalog owns model structure and rule configuration (factors, norms, policies).
-//   - Calculation executes those rules and produces calculation.Result.
-//   - Evaluation orchestrates one assessment run and maps calculation results into
-//     assessment.AssessmentOutcome via application-layer adapters.
+// 边界：
+//   - ModelCatalog 负责模型结构和规则配置（因子、常模、策略）。
+//   - Calculation 执行这些规则并生成 calculation.Result。
+//   - Evaluation 编排一次测评执行，并通过应用层适配器把计算结果映射为
+//     assessment.AssessmentOutcome。
 //
-// Calculation is a stateless computation kernel: it must not import modelcatalog, factor,
-// question, or other domain assets. Callers translate their domain assets into calculation's
-// neutral inputs (ScoreNode, ScoreValue) and consume calculation.Result.
+// Calculation 是无状态计算内核，不得导入 modelcatalog、factor、question 或其他领域资产。
+// 调用方负责把自身领域资产转换为 calculation 的中性输入（ScoreNode、ScoreValue），
+// 并消费 calculation.Result。
 package calculation

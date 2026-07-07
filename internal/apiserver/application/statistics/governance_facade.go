@@ -20,7 +20,7 @@ type governanceFacade struct {
 	statusService cachegov.StatusService
 }
 
-// NewGovernanceFacade 创建统计治理 facade。
+// NewGovernanceFacade 创建统计治理 门面。
 func NewGovernanceFacade(component string, coordinator cachegov.Coordinator, statusService cachegov.StatusService) GovernanceFacade {
 	return &governanceFacade{
 		component:     component,

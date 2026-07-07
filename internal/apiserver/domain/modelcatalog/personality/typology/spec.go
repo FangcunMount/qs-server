@@ -2,7 +2,7 @@ package typology
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// RuntimeSpec is the configuration-driven execution view of a typology payload.
+// RuntimeSpec 是配置-driven execution 视图 of 类型学载荷。
 type RuntimeSpec struct {
 	FactorGraph    FactorGraphSpec         `json:"factor_graph"`
 	Decision       PersonalityDecisionSpec `json:"decision"`
@@ -11,9 +11,9 @@ type RuntimeSpec struct {
 	Report         ReportSpec              `json:"report"`
 }
 
-// FactorGraphSpec describes factor dimensions and question mappings for scoring.
-// When Factors and Roots are set, the explicit factor graph takes precedence over
-// the legacy DimensionOrder/Dimensions/QuestionMappings flat layout.
+// FactorGraphSpec 描述因子 维度 和 question mappings 用于 计分。
+// When 因子 和 根s 是 set, 显式 因子图 takes precedence over。
+// 旧版 维度Order/维度/QuestionMappings flat layout。
 type FactorGraphSpec struct {
 	DimensionOrder   []string              `json:"dimension_order,omitempty"`
 	Dimensions       map[string]Dimension  `json:"dimensions,omitempty"`
@@ -22,7 +22,7 @@ type FactorGraphSpec struct {
 	Roots            []string              `json:"roots,omitempty"`
 }
 
-// FactorSpec defines one node in an explicit factor graph.
+// FactorSpec 定义一个node in 显式 因子图。
 type FactorSpec struct {
 	ID            string                   `json:"id"`
 	Code          string                   `json:"code,omitempty"`
@@ -36,7 +36,7 @@ type FactorSpec struct {
 	OptionScoring FactorOptionScoring      `json:"option_scoring,omitempty"`
 }
 
-// FactorSpecKind distinguishes leaf and composite factor nodes.
+// FactorSpecKind 区分叶子 和 复合 因子 nodes。
 type FactorSpecKind string
 
 const (
@@ -44,7 +44,7 @@ const (
 	FactorSpecKindComposite FactorSpecKind = "composite"
 )
 
-// FactorAggregation defines how composite factors combine child scores.
+// FactorAggregation 定义如何复合 因子 组合子节点 分数。
 type FactorAggregation string
 
 const (
@@ -53,7 +53,7 @@ const (
 	FactorAggregationWeightedAvg FactorAggregation = "weighted_avg"
 )
 
-// FactorOptionScoring controls option-mapped answer scoring for leaf factors.
+// FactorOptionScoring 控制选项-mapped answer 计分 用于 叶子 因子。
 type FactorOptionScoring string
 
 const (
@@ -61,19 +61,19 @@ const (
 	FactorOptionScoringCompat FactorOptionScoring = "compat"
 )
 
-// FactorContributionSpec maps a questionnaire item to a leaf factor score.
+// FactorContributionSpec 映射问卷题目 到 叶子 因子 score。
 type FactorContributionSpec struct {
 	QuestionCode string             `json:"question_code"`
 	Sign         float64            `json:"sign,omitempty"`
 	OptionScores map[string]float64 `json:"option_scores,omitempty"`
 }
 
-// HasExplicitFactorGraph reports whether the spec carries an explicit factor hierarchy.
+// HasExplicitFactorGraph 报告是否 spec 携带 显式 因子 层级。
 func (fg FactorGraphSpec) HasExplicitFactorGraph() bool {
 	return len(fg.Factors) > 0 && len(fg.Roots) > 0
 }
 
-// DecisionFactorOrder returns the factor ids used by decision and outcome assembly.
+// DecisionFactorOrder 返回因子 ids 供 decision 和 结果 assembly。
 func (fg FactorGraphSpec) DecisionFactorOrder() []string {
 	if fg.HasExplicitFactorGraph() {
 		return append([]string(nil), fg.Roots...)
@@ -81,7 +81,7 @@ func (fg FactorGraphSpec) DecisionFactorOrder() []string {
 	return append([]string(nil), fg.DimensionOrder...)
 }
 
-// PersonalityDecisionSpec describes how profile vectors become outcomes.
+// PersonalityDecisionSpec 描述如何画像 向量转成 结果。
 type PersonalityDecisionSpec struct {
 	Kind                        modelcatalog.DecisionKind `json:"kind"`
 	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
@@ -89,13 +89,13 @@ type PersonalityDecisionSpec struct {
 	LevelRule                   *LevelRuleSpec            `json:"level_rule,omitempty"`
 }
 
-// LevelRuleSpec maps raw factor scores to discrete levels for pattern matching.
+// LevelRuleSpec 映射原始 因子 分数 到 离散等级 用于 模式匹配。
 type LevelRuleSpec struct {
 	LowMax  float64 `json:"low_max,omitempty"`
 	HighMin float64 `json:"high_min,omitempty"`
 }
 
-// SpecialRulePhase selects when a special rule is evaluated.
+// SpecialRulePhase 选择when special rule 是 evaluated。
 type SpecialRulePhase string
 
 const (
@@ -104,7 +104,7 @@ const (
 	SpecialRuleAfterDecision  SpecialRulePhase = "after_decision"
 )
 
-// SpecialRuleSpec describes a configurable special outcome rule.
+// SpecialRuleSpec 描述配置urable special 结果 rule。
 type SpecialRuleSpec struct {
 	Code          string               `json:"code"`
 	Kind          SpecialRuleKind      `json:"kind,omitempty"`
@@ -116,7 +116,7 @@ type SpecialRuleSpec struct {
 	OptionValues  []string             `json:"option_values,omitempty"`
 }
 
-// SpecialRuleKind selects the evaluation strategy for a special rule.
+// SpecialRuleKind 选择评估 strategy 用于 special rule。
 type SpecialRuleKind string
 
 const (
@@ -124,13 +124,13 @@ const (
 	SpecialRuleKindFallbackThreshold SpecialRuleKind = "fallback_threshold"
 )
 
-// SpecialRuleCondition carries kind-specific match parameters.
+// SpecialRuleCondition 携带类型-特定 match parameters。
 type SpecialRuleCondition struct {
 	QuestionCodes []string `json:"question_codes,omitempty"`
 	OptionValues  []string `json:"option_values,omitempty"`
 }
 
-// ResolvedKind returns the configured kind, deriving from legacy fields when needed.
+// ResolvedKind 返回配置化 类型, deriving 从 旧版 字段 when needed。
 func (r SpecialRuleSpec) ResolvedKind() SpecialRuleKind {
 	if r.Kind != "" {
 		return r.Kind
@@ -144,7 +144,7 @@ func (r SpecialRuleSpec) ResolvedKind() SpecialRuleKind {
 	return ""
 }
 
-// ResolvedQuestionCodes returns question codes from condition or legacy flat fields.
+// ResolvedQuestionCodes 返回question 编码 从 condition 或 旧版 flat 字段。
 func (r SpecialRuleSpec) ResolvedQuestionCodes() []string {
 	if len(r.Condition.QuestionCodes) > 0 {
 		return append([]string(nil), r.Condition.QuestionCodes...)
@@ -152,7 +152,7 @@ func (r SpecialRuleSpec) ResolvedQuestionCodes() []string {
 	return append([]string(nil), r.QuestionCodes...)
 }
 
-// ResolvedOptionValues returns option values from condition or legacy flat fields.
+// ResolvedOptionValues 返回选项 values 从 condition 或 旧版 flat 字段。
 func (r SpecialRuleSpec) ResolvedOptionValues() []string {
 	if len(r.Condition.OptionValues) > 0 {
 		return append([]string(nil), r.Condition.OptionValues...)
@@ -160,7 +160,7 @@ func (r SpecialRuleSpec) ResolvedOptionValues() []string {
 	return append([]string(nil), r.OptionValues...)
 }
 
-// OutcomeDetailKind selects how scoring detail maps to AssessmentOutcome.
+// OutcomeDetailKind 选择如何计分 detail 映射到 AssessmentOutcome。
 type OutcomeDetailKind string
 
 const (
@@ -168,14 +168,14 @@ const (
 	OutcomeDetailTraitProfile    OutcomeDetailKind = "trait_profile"
 )
 
-// OutcomeMappingSpec describes how scoring detail becomes AssessmentOutcome fields.
+// OutcomeMappingSpec 描述如何计分 detail 转成 AssessmentOutcome 字段。
 type OutcomeMappingSpec struct {
 	DetailKind       OutcomeDetailKind      `json:"detail_kind"`
 	DetailAdapterKey DetailAdapterKey       `json:"detail_adapter_key,omitempty"`
 	Algorithm        modelcatalog.Algorithm `json:"algorithm,omitempty"`
 }
 
-// DetailAdapterKey selects the detail assembler implementation.
+// DetailAdapterKey 选择明细组装器 实现。
 type DetailAdapterKey string
 
 const (
@@ -186,7 +186,7 @@ const (
 	DetailAdapterBigFive         DetailAdapterKey = "bigfive"
 )
 
-// ResolvedDetailAdapterKey returns the configured adapter key, deriving from legacy fields when needed.
+// ResolvedDetailAdapterKey 返回配置化 adapter 键, deriving 从 旧版 字段 when needed。
 func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind modelcatalog.DecisionKind) DetailAdapterKey {
 	if m.DetailAdapterKey != "" {
 		return m.DetailAdapterKey
@@ -197,7 +197,7 @@ func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind modelcatalog.D
 	return DetailAdapterPersonalityType
 }
 
-// ReportKind selects the report adapter strategy.
+// ReportKind 选择报告适配器 strategy。
 type ReportKind string
 
 const (
@@ -206,7 +206,7 @@ const (
 	ReportKindTemplate        ReportKind = "template"
 )
 
-// ReportSpec describes how to build interpret reports for a typology model.
+// ReportSpec 描述如何 build interpret reports 用于 类型学 model。
 type ReportSpec struct {
 	Kind          ReportKind       `json:"kind"`
 	AdapterKey    ReportAdapterKey `json:"adapter_key,omitempty"`
@@ -214,7 +214,7 @@ type ReportSpec struct {
 	CategoryLabel string           `json:"category_label,omitempty"`
 }
 
-// ReportAdapterKey selects the report builder implementation.
+// ReportAdapterKey 选择报告构建器 实现。
 type ReportAdapterKey string
 
 const (
@@ -225,8 +225,8 @@ const (
 	ReportAdapterBigFive         ReportAdapterKey = "bigfive"
 )
 
-// ResolvedAdapterKey returns the configured report adapter from explicit key or generic report kind.
-// Legacy model-specific report adapters must be set on AdapterKey during legacy derivation.
+// ResolvedAdapterKey 返回配置化 报告适配器 从 显式 键 或 通用 report 类型。
+// Legacy model-特定 报告适配器 必须 be set on Adapter键 在 旧版 derivation。
 func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ modelcatalog.DecisionKind) ReportAdapterKey {
 	if r.AdapterKey != "" {
 		return r.AdapterKey

@@ -7,13 +7,13 @@ const (
 	SchemaVersionV2 = "2"
 )
 
-// QuestionnaireBinding binds a published model to a questionnaire version.
+// QuestionnaireBinding binds 已发布模型 到 问卷版本。
 type QuestionnaireBinding struct {
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 }
 
-// ModelDefinition is canonical published-model metadata.
+// ModelDefinition 是规范 published-model 元数据。
 type ModelDefinition struct {
 	ProductChannel identity.ProductChannel
 	Kind           identity.Kind
@@ -25,15 +25,15 @@ type ModelDefinition struct {
 	Status         string
 }
 
-// DecisionSpec captures the outcome decision strategy for a published model.
+// DecisionSpec 记录结果 判定策略 用于 已发布模型。
 type DecisionSpec struct {
 	Kind identity.DecisionKind
 }
 
-// SourceRef carries optional provenance metadata for a published snapshot.
+// SourceRef 携带可选 provenance 元数据 用于 已发布快照。
 type SourceRef map[string]any
 
-// PublishedModelSnapshot is the v2 published-model envelope.
+// PublishedModelSnapshot 是v2 published-model envelope。
 type PublishedModelSnapshot struct {
 	SchemaVersion string
 	Model         ModelDefinition

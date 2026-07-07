@@ -8,7 +8,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// BuildPublishedSnapshot materializes a v2 published snapshot from a draft cognitive model.
+// BuildPublishedSnapshot 物化v2 已发布快照 从 draft cognitive model。
 func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedModelSnapshot, error) {
 	if model == nil {
 		return nil, fmt.Errorf("assessment model is nil")

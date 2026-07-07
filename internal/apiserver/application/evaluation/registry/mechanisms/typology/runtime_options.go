@@ -4,7 +4,7 @@ import (
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
 )
 
-// PersonalityRuntimeOptions configures injectable adapter registries for typology execution.
+// PersonalityRuntimeOptions 配置injectable adapter 注册表 用于 类型学 execution。
 type PersonalityRuntimeOptions struct {
 	DetailRegistry  personalityconfigured.DetailAssemblerRegistry
 	OutcomeRegistry OutcomeAdapterRegistry

@@ -1,4 +1,4 @@
-// Package template owns report template selection and rendering contracts.
+// Package template 负责report template 选择 和 rendering contracts。
 package template
 
 import (
@@ -6,31 +6,31 @@ import (
 	typologytemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 )
 
-// Profile is a mechanism-neutral report template profile.
+// Profile 是机制无关 report template 画像。
 type Profile struct {
 	Kind             string
 	DefaultModelName string
 	DefaultModelCode string
 }
 
-// Renderer renders a report template into domain report structures.
+// Renderer renders report template 为 领域报告结构。
 type Renderer interface {
 	Profile() Profile
 }
 
-// PersonalityTypeTemplate is the typology personality-type presentation template.
+// PersonalityTypeTemplate 是类型学 personality-type 呈现 template。
 type PersonalityTypeTemplate = typologytemplate.PersonalityTypeReportTemplate
 
-// TraitProfileTemplate is the typology trait-profile presentation template.
+// TraitProfileTemplate 是类型学 trait-画像 呈现 template。
 type TraitProfileTemplate = typologytemplate.TraitProfileReportTemplate
 
-// BuildPersonalityTypeReport renders a personality-type report from mechanism-neutral detail.
+// BuildPersonalityTypeReport renders personality-type report 从 机制无关 detail。
 var BuildPersonalityTypeReport = typologytemplate.BuildPersonalityTypeReport
 
-// BuildTraitProfileReport renders a trait-profile report from mechanism-neutral detail.
+// BuildTraitProfileReport renders trait-画像 report 从 机制无关 detail。
 var BuildTraitProfileReport = typologytemplate.BuildTraitProfileReport
 
-// DefaultReportBuilder is the shared default report composer.
+// 默认ReportBuilder 是共享 默认 report composer。
 type DefaultReportBuilder = domainreport.DefaultReportBuilder
 
 var NewDefaultInterpretReportBuilder = domainreport.NewDefaultInterpretReportBuilder

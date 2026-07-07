@@ -10,17 +10,17 @@ import (
 
 type outcomeAdapterFunc func(assessment.EvaluationModelRef, evaluationtypology.ScoringResult) (*assessment.AssessmentOutcome, error)
 
-// OutcomeAdapterRegistry resolves assessment outcome assemblers by detail adapter key.
+// OutcomeAdapterRegistry 解析测评结果 assemblers 按 detail adapter 键。
 type OutcomeAdapterRegistry struct {
 	adapters map[modeltypology.DetailAdapterKey]outcomeAdapterFunc
 }
 
-// DefaultOutcomeAdapterRegistry returns the built-in generic and legacy outcome adapters.
+// 默认OutcomeAdapterRegistry 返回内置 通用 和 旧版 结果 adapters。
 func DefaultOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 	return NewOutcomeAdapterRegistry()
 }
 
-// NewOutcomeAdapterRegistry returns the built-in generic and legacy outcome adapters.
+// NewOutcomeAdapterRegistry 返回内置 通用 和 旧版 结果 adapters。
 func NewOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 	return OutcomeAdapterRegistry{
 		adapters: map[modeltypology.DetailAdapterKey]outcomeAdapterFunc{
@@ -30,7 +30,7 @@ func NewOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 	}
 }
 
-// Register returns a registry copy with an additional or overridden outcome adapter.
+// Register 返回注册表副本 使用 额外 或 覆盖 结果 adapter。
 func (r OutcomeAdapterRegistry) Register(key modeltypology.DetailAdapterKey, adapter outcomeAdapterFunc) OutcomeAdapterRegistry {
 	next := OutcomeAdapterRegistry{adapters: make(map[modeltypology.DetailAdapterKey]outcomeAdapterFunc, len(r.adapters)+1)}
 	for k, v := range r.adapters {

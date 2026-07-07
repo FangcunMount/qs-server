@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-// HierarchyProjection annotates dimension results with score-node hierarchy metadata.
+// HierarchyProjection 标注维度结果 使用 计分节点 层级 元数据。
 type HierarchyProjection struct {
 	Nodes []calculation.ScoreNode
 }

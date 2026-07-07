@@ -2,17 +2,17 @@ package systemgovernance
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 
-// ActionRegistry exposes governance action descriptors.
+// ActionRegistry 暴露governance action 描述符。
 type ActionRegistry struct {
 	actions []ActionDescriptor
 }
 
-// NewActionRegistry returns the v1 action catalog.
+// NewActionRegistry 返回v1 action 目录。
 func NewActionRegistry() *ActionRegistry {
 	return &ActionRegistry{actions: defaultActions()}
 }
 
-// List returns all action descriptors.
+// List 返回全部action 描述符。
 func (r *ActionRegistry) List() []ActionDescriptor {
 	if r == nil {
 		return defaultActions()
@@ -22,7 +22,7 @@ func (r *ActionRegistry) List() []ActionDescriptor {
 	return out
 }
 
-// Get returns one action descriptor.
+// Get 返回一个action 描述符。
 func (r *ActionRegistry) Get(actionID string) (ActionDescriptor, bool) {
 	for _, item := range r.List() {
 		if item.ID == actionID {

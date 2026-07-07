@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ModelKind distinguishes mechanism-oriented runtime descriptors during migration.
+// ModelKind 区分面向机制 运行时描述符 在 迁移。
 type ModelKind string
 
 const (
@@ -16,7 +16,7 @@ const (
 	ModelKindCognitive        ModelKind = "cognitive"
 )
 
-// DecisionKindFromSnapshot resolves the decision strategy for runtime routing.
+// DecisionKindFromSnapshot 解析判定策略 用于 运行时路由。
 func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.DecisionKind, bool) {
 	if snapshot.Decision.Kind != "" {
 		return snapshot.Decision.Kind, true
@@ -24,8 +24,8 @@ func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (mod
 	return modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
 }
 
-// ExecutionRoutingFromSnapshot is the single source for runtime and report mechanism routing.
-// Legacy model kinds route by execution path family; DecisionKindForIdentity remains for publish matrices.
+// ExecutionRoutingFromSnapshot 是单一 来源 用于 运行时 和 report 机制 路由。
+// Legacy 建模类型 路由 按 执行路径家族; 判定类型For身份 保持 用于 publish matrices。
 func ExecutionRoutingFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
 	family, ok := ExecutionFamilyFromSnapshot(snapshot)
 	if !ok {
@@ -38,12 +38,12 @@ func ExecutionRoutingFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) 
 	}, nil
 }
 
-// RuntimeDescriptorKeyFromSnapshot derives mechanism routing keys from a published snapshot.
+// RuntimeDescriptorKeyFromSnapshot 推导机制 路由 键 从 已发布快照。
 func RuntimeDescriptorKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
 	return ExecutionRoutingFromSnapshot(snapshot)
 }
 
-// ExecutionFamilyFromSnapshot resolves the execution family using kind-primary routing.
+// ExecutionFamilyFromSnapshot 解析执行家族 using 类型-主 路由。
 func ExecutionFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
 	if family, ok := executionFamilyFromModelKind(snapshot.Model); ok {
 		return family, true
@@ -54,7 +54,7 @@ func ExecutionFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (
 	return modelcatalog.AlgorithmFamilyFromIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
 }
 
-// ExecutionDecisionFromSnapshot resolves decision kind aligned with the execution family.
+// ExecutionDecisionFromSnapshot 解析判定类型 aligned 使用 执行家族。
 func ExecutionDecisionFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot, family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
 	if snapshot.Decision.Kind != "" {
 		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind); ok && decisionFamily == family {
@@ -100,12 +100,12 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 	}
 }
 
-// AlgorithmFamilyFromSnapshot resolves the execution family for a published snapshot.
+// AlgorithmFamilyFromSnapshot 解析执行家族 用于 已发布快照。
 func AlgorithmFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
 	return ExecutionFamilyFromSnapshot(snapshot)
 }
 
-// AlgorithmFamilyFromModelKind maps legacy model-kind descriptors to mechanism families.
+// AlgorithmFamilyFromModelKind 映射旧版 模型类型描述符 到 机制家族。
 func AlgorithmFamilyFromModelKind(kind ModelKind) (modelcatalog.AlgorithmFamily, bool) {
 	switch kind {
 	case ModelKindScale:
@@ -121,7 +121,7 @@ func AlgorithmFamilyFromModelKind(kind ModelKind) (modelcatalog.AlgorithmFamily,
 	}
 }
 
-// ExecutionPathForFamily maps an algorithm family to its materialization path.
+// ExecutionPathForFamily 映射算法家族 到 its 物化路径。
 func ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, error) {
 	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
@@ -137,7 +137,7 @@ func ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.E
 	}
 }
 
-// ExecutionPathForModelKind maps a legacy model kind to its materialization path.
+// ExecutionPathForModelKind 映射旧模型类型 到 its 物化路径。
 func ExecutionPathForModelKind(kind ModelKind) (modelcatalog.ExecutionPath, error) {
 	family, ok := AlgorithmFamilyFromModelKind(kind)
 	if !ok {

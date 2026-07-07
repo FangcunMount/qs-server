@@ -14,32 +14,32 @@ type (
 	CognitiveScoreProjector        = TaskPerformanceScoreProjector
 )
 
-// Deprecated: use NewFactorScoringReportBuilder.
+// Deprecated: 使用 NewFactorScoringReportBuilder。
 func NewScaleReportBuilder(composer domainReport.ReportBuilder) ScaleReportBuilder {
 	return NewFactorScoringReportBuilder(composer)
 }
 
-// Deprecated: use NewFactorScoringScoreProjector.
+// Deprecated: 使用 NewFactorScoringScoreProjector。
 func NewScaleScoreProjector(scoreRepo assessment.ScoreRepository) ScaleScoreProjector {
 	return NewFactorScoringScoreProjector(scoreRepo)
 }
 
-// Deprecated: use NewNormProfileReportBuilder.
+// Deprecated: 使用 NewNormProfileReportBuilder。
 func NewBehavioralRatingReportBuilder(composer domainReport.ReportBuilder) BehavioralRatingReportBuilder {
 	return NewNormProfileReportBuilder(composer)
 }
 
-// Deprecated: use NewNormProfileScoreProjector.
+// Deprecated: 使用 NewNormProfileScoreProjector。
 func NewBehavioralRatingScoreProjector(scoreRepo assessment.ScoreRepository) NormProfileScoreProjector {
 	return NewNormProfileScoreProjector(scoreRepo)
 }
 
-// Deprecated: use NewTaskPerformanceReportBuilder.
+// Deprecated: 使用 NewTaskPerformanceReportBuilder。
 func NewCognitiveReportBuilder(composer domainReport.ReportBuilder) CognitiveReportBuilder {
 	return NewTaskPerformanceReportBuilder(composer)
 }
 
-// Deprecated: use NewTaskPerformanceScoreProjector.
+// Deprecated: 使用 NewTaskPerformanceScoreProjector。
 func NewCognitiveScoreProjector(scoreRepo assessment.ScoreRepository) CognitiveScoreProjector {
 	return NewTaskPerformanceScoreProjector(scoreRepo)
 }

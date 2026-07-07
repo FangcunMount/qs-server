@@ -1,7 +1,7 @@
 package calculation
 
-// AggregationStrategy names how a composite node derives its score from children.
-// It is a calculation-native enum; callers translate their domain policies into it.
+// AggregationStrategy 命名如何 复合 node 从中推导分数： 子节点。
+// 它是计算层原生枚举; callers 转换其 领域策略 为 it。
 type AggregationStrategy string
 
 const (
@@ -13,9 +13,9 @@ const (
 	AggregationCustom      AggregationStrategy = "custom"
 )
 
-// ScoreNode is an abstract scoring-tree node consumed by projections.
-// It carries no model-catalog/factor coupling: callers translate their own domain
-// assets (e.g. factor snapshots) into ScoreNode before invoking calculation.
+// ScoreNode 是abstract 计分树节点 消费d 按 投影。
+// It 携带no model-目录/因子 coupling: callers 转换其 own 领域。
+// assets (例如 因子快照) 为 ScoreNode 在之前 调用 计算。
 type ScoreNode struct {
 	Code        string
 	Name        string

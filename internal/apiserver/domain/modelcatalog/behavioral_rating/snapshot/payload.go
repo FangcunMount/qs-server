@@ -10,7 +10,7 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
-// Snapshot is a published behavioral_rating execution payload (default.v1 or brief2.v1).
+// Snapshot 是published behavioral_rating 执行载荷 (默认.v1 或 brief2.v1)。
 type Snapshot struct {
 	Code                 string
 	Version              string
@@ -22,7 +22,7 @@ type Snapshot struct {
 	Brief2               *Brief2Profile
 }
 
-// Brief2Profile carries BRIEF-2 specific configuration beyond score_range scoring.
+// Brief2Profile 携带BRIEF-2 特定 配置 beyond score_range 计分。
 type Brief2Profile struct {
 	FormVariant          string
 	NormTableVersion     string
@@ -32,7 +32,7 @@ type Brief2Profile struct {
 	NormTables           *calcnorm.NormTables
 }
 
-// NormTablesOrNil returns parsed norm tables when Brief-2 norm configuration is present.
+// NormTablesOrNil 返回parsed 常模表 when Brief-2 常模 配置 是 存在。
 func (p *Brief2Profile) NormTablesOrNil() *calcnorm.NormTables {
 	if p == nil {
 		return nil
@@ -102,12 +102,12 @@ type brief2TScoreRange struct {
 	Suggestion string  `json:"suggestion,omitempty"`
 }
 
-// ParseDefinitionPayload decodes a behavioral_rating payload body into a runtime snapshot.
+// ParseDefinitionPayload de编码 behavioral_rating 载荷 body 为 运行时 快照。
 func ParseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// ParsePublishedPayload decodes a published snapshot using its payload format label.
+// ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
 func ParsePublishedPayload(payloadFormat, modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	switch payloadFormat {
 	case "", "assessmentmodel.behavioral_rating.default.v1", "assessmentmodel.behavioral_rating.brief2.v1":
@@ -228,7 +228,7 @@ func (s *Snapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
 }
 
-// ToScaleSnapshot projects behavioral_rating factors into the scale execution shape.
+// ToScaleSnapshot 投影behavioral_rating 因子 为 scale execution 结构。
 func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil

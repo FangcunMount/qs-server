@@ -4,7 +4,7 @@ import "github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 
 // ==================== 答案值适配器 ====================
 
-// answerValueAdapter exposes AnswerValue through the scoring value surface.
+// answerValueAdapter exposes AnswerValue 通过 计分 value surface。
 type answerValueAdapter struct {
 	value AnswerValue
 }

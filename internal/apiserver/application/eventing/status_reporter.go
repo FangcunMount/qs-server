@@ -21,7 +21,7 @@ type outboxStatusReporter struct {
 	lastAttemptAt time.Time
 }
 
-// NewOutboxStatusReporter creates the best-effort metrics bridge for one outbox store.
+// NewOutboxStatusReporter 创建best-effort 指标桥接器 用于 一个outbox 存储。
 func NewOutboxStatusReporter(name string, reader OutboxStatusReader, observer eventobservability.Observer) OutboxStatusReporter {
 	return newOutboxStatusReporter(name, reader, observer, time.Now)
 }

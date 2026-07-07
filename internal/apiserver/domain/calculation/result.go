@@ -1,6 +1,6 @@
 package calculation
 
-// DimensionKind classifies a dimension result independent of scale factor semantics.
+// DimensionKind 划分维度结果 独立于 scale 因子 semantics。
 type DimensionKind string
 
 const (
@@ -11,7 +11,7 @@ const (
 	DimensionKindAbility DimensionKind = "ability"
 )
 
-// ScoreKind classifies a primary or dimension score value.
+// ScoreKind 划分主 或 维度分 value。
 type ScoreKind string
 
 const (
@@ -21,7 +21,7 @@ const (
 	ScoreKindPercentile   ScoreKind = "percentile"
 )
 
-// ScoreValue is the canonical score representation on a calculation result.
+// ScoreValue 是规范 score re呈现 on 计算结果。
 type ScoreValue struct {
 	Kind  ScoreKind
 	Value float64
@@ -29,14 +29,14 @@ type ScoreValue struct {
 	Max   *float64
 }
 
-// ResultLevel is the canonical level representation on a calculation result.
+// ResultLevel 是规范 等级 re呈现 on 计算结果。
 type ResultLevel struct {
 	Code     string
 	Label    string
 	Severity string
 }
 
-// DimensionResult records one scored dimension on a calculation result.
+// DimensionResult 记录一个scored 维度 on 计算结果。
 type DimensionResult struct {
 	Code           string
 	Name           string
@@ -52,7 +52,7 @@ type DimensionResult struct {
 	Suggestion     string
 }
 
-// Result is the canonical output of calculation projections.
+// Result 是规范 output of 计算投影。
 type Result struct {
 	Primary      *ScoreValue
 	Level        *ResultLevel

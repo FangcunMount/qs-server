@@ -292,7 +292,7 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 	return nil
 }
 
-// StageEvaluatedEvent records that scoring completed and report generation should follow.
+// StageEvaluatedEvent 记录that 计分完成 和 报告生成 应该 follow。
 func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time) {
 	a.addEvent(NewAssessmentEvaluatedEvent(
 		a.orgID,
@@ -343,7 +343,7 @@ func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
 // 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型
 // 后置条件：状态变为 interpreted，记录评估结果
 //
-// Deprecated: Use ApplyOutcome. Retained for lifecycle/infra tests and legacy adapters.
+// Deprecated: 使用 ApplyOutcome。为生命周期/基础设施测试和旧适配器保留。
 //
 // 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
 // 因此这里不直接添加领域事件。
@@ -432,7 +432,7 @@ func (a *Assessment) OrgID() int64 {
 	return a.orgID
 }
 
-// CurrentRunID returns the in-memory active evaluation run identifier.
+// CurrentRunID 返回in-memory 活跃 评估执行 identifier。
 func (a *Assessment) CurrentRunID() evalrun.ID {
 	if a == nil {
 		return ""
@@ -440,7 +440,7 @@ func (a *Assessment) CurrentRunID() evalrun.ID {
 	return a.currentRunID
 }
 
-// SetCurrentRunID tracks the active evaluation run in memory only.
+// SetCurrentRunID 跟踪活跃 评估执行 in memory 仅。
 func (a *Assessment) SetCurrentRunID(runID evalrun.ID) {
 	if a == nil {
 		return

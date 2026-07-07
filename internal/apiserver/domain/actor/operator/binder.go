@@ -99,11 +99,8 @@ func (b *binder) ValidateBinding(_ context.Context, staff *Operator) error {
 		return err
 	}
 
-	// TODO: 可以在这里添加调用用户服务验证用户是否存在的逻辑
-	// userExists, err := userService.CheckUserExists(ctx, staff.UserID())
-	// if err != nil || !userExists {
-	//     return errors.WithCode(code.ErrUserNotFound, "bound user not found")
-	// }
+	// TODO: 可在这里调用用户服务校验绑定用户是否存在。
+	// 旧实现草案：检查 userExists，失败时返回 ErrUserNotFound。
 
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
-// ResilienceProjection is the diagnostic pressure-protection view.
+// ResilienceProjection 是diagnostic pressure-protection 视图。
 type ResilienceProjection struct {
 	Summary          ResilienceSummary
 	QueueRows        []ResilienceQueueRow
@@ -17,7 +17,7 @@ type ResilienceProjection struct {
 	Signals          []Signal
 }
 
-// ResilienceProjector turns runtime snapshots into operator-facing rows and signals.
+// ResilienceProjector 将运行时 快照转换为operator-facing 行 和 信号。
 type ResilienceProjector struct {
 	evidence MetricEvidenceReader
 }

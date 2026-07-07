@@ -2,15 +2,15 @@ package factor
 
 import "fmt"
 
-// HierarchyIssue records one factor hierarchy validation problem.
+// HierarchyIssue 记录一个因子 层级 校验 problem。
 type HierarchyIssue struct {
 	Field   string
 	Code    string
 	Message string
 }
 
-// ValidateFactorHierarchy checks multi-level factor invariants for a flat factor list.
-// Models without ParentCode pass with zero issues.
+// ValidateFactorHierarchy 检查multi-等级 因子 invariants 用于 flat 因子 list。
+// Models 不使用 Parent编码 pass 使用 zero issues。
 func ValidateFactorHierarchy(factors []FactorSnapshot) []HierarchyIssue {
 	if len(factors) == 0 {
 		return nil

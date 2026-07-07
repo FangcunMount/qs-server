@@ -5,7 +5,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// ScoringResult is the domain-local output of a personality model adapter.
+// ScoringResult 是领域-本地 output of 人格模型适配器。
 type ScoringResult struct {
 	Runtime         *modeltypology.RuntimeSpec
 	Vector          trait.ProfileVector
@@ -15,21 +15,21 @@ type ScoringResult struct {
 	Detail          any
 }
 
-// SelectedOutcome captures the chosen model outcome before detail assembly.
+// SelectedOutcome 记录选中 model 结果 在之前 明细组装。
 type SelectedOutcome struct {
 	Code       string
 	Similarity float64
 	Trigger    string
 }
 
-// ScoringSpecialMatch records a special rule that altered scoring.
+// ScoringSpecialMatch 记录special rule that altered 计分。
 type ScoringSpecialMatch struct {
 	OutcomeCode string
 	Trigger     string
 	SkipScoring bool
 }
 
-// LegacyDetail returns the typed detail payload for backward-compatible callers.
+// LegacyDetail 返回typed 明细载荷 用于 backward-compatible callers。
 func (r ScoringResult) LegacyDetail() any {
 	return r.Detail
 }

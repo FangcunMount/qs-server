@@ -214,8 +214,8 @@ func FilterNewTasks(newTasks []*AssessmentTask, existingTasks []*AssessmentTask)
 	return result
 }
 
-// Helper function for creating tasks with testee and scale code
-// This is a convenience function that can be used when you have the code directly
+// Helper 函数 用于 creating tasks 使用 testee 和 scale 编码。
+// 这是convenience 函数 that can be 用于 you have 编码 直接。
 func GenerateTasksWithIDs(
 	planID AssessmentPlanID,
 	orgID int64,
@@ -229,8 +229,8 @@ func GenerateTasksWithIDs(
 	fixedDates []time.Time,
 	customWeeks []int,
 ) []*AssessmentTask {
-	// Create a temporary plan-like structure for generation
-	// Note: This is a helper function, actual plan creation should go through NewAssessmentPlan
+	// Create temporary plan-like structure 用于 generation。
+	// 保留的旧实现片段：Note: This is a 辅助函数 function, actual plan creation should go through NewAssessmentPlan
 	var tasks []*AssessmentTask
 
 	switch scheduleType {

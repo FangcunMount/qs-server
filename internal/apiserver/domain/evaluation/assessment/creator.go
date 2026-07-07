@@ -151,9 +151,9 @@ func (v scaleEvaluationModelValidator) ValidateEvaluationModel(ctx context.Conte
 	return nil
 }
 
-// ==================== DefaultAssessmentCreator 默认实现 ====================
+// ==================== 默认AssessmentCreator 默认实现 ====================
 
-// DefaultAssessmentCreator 默认测评创建服务
+// 默认AssessmentCreator 默认测评创建服务
 // 包含完整的跨聚合验证逻辑
 type DefaultAssessmentCreator struct {
 	testeeValidator        TesteeValidator
@@ -204,7 +204,7 @@ func WithScaleValidator(v ScaleValidator) AssessmentCreatorOption {
 	}
 }
 
-// NewDefaultAssessmentCreator 创建默认测评创建服务
+// New默认AssessmentCreator 创建默认测评创建服务
 func NewDefaultAssessmentCreator(opts ...AssessmentCreatorOption) *DefaultAssessmentCreator {
 	c := &DefaultAssessmentCreator{}
 	for _, opt := range opts {

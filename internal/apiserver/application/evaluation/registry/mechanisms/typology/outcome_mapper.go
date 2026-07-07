@@ -9,22 +9,22 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// OutcomeAssembler maps scoring results to assessment outcomes using outcome mapping spec.
+// OutcomeAssembler 映射计分结果 到 测评结果 using 结果 mapping spec。
 type OutcomeAssembler struct {
 	registry OutcomeAdapterRegistry
 }
 
-// NewOutcomeAssembler returns the default typology outcome assembler.
+// NewOutcomeAssembler 返回默认 类型学 结果组装器。
 func NewOutcomeAssembler() OutcomeAssembler {
 	return NewOutcomeAssemblerWithRegistry(DefaultOutcomeAdapterRegistry())
 }
 
-// NewOutcomeAssemblerWithRegistry returns an outcome assembler bound to a specific adapter registry.
+// NewOutcomeAssemblerWithRegistry 返回结果组装器 bound 到 特定 adapter 注册表。
 func NewOutcomeAssemblerWithRegistry(registry OutcomeAdapterRegistry) OutcomeAssembler {
 	return OutcomeAssembler{registry: registry}
 }
 
-// Assemble converts a scoring result into an AssessmentOutcome.
+// Assemble 转换计分结果 为 AssessmentOutcome。
 func (a OutcomeAssembler) Assemble(
 	modelRef assessment.EvaluationModelRef,
 	result evaluationtypology.ScoringResult,
@@ -63,7 +63,7 @@ func assembleGenericPersonalityTypeOutcome(
 	return assessmentOutcomeFromPersonalityType(modelRef, detail), nil
 }
 
-// AssembleFromPayload derives mapping from payload and assembles the outcome.
+// AssembleFromPayload 推导mapping 从 载荷 和 assembles 结果。
 func (a OutcomeAssembler) AssembleFromPayload(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,

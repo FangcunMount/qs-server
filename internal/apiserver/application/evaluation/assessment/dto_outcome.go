@@ -2,7 +2,7 @@ package assessment
 
 import "time"
 
-// ModelIdentityResult is the published-model reference on outcome read APIs.
+// ModelIdentityResult 是published-模型引用 on 结果 read APIs。
 type ModelIdentityResult struct {
 	Kind      string `json:"kind"`
 	SubKind   string `json:"sub_kind,omitempty"`
@@ -12,7 +12,7 @@ type ModelIdentityResult struct {
 	Title     string `json:"title,omitempty"`
 }
 
-// ScoreValueResult is the primary score projection on outcome read APIs.
+// ScoreValueResult 是主 score 投影 on 结果 read APIs。
 type ScoreValueResult struct {
 	Kind  string   `json:"kind"`
 	Value float64  `json:"value"`
@@ -20,14 +20,14 @@ type ScoreValueResult struct {
 	Max   *float64 `json:"max,omitempty"`
 }
 
-// ResultLevelResult is the outcome level projection on outcome read APIs.
+// ResultLevelResult 是结果 等级 投影 on 结果 read APIs。
 type ResultLevelResult struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity,omitempty"`
 }
 
-// AssessmentOutcomeResult exposes assessment facts with outcome summary.
+// AssessmentOutcomeResult 暴露assessment 事实 使用 结果 summary。
 type AssessmentOutcomeResult struct {
 	ID                   uint64              `json:"id"`
 	OrgID                uint64              `json:"org_id"`
@@ -47,7 +47,7 @@ type AssessmentOutcomeResult struct {
 	FailureReason        *string             `json:"failure_reason,omitempty"`
 }
 
-// AssessmentOutcomeListResult is a paginated outcome assessment list.
+// AssessmentOutcomeListResult 是paginated 结果 assessment list。
 type AssessmentOutcomeListResult struct {
 	Items      []*AssessmentOutcomeResult `json:"items"`
 	Total      int                        `json:"total"`
@@ -56,7 +56,7 @@ type AssessmentOutcomeListResult struct {
 	TotalPages int                        `json:"total_pages"`
 }
 
-// ReportOutcomeResult exposes report facts with outcome summary.
+// ReportOutcomeResult 暴露report 事实 使用 结果 summary。
 type ReportOutcomeResult struct {
 	AssessmentID uint64              `json:"assessment_id"`
 	Model        ModelIdentityResult `json:"model"`
@@ -69,7 +69,7 @@ type ReportOutcomeResult struct {
 	CreatedAt    time.Time           `json:"created_at"`
 }
 
-// ReportOutcomeListResult is a paginated outcome report list.
+// ReportOutcomeListResult 是paginated 结果 report list。
 type ReportOutcomeListResult struct {
 	Items      []*ReportOutcomeResult `json:"items"`
 	Total      int                    `json:"total"`
@@ -78,14 +78,14 @@ type ReportOutcomeListResult struct {
 	TotalPages int                    `json:"total_pages"`
 }
 
-// Deprecated: use AssessmentOutcomeResult.
+// Deprecated: 使用 AssessmentOutcomeResult。
 type AssessmentV2Result = AssessmentOutcomeResult
 
-// Deprecated: use AssessmentOutcomeListResult.
+// Deprecated: 使用 AssessmentOutcomeListResult。
 type AssessmentV2ListResult = AssessmentOutcomeListResult
 
-// Deprecated: use ReportOutcomeResult.
+// Deprecated: 使用 ReportOutcomeResult。
 type ReportV2Result = ReportOutcomeResult
 
-// Deprecated: use ReportOutcomeListResult.
+// Deprecated: 使用 ReportOutcomeListResult。
 type ReportV2ListResult = ReportOutcomeListResult

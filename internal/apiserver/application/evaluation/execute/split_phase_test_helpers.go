@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// splitPhaseCapture records split-phase persistence for execute package tests.
+// splitPhaseCapture records 分阶段 持久化 用于 execute 包 tests。
 type splitPhaseCapture struct {
 	ScoringCalls        int
 	InterpretationCalls int

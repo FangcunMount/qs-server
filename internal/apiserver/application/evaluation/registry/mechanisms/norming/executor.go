@@ -13,14 +13,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
-// Executor runs factor-norm evaluations via the shared factor-scoring engine.
+// Executor 运行因子-常模 评估s via 共享 因子计分 engine。
 type Executor struct {
 	scoring *factorscoring.Executor
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
-// NewExecutor creates a factor-norm evaluation executor.
+// NewExecutor 创建因子-常模 评估 executor。
 func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return &Executor{scoring: factorscoring.NewExecutor(scorer)}
 }

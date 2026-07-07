@@ -87,7 +87,7 @@ type OperatorRoleProjectionUpdater interface {
 	SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error
 }
 
-// ============= DTOs =============
+// === DTO ===
 
 // RegisterOperatorDTO 注册操作者 DTO
 type RegisterOperatorDTO struct {

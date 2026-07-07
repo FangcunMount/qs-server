@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// AssignmentRequest describes a clinician-testee relation assignment command.
+// AssignmentRequest 描述咨询师-受试者关系分配命令。
 type AssignmentRequest struct {
 	OrgID        int64
 	ClinicianID  clinician.ID
@@ -20,14 +20,14 @@ type AssignmentRequest struct {
 	Now          time.Time
 }
 
-// AssignmentPlan is the domain decision for relation assignment.
+// AssignmentPlan 是领域 decision 用于 关系分配。
 type AssignmentPlan struct {
 	ReuseRelation *ClinicianTesteeRelation
 	Unbind        []*ClinicianTesteeRelation
 	Create        *ClinicianTesteeRelation
 }
 
-// AssignmentPolicy decides how to reuse, replace, or create assignment relations.
+// AssignmentPolicy decides 如何 reuse, replace, 或 create 分配关系。
 type AssignmentPolicy interface {
 	PlanAssignment(
 		request AssignmentRequest,
@@ -38,7 +38,7 @@ type AssignmentPolicy interface {
 
 type assignmentPolicy struct{}
 
-// NewAssignmentPolicy creates a clinician-testee assignment policy.
+// NewAssignmentPolicy 创建咨询师-受试者分配策略。
 func NewAssignmentPolicy() AssignmentPolicy {
 	return &assignmentPolicy{}
 }

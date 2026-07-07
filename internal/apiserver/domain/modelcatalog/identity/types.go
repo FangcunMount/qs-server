@@ -1,6 +1,6 @@
 package identity
 
-// Kind is the canonical assessment model family.
+// Kind 是规范 assessment 模型家族。
 type Kind string
 
 const (
@@ -11,7 +11,7 @@ const (
 	KindCustom           Kind = "custom"
 )
 
-// SubKind narrows a Kind when multiple payload shapes share the same family.
+// SubKind nar行 类型 when multiple 载荷 结构s share same 家族。
 type SubKind string
 
 const (
@@ -20,7 +20,7 @@ const (
 	SubKindTypology SubKind = "typology"
 )
 
-// Algorithm selects the evaluation algorithm within a model family.
+// Algorithm 选择评估 算法 在 模型家族。
 type Algorithm string
 
 const (
@@ -49,7 +49,7 @@ func (s SubKind) String() string { return string(s) }
 
 func (a Algorithm) String() string { return string(a) }
 
-// DecisionKind describes how raw scores map to outcomes.
+// DecisionKind 描述如何原始分 映射到 结果。
 type DecisionKind string
 
 const (
@@ -60,6 +60,6 @@ const (
 	DecisionKindNormLookup      DecisionKind = "norm_lookup"
 	DecisionKindAbilityLevel    DecisionKind = "ability_level"
 
-	// Deprecated: use DecisionKindScoreRange.
+	// Deprecated: 使用 DecisionKindScoreRange。
 	DecisionKindScoreRangeInterpretation DecisionKind = "score_range_interpretation"
 )

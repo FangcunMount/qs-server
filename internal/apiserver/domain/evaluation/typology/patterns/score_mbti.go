@@ -9,7 +9,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// Deprecated: use mbti adapter Score via profile.ScoreGraph instead. Kept for characterization equivalence tests.
+// Deprecated: 改用 mbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。
 func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (MBTIResultDetail, error) {
 	if model == nil {
 		return MBTIResultDetail{}, fmt.Errorf("mbti model is required")

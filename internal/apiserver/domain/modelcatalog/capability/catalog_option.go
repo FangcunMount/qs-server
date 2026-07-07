@@ -2,7 +2,7 @@ package capability
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 
-// CatalogOption carries presentation and API-facing catalog options for a model family.
+// CatalogOption 携带呈现 和 API-facing 目录选项 用于 模型家族。
 type CatalogOption struct {
 	Kind             identity.Kind
 	APIKind          string
@@ -20,14 +20,14 @@ var defaultCatalogOptions = []CatalogOption{
 	{Kind: identity.KindCustom, APIKind: "custom", DisplayName: "自定义测评"},
 }
 
-// DefaultCatalogOptions returns API/presentation options for model catalog surfaces.
+// 默认CatalogOptions 返回API/展示选项 用于 模型目录 surfaces。
 func DefaultCatalogOptions() []CatalogOption {
 	out := make([]CatalogOption, len(defaultCatalogOptions))
 	copy(out, defaultCatalogOptions)
 	return out
 }
 
-// CatalogOptionByKind resolves presentation options for a model family kind.
+// CatalogOptionByKind 解析展示选项 用于 模型家族 类型。
 func CatalogOptionByKind(kind identity.Kind) (CatalogOption, bool) {
 	for _, option := range defaultCatalogOptions {
 		if option.Kind == kind {

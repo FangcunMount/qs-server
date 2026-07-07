@@ -11,7 +11,7 @@ type descriptorPipeline struct {
 	registry *RuntimeDescriptorRegistry
 }
 
-// NewEvaluationPipeline creates a pipeline backed by a runtime descriptor registry.
+// NewEvaluationPipeline 创建pipeline 基于 运行时描述符注册表。
 func NewEvaluationPipeline(registry *RuntimeDescriptorRegistry) EvaluationPipeline {
 	return &descriptorPipeline{registry: registry}
 }

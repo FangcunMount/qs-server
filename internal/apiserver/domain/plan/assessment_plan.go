@@ -196,7 +196,7 @@ func (p *AssessmentPlan) IsActive() bool {
 	return p.status == PlanStatusActive
 }
 
-// IsPaused 是否暂停状态
+// IsPa使用 是否暂停状态
 func (p *AssessmentPlan) IsPaused() bool {
 	return p.status == PlanStatusPaused
 }
@@ -213,7 +213,7 @@ func (p *AssessmentPlan) IsCanceled() bool {
 
 // ==================== 包内私有方法（供领域服务调用）===================
 
-// pause 暂停计划（包内方法）
+// pa使用 暂停计划（包内方法）
 func (p *AssessmentPlan) pause() error {
 	if p.status != PlanStatusActive {
 		return ErrPlanNotActive

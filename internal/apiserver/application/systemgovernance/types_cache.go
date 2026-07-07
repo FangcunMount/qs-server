@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
-// CacheView exposes cache governance detail.
+// CacheView 暴露缓存 governance detail。
 type CacheView struct {
 	GeneratedAt time.Time                 `json:"generated_at"`
 	Window      string                    `json:"window"`
@@ -22,14 +22,14 @@ type CacheView struct {
 	Hotsets     []CacheHotsetView         `json:"hotsets,omitempty"`
 }
 
-// ComponentCache holds one component cache/redis payload with fetch metadata.
+// ComponentCache 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。
 type ComponentCache struct {
 	Available bool                           `json:"available"`
 	Reason    string                         `json:"reason,omitempty"`
 	Snapshot  *observability.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
-// CacheFamilyRow is a UI-ready cache family health row across components.
+// CacheFamilyRow 是面向 UI 缓存 家族 健康度 行 across 组件。
 type CacheFamilyRow struct {
 	Component           string           `json:"component"`
 	Family              string           `json:"family"`
@@ -50,7 +50,7 @@ type CacheFamilyRow struct {
 	MetricEvidence      []MetricEvidence `json:"metric_evidence,omitempty"`
 }
 
-// CacheWarmupKind describes one supported manual warmup target kind.
+// CacheWarmupKind 描述一个supported manual warmup target 类型。
 type CacheWarmupKind struct {
 	Kind                 cachetarget.WarmupKind `json:"kind"`
 	Family               cachemodel.Family      `json:"family"`
@@ -58,7 +58,7 @@ type CacheWarmupKind struct {
 	SupportsManualWarmup bool                   `json:"supports_manual_warmup"`
 }
 
-// CacheHotsetView exposes recommended manual warmup targets for one kind.
+// CacheHotsetView 暴露recommended manual warmup targets 用于 一个类型。
 type CacheHotsetView struct {
 	Family         cachemodel.Family      `json:"family,omitempty"`
 	Kind           cachetarget.WarmupKind `json:"kind,omitempty"`
@@ -70,7 +70,7 @@ type CacheHotsetView struct {
 	MetricEvidence []MetricEvidence       `json:"metric_evidence,omitempty"`
 }
 
-// CacheHotsetItem is a flattened cachetarget.HotsetItem for frontend tables.
+// CacheHotsetItem 是flattened 缓存target.Hotset题目 用于 frontend tables。
 type CacheHotsetItem struct {
 	Family string                 `json:"family"`
 	Kind   cachetarget.WarmupKind `json:"kind"`

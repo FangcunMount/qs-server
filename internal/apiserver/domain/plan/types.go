@@ -40,7 +40,7 @@ type PlanStatus string
 const (
 	// PlanStatusActive 活跃：计划正在执行中
 	PlanStatusActive PlanStatus = "active"
-	// PlanStatusPaused 暂停：计划暂时停止，可恢复
+	// PlanStatusPa使用 暂停：计划暂时停止，可恢复
 	PlanStatusPaused PlanStatus = "paused"
 	// PlanStatusFinished 已完成：管理员手动结束计划，不再允许新的加入和任务继续推进
 	PlanStatusFinished PlanStatus = "finished"
@@ -84,7 +84,7 @@ func (s PlanStatus) IsActive() bool {
 	return s == PlanStatusActive
 }
 
-// IsPaused 是否暂停状态
+// IsPa使用 是否暂停状态
 func (s PlanStatus) IsPaused() bool {
 	return s == PlanStatusPaused
 }

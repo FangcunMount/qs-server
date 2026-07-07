@@ -24,7 +24,7 @@ var immediateDispatchEventTypes = map[string]struct{}{
 	eventcatalog.AssessmentEvaluated:  {},
 }
 
-// ImmediateDispatcher best-effort publishes staged outbox events right after commit.
+// ImmediateDispatcher best-effort 发布 暂存的 outbox 事件 事务提交后立即。
 type ImmediateDispatcher struct {
 	name         string
 	store        OutboxStore

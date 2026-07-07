@@ -37,7 +37,7 @@ func NewOperator(orgID int64, userID int64, name string) *Operator {
 	}
 }
 
-// === Getters ===
+// === Getter 访问方法 ===
 
 // ID 获取员工ID
 func (s *Operator) ID() ID {

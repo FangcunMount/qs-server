@@ -18,7 +18,7 @@ const (
 	EventTypeSubmitted = eventcatalog.AssessmentSubmitted
 	// EventTypeEvaluated 测评已计分
 	EventTypeEvaluated = eventcatalog.AssessmentEvaluated
-	// EventTypeInterpreted 测评已解读（outcome 投影见 events_outcome.go）
+	// EventTypeInterpreted 测评已解读（结果 投影见 events_结果.go）
 	EventTypeInterpreted = eventcatalog.AssessmentInterpreted
 	// EventTypeFailed 测评失败
 	EventTypeFailed = eventcatalog.AssessmentFailed

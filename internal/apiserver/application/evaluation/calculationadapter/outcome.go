@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// CalcResultFromOutcome translates an assessment outcome into a calculation result.
+// CalcResultFromOutcome translates 测评结果 为 计算结果。
 func CalcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
 	if outcome == nil {
 		return nil
@@ -26,7 +26,7 @@ func CalcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.R
 	return result
 }
 
-// MergeCalcResultIntoOutcome merges a calculation result back into an assessment outcome.
+// MergeCalcResultIntoOutcome merges 计算结果 back 为 测评结果。
 func MergeCalcResultIntoOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
 	if outcome == nil || result == nil {
 		return outcome

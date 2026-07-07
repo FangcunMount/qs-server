@@ -7,7 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DecodeFromSnapshot decodes a published snapshot into a typology payload.
+// DecodeFromSnapshot de编码 已发布快照 为 类型学载荷。
 func DecodeFromSnapshot(snapshot *domain.Snapshot) (*Payload, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")

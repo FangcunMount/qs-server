@@ -4,7 +4,7 @@ import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
 )
 
-// Classification holds domain classification values assembled from DTO string slices.
+// Classification 保存领域 分类 values assembled 从 DTO string slices。
 type Classification struct {
 	Category       scaledefinition.Category
 	Stages         []scaledefinition.Stage
@@ -13,7 +13,7 @@ type Classification struct {
 	Tags           []scaledefinition.Tag
 }
 
-// ClassificationFromDTO maps flat string lists into domain classification types.
+// ClassificationFromDTO 映射flat string lists 为 领域 分类 types。
 func ClassificationFromDTO(category string, stages, applicableAges, reporters, tags []string) Classification {
 	c := Classification{
 		Category:       scaledefinition.NewCategory(category),
@@ -37,7 +37,7 @@ func ClassificationFromDTO(category string, stages, applicableAges, reporters, t
 	return c
 }
 
-// InterpretRulesFromDTOs converts interpret rule DTOs to domain rules.
+// InterpretRulesFromDTOs 转换interpret rule DTO 到 领域 rules。
 func InterpretRulesFromDTOs(dtos []InterpretRuleDTO) []scaledefinition.InterpretationRule {
 	rules := make([]scaledefinition.InterpretationRule, 0, len(dtos))
 	for _, dto := range dtos {

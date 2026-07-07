@@ -25,7 +25,7 @@ func NewEvaluator(scoringRegistry ScoringStrategyRegistry) *Evaluator {
 	}
 }
 
-// NewDefaultEvaluator 创建默认量表解释模型评估器。
+// New默认Evaluator 创建默认量表解释模型评估器。
 func NewDefaultEvaluator() *Evaluator {
 	return NewEvaluator(DefaultScoringStrategyRegistry{})
 }
@@ -43,7 +43,7 @@ func (e *Evaluator) Score(ctx context.Context, input ScaleInterpretationInput) (
 	}, nil
 }
 
-// DefaultScoringStrategyRegistry 默认量表因子聚合策略注册表。
+// 默认ScoringStrategyRegistry 默认量表因子聚合策略注册表。
 type DefaultScoringStrategyRegistry struct{}
 
 // ScoreFactor 执行量表因子聚合策略。

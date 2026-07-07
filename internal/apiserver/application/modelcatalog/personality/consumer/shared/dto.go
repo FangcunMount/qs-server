@@ -1,13 +1,13 @@
 package shared
 
-// ListPersonalityModelsDTO lists published personality models for C-side catalogs.
+// ListPersonalityModelsDTO 列出published 人格模型 用于 C 端 目录s。
 type ListPersonalityModelsDTO struct {
 	Page      int
 	PageSize  int
 	Algorithm string
 }
 
-// PersonalityModelSummaryResult is the list item projection.
+// PersonalityModelSummaryResult 是list 题目 投影。
 type PersonalityModelSummaryResult struct {
 	Code                 string
 	Version              string
@@ -20,7 +20,7 @@ type PersonalityModelSummaryResult struct {
 	QuestionCount        int
 }
 
-// PersonalityModelSummaryListResult is a paginated summary list.
+// PersonalityModelSummaryListResult 是paginated summary list。
 type PersonalityModelSummaryListResult struct {
 	Items      []PersonalityModelSummaryResult
 	Total      int64
@@ -29,7 +29,7 @@ type PersonalityModelSummaryListResult struct {
 	TotalPages int
 }
 
-// PersonalityDimensionResult exposes pole metadata for C-side detail views.
+// PersonalityDimensionResult 暴露pole 元数据 用于 C 端 detail 视图。
 type PersonalityDimensionResult struct {
 	Code      string
 	Name      string
@@ -37,7 +37,7 @@ type PersonalityDimensionResult struct {
 	RightPole string
 }
 
-// PersonalityOutcomeSummaryResult exposes outcome cards without scoring internals.
+// PersonalityOutcomeSummaryResult 暴露结果 cards 不使用 计分 内部s。
 type PersonalityOutcomeSummaryResult struct {
 	Code     string
 	Name     string
@@ -45,7 +45,7 @@ type PersonalityOutcomeSummaryResult struct {
 	ImageURL string
 }
 
-// PersonalityModelResult is the detail projection.
+// PersonalityModelResult 是detail 投影。
 type PersonalityModelResult struct {
 	PersonalityModelSummaryResult
 	DimensionOrder []string
@@ -53,13 +53,13 @@ type PersonalityModelResult struct {
 	Outcomes       []PersonalityOutcomeSummaryResult
 }
 
-// PersonalityModelCategoryResult is an algorithm/category option.
+// PersonalityModelCategoryResult 是算法/category 选项。
 type PersonalityModelCategoryResult struct {
 	Value string
 	Label string
 }
 
-// PersonalityModelCategoriesResult lists algorithm options.
+// PersonalityModelCategoriesResult 列出算法 选项。
 type PersonalityModelCategoriesResult struct {
 	Categories []PersonalityModelCategoryResult
 }

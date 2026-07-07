@@ -9,7 +9,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// ModelAdapter scores a typology payload through the personality profile pipeline.
+// ModelAdapter 计算类型学载荷 通过 人格画像流水线。
 type ModelAdapter interface {
 	Algorithm() modelcatalog.Algorithm
 	Score(
@@ -18,12 +18,12 @@ type ModelAdapter interface {
 	) (evaluationtypology.ScoringResult, error)
 }
 
-// Registry resolves personality model adapters by algorithm.
+// Registry 解析人格模型适配器 按 算法。
 type Registry struct {
 	adapters map[modelcatalog.Algorithm]ModelAdapter
 }
 
-// NewRegistry builds a typology adapter registry from configured adapters.
+// NewRegistry 构建类型学 adapter 注册表 从 配置化 adapters。
 func NewRegistry(adapters ...ModelAdapter) Registry {
 	registry := Registry{adapters: make(map[modelcatalog.Algorithm]ModelAdapter, len(adapters))}
 	for _, adapter := range adapters {

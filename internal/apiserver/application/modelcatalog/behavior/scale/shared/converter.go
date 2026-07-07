@@ -233,9 +233,9 @@ func scoringParamsResultMap(params *scaledefinition.ScoringParams, strategy scal
 			result["cnt_option_contents"] = contents
 		}
 	case scaledefinition.ScoringStrategySum, scaledefinition.ScoringStrategyAvg:
-		// These strategies currently do not expose additional params.
+		// These strategies 当前ly do 不 expose 额外 params。
 	default:
-		// Keep unknown strategies empty; strategy validation belongs to the domain.
+		// Keep unknown strategies 空; strategy 校验 属于 领域。
 	}
 	return result
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
-// Facade is the unified system governance entry point.
+// Facade 是unified system governance entry point。
 type Facade interface {
 	GetOverview(ctx context.Context, window string) (*OverviewResponse, error)
 	GetEvents(ctx context.Context, window string) (*EventsView, error)
@@ -21,13 +21,13 @@ type Facade interface {
 	RunAction(ctx context.Context, orgID int64, actionID string, req ActionRunRequest) (*ActionRunResult, error)
 }
 
-// MetricsClient provides Prometheus availability and query evidence.
+// MetricsClient 提供Prometheus availability 和 查询 evidence。
 type MetricsClient interface {
 	MetricsReader
 	Probe(ctx context.Context, evalAt time.Time) govprom.Summary
 }
 
-// FacadeDeps wires governance data sources.
+// FacadeDeps 线缆s 治理数据源。
 type FacadeDeps struct {
 	EventStatusService      appEventing.StatusService
 	EventTypeSources        []EventTypeStatusSource
@@ -50,7 +50,7 @@ type evaluationContext struct {
 	metrics     MetricsSummary
 }
 
-// NewFacade creates the governance facade.
+// NewFacade 创建governance 门面。
 func NewFacade(deps FacadeDeps) Facade {
 	registry := NewActionRegistry()
 	if deps.Actions == nil {

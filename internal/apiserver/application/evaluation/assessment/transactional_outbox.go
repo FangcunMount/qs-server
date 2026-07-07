@@ -19,7 +19,7 @@ type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
-// AdditionalEventBuilder builds outbox events after persistence assigns aggregate IDs.
+// AdditionalEventBuilder 构建outbox 事件 在之后 持久化 assigns aggregate IDs。
 type AdditionalEventBuilder func(a *domainAssessment.Assessment) []event.DomainEvent
 
 // saveAssessmentAndStageEvents 保存测评并阶段事件

@@ -1,6 +1,6 @@
 package capability
 
-// CatalogOperation is a model-catalog API operation guarded by KindCapability.
+// CatalogOperation 是model-目录 API 操作 守卫ed 按 类型能力。
 type CatalogOperation string
 
 const (
@@ -17,7 +17,7 @@ const (
 	CatalogOpQRCode            CatalogOperation = "qrcode"
 )
 
-// Allows reports whether the capability matrix permits an operation for a model family.
+// Allows 报告是否 能力 矩阵 permits 操作 用于 模型家族。
 func (c KindCapability) Allows(op CatalogOperation) bool {
 	switch op {
 	case CatalogOpCreate:

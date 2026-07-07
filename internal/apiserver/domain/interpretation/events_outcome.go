@@ -9,12 +9,12 @@ import (
 
 const EventTypeGeneratedOutcome = EventTypeGenerated
 
-// ReportGeneratedOutcomeData is the outcome-enriched report generated event payload.
+// ReportGeneratedOutcomeData 是结果-enriched report generated 事件载荷。
 type ReportGeneratedOutcomeData = eventoutcome.ReportGeneratedPayload
 
 type ReportGeneratedOutcomeEvent = event.Event[ReportGeneratedOutcomeData]
 
-// NewReportGeneratedOutcomeEvent creates an outcome-enriched report generated event.
+// NewReportGeneratedOutcomeEvent 创建结果-enriched report generated event。
 func NewReportGeneratedOutcomeEvent(
 	reportID string,
 	assessmentID string,

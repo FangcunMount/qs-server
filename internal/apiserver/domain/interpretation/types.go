@@ -68,7 +68,7 @@ func (c FactorCode) Equals(other FactorCode) bool {
 	return c == other
 }
 
-// DimensionCode is the neutral dimension identifier on reports.
+// DimensionCode 是中性 维度 identifier on reports。
 type DimensionCode string
 
 func NewDimensionCode(code string) DimensionCode {
@@ -87,7 +87,7 @@ func (c DimensionCode) Equals(other DimensionCode) bool {
 	return c == other
 }
 
-// DimensionKind classifies a report dimension independent of scale factor semantics.
+// DimensionKind 划分report 维度 独立于 scale 因子 semantics。
 type DimensionKind string
 
 const (

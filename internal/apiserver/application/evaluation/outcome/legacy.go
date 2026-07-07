@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// LegacyResult projects the canonical outcome into the legacy write model.
+// LegacyResult 投影规范 结果 为 旧写模型。
 func LegacyResult(o Outcome) *assessment.EvaluationResult {
 	if o.Execution == nil {
 		return nil
@@ -14,7 +14,7 @@ func LegacyResult(o Outcome) *assessment.EvaluationResult {
 	return o.Execution.ToEvaluationResult()
 }
 
-// NewOutcomeFromLegacyResult adapts a legacy evaluation result for tests and compatibility callers.
+// NewOutcomeFromLegacyResult 适配旧版 评估 结果 用于 tests 和 兼容性 callers。
 func NewOutcomeFromLegacyResult(
 	a *assessment.Assessment,
 	input *evaluationinput.InputSnapshot,
@@ -23,7 +23,7 @@ func NewOutcomeFromLegacyResult(
 	outcome := Outcome{
 		Assessment: a,
 		Input:      input,
-		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result), //nolint:staticcheck // single boundary adapter for characterization
+		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result), //nolint:staticcheck // 单一表征边界适配器
 	}
 	if snapshot, ok := PublishedSnapshotFromInput(input); ok {
 		if key, err := evalpipeline.RuntimeDescriptorKeyFromSnapshot(snapshot); err == nil {

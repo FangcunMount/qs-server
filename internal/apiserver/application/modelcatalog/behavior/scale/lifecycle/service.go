@@ -51,31 +51,31 @@ type RuleSetPublisher interface {
 	PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
-// QuestionnairePublisher is the narrow port used by scale publication to
-// publish a draft questionnaire and get its activated version.
+// QuestionnairePublisher 是nar行 port 供 scale 发布 到。
+// publish draft 问卷 和 get its activated version。
 type QuestionnairePublisher interface {
 	PublishQuestionnaire(ctx context.Context, code string) (string, error)
 }
 
-// ServiceOption configures lifecycle service collaborators.
+// ServiceOption 配置lifecycle service 协作者。
 type ServiceOption func(*lifecycleService)
 
-// WithQuestionnairePublisher injects the questionnaire lifecycle service used
-// to publish a draft questionnaire before a scale snapshot is activated.
+// WithQuestionnairePublisher 注入问卷 lifecycle service 使用。
+// 到 publish draft 问卷 在之前 scale 快照 是 activated。
 func WithQuestionnairePublisher(publisher QuestionnairePublisher) ServiceOption {
 	return func(s *lifecycleService) {
 		s.questionnairePublisher = publisher
 	}
 }
 
-// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+// WithCacheSignalNotifier 注入best-effort 缓存 in校验 notifier。
 func WithCacheSignalNotifier(notifier CacheSignalNotifier) ServiceOption {
 	return func(s *lifecycleService) {
 		s.cacheSignalNotifier = notifier
 	}
 }
 
-// WithRuleSetPublisher injects the interpretation model sync port.
+// WithRuleSetPublisher 注入interpretation model 同步端口。
 func WithRuleSetPublisher(publisher RuleSetPublisher) ServiceOption {
 	return func(s *lifecycleService) {
 		s.interpretationPublisher = publisher

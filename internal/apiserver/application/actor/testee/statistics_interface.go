@@ -58,7 +58,7 @@ type ScaleFactorQueryResult struct {
 	RiskLevel  string
 }
 
-// ============= Statistics DTOs =============
+// === 统计 DTO ===
 
 // ScaleAnalysisResult 量表趋势分析结果
 type ScaleAnalysisResult struct {

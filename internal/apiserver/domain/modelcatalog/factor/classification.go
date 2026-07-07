@@ -1,7 +1,7 @@
 package factor
 
-// ClassificationSpec carries pole-composition metadata for typology models.
-// Personality typology still uses its own runtime graph; this type is the shared catalog seam.
+// ClassificationSpec 携带pole-composition 元数据 用于 类型学 models。
+// Personality 类型学 still uses its own 运行时 graph; 这个type 是 共享 目录 seam。
 type ClassificationSpec struct {
 	PositivePole string
 	NegativePole string

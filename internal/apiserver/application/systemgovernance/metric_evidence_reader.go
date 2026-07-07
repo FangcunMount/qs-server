@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
-// MetricEvidenceReader keeps PromQL query construction out of domain projectors.
+// MetricEvidenceReader 保留PromQL 查询 construction out of 领域投影器。
 type MetricEvidenceReader struct {
 	metrics MetricsReader
 }

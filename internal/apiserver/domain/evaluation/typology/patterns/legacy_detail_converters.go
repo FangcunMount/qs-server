@@ -2,7 +2,7 @@ package patterns
 
 import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 
-// MBTIResultDetailFromPersonalityType projects a generic personality type detail into legacy MBTI shape.
+// MBTIResultDetailFromPersonalityType 投影通用人格类型明细 为 旧 MBTI 结构。
 func MBTIResultDetailFromPersonalityType(detail PersonalityTypeDetail) MBTIResultDetail {
 	dimensions := make([]MBTIDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
@@ -45,7 +45,7 @@ func MBTIResultDetailFromPersonalityType(detail PersonalityTypeDetail) MBTIResul
 	}
 }
 
-// SBTIResultDetailFromPersonalityType projects a generic personality type detail into legacy SBTI shape.
+// SBTIResultDetailFromPersonalityType 投影通用人格类型明细 为 旧 SBTI 结构。
 func SBTIResultDetailFromPersonalityType(detail PersonalityTypeDetail) SBTIResultDetail {
 	dimensions := make([]SBTIDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
@@ -76,7 +76,7 @@ func SBTIResultDetailFromPersonalityType(detail PersonalityTypeDetail) SBTIResul
 	}
 }
 
-// BigFiveResultDetailFromTraitProfile projects a generic trait profile into legacy BigFive shape.
+// BigFiveResultDetailFromTraitProfile 投影通用特质画像 为 旧 BigFive 结构。
 func BigFiveResultDetailFromTraitProfile(detail TraitProfileDetail) BigFiveResultDetail {
 	traits := make([]BigFiveTraitResult, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
@@ -85,7 +85,7 @@ func BigFiveResultDetailFromTraitProfile(detail TraitProfileDetail) BigFiveResul
 	return BigFiveResultDetail{Traits: traits, Source: detail.Source}
 }
 
-// PersonalityTypeDetailFromMBTI converts legacy MBTI detail into the generic personality type shape.
+// PersonalityTypeDetailFromMBTI 转换旧版 MBTI 明细 为 通用人格类型结构。
 func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) PersonalityTypeDetail {
 	dimensions := make([]PersonalityDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
@@ -125,7 +125,7 @@ func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) PersonalityTypeDetai
 	}
 }
 
-// PersonalityTypeDetailFromSBTI converts legacy SBTI detail into the generic personality type shape.
+// PersonalityTypeDetailFromSBTI 转换旧版 SBTI 明细 为 通用人格类型结构。
 func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) PersonalityTypeDetail {
 	dimensions := make([]PersonalityDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
@@ -155,7 +155,7 @@ func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) PersonalityTypeDetai
 	}
 }
 
-// TraitProfileDetailFromBigFive converts legacy BigFive detail into the generic trait profile shape.
+// TraitProfileDetailFromBigFive 转换旧版 BigFive 明细 为 通用特质画像结构。
 func TraitProfileDetailFromBigFive(detail BigFiveResultDetail) TraitProfileDetail {
 	traits := make([]TraitProfileFactorResult, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {

@@ -7,7 +7,7 @@ const (
 	ScoreKindMatchPercent = "match_percent"
 )
 
-// ScoreValue is the canonical primary score on a report.
+// ScoreValue 是规范 主 score on report。
 type ScoreValue struct {
 	Kind  string
 	Value float64
@@ -15,7 +15,7 @@ type ScoreValue struct {
 	Max   *float64
 }
 
-// ResultLevel is the canonical outcome level on a report.
+// ResultLevel 是规范 结果 等级 on report。
 type ResultLevel struct {
 	Code     string
 	Label    string
@@ -54,12 +54,12 @@ func severityFromRisk(risk RiskLevel) string {
 	}
 }
 
-// IsHighSeverity reports whether severity should trigger high-risk workflows.
+// IsHighSeverity 报告是否 severity 应该 trigger high-risk workflows。
 func IsHighSeverity(severity string) bool {
 	return eventoutcome.IsHighSeverity(severity)
 }
 
-// AttentionRiskLevel maps a v2 level projection to the legacy risk_level used by attention sync.
+// AttentionRiskLevel 映射v2 等级 投影 到 旧版 risk_等级 供 attention sync。
 func AttentionRiskLevel(level *EventResultLevel) string {
 	return eventoutcome.AttentionRiskLevel(level)
 }

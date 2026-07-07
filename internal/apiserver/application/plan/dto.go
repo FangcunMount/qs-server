@@ -45,7 +45,7 @@ type ListTasksDTO struct {
 }
 
 // ListTaskWindowDTO 查询计划任务窗口 DTO。
-// 供 seeddata process 等后台任务使用，避免分页时额外执行 COUNT(*)。
+// 供 seeddata 进程 等后台任务使用，避免分页时额外执行 COUNT(*)。
 type ListTaskWindowDTO struct {
 	OrgID         int64    // 机构ID
 	PlanID        string   // 计划ID（必填）

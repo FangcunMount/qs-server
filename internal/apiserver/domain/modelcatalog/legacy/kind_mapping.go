@@ -1,12 +1,12 @@
 package legacy
 
-// Flat migration-only kinds must not be used when creating new draft models.
+// Flat 迁移-仅 类型 不得 be 用于 creating 新的草稿模型。
 const (
 	KindMBTIMigration = "mbti"
 	KindSBTIMigration = "sbti"
 )
 
-// KindMapping resolves deprecated flat kinds to v2 identity triples for read/migration paths.
+// KindMapping 解析deprecated flat 类型 到 v2 身份 triples 用于 read/迁移 paths。
 func KindMapping(kind string) (mappedKind, subKind, algorithm string, ok bool) {
 	switch kind {
 	case "scale":
@@ -20,7 +20,7 @@ func KindMapping(kind string) (mappedKind, subKind, algorithm string, ok bool) {
 	}
 }
 
-// IsMigrationOnlyKind reports legacy flat kinds that must not be used for new draft models.
+// IsMigrationOnlyKind 报告旧版 flat 类型 that 不得 be 用于 新的草稿模型。
 func IsMigrationOnlyKind(kind string) bool {
 	switch kind {
 	case KindMBTIMigration, KindSBTIMigration:

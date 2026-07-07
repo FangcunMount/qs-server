@@ -23,7 +23,7 @@ const (
 	maxHotScaleWindowDays     = 365
 )
 
-// queryService 量表查询服务实现
+// 查询Service 量表查询服务实现
 // 行为者：所有用户
 type queryService struct {
 	repo         scaleQueryRepository

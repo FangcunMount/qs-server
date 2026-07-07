@@ -2,7 +2,7 @@ package systemgovernance
 
 import "time"
 
-// ActionDescriptor describes a governance command exposed to operators.
+// ActionDescriptor 描述governance 命令 exposed 到 operators。
 type ActionDescriptor struct {
 	ID                   string                 `json:"id"`
 	Domain               Domain                 `json:"domain"`
@@ -14,19 +14,19 @@ type ActionDescriptor struct {
 	InputSchema          map[string]interface{} `json:"input_schema,omitempty"`
 }
 
-// ActionsView lists governance commands.
+// ActionsView 列出治理命令。
 type ActionsView struct {
 	GeneratedAt time.Time          `json:"generated_at"`
 	Actions     []ActionDescriptor `json:"actions"`
 }
 
-// ActionRunRequest is the body for POST /actions/:action_id/runs.
+// ActionRunRequest 是body 用于 POST /actions/:action_id/runs。
 type ActionRunRequest struct {
 	Confirm bool                   `json:"confirm"`
 	Input   map[string]interface{} `json:"input,omitempty"`
 }
 
-// ActionRunResult is the outcome of an executed governance command.
+// ActionRunResult 是结果 of executed governance 命令。
 type ActionRunResult struct {
 	ActionID   string                 `json:"action_id"`
 	StartedAt  time.Time              `json:"started_at"`

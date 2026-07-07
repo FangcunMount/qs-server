@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// MechanismReportBuilderKeyFromRuntimeDescriptorKey maps runtime descriptor routing to report builders.
+// MechanismReportBuilderKeyFromRuntimeDescriptorKey 映射运行时描述符 路由 到 报告构建器。
 func MechanismReportBuilderKeyFromRuntimeDescriptorKey(
 	key evalpipeline.RuntimeDescriptorKey,
 	reportType domainReport.ReportType,
@@ -50,7 +50,7 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 	}
 }
 
-// MechanismReportBuilderKeyFromExecutionIdentity derives the mechanism routing key from an evaluator key.
+// MechanismReportBuilderKeyFromExecutionIdentity 推导机制 路由 键 从 评估器键。
 func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (MechanismReportBuilderKey, bool) {
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
@@ -70,7 +70,7 @@ func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIden
 	}, true
 }
 
-// MechanismReportBuilderKeyFromOutcome derives the mechanism routing key from a scored outcome.
+// MechanismReportBuilderKeyFromOutcome 推导机制 路由 键 从 scored 结果。
 func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (MechanismReportBuilderKey, bool) {
 	reportType := resolveReportType(outcome)
 	if !outcome.RuntimeDescriptorKey.IsZero() {

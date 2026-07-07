@@ -1,7 +1,7 @@
 package assessment
 
-// ScaleScoreProjection is the legacy scale-compatible score projection stored in MySQL.
-// New model families should write AssessmentOutcome instead.
+// ScaleScoreProjection 是旧量表兼容分数投影 stored in MySQL。
+// New 建模家族 应该 write AssessmentOutcome instead。
 type ScaleScoreProjection struct {
 	assessmentID ID
 	totalScore   float64
@@ -9,7 +9,7 @@ type ScaleScoreProjection struct {
 	factorScores []ScaleFactorScore
 }
 
-// NewScaleScoreProjection creates a scale score projection.
+// NewScaleScoreProjection 创建scale score 投影。
 func NewScaleScoreProjection(
 	assessmentID ID,
 	totalScore float64,
@@ -24,7 +24,7 @@ func NewScaleScoreProjection(
 	}
 }
 
-// ReconstructScaleScoreProjection rebuilds a scale score projection from persistence.
+// ReconstructScaleScoreProjection rebuilds scale score 投影 从 持久化。
 func ReconstructScaleScoreProjection(
 	assessmentID ID,
 	totalScore float64,
@@ -39,7 +39,7 @@ func ReconstructScaleScoreProjection(
 	}
 }
 
-// ScaleScoreProjectionFromOutcome projects a canonical outcome into scale storage.
+// ScaleScoreProjectionFromOutcome 投影规范 结果 为 scale storage。
 func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome) *ScaleScoreProjection {
 	if outcome == nil || !outcome.ModelRef.IsScale() {
 		return nil
@@ -79,9 +79,9 @@ func factorScoresForScaleProjection(outcome *AssessmentOutcome) []FactorScoreRes
 	return nil
 }
 
-// ScaleScoreProjectionFromEvaluationResult projects a legacy evaluation result into scale storage.
+// ScaleScoreProjectionFromEvaluationResult 投影旧版 评估 结果 为 scale storage。
 //
-// Deprecated: characterization boundary only; persistence should use ScaleScoreProjectionFromOutcome.
+// Deprecated: 仅作为表征边界保留；持久化应使用 ScaleScoreProjectionFromOutcome。
 func ScaleScoreProjectionFromEvaluationResult(assessmentID ID, result *EvaluationResult) *ScaleScoreProjection {
 	if result == nil {
 		return nil
@@ -158,7 +158,7 @@ func (s *ScaleScoreProjection) FactorCount() int {
 	return len(s.factorScores)
 }
 
-// ScaleFactorScore records one factor row in the scale score projection.
+// ScaleFactorScore 记录一个因子行 in scale score 投影。
 type ScaleFactorScore struct {
 	factorCode   FactorCode
 	factorName   string

@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
-// ValidationLevel classifies a validation issue severity.
+// ValidationLevel 划分校验问题 severity。
 type ValidationLevel string
 
 const (
@@ -14,7 +14,7 @@ const (
 	ValidationLevelWarning ValidationLevel = "warning"
 )
 
-// DomainValidationIssue is a structured validation finding at domain layer.
+// DomainValidationIssue 是structured 校验发现 at 领域层。
 type DomainValidationIssue struct {
 	Field   string
 	Message string
@@ -22,7 +22,7 @@ type DomainValidationIssue struct {
 	Level   ValidationLevel
 }
 
-// DomainValidationResult aggregates domain validation findings.
+// DomainValidationResult 聚合 领域校验发现s。
 type DomainValidationResult struct {
 	Issues []DomainValidationIssue
 }
@@ -39,7 +39,7 @@ func (r DomainValidationResult) Passed() bool {
 	return true
 }
 
-// ValidateBasic checks required draft fields before publish.
+// ValidateBasic 检查required draft 字段 在之前 publish。
 func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 	var issues []DomainValidationIssue
 	if m == nil {
@@ -79,7 +79,7 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 	return DomainValidationResult{Issues: issues}
 }
 
-// ValidateForPublish checks publish readiness including shared factor hierarchy rules.
+// ValidateForPublish 检查publish readiness including 共享 因子 层级 rules。
 func (m *AssessmentModel) ValidateForPublish() DomainValidationResult {
 	result := m.ValidateBasic()
 	if m != nil && m.IsArchived() {

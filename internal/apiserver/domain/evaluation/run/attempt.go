@@ -1,6 +1,6 @@
 package run
 
-// Status tracks execution-phase progress for one evaluation attempt.
+// Status 跟踪execution-phase progress 用于 一个评估 尝试。
 type Status string
 
 const (
@@ -12,13 +12,13 @@ const (
 
 func (s Status) String() string { return string(s) }
 
-// Attempt records one evaluation execution try.
+// Attempt 记录一个评估执行 try。
 type Attempt struct {
 	Number int
 	Status Status
 }
 
-// NewAttempt creates the first execution attempt.
+// NewAttempt 创建首个 执行尝试。
 func NewAttempt() Attempt {
 	return Attempt{Number: 1, Status: StatusPending}
 }

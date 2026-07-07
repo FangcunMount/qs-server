@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-// CompositeProjection derives parent/index raw scores from child dimension scores.
+// CompositeProjection 推导父节点/index 原始分 从 子节点 维度分。
 type CompositeProjection struct {
 	Nodes []calculation.ScoreNode
 }
@@ -89,9 +89,9 @@ func aggregateSum(children []string, scores map[string]float64) (float64, bool) 
 	return sum, found
 }
 
-// aggregateAverage computes sum(present child scores) / len(children).
-// Missing children contribute 0 to the numerator but still count toward the divisor,
-// so absent scores dilute the average rather than being ignored in the denominator.
+// aggregate平均值 computes sum(存在 子节点 分数) / len(子节点)。
+// Missing 子节点 contribute 0 到 分子 但 still count toward divisor,。
+// so 缺失 分数 dilute 平均值 rather than being ignored in 分母。
 func aggregateAverage(children []string, scores map[string]float64) (float64, bool) {
 	sum, found := aggregateSum(children, scores)
 	if !found {

@@ -4,7 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// CompositeIndexSpec declares how a composite index derives from child factors.
+// CompositeIndexSpec declares 如何复合 index 推导自 子节点 因子。
 type CompositeIndexSpec struct {
 	Code       string
 	Strategy   factor.ChildrenAggregationStrategy
@@ -12,7 +12,7 @@ type CompositeIndexSpec struct {
 	ParentCode string
 }
 
-// ApplyCompositeMetadata annotates factors with composite index policies.
+// ApplyCompositeMetadata 标注因子 使用 复合 index 策略。
 func ApplyCompositeMetadata(factors []factor.FactorSnapshot, specs []CompositeIndexSpec) []factor.FactorSnapshot {
 	if len(factors) == 0 || len(specs) == 0 {
 		return factors
@@ -50,7 +50,7 @@ func ApplyCompositeMetadata(factors []factor.FactorSnapshot, specs []CompositeIn
 	return factor.DeriveLevels(out)
 }
 
-// MetadataContext carries norming metadata without embedding norm table bodies.
+// MetadataContext 携带常模ing 元数据 不使用 embedding 常模表 bodies。
 type MetadataContext struct {
 	NormTableVersion string
 	IndexCodes       []string
@@ -58,7 +58,7 @@ type MetadataContext struct {
 	NormFactorCodes  []string
 }
 
-// ApplyNormMetadata annotates canonical factors with index/validity roles and norm references.
+// ApplyNormMetadata 标注规范 因子 使用 index/有效ity 角色 和 常模 references。
 func ApplyNormMetadata(factors []factor.FactorSnapshot, ctx MetadataContext) []factor.FactorSnapshot {
 	if len(factors) == 0 {
 		return factors

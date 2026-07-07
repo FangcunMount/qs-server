@@ -12,7 +12,7 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// queryService 计划查询服务实现
+// 查询Service 计划查询服务实现
 // 行为者：所有用户
 type queryService struct {
 	planReader   planreadmodel.PlanReader

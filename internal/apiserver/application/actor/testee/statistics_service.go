@@ -25,9 +25,8 @@ type statisticsService struct {
 
 // NewStatisticsService 创建受试者统计服务。
 //
-// Deprecated: evaluation command repositories no longer expose read-model
-// methods. Use NewStatisticsServiceWithReadModels when this legacy service is
-// still needed.
+// Deprecated: evaluation command repositories 不再暴露读模型方法。
+// 仍需要旧服务时，请使用 NewStatisticsServiceWithReadModels。
 func NewStatisticsService(
 	testeeRepo domain.Repository,
 	_ assessment.Repository,

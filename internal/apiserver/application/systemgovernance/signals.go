@@ -8,7 +8,7 @@ import (
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 )
 
-// MetricsReader loads near-window Prometheus metrics.
+// MetricsReader 加载近窗口 Prometheus 指标。
 type MetricsReader interface {
 	Query(ctx context.Context, spec govprom.QuerySpec, evalAt time.Time) govprom.MetricResult
 }
@@ -33,7 +33,7 @@ func nonEmpty(values ...string) string {
 	return ""
 }
 
-// SortSignals orders signals by severity then id.
+// SortSignals orders 信号 按 severity then id。
 func SortSignals(items []Signal) []Signal {
 	sort.SliceStable(items, func(i, j int) bool {
 		left := severityRank(items[i].Severity)
@@ -59,7 +59,7 @@ func severityRank(severity Severity) int {
 	}
 }
 
-// OverallSeverity derives the top severity from a signal list.
+// OverallSeverity 推导top severity 从 signal list。
 func OverallSeverity(items []Signal) Severity {
 	best := SeverityHealthy
 	for _, item := range items {
@@ -70,7 +70,7 @@ func OverallSeverity(items []Signal) Severity {
 	return best
 }
 
-// DomainSummaries groups signals by domain.
+// DomainSummaries 分组信号 按 领域。
 func DomainSummaries(items []Signal) map[Domain]DomainSummary {
 	result := map[Domain]DomainSummary{
 		DomainEvents:     {Severity: SeverityHealthy},

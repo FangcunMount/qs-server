@@ -5,7 +5,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// RegisterLegacyDetailAssemblers returns a registry copy with characterization-only legacy detail adapters.
+// RegisterLegacyDetailAssemblers 返回注册表副本 使用 仅用于表征 旧明细适配器。
 func RegisterLegacyDetailAssemblers(registry DetailAssemblerRegistry) DetailAssemblerRegistry {
 	return registry.
 		Register(modeltypology.DetailAdapterMBTI, assembleMBTIDetail).

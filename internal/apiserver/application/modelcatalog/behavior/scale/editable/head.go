@@ -12,8 +12,8 @@ type SnapshotRepository interface {
 	CreatePublishedSnapshot(ctx context.Context, scale *scaledefinition.MedicalScale, active bool) error
 }
 
-// EnsureHeadEditable preserves the currently published snapshot before a
-// published head is forked into a new draft candidate.
+// EnsureHeadEditable preserves 当前ly 已发布快照 在之前 a。
+// published head 是 forked 为 new draft candidate。
 func EnsureHeadEditable(ctx context.Context, repo SnapshotRepository, scale *scaledefinition.MedicalScale) error {
 	if scale == nil {
 		return nil

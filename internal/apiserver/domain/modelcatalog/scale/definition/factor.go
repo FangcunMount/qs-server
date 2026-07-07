@@ -98,7 +98,7 @@ func WithIsTotalScore(isTotalScore bool) FactorOption {
 	}
 }
 
-// WithIsShow 设置是否显示
+// WithIsS如何设置是否显示
 func WithIsShow(isShow bool) FactorOption {
 	return func(f *Factor) {
 		f.isShow = isShow
@@ -173,7 +173,7 @@ func (f *Factor) IsTotalScore() bool {
 	return f.isTotalScore
 }
 
-// IsShow 是否显示
+// IsS如何是否显示
 func (f *Factor) IsShow() bool {
 	return f.isShow
 }

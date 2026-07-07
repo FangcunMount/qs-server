@@ -1,6 +1,6 @@
 package interpretation
 
-// ModelIdentity is the canonical published-model reference on a report.
+// ModelIdentity 是规范 published-模型引用 on report。
 type ModelIdentity struct {
 	Kind      string
 	SubKind   string

@@ -6,17 +6,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// RuntimeDescriptorRegistry resolves runtime descriptors by mechanism keys.
+// RuntimeDescriptorRegistry 解析运行时描述符 按 机制键。
 type RuntimeDescriptorRegistry struct {
 	byKey map[RuntimeDescriptorKey]RuntimeDescriptor
 }
 
-// NewRuntimeDescriptorRegistry creates an empty descriptor registry.
+// NewRuntimeDescriptorRegistry 创建空 描述符注册表。
 func NewRuntimeDescriptorRegistry() *RuntimeDescriptorRegistry {
 	return &RuntimeDescriptorRegistry{byKey: make(map[RuntimeDescriptorKey]RuntimeDescriptor)}
 }
 
-// Register adds a runtime descriptor. PayloadFormat may be empty to match any format within the family.
+// Register 添加运行时描述符. 载荷格式 可以是 空 到 match 任意 格式 在 家族。
 func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	if r == nil {
 		return fmt.Errorf("runtime descriptor registry is nil")
@@ -41,7 +41,7 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	return nil
 }
 
-// Resolve selects a descriptor for a published model snapshot.
+// Resolve 选择描述符 用于 已发布模型快照。
 func (r *RuntimeDescriptorRegistry) Resolve(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptor, error) {
 	if r == nil {
 		return RuntimeDescriptor{}, fmt.Errorf("runtime descriptor registry is nil")
@@ -79,7 +79,7 @@ func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.Algo
 	return RuntimeDescriptor{}, false
 }
 
-// Len returns the number of registered descriptors.
+// Len 返回数量 已注册 描述符。
 func (r *RuntimeDescriptorRegistry) Len() int {
 	if r == nil {
 		return 0
@@ -87,7 +87,7 @@ func (r *RuntimeDescriptorRegistry) Len() int {
 	return len(r.byKey)
 }
 
-// HasAlgorithmFamily reports whether a family-level descriptor is registered.
+// HasAlgorithmFamily 报告是否 家族-等级 描述符 是 已注册。
 func (r *RuntimeDescriptorRegistry) HasAlgorithmFamily(family modelcatalog.AlgorithmFamily) bool {
 	if r == nil {
 		return false
@@ -96,7 +96,7 @@ func (r *RuntimeDescriptorRegistry) HasAlgorithmFamily(family modelcatalog.Algor
 	return ok
 }
 
-// ExecutionPathForDescriptor returns the registered execution path for a family, if any.
+// ExecutionPathForDescriptor 返回已注册 执行路径 用于 家族, 如果存在。
 func (r *RuntimeDescriptorRegistry) ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, bool) {
 	if r == nil {
 		return "", false

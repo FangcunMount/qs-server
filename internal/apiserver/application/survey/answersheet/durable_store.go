@@ -10,11 +10,11 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// DurableSubmitMeta carries application-level durable write metadata.
+// DurableSubmitMeta 携带application-等级 持久化 write 元数据。
 type DurableSubmitMeta = submitport.DurableSubmitMeta
 
-// SubmissionDurableStore persists answersheets together with inbound idempotency
-// metadata and staged domain events.
+// SubmissionDurableStore 持久化answersheets together 使用 inbound idempotency。
+// 元数据 和 staged 领域事件。
 type SubmissionDurableStore interface {
 	CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error)
 }
@@ -43,8 +43,8 @@ func NewTransactionalSubmissionDurableStore(
 	}
 }
 
-// SubmittedEventRelay keeps a compatibility name for the shared outbox relay.
+// SubmittedEventRelay 保留兼容性 name 用于 共享 outbox relay。
 type SubmittedEventRelay = appEventing.OutboxRelay
 
-// SubmittedEventOutboxStore keeps a compatibility name for the shared outbox store.
+// SubmittedEventOutboxStore 保留兼容性 name 用于 共享 outbox 存储。
 type SubmittedEventOutboxStore = appEventing.OutboxStore

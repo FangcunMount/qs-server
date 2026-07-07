@@ -44,7 +44,7 @@ func (lc *lifecycler) Activate(staff *Operator) error {
 	staff.activate()
 
 	// TODO: 发布领域事件
-	// events.Publish(NewStaffActivatedEvent(staff.ID()))
+	// 后续可在这里发布 NewStaffActivatedEvent。
 
 	return nil
 }
@@ -67,7 +67,7 @@ func (lc *lifecycler) Deactivate(staff *Operator, _ string) error {
 	staff.deactivate()
 
 	// TODO: 发布领域事件
-	// events.Publish(NewStaffDeactivatedEvent(staff.ID(), reason))
+	// 后续可在这里发布 NewStaffDeactivatedEvent。
 
 	return nil
 }

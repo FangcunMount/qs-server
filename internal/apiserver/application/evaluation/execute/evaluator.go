@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
-// mutableEvaluatorRegistry routes execution by v2 EvaluatorKey.
+// mutableEvaluator注册表 路由 execution 按 v2 Evaluator键。
 type mutableEvaluatorRegistry struct {
 	items map[evaluation.ExecutionIdentity]Evaluator
 }
@@ -15,7 +15,7 @@ func newEmptyEvaluatorRegistry() *mutableEvaluatorRegistry {
 	return &mutableEvaluatorRegistry{items: make(map[evaluation.ExecutionIdentity]Evaluator)}
 }
 
-// NewEvaluatorRegistry creates an evaluator registry keyed by EvaluatorKey.
+// NewEvaluatorRegistry 创建evaluator 注册表 键ed 按 Evaluator键。
 func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, error) {
 	registry := newEmptyEvaluatorRegistry()
 	for _, evaluator := range evaluators {
@@ -26,7 +26,7 @@ func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, e
 	return registry, nil
 }
 
-// Register registers an evaluator for its EvaluatorKey.
+// Register registers evaluator 用于 its Evaluator键。
 func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	if evaluator == nil {
 		return fmt.Errorf("evaluation evaluator is nil")
@@ -42,7 +42,7 @@ func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	return nil
 }
 
-// Resolve finds an evaluator by v2 key.
+// Resolve finds evaluator 按 v2 键。
 func (r *mutableEvaluatorRegistry) Resolve(key evaluation.ExecutionIdentity) (Evaluator, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")
