@@ -5,10 +5,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
-// KindCapability is the canonical capability matrix for a model family.
-// API options, create/publish guards, and runtime descriptor export should read this table.
-// ProductChannel is a taxonomy field on AssessmentModel, not a model family capability.
-// Use ModelFamilyCapabilities for runtime/create/publish guards on executable families.
+// KindCapability is the composed capability view used during migration.
+// Prefer ModelFamilyCapability for domain guards and CatalogOption for API surfaces.
 type KindCapability struct {
 	Kind                      identity.Kind
 	Role                      CapabilityRole
@@ -26,91 +24,29 @@ type KindCapability struct {
 	ExecutionPath             routing.ExecutionPath
 }
 
+// CanExecute reports whether the model family can run through evaluation runtime.
 func (c KindCapability) CanExecute() bool {
 	return c.RuntimeExecutable
 }
 
-var defaultCapabilities = []KindCapability{
-	{
-		Kind:                      identity.KindPersonality,
-		Role:                      CapabilityRoleModelFamily,
-		APIKind:                   "personality",
-		DisplayName:               "人格测评",
-		OptionsEnabled:            true,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		PreviewSupported:          true,
-		QRCodeSupported:           true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathTypologyDescriptor,
-	},
-	{
-		Kind:                      identity.KindBehavioralRating,
-		Role:                      CapabilityRoleModelFamily,
-		APIKind:                   string(identity.KindBehavioralRating),
-		DisplayName:               "行为评分",
-		OptionsEnabled:            true,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		PreviewSupported:          false,
-		QRCodeSupported:           true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathBehavioralRatingDescriptor,
-	},
-	{
-		Kind:              identity.KindScale,
-		Role:              CapabilityRoleModelFamily,
-		APIKind:           "medical_scale",
-		DisplayName:       "医学量表",
-		OptionsEnabled:    true,
-		ListSupported:     false,
-		RuntimeExecutable: true,
-		ExecutionPath:     routing.ExecutionPathScaleDescriptor,
-	},
-	{
-		Kind:                      identity.KindCognitive,
-		Role:                      CapabilityRoleModelFamily,
-		APIKind:                   "cognitive",
-		DisplayName:               "认知测评",
-		OptionsEnabled:            true,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		PreviewSupported:          false,
-		QRCodeSupported:           true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathCognitiveDescriptor,
-	},
-	{
-		Kind:           identity.KindCustom,
-		Role:           CapabilityRoleModelFamily,
-		APIKind:        "custom",
-		DisplayName:    "自定义测评",
-		OptionsEnabled: false,
-		ExecutionPath:  routing.ExecutionPathNone,
-	},
-}
-
-// DefaultCapabilities returns the built-in model-catalog capability matrix.
+// DefaultCapabilities returns the composed capability matrix.
 func DefaultCapabilities() []KindCapability {
-	out := make([]KindCapability, len(defaultCapabilities))
-	copy(out, defaultCapabilities)
+	families := DefaultFamilyCapabilities()
+	optionsByKind := make(map[identity.Kind]CatalogOption, len(defaultCatalogOptions))
+	for _, option := range defaultCatalogOptions {
+		optionsByKind[option.Kind] = option
+	}
+	out := make([]KindCapability, 0, len(families))
+	for _, family := range families {
+		out = append(out, mergeKindCapability(family, optionsByKind[family.Kind]))
+	}
 	return out
 }
 
 // ModelFamilyCapabilities returns executable model-family capabilities only.
-// Product-channel slots such as behavior_ability are excluded.
 func ModelFamilyCapabilities() []KindCapability {
-	out := make([]KindCapability, 0, len(defaultCapabilities))
-	for _, cap := range defaultCapabilities {
+	out := make([]KindCapability, 0)
+	for _, cap := range DefaultCapabilities() {
 		if cap.Role == CapabilityRoleModelFamily {
 			out = append(out, cap)
 		}
@@ -120,28 +56,29 @@ func ModelFamilyCapabilities() []KindCapability {
 
 // ModelFamilyCapabilityByKind resolves a model-family capability, excluding product channels.
 func ModelFamilyCapabilityByKind(kind identity.Kind) (KindCapability, bool) {
-	cap, ok := CapabilityByKind(kind)
-	if !ok || cap.Role != CapabilityRoleModelFamily {
+	family, ok := FamilyCapabilityByKind(kind)
+	if !ok || family.Role != CapabilityRoleModelFamily {
 		return KindCapability{}, false
 	}
-	return cap, true
+	option, _ := CatalogOptionByKind(kind)
+	return mergeKindCapability(family, option), true
 }
 
 // CapabilityByKind resolves capability for a canonical domain kind.
 func CapabilityByKind(kind identity.Kind) (KindCapability, bool) {
-	for _, cap := range defaultCapabilities {
-		if cap.Kind == kind {
-			return cap, true
-		}
+	family, ok := FamilyCapabilityByKind(kind)
+	if !ok {
+		return KindCapability{}, false
 	}
-	return KindCapability{}, false
+	option, _ := CatalogOptionByKind(kind)
+	return mergeKindCapability(family, option), true
 }
 
 // CapabilityByAPIKind resolves capability using the external model-catalog API kind.
 func CapabilityByAPIKind(apiKind string) (KindCapability, bool) {
-	for _, cap := range defaultCapabilities {
-		if cap.APIKind == apiKind {
-			return cap, true
+	for _, option := range defaultCatalogOptions {
+		if option.APIKind == apiKind {
+			return CapabilityByKind(option.Kind)
 		}
 	}
 	return KindCapability{}, false
@@ -149,8 +86,8 @@ func CapabilityByAPIKind(apiKind string) (KindCapability, bool) {
 
 // RuntimeExecutableKinds returns domain kinds that have a direct evaluation descriptor.
 func RuntimeExecutableKinds() []identity.Kind {
-	out := make([]identity.Kind, 0, len(defaultCapabilities))
-	for _, cap := range ModelFamilyCapabilities() {
+	out := make([]identity.Kind, 0)
+	for _, cap := range DefaultFamilyCapabilities() {
 		if cap.RuntimeExecutable {
 			out = append(out, cap.Kind)
 		}

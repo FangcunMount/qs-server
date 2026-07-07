@@ -14,6 +14,8 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -30,6 +32,7 @@ type service struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	evaluators            EvaluatorRegistry
+	runtimeResolver       *RuntimeResolver
 	scoringWriter         evaluationscoring.Writer
 	interpretationService interpretationapp.Service
 	scoringSnapshotStore  evaluationscoring.ScoringSnapshotStore
@@ -63,6 +66,14 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 	return func(s *service) {
 		s.evaluators = registry
+		s.runtimeResolver = NewRuntimeResolver(nil, registry)
+	}
+}
+
+// WithRuntimeDescriptorRegistry configures descriptor-primary evaluation routing.
+func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ServiceOption {
+	return func(s *service) {
+		s.runtimeResolver = NewRuntimeResolver(registry, s.evaluators)
 	}
 }
 
@@ -144,6 +155,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
+	evaluationRun := evalrun.NewEvaluationRun(assessmentID)
+	evaluationRun.Start(time.Now())
+	a.SetCurrentRunID(evaluationRun.RunID)
 	if s.reportStatus != nil {
 		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
 		s.reportStatus.SetProcessing(ctx, assessmentID, answerSheetID, "scoring")
@@ -156,55 +170,64 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	// 解析评估模型执行键
-	evaluatorKey := resolveEvaluatorKey(a, input)
+	// 解析并执行评估模型
+	if s.runtimeResolver == nil {
+		err := evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured")
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		return err
+	}
+
+	resolved, resolveErr := s.runtimeResolver.ResolveExecution(a, input)
+	if resolveErr != nil {
+		l.Errorw("评估运行时解析失败",
+			"assessment_id", assessmentID,
+			"evaluation_run", evaluationRun.String(),
+			"model_key", resolved.EvaluatorKey.String(),
+			"runtime_descriptor_key", resolved.DescriptorKey.String(),
+			"result", "failed",
+			"error", resolveErr.Error(),
+		)
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+resolveErr.Error())
+		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()})
+		return resolveErr
+	}
 
 	l.Infow("开始执行评估解释器",
 		"assessment_id", assessmentID,
-		"model_key", evaluatorKey.String(),
+		"evaluation_run", evaluationRun.String(),
+		"model_key", resolved.EvaluatorKey.String(),
+		"runtime_descriptor_key", resolved.DescriptorKey.String(),
+		"runtime_descriptor_primary", resolved.UsedDescriptor,
 		"model_code", evaluationModelCode(a, input),
 	)
 
-	// 解析评估模型执行器
-	if s.evaluators == nil {
-		err := evalerrors.ModuleNotConfigured("evaluation evaluator registry is not configured")
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		return err
-	}
-
-	// 解析评估模型执行器
-	evaluator, err := s.evaluators.Resolve(evaluatorKey)
-	if err != nil {
-		l.Errorw("评估模型执行器解析失败",
-			"assessment_id", assessmentID,
-			"model_key", evaluatorKey.String(),
-			"result", "failed",
-			"error", err.Error(),
-		)
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		return err
-	}
-
-	// 执行评估模型
-	evaluationOutcome, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+	evaluationOutcome, _, err := s.runtimeResolver.Execute(ctx, a, input)
 	if err != nil {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
-			"model_key", evaluatorKey.String(),
+			"evaluation_run", evaluationRun.String(),
+			"model_key", resolved.EvaluatorKey.String(),
+			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
 		)
-		// 标记评估流程执行失败
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true})
 		return err
 	}
 
 	// 执行评估成功，写入计分结果并生成报告
-	if err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
+	if err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
+		Assessment:           a,
+		Input:                input,
+		Execution:            evaluationOutcome,
+		RuntimeDescriptorKey: resolved.DescriptorKey,
+	}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
-			"model_key", evaluatorKey.String(),
+			"model_key", resolved.EvaluatorKey.String(),
+			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
@@ -213,12 +236,15 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
+	evaluationRun.Succeed(time.Now())
 	l.Infow("评估执行完成",
 		"action", "evaluate",
 		"resource", "assessment",
 		"result", "success",
 		"assessment_id", assessmentID,
-		"model_key", evaluatorKey.String(),
+		"evaluation_run", evaluationRun.String(),
+		"model_key", resolved.EvaluatorKey.String(),
+		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
@@ -277,15 +303,15 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 			return markReportFailed(err.Error(), err)
 		}
 	} else {
-		evaluatorKey := resolveEvaluatorKey(a, input)
-		evaluator, resolveErr := s.evaluators.Resolve(evaluatorKey)
-		if resolveErr != nil {
-			return markReportFailed("报告生成执行器解析失败: "+resolveErr.Error(), resolveErr)
+		if s.runtimeResolver == nil {
+			return markReportFailed("报告生成执行器未配置", evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured"))
 		}
-		execution, err = evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+		var resolved ResolvedExecution
+		execution, resolved, err = s.runtimeResolver.Execute(ctx, a, input)
 		if err != nil {
 			return markReportFailed("报告生成计分失败: "+err.Error(), err)
 		}
+		_ = resolved
 	}
 	if s.interpretationService == nil {
 		err = evalerrors.ModuleNotConfigured("interpretation service is not configured")

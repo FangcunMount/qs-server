@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -9,14 +10,23 @@ import (
 // RuntimeDescriptorKey routes evaluation execution by mechanism, not assessment code.
 type RuntimeDescriptorKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
+	DecisionKind    modelcatalog.DecisionKind
 	PayloadFormat   string
 }
 
+func (k RuntimeDescriptorKey) IsZero() bool {
+	return k.AlgorithmFamily == ""
+}
+
 func (k RuntimeDescriptorKey) String() string {
-	if k.PayloadFormat == "" {
-		return k.AlgorithmFamily.String()
+	parts := []string{k.AlgorithmFamily.String()}
+	if k.DecisionKind != "" {
+		parts = append(parts, string(k.DecisionKind))
 	}
-	return k.AlgorithmFamily.String() + "/" + k.PayloadFormat
+	if k.PayloadFormat != "" {
+		parts = append(parts, k.PayloadFormat)
+	}
+	return strings.Join(parts, "/")
 }
 
 // CalculationInput is the mechanism-neutral input passed into a calculator.

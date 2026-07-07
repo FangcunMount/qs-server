@@ -16,14 +16,24 @@ const (
 	ModelKindCognitive        ModelKind = "cognitive"
 )
 
+// DecisionKindFromSnapshot resolves the decision strategy for runtime routing.
+func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.DecisionKind, bool) {
+	if snapshot.Decision.Kind != "" {
+		return snapshot.Decision.Kind, true
+	}
+	return modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
+}
+
 // RuntimeDescriptorKeyFromSnapshot derives mechanism routing keys from a published snapshot.
 func RuntimeDescriptorKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
 	family, ok := AlgorithmFamilyFromSnapshot(snapshot)
 	if !ok {
 		return RuntimeDescriptorKey{}, fmt.Errorf("unsupported snapshot identity for runtime descriptor: %s/%s", snapshot.Model.Kind, snapshot.Model.Algorithm)
 	}
+	decision, _ := DecisionKindFromSnapshot(snapshot)
 	return RuntimeDescriptorKey{
 		AlgorithmFamily: family,
+		DecisionKind:    decision,
 		PayloadFormat:   snapshot.PayloadFormat,
 	}, nil
 }

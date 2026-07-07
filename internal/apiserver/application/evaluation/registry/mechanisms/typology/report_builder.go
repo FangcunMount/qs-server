@@ -16,7 +16,10 @@ type ReportBuilder struct {
 	key    evaluation.EvaluatorKey
 }
 
-var _ interpretationreporting.ReportBuilder = ReportBuilder{}
+var (
+	_ interpretationreporting.ReportBuilder              = ReportBuilder{}
+	_ interpretationreporting.MechanismKeyedReportBuilder = ReportBuilder{}
+)
 
 func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 	return NewReportBuilderWithRegistry(mustDefaultModuleRegistry(), algorithm)
@@ -67,6 +70,13 @@ func (b ReportBuilder) Key() evaluation.EvaluatorKey {
 
 func (ReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
+}
+
+func (ReportBuilder) MechanismKey() interpretationreporting.MechanismReportBuilderKey {
+	return interpretationreporting.MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
 }
 
 func (b ReportBuilder) Build(_ context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {

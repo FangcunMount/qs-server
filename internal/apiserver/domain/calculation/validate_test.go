@@ -42,7 +42,7 @@ func TestValidateScoreNodesRejectsDanglingChild(t *testing.T) {
 	t.Parallel()
 
 	issues := calculation.ValidateScoreNodes([]calculation.ScoreNode{
-		{Code: "parent", Children: []string{"missing"}},
+		{Code: "parent", Children: []string{"missing"}, Aggregation: calculation.AggregationSum},
 	})
 	if len(issues) != 1 || issues[0].Code != calculation.IssueScoreNodeDanglingChild {
 		t.Fatalf("issues = %#v, want dangling child", issues)
@@ -53,8 +53,8 @@ func TestValidateScoreNodesRejectsCycle(t *testing.T) {
 	t.Parallel()
 
 	issues := calculation.ValidateScoreNodes([]calculation.ScoreNode{
-		{Code: "a", Children: []string{"b"}},
-		{Code: "b", Children: []string{"a"}},
+		{Code: "a", Children: []string{"b"}, Aggregation: calculation.AggregationSum},
+		{Code: "b", Children: []string{"a"}, Aggregation: calculation.AggregationSum},
 	})
 	if len(issues) == 0 || issues[0].Code != calculation.IssueScoreNodeCycle {
 		t.Fatalf("issues = %#v, want cycle", issues)
@@ -76,6 +76,18 @@ func TestValidateScoreNodesWarnsMissingWeight(t *testing.T) {
 	})
 	if len(issues) != 1 || issues[0].Code != calculation.IssueScoreNodeMissingWeight {
 		t.Fatalf("issues = %#v, want missing weight warning", issues)
+	}
+}
+
+func TestValidateScoreNodesRejectsInvalidCompositeAggregation(t *testing.T) {
+	t.Parallel()
+
+	issues := calculation.ValidateScoreNodes([]calculation.ScoreNode{
+		{Code: "parent", Children: []string{"child"}},
+		{Code: "child"},
+	})
+	if len(issues) != 1 || issues[0].Code != calculation.IssueScoreNodeInvalidAggregation {
+		t.Fatalf("issues = %#v, want invalid aggregation", issues)
 	}
 }
 

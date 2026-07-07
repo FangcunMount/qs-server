@@ -10,6 +10,7 @@ import (
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -50,6 +51,7 @@ type BootstrapInput struct {
 	ReportStatusConfig                          reportstatus.Config
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
+	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
 	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
 	ReportDurableSaver                          interpretationreporting.ReportDurableSaver

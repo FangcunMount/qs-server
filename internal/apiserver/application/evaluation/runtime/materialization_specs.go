@@ -121,13 +121,33 @@ func buildFactoryMaps(specs []pathMaterialization) (
 func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.RuntimeDescriptor, error) {
 	descs := make([]evalpipeline.RuntimeDescriptor, 0, len(specs))
 	for _, spec := range specs {
+		decisionKind := defaultDecisionKindForFamily(spec.family)
 		descs = append(descs, evalpipeline.RuntimeDescriptor{
-			Key:             evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: spec.family},
+			Key: evalpipeline.RuntimeDescriptorKey{
+				AlgorithmFamily: spec.family,
+				DecisionKind:    decisionKind,
+			},
 			AlgorithmFamily: spec.family,
+			DecisionKind:    decisionKind,
 			ExecutionPath:   spec.path,
 		})
 	}
 	return descs, nil
+}
+
+func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	switch family {
+	case modelcatalog.AlgorithmFamilyFactorScoring:
+		return modelcatalog.DecisionKindScoreRange
+	case modelcatalog.AlgorithmFamilyFactorClassification:
+		return modelcatalog.DecisionKindPoleComposition
+	case modelcatalog.AlgorithmFamilyFactorNorm:
+		return modelcatalog.DecisionKindNormLookup
+	case modelcatalog.AlgorithmFamilyTaskPerformance:
+		return modelcatalog.DecisionKindAbilityLevel
+	default:
+		return ""
+	}
 }
 
 func algorithmFamilyForExecutionPath(path modelcatalog.ExecutionPath) (modelcatalog.AlgorithmFamily, bool) {

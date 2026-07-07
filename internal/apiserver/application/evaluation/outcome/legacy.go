@@ -2,6 +2,7 @@ package outcome
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -19,9 +20,15 @@ func NewOutcomeFromLegacyResult(
 	input *evaluationinput.InputSnapshot,
 	result *assessment.EvaluationResult,
 ) Outcome {
-	return Outcome{
+	outcome := Outcome{
 		Assessment: a,
 		Input:      input,
 		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result), //nolint:staticcheck // single boundary adapter for characterization
 	}
+	if snapshot, ok := PublishedSnapshotFromInput(input); ok {
+		if key, err := evalpipeline.RuntimeDescriptorKeyFromSnapshot(snapshot); err == nil {
+			outcome.RuntimeDescriptorKey = key
+		}
+	}
+	return outcome
 }

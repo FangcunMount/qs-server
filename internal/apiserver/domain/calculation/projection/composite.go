@@ -68,10 +68,10 @@ func aggregateChildScore(node calculation.ScoreNode, scores map[string]float64) 
 		return aggregateAverage(node.Children, scores)
 	case calculation.AggregationWeightedSum:
 		return aggregateWeightedSum(node.Children, node.Weights, scores)
-	case calculation.AggregationSum, "":
-		fallthrough
-	default:
+	case calculation.AggregationSum:
 		return aggregateSum(node.Children, scores)
+	default:
+		return 0, false
 	}
 }
 

@@ -31,6 +31,9 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	if key.PayloadFormat == "" {
 		key.PayloadFormat = desc.PayloadFormat
 	}
+	if key.DecisionKind == "" {
+		key.DecisionKind = desc.DecisionKind
+	}
 	if _, exists := r.byKey[key]; exists {
 		return fmt.Errorf("runtime descriptor already registered for %s", key)
 	}
@@ -50,11 +53,30 @@ func (r *RuntimeDescriptorRegistry) Resolve(snapshot modelcatalog.PublishedModel
 	if desc, ok := r.byKey[key]; ok {
 		return desc, nil
 	}
-	familyKey := RuntimeDescriptorKey{AlgorithmFamily: key.AlgorithmFamily}
-	if desc, ok := r.byKey[familyKey]; ok {
+	formatKey := RuntimeDescriptorKey{
+		AlgorithmFamily: key.AlgorithmFamily,
+		PayloadFormat:   key.PayloadFormat,
+	}
+	if desc, ok := r.byKey[formatKey]; ok {
+		return desc, nil
+	}
+	if desc, ok := r.descriptorForFamily(key.AlgorithmFamily); ok {
 		return desc, nil
 	}
 	return RuntimeDescriptor{}, fmt.Errorf("unsupported runtime descriptor key: %s", key)
+}
+
+func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
+	familyKey := RuntimeDescriptorKey{AlgorithmFamily: family}
+	if desc, ok := r.byKey[familyKey]; ok {
+		return desc, true
+	}
+	for key, desc := range r.byKey {
+		if key.AlgorithmFamily == family {
+			return desc, true
+		}
+	}
+	return RuntimeDescriptor{}, false
 }
 
 // Len returns the number of registered descriptors.
@@ -70,7 +92,7 @@ func (r *RuntimeDescriptorRegistry) HasAlgorithmFamily(family modelcatalog.Algor
 	if r == nil {
 		return false
 	}
-	_, ok := r.byKey[RuntimeDescriptorKey{AlgorithmFamily: family}]
+	_, ok := r.descriptorForFamily(family)
 	return ok
 }
 
@@ -79,7 +101,7 @@ func (r *RuntimeDescriptorRegistry) ExecutionPathForFamily(family modelcatalog.A
 	if r == nil {
 		return "", false
 	}
-	desc, ok := r.byKey[RuntimeDescriptorKey{AlgorithmFamily: family}]
+	desc, ok := r.descriptorForFamily(family)
 	if !ok {
 		return "", false
 	}

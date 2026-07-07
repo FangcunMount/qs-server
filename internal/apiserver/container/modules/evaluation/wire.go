@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
@@ -57,6 +58,7 @@ type WireInput struct {
 	PublishedModelPolicy                        cachepolicy.CachePolicy
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
+	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportPorts                                 compose.ReportIntegrationPorts
 }
 
@@ -188,6 +190,7 @@ func Wire(in WireInput) (WireResult, error) {
 		ReportStatusConfig:                          in.ReportStatusConfig,
 		ModelDescriptors:                            modelDescriptors,
 		TypologyRegistry:                            in.TypologyRegistry,
+		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
 		ReportReader:                                in.ReportPorts.Reader,
 		ReportBuilderRegistry:                       in.ReportPorts.BuilderRegistry,
 		ReportDurableSaver:                          in.ReportPorts.DurableSaver,

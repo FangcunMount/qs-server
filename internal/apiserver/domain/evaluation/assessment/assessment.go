@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
 
 // Assessment 测评聚合根
@@ -42,6 +43,9 @@ type Assessment struct {
 
 	// === 失败信息 ===
 	failureReason *string
+
+	// === 执行运行态（内存字段，暂不持久化） ===
+	currentRunID evalrun.ID
 
 	// === 领域事件（未持久化，提交后清空）===
 	events []DomainEvent
@@ -426,6 +430,22 @@ func (a *Assessment) AssignID(id ID) {
 // OrgID 获取组织ID
 func (a *Assessment) OrgID() int64 {
 	return a.orgID
+}
+
+// CurrentRunID returns the in-memory active evaluation run identifier.
+func (a *Assessment) CurrentRunID() evalrun.ID {
+	if a == nil {
+		return ""
+	}
+	return a.currentRunID
+}
+
+// SetCurrentRunID tracks the active evaluation run in memory only.
+func (a *Assessment) SetCurrentRunID(runID evalrun.ID) {
+	if a == nil {
+		return
+	}
+	a.currentRunID = runID
 }
 
 // ==================== 关联实体查询方法 ====================

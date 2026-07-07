@@ -4,13 +4,14 @@ import "strconv"
 
 // Issue codes for ScoreNode validation.
 const (
-	IssueScoreNodeEmptyCode       = "score_node_empty_code"
-	IssueScoreNodeDuplicateCode   = "score_node_duplicate_code"
-	IssueScoreNodeDanglingChild   = "score_node_dangling_child"
-	IssueScoreNodeCycle           = "score_node_cycle"
-	IssueScoreNodeMissingWeight   = "score_node_missing_weight"
-	IssueResultDimensionEmpty     = "result_dimension_empty_code"
-	IssueResultDimensionDuplicate = "result_dimension_duplicate_code"
+	IssueScoreNodeEmptyCode          = "score_node_empty_code"
+	IssueScoreNodeDuplicateCode      = "score_node_duplicate_code"
+	IssueScoreNodeDanglingChild      = "score_node_dangling_child"
+	IssueScoreNodeCycle              = "score_node_cycle"
+	IssueScoreNodeMissingWeight      = "score_node_missing_weight"
+	IssueScoreNodeInvalidAggregation = "score_node_invalid_aggregation"
+	IssueResultDimensionEmpty        = "result_dimension_empty_code"
+	IssueResultDimensionDuplicate    = "result_dimension_duplicate_code"
 )
 
 // ValidateScoreNodes checks calculation ScoreNode inputs for structural integrity.
@@ -64,6 +65,9 @@ func ValidateScoreNodes(nodes []ScoreNode) []Issue {
 				}
 			}
 		}
+		if len(node.Children) > 0 {
+			issues = append(issues, validateCompositeAggregation(node)...)
+		}
 	}
 	issues = append(issues, detectScoreNodeCycles(nodes)...)
 	return issues
@@ -98,6 +102,28 @@ func missingWeightIssue(parentCode, childCode string) Issue {
 		IssueScoreNodeMissingWeight,
 		"weighted_sum node "+parentCode+" child "+childCode+" has no explicit weight; defaulting to 1",
 	)
+}
+
+func validateCompositeAggregation(node ScoreNode) []Issue {
+	switch node.Aggregation {
+	case AggregationSum, AggregationAverage, AggregationWeightedSum:
+		return nil
+	case AggregationNone, AggregationLookup, AggregationCustom:
+		return []Issue{NewIssue(
+			IssueScoreNodeInvalidAggregation,
+			"composite score node "+node.Code+" uses non-aggregating strategy "+string(node.Aggregation),
+		)}
+	case "":
+		return []Issue{NewIssue(
+			IssueScoreNodeInvalidAggregation,
+			"composite score node "+node.Code+" requires an explicit aggregation strategy",
+		)}
+	default:
+		return []Issue{NewIssue(
+			IssueScoreNodeInvalidAggregation,
+			"composite score node "+node.Code+" has unsupported aggregation "+string(node.Aggregation),
+		)}
+	}
 }
 
 func detectScoreNodeCycles(nodes []ScoreNode) []Issue {

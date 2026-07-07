@@ -88,6 +88,49 @@ func TestRuntimeDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
 			if key.AlgorithmFamily != wantFamily {
 				t.Fatalf("case %d: family=%s want=%s", i, key.AlgorithmFamily, wantFamily)
 			}
+			if key.DecisionKind != snapshot.Decision.Kind {
+				t.Fatalf("case %d: decision=%s want=%s", i, key.DecisionKind, snapshot.Decision.Kind)
+			}
+		}
+	}
+}
+
+func TestRuntimeDescriptorKeyAlignsWithMechanismReportBuilderFamilyAndDecision(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		snapshot modelcatalog.PublishedModelSnapshot
+	}{
+		{
+			snapshot: modelcatalog.PublishedModelSnapshot{
+				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindScoreRange},
+			},
+		},
+		{
+			snapshot: modelcatalog.PublishedModelSnapshot{
+				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+			},
+		},
+		{
+			snapshot: modelcatalog.PublishedModelSnapshot{
+				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+			},
+		},
+	}
+	for i, tc := range cases {
+		key, err := evalpipeline.RuntimeDescriptorKeyFromSnapshot(tc.snapshot)
+		if err != nil {
+			t.Fatalf("case %d: %v", i, err)
+		}
+		family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(tc.snapshot.Decision.Kind)
+		if !ok {
+			t.Fatalf("case %d: decision %s", i, tc.snapshot.Decision.Kind)
+		}
+		if key.AlgorithmFamily != family {
+			t.Fatalf("case %d: family=%s want=%s", i, key.AlgorithmFamily, family)
+		}
+		if key.DecisionKind != tc.snapshot.Decision.Kind {
+			t.Fatalf("case %d: decision=%s want=%s", i, key.DecisionKind, tc.snapshot.Decision.Kind)
 		}
 	}
 }

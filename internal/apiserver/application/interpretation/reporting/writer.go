@@ -195,12 +195,9 @@ func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.EvaluatorKey {
 }
 
 func (w *writer) resolveReportBuilder(outcome evaloutcome.Outcome) (ReportBuilder, error) {
-	reportType := resolveReportType(outcome)
-	if mechanismKey, ok := MechanismReportBuilderKeyFromOutcome(outcome); ok {
-		if builder, err := w.reportBuilders.ResolveByMechanism(mechanismKey); err == nil {
-			return builder, nil
-		}
+	mechanismKey, ok := MechanismReportBuilderKeyFromOutcome(outcome)
+	if !ok {
+		return nil, fmt.Errorf("unsupported mechanism report builder key for outcome")
 	}
-	key := ResolveOutcomeKey(outcome)
-	return w.reportBuilders.Resolve(key, reportType)
+	return w.reportBuilders.ResolveByMechanism(mechanismKey)
 }

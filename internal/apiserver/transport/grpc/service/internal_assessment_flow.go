@@ -146,6 +146,16 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 		return nil, err
 	}
 
+	if s.answerSheetScoringService != nil {
+		if err := s.answerSheetScoringService.CalculateAndSave(ctx, req.AnswersheetId); err != nil {
+			l.Errorw("答卷计分失败",
+				"answersheet_id", req.AnswersheetId,
+				"error", err.Error(),
+			)
+			return nil, status.Errorf(codes.Internal, "答卷计分失败: %v", err)
+		}
+	}
+
 	orgID, err := requestOrgIDUint64(ctx, req.OrgId)
 	if err != nil {
 		return nil, err

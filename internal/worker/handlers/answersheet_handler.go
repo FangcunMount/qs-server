@@ -78,20 +78,9 @@ func handleAnswerSheetSubmittedWithHooks(
 		}
 
 		return gate.Run(ctx, deps, env.ID, answerSheetID, func(runCtx context.Context) error {
-			// Step 1: 计算答卷分数（在 Survey 域完成）
-			if err := calculateAnswerSheetScore(runCtx, deps, answerSheetID); err != nil {
-				deps.Logger.Error("failed to calculate answersheet score",
-					slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
-					slog.String("error", err.Error()),
-				)
-				return fmt.Errorf("failed to calculate answersheet score: %w", err)
-			}
-
-			// Step 2: 创建 Assessment（在 Evaluation 域完成）
 			if err := createAssessmentFromAnswerSheet(runCtx, deps, answerSheetID, data); err != nil {
 				return fmt.Errorf("failed to create assessment from answersheet: %w", err)
 			}
-
 			return nil
 		})
 	}
@@ -257,33 +246,6 @@ func answerSheetProcessingLockKey(deps *Dependencies, answerSheetID uint64) stri
 		return deps.LockKeyBuilder.BuildAnswerSheetProcessingLockKey(answerSheetID)
 	}
 	return answerSheetProcessingLockKeyBase(answerSheetID)
-}
-
-// 计算答卷分数
-func calculateAnswerSheetScore(ctx context.Context, deps *Dependencies, answerSheetID uint64) error {
-	if deps.InternalClient == nil {
-		return fmt.Errorf("internal client is not available")
-	}
-	scoreReq := &pb.CalculateAnswerSheetScoreRequest{
-		AnswersheetId: answerSheetID,
-	}
-	scoreResp, err := deps.InternalClient.CalculateAnswerSheetScore(ctx, scoreReq)
-	if err != nil {
-		return fmt.Errorf("failed to calculate answersheet score: %w", err)
-	}
-	if scoreResp == nil || !scoreResp.Success {
-		message := "unknown scoring error"
-		if scoreResp != nil && scoreResp.Message != "" {
-			message = scoreResp.Message
-		}
-		return fmt.Errorf("answersheet scoring failed: %s", message)
-	}
-	deps.Logger.Debug("answersheet scoring detail",
-		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
-		"total_score", scoreResp.TotalScore,
-		"message", scoreResp.Message,
-	)
-	return nil
 }
 
 // 创建测评

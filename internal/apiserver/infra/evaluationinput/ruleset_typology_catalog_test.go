@@ -238,33 +238,6 @@ func TestRuleSetTypologyCatalogMBTILookupViaV2Ref(t *testing.T) {
 	}
 }
 
-type sequentialRuleReader struct {
-	snapshots []struct {
-		ref      rulesetport.RuleSetRef
-		snapshot *domain.RuleSetSnapshot
-	}
-	calls int
-}
-
-func (s *sequentialRuleReader) GetPublishedByRef(_ context.Context, ref rulesetport.RuleSetRef) (*domain.RuleSetSnapshot, error) {
-	if s.calls >= len(s.snapshots) {
-		return nil, domain.ErrNotFound
-	}
-	entry := s.snapshots[s.calls]
-	s.calls++
-	if entry.ref != ref {
-		return nil, domain.ErrNotFound
-	}
-	if entry.snapshot == nil {
-		return nil, domain.ErrNotFound
-	}
-	return entry.snapshot, nil
-}
-
-func (s *sequentialRuleReader) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.RuleSetSnapshot, error) {
-	return nil, domain.ErrNotFound
-}
-
 func TestRuleSetTypologyCatalogV2BigFiveUsesPersonalityRef(t *testing.T) {
 	payload := &modeltypology.Payload{
 		Code:      "BF",

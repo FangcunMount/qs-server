@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -119,6 +120,13 @@ func (*writerReportBuilderStub) Key() evaluation.EvaluatorKey {
 }
 func (*writerReportBuilderStub) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
+}
+func (*writerReportBuilderStub) MechanismKey() interpretationreporting.MechanismReportBuilderKey {
+	return interpretationreporting.MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainreport.ReportTypeStandard,
+	}
 }
 func (b *writerReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
 	*b.order = append(*b.order, "report_build")

@@ -10,6 +10,8 @@ const (
 	ProductChannelPersonality     ProductChannel = "personality"
 	ProductChannelBehaviorAbility ProductChannel = "behavior_ability"
 	ProductChannelCognitive       ProductChannel = "cognitive"
+	ProductChannelScreening       ProductChannel = "screening"
+	ProductChannelFollowup        ProductChannel = "followup"
 	ProductChannelCustom          ProductChannel = "custom"
 )
 
@@ -21,6 +23,8 @@ func (pc ProductChannel) IsValid() bool {
 		ProductChannelPersonality,
 		ProductChannelBehaviorAbility,
 		ProductChannelCognitive,
+		ProductChannelScreening,
+		ProductChannelFollowup,
 		ProductChannelCustom:
 		return true
 	default:
@@ -75,6 +79,8 @@ func AllProductChannels() []ProductChannel {
 		ProductChannelPersonality,
 		ProductChannelBehaviorAbility,
 		ProductChannelCognitive,
+		ProductChannelScreening,
+		ProductChannelFollowup,
 		ProductChannelCustom,
 	}
 }

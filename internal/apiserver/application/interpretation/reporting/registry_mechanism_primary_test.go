@@ -3,9 +3,12 @@ package reporting
 import (
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func TestResolvePrefersMechanismKeyOverEvaluatorKey(t *testing.T) {
@@ -73,17 +76,56 @@ func TestResolveLegacyTypologyStillWorksAfterMechanismPrimary(t *testing.T) {
 	}
 }
 
-func TestMechanismReportBuilderKeyFromOutcomeMatchesEvaluatorDerivation(t *testing.T) {
+func TestMechanismReportBuilderKeyFromOutcomeUsesInputSnapshot(t *testing.T) {
 	t.Parallel()
 
-	key, ok := MechanismReportBuilderKeyFromEvaluatorKey(evaluation.EvaluatorKeyScaleDefault, domainReport.ReportTypeStandard)
+	outcome := evaloutcome.Outcome{
+		Input: &evaluationinput.InputSnapshot{
+			Model: &evaluationinput.ModelSnapshot{
+				Kind:      evaluationinput.EvaluationModelKindScale,
+				Algorithm: "scale_default",
+				Code:      "PHQ9",
+			},
+		},
+	}
+	key, ok := MechanismReportBuilderKeyFromOutcome(outcome)
 	if !ok {
-		t.Fatal("MechanismReportBuilderKeyFromEvaluatorKey returned false")
+		t.Fatal("MechanismReportBuilderKeyFromOutcome returned false")
 	}
 	if key.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
 		t.Fatalf("family=%s", key.AlgorithmFamily)
 	}
 	if key.DecisionKind != modelcatalog.DecisionKindScoreRange {
 		t.Fatalf("decision=%s", key.DecisionKind)
+	}
+}
+
+func TestMechanismReportBuilderKeyFromOutcomeUsesBehavioralRatingExecutionFamily(t *testing.T) {
+	t.Parallel()
+
+	outcome := evaloutcome.Outcome{
+		Input: behavioralRatingInputSnapshotForMechanismKey(t),
+	}
+	key, ok := MechanismReportBuilderKeyFromOutcome(outcome)
+	if !ok {
+		t.Fatal("MechanismReportBuilderKeyFromOutcome returned false")
+	}
+	if key.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorNorm {
+		t.Fatalf("family=%s", key.AlgorithmFamily)
+	}
+	if key.DecisionKind != modelcatalog.DecisionKindNormLookup {
+		t.Fatalf("decision=%s", key.DecisionKind)
+	}
+}
+
+func behavioralRatingInputSnapshotForMechanismKey(t *testing.T) *evaluationinput.InputSnapshot {
+	t.Helper()
+	snapshot := &behavioralsnapshot.Snapshot{
+		Code:    "BR-001",
+		Version: "1.0.0",
+		Title:   "行为评分",
+	}
+	return &evaluationinput.InputSnapshot{
+		Model: evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
 	}
 }

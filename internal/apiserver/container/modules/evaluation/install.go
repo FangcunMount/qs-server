@@ -52,6 +52,7 @@ func InstallFrom(host InstallHost) error {
 		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.PolicyPublishedModel),
 		ModelDescriptors:                            catalog.Descriptors,
 		TypologyRegistry:                            catalog.TypologyRegistry,
+		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
 		ReportPorts:                                 host.ReportIntegrationPorts(),
 	})
 	if err != nil {

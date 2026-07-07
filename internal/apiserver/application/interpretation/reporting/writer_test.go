@@ -74,6 +74,43 @@ func (b *resultReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*
 	return b.rpt, b.err
 }
 
+type mechanismScaleReportBuilder struct {
+	resultReportBuilderStub
+}
+
+func (mechanismScaleReportBuilder) MechanismKey() MechanismReportBuilderKey {
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+}
+
+type mechanismTypologyReportBuilder struct {
+	resultReportBuilderStub
+	decision modelcatalog.DecisionKind
+}
+
+func (b mechanismTypologyReportBuilder) MechanismKey() MechanismReportBuilderKey {
+	decision := b.decision
+	if decision == "" {
+		decision = modelcatalog.DecisionKindPoleComposition
+	}
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    decision,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+}
+
+func typologyReportBuilderStub(order *[]string, key evaluation.EvaluatorKey, rpt *domainReport.InterpretReport) ReportBuilder {
+	return &mechanismTypologyReportBuilder{resultReportBuilderStub: resultReportBuilderStub{order: order, key: key, rpt: rpt}}
+}
+
+func scaleReportBuilderStub(order *[]string, rpt *domainReport.InterpretReport, err error) ReportBuilder {
+	return &mechanismScaleReportBuilder{resultReportBuilderStub{order: order, rpt: rpt, err: err}}
+}
+
 type resultReportSaverStub struct {
 	order      *[]string
 	err        error
@@ -109,20 +146,17 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 		t.Fatalf("NewScoreProjectorRegistry returned error: %v", err)
 	}
 	reportSaver := &resultReportSaverStub{order: &order}
-	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		rpt: domainReport.NewInterpretReport(
-			domainReport.ID(a.ID()),
-			"Scale",
-			"S-001",
-			7,
-			domainReport.RiskLevelLow,
-			"ok",
-			nil,
-			nil,
-			nil,
-		),
-	})
+	reportBuilders, err := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(
+		domainReport.ID(a.ID()),
+		"Scale",
+		"S-001",
+		7,
+		domainReport.RiskLevelLow,
+		"ok",
+		nil,
+		nil,
+		nil,
+	), nil))
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
@@ -167,10 +201,7 @@ func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testin
 	a := submittedScaleAssessment(t)
 	buildErr := errors.New("report build failed")
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
-	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		err:   buildErr,
-	})
+	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, nil, buildErr))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	writer, err := NewWriter(
 		assessmentRepo,
@@ -201,10 +232,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 	a := submittedScaleAssessment(t)
 	reportErr := errors.New("report save failed")
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
-	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
-	})
+	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	writer, err := NewWriter(
 		assessmentRepo,
@@ -239,10 +267,7 @@ func TestWriterScoreProjectionFailureKeepsAssessmentUninterpreted(t *testing.T) 
 	scoreErr := errors.New("score save failed")
 	scoreRepo := &resultScoreRepoStub{order: &order, err: scoreErr}
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(scoreRepo))
-	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
-	})
+	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	notifier := &resultNotifierStub{order: &order}
 	writer, err := NewWriter(
@@ -280,10 +305,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 	a := submittedScaleAssessment(t)
 	saveErr := errors.New("assessment save failed")
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
-	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
-	})
+	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order, err: saveErr}
 	notifier := &resultNotifierStub{order: &order}
 	writer, err := NewWriter(
@@ -347,11 +369,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 	}
 	a.ClearEvents()
 
-	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
-		order: &order,
-		key:   evaluation.EvaluatorKeyMBTI,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil),
-	})
+	reportBuilders, err := NewReportBuilderRegistry(typologyReportBuilderStub(&order, evaluation.EvaluatorKeyMBTI, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil)))
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
@@ -372,7 +390,15 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		Payload: "INTJ",
 	})
 
-	if err := writer.Write(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result)); err != nil {
+	input := &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:      evaluationinput.EvaluationModelKindPersonality,
+			SubKind:   "typology",
+			Algorithm: string(modelcatalog.AlgorithmMBTI),
+			Code:      "MBTI-16P",
+		},
+	}
+	if err := writer.Write(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, input, result)); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 

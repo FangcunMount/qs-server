@@ -46,6 +46,12 @@ func (f *fakeWorkerInternalClient) CreateAssessmentFromAnswerSheet(
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
 	f.createCalls++
 	f.calls = append(f.calls, "create_assessment")
+	if f.calculateScoreMessage != "" && !f.calculateScoreSuccess {
+		return &pb.CreateAssessmentFromAnswerSheetResponse{
+			Success: false,
+			Message: f.calculateScoreMessage,
+		}, nil
+	}
 	success := true
 	if f.createMessage != "" {
 		success = f.createSuccess
@@ -187,9 +193,6 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
-	}
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
@@ -198,7 +201,7 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 	}
 }
 
-func TestHandleAnswerSheetSubmitted_CalculatesScoreBeforeCreatingAssessment(t *testing.T) {
+func TestHandleAnswerSheetSubmitted_UsesSingleCreateAssessmentCall(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
@@ -214,7 +217,7 @@ func TestHandleAnswerSheetSubmitted_CalculatesScoreBeforeCreatingAssessment(t *t
 		t.Fatalf("handler returned error: %v", err)
 	}
 
-	want := []string{"calculate_score", "create_assessment"}
+	want := []string{"create_assessment"}
 	if len(client.calls) != len(want) {
 		t.Fatalf("calls = %#v, want %#v", client.calls, want)
 	}
@@ -285,9 +288,6 @@ func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) 
 		t.Fatalf("handler returned error: %v", err)
 	}
 
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
-	}
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
@@ -317,9 +317,6 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 		t.Fatalf("handler returned error: %v", err)
 	}
 
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
-	}
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
@@ -378,9 +375,6 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
-	}
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
@@ -405,11 +399,8 @@ func TestHandleAnswerSheetSubmitted_ScoringFailureStopsBeforeCreate(t *testing.T
 	if err == nil {
 		t.Fatal("expected scoring failure error")
 	}
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
-	}
-	if client.createCalls != 0 {
-		t.Fatalf("expected no create call after scoring failure, got %d", client.createCalls)
+	if client.createCalls != 1 {
+		t.Fatalf("expected 1 create call after scoring failure, got %d", client.createCalls)
 	}
 }
 
@@ -431,9 +422,6 @@ func TestHandleAnswerSheetSubmitted_CreateFailureAfterSuccessfulScore(t *testing
 	err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 1002))
 	if err == nil {
 		t.Fatal("expected assessment creation failure error")
-	}
-	if client.calculateCalls != 1 {
-		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
 	}
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)

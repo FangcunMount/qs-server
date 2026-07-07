@@ -24,6 +24,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
@@ -98,6 +99,7 @@ type Deps struct {
 	ReportStatusConfig                          reportstatus.Config
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
+	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
 	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
 	ReportDurableSaver                          interpretationreporting.ReportDurableSaver
@@ -266,6 +268,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
+			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithScoringWriter(scoringWriter),
 			execute.WithInterpretationService(interpretationService),

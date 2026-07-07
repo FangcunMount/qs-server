@@ -220,4 +220,3 @@ func (m *AssessmentModel) MarkArchived(now time.Time) error {
 	m.touch(now)
 	return nil
 }
-
