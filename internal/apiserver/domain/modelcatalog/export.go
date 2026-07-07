@@ -46,7 +46,6 @@ type (
 const (
 	KindScale            = identity.KindScale
 	KindPersonality      = identity.KindPersonality
-	KindBehaviorAbility  = identity.Kind(legacypkg.KindBehaviorAbilityLegacy)
 	KindBehavioralRating = identity.KindBehavioralRating
 	KindCognitive        = identity.KindCognitive
 	KindCustom           = identity.KindCustom
@@ -66,13 +65,13 @@ const (
 	AlgorithmSPM                     = identity.AlgorithmSPM
 	AlgorithmBehavioralRatingDefault = identity.AlgorithmBehavioralRatingDefault
 
-	DecisionKindScoreRange               = identity.DecisionKindScoreRange
-	DecisionKindPoleComposition          = identity.DecisionKindPoleComposition
-	DecisionKindTraitProfile             = identity.DecisionKindTraitProfile
-	DecisionKindNearestPattern           = identity.DecisionKindNearestPattern
-	DecisionKindNormLookup               = identity.DecisionKindNormLookup
-	DecisionKindAbilityLevel             = identity.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation = identity.DecisionKind(legacypkg.DecisionKindScoreRangeInterpretationLegacy)
+	DecisionKindScoreRange                            = identity.DecisionKindScoreRange
+	DecisionKindPoleComposition                       = identity.DecisionKindPoleComposition
+	DecisionKindTraitProfile                          = identity.DecisionKindTraitProfile
+	DecisionKindNearestPattern                        = identity.DecisionKindNearestPattern
+	DecisionKindNormLookup                            = identity.DecisionKindNormLookup
+	DecisionKindAbilityLevel                          = identity.DecisionKindAbilityLevel
+	DecisionKindScoreRangeInterpretation DecisionKind = "score_range_interpretation"
 
 	ProductChannelMedicalScale    = identity.ProductChannelMedicalScale
 	ProductChannelPersonality     = identity.ProductChannelPersonality
@@ -85,12 +84,11 @@ const (
 	AlgorithmFamilyFactorNorm           = routing.AlgorithmFamilyFactorNorm
 	AlgorithmFamilyTaskPerformance      = routing.AlgorithmFamilyTaskPerformance
 
-	ExecutionPathNone                        = routing.ExecutionPathNone
-	ExecutionPathScaleDescriptor             = routing.ExecutionPathScaleDescriptor
-	ExecutionPathTypologyDescriptor          = routing.ExecutionPathTypologyDescriptor
-	ExecutionPathBehaviorAbilityScaleAdapter = routing.ExecutionPathBehaviorAbilityScaleAdapter
-	ExecutionPathBehavioralRatingDescriptor  = routing.ExecutionPathBehavioralRatingDescriptor
-	ExecutionPathCognitiveDescriptor         = routing.ExecutionPathCognitiveDescriptor
+	ExecutionPathNone                       = routing.ExecutionPathNone
+	ExecutionPathScaleDescriptor            = routing.ExecutionPathScaleDescriptor
+	ExecutionPathTypologyDescriptor         = routing.ExecutionPathTypologyDescriptor
+	ExecutionPathBehavioralRatingDescriptor = routing.ExecutionPathBehavioralRatingDescriptor
+	ExecutionPathCognitiveDescriptor        = routing.ExecutionPathCognitiveDescriptor
 
 	PayloadFormatAssessmentScaleV1         = routing.PayloadFormatAssessmentScaleV1
 	PayloadFormatPersonalityTypologyV1     = routing.PayloadFormatPersonalityTypologyV1
@@ -128,8 +126,7 @@ const (
 	RuleSetKindMBTI  = legacypkg.RuleSetKindMBTI
 	RuleSetKindSBTI  = legacypkg.RuleSetKindSBTI
 
-	APIKindBehaviorAbility              = legacypkg.APIKindBehaviorAbility
-	PayloadFormatBehaviorAbilityScaleV1 = legacypkg.PayloadFormatBehaviorAbilityScaleV1
+	APIKindBehaviorAbility = legacypkg.APIKindBehaviorAbility
 
 	ModelStatusDraft     = catalog.ModelStatusDraft
 	ModelStatusPublished = catalog.ModelStatusPublished
@@ -173,7 +170,6 @@ var (
 	ModelDefinitionFromLegacy              = legacypkg.ModelDefinitionFromLegacy
 	PublishedFromLegacy                    = legacypkg.PublishedFromLegacy
 	LegacyFromPublished                    = legacypkg.LegacyFromPublished
-	IsBehaviorAbilityScaleAdapter          = legacypkg.IsBehaviorAbilityScaleAdapter
 	IsBehaviorAbilityProductChannelAPIKind = legacypkg.IsBehaviorAbilityProductChannelAPIKind
 	BehaviorAbilityChannelModelFamilies    = legacypkg.BehaviorAbilityChannelModelFamilies
 	IsBehaviorAbilityChannelFamily         = legacypkg.IsBehaviorAbilityChannelFamily
@@ -182,9 +178,3 @@ var (
 	NewAssessmentModel = catalog.NewAssessmentModel
 	ParseModelStatus   = catalog.ParseModelStatus
 )
-
-// BehaviorAbilityScaleAdapterCapability returns the canonical capability entry for the
-// behavior_ability API family.
-func BehaviorAbilityScaleAdapterCapability() (KindCapability, bool) {
-	return CapabilityByKind(KindBehaviorAbility)
-}

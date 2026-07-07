@@ -226,7 +226,7 @@ func (m *AssessmentModel) MarkArchived(now time.Time) error {
 
 func isForbiddenDraftKind(kind identity.Kind) bool {
 	switch kind {
-	case identity.KindMBTIMigration, identity.KindSBTIMigration, identity.Kind("behavior_ability"):
+	case identity.KindMBTIMigration, identity.KindSBTIMigration:
 		return true
 	default:
 		return false

@@ -15,7 +15,7 @@ func BehaviorAbilityChannelModelFamilies() []identity.Kind {
 // IsBehaviorAbilityChannelFamily reports whether kind is listed under the behavior-ability channel.
 func IsBehaviorAbilityChannelFamily(kind identity.Kind) bool {
 	switch kind {
-	case BehaviorAbilityKind(), identity.KindBehavioralRating, identity.KindCognitive:
+	case identity.KindBehavioralRating, identity.KindCognitive:
 		return true
 	default:
 		return false
@@ -25,7 +25,7 @@ func IsBehaviorAbilityChannelFamily(kind identity.Kind) bool {
 // ResolveBehaviorAbilityChannelFamily maps an optional channel filter to a model family kind.
 func ResolveBehaviorAbilityChannelFamily(filter string) (identity.Kind, bool) {
 	switch identity.Kind(filter) {
-	case BehaviorAbilityKind(), identity.KindBehavioralRating, identity.KindCognitive:
+	case identity.KindBehavioralRating, identity.KindCognitive:
 		return identity.Kind(filter), true
 	case "":
 		return "", false

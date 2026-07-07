@@ -76,7 +76,7 @@ func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algor
 		return identity.DecisionKindScoreRange, true
 	case identity.KindCognitive:
 		return identity.DecisionKindScoreRange, true
-	case identity.Kind("behavior_ability"), identity.KindCustom:
+	case identity.KindCustom:
 		return "", false
 	default:
 		return "", false
@@ -85,9 +85,6 @@ func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algor
 
 // AlgorithmFamilyFromIdentity derives the execution family from draft model identity.
 func AlgorithmFamilyFromIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (AlgorithmFamily, bool) {
-	if kind == identity.Kind("behavior_ability") {
-		return "", false
-	}
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)
 	if !ok {
 		return "", false

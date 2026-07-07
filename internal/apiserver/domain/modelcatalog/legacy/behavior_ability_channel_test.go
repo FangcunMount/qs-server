@@ -16,7 +16,7 @@ func TestBehaviorAbilityChannelFamilies(t *testing.T) {
 	if !IsBehaviorAbilityProductChannelAPIKind(APIKindBehaviorAbility) {
 		t.Fatal("behavior_ability must be a product channel api kind")
 	}
-	for _, kind := range []identity.Kind{identity.KindBehavioralRating, identity.KindCognitive, BehaviorAbilityKind()} {
+	for _, kind := range []identity.Kind{identity.KindBehavioralRating, identity.KindCognitive} {
 		if !IsBehaviorAbilityChannelFamily(kind) {
 			t.Fatalf("%q must belong to behavior_ability channel", kind)
 		}

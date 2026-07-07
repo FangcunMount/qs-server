@@ -9,7 +9,6 @@ func TestDefaultProductChannelFor(t *testing.T) {
 	}{
 		{KindScale, ProductChannelMedicalScale},
 		{KindPersonality, ProductChannelPersonality},
-		{KindBehaviorAbility, ProductChannelBehaviorAbility},
 		{KindBehavioralRating, ProductChannelBehaviorAbility},
 		{KindCognitive, ProductChannelCognitive},
 		{KindCustom, ProductChannelCustom},

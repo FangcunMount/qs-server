@@ -48,7 +48,6 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		{name: "behavioral_rating_empty_algo", kind: identity.KindBehavioralRating, algorithm: "", want: AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "cognitive_spm", kind: identity.KindCognitive, algorithm: identity.AlgorithmSPM, want: AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "cognitive_empty_algo", kind: identity.KindCognitive, algorithm: "", want: AlgorithmFamilyFactorScoring, wantOK: true},
-		{name: "behavior_ability_channel", kind: identity.Kind("behavior_ability"), wantOK: false},
 		{name: "custom", kind: identity.KindCustom, wantOK: false},
 	}
 	for _, tc := range tests {

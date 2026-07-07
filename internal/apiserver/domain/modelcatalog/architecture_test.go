@@ -74,9 +74,7 @@ func TestModelCatalogExportHasNoNonAliasBusinessLogic(t *testing.T) {
 		if !ok || fn.Recv != nil {
 			continue
 		}
-		if fn.Name.Name != "BehaviorAbilityScaleAdapterCapability" {
-			t.Fatalf("export.go defines %s(); root facade may only bridge behavior_ability capability lookup", fn.Name.Name)
-		}
+		t.Fatalf("export.go defines %s(); root facade must not contain business logic", fn.Name.Name)
 	}
 }
 

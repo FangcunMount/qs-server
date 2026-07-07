@@ -8,79 +8,12 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
-
-type behaviorCommandStub struct {
-	createCalled bool
-	qrCodeURL    string
-	getErr       error
-}
-
-func (s *behaviorCommandStub) List(context.Context, behavior.ListInput) (*behavior.ListResult, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) Create(_ context.Context, input behavior.CreateInput) (*behavior.Model, error) {
-	s.createCalled = true
-	return &behavior.Model{Code: input.Code, Title: input.Title}, nil
-}
-
-func (s *behaviorCommandStub) Get(_ context.Context, modelCode string) (*behavior.Model, error) {
-	if s.getErr != nil {
-		return nil, s.getErr
-	}
-	if modelCode == "behavior_demo" {
-		return &behavior.Model{Code: modelCode}, nil
-	}
-	return nil, stderrors.New("not found")
-}
-
-func (s *behaviorCommandStub) UpdateBasicInfo(context.Context, behavior.UpdateBasicInfoInput) (*behavior.Model, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) Delete(context.Context, string) error { return nil }
-
-func (s *behaviorCommandStub) Publish(context.Context, string) (*behavior.Model, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) Unpublish(context.Context, string) (*behavior.Model, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) Archive(context.Context, string) (*behavior.Model, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) BindQuestionnaire(_ context.Context, input behavior.BindQuestionnaireInput) (*behavior.Binding, error) {
-	return &behavior.Binding{
-		QuestionnaireCode:    input.QuestionnaireCode,
-		QuestionnaireVersion: input.QuestionnaireVersion,
-	}, nil
-}
-
-func (s *behaviorCommandStub) GetDefinition(context.Context, string) (*behavior.Definition, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) UpdateDefinition(context.Context, string, behavior.DefinitionInput) (*behavior.Definition, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) Options(context.Context) (*behavior.Options, error) {
-	return nil, nil
-}
-
-func (s *behaviorCommandStub) GetQRCode(context.Context, string) (string, error) {
-	return s.qrCodeURL, nil
-}
 
 type personalityCommandStub struct {
 	createCalled bool
@@ -282,7 +215,6 @@ func (s *personalityQRCodeGeneratorStub) GeneratePersonalityAssessmentQRCode(_ c
 
 func TestCreateRequiresKind(t *testing.T) {
 	svc := NewService(Dependencies{
-		BehaviorCommand:    &behaviorCommandStub{},
 		PersonalityCommand: &personalityCommandStub{},
 	})
 
@@ -295,11 +227,9 @@ func TestCreateRequiresKind(t *testing.T) {
 	}
 }
 
-func TestCreatePersonalityDoesNotDefaultToBehaviorAbility(t *testing.T) {
+func TestCreatePersonalityUsesPersonalityCommand(t *testing.T) {
 	personalityStub := &personalityCommandStub{}
-	behaviorStub := &behaviorCommandStub{}
 	svc := NewService(Dependencies{
-		BehaviorCommand:    behaviorStub,
 		PersonalityCommand: personalityStub,
 	})
 
@@ -314,19 +244,14 @@ func TestCreatePersonalityDoesNotDefaultToBehaviorAbility(t *testing.T) {
 	if !personalityStub.createCalled {
 		t.Fatal("personality command Create was not called")
 	}
-	if behaviorStub.createCalled {
-		t.Fatal("behavior command Create should not be called")
-	}
 	if result.Kind != KindPersonality {
 		t.Fatalf("result kind = %s, want %s", result.Kind, KindPersonality)
 	}
 }
 
 func TestGetQRCodeDispatchesByKind(t *testing.T) {
-	behaviorStub := &behaviorCommandStub{qrCodeURL: "https://example.com/scale.png"}
 	personalityStub := &personalityCommandStub{}
 	svc := NewService(Dependencies{
-		BehaviorCommand:    behaviorStub,
 		PersonalityCommand: personalityStub,
 		RawQRCodeGenerator: &personalityQRCodeGeneratorStub{},
 	})
@@ -339,16 +264,6 @@ func TestGetQRCodeDispatchesByKind(t *testing.T) {
 		want := "https://example.com/qrcodes/personality_personality_demo.png"
 		if got != want {
 			t.Fatalf("GetQRCode() = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("behavior model", func(t *testing.T) {
-		got, err := svc.GetQRCode(context.Background(), "behavior_demo")
-		if err != nil {
-			t.Fatalf("GetQRCode() error = %v", err)
-		}
-		if got != behaviorStub.qrCodeURL {
-			t.Fatalf("GetQRCode() = %q, want behavior qrcode url", got)
 		}
 	})
 

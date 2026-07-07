@@ -6,18 +6,17 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestBehaviorAbilityKindMapperBoundary(t *testing.T) {
+func TestBehaviorAbilityIsProductChannelOnly(t *testing.T) {
 	t.Parallel()
 
-	domainKind, ok := APIKindToDomainKind(KindBehaviorAbility)
-	if !ok || domainKind != domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-		t.Fatalf("APIKindToDomainKind(behavior_ability) = %q, %v", domainKind, ok)
+	if _, ok := APIKindToDomainKind(KindBehaviorAbility); ok {
+		t.Fatal("APIKindToDomainKind(behavior_ability) should not map to a domain kind")
 	}
-	if got := DomainKindToAPIKind(domain.KindBehaviorAbility); got != KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-		t.Fatalf("DomainKindToAPIKind(behavior_ability) = %q, want %q", got, KindBehaviorAbility)
+	if !IsSupportedAPIKind(KindBehaviorAbility) {
+		t.Fatal("behavior_ability must remain a supported API channel kind")
 	}
-	if !domain.IsBehaviorAbilityScaleAdapter(domainKind) {
-		t.Fatal("behavior_ability must resolve to scale adapter taxonomy slot")
+	if !domain.IsBehaviorAbilityProductChannelAPIKind(KindBehaviorAbility) {
+		t.Fatal("behavior_ability must be a product channel API kind")
 	}
 }
 
@@ -33,34 +32,15 @@ func TestBehavioralRatingKindMapperBoundary(t *testing.T) {
 	}
 }
 
-func TestBehaviorAbilityPayloadFormatBoundary(t *testing.T) {
+func TestMedicalScalePayloadFormatBoundary(t *testing.T) {
 	t.Parallel()
 
-	got := APIPayloadFormatToDomain(PayloadFormatScaleV1)
-	if got != domain.PayloadFormatBehaviorAbilityScaleV1 {
-		t.Fatalf("APIPayloadFormatToDomain() = %q, want %q", got, domain.PayloadFormatBehaviorAbilityScaleV1)
+	got := APIPayloadFormatToDomain(PayloadFormatMedicalScaleV1)
+	if got != domain.PayloadFormatAssessmentScaleV1 {
+		t.Fatalf("APIPayloadFormatToDomain() = %q, want %q", got, domain.PayloadFormatAssessmentScaleV1)
 	}
-	if got == domain.PayloadFormatBehavioralRatingDefaultV1 {
-		t.Fatal("behavior_ability payload must not normalize to behavioral_rating.default")
-	}
-
-	roundTrip := DomainPayloadFormatToAPI(KindBehaviorAbility, got)
-	if roundTrip != PayloadFormatScaleV1 {
-		t.Fatalf("DomainPayloadFormatToAPI() = %q, want %q", roundTrip, PayloadFormatScaleV1)
-	}
-}
-
-func TestCapabilityPolicyUsesBehaviorAbilityAPIKind(t *testing.T) {
-	t.Parallel()
-
-	cap, ok := domain.CapabilityByAPIKind(KindBehaviorAbility)
-	if !ok {
-		t.Fatal("CapabilityByAPIKind(behavior_ability) = false, want true")
-	}
-	if cap.Kind != domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-		t.Fatalf("capability kind = %q, want behavior_ability", cap.Kind)
-	}
-	if cap.ExecutionPath != domain.ExecutionPathBehaviorAbilityScaleAdapter {
-		t.Fatalf("execution path = %q", cap.ExecutionPath)
+	roundTrip := DomainPayloadFormatToAPI(KindMedicalScale, got)
+	if roundTrip != PayloadFormatMedicalScaleV1 {
+		t.Fatalf("DomainPayloadFormatToAPI() = %q, want %q", roundTrip, PayloadFormatMedicalScaleV1)
 	}
 }

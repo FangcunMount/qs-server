@@ -8,11 +8,6 @@ func (s *service) resolveModelKind(ctx context.Context, modelCode string) (strin
 			return KindPersonality, true
 		}
 	}
-	if s.behavior.cmd != nil {
-		if _, err := s.behavior.cmd.Get(ctx, modelCode); err == nil {
-			return KindBehaviorAbility, true
-		}
-	}
 	if s.behavioralRating.cmd != nil {
 		if _, err := s.behavioralRating.cmd.Get(ctx, modelCode); err == nil {
 			return KindBehavioralRating, true

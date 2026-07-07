@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
@@ -38,7 +37,6 @@ type Service interface {
 }
 
 type Dependencies struct {
-	BehaviorCommand         behavior.Command
 	BehavioralRatingCommand behavioral_rating.Service
 	PersonalityCommand      personality.Service
 	CognitiveCommand        cognitive.Service
@@ -50,7 +48,6 @@ type Dependencies struct {
 
 type service struct {
 	deps             Dependencies
-	behavior         behaviorGateway
 	behavioralRating behavioralRatingGateway
 	personality      personalityGateway
 	cognitive        cognitiveGateway
@@ -59,7 +56,6 @@ type service struct {
 func NewService(deps Dependencies) Service {
 	return &service{
 		deps:             deps,
-		behavior:         behaviorGateway{cmd: deps.BehaviorCommand},
 		behavioralRating: behavioralRatingGateway{cmd: deps.BehavioralRatingCommand},
 		personality:      personalityGateway{cmd: deps.PersonalityCommand},
 		cognitive:        cognitiveGateway{cmd: deps.CognitiveCommand},
@@ -73,7 +69,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	if dto.PageSize <= 0 {
 		dto.PageSize = 20
 	}
-	if dto.Kind != "" {
+	if dto.Kind != "" && !domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
 		if err := requireCatalogOperation(dto.Kind, domain.CatalogOpList); err != nil {
 			return nil, err
 		}
@@ -82,14 +78,6 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
 	if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
 		return s.listBehaviorAbilityChannel(ctx, dto)
-	}
-	if shouldListModelKind(dto.Kind, KindBehaviorAbility) {
-		scales, err := s.listBehaviorAbility(ctx, dto)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = append(result.Items, scales.Items...)
-		result.Total += scales.Total
 	}
 	if shouldListModelKind(dto.Kind, KindPersonality) {
 		items, total, err := s.listPersonality(ctx, dto)
@@ -122,12 +110,13 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	if dto.Kind == "" {
 		return nil, invalidArgument("模型类型不能为空")
 	}
+	if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
+		return nil, invalidArgument("模型类型无效")
+	}
 	if err := requireCatalogOperation(dto.Kind, domain.CatalogOpCreate); err != nil {
 		return nil, err
 	}
 	switch dto.Kind {
-	case KindBehaviorAbility:
-		return s.createBehaviorAbility(ctx, dto)
 	case KindPersonality:
 		return s.personality.create(ctx, dto)
 	case KindCognitive:
@@ -142,11 +131,6 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	if modelCode == "" {
 		return nil, invalidArgument("模型编码不能为空")
-	}
-	if s.behavior.cmd != nil {
-		if result, err := s.behavior.cmd.Get(ctx, modelCode); err == nil && result != nil {
-			return summaryFromBehavior(result), nil
-		}
 	}
 	if s.personality.cmd != nil {
 		if result, err := s.personality.cmd.Get(ctx, modelCode); err == nil && result != nil {
@@ -179,8 +163,6 @@ func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (
 	switch kind {
 	case KindPersonality:
 		return s.personality.updateBasicInfo(ctx, dto)
-	case KindBehaviorAbility:
-		return s.updateBehaviorBasicInfo(ctx, dto)
 	case KindCognitive:
 		return s.cognitive.updateBasicInfo(ctx, dto)
 	case KindBehavioralRating:
@@ -198,8 +180,6 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 	switch kind {
 	case KindPersonality:
 		return s.personality.delete(ctx, modelCode)
-	case KindBehaviorAbility:
-		return s.behavior.delete(ctx, modelCode)
 	case KindCognitive:
 		return s.cognitive.delete(ctx, modelCode)
 	case KindBehavioralRating:
@@ -217,8 +197,6 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	switch kind {
 	case KindPersonality:
 		return s.personality.publish(ctx, modelCode)
-	case KindBehaviorAbility:
-		return s.behavior.publish(ctx, modelCode)
 	case KindCognitive:
 		return s.cognitive.publish(ctx, modelCode)
 	case KindBehavioralRating:
@@ -236,8 +214,6 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 	switch kind {
 	case KindPersonality:
 		return s.personality.unpublish(ctx, modelCode)
-	case KindBehaviorAbility:
-		return s.behavior.unpublish(ctx, modelCode)
 	case KindCognitive:
 		return s.cognitive.unpublish(ctx, modelCode)
 	case KindBehavioralRating:
@@ -255,8 +231,6 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 	switch kind {
 	case KindPersonality:
 		return s.personality.archive(ctx, modelCode)
-	case KindBehaviorAbility:
-		return s.behavior.archive(ctx, modelCode)
 	case KindCognitive:
 		return s.cognitive.archive(ctx, modelCode)
 	case KindBehavioralRating:
@@ -274,12 +248,6 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 	switch kind {
 	case KindPersonality:
 		return s.personality.bindQuestionnaire(ctx, dto)
-	case KindBehaviorAbility:
-		binding, bindErr := s.behavior.bindQuestionnaire(ctx, dto)
-		if bindErr != nil {
-			return nil, bindErr
-		}
-		return s.questionnaireBinding(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
 	case KindCognitive:
 		return s.cognitive.bindQuestionnaire(ctx, dto)
 	case KindBehavioralRating:
@@ -290,14 +258,36 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 }
 
 func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*QuestionnaireBindingResult, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
+	kind, ok := s.resolveModelKind(ctx, modelCode)
+	if !ok {
+		return nil, modelNotFoundError()
+	}
+	switch kind {
+	case KindPersonality:
 		return s.personality.getQuestionnaire(ctx, modelCode)
+	case KindBehavioralRating:
+		cmd, err := s.behavioralRating.require()
+		if err != nil {
+			return nil, err
+		}
+		model, err := cmd.Get(ctx, modelCode)
+		if err != nil {
+			return nil, err
+		}
+		return s.questionnaireBinding(ctx, model.QuestionnaireCode, model.QuestionnaireVersion)
+	case KindCognitive:
+		cmd, err := s.cognitive.require()
+		if err != nil {
+			return nil, err
+		}
+		model, err := cmd.Get(ctx, modelCode)
+		if err != nil {
+			return nil, err
+		}
+		return s.questionnaireBinding(ctx, model.QuestionnaireCode, model.QuestionnaireVersion)
+	default:
+		return nil, modelNotFoundError()
 	}
-	result, err := s.loadBehaviorAbility(ctx, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	return s.questionnaireBinding(ctx, result.QuestionnaireCode, result.QuestionnaireVersion)
 }
 
 func (s *service) GetDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
@@ -310,32 +300,23 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindBehavioralRating {
 		return s.behavioralRating.getDefinition(ctx, modelCode)
 	}
-	result, err := s.loadBehaviorAbility(ctx, modelCode)
-	if err == nil {
-		definition, err := s.behavior.cmd.GetDefinition(ctx, result.Code)
-		if err != nil {
-			return nil, err
+	if s.deps.PersonalityQuery != nil {
+		personality, err := s.deps.PersonalityQuery.GetPublishedByCode(ctx, modelCode)
+		if err == nil && personality != nil {
+			payload, marshalErr := json.Marshal(newPersonalityDefinitionPayload(personality))
+			if marshalErr != nil {
+				return nil, marshalErr
+			}
+			return &DefinitionDTO{
+				Kind:          KindPersonality,
+				SubKind:       SubKindTypology,
+				Algorithm:     personality.Algorithm,
+				PayloadFormat: PayloadFormatPersonalityTypologyV1,
+				Payload:       payload,
+			}, nil
 		}
-		return definitionFromBehavior(definition), nil
 	}
-	if s.deps.PersonalityQuery == nil {
-		return nil, err
-	}
-	personality, personalityErr := s.deps.PersonalityQuery.GetPublishedByCode(ctx, modelCode)
-	if personalityErr != nil {
-		return nil, err
-	}
-	payload, marshalErr := json.Marshal(newPersonalityDefinitionPayload(personality))
-	if marshalErr != nil {
-		return nil, marshalErr
-	}
-	return &DefinitionDTO{
-		Kind:          KindPersonality,
-		SubKind:       SubKindTypology,
-		Algorithm:     personality.Algorithm,
-		PayloadFormat: PayloadFormatPersonalityTypologyV1,
-		Payload:       payload,
-	}, nil
+	return nil, modelNotFoundError()
 }
 
 func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
@@ -346,8 +327,6 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 	switch kind {
 	case KindPersonality:
 		return s.personality.updateDefinition(ctx, modelCode, dto)
-	case KindBehaviorAbility:
-		return s.updateBehaviorDefinition(ctx, modelCode, dto)
 	case KindCognitive:
 		return s.cognitive.updateDefinition(ctx, modelCode, dto)
 	case KindBehavioralRating:
@@ -374,24 +353,12 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 			{Label: "量表评分", Value: SubKindScale},
 		},
 	}
-	if kind == "" || kind == KindBehaviorAbility {
+	if kind == "" || domain.IsBehaviorAbilityProductChannelAPIKind(kind) {
 		result.ModelFamilies = behaviorAbilityChannelModelFamilyOptions()
 		result.Algorithms = append(result.Algorithms,
 			Option{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)},
 			Option{Label: "SPM", Value: string(domain.AlgorithmSPM)},
 		)
-		if s.behavior.cmd != nil {
-			categories, err := s.behavior.cmd.Options(ctx)
-			if err != nil {
-				return nil, err
-			}
-			for _, item := range categories.Categories {
-				result.Categories = append(result.Categories, Option{Label: item.Label, Value: item.Value})
-			}
-			for _, item := range categories.Tags {
-				result.Tags = append(result.Tags, Option{Label: item.Label, Value: item.Value})
-			}
-		}
 	}
 	if kind == string(domain.KindBehavioralRating) {
 		result.Algorithms = append(result.Algorithms, Option{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)})
@@ -455,14 +422,10 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	switch kind {
-	case KindPersonality:
-		return s.getPersonalityQRCode(ctx, modelCode)
-	case KindBehaviorAbility:
-		return s.behavior.getQRCode(ctx, modelCode)
-	default:
+	if kind != KindPersonality {
 		return "", invalidArgument("模型类型不支持二维码")
 	}
+	return s.getPersonalityQRCode(ctx, modelCode)
 }
 
 func invalidArgument(format string, args ...interface{}) error {

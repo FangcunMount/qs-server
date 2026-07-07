@@ -37,8 +37,6 @@ func DefaultProductChannelFor(kind Kind) ProductChannel {
 		return ProductChannelMedicalScale
 	case KindPersonality:
 		return ProductChannelPersonality
-	case KindBehaviorAbility:
-		return ProductChannelBehaviorAbility
 	case KindBehavioralRating:
 		return ProductChannelBehaviorAbility
 	case KindCognitive:

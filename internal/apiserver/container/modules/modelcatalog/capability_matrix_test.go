@@ -104,26 +104,11 @@ func TestRuntimeCapabilityPolicy(t *testing.T) {
 	}
 }
 
-func TestBehaviorAbilityDoesNotRegisterDedicatedRuntimeDescriptor(t *testing.T) {
-	t.Parallel()
-
-	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility) //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-	if !ok || cap.RuntimeExecutable || !cap.RuntimeViaScaleLegacy {
-		t.Fatalf("behavior_ability capability = %#v", cap)
-	}
-
-	for _, desc := range DefaultEvaluationDescriptors() {
-		if desc.Key.Kind == domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-			t.Fatalf("unexpected behavior_ability descriptor: %#v", desc.Key)
-		}
-	}
-}
-
 func TestBehavioralRatingRegistersDedicatedRuntimeDescriptor(t *testing.T) {
 	t.Parallel()
 
 	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
-	if !ok || !cap.RuntimeExecutable || cap.RuntimeViaScaleLegacy {
+	if !ok || !cap.RuntimeExecutable {
 		t.Fatalf("behavioral_rating capability = %#v", cap)
 	}
 

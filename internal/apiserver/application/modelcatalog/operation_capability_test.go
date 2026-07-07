@@ -20,7 +20,6 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				BehaviorCommand:         &behaviorCommandStub{},
 				PersonalityCommand:      &personalityCommandStub{},
 				CognitiveCommand:        &cognitiveCommandStub{},
 				BehavioralRatingCommand: &behavioralRatingCommandStub{},
@@ -47,11 +46,10 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 	}
 }
 
-func TestUpdateDefinitionDoesNotDefaultToBehaviorAbility(t *testing.T) {
+func TestUpdateDefinitionRejectsUnknownModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		BehaviorCommand:    &behaviorCommandStub{},
 		PersonalityCommand: &personalityCommandStub{},
 		CognitiveCommand:   &cognitiveCommandStub{},
 	})
@@ -77,7 +75,6 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				BehaviorCommand:         &behaviorCommandStub{},
 				PersonalityCommand:      &personalityCommandStub{},
 				CognitiveCommand:        &cognitiveCommandStub{},
 				BehavioralRatingCommand: &behavioralRatingCommandStub{},
@@ -110,7 +107,6 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				BehaviorCommand:         &behaviorCommandStub{},
 				PersonalityCommand:      &personalityCommandStub{},
 				CognitiveCommand:        &cognitiveCommandStub{},
 				BehavioralRatingCommand: &behavioralRatingCommandStub{},

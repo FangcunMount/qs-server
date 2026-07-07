@@ -6,10 +6,132 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
+
+type channelListBehavioralRatingStub struct {
+	behavioralRatingCommandStub
+}
+
+func (s *channelListBehavioralRatingStub) List(context.Context, behavioral_rating.ListInput) (*behavioral_rating.ModelListResult, error) {
+	return &behavioral_rating.ModelListResult{
+		Total: 1,
+		Items: []behavioral_rating.ModelSummary{{Code: "BR-001", Kind: behavioral_rating.KindBehavioralRating, Title: "BRIEF-2"}},
+	}, nil
+}
+
+type channelListCognitiveStub struct {
+	cognitiveCommandStub
+}
+
+func (s *channelListCognitiveStub) List(context.Context, cognitive.ListInput) (*cognitive.ModelListResult, error) {
+	return &cognitive.ModelListResult{
+		Total: 1,
+		Items: []cognitive.ModelSummary{{Code: "COG-001", Kind: cognitive.KindCognitive, Title: "SPM"}},
+	}, nil
+}
+
+func TestListBehaviorAbilityChannelAggregatesFamilies(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{
+		BehavioralRatingCommand: &channelListBehavioralRatingStub{},
+		CognitiveCommand:        &channelListCognitiveStub{},
+	})
+
+	result, err := svc.List(context.Background(), ListModelsDTO{
+		Kind:     KindBehaviorAbility,
+		Page:     1,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if result.Total != 2 {
+		t.Fatalf("total = %d, want 2", result.Total)
+	}
+	if len(result.Items) != 2 {
+		t.Fatalf("items = %#v", result.Items)
+	}
+	kinds := map[string]bool{}
+	for _, item := range result.Items {
+		kinds[item.Kind] = true
+	}
+	for _, want := range []string{KindBehavioralRating, KindCognitive} {
+		if !kinds[want] {
+			t.Fatalf("missing kind %q in %#v", want, kinds)
+		}
+	}
+}
+
+func TestListBehaviorAbilityChannelFamilyFilter(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{
+		BehavioralRatingCommand: &channelListBehavioralRatingStub{},
+		CognitiveCommand:        &channelListCognitiveStub{},
+	})
+
+	result, err := svc.List(context.Background(), ListModelsDTO{
+		Kind:        KindBehaviorAbility,
+		ModelFamily: string(domain.KindBehavioralRating),
+		Page:        1,
+		PageSize:    20,
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if result.Total != 1 || len(result.Items) != 1 || result.Items[0].Kind != KindBehavioralRating {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestOptionsExposeBehaviorAbilityModelFamilies(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{})
+	result, err := svc.Options(context.Background(), KindBehaviorAbility)
+	if err != nil {
+		t.Fatalf("Options: %v", err)
+	}
+	if len(result.ModelFamilies) != 2 {
+		t.Fatalf("model families = %#v", result.ModelFamilies)
+	}
+}
+
+func TestCreateRejectsBehaviorAbilityChannelKind(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{})
+	_, err := svc.Create(context.Background(), CreateModelDTO{
+		Kind:  KindBehaviorAbility,
+		Code:  "BA-001",
+		Title: "invalid",
+	})
+	if err == nil {
+		t.Fatal("Create(behavior_ability) error = nil, want rejection")
+	}
+	if !cberrors.IsCode(err, code.ErrInvalidArgument) {
+		t.Fatalf("Create(behavior_ability) code = %v, want ErrInvalidArgument", cberrors.ParseCoder(err))
+	}
+}
+
+func TestListBehaviorAbilityChannelAllowedWithoutCapabilityRow(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{})
+	_, err := svc.List(context.Background(), ListModelsDTO{
+		Kind:     KindBehaviorAbility,
+		Page:     1,
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("List(behavior_ability) error = %v", err)
+	}
+}
 
 func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	t.Parallel()
@@ -87,12 +209,10 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			behaviorStub := &behaviorCommandStub{}
 			personalityStub := &personalityCommandStub{}
 			cognitiveStub := &cognitiveCommandStub{}
 			behavioralRatingStub := &behavioralRatingCommandStub{}
 			svc := NewService(Dependencies{
-				BehaviorCommand:         behaviorStub,
 				PersonalityCommand:      personalityStub,
 				CognitiveCommand:        cognitiveStub,
 				BehavioralRatingCommand: behavioralRatingStub,
@@ -109,10 +229,6 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 					t.Fatalf("Create(%q) error = %v, want success", apiKind, err)
 				}
 				switch apiKind {
-				case KindBehaviorAbility:
-					if !behaviorStub.createCalled {
-						t.Fatal("behavior command Create was not called")
-					}
 				case KindPersonality:
 					if !personalityStub.createCalled {
 						t.Fatal("personality command Create was not called")
@@ -139,30 +255,10 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 	}
 }
 
-func TestBehaviorAbilityIsLegacyScaleAdapter(t *testing.T) {
-	t.Parallel()
-
-	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility) //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-	if !ok || !cap.RuntimeViaScaleLegacy || cap.RuntimeExecutable {
-		t.Fatalf("behavior_ability capability = %#v", cap)
-	}
-	if cap.APIKind != domain.APIKindBehaviorAbility {
-		t.Fatalf("APIKind = %q, want %q", cap.APIKind, domain.APIKindBehaviorAbility)
-	}
-	if behavior.PayloadFormatScale != domain.PayloadFormatBehaviorAbilityScaleV1 {
-		t.Fatalf("behavior payload format = %q, want %q", behavior.PayloadFormatScale, domain.PayloadFormatBehaviorAbilityScaleV1)
-	}
-	if domain.PayloadFormatBehavioralRatingDefaultV1 == domain.PayloadFormatBehaviorAbilityScaleV1 {
-		t.Fatal("behavior_ability must not use canonical behavioral_rating.default payload format")
-	}
-}
-
 func previewModelCode(apiKind string) string {
 	switch apiKind {
 	case KindPersonality:
 		return "personality_demo"
-	case KindBehaviorAbility:
-		return "behavior_demo"
 	case KindCognitive:
 		return "cognitive_demo"
 	case KindBehavioralRating:
@@ -176,7 +272,6 @@ func TestPreviewReportCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		BehaviorCommand:    &behaviorCommandStub{},
 		PersonalityCommand: &personalityCommandStub{},
 	})
 

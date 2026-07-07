@@ -4,11 +4,8 @@ package identity
 type Kind string
 
 const (
-	KindScale       Kind = "scale"
-	KindPersonality Kind = "personality"
-	// Deprecated: behavior_ability is a product channel / legacy API filter only.
-	// New models must use behavioral_rating or cognitive.
-	KindBehaviorAbility  Kind = "behavior_ability"
+	KindScale            Kind = "scale"
+	KindPersonality      Kind = "personality"
 	KindBehavioralRating Kind = "behavioral_rating"
 	KindCognitive        Kind = "cognitive"
 	KindCustom           Kind = "custom"
@@ -45,7 +42,7 @@ func (k Kind) String() string { return string(k) }
 
 func (k Kind) IsValid() bool {
 	switch k {
-	case KindScale, KindPersonality, KindBehaviorAbility, KindBehavioralRating, KindCognitive, KindCustom,
+	case KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom,
 		KindMBTIMigration, KindSBTIMigration:
 		return true
 	default:

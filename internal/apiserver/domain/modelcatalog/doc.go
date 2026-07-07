@@ -11,14 +11,11 @@
 // it must not drive runtime execution path selection. Use ModelFamilyCapabilities for
 // executable model-family guards.
 //
-//   - behavior_ability (CapabilityRoleProductChannel): legacy API aggregation slot; new drafts
-//     must use behavioral_rating or cognitive instead.
 //   - behavioral_rating / cognitive (CapabilityRoleModelFamily): executable families;
 //     Brief-2 lands on behavioral_rating+AlgorithmBrief2, SPM on cognitive+AlgorithmSPM.
 //
-// API kind behavior_ability maps to domain KindBehaviorAbility and executes as a
-// scale adapter (assessmentmodel.behavior_ability.scale.v1). The API kind is also a
-// product channel that aggregates behavioral_rating and cognitive listings. Domain KindBehavioralRating
+// API kind behavior_ability is a product channel that aggregates behavioral_rating and
+// cognitive listings only; it does not map to a domain Kind. Domain KindBehavioralRating
 // is the standalone behavioral_rating runtime (assessmentmodel.behavioral_rating.default.v1
 // for legacy default models; assessmentmodel.behavioral_rating.brief2.v1 for Brief-2).
 //
@@ -68,13 +65,12 @@
 //   - export.go: root type aliases
 //   - capability/capability.go, capability_role.go: KindCapability matrix
 //   - capability/operation.go: CatalogOperation
-//   - capability/behavior_ability_legacy.go: behavior_ability product-channel matrix row
 //
-// Legacy / compatibility — migration readers and behavior_ability channel (legacy/ subpackage):
+// Legacy / compatibility — migration readers and behavior_ability product channel (legacy/ subpackage):
 //   - legacy/alias.go: v1 Snapshot, Definition, RuleSetKind aliases
 //   - legacy/adapter.go: LegacyKindMapping, PublishedFromLegacy
 //   - legacy/behavior_ability.go, legacy/behavior_ability_channel.go
-//   - legacy/kind_mapping.go, legacy/deprecated_kind.go
+//   - legacy/kind_mapping.go
 //
 // Shared:
 //   - errors.go: domain errors

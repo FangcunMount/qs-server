@@ -3,7 +3,6 @@ package modelcatalog
 import (
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	assessmentModelBehavior "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	appBehavioralRating "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
@@ -33,13 +32,6 @@ func (m *Module) ExportRESTDeps(
 	var personalityQuery = m.personalityQuery()
 	var personalityCommand = m.personalityCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
-		BehaviorCommand: assessmentModelBehavior.NewLegacyScaleCommand(assessmentModelBehavior.LegacyScaleDeps{
-			Lifecycle: deps.Scale.LifecycleService,
-			Factor:    deps.Scale.FactorService,
-			Query:     deps.Scale.QueryService,
-			Category:  deps.Scale.CategoryService,
-			QRCode:    deps.Scale.QRCodeService,
-		}),
 		PersonalityCommand:      personalityCommand,
 		BehavioralRatingCommand: m.behavioralRatingCommand(),
 		CognitiveCommand:        m.cognitiveCommand(),

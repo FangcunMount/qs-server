@@ -50,7 +50,6 @@ func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
 		t.Fatal("cognitive evaluator not materialized")
 	}
 	for _, forbidden := range []domain.Kind{
-		domain.KindBehaviorAbility, //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		domain.KindCustom,
 	} {
 		for key := range keys {

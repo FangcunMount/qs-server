@@ -12,13 +12,6 @@ func (s *service) listBehaviorAbilityChannel(ctx context.Context, dto ListModels
 	}
 
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
-	legacy, err := s.listBehaviorAbility(ctx, dto)
-	if err != nil {
-		return nil, err
-	}
-	result.Items = append(result.Items, legacy.Items...)
-	result.Total += legacy.Total
-
 	rating, err := s.listBehavioralRating(ctx, dto)
 	if err != nil {
 		return nil, err
@@ -37,8 +30,6 @@ func (s *service) listBehaviorAbilityChannel(ctx context.Context, dto ListModels
 
 func (s *service) listBehaviorAbilityChannelFamily(ctx context.Context, dto ListModelsDTO, family domain.Kind) (*ModelListResult, error) {
 	switch family {
-	case domain.KindBehaviorAbility: //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
-		return s.listBehaviorAbility(ctx, dto)
 	case domain.KindBehavioralRating:
 		return s.listBehavioralRating(ctx, dto)
 	case domain.KindCognitive:
@@ -52,6 +43,5 @@ func behaviorAbilityChannelModelFamilyOptions() []Option {
 	return []Option{
 		{Label: "行为评定", Value: string(domain.KindBehavioralRating)},
 		{Label: "认知能力", Value: string(domain.KindCognitive)},
-		{Label: "legacy scale adapter", Value: string(domain.KindBehaviorAbility)}, //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 	}
 }

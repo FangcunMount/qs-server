@@ -9,7 +9,7 @@ import (
 
 const (
 	KindPersonality = "personality"
-	// KindBehaviorAbility is the API kind for behavior-ability models backed by legacy scale adapters.
+	// KindBehaviorAbility is the API product-channel kind for aggregating behavioral_rating and cognitive lists.
 	KindBehaviorAbility                = domain.APIKindBehaviorAbility
 	KindBehavioralRating               = string(domain.KindBehavioralRating)
 	KindMedicalScale                   = "medical_scale"
@@ -20,7 +20,6 @@ const (
 	StatusDraft                        = "draft"
 	StatusPublished                    = "published"
 	StatusArchived                     = "archived"
-	PayloadFormatScaleV1               = domain.PayloadFormatBehaviorAbilityScaleV1
 	PayloadFormatMedicalScaleV1        = "assessmentmodel.medical_scale.scale.v1"
 	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
 )

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 )
 
 func TestKindCapabilityAllowsOperations(t *testing.T) {
@@ -30,20 +29,6 @@ func TestKindCapabilityAllowsOperations(t *testing.T) {
 		if !personality.Allows(op) {
 			t.Fatalf("personality must allow %q", op)
 		}
-	}
-
-	behavior, ok := CapabilityByKind(legacy.BehaviorAbilityKind())
-	if !ok {
-		t.Fatal("behavior_ability capability missing")
-	}
-	if !behavior.Allows(CatalogOpUpdateDefinition) {
-		t.Fatal("behavior_ability must allow definition update")
-	}
-	if behavior.Allows(CatalogOpCreate) {
-		t.Fatal("behavior_ability must not allow create")
-	}
-	if behavior.Allows(CatalogOpPreview) {
-		t.Fatal("behavior_ability must not allow preview")
 	}
 
 	for _, kind := range []identity.Kind{identity.KindScale, identity.KindCustom} {

@@ -13,8 +13,7 @@ type ModelCatalogOption struct {
 	PreviewEnabled bool
 }
 
-// ModelCatalogOptions returns API kind options from the full capability matrix,
-// including legacy product-channel entries such as behavior_ability.
+// ModelCatalogOptions returns API kind options from the model-family capability matrix.
 func ModelCatalogOptions() []ModelCatalogOption {
 	caps := domain.DefaultCapabilities()
 	options := make([]ModelCatalogOption, 0, len(caps))

@@ -23,15 +23,14 @@ type KindCapability struct {
 	PreviewSupported          bool
 	QRCodeSupported           bool
 	RuntimeExecutable         bool
-	RuntimeViaScaleLegacy     bool
 	ExecutionPath             routing.ExecutionPath
 }
 
 func (c KindCapability) CanExecute() bool {
-	return c.RuntimeExecutable || c.RuntimeViaScaleLegacy
+	return c.RuntimeExecutable
 }
 
-var defaultCapabilities = append([]KindCapability{
+var defaultCapabilities = []KindCapability{
 	{
 		Kind:                      identity.KindPersonality,
 		Role:                      CapabilityRoleModelFamily,
@@ -98,7 +97,7 @@ var defaultCapabilities = append([]KindCapability{
 		OptionsEnabled: false,
 		ExecutionPath:  routing.ExecutionPathNone,
 	},
-}, behaviorAbilityLegacyCapability())
+}
 
 // DefaultCapabilities returns the built-in model-catalog capability matrix.
 func DefaultCapabilities() []KindCapability {

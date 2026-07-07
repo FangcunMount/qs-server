@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
@@ -12,8 +11,8 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 	t.Parallel()
 
 	caps := DefaultCapabilities()
-	if len(caps) != 6 {
-		t.Fatalf("capability count = %d, want 6", len(caps))
+	if len(caps) != 5 {
+		t.Fatalf("capability count = %d, want 5", len(caps))
 	}
 
 	byKind := make(map[identity.Kind]KindCapability, len(caps))
@@ -26,25 +25,8 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 		t.Fatalf("personality capability = %#v", personality)
 	}
 
-	behaviorAbility := byKind[legacy.BehaviorAbilityKind()]
-	if behaviorAbility.CreateSupported || behaviorAbility.PreviewSupported || behaviorAbility.RuntimeExecutable {
-		t.Fatalf("behavior_ability capability = %#v", behaviorAbility)
-	}
-	if behaviorAbility.Role != CapabilityRoleProductChannel || !behaviorAbility.IsProductChannel() {
-		t.Fatalf("behavior_ability role = %q, IsProductChannel = %v", behaviorAbility.Role, behaviorAbility.IsProductChannel())
-	}
-	if behaviorAbility.AllowsNewDraft() {
-		t.Fatal("behavior_ability must not allow new drafts")
-	}
-	if !behaviorAbility.DefinitionUpdateSupported {
-		t.Fatal("behavior_ability must allow definition update")
-	}
-	if !behaviorAbility.RuntimeViaScaleLegacy || !behaviorAbility.CanExecute() {
-		t.Fatalf("behavior_ability must execute via scale legacy binding")
-	}
-
 	behavioralRating := byKind[identity.KindBehavioralRating]
-	if !behavioralRating.CreateSupported || behavioralRating.RuntimeViaScaleLegacy || !behavioralRating.RuntimeExecutable {
+	if !behavioralRating.CreateSupported || !behavioralRating.RuntimeExecutable {
 		t.Fatalf("behavioral_rating capability = %#v", behavioralRating)
 	}
 	if behavioralRating.Role != CapabilityRoleModelFamily || !behavioralRating.AllowsNewDraft() {
@@ -102,24 +84,6 @@ func TestReservedKindsAreNotRuntimeExecutable(t *testing.T) {
 	}
 }
 
-func TestBehaviorAbilityLegacyCapabilityRow(t *testing.T) {
-	t.Parallel()
-
-	cap, ok := CapabilityByKind(legacy.BehaviorAbilityKind())
-	if !ok {
-		t.Fatal("CapabilityByKind(behavior_ability) = false, want true")
-	}
-	if cap.APIKind != legacy.APIKindBehaviorAbility {
-		t.Fatalf("APIKind = %q, want %q", cap.APIKind, legacy.APIKindBehaviorAbility)
-	}
-	if cap.RuntimeExecutable || !cap.RuntimeViaScaleLegacy {
-		t.Fatalf("capability = %#v, want scale adapter routing only", cap)
-	}
-	if cap.ExecutionPath != routing.ExecutionPathBehaviorAbilityScaleAdapter {
-		t.Fatalf("ExecutionPath = %q, want behavior_ability_scale_adapter", cap.ExecutionPath)
-	}
-}
-
 func TestRuntimeExecutableKinds(t *testing.T) {
 	t.Parallel()
 
@@ -152,9 +116,6 @@ func TestRuntimeExecutableKindsExcludeProductChannel(t *testing.T) {
 			t.Fatalf("product channel kind %q must not be runtime executable", kind)
 		}
 	}
-	if cap, ok := CapabilityByKind(legacy.BehaviorAbilityKind()); !ok || !cap.IsProductChannel() {
-		t.Fatalf("behavior_ability capability = %#v, %v", cap, ok)
-	}
 }
 
 func TestModelFamilyCapabilitiesExcludeProductChannel(t *testing.T) {
@@ -174,7 +135,7 @@ func TestModelFamilyCapabilitiesExcludeProductChannel(t *testing.T) {
 func TestModelFamilyCapabilityByKind(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := ModelFamilyCapabilityByKind(legacy.BehaviorAbilityKind()); ok {
+	if _, ok := ModelFamilyCapabilityByKind(identity.Kind("behavior_ability")); ok {
 		t.Fatal("behavior_ability must not resolve as model family capability")
 	}
 	cap, ok := ModelFamilyCapabilityByKind(identity.KindPersonality)
