@@ -70,6 +70,12 @@ func (r *mutableReportBuilderRegistry) Resolve(key evaluation.EvaluatorKey, repo
 			return builder, nil
 		}
 	}
+	if routed := evaluation.ResolveBehavioralRatingExecutorKey(key); routed != key {
+		registryKey.key = routed
+		if builder, ok := r.items[registryKey]; ok {
+			return builder, nil
+		}
+	}
 	if mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(key.Kind); ok {
 		registryKey.key = evaluation.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}
 		if builder, ok := r.items[registryKey]; ok {

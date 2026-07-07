@@ -7,7 +7,7 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
-// Snapshot is the published cognitive.default.v1 execution payload.
+// Snapshot is a published cognitive execution payload (default.v1 or spm.v1).
 type Snapshot struct {
 	Code                 string
 	Version              string
@@ -16,6 +16,14 @@ type Snapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
+	SPM                  *SPMProfile
+}
+
+// SPMProfile carries SPM-specific configuration beyond score_range scoring.
+type SPMProfile struct {
+	TimeLimitSeconds int
+	ItemSetCodes     []string
+	NormTableVersion string
 }
 
 type FactorSnapshot struct {
@@ -39,6 +47,13 @@ type InterpretRuleSnapshot struct {
 type definitionPayload struct {
 	Dimensions     []dimensionRule `json:"dimensions"`
 	InterpretRules []interpretRule `json:"interpret_rules"`
+	SPM            *spmExtension   `json:"spm,omitempty"`
+}
+
+type spmExtension struct {
+	TimeLimitSeconds int      `json:"time_limit_seconds,omitempty"`
+	ItemSetCodes     []string `json:"item_set_codes,omitempty"`
+	NormTableVersion string   `json:"norm_table_version,omitempty"`
 }
 
 type dimensionRule struct {
@@ -63,8 +78,22 @@ type scoreRange struct {
 	Level      string  `json:"level,omitempty"`
 }
 
-// ParseDefinitionPayload decodes cognitive.default.v1 body into a runtime snapshot.
+// ParseDefinitionPayload decodes a cognitive payload body into a runtime snapshot.
 func ParseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
+	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
+}
+
+// ParsePublishedPayload decodes a published snapshot using its payload format label.
+func ParsePublishedPayload(payloadFormat, modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
+	switch payloadFormat {
+	case "", "assessmentmodel.cognitive.default.v1", "assessmentmodel.cognitive.spm.v1":
+		return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
+	default:
+		return nil, fmt.Errorf("unsupported cognitive payload format: %s", payloadFormat)
+	}
+}
+
+func parseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	var body definitionPayload
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return nil, fmt.Errorf("decode cognitive payload: %w", err)
@@ -89,13 +118,21 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 			InterpretRules:  rulesByDimension[dimension.Code],
 		})
 	}
-	return &Snapshot{
+	out := &Snapshot{
 		Code:    modelCode,
 		Version: modelVersion,
 		Title:   title,
 		Status:  status,
 		Factors: factors,
-	}, nil
+	}
+	if body.SPM != nil {
+		out.SPM = &SPMProfile{
+			TimeLimitSeconds: body.SPM.TimeLimitSeconds,
+			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
+			NormTableVersion: body.SPM.NormTableVersion,
+		}
+	}
+	return out, nil
 }
 
 func (s *Snapshot) IsPublished() bool {

@@ -17,6 +17,8 @@ type OutcomeScoreKind string
 const (
 	OutcomeScoreKindRawTotal     OutcomeScoreKind = "raw_total"
 	OutcomeScoreKindMatchPercent OutcomeScoreKind = "match_percent"
+	OutcomeScoreKindTScore       OutcomeScoreKind = "t_score"
+	OutcomeScoreKindPercentile   OutcomeScoreKind = "percentile"
 )
 
 // ProfileKind classifies a profile result independent of model family.
@@ -57,13 +59,14 @@ type OutcomeResultLevel struct {
 
 // DimensionResult records one scored dimension on an assessment outcome.
 type DimensionResult struct {
-	Code        string
-	Name        string
-	Kind        DimensionKind
-	Score       *OutcomeScoreValue
-	Level       *OutcomeResultLevel
-	Description string
-	Suggestion  string
+	Code          string
+	Name          string
+	Kind          DimensionKind
+	Score         *OutcomeScoreValue
+	DerivedScores []OutcomeScoreValue
+	Level         *OutcomeResultLevel
+	Description   string
+	Suggestion    string
 }
 
 // ValidityResult records optional validity checks for an assessment outcome.

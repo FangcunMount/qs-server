@@ -66,9 +66,9 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 | ------------- | ---- | -------------- | --------- | -------------- | ---- |
 | `scale` | 是 | 是 | 是 | 是 | 医学量表主链路 |
 | `personality/typology`（MBTI/SBTI/BigFive/配置化） | 是 | 是 | 是 | 是 | configured runtime 主路径 |
-| `behavior_ability`（domain: `behavior_ability`） | 是 | 否（scale legacy binding） | 否（scale legacy binding） | 否 | API 名 behavior_ability；走医学量表执行链 |
-| `behavioral_rating` | 是 | 是 | 是 | 是 | 独立 runtime；`behavioral_rating.default.v1` 投影为 scale 计分引擎 |
-| `cognitive` | 是 | 是 | 是 | 是 | 独立 runtime；`cognitive.default.v1` 投影为 scale 计分引擎（AlgorithmSPM） |
+| `behavior_ability`（domain: `behavior_ability`） | 是 | 否（scale legacy binding） | 否（scale legacy binding） | 否 | 产品频道：聚合 legacy + `behavioral_rating` + `cognitive` 列表；新模型走后者 |
+| `behavioral_rating` | 是 | 是 | 是 | 是 | 独立 runtime；Brief-2 用 `behavioral_rating.brief2.v1`，legacy 读 `default.v1` |
+| `cognitive` | 是 | 是 | 是 | 是 | 独立 runtime；SPM 用 `cognitive.spm.v1`，legacy 读 `default.v1` |
 | `custom` | 部分（enum） | 否 | 否 | 否 | **Reserved Kind**：仅占位，与 typology `custom_typology`、plan `scheduleType=custom` 无关 |
 
 ### Reserved Kind 说明

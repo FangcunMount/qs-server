@@ -5,6 +5,7 @@ import (
 
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const EvaluationModelKindBehavioralRating EvaluationModelKind = "behavioral_rating"
@@ -22,9 +23,13 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot) *Mo
 		return nil
 	}
 	version := snapshot.Version
+	algorithm := string(modelcatalog.AlgorithmBehavioralRatingDefault)
+	if snapshot.Brief2 != nil {
+		algorithm = string(modelcatalog.AlgorithmBrief2)
+	}
 	return &ModelSnapshot{
 		Kind:      EvaluationModelKindBehavioralRating,
-		Algorithm: "behavioral_rating_default",
+		Algorithm: algorithm,
 		Code:      snapshot.Code,
 		Version:   version,
 		Title:     snapshot.Title,

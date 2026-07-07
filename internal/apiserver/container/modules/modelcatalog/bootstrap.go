@@ -42,5 +42,9 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 			ModelRepo:     in.Personality.ModelRepo,
 			PublishedRepo: in.Personality.PublishedRepo,
 		},
+		BehavioralRating: BehavioralRatingDeps{
+			ModelRepo:     in.Personality.ModelRepo,
+			PublishedRepo: in.Personality.PublishedRepo,
+		},
 	})
 }

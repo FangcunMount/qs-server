@@ -11,6 +11,7 @@ const (
 	KindPersonality = "personality"
 	// KindBehaviorAbility is the API kind for behavior-ability models backed by legacy scale adapters.
 	KindBehaviorAbility                = domain.APIKindBehaviorAbility
+	KindBehavioralRating               = string(domain.KindBehavioralRating)
 	KindMedicalScale                   = "medical_scale"
 	KindCognitive                      = "cognitive"
 	KindCustom                         = "custom"
@@ -39,6 +40,8 @@ type ListModelsDTO struct {
 	Algorithm string
 	Page      int
 	PageSize  int
+	// ModelFamily filters behavior_ability channel listing to one execution family.
+	ModelFamily string
 }
 
 type CreateModelDTO struct {
@@ -115,11 +118,12 @@ type QuestionnaireBindingResult struct {
 }
 
 type OptionsResult struct {
-	Kinds      []Option `json:"kinds"`
-	Categories []Option `json:"categories"`
-	Algorithms []Option `json:"algorithms"`
-	SubKinds   []Option `json:"sub_kinds"`
-	Tags       []Option `json:"tags,omitempty"`
+	Kinds         []Option `json:"kinds"`
+	ModelFamilies []Option `json:"model_families,omitempty"`
+	Categories    []Option `json:"categories"`
+	Algorithms    []Option `json:"algorithms"`
+	SubKinds      []Option `json:"sub_kinds"`
+	Tags          []Option `json:"tags,omitempty"`
 }
 
 type ValidationIssue struct {

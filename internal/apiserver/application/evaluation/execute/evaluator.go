@@ -55,5 +55,10 @@ func (r *mutableEvaluatorRegistry) Resolve(key evaluation.EvaluatorKey) (Evaluat
 			return evaluator, nil
 		}
 	}
+	if routed := evaluation.ResolveBehavioralRatingExecutorKey(key); routed != key {
+		if evaluator, ok := r.items[routed]; ok {
+			return evaluator, nil
+		}
+	}
 	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }

@@ -48,6 +48,9 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
 	}
+	if input.Kind == KindBehaviorAbility {
+		return nil, fmt.Errorf("%w: behavior_ability is a legacy product channel; use behavioral_rating or cognitive", ErrInvalidArgument)
+	}
 	now := input.Now
 	if now.IsZero() {
 		now = time.Now().UTC()

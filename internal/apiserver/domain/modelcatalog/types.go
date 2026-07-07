@@ -92,7 +92,9 @@ const (
 	PayloadFormatAssessmentScaleV1         = "assessmentmodel.scale.v1"
 	PayloadFormatPersonalityTypologyV1     = "assessmentmodel.personality.typology.v1"
 	PayloadFormatBehavioralRatingDefaultV1 = "assessmentmodel.behavioral_rating.default.v1"
-	PayloadFormatCognitiveDefaultV1        = "assessmentmodel.cognitive.default.v1"
+	PayloadFormatBehavioralRatingBrief2V1  = "assessmentmodel.behavioral_rating.brief2.v1"
+	PayloadFormatCognitiveDefaultV1          = "assessmentmodel.cognitive.default.v1"
+	PayloadFormatCognitiveSPMV1            = "assessmentmodel.cognitive.spm.v1"
 
 	// Legacy read-only payload formats (migration / outbox drain).
 	PayloadFormatScaleV1 = "ruleset.scale.v1"

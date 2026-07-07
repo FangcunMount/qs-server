@@ -45,9 +45,13 @@ func (c PublishedBehavioralRatingCatalog) FindBehavioralRatingByQuestionnaire(ct
 }
 
 func behavioralRatingLookupRef(ref port.ModelRef) rulesetport.Ref {
+	algorithm := domain.Algorithm(ref.Algorithm)
+	if algorithm == "" {
+		algorithm = domain.AlgorithmBrief2
+	}
 	return rulesetport.Ref{
 		Kind:      domain.KindBehavioralRating,
-		Algorithm: domain.AlgorithmBehavioralRatingDefault,
+		Algorithm: algorithm,
 		Code:      ref.Code,
 		Version:   ref.Version,
 		Title:     ref.Title,
@@ -61,7 +65,11 @@ func decodePublishedBehavioralRatingModel(snapshot *domain.PublishedModelSnapsho
 	if snapshot.Model.Kind != domain.KindBehavioralRating {
 		return nil, fmt.Errorf("published model kind = %q, want behavioral_rating", snapshot.Model.Kind)
 	}
-	payload, err := behavioralsnapshot.ParseDefinitionPayload(
+	if !domain.IsBehavioralRatingPayloadFormat(snapshot.PayloadFormat) {
+		return nil, fmt.Errorf("unsupported behavioral_rating payload format: %s", snapshot.PayloadFormat)
+	}
+	payload, err := behavioralsnapshot.ParsePublishedPayload(
+		snapshot.PayloadFormat,
 		snapshot.Model.Code,
 		snapshot.Model.Version,
 		snapshot.Model.Title,

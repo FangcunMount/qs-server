@@ -4,6 +4,7 @@ package modelcatalog
 // API options, create/publish guards, and runtime descriptor export should read this table.
 type KindCapability struct {
 	Kind                      Kind
+	Role                      CapabilityRole
 	APIKind                   string
 	DisplayName               string
 	OptionsEnabled            bool
@@ -26,6 +27,7 @@ func (c KindCapability) CanExecute() bool {
 var defaultCapabilities = []KindCapability{
 	{
 		Kind:                      KindPersonality,
+		Role:                      CapabilityRoleModelFamily,
 		APIKind:                   "personality",
 		DisplayName:               "人格测评",
 		OptionsEnabled:            true,
@@ -41,10 +43,11 @@ var defaultCapabilities = []KindCapability{
 	},
 	{
 		Kind:                      KindBehaviorAbility,
+		Role:                      CapabilityRoleProductChannel,
 		APIKind:                   APIKindBehaviorAbility,
 		DisplayName:               "行为能力测评",
 		OptionsEnabled:            true,
-		CreateSupported:           true,
+		CreateSupported:           false,
 		ListSupported:             true,
 		PublishSupported:          true,
 		BindQuestionnaire:         true,
@@ -55,14 +58,24 @@ var defaultCapabilities = []KindCapability{
 		ExecutionPath:             ExecutionPathBehaviorAbilityScaleAdapter,
 	},
 	{
-		Kind:              KindBehavioralRating,
-		APIKind:           string(KindBehavioralRating),
-		DisplayName:       "行为评分",
-		RuntimeExecutable: true,
-		ExecutionPath:     ExecutionPathBehavioralRatingDescriptor,
+		Kind:                      KindBehavioralRating,
+		Role:                      CapabilityRoleModelFamily,
+		APIKind:                   string(KindBehavioralRating),
+		DisplayName:               "行为评分",
+		OptionsEnabled:            true,
+		CreateSupported:           true,
+		ListSupported:             true,
+		PublishSupported:          true,
+		BindQuestionnaire:         true,
+		DefinitionUpdateSupported: true,
+		PreviewSupported:          false,
+		QRCodeSupported:           true,
+		RuntimeExecutable:         true,
+		ExecutionPath:             ExecutionPathBehavioralRatingDescriptor,
 	},
 	{
 		Kind:              KindScale,
+		Role:              CapabilityRoleModelFamily,
 		APIKind:           "medical_scale",
 		DisplayName:       "医学量表",
 		OptionsEnabled:    true,
@@ -72,6 +85,7 @@ var defaultCapabilities = []KindCapability{
 	},
 	{
 		Kind:                      KindCognitive,
+		Role:                      CapabilityRoleModelFamily,
 		APIKind:                   "cognitive",
 		DisplayName:               "认知测评",
 		OptionsEnabled:            true,
@@ -87,6 +101,7 @@ var defaultCapabilities = []KindCapability{
 	},
 	{
 		Kind:           KindCustom,
+		Role:           CapabilityRoleModelFamily,
 		APIKind:        "custom",
 		DisplayName:    "自定义测评",
 		OptionsEnabled: false,

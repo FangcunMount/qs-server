@@ -1,11 +1,12 @@
-package cognitive_test
+package behavioral_rating_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -77,19 +78,19 @@ func (r *memoryPublishedRepo) DeletePublished(_ context.Context, _ domain.Kind, 
 	return nil
 }
 
-func TestPublishCognitiveModelRoundTrip(t *testing.T) {
+func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	modelRepo := &memoryModelRepo{}
 	publishedRepo := &memoryPublishedRepo{}
-	svc := cognitive.NewService(cognitive.Dependencies{
+	svc := behavioral_rating.NewService(behavioral_rating.Dependencies{
 		ModelRepo:     modelRepo,
 		PublishedRepo: publishedRepo,
 	})
 
-	created, err := svc.Create(context.Background(), cognitive.CreateInput{
-		Code:  "COG-001",
-		Title: "认知测评",
+	created, err := svc.Create(context.Background(), behavioral_rating.CreateInput{
+		Code:  "BR-001",
+		Title: "BRIEF-2",
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -97,21 +98,30 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 	if created.Status != "draft" {
 		t.Fatalf("status = %q, want draft", created.Status)
 	}
+	if created.Algorithm != string(domain.AlgorithmBrief2) {
+		t.Fatalf("algorithm = %q, want brief2", created.Algorithm)
+	}
 
 	definition := []byte(`{
 		"dimensions": [{
-			"code": "total",
-			"title": "总分",
+			"code": "gec",
+			"title": "GEC",
 			"question_codes": ["q1"],
 			"scoring_strategy": "sum",
 			"is_total_score": true
 		}],
 		"interpret_rules": [{
-			"dimension_code": "total",
+			"dimension_code": "gec",
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]
-		}]
+		}],
+		"brief2": {
+			"form_variant": "parent",
+			"norm_table_version": "2024",
+			"index_codes": ["bri", "eri", "cri", "gec"],
+			"validity_codes": ["inconsistency", "negativity"]
+		}
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, cognitive.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, behavioral_rating.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
@@ -123,14 +133,32 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 		t.Fatalf("status = %q, want published", published.Status)
 	}
 
-	snapshot, err := publishedRepo.FindLatestPublishedByModelCode(context.Background(), domain.KindCognitive, created.Code)
+	snapshot, err := publishedRepo.FindLatestPublishedByModelCode(context.Background(), domain.KindBehavioralRating, created.Code)
 	if err != nil {
 		t.Fatalf("FindLatestPublishedByModelCode: %v", err)
 	}
-	if snapshot.PayloadFormat != domain.PayloadFormatCognitiveSPMV1 {
-		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatCognitiveSPMV1)
+	if snapshot.PayloadFormat != domain.PayloadFormatBehavioralRatingBrief2V1 {
+		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatBehavioralRatingBrief2V1)
 	}
-	if snapshot.Model.Kind != domain.KindCognitive || snapshot.Model.Algorithm != domain.AlgorithmSPM {
+	if snapshot.Model.Kind != domain.KindBehavioralRating || snapshot.Model.Algorithm != domain.AlgorithmBrief2 {
 		t.Fatalf("model identity = %#v", snapshot.Model)
+	}
+	decoded, err := publishedRepo.FindLatestPublishedByModelCode(context.Background(), domain.KindBehavioralRating, created.Code)
+	if err != nil {
+		t.Fatalf("reload snapshot: %v", err)
+	}
+	runtimeSnapshot, err := behavioralsnapshot.ParsePublishedPayload(
+		decoded.PayloadFormat,
+		decoded.Model.Code,
+		decoded.Model.Version,
+		decoded.Model.Title,
+		decoded.Model.Status,
+		decoded.Payload,
+	)
+	if err != nil {
+		t.Fatalf("ParsePublishedPayload: %v", err)
+	}
+	if runtimeSnapshot.Brief2 == nil || runtimeSnapshot.Brief2.FormVariant != "parent" {
+		t.Fatalf("brief2 profile = %#v", runtimeSnapshot.Brief2)
 	}
 }

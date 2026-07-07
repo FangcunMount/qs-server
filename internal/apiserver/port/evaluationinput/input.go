@@ -66,6 +66,13 @@ type InputSnapshot struct {
 	MedicalScale  *scalesnapshot.ScaleSnapshot
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
+	NormSubject   *NormSubjectSnapshot
+}
+
+// NormSubjectSnapshot carries demographics for norm-based scoring such as Brief-2 T-scores.
+type NormSubjectSnapshot struct {
+	AgeMonths int
+	Gender    string
 }
 
 type ModelSnapshot struct {

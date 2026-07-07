@@ -45,9 +45,13 @@ func (c PublishedCognitiveCatalog) FindCognitiveByQuestionnaire(ctx context.Cont
 }
 
 func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
+	algorithm := domain.Algorithm(ref.Algorithm)
+	if algorithm == "" {
+		algorithm = domain.AlgorithmSPM
+	}
 	return rulesetport.Ref{
 		Kind:      domain.KindCognitive,
-		Algorithm: domain.AlgorithmSPM,
+		Algorithm: algorithm,
 		Code:      ref.Code,
 		Version:   ref.Version,
 		Title:     ref.Title,
@@ -61,7 +65,11 @@ func decodePublishedCognitiveModel(snapshot *domain.PublishedModelSnapshot) (*co
 	if snapshot.Model.Kind != domain.KindCognitive {
 		return nil, fmt.Errorf("published model kind = %q, want cognitive", snapshot.Model.Kind)
 	}
-	payload, err := cognitivesnapshot.ParseDefinitionPayload(
+	if !domain.IsCognitivePayloadFormat(snapshot.PayloadFormat) {
+		return nil, fmt.Errorf("unsupported cognitive payload format: %s", snapshot.PayloadFormat)
+	}
+	payload, err := cognitivesnapshot.ParsePublishedPayload(
+		snapshot.PayloadFormat,
 		snapshot.Model.Code,
 		snapshot.Model.Version,
 		snapshot.Model.Title,

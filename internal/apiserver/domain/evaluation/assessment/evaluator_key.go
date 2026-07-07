@@ -10,12 +10,15 @@ func (r EvaluationModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
 	if r.algorithm != "" {
 		kind := modelcatalog.Kind(r.kind)
 		if r.subKind != "" {
-			return evaldomain.EvaluatorKey{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
+			key := evaldomain.EvaluatorKey{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
+			return evaldomain.ResolveBehavioralRatingExecutorKey(key)
 		}
 		if mappedKind, subKind, _, ok := modelcatalog.LegacyKindMapping(kind); ok {
-			return evaldomain.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: r.algorithm}
+			key := evaldomain.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: r.algorithm}
+			return evaldomain.ResolveBehavioralRatingExecutorKey(key)
 		}
-		return evaldomain.EvaluatorKey{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
+		key := evaldomain.EvaluatorKey{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
+		return evaldomain.ResolveBehavioralRatingExecutorKey(key)
 	}
 	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(modelcatalog.Kind(r.kind)); ok {
 		return key

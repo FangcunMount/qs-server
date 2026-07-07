@@ -8,11 +8,12 @@ import (
 
 func (r ModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
 	if r.Algorithm != "" {
-		return evaldomain.EvaluatorKey{
+		key := evaldomain.EvaluatorKey{
 			Kind:      modelcatalog.Kind(r.Kind),
 			SubKind:   modelcatalog.SubKind(r.SubKind),
 			Algorithm: modelcatalog.Algorithm(r.Algorithm),
 		}
+		return evaldomain.ResolveBehavioralRatingExecutorKey(key)
 	}
 	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
 		return key

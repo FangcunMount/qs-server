@@ -34,6 +34,9 @@ func TestKindCapabilityAllowsOperations(t *testing.T) {
 	if !behavior.Allows(CatalogOpUpdateDefinition) {
 		t.Fatal("behavior_ability must allow definition update")
 	}
+	if behavior.Allows(CatalogOpCreate) {
+		t.Fatal("behavior_ability must not allow create")
+	}
 	if behavior.Allows(CatalogOpPreview) {
 		t.Fatal("behavior_ability must not allow preview")
 	}

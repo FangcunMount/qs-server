@@ -90,10 +90,12 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 			behaviorStub := &behaviorCommandStub{}
 			personalityStub := &personalityCommandStub{}
 			cognitiveStub := &cognitiveCommandStub{}
+			behavioralRatingStub := &behavioralRatingCommandStub{}
 			svc := NewService(Dependencies{
-				BehaviorCommand:    behaviorStub,
-				PersonalityCommand: personalityStub,
-				CognitiveCommand:   cognitiveStub,
+				BehaviorCommand:         behaviorStub,
+				PersonalityCommand:      personalityStub,
+				CognitiveCommand:        cognitiveStub,
+				BehavioralRatingCommand: behavioralRatingStub,
 			})
 
 			_, err := svc.Create(context.Background(), CreateModelDTO{
@@ -118,6 +120,10 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 				case KindCognitive:
 					if !cognitiveStub.createCalled {
 						t.Fatal("cognitive command Create was not called")
+					}
+				case KindBehavioralRating:
+					if !behavioralRatingStub.createCalled {
+						t.Fatal("behavioral_rating command Create was not called")
 					}
 				}
 				return
@@ -159,6 +165,8 @@ func previewModelCode(apiKind string) string {
 		return "behavior_demo"
 	case KindCognitive:
 		return "cognitive_demo"
+	case KindBehavioralRating:
+		return "behavioral_demo"
 	default:
 		return apiKind + "_demo"
 	}

@@ -85,6 +85,16 @@ func ResolvePersonalityTypologyExecutorKey(key EvaluatorKey) EvaluatorKey {
 	return key
 }
 
+// ResolveBehavioralRatingExecutorKey maps algorithm-specific keys to the configured runtime executor.
+func ResolveBehavioralRatingExecutorKey(key EvaluatorKey) EvaluatorKey {
+	switch key.Kind {
+	case modelcatalog.KindBehavioralRating:
+		return EvaluatorKeyBehavioralRatingDefault
+	default:
+		return key
+	}
+}
+
 func EvaluatorKeyFromLegacyKind(kind modelcatalog.Kind) (EvaluatorKey, bool) {
 	mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(kind)
 	if !ok {

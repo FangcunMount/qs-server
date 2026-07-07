@@ -21,8 +21,14 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 	}
 
 	behaviorAbility := byKind[KindBehaviorAbility]
-	if !behaviorAbility.CreateSupported || behaviorAbility.PreviewSupported || behaviorAbility.RuntimeExecutable {
+	if behaviorAbility.CreateSupported || behaviorAbility.PreviewSupported || behaviorAbility.RuntimeExecutable {
 		t.Fatalf("behavior_ability capability = %#v", behaviorAbility)
+	}
+	if behaviorAbility.Role != CapabilityRoleProductChannel || !behaviorAbility.IsProductChannel() {
+		t.Fatalf("behavior_ability role = %q, IsProductChannel = %v", behaviorAbility.Role, behaviorAbility.IsProductChannel())
+	}
+	if behaviorAbility.AllowsNewDraft() {
+		t.Fatal("behavior_ability must not allow new drafts")
 	}
 	if !behaviorAbility.DefinitionUpdateSupported {
 		t.Fatal("behavior_ability must allow definition update")
@@ -32,8 +38,11 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 	}
 
 	behavioralRating := byKind[KindBehavioralRating]
-	if behavioralRating.CreateSupported || behavioralRating.RuntimeViaScaleLegacy || !behavioralRating.RuntimeExecutable {
+	if !behavioralRating.CreateSupported || behavioralRating.RuntimeViaScaleLegacy || !behavioralRating.RuntimeExecutable {
 		t.Fatalf("behavioral_rating capability = %#v", behavioralRating)
+	}
+	if behavioralRating.Role != CapabilityRoleModelFamily || !behavioralRating.AllowsNewDraft() {
+		t.Fatalf("behavioral_rating role/guard = %#v", behavioralRating)
 	}
 
 	scale := byKind[KindScale]

@@ -171,6 +171,11 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.EvaluatorKey) (Model
 			return provider, nil
 		}
 	}
+	if routed := evaldomain.ResolveBehavioralRatingExecutorKey(key); routed != key {
+		if provider, ok := r.items[routed]; ok {
+			return provider, nil
+		}
+	}
 	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }
 

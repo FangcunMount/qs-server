@@ -60,6 +60,42 @@ func TestPublishedBehavioralRatingCatalogDecodesPublishedModelSnapshot(t *testin
 	}
 }
 
+func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+		"dimensions": [{"code": "gec", "title": "GEC", "question_codes": ["q1"], "scoring_strategy": "sum"}],
+		"interpret_rules": [{"dimension_code": "gec", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
+		"brief2": {"form_variant": "parent", "norm_table_version": "2024", "index_codes": ["gec"]}
+	}`)
+	reader := stubPublishedBehavioralRatingReader{snapshot: &domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1,
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindBehavioralRating,
+			Algorithm: domain.AlgorithmBrief2,
+			Code:      "BR-BRIEF2",
+			Version:   "1.0.0",
+			Title:     "BRIEF-2",
+			Status:    "published",
+		},
+		Payload: raw,
+	}}
+	catalog := NewPublishedBehavioralRatingCatalog(reader)
+	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
+		Kind:      port.EvaluationModelKindBehavioralRating,
+		Algorithm: string(domain.AlgorithmBrief2),
+		Code:      "BR-BRIEF2",
+		Version:   "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GetBehavioralRatingByRef: %v", err)
+	}
+	if got.Brief2 == nil || got.Brief2.FormVariant != "parent" {
+		t.Fatalf("brief2 profile = %#v", got.Brief2)
+	}
+}
+
 type stubPublishedBehavioralRatingReader struct {
 	snapshot *domain.PublishedModelSnapshot
 	err      error

@@ -9,8 +9,10 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -199,6 +201,59 @@ func (s *cognitiveCommandStub) Unpublish(context.Context, string) (*cognitive.Mo
 }
 
 func (s *cognitiveCommandStub) Archive(context.Context, string) (*cognitive.ModelSummary, error) {
+	return nil, nil
+}
+
+type behavioralRatingCommandStub struct {
+	createCalled bool
+}
+
+func (s *behavioralRatingCommandStub) List(context.Context, behavioral_rating.ListInput) (*behavioral_rating.ModelListResult, error) {
+	return nil, nil
+}
+
+func (s *behavioralRatingCommandStub) Create(_ context.Context, input behavioral_rating.CreateInput) (*behavioral_rating.ModelSummary, error) {
+	s.createCalled = true
+	return &behavioral_rating.ModelSummary{Code: input.Code, Kind: behavioral_rating.KindBehavioralRating, Title: input.Title, Status: "draft"}, nil
+}
+
+func (s *behavioralRatingCommandStub) Get(_ context.Context, modelCode string) (*behavioral_rating.ModelSummary, error) {
+	if strings.Contains(modelCode, "behavioral") || strings.Contains(modelCode, "BR-") {
+		return &behavioral_rating.ModelSummary{Code: modelCode, Kind: behavioral_rating.KindBehavioralRating}, nil
+	}
+	return nil, stderrors.New("not found")
+}
+
+func (s *behavioralRatingCommandStub) UpdateBasicInfo(context.Context, behavioral_rating.UpdateBasicInfoInput) (*behavioral_rating.ModelSummary, error) {
+	return nil, nil
+}
+
+func (s *behavioralRatingCommandStub) Delete(context.Context, string) error { return nil }
+
+func (s *behavioralRatingCommandStub) BindQuestionnaire(_ context.Context, input behavioral_rating.BindQuestionnaireInput) (*behavioral_rating.QuestionnaireBindingResult, error) {
+	return &behavioral_rating.QuestionnaireBindingResult{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+	}, nil
+}
+
+func (s *behavioralRatingCommandStub) GetDefinition(context.Context, string) (*behavioral_rating.DefinitionResult, error) {
+	return nil, nil
+}
+
+func (s *behavioralRatingCommandStub) UpdateDefinition(_ context.Context, modelCode string, input behavioral_rating.DefinitionInput) (*behavioral_rating.DefinitionResult, error) {
+	return &behavioral_rating.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1, Payload: input.Payload}, nil
+}
+
+func (s *behavioralRatingCommandStub) Publish(_ context.Context, modelCode string) (*behavioral_rating.ModelSummary, error) {
+	return &behavioral_rating.ModelSummary{Code: modelCode, Kind: behavioral_rating.KindBehavioralRating, Status: "published"}, nil
+}
+
+func (s *behavioralRatingCommandStub) Unpublish(context.Context, string) (*behavioral_rating.ModelSummary, error) {
+	return nil, nil
+}
+
+func (s *behavioralRatingCommandStub) Archive(context.Context, string) (*behavioral_rating.ModelSummary, error) {
 	return nil, nil
 }
 

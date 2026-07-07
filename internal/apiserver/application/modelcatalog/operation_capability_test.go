@@ -19,12 +19,11 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			behaviorStub := &behaviorCommandStub{}
-			personalityStub := &personalityCommandStub{}
 			svc := NewService(Dependencies{
-				BehaviorCommand:    behaviorStub,
-				PersonalityCommand: personalityStub,
-				CognitiveCommand:   &cognitiveCommandStub{},
+				BehaviorCommand:         &behaviorCommandStub{},
+				PersonalityCommand:      &personalityCommandStub{},
+				CognitiveCommand:        &cognitiveCommandStub{},
+				BehavioralRatingCommand: &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.UpdateDefinition(context.Background(), "capability_"+apiKind, DefinitionDTO{
@@ -78,9 +77,10 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				BehaviorCommand:    &behaviorCommandStub{},
-				PersonalityCommand: &personalityCommandStub{},
-				CognitiveCommand:   &cognitiveCommandStub{},
+				BehaviorCommand:         &behaviorCommandStub{},
+				PersonalityCommand:      &personalityCommandStub{},
+				CognitiveCommand:        &cognitiveCommandStub{},
+				BehavioralRatingCommand: &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.Publish(context.Background(), previewModelCode(apiKind))
@@ -110,9 +110,10 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				BehaviorCommand:    &behaviorCommandStub{},
-				PersonalityCommand: &personalityCommandStub{},
-				CognitiveCommand:   &cognitiveCommandStub{},
+				BehaviorCommand:         &behaviorCommandStub{},
+				PersonalityCommand:      &personalityCommandStub{},
+				CognitiveCommand:        &cognitiveCommandStub{},
+				BehavioralRatingCommand: &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.BindQuestionnaire(context.Background(), BindQuestionnaireDTO{

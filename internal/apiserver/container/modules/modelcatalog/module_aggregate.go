@@ -4,16 +4,18 @@ import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 
 // Module is the assessment-model composition root (scale + personality catalog).
 type Module struct {
-	Scale       *Scale
-	Personality *Personality
-	Cognitive   *Cognitive
+	Scale            *Scale
+	Personality      *Personality
+	Cognitive        *Cognitive
+	BehavioralRating *BehavioralRating
 }
 
 // Deps groups constructor dependencies for both assessment-model capabilities.
 type Deps struct {
-	Scale       ScaleDeps
-	Personality PersonalityDeps
-	Cognitive   CognitiveDeps
+	Scale            ScaleDeps
+	Personality      PersonalityDeps
+	Cognitive        CognitiveDeps
+	BehavioralRating BehavioralRatingDeps
 }
 
 // New assembles scale and personality catalog capabilities.
@@ -30,10 +32,15 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	behavioralRating, err := NewBehavioralRating(deps.BehavioralRating)
+	if err != nil {
+		return nil, err
+	}
 	return &Module{
-		Scale:       scale,
-		Personality: personality,
-		Cognitive:   cognitive,
+		Scale:            scale,
+		Personality:      personality,
+		Cognitive:        cognitive,
+		BehavioralRating: behavioralRating,
 	}, nil
 }
 
@@ -53,7 +60,12 @@ func (m *Module) Cleanup() error {
 		}
 	}
 	if m.Cognitive != nil {
-		return m.Cognitive.Cleanup()
+		if err := m.Cognitive.Cleanup(); err != nil {
+			return err
+		}
+	}
+	if m.BehavioralRating != nil {
+		return m.BehavioralRating.Cleanup()
 	}
 	return nil
 }
@@ -74,7 +86,12 @@ func (m *Module) CheckHealth() error {
 		}
 	}
 	if m.Cognitive != nil {
-		return m.Cognitive.CheckHealth()
+		if err := m.Cognitive.CheckHealth(); err != nil {
+			return err
+		}
+	}
+	if m.BehavioralRating != nil {
+		return m.BehavioralRating.CheckHealth()
 	}
 	return nil
 }

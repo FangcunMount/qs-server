@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
@@ -305,6 +306,61 @@ func behavioralRatingInputSnapshot() *evaluationinput.InputSnapshot {
 	return &evaluationinput.InputSnapshot{
 		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
 		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "q1", Score: 3},
+				{QuestionCode: "q2", Score: 2},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+	}
+}
+
+func brief2InputSnapshot() *evaluationinput.InputSnapshot {
+	snapshot := &behavioralsnapshot.Snapshot{
+		Code:                 "BR-BRIEF2",
+		Version:              "1.0.0",
+		Title:                "BRIEF-2",
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Factors: []behavioralsnapshot.FactorSnapshot{
+			{
+				Code:            "gec",
+				Title:           "GEC",
+				IsTotalScore:    true,
+				QuestionCodes:   []string{"q1", "q2"},
+				ScoringStrategy: "sum",
+				InterpretRules: []behavioralsnapshot.InterpretRuleSnapshot{
+					{MinScore: 0, MaxScore: 20, Conclusion: "raw", Level: "raw"},
+				},
+			},
+		},
+		Brief2: &behavioralsnapshot.Brief2Profile{
+			FormVariant:      "parent",
+			NormTableVersion: "2024",
+			NormTables: &brief2norm.NormTables{
+				Factors: []brief2norm.FactorNormTable{{
+					FactorCode: "gec",
+					Lookup: []brief2norm.NormLookupEntry{
+						{RawMin: 0, RawMax: 10, TScore: 65, Percentile: 90},
+					},
+				}},
+				TScoreRules: []brief2norm.TScoreInterpretRule{{
+					FactorCode: "gec",
+					Ranges: []brief2norm.TScoreRange{
+						{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "升高"},
+					},
+				}},
+			},
+		},
+	}
+	return &evaluationinput.InputSnapshot{
+		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
+		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
+		NormSubject:  &evaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "male"},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",

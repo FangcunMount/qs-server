@@ -36,10 +36,18 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if !ok || scaleSnapshot == nil {
 		return nil, fmt.Errorf("behavioral_rating model payload is required")
 	}
-	return e.scale.Execute(ctx, evaluationexecute.ExecutionInput{
+	outcome, err := e.scale.Execute(ctx, evaluationexecute.ExecutionInput{
 		Assessment: input.Assessment,
 		Input:      cloneInputWithScaleSnapshot(input.Input, scaleSnapshot),
 	})
+	if err != nil {
+		return nil, err
+	}
+	payload, ok := portevaluationinput.BehavioralRatingPayload(input.Input)
+	if !ok || payload.Snapshot == nil {
+		return outcome, nil
+	}
+	return EnrichBrief2Outcome(outcome, payload.Snapshot, NormSubjectFromInput(input.Input)), nil
 }
 
 func cloneInputWithScaleSnapshot(input *portevaluationinput.InputSnapshot, scaleSnapshot *scalesnapshot.ScaleSnapshot) *portevaluationinput.InputSnapshot {
