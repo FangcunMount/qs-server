@@ -116,6 +116,7 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 		}],
 		"brief2": {
 			"form_variant": "parent",
+			"primary_dimension_code": "gec",
 			"norm_table_version": "2024",
 			"index_codes": ["bri", "eri", "cri", "gec"],
 			"validity_codes": ["inconsistency", "negativity"]

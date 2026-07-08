@@ -5,15 +5,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// MechanismReportBuilderKey 路由报告构建器 按 执行机制, 不 测评编码。
+// MechanismReportBuilderKey 路由报告构建器按执行机制，可选 algorithm/productChannel 细化。
 type MechanismReportBuilderKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      domainReport.ReportType
+	Algorithm       modelcatalog.Algorithm
+	ProductChannel  modelcatalog.ProductChannel
 }
 
 func (k MechanismReportBuilderKey) String() string {
-	return k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType)
+	base := k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType)
+	if k.Algorithm != "" {
+		base += "/" + string(k.Algorithm)
+	}
+	if k.ProductChannel != "" {
+		base += "/" + string(k.ProductChannel)
+	}
+	return base
 }
 
 // MechanismKeyedReportBuilder 暴露机制 路由 元数据 用于 报告构建器。

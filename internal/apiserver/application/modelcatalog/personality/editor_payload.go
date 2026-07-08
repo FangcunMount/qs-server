@@ -390,16 +390,7 @@ func normalizeDecisionKind(kind domain.DecisionKind, algorithm domain.Algorithm)
 	if isEditorDecisionKind(kind) {
 		return kind
 	}
-	switch algorithm {
-	case domain.AlgorithmMBTI:
-		return domain.DecisionKindPoleComposition
-	case domain.AlgorithmSBTI:
-		return domain.DecisionKindNearestPattern
-	case domain.AlgorithmBigFive:
-		return domain.DecisionKindTraitProfile
-	default:
-		return kind
-	}
+	return kind
 }
 
 func isEditorDecisionKind(kind domain.DecisionKind) bool {

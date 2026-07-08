@@ -79,6 +79,20 @@ func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (Mechanis
 	return ctx.MechanismKey()
 }
 
+// mechanismKeyFallbackCandidates returns progressively broader lookup keys for registry resolution.
+func mechanismKeyFallbackCandidates(key MechanismReportBuilderKey) []MechanismReportBuilderKey {
+	if key.ReportType == "" {
+		key.ReportType = domainReport.ReportTypeStandard
+	}
+	return []MechanismReportBuilderKey{
+		key,
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType},
+		{AlgorithmFamily: key.AlgorithmFamily, ReportType: key.ReportType},
+	}
+}
+
 func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard

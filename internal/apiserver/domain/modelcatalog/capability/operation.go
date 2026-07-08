@@ -17,8 +17,8 @@ const (
 	CatalogOpQRCode            CatalogOperation = "qrcode"
 )
 
-// Allows 报告是否 能力 矩阵 permits 操作 用于 模型家族。
-func (c KindCapability) Allows(op CatalogOperation) bool {
+// Allows reports whether the model-family capability permits an operation.
+func (c ModelFamilyCapability) Allows(op CatalogOperation) bool {
 	switch op {
 	case CatalogOpCreate:
 		return c.CreateSupported
@@ -32,10 +32,8 @@ func (c KindCapability) Allows(op CatalogOperation) bool {
 		return c.BindQuestionnaire
 	case CatalogOpUpdateDefinition:
 		return c.DefinitionUpdateSupported
-	case CatalogOpPreview:
-		return c.PreviewSupported
-	case CatalogOpQRCode:
-		return c.QRCodeSupported
+	case CatalogOpPreview, CatalogOpQRCode:
+		return false
 	default:
 		return false
 	}

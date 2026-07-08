@@ -14,8 +14,8 @@ const (
 	IssueResultDimensionDuplicate    = "result_dimension_duplicate_code"
 )
 
-// ValidateScoreNodes 检查计算 ScoreNode 输入 用于 结构完整性。
-// Missing weights on weighted_sum 节点 emit IssueScoreNode缺失Weight warnings 仅。
+// ValidateScoreNodes checks calculation ScoreNode input for structural integrity.
+// Missing weights on weighted_sum nodes are validation errors.
 func ValidateScoreNodes(nodes []ScoreNode) []Issue {
 	if len(nodes) == 0 {
 		return nil
@@ -100,7 +100,7 @@ func ValidateResult(result *Result) []Issue {
 func missingWeightIssue(parentCode, childCode string) Issue {
 	return NewIssue(
 		IssueScoreNodeMissingWeight,
-		"weighted_sum node "+parentCode+" child "+childCode+" has no explicit weight; defaulting to 1",
+		"weighted_sum node "+parentCode+" child "+childCode+" requires an explicit weight",
 	)
 }
 

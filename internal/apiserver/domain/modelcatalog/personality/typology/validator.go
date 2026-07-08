@@ -194,9 +194,6 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 		v.add("decision.kind", "decision.kind.unsupported", fmt.Sprintf("decision kind %s 不支持", spec.Decision.Kind))
 		return
 	}
-	if expected, ok := expectedDecisionKindForAlgorithm(v.algorithm); ok && spec.Decision.Kind != expected {
-		v.add("decision.kind", "decision.kind.incompatible", fmt.Sprintf("algorithm %s 必须使用 decision kind %s", v.algorithm, expected))
-	}
 	if spec.Decision.FallbackCode != "" {
 		v.validateOutcomeCode("decision.fallback_code", "decision.fallback_code.not_found", spec.Decision.FallbackCode)
 	}
@@ -326,19 +323,6 @@ func isSupportedDecisionKind(kind modelcatalog.DecisionKind) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func expectedDecisionKindForAlgorithm(algorithm modelcatalog.Algorithm) (modelcatalog.DecisionKind, bool) {
-	switch algorithm {
-	case modelcatalog.AlgorithmMBTI:
-		return modelcatalog.DecisionKindPoleComposition, true
-	case modelcatalog.AlgorithmSBTI:
-		return modelcatalog.DecisionKindNearestPattern, true
-	case modelcatalog.AlgorithmBigFive:
-		return modelcatalog.DecisionKindTraitProfile, true
-	default:
-		return "", false
 	}
 }
 

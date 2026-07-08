@@ -3,6 +3,7 @@ package option
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/capability"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
 )
 
@@ -133,6 +134,16 @@ func (r *Registry) PresentationOptions() []ModelCatalogOption {
 	return out
 }
 
+// RegisteredOptions returns all registry entries in registration order.
+func (r *Registry) RegisteredOptions() []RegisteredOption {
+	if r == nil {
+		return nil
+	}
+	out := make([]RegisteredOption, len(r.ordered))
+	copy(out, r.ordered)
+	return out
+}
+
 func (o RegisteredOption) catalogOption() ModelCatalogOption {
 	return ModelCatalogOption{
 		Kind:             o.Kind,
@@ -228,6 +239,16 @@ var defaultRegisteredOptions = []RegisteredOption{
 		DisplayName: "自定义测评",
 		Operations: CatalogOperations{
 			ExecutionPath: routing.ExecutionPathNone,
+		},
+	},
+	{
+		Kind:        identity.Kind(legacy.APIKindBehaviorAbility),
+		Role:        capability.CapabilityRoleProductChannel,
+		APIKind:     legacy.APIKindBehaviorAbility,
+		DisplayName: "行为能力",
+		Operations: CatalogOperations{
+			ListSupported:   false,
+			CreateSupported: false,
 		},
 	},
 }

@@ -452,5 +452,19 @@ type Algorithm = identity.Algorithm
 | 应用层 | `ResolveOutcomeKey` / `resolveExecutionIdentity` 统一 `ExecutionIdentity()`；删除 `EvaluatorKey()` 包装 |
 | 注册表 | 移除 `MaterializeLegacyEvaluators`；evaluator registry 空壳 + familyEvaluators 主路径 |
 
-**刻意保留（R34+）**：Statistics 投影统一、DB 列删除、Conners 新 mechanism、`migration 000039` 索引（explain 需要时）。
+**刻意保留（R34+）**：DB 列删除、Conners 新 mechanism、`migration 000039` 索引（explain 需要时）。
+
+## Round 32–40：终局收敛（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R32 | Typology `decision.kind` 唯一来源 payload/snapshot；`DecisionKindForIdentity` 不再为 personality 做 algorithm fallback；`legacy.FallbackPersonalityDecisionKind` 仅 migration 读路径 |
+| R33 | Brief-2 publish 强制 `brief2.primary_dimension_code`；runtime `total/gec` 仅 legacy snapshot 兜底 |
+| R34 | `calculation.ValidateScoreNodes` 接入 behavioral_rating publish（application 层）；`weighted_sum` 缺权重升为 error |
+| R35 | 新建 `domain/evaluation/event`；assessment 事件经 compat 重导出；清理 architecture stale 白名单 |
+| R36 | `calculationadapter/score.go` 抽取 score/level 转换 |
+| R37 | `descriptorDrivenExecutor` 支持三件套 pipeline；有 registry 时禁止无 snapshot 的 legacy evaluator fallback |
+| R38 | `option.Registry` 注册 `behavior_ability` product channel 元数据 |
+| R39 | `MechanismReportBuilderKey` 扩展 `Algorithm`/`ProductChannel`；registry 逐级 fallback |
+| R40 | `domain/evaluation/run/checkpoint.go` 定义 `CheckpointSeam` 契约；合表迁移后续轮次 |
 

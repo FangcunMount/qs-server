@@ -91,15 +91,10 @@ func (r *mutableScoreProjectorRegistry) ResolveByMechanism(key MechanismReportBu
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
-	if projector, ok := r.mechanismItems[key]; ok {
-		return projector
-	}
-	familyKey := MechanismReportBuilderKey{
-		AlgorithmFamily: key.AlgorithmFamily,
-		ReportType:      key.ReportType,
-	}
-	if projector, ok := r.mechanismItems[familyKey]; ok {
-		return projector
+	for _, candidate := range mechanismKeyFallbackCandidates(key) {
+		if projector, ok := r.mechanismItems[candidate]; ok {
+			return projector
+		}
 	}
 	return noopScoreProjector{}
 }

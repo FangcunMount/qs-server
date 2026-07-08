@@ -55,7 +55,8 @@ func AlgorithmFamilyFromDecisionKind(decision identity.DecisionKind) (AlgorithmF
 	}
 }
 
-// DecisionKindForIdentity mirrors publish-builder decision 选择 用于 draft 身份。
+// DecisionKindForIdentity mirrors publish-builder decision selection for non-typology draft identity.
+// Personality typology requires explicit decision.kind in payload; no algorithm fallback.
 func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (identity.DecisionKind, bool) {
 	switch kind {
 	case identity.KindScale:
@@ -64,7 +65,7 @@ func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algor
 		if subKind != identity.SubKindTypology {
 			return "", false
 		}
-		return identity.FallbackPersonalityDecisionKind(algorithm), true
+		return "", false
 	case identity.KindBehavioralRating:
 		algo := algorithm
 		if algo == "" {
@@ -83,8 +84,11 @@ func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algor
 	}
 }
 
-// AlgorithmFamilyFromIdentity 推导执行家族 从 draft 模型身份。
+// AlgorithmFamilyFromIdentity 推导执行家族 from draft model identity.
 func AlgorithmFamilyFromIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (AlgorithmFamily, bool) {
+	if kind == identity.KindPersonality && subKind == identity.SubKindTypology {
+		return AlgorithmFamilyFactorClassification, true
+	}
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)
 	if !ok {
 		return "", false

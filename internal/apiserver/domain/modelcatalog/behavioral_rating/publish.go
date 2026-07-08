@@ -27,7 +27,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	if algorithm == "" {
 		algorithm = domain.AlgorithmBrief2
 	}
-	encoded, err := ensureBrief2PrimaryDimensionDefault(encoded, algorithm)
+	encoded, err := requireBrief2PrimaryDimensionCode(encoded, algorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +62,7 @@ func brief2DecisionSpec(algorithm domain.Algorithm) domain.DecisionSpec {
 	return domain.DecisionSpec{Kind: domain.DecisionKindScoreRange}
 }
 
-const defaultBrief2PrimaryDimensionCode = "gec"
-
-func ensureBrief2PrimaryDimensionDefault(payload []byte, algorithm domain.Algorithm) ([]byte, error) {
+func requireBrief2PrimaryDimensionCode(payload []byte, algorithm domain.Algorithm) ([]byte, error) {
 	if algorithm != domain.AlgorithmBrief2 {
 		return payload, nil
 	}
@@ -84,22 +82,8 @@ func ensureBrief2PrimaryDimensionDefault(payload []byte, algorithm domain.Algori
 			return nil, fmt.Errorf("decode behavioral_rating primary_dimension_code: %w", err)
 		}
 	}
-	if primaryDimensionCode != "" {
-		return payload, nil
+	if primaryDimensionCode == "" {
+		return nil, fmt.Errorf("brief2.primary_dimension_code is required for publish")
 	}
-	encodedCode, err := json.Marshal(defaultBrief2PrimaryDimensionCode)
-	if err != nil {
-		return nil, fmt.Errorf("encode behavioral_rating primary_dimension_code: %w", err)
-	}
-	brief2["primary_dimension_code"] = encodedCode
-	brief2Encoded, err := json.Marshal(brief2)
-	if err != nil {
-		return nil, fmt.Errorf("encode behavioral_rating brief2 extension: %w", err)
-	}
-	body["brief2"] = brief2Encoded
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("encode behavioral_rating brief2 payload: %w", err)
-	}
-	return encoded, nil
+	return payload, nil
 }

@@ -74,9 +74,6 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 		decision  identity.DecisionKind
 	}{
 		{identity.KindScale, identity.SubKindEmpty, identity.AlgorithmScaleDefault, identity.DecisionKindScoreRange},
-		{identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI, identity.DecisionKindPoleComposition},
-		{identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmSBTI, identity.DecisionKindNearestPattern},
-		{identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmBigFive, identity.DecisionKindTraitProfile},
 		{identity.KindBehavioralRating, identity.SubKindEmpty, identity.AlgorithmBrief2, identity.DecisionKindNormLookup},
 		{identity.KindBehavioralRating, identity.SubKindEmpty, identity.AlgorithmBehavioralRatingDefault, identity.DecisionKindScoreRange},
 		{identity.KindBehavioralRating, identity.SubKindEmpty, "", identity.DecisionKindNormLookup},
@@ -101,5 +98,15 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 		if fromIdentity != fromDecision {
 			t.Fatalf("identity family %q != decision family %q for %+v", fromIdentity, fromDecision, tc)
 		}
+	}
+}
+
+func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
+	if _, ok := DecisionKindForIdentity(identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI); ok {
+		t.Fatal("personality typology must not infer decision.kind from algorithm")
+	}
+	family, ok := AlgorithmFamilyFromIdentity(identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI)
+	if !ok || family != AlgorithmFamilyFactorClassification {
+		t.Fatalf("family = %s ok=%v, want factor_classification", family, ok)
 	}
 }

@@ -64,6 +64,8 @@ func (c ReportRoutingContext) MechanismKey() (MechanismReportBuilderKey, bool) {
 		AlgorithmFamily: c.AlgorithmFamily,
 		DecisionKind:    c.DecisionKind,
 		ReportType:      reportType,
+		Algorithm:       c.Algorithm,
+		ProductChannel:  c.ProductChannel,
 	}, true
 }
 

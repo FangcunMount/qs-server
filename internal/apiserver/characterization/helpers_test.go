@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
@@ -222,4 +223,13 @@ func mustV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescript
 		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
 	}
 	return registry
+}
+
+func mustConfiguredReportBuilder(t *testing.T) typologyeval.ReportBuilder {
+	t.Helper()
+	builder, err := typologyeval.NewConfiguredReportBuilder()
+	if err != nil {
+		t.Fatalf("NewConfiguredReportBuilder: %v", err)
+	}
+	return builder
 }

@@ -16,12 +16,12 @@ const (
 	ModelKindCognitive        ModelKind = "cognitive"
 )
 
-// DecisionKindFromSnapshot 解析判定策略 用于 运行时路由。
+// DecisionKindFromSnapshot 解析判定策略用于运行时路由；仅使用 snapshot 显式 decision.kind。
 func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.DecisionKind, bool) {
 	if snapshot.Decision.Kind != "" {
 		return snapshot.Decision.Kind, true
 	}
-	return modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
+	return "", false
 }
 
 // ExecutionRoutingFromSnapshot 是单一 来源 用于 运行时 和 report 机制 路由。
@@ -59,11 +59,6 @@ func ExecutionDecisionFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot,
 	if snapshot.Decision.Kind != "" {
 		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind); ok && decisionFamily == family {
 			return snapshot.Decision.Kind
-		}
-	}
-	if family == modelcatalog.AlgorithmFamilyFactorClassification {
-		if decision, ok := modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm); ok {
-			return decision
 		}
 	}
 	return defaultDecisionKindForFamily(family)

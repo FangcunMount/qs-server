@@ -116,9 +116,6 @@ func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
-	if !hasIssueCode(issues, "decision.kind.incompatible") {
-		t.Fatalf("issues = %#v, want decision.kind.incompatible", issues)
-	}
 	if !hasIssueCode(issues, "decision.level_rule.invalid") {
 		t.Fatalf("issues = %#v, want decision.level_rule.invalid", issues)
 	}

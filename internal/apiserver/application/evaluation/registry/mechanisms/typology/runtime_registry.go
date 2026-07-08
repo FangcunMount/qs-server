@@ -3,7 +3,6 @@ package typology
 import (
 	"fmt"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/adapter/configured"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
@@ -21,7 +20,7 @@ type PersonalityRuntimeRegistry struct {
 // 默认PersonalityRuntimeRegistry 构建默认 配置化 类型学 运行时。
 func DefaultPersonalityRuntimeRegistry() PersonalityRuntimeRegistry {
 	return NewPersonalityRuntimeRegistry(
-		typologylegacy.DefaultAlgorithmAliases()...,
+		DefaultAlgorithmAliases()...,
 	)
 }
 

@@ -224,6 +224,9 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
+	if err := validatePublishedScoreNodes(snapshot); err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
 	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode); err != nil {
 		return nil, err
 	}

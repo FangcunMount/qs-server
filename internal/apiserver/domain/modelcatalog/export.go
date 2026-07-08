@@ -18,7 +18,7 @@ type (
 	AlgorithmFamily = routing.AlgorithmFamily
 	ExecutionPath   = routing.ExecutionPath
 
-	KindCapability   = capability.KindCapability
+	KindCapability   = capability.ModelFamilyCapability
 	CapabilityRole   = capability.CapabilityRole
 	CatalogOperation = capability.CatalogOperation
 
@@ -138,8 +138,8 @@ var (
 	DefaultProductChannelFor        = identity.DefaultProductChannelFor
 	ResolveProductChannel           = identity.ResolveProductChannel
 	CompleteProductChannel          = identity.CompleteProductChannel
-	AllProductChannels              = identity.AllProductChannels
-	FallbackPersonalityDecisionKind = identity.FallbackPersonalityDecisionKind
+	AllProductChannels     = identity.AllProductChannels
+	FallbackPersonalityDecisionKind = legacypkg.FallbackPersonalityDecisionKind
 
 	AlgorithmFamilyFromDecisionKind = routing.AlgorithmFamilyFromDecisionKind
 	DecisionKindForIdentity         = routing.DecisionKindForIdentity
@@ -157,12 +157,8 @@ var (
 	IsCognitivePayloadFormat           = routing.IsCognitivePayloadFormat
 	DraftPayloadFormatForModel         = routing.DraftPayloadFormatForModel
 
-	DefaultCapabilities         = capability.DefaultCapabilities
-	ModelFamilyCapabilities     = capability.ModelFamilyCapabilities
-	ModelFamilyCapabilityByKind = capability.ModelFamilyCapabilityByKind
-	CapabilityByKind            = capability.CapabilityByKind
-	CapabilityByAPIKind         = capability.CapabilityByAPIKind
-	RuntimeExecutableKinds      = capability.RuntimeExecutableKinds
+	FamilyCapabilityByKind = capability.FamilyCapabilityByKind
+	RuntimeExecutableKinds = capability.RuntimeExecutableKinds
 
 	LegacyKindMapping                      = legacypkg.LegacyKindMapping
 	ModelDefinitionFromLegacy              = legacypkg.ModelDefinitionFromLegacy

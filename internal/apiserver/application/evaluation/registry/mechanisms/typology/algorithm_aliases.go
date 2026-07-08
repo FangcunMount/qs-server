@@ -1,20 +1,24 @@
-package legacy
+package typology
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-// 默认AlgorithmAliases 返回内置 类型学算法 别名 用于 旧版 路由。
-func DefaultAlgorithmAliases() []modelcatalog.Algorithm {
-	return []modelcatalog.Algorithm{
-		modelcatalog.AlgorithmMBTI,
-		modelcatalog.AlgorithmSBTI,
-		modelcatalog.AlgorithmBigFive,
-	}
+var defaultAlgorithmAliases = []modelcatalog.Algorithm{
+	modelcatalog.AlgorithmMBTI,
+	modelcatalog.AlgorithmSBTI,
+	modelcatalog.AlgorithmBigFive,
 }
 
-// CategoryLabelFor 解析display label 用于 旧版 类型学算法 别名。
+// DefaultAlgorithmAliases returns built-in typology algorithm aliases for migration read paths.
+func DefaultAlgorithmAliases() []modelcatalog.Algorithm {
+	out := make([]modelcatalog.Algorithm, len(defaultAlgorithmAliases))
+	copy(out, defaultAlgorithmAliases)
+	return out
+}
+
+// CategoryLabelFor resolves display labels for legacy typology algorithm identifiers.
 func CategoryLabelFor(algorithm modelcatalog.Algorithm) string {
 	switch algorithm {
 	case modelcatalog.AlgorithmSBTI:
@@ -26,12 +30,12 @@ func CategoryLabelFor(algorithm modelcatalog.Algorithm) string {
 	}
 }
 
-// ReportSpecForAlgorithm 推导report spec 从 旧版 算法 identifier。
+// ReportSpecForAlgorithm derives report spec from legacy algorithm identifiers.
 func ReportSpecForAlgorithm(algorithm modelcatalog.Algorithm) modeltypology.ReportSpec {
 	return modeltypology.LegacyReportSpecFromAlgorithm(algorithm)
 }
 
-// OutcomeMappingForAlgorithm 推导结果 mapping 从 旧版 算法 identifier。
+// OutcomeMappingForAlgorithm derives outcome mapping from legacy algorithm identifiers.
 func OutcomeMappingForAlgorithm(algorithm modelcatalog.Algorithm) modeltypology.OutcomeMappingSpec {
 	return modeltypology.LegacyOutcomeMappingFromAlgorithm(algorithm)
 }

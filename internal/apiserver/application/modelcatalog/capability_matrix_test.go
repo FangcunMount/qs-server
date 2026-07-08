@@ -6,9 +6,21 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
+
+func modelFamilyRegistryOptions() []option.RegisteredOption {
+	out := make([]option.RegisteredOption, 0)
+	for _, entry := range option.DefaultRegistry().RegisteredOptions() {
+		if entry.IsProductChannel() {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
 
 func TestListBehaviorAbilityChannelReturnsInvalidArgument(t *testing.T) {
 	t.Parallel()
@@ -60,9 +72,13 @@ func TestCreateRejectsBehaviorAbilityChannelKind(t *testing.T) {
 func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
+		cap, ok := domain.FamilyCapabilityByKind(entry.Kind)
+		if !ok {
+			t.Fatalf("missing family capability for %q", entry.Kind)
+		}
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
@@ -70,25 +86,25 @@ func TestAPICatalogCapabilityMatrix(t *testing.T) {
 			if !ok {
 				t.Fatalf("APIKindToDomainKind(%q) = false, want true", apiKind)
 			}
-			if mapped != cap.Kind {
-				t.Fatalf("APIKindToDomainKind(%q) = %q, want %q", apiKind, mapped, cap.Kind)
+			if mapped != entry.Kind {
+				t.Fatalf("APIKindToDomainKind(%q) = %q, want %q", apiKind, mapped, entry.Kind)
 			}
-			if got := DomainKindToAPIKind(cap.Kind); got != apiKind {
-				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", cap.Kind, got, apiKind)
+			if got := DomainKindToAPIKind(entry.Kind); got != apiKind {
+				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", entry.Kind, got, apiKind)
 			}
 
 			got, ok := registeredOptionForAPIKind(apiKind)
 			if !ok {
 				t.Fatalf("registeredOptionForAPIKind(%q) = false, want true", apiKind)
 			}
-			if got.OptionsEnabled != cap.OptionsEnabled {
-				t.Fatalf("OptionsEnabled = %v, want %v", got.OptionsEnabled, cap.OptionsEnabled)
+			if got.OptionsEnabled != entry.OptionsEnabled {
+				t.Fatalf("OptionsEnabled = %v, want %v", got.OptionsEnabled, entry.OptionsEnabled)
 			}
 			if got.Operations.CreateSupported != cap.CreateSupported {
 				t.Fatalf("CreateSupported = %v, want %v", got.Operations.CreateSupported, cap.CreateSupported)
 			}
-			if got.Operations.PreviewSupported != cap.PreviewSupported {
-				t.Fatalf("PreviewSupported = %v, want %v", got.Operations.PreviewSupported, cap.PreviewSupported)
+			if got.Operations.PreviewSupported != entry.Operations.PreviewSupported {
+				t.Fatalf("PreviewSupported = %v, want %v", got.Operations.PreviewSupported, entry.Operations.PreviewSupported)
 			}
 		})
 	}
@@ -108,16 +124,16 @@ func TestOptionsReflectsCapabilityPolicy(t *testing.T) {
 		optionByValue[item.Value] = item
 	}
 
-	for _, cap := range domain.DefaultCapabilities() {
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		apiKind := entry.APIKind
 		item, ok := optionByValue[apiKind]
 		if !ok {
 			t.Fatalf("Options().Kinds missing %q", apiKind)
 		}
-		if item.Label != cap.DisplayName {
-			t.Fatalf("Options().Kinds[%q].Label = %q, want %q", apiKind, item.Label, cap.DisplayName)
+		if item.Label != entry.DisplayName {
+			t.Fatalf("Options().Kinds[%q].Label = %q, want %q", apiKind, item.Label, entry.DisplayName)
 		}
-		wantDisabled := !cap.OptionsEnabled
+		wantDisabled := !entry.OptionsEnabled
 		if item.Disabled != wantDisabled {
 			t.Fatalf("Options().Kinds[%q].Disabled = %v, want %v", apiKind, item.Disabled, wantDisabled)
 		}
@@ -127,9 +143,13 @@ func TestOptionsReflectsCapabilityPolicy(t *testing.T) {
 func TestCreateCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
+		cap, ok := domain.FamilyCapabilityByKind(entry.Kind)
+		if !ok {
+			t.Fatalf("missing family capability for %q", entry.Kind)
+		}
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
@@ -199,14 +219,14 @@ func TestPreviewReportCapabilityPolicy(t *testing.T) {
 		PersonalityCommand: &personalityCommandStub{},
 	})
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
 			_, err := svc.PreviewReport(context.Background(), previewModelCode(apiKind), json.RawMessage(`{}`))
-			if cap.PreviewSupported {
+			if entry.Operations.PreviewSupported {
 				if err != nil {
 					t.Fatalf("PreviewReport(%q) error = %v, want success path", apiKind, err)
 				}

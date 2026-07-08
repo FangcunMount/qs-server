@@ -78,14 +78,7 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 	},
 }
 
-// 默认FamilyCapabilities 返回领域-仅 模型家族 能力。
-func DefaultFamilyCapabilities() []ModelFamilyCapability {
-	out := make([]ModelFamilyCapability, len(defaultFamilyCapabilities))
-	copy(out, defaultFamilyCapabilities)
-	return out
-}
-
-// FamilyCapabilityByKind 解析model-家族 能力。
+// FamilyCapabilityByKind resolves model-family capability guards.
 func FamilyCapabilityByKind(kind identity.Kind) (ModelFamilyCapability, bool) {
 	for _, cap := range defaultFamilyCapabilities {
 		if cap.Kind == kind {
@@ -93,4 +86,15 @@ func FamilyCapabilityByKind(kind identity.Kind) (ModelFamilyCapability, bool) {
 		}
 	}
 	return ModelFamilyCapability{}, false
+}
+
+// RuntimeExecutableKinds returns domain types that have direct evaluation descriptors.
+func RuntimeExecutableKinds() []identity.Kind {
+	out := make([]identity.Kind, 0)
+	for _, cap := range defaultFamilyCapabilities {
+		if cap.RuntimeExecutable {
+			out = append(out, cap.Kind)
+		}
+	}
+	return out
 }

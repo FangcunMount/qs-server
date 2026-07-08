@@ -2,7 +2,6 @@ package typology
 
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -30,8 +29,8 @@ func resolveReportBuildContext(
 		algorithm = legacyAlgorithmFromOutcome(outcome)
 	}
 	if algorithm != "" {
-		spec = legacy.ReportSpecForAlgorithm(algorithm)
-		mapping = legacy.OutcomeMappingForAlgorithm(algorithm)
+		spec = ReportSpecForAlgorithm(algorithm)
+		mapping = OutcomeMappingForAlgorithm(algorithm)
 	}
 	return spec, mapping, decisionKind
 }

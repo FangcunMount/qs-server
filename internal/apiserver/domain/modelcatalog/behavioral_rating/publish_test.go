@@ -8,7 +8,7 @@ import (
 	behavioralratingdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating"
 )
 
-func TestBuildPublishedSnapshotDefaultsBrief2PrimaryDimension(t *testing.T) {
+func TestBuildPublishedSnapshotRequiresBrief2PrimaryDimension(t *testing.T) {
 	t.Parallel()
 
 	model := &domain.AssessmentModel{
@@ -22,30 +22,9 @@ func TestBuildPublishedSnapshotDefaultsBrief2PrimaryDimension(t *testing.T) {
 		},
 	}
 
-	snapshot, err := behavioralratingdomain.BuildPublishedSnapshot(model)
-	if err != nil {
-		t.Fatalf("BuildPublishedSnapshot: %v", err)
-	}
-	var body struct {
-		Dimensions []struct {
-			Code string `json:"code"`
-		} `json:"dimensions"`
-		Brief2 struct {
-			FormVariant          string `json:"form_variant"`
-			PrimaryDimensionCode string `json:"primary_dimension_code"`
-		} `json:"brief2"`
-	}
-	if err := json.Unmarshal(snapshot.Payload, &body); err != nil {
-		t.Fatalf("decode published payload: %v", err)
-	}
-	if len(body.Dimensions) != 1 || body.Dimensions[0].Code != "inhibit" {
-		t.Fatalf("dimensions = %#v, want original dimensions preserved", body.Dimensions)
-	}
-	if body.Brief2.FormVariant != "parent" {
-		t.Fatalf("brief2 form_variant = %q, want parent", body.Brief2.FormVariant)
-	}
-	if body.Brief2.PrimaryDimensionCode != "gec" {
-		t.Fatalf("primary_dimension_code = %q, want gec", body.Brief2.PrimaryDimensionCode)
+	_, err := behavioralratingdomain.BuildPublishedSnapshot(model)
+	if err == nil {
+		t.Fatal("BuildPublishedSnapshot: want error when primary_dimension_code missing")
 	}
 }
 

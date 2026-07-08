@@ -112,37 +112,9 @@ func (r *RuntimeResolver) resolveDescriptorExecutor(resolved ResolvedExecution) 
 	if err != nil {
 		return nil, err
 	}
-	return evaluatorBackedDescriptorExecutor{evaluator: evaluator}, nil
+	return descriptorDrivenExecutor{fallback: evaluator}, nil
 }
 
 func (r *RuntimeResolver) resolveEvaluator(key evaluation.ExecutionIdentity) (Evaluator, error) {
 	return r.evaluators.Resolve(key)
-}
-
-type evaluatorBackedDescriptorExecutor struct {
-	evaluator Evaluator
-}
-
-func (e evaluatorBackedDescriptorExecutor) Execute(
-	ctx context.Context,
-	_ evalpipeline.RuntimeDescriptor,
-	input ExecutionInput,
-) (*assessment.AssessmentOutcome, error) {
-	if e.evaluator == nil {
-		return nil, fmt.Errorf("evaluation descriptor executor is not configured")
-	}
-	return e.evaluator.Execute(ctx, input)
-}
-
-func descriptorExecutorsFromFamilyEvaluators(
-	familyEvaluators map[modelcatalog.AlgorithmFamily]Evaluator,
-) map[modelcatalog.AlgorithmFamily]DescriptorExecutor {
-	if familyEvaluators == nil {
-		return nil
-	}
-	out := make(map[modelcatalog.AlgorithmFamily]DescriptorExecutor, len(familyEvaluators))
-	for family, evaluator := range familyEvaluators {
-		out[family] = evaluatorBackedDescriptorExecutor{evaluator: evaluator}
-	}
-	return out
 }

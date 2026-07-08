@@ -13,9 +13,7 @@ var transitionalAssessmentCodePackages = map[string]string{}
 
 // transitional模型家族包 lists model-家族 包 allowed 在 迁移。
 // Evaluation 和 interpretation 领域 cores 不得 add new entries here。
-var transitionalModelFamilyPackages = map[string]string{
-	"internal/apiserver/application/evaluation/personality": "transitional: factor_classification re-export only (empty)",
-}
+var transitionalModelFamilyPackages = map[string]string{}
 
 var forbiddenAssessmentCodeDirNames = []string{
 	"brief2", "spm", "mbti", "sbti", "bigfive", "conners", "snap_iv", "snapiv", "phq9", "gad7",

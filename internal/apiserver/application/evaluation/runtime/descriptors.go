@@ -56,10 +56,12 @@ func EvaluationDescriptorsFromRegistry(
 // FilterExecutablePaths 保留仅 paths 基于 运行时-可执行 model 能力。
 func FilterExecutablePaths(paths []modelcatalog.ExecutionPath) []modelcatalog.ExecutionPath {
 	executable := make(map[modelcatalog.ExecutionPath]bool)
-	for _, cap := range modelcatalog.ModelFamilyCapabilities() {
-		if cap.RuntimeExecutable {
-			executable[cap.ExecutionPath] = true
+	for _, kind := range modelcatalog.RuntimeExecutableKinds() {
+		cap, ok := modelcatalog.FamilyCapabilityByKind(kind)
+		if !ok || !cap.RuntimeExecutable {
+			continue
 		}
+		executable[cap.ExecutionPath] = true
 	}
 	filtered := make([]modelcatalog.ExecutionPath, 0, len(paths))
 	for _, path := range paths {

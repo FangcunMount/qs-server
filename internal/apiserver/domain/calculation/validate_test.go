@@ -61,7 +61,7 @@ func TestValidateScoreNodesRejectsCycle(t *testing.T) {
 	}
 }
 
-func TestValidateScoreNodesWarnsMissingWeight(t *testing.T) {
+func TestValidateScoreNodesRejectsMissingWeight(t *testing.T) {
 	t.Parallel()
 
 	issues := calculation.ValidateScoreNodes([]calculation.ScoreNode{
@@ -75,7 +75,7 @@ func TestValidateScoreNodesWarnsMissingWeight(t *testing.T) {
 		{Code: "b"},
 	})
 	if len(issues) != 1 || issues[0].Code != calculation.IssueScoreNodeMissingWeight {
-		t.Fatalf("issues = %#v, want missing weight warning", issues)
+		t.Fatalf("issues = %#v, want missing weight error", issues)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
@@ -225,6 +226,9 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
+		}
+		if normalized.RuntimeDescriptorRegistry != nil {
+			evalruntime.AttachEvaluatorPipelines(normalized.RuntimeDescriptorRegistry, familyEvaluators)
 		}
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
 		if err != nil {

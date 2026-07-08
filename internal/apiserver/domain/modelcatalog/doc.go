@@ -42,7 +42,7 @@
 // - export.go: 根 类型别名。
 // - identity/types.go: Kind、SubKind、Algorithm、DecisionKind。
 // - identity/product_channel.go: ProductChannel。
-// - identity/personality_decision.go: FallbackPersonalityDecisionKind。
+// - legacy/personality_decision.go: FallbackPersonalityDecisionKind（仅 migration 读路径）。
 //
 // Routing — 执行家族和物化路径（routing/ 子包）：
 // - export.go: 根 类型别名。

@@ -93,15 +93,11 @@ func (r *mutableReportBuilderRegistry) ResolveByMechanism(key MechanismReportBui
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
-	if builder, ok := r.mechanismItems[key]; ok {
-		return builder, nil
-	}
-	familyKey := MechanismReportBuilderKey{
-		AlgorithmFamily: key.AlgorithmFamily,
-		ReportType:      key.ReportType,
-	}
-	if builder, ok := r.mechanismItems[familyKey]; ok {
-		return builder, nil
+	candidates := mechanismKeyFallbackCandidates(key)
+	for _, candidate := range candidates {
+		if builder, ok := r.mechanismItems[candidate]; ok {
+			return builder, nil
+		}
 	}
 	return nil, fmt.Errorf("unsupported interpretation report builder mechanism: %s", key)
 }

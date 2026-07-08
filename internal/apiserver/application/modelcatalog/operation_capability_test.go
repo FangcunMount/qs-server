@@ -13,9 +13,13 @@ import (
 func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
+		cap, ok := domain.FamilyCapabilityByKind(entry.Kind)
+		if !ok {
+			t.Fatalf("missing family capability for %q", entry.Kind)
+		}
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
@@ -68,9 +72,13 @@ func TestUpdateDefinitionRejectsUnknownModel(t *testing.T) {
 func TestPublishCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
+		cap, ok := domain.FamilyCapabilityByKind(entry.Kind)
+		if !ok {
+			t.Fatalf("missing family capability for %q", entry.Kind)
+		}
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
@@ -100,9 +108,13 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		apiKind := DomainKindToAPIKind(cap.Kind)
+	for _, entry := range modelFamilyRegistryOptions() {
+		entry := entry
+		apiKind := entry.APIKind
+		cap, ok := domain.FamilyCapabilityByKind(entry.Kind)
+		if !ok {
+			t.Fatalf("missing family capability for %q", entry.Kind)
+		}
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 

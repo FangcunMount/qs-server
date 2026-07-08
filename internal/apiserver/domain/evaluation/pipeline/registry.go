@@ -103,3 +103,24 @@ func (r *RuntimeDescriptorRegistry) ExecutionPathForFamily(family modelcatalog.A
 	}
 	return desc.ExecutionPath, true
 }
+
+// DescriptorForFamily returns the family-level runtime descriptor when registered.
+func (r *RuntimeDescriptorRegistry) DescriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
+	if r == nil {
+		return RuntimeDescriptor{}, false
+	}
+	return r.descriptorForFamily(family)
+}
+
+// ReplaceFamilyDescriptor updates the family-level descriptor entry in-place.
+func (r *RuntimeDescriptorRegistry) ReplaceFamilyDescriptor(family modelcatalog.AlgorithmFamily, desc RuntimeDescriptor) error {
+	if r == nil {
+		return fmt.Errorf("runtime descriptor registry is nil")
+	}
+	familyKey := RuntimeDescriptorKey{AlgorithmFamily: family}
+	if _, ok := r.byKey[familyKey]; !ok {
+		return fmt.Errorf("runtime descriptor is not registered for family %s", family)
+	}
+	r.byKey[familyKey] = desc
+	return nil
+}

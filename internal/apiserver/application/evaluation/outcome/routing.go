@@ -26,8 +26,6 @@ func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcata
 	decision := modelcatalog.DecisionSpec{}
 	if payload, ok := evaluationinput.TypologyPayload(input); ok && payload.HasExplicitRuntime() && payload.Runtime.Decision.Kind != "" {
 		decision.Kind = payload.Runtime.Decision.Kind
-	} else if resolved, ok := modelcatalog.DecisionKindForIdentity(kind, subKind, algorithm); ok {
-		decision.Kind = resolved
 	}
 
 	productChannel := modelcatalog.ProductChannel(model.ProductChannel)

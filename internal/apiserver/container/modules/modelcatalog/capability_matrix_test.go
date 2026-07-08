@@ -66,7 +66,11 @@ func TestEvaluationDescriptorsMatchCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	descKinds := descriptorDomainKinds(DefaultEvaluationDescriptors())
-	for _, cap := range domain.DefaultCapabilities() {
+	for _, kind := range domain.RuntimeExecutableKinds() {
+		cap, ok := domain.FamilyCapabilityByKind(kind)
+		if !ok {
+			t.Fatalf("missing capability for %q", kind)
+		}
 		if cap.RuntimeExecutable && !descKinds[cap.Kind] {
 			t.Fatalf("missing runtime descriptor for %q (%s)", cap.Kind, cap.ExecutionPath)
 		}
@@ -81,24 +85,28 @@ func TestRuntimeCapabilityPolicy(t *testing.T) {
 
 	descKinds := descriptorDomainKinds(DefaultEvaluationDescriptors())
 
-	for _, cap := range domain.DefaultCapabilities() {
-		cap := cap
-		t.Run(string(cap.Kind), func(t *testing.T) {
+	for _, kind := range domain.RuntimeExecutableKinds() {
+		cap, ok := domain.FamilyCapabilityByKind(kind)
+		if !ok {
+			t.Fatalf("missing capability for %q", kind)
+		}
+		familyCap := cap
+		t.Run(string(familyCap.Kind), func(t *testing.T) {
 			t.Parallel()
 
-			if got := descKinds[cap.Kind]; got != cap.RuntimeExecutable {
-				t.Fatalf("descriptor presence = %v, want runtime executable %v (%s)", got, cap.RuntimeExecutable, cap.ExecutionPath)
+			if got := descKinds[familyCap.Kind]; got != familyCap.RuntimeExecutable {
+				t.Fatalf("descriptor presence = %v, want runtime executable %v (%s)", got, familyCap.RuntimeExecutable, familyCap.ExecutionPath)
 			}
 
-			_, _, _, legacyMapped := domain.LegacyKindMapping(cap.Kind)
-			wantLegacy := cap.Kind == domain.KindScale
+			_, _, _, legacyMapped := domain.LegacyKindMapping(familyCap.Kind)
+			wantLegacy := familyCap.Kind == domain.KindScale
 			if legacyMapped != wantLegacy {
-				t.Fatalf("LegacyKindMapping(%q) = %v, want %v", cap.Kind, legacyMapped, wantLegacy)
+				t.Fatalf("LegacyKindMapping(%q) = %v, want %v", familyCap.Kind, legacyMapped, wantLegacy)
 			}
 
-			_, evaluatorMapped := evaldomain.ExecutionIdentityFromLegacyKind(cap.Kind)
+			_, evaluatorMapped := evaldomain.ExecutionIdentityFromLegacyKind(familyCap.Kind)
 			if evaluatorMapped != wantLegacy {
-				t.Fatalf("ExecutionIdentityFromLegacyKind(%q) = %v, want %v", cap.Kind, evaluatorMapped, wantLegacy)
+				t.Fatalf("ExecutionIdentityFromLegacyKind(%q) = %v, want %v", familyCap.Kind, evaluatorMapped, wantLegacy)
 			}
 		})
 	}
@@ -107,7 +115,7 @@ func TestRuntimeCapabilityPolicy(t *testing.T) {
 func TestBehavioralRatingRegistersDedicatedRuntimeDescriptor(t *testing.T) {
 	t.Parallel()
 
-	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	cap, ok := domain.FamilyCapabilityByKind(domain.KindBehavioralRating)
 	if !ok || !cap.RuntimeExecutable {
 		t.Fatalf("behavioral_rating capability = %#v", cap)
 	}

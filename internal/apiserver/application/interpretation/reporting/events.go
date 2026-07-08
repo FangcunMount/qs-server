@@ -93,15 +93,10 @@ func (r *mutableEventAssemblerRegistry) ResolveByMechanism(key MechanismReportBu
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
-	if assembler, ok := r.mechanismItems[key]; ok {
-		return assembler
-	}
-	familyKey := MechanismReportBuilderKey{
-		AlgorithmFamily: key.AlgorithmFamily,
-		ReportType:      key.ReportType,
-	}
-	if assembler, ok := r.mechanismItems[familyKey]; ok {
-		return assembler
+	for _, candidate := range mechanismKeyFallbackCandidates(key) {
+		if assembler, ok := r.mechanismItems[candidate]; ok {
+			return assembler
+		}
 	}
 	return GenericEventAssembler{}
 }

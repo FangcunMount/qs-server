@@ -274,12 +274,12 @@ func TestNormalizeDefinitionPayloadForStorageSynthesizesTraitProfileOutcomes(t *
 	}
 }
 
-func TestNormalizeDecisionKindMapsAlgorithmAlias(t *testing.T) {
-	if got := normalizeDecisionKind("mbti", domain.AlgorithmMBTI); got != domain.DecisionKindPoleComposition {
-		t.Fatalf("normalizeDecisionKind(mbti) = %s, want pole_composition", got)
+func TestNormalizeDecisionKindPreservesExplicitKinds(t *testing.T) {
+	if got := normalizeDecisionKind(domain.DecisionKindPoleComposition, domain.AlgorithmMBTI); got != domain.DecisionKindPoleComposition {
+		t.Fatalf("normalizeDecisionKind(pole_composition) = %s", got)
 	}
-	if got := normalizeDecisionKind("sbti", domain.AlgorithmSBTI); got != domain.DecisionKindNearestPattern {
-		t.Fatalf("normalizeDecisionKind(sbti) = %s, want nearest_pattern", got)
+	if got := normalizeDecisionKind("mbti", domain.AlgorithmMBTI); got != "mbti" {
+		t.Fatalf("normalizeDecisionKind(mbti) = %s, want alias preserved without algorithm fallback", got)
 	}
 }
 
@@ -298,7 +298,7 @@ func TestNormalizeDefinitionPayloadForStorageFixesDecisionKindAlias(t *testing.T
 	if err := json.Unmarshal(stored, &envelope); err != nil {
 		t.Fatalf("unmarshal envelope: %v", err)
 	}
-	if envelope.Runtime == nil || envelope.Runtime.Decision.Kind != domain.DecisionKindPoleComposition {
-		t.Fatalf("decision kind = %s, want pole_composition", envelope.Runtime.Decision.Kind)
+	if envelope.Runtime == nil || envelope.Runtime.Decision.Kind != "mbti" {
+		t.Fatalf("decision kind = %s, want mbti alias preserved", envelope.Runtime.Decision.Kind)
 	}
 }
