@@ -40,7 +40,7 @@ type Dependencies struct {
 	NormingCommand         norming.Service
 	TypologyCommand        typology.Service
 	TaskPerformanceCommand taskperformance.Service
-	TypologyQuery          typologyconsumer.PersonalityModelQueryService
+	TypologyQuery          typologyconsumer.TypologyModelQueryService
 	QuestionnaireQuery     questionnaireapp.QuestionnaireQueryService
 	Codes                  codes.CodesService
 	RawQRCodeGenerator     qrcode.QRCodeService
@@ -96,7 +96,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 		result.Total += items.Total
 	}
 	if shouldListModelKind(dto.Kind, KindBehavioralRating) {
-		items, err := s.listBehavioralRating(ctx, dto)
+		items, err := s.listNormingModels(ctx, dto)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	case KindCognitive:
 		return s.createCognitive(ctx, dto)
 	case KindBehavioralRating:
-		return s.createBehavioralRating(ctx, dto)
+		return s.createNormingModel(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -144,12 +144,12 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 	}
 	if s.normingKind.cmd != nil {
 		if result, err := s.normingKind.cmd.Get(ctx, modelCode); err == nil && result != nil {
-			return behavioralRatingSummaryFromResult(result), nil
+			return normingSummaryFromResult(result), nil
 		}
 	}
 	if s.deps.TypologyQuery != nil {
 		if result, err := s.deps.TypologyQuery.GetPublishedByCode(ctx, modelCode); err == nil && result != nil {
-			return personalitySummaryFromDetail(result), nil
+			return typologySummaryFromDetail(result), nil
 		}
 	}
 	return nil, errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
@@ -303,7 +303,7 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 	if s.deps.TypologyQuery != nil {
 		personality, err := s.deps.TypologyQuery.GetPublishedByCode(ctx, modelCode)
 		if err == nil && personality != nil {
-			payload, marshalErr := json.Marshal(newPersonalityDefinitionPayload(personality))
+			payload, marshalErr := json.Marshal(newTypologyDefinitionPayload(personality))
 			if marshalErr != nil {
 				return nil, marshalErr
 			}

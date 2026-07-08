@@ -13,7 +13,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"

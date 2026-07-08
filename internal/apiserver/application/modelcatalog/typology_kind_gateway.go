@@ -158,5 +158,5 @@ func (g typologyKindGateway) previewReport(ctx context.Context, modelCode string
 		}
 		return nil, err
 	}
-	return previewFromPersonality(result), nil
+	return previewFromTypology(result), nil
 }

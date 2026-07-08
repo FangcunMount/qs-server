@@ -18,8 +18,8 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 		}
 		if !strings.HasSuffix(path, ".go") ||
 			path == "architecture_test.go" ||
-			strings.HasPrefix(path, "behavior"+string(filepath.Separator)) ||
-			strings.Contains(path, string(filepath.Separator)+"behavior"+string(filepath.Separator)) {
+			strings.HasPrefix(path, "scoring"+string(filepath.Separator)) ||
+			strings.Contains(path, string(filepath.Separator)+"scoring"+string(filepath.Separator)) {
 			return nil
 		}
 		content, err := os.ReadFile(path)
@@ -35,7 +35,7 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 			"ScaleQRCodeQueryService",
 		} {
 			if strings.Contains(text, forbidden) {
-				t.Fatalf("%s must not depend on legacy scale port %s; put scale adaptation behind modelcatalog/behavior", path, forbidden)
+				t.Fatalf("%s must not depend on legacy scale port %s; put scale adaptation behind modelcatalog/scoring", path, forbidden)
 			}
 		}
 		return nil

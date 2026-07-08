@@ -12,7 +12,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -92,7 +92,7 @@ type ScaleDeps struct {
 }
 
 type PersonalityModelDeps struct {
-	QueryService personalityModelApp.PersonalityModelQueryService
+	QueryService personalityModelApp.TypologyModelQueryService
 }
 
 type PlanDeps struct {

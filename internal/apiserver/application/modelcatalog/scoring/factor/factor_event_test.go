@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"

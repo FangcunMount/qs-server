@@ -41,18 +41,21 @@ func LegacyReportSpecFromAlgorithm(algorithm binding.Algorithm) ReportSpec {
 		return ReportSpec{
 			Kind:          ReportKindTraitProfile,
 			AdapterKey:    ReportAdapterTraitProfile,
+			TemplateID:    "bigfive",
 			CategoryLabel: "Big Five",
 		}
 	case binding.AlgorithmSBTI:
 		return ReportSpec{
 			Kind:          ReportKindPersonalityType,
 			AdapterKey:    ReportAdapterPersonalityType,
+			TemplateID:    "sbti",
 			CategoryLabel: "SBTI",
 		}
 	default:
 		return ReportSpec{
 			Kind:          ReportKindPersonalityType,
 			AdapterKey:    ReportAdapterPersonalityType,
+			TemplateID:    "mbti",
 			CategoryLabel: "MBTI",
 		}
 	}

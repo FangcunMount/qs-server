@@ -18,7 +18,7 @@ func (g normingKindGateway) require() (appNorming.Service, error) {
 	return g.cmd, nil
 }
 
-func (s *service) createBehavioralRating(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
+func (s *service) createNormingModel(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
 	cmd, err := s.normingKind.require()
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *service) createBehavioralRating(ctx context.Context, dto CreateModelDTO
 	if err != nil {
 		return nil, err
 	}
-	return behavioralRatingSummaryFromResult(result), nil
+	return normingSummaryFromResult(result), nil
 }
 
 func (g normingKindGateway) updateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
@@ -55,7 +55,7 @@ func (g normingKindGateway) updateBasicInfo(ctx context.Context, dto UpdateBasic
 	if err != nil {
 		return nil, err
 	}
-	return behavioralRatingSummaryFromResult(result), nil
+	return normingSummaryFromResult(result), nil
 }
 
 func (g normingKindGateway) delete(ctx context.Context, modelCode string) error {
@@ -75,7 +75,7 @@ func (g normingKindGateway) publish(ctx context.Context, modelCode string) (*Mod
 	if err != nil {
 		return nil, err
 	}
-	return behavioralRatingSummaryFromResult(result), nil
+	return normingSummaryFromResult(result), nil
 }
 
 func (g normingKindGateway) unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
@@ -87,7 +87,7 @@ func (g normingKindGateway) unpublish(ctx context.Context, modelCode string) (*M
 	if err != nil {
 		return nil, err
 	}
-	return behavioralRatingSummaryFromResult(result), nil
+	return normingSummaryFromResult(result), nil
 }
 
 func (g normingKindGateway) archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
@@ -99,7 +99,7 @@ func (g normingKindGateway) archive(ctx context.Context, modelCode string) (*Mod
 	if err != nil {
 		return nil, err
 	}
-	return behavioralRatingSummaryFromResult(result), nil
+	return normingSummaryFromResult(result), nil
 }
 
 func (g normingKindGateway) bindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
@@ -161,7 +161,7 @@ func (g normingKindGateway) updateDefinition(ctx context.Context, modelCode stri
 	return out, nil
 }
 
-func behavioralRatingSummaryFromResult(result *appNorming.ModelSummary) *ModelSummary {
+func normingSummaryFromResult(result *appNorming.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -184,7 +184,7 @@ func behavioralRatingSummaryFromResult(result *appNorming.ModelSummary) *ModelSu
 	return summary
 }
 
-func (s *service) listBehavioralRating(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
+func (s *service) listNormingModels(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
 	cmd, err := s.normingKind.require()
 	if err != nil {
 		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
@@ -200,7 +200,7 @@ func (s *service) listBehavioralRating(ctx context.Context, dto ListModelsDTO) (
 	}
 	out := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize, Total: result.Total}
 	for _, item := range result.Items {
-		out.Items = append(out.Items, *behavioralRatingSummaryFromResult(&item))
+		out.Items = append(out.Items, *normingSummaryFromResult(&item))
 	}
 	return out, nil
 }

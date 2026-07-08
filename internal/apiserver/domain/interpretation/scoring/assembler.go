@@ -4,8 +4,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
-// ScaleReportInput 是 scale 家族报告组装输入。
-type ScaleReportInput struct {
+// FactorScoringReportInput is factor-scoring mechanism report assembly input.
+type FactorScoringReportInput struct {
 	AssessmentID report.ID
 	Scale        *ReportModel
 	TotalScore   float64
@@ -15,13 +15,13 @@ type ScaleReportInput struct {
 	FactorScores []FactorReportScore
 }
 
-// BuildFactorScoringReport assembles factor-scoring mechanism reports.
-var BuildFactorScoringReport = BuildScaleReport
+// ScaleReportInput is a deprecated alias for FactorScoringReportInput.
+type ScaleReportInput = FactorScoringReportInput
 
-// BuildScaleReport 组装 scale 家族解读报告。
-// 当因子未携带结论/建议文案时，依据模型解读规则在解读侧生成，
-// 整体结论/建议在未显式给定时取自总分因子。
-func BuildScaleReport(composer report.ReportBuilder, input ScaleReportInput) (*report.InterpretReport, error) {
+// BuildFactorScoringReport assembles factor-scoring mechanism reports.
+// When factor conclusion/suggestion is empty, interpretation rules generate them;
+// overall conclusion/suggestion falls back to the total-score factor when unset.
+func BuildFactorScoringReport(composer report.ReportBuilder, input FactorScoringReportInput) (*report.InterpretReport, error) {
 	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
 	for _, fs := range input.FactorScores {
 		if fs.Conclusion == "" && fs.Suggestion == "" {
@@ -50,6 +50,9 @@ func BuildScaleReport(composer report.ReportBuilder, input ScaleReportInput) (*r
 		FactorScores: factorScores,
 	})
 }
+
+// BuildScaleReport is a deprecated alias for BuildFactorScoringReport.
+var BuildScaleReport = BuildFactorScoringReport
 
 func BuildReport(composer report.ReportBuilder, input ReportInput) (*report.InterpretReport, error) {
 	if composer == nil {

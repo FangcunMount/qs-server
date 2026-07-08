@@ -29,7 +29,7 @@ func (s *service) listTypology(ctx context.Context, dto ListModelsDTO) ([]ModelS
 
 	if dto.Status == "" || dto.Status == StatusPublished {
 		if s.deps.TypologyQuery != nil {
-			result, err := s.deps.TypologyQuery.ListPublished(ctx, typologyconsumer.ListPersonalityModelsDTO{
+			result, err := s.deps.TypologyQuery.ListPublished(ctx, typologyconsumer.ListTypologyModelsDTO{
 				Page:     dto.Page,
 				PageSize: dto.PageSize,
 			})
@@ -49,7 +49,7 @@ func (s *service) listTypology(ctx context.Context, dto ListModelsDTO) ([]ModelS
 				if _, ok := seen[item.Code]; ok {
 					continue
 				}
-				items = append(items, personalitySummaryFromSummary(item))
+				items = append(items, typologySummaryFromSummary(item))
 				total++
 			}
 		}

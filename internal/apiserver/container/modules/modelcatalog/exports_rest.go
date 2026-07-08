@@ -3,7 +3,7 @@ package modelcatalog
 import (
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	assessmentModelAppTypology "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
@@ -25,10 +25,10 @@ func (m *Module) ExportRESTDeps(
 	questionnaireQuery questionnaireApp.QuestionnaireQueryService,
 ) RESTDeps {
 	deps := RESTDeps{}
-	if m == nil || m.Scale == nil {
+	if m == nil || m.Scoring == nil {
 		return deps
 	}
-	deps.Scale = m.Scale.ExportRESTDeps(qrCodeService)
+	deps.Scale = m.Scoring.ExportRESTDeps(qrCodeService)
 	var typologyQuery = m.typologyQuery()
 	var typologyCommand = m.typologyCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
@@ -43,8 +43,8 @@ func (m *Module) ExportRESTDeps(
 	return deps
 }
 
-// ExportRESTDeps exposes scale capabilities to REST transport.
-func (s *Scale) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttransport.ScaleDeps {
+// ExportRESTDeps exposes scoring capabilities to REST transport.
+func (s *Scoring) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttransport.ScaleDeps {
 	deps := resttransport.ScaleDeps{}
 	if s == nil {
 		return deps
@@ -53,11 +53,11 @@ func (s *Scale) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttransp
 	deps.FactorService = s.FactorService
 	deps.QueryService = s.QueryService
 	deps.CategoryService = s.CategoryService
-	deps.QRCodeService = scaleApp.NewQRCodeQueryService(qrCodeService)
+	deps.QRCodeService = scoringApp.NewQRCodeQueryService(qrCodeService)
 	return deps
 }
 
-func (m *Module) typologyQuery() typologyModelApp.PersonalityModelQueryService {
+func (m *Module) typologyQuery() typologyModelApp.TypologyModelQueryService {
 	if m == nil || m.Typology == nil {
 		return nil
 	}

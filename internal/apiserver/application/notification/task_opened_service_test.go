@@ -8,7 +8,7 @@ import (
 	"time"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"

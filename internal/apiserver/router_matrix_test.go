@@ -14,7 +14,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"

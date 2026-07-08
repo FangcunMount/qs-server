@@ -4,9 +4,9 @@ import (
 	"context"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/query"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"

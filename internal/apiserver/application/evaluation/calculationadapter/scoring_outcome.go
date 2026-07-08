@@ -5,8 +5,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// AssessmentOutcomeFromScaleInterpretation maps scale scoring output to a canonical assessment outcome.
-func AssessmentOutcomeFromScaleInterpretation(
+// AssessmentOutcomeFromScoringInterpretation maps factor-scoring output to a canonical assessment outcome.
+func AssessmentOutcomeFromScoringInterpretation(
 	result *scoring.Result,
 	modelRef assessment.EvaluationModelRef,
 ) *assessment.AssessmentOutcome {
@@ -79,3 +79,6 @@ func assessmentDimensionResultsFromFactorScores(scores []assessment.FactorScoreR
 	}
 	return results
 }
+
+// AssessmentOutcomeFromScaleInterpretation is a deprecated alias for AssessmentOutcomeFromScoringInterpretation.
+var AssessmentOutcomeFromScaleInterpretation = AssessmentOutcomeFromScoringInterpretation

@@ -2,8 +2,8 @@ package modelcatalog
 
 import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-// ModelCatalogOption 是application-facing model-目录 类型 选项。
-// It includes API/UI 元数据 和 旧版 product-channel slots。
+// ModelCatalogOption 是 REST/BFF 展示的目录类型选项（由 option 注册表投影）。
+// 领域执行守卫见 domain/modelcatalog/binding.ModelFamilyCapability。
 type ModelCatalogOption struct {
 	APIKind        string
 	DisplayName    string

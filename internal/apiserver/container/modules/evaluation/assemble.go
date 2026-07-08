@@ -295,7 +295,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	if normalized.PublishedModelReader != nil {
 		creatorOpts = append(creatorOpts, assessment.WithEvaluationModelValidator(
 			assessmentApp.NewCompositeEvaluationModelValidator(
-				assessmentApp.NewPersonalityEvaluationModelValidator(normalized.PublishedModelReader),
+				assessmentApp.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
 			),
 		))
 	}

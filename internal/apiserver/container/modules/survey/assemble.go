@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"

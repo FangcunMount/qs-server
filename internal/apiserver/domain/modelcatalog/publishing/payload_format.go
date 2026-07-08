@@ -11,6 +11,8 @@ const (
 	// v2 production 载荷格式。
 	PayloadFormatAssessmentScaleV1         = "assessmentmodel.scale.v1"
 	PayloadFormatPersonalityTypologyV1     = "assessmentmodel.personality.typology.v1"
+	// PayloadFormatTypologyV1 is a mechanism-oriented identifier alias; BSON/API string unchanged.
+	PayloadFormatTypologyV1 = PayloadFormatPersonalityTypologyV1
 	PayloadFormatBehavioralRatingDefaultV1 = "assessmentmodel.behavioral_rating.default.v1"
 	// PayloadFormatBehavioralRatingBrief2V1 is legacy-decode-only; new drafts use DefaultV1.
 	PayloadFormatBehavioralRatingBrief2V1 = "assessmentmodel.behavioral_rating.brief2.v1"

@@ -5,7 +5,7 @@ import (
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"

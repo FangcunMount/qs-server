@@ -8,8 +8,8 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Payload) PersonalityModelSummaryResult {
-	result := PersonalityModelSummaryResult{
+func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Payload) TypologyModelSummaryResult {
+	result := TypologyModelSummaryResult{
 		Code:                 snapshot.Definition.Code,
 		Version:              snapshot.Definition.Version,
 		Title:                snapshot.Definition.Title,
@@ -38,20 +38,20 @@ func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Paylo
 	return result
 }
 
-func SummaryFromSnapshotOnly(snapshot *domain.Snapshot) (PersonalityModelSummaryResult, error) {
+func SummaryFromSnapshotOnly(snapshot *domain.Snapshot) (TypologyModelSummaryResult, error) {
 	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
-		return PersonalityModelSummaryResult{}, err
+		return TypologyModelSummaryResult{}, err
 	}
 	return SummaryFromSnapshot(snapshot, payload), nil
 }
 
-func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (PersonalityModelSummaryResult, error) {
+func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (TypologyModelSummaryResult, error) {
 	payload, err := payloadFromPublishedModel(snapshot)
 	if err != nil {
-		return PersonalityModelSummaryResult{}, err
+		return TypologyModelSummaryResult{}, err
 	}
-	result := PersonalityModelSummaryResult{
+	result := TypologyModelSummaryResult{
 		Code:                 snapshot.Model.Code,
 		Version:              snapshot.Model.Version,
 		Title:                snapshot.Model.Title,
@@ -63,7 +63,7 @@ func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (Persona
 	return result, nil
 }
 
-func DetailFromSnapshot(snapshot *domain.Snapshot) (*PersonalityModelResult, error) {
+func DetailFromSnapshot(snapshot *domain.Snapshot) (*TypologyModelResult, error) {
 	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
 		return nil, err
@@ -71,15 +71,15 @@ func DetailFromSnapshot(snapshot *domain.Snapshot) (*PersonalityModelResult, err
 	summary := SummaryFromSnapshot(snapshot, payload)
 	dimensions, order := dimensionsFromPayload(payload)
 	outcomes := outcomesFromPayload(payload)
-	return &PersonalityModelResult{
-		PersonalityModelSummaryResult: summary,
+	return &TypologyModelResult{
+		TypologyModelSummaryResult: summary,
 		DimensionOrder:                order,
 		Dimensions:                    dimensions,
 		Outcomes:                      outcomes,
 	}, nil
 }
 
-func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*PersonalityModelResult, error) {
+func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*TypologyModelResult, error) {
 	payload, err := payloadFromPublishedModel(snapshot)
 	if err != nil {
 		return nil, err
@@ -89,8 +89,8 @@ func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*Persona
 		return nil, err
 	}
 	dimensions, order := dimensionsFromPayload(payload)
-	return &PersonalityModelResult{
-		PersonalityModelSummaryResult: summary,
+	return &TypologyModelResult{
+		TypologyModelSummaryResult: summary,
 		DimensionOrder:                order,
 		Dimensions:                    dimensions,
 		Outcomes:                      outcomesFromPayload(payload),
@@ -111,7 +111,7 @@ func payloadFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*modelt
 	return &payload, nil
 }
 
-func applyPayloadSummary(result *PersonalityModelSummaryResult, payload *modeltypology.Payload) {
+func applyPayloadSummary(result *TypologyModelSummaryResult, payload *modeltypology.Payload) {
 	if result == nil || payload == nil {
 		return
 	}
@@ -133,7 +133,7 @@ func applyPayloadSummary(result *PersonalityModelSummaryResult, payload *modelty
 	}
 }
 
-func dimensionsFromPayload(payload *modeltypology.Payload) ([]PersonalityDimensionResult, []string) {
+func dimensionsFromPayload(payload *modeltypology.Payload) ([]TypologyDimensionResult, []string) {
 	if payload == nil {
 		return nil, nil
 	}
@@ -147,10 +147,10 @@ func dimensionsFromPayload(payload *modeltypology.Payload) ([]PersonalityDimensi
 			dimensions = payload.Runtime.FactorGraph.Dimensions
 		}
 	}
-	items := make([]PersonalityDimensionResult, 0, len(order))
+	items := make([]TypologyDimensionResult, 0, len(order))
 	for _, code := range order {
 		if dim, ok := dimensions[code]; ok {
-			items = append(items, PersonalityDimensionResult{
+			items = append(items, TypologyDimensionResult{
 				Code:      dim.Code,
 				Name:      dim.Name,
 				LeftPole:  dim.LeftPole,
@@ -160,7 +160,7 @@ func dimensionsFromPayload(payload *modeltypology.Payload) ([]PersonalityDimensi
 		}
 		if payload.Runtime != nil {
 			if factor, ok := payload.Runtime.FactorGraph.Factors[code]; ok {
-				items = append(items, PersonalityDimensionResult{
+				items = append(items, TypologyDimensionResult{
 					Code: factor.Code,
 					Name: factor.Name,
 				})
@@ -170,17 +170,17 @@ func dimensionsFromPayload(payload *modeltypology.Payload) ([]PersonalityDimensi
 	return items, order
 }
 
-func outcomesFromPayload(payload *modeltypology.Payload) []PersonalityOutcomeSummaryResult {
+func outcomesFromPayload(payload *modeltypology.Payload) []TypologyOutcomeSummaryResult {
 	if payload == nil {
 		return nil
 	}
-	outcomes := make([]PersonalityOutcomeSummaryResult, 0, len(payload.Outcomes))
+	outcomes := make([]TypologyOutcomeSummaryResult, 0, len(payload.Outcomes))
 	for _, outcome := range payload.Outcomes {
 		imageURL := outcome.ImageURL
 		if imageURL == "" {
 			imageURL = outcome.Image
 		}
-		outcomes = append(outcomes, PersonalityOutcomeSummaryResult{
+		outcomes = append(outcomes, TypologyOutcomeSummaryResult{
 			Code:     outcome.Code,
 			Name:     outcome.Name,
 			OneLiner: outcome.OneLiner,

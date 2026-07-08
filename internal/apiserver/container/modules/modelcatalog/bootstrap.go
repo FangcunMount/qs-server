@@ -7,7 +7,7 @@ import (
 
 // BootstrapInput carries container integration inputs for assessment-model bootstrap.
 type BootstrapInput struct {
-	Scale    ScaleDeps
+	Scoring  ScoringDeps
 	Typology TypologyDeps
 	Survey   SurveyBootstrapPorts
 }
@@ -18,8 +18,8 @@ type SurveyBootstrapPorts struct {
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 }
 
-// ApplySurveyPorts fills optional scale deps from survey module ports.
-func (p SurveyBootstrapPorts) ApplySurveyPorts(deps *ScaleDeps) {
+// ApplySurveyPorts fills optional scoring deps from survey module ports.
+func (p SurveyBootstrapPorts) ApplySurveyPorts(deps *ScoringDeps) {
 	if deps == nil {
 		return
 	}
@@ -31,12 +31,12 @@ func (p SurveyBootstrapPorts) ApplySurveyPorts(deps *ScaleDeps) {
 	}
 }
 
-// Bootstrap assembles scale + personality catalog capabilities.
+// Bootstrap assembles scoring + personality catalog capabilities.
 func Bootstrap(in BootstrapInput) (*Module, error) {
-	scaleDeps := in.Scale
-	in.Survey.ApplySurveyPorts(&scaleDeps)
+	scoringDeps := in.Scoring
+	in.Survey.ApplySurveyPorts(&scoringDeps)
 	return New(Deps{
-		Scale:    scaleDeps,
+		Scoring:  scoringDeps,
 		Typology: in.Typology,
 		TaskPerformance: TaskPerformanceDeps{
 			ModelRepo:     in.Typology.ModelRepo,

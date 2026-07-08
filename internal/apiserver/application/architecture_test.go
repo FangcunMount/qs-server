@@ -36,7 +36,7 @@ func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testi
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/modelcatalog/behavior/scale",
+		"internal/apiserver/application/modelcatalog/scoring",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -78,7 +78,7 @@ func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/modelcatalog/behavior/scale",
+		"internal/apiserver/application/modelcatalog/scoring",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {

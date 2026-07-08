@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"

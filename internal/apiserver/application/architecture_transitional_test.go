@@ -89,7 +89,7 @@ func TestModelCatalogApplicationDoesNotReintroduceModelFamilyTopLevelDirs(t *tes
 
 	root := repoRoot(t)
 	modelCatalogRoot := filepath.Join(root, "internal/apiserver/application/modelcatalog")
-	forbiddenDirs := []string{"personality", "behavioral_rating", "cognitive"}
+	forbiddenDirs := []string{"personality", "behavioral_rating", "cognitive", "behavior"}
 	entries, err := os.ReadDir(modelCatalogRoot)
 	if err != nil {
 		t.Fatal(err)
@@ -101,9 +101,12 @@ func TestModelCatalogApplicationDoesNotReintroduceModelFamilyTopLevelDirs(t *tes
 		name := entry.Name()
 		for _, forbidden := range forbiddenDirs {
 			if name == forbidden {
-				t.Fatalf("application/modelcatalog/%s is forbidden; use typology/norming/taskperformance", forbidden)
+				t.Fatalf("application/modelcatalog/%s is forbidden; use typology/norming/taskperformance/scoring", forbidden)
 			}
 		}
+	}
+	if _, err := os.Stat(filepath.Join(modelCatalogRoot, "scoring")); err != nil {
+		t.Fatalf("application/modelcatalog/scoring is required after behavior/scale migration: %v", err)
 	}
 }
 

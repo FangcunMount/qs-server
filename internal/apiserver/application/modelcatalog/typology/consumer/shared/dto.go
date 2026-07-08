@@ -1,14 +1,14 @@
 package shared
 
-// ListPersonalityModelsDTO 列出published 人格模型 用于 C 端 目录s。
-type ListPersonalityModelsDTO struct {
+// ListTypologyModelsDTO 列出 published typology 模型，用于 C 端目录。
+type ListTypologyModelsDTO struct {
 	Page      int
 	PageSize  int
 	Algorithm string
 }
 
-// PersonalityModelSummaryResult 是list 题目 投影。
-type PersonalityModelSummaryResult struct {
+// TypologyModelSummaryResult 是 list 条目投影。
+type TypologyModelSummaryResult struct {
 	Code                 string
 	Version              string
 	Title                string
@@ -20,46 +20,65 @@ type PersonalityModelSummaryResult struct {
 	QuestionCount        int
 }
 
-// PersonalityModelSummaryListResult 是paginated summary list。
-type PersonalityModelSummaryListResult struct {
-	Items      []PersonalityModelSummaryResult
+// TypologyModelSummaryListResult 是 paginated summary list。
+type TypologyModelSummaryListResult struct {
+	Items      []TypologyModelSummaryResult
 	Total      int64
 	Page       int
 	PageSize   int
 	TotalPages int
 }
 
-// PersonalityDimensionResult 暴露pole 元数据 用于 C 端 detail 视图。
-type PersonalityDimensionResult struct {
+// TypologyDimensionResult 暴露 pole 元数据，用于 C 端 detail 视图。
+type TypologyDimensionResult struct {
 	Code      string
 	Name      string
 	LeftPole  string
 	RightPole string
 }
 
-// PersonalityOutcomeSummaryResult 暴露结果 cards 不使用 计分 内部s。
-type PersonalityOutcomeSummaryResult struct {
+// TypologyOutcomeSummaryResult 暴露结果 cards，不使用计分内部结构。
+type TypologyOutcomeSummaryResult struct {
 	Code     string
 	Name     string
 	OneLiner string
 	ImageURL string
 }
 
-// PersonalityModelResult 是detail 投影。
-type PersonalityModelResult struct {
-	PersonalityModelSummaryResult
+// TypologyModelResult 是 detail 投影。
+type TypologyModelResult struct {
+	TypologyModelSummaryResult
 	DimensionOrder []string
-	Dimensions     []PersonalityDimensionResult
-	Outcomes       []PersonalityOutcomeSummaryResult
+	Dimensions     []TypologyDimensionResult
+	Outcomes       []TypologyOutcomeSummaryResult
 }
 
-// PersonalityModelCategoryResult 是算法/category 选项。
-type PersonalityModelCategoryResult struct {
+// TypologyModelCategoryResult 是算法/category 选项。
+type TypologyModelCategoryResult struct {
 	Value string
 	Label string
 }
 
-// PersonalityModelCategoriesResult 列出算法 选项。
-type PersonalityModelCategoriesResult struct {
-	Categories []PersonalityModelCategoryResult
+// TypologyModelCategoriesResult 列出算法选项。
+type TypologyModelCategoriesResult struct {
+	Categories []TypologyModelCategoryResult
 }
+
+type (
+	// Deprecated: use ListTypologyModelsDTO.
+	ListPersonalityModelsDTO = ListTypologyModelsDTO
+	// Deprecated: use TypologyModelSummaryResult.
+	PersonalityModelSummaryResult = TypologyModelSummaryResult
+	// Deprecated: use TypologyModelSummaryListResult.
+	PersonalityModelSummaryListResult = TypologyModelSummaryListResult
+	// Deprecated: use TypologyDimensionResult.
+	PersonalityDimensionResult = TypologyDimensionResult
+	// Deprecated: use TypologyOutcomeSummaryResult.
+	PersonalityOutcomeSummaryResult = TypologyOutcomeSummaryResult
+	// Deprecated: use TypologyModelResult.
+	PersonalityModelResult = TypologyModelResult
+	// Deprecated: use TypologyModelCategoryResult.
+	PersonalityModelCategoryResult = TypologyModelCategoryResult
+	// Deprecated: use TypologyModelCategoriesResult.
+	PersonalityModelCategoriesResult = TypologyModelCategoriesResult
+)

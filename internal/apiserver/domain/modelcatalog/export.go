@@ -1,5 +1,9 @@
 package modelcatalog
 
+// Root facade: thin aliases over mechanism subpackages. Deep-import factor/scoring/typology
+// when mechanism-specific types are required; use this package for cross-mechanism identity
+// and publishing surfaces. Legacy symbols are grouped at the bottom.
+
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	legacypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
@@ -16,8 +20,9 @@ type (
 	AlgorithmFamily = publishing.AlgorithmFamily
 	ExecutionPath   = publishing.ExecutionPath
 
-	KindCapability   = binding.KindCapability
-	CapabilityRole   = binding.CapabilityRole
+	KindCapability        = binding.KindCapability
+	ModelFamilyCapability = binding.ModelFamilyCapability
+	CapabilityRole        = binding.CapabilityRole
 	CatalogOperation = binding.CatalogOperation
 
 	QuestionnaireBinding   = binding.QuestionnaireBinding
@@ -88,6 +93,7 @@ const (
 
 	PayloadFormatAssessmentScaleV1         = publishing.PayloadFormatAssessmentScaleV1
 	PayloadFormatPersonalityTypologyV1     = publishing.PayloadFormatPersonalityTypologyV1
+	PayloadFormatTypologyV1                = publishing.PayloadFormatTypologyV1
 	PayloadFormatBehavioralRatingDefaultV1 = publishing.PayloadFormatBehavioralRatingDefaultV1
 	PayloadFormatBehavioralRatingBrief2V1  = publishing.PayloadFormatBehavioralRatingBrief2V1
 	PayloadFormatCognitiveDefaultV1        = publishing.PayloadFormatCognitiveDefaultV1

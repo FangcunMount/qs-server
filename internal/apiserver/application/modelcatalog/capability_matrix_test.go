@@ -153,7 +153,7 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			personalityStub := &personalityCommandStub{}
+			personalityStub := &typologyCommandStub{}
 			cognitiveStub := &cognitiveCommandStub{}
 			behavioralRatingStub := &behavioralRatingCommandStub{}
 			svc := NewService(Dependencies{
@@ -216,7 +216,7 @@ func TestPreviewReportCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		TypologyCommand: &personalityCommandStub{},
+		TypologyCommand: &typologyCommandStub{},
 	})
 
 	for _, entry := range modelFamilyRegistryOptions() {

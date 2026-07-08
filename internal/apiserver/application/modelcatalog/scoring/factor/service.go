@@ -5,9 +5,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/editable"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/ports"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/editable"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"

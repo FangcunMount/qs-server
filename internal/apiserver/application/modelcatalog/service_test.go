@@ -15,15 +15,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-type personalityCommandStub struct {
+type typologyCommandStub struct {
 	createCalled bool
 }
 
-func (s *personalityCommandStub) List(context.Context, typology.ListInput) (*typology.ModelListResult, error) {
+func (s *typologyCommandStub) List(context.Context, typology.ListInput) (*typology.ModelListResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Create(_ context.Context, input typology.CreateInput) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) Create(_ context.Context, input typology.CreateInput) (*typology.ModelSummary, error) {
 	s.createCalled = true
 	return &typology.ModelSummary{
 		Code:  input.Code,
@@ -32,55 +32,55 @@ func (s *personalityCommandStub) Create(_ context.Context, input typology.Create
 	}, nil
 }
 
-func (s *personalityCommandStub) Get(_ context.Context, modelCode string) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) Get(_ context.Context, modelCode string) (*typology.ModelSummary, error) {
 	if modelCode == "personality_demo" {
 		return &typology.ModelSummary{Code: modelCode, Kind: typology.KindPersonality}, nil
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *personalityCommandStub) UpdateBasicInfo(context.Context, typology.UpdateBasicInfoInput) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) UpdateBasicInfo(context.Context, typology.UpdateBasicInfoInput) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Delete(context.Context, string) error { return nil }
+func (s *typologyCommandStub) Delete(context.Context, string) error { return nil }
 
-func (s *personalityCommandStub) BindQuestionnaire(_ context.Context, input typology.BindQuestionnaireInput) (*typology.QuestionnaireBindingResult, error) {
+func (s *typologyCommandStub) BindQuestionnaire(_ context.Context, input typology.BindQuestionnaireInput) (*typology.QuestionnaireBindingResult, error) {
 	return &typology.QuestionnaireBindingResult{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 	}, nil
 }
 
-func (s *personalityCommandStub) GetQuestionnaire(context.Context, string) (*typology.QuestionnaireBindingResult, error) {
+func (s *typologyCommandStub) GetQuestionnaire(context.Context, string) (*typology.QuestionnaireBindingResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) GetDefinition(context.Context, string) (*typology.DefinitionResult, error) {
+func (s *typologyCommandStub) GetDefinition(context.Context, string) (*typology.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) UpdateDefinition(context.Context, string, typology.DefinitionInput) (*typology.DefinitionResult, error) {
+func (s *typologyCommandStub) UpdateDefinition(context.Context, string, typology.DefinitionInput) (*typology.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Validate(context.Context, string) (*typology.ValidationResult, error) {
+func (s *typologyCommandStub) Validate(context.Context, string) (*typology.ValidationResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) PreviewReport(context.Context, string, json.RawMessage) (*typology.PreviewReportResult, error) {
+func (s *typologyCommandStub) PreviewReport(context.Context, string, json.RawMessage) (*typology.PreviewReportResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Publish(context.Context, string) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) Publish(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Unpublish(context.Context, string) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) Unpublish(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Archive(context.Context, string) (*typology.ModelSummary, error) {
+func (s *typologyCommandStub) Archive(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
@@ -215,7 +215,7 @@ func (s *personalityQRCodeGeneratorStub) GeneratePersonalityAssessmentQRCode(_ c
 
 func TestCreateRequiresKind(t *testing.T) {
 	svc := NewService(Dependencies{
-		TypologyCommand: &personalityCommandStub{},
+		TypologyCommand: &typologyCommandStub{},
 	})
 
 	_, err := svc.Create(context.Background(), CreateModelDTO{Title: "No Kind"})
@@ -228,7 +228,7 @@ func TestCreateRequiresKind(t *testing.T) {
 }
 
 func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
-	personalityStub := &personalityCommandStub{}
+	personalityStub := &typologyCommandStub{}
 	svc := NewService(Dependencies{
 		TypologyCommand: personalityStub,
 	})
@@ -250,7 +250,7 @@ func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 }
 
 func TestGetQRCodeDispatchesByKind(t *testing.T) {
-	personalityStub := &personalityCommandStub{}
+	personalityStub := &typologyCommandStub{}
 	svc := NewService(Dependencies{
 		TypologyCommand:    personalityStub,
 		RawQRCodeGenerator: &personalityQRCodeGeneratorStub{},
@@ -280,7 +280,7 @@ func TestGetQRCodeDispatchesByKind(t *testing.T) {
 
 func TestGetPersonalityQRCodeFallsBackToEntryURL(t *testing.T) {
 	svc := NewService(Dependencies{
-		TypologyCommand: &personalityCommandStub{},
+		TypologyCommand: &typologyCommandStub{},
 	})
 
 	got, err := svc.GetQRCode(context.Background(), "personality_demo")

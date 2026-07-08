@@ -18,7 +18,7 @@ import (
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"

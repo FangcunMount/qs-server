@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -188,10 +188,10 @@ func (c *Container) SetSurveyModule(module *surveymod.Module) {
 
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
-	c.ScaleModule = module.Scale
+	c.ScaleModule = module.Scoring
 	c.PersonalityModelModule = module.Typology
 	c.registerModule("modelcatalog", module)
-	c.registerModule("scale", module.Scale)
+	c.registerModule("scale", module.Scoring)
 	c.registerModule("personalitymodel", module.Typology)
 }
 

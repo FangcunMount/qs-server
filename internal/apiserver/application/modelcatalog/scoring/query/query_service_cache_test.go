@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"

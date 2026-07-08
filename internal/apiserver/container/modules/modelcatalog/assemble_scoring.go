@@ -6,8 +6,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
-	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
+	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	scoringLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -22,18 +22,18 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// Scale assembles scale-definition application services.
-type Scale struct {
-	LifecycleService scaleApp.ScaleLifecycleService
-	FactorService    scaleApp.ScaleFactorService
-	QueryService     scaleApp.ScaleQueryService
-	CategoryService  scaleApp.ScaleCategoryService
+// Scoring assembles scoring-definition application services.
+type Scoring struct {
+	LifecycleService scoringApp.ScaleLifecycleService
+	FactorService    scoringApp.ScaleFactorService
+	QueryService     scoringApp.ScaleQueryService
+	CategoryService  scoringApp.ScaleCategoryService
 
 	eventPublisher event.EventPublisher
 }
 
-// ScaleDeps defines explicit constructor dependencies for the scale capability.
-type ScaleDeps struct {
+// ScoringDeps defines explicit constructor dependencies for the scoring capability.
+type ScoringDeps struct {
 	EventPublisher         event.EventPublisher
 	Repo                   scaledefinition.Repository
 	Reader                 scalereadmodel.ScaleReader
@@ -45,32 +45,32 @@ type ScaleDeps struct {
 	RankCacheBuilder       *keyspace.Builder
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
-	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
-	RuleSetPublisher       scaleLifecycle.RuleSetPublisher
+	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
+	RuleSetPublisher       scoringLifecycle.RuleSetPublisher
 }
 
-// NewScale assembles the scale capability.
-func NewScale(deps ScaleDeps) (*Scale, error) {
-	normalized, err := normalizeScaleDeps(deps)
+// NewScoring assembles the scoring capability.
+func NewScoring(deps ScoringDeps) (*Scoring, error) {
+	normalized, err := normalizeScoringDeps(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	module := &Scale{}
+	module := &Scoring{}
 	module.eventPublisher = normalized.EventPublisher
 
-	module.LifecycleService = scaleApp.NewLifecycleService(
+	module.LifecycleService = scoringApp.NewLifecycleService(
 		normalized.Repo,
 		normalized.QuestionnaireCatalog,
 		module.eventPublisher,
 		normalized.ListCache,
-		scaleApp.WithQuestionnairePublisher(newScaleQuestionnairePublisher(normalized.QuestionnairePublisher)),
-		scaleApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
-		scaleApp.WithRuleSetPublisher(normalized.RuleSetPublisher),
+		scoringApp.WithQuestionnairePublisher(newScoringQuestionnairePublisher(normalized.QuestionnairePublisher)),
+		scoringApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
+		scoringApp.WithRuleSetPublisher(normalized.RuleSetPublisher),
 	)
-	module.FactorService = scaleApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
+	module.FactorService = scoringApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
-	module.QueryService = scaleApp.NewQueryServiceWithHotListCache(
+	module.QueryService = scoringApp.NewQueryServiceWithHotListCache(
 		normalized.Repo,
 		normalized.Reader,
 		normalized.IdentityService,
@@ -79,12 +79,12 @@ func NewScale(deps ScaleDeps) (*Scale, error) {
 		normalized.HotsetRecorder,
 		hotRankReader,
 	)
-	module.CategoryService = scaleApp.NewCategoryService()
+	module.CategoryService = scoringApp.NewCategoryService()
 
 	return module, nil
 }
 
-func newScaleQuestionnairePublisher(service quesApp.QuestionnaireLifecycleService) scaleApp.QuestionnairePublisherFunc {
+func newScoringQuestionnairePublisher(service quesApp.QuestionnaireLifecycleService) scoringApp.QuestionnairePublisherFunc {
 	if service == nil {
 		return nil
 	}
@@ -100,9 +100,9 @@ func newScaleQuestionnairePublisher(service quesApp.QuestionnaireLifecycleServic
 	}
 }
 
-func normalizeScaleDeps(deps ScaleDeps) (ScaleDeps, error) {
+func normalizeScoringDeps(deps ScoringDeps) (ScoringDeps, error) {
 	if deps.Repo == nil || deps.Reader == nil {
-		return ScaleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "scale repository and read model are required")
+		return ScoringDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "scale repository and read model are required")
 	}
 	if deps.EventPublisher == nil {
 		deps.EventPublisher = event.NewNopEventPublisher()
@@ -111,20 +111,31 @@ func normalizeScaleDeps(deps ScaleDeps) (ScaleDeps, error) {
 }
 
 // Cleanup releases module resources.
-func (m *Scale) Cleanup() error {
+func (m *Scoring) Cleanup() error {
 	return nil
 }
 
 // CheckHealth verifies module health.
-func (m *Scale) CheckHealth() error {
+func (m *Scoring) CheckHealth() error {
 	return nil
 }
 
 // ModuleInfo returns legacy scale module metadata.
-func (m *Scale) ModuleInfo() modules.ModuleInfo {
+func (m *Scoring) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
 		Name:        "scale",
 		Version:     "2.0.0",
 		Description: "量表管理模块（重构版）",
 	}
+}
+
+// Scale is a deprecated alias for Scoring (container compat).
+type Scale = Scoring
+
+// ScaleDeps is a deprecated alias for ScoringDeps (container compat).
+type ScaleDeps = ScoringDeps
+
+// NewScale is a deprecated alias for NewScoring (container compat).
+func NewScale(deps ScaleDeps) (*Scale, error) {
+	return NewScoring(deps)
 }

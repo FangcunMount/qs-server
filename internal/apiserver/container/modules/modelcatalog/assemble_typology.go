@@ -13,7 +13,7 @@ import (
 
 // Typology hosts C-side typology model catalog services.
 type Typology struct {
-	QueryService   appTypologyCatalog.PersonalityModelQueryService
+	QueryService   appTypologyCatalog.TypologyModelQueryService
 	CommandService appTypologyModel.Service
 }
 
@@ -32,7 +32,7 @@ func NewTypology(deps TypologyDeps) (*Typology, error) {
 	if deps.PublishedLister == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "personality model published lister is required")
 	}
-	var queryService appTypologyCatalog.PersonalityModelQueryService
+	var queryService appTypologyCatalog.TypologyModelQueryService
 	if deps.PublishedAlgorithmLister != nil {
 		queryService = appTypologyCatalog.NewQueryServiceWithAlgorithmLister(deps.PublishedLister, deps.PublishedAlgorithmLister)
 	} else {

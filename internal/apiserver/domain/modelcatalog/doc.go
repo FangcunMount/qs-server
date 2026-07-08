@@ -33,59 +33,26 @@
 //
 // See docs/02-业务模块/mechanism-oriented-migration.md §包名与 AlgorithmFamily 对照表.
 //
-// # 根包文件映射（Round 16 基线）
+// # 根包门面（export.go）
 //
-// 下列文件当前位于 modelcatalog 根包。Round 16+ 可能把它们移动到子包
-// （identity/、routing/、catalog/、capability/、legacy/），并在根包保留类型别名。
+// 根包仅保留 doc.go、errors.go、export.go。业务类型通过子包实现，根包 re-export：
 //
-// Identity — 草稿/已发布模型身份和产品分类体系（identity/ 子包）：
-// - export.go: 根 类型别名。
-// - identity/types.go: Kind、SubKind、Algorithm、DecisionKind。
-// - identity/product_channel.go: ProductChannel。
-// - legacy/personality_decision.go: FallbackPersonalityDecisionKind（仅 migration 读路径）。
+//   - binding/: Kind、SubKind、Algorithm、ModelFamilyCapability（执行/生命周期守卫）
+//   - publishing/: PublishedModelSnapshot、AlgorithmFamily、PayloadFormat
+//   - factor|scoring|norming|typology|taskperformance/: 机制载荷与快照
+//   - legacy/: v1 信封、迁移适配器、behavior_ability 产品通道
 //
-// Routing — 执行家族和物化路径（routing/ 子包）：
-// - export.go: 根 类型别名。
-// - routing/algorithm_family.go: AlgorithmFamily，身份到家族的映射。
-// - routing/execution_path.go: ExecutionPath。
-// - routing/payload_format.go: 载荷格式常量和辅助函数。
+// 深 import 机制子包（factor/typology 等）用于机制专用逻辑；跨机制身份/发布读根包别名即可。
+// application 展示选项见 application/modelcatalog/option.ModelCatalogOption（与 domain ModelFamilyCapability 分离）。
 //
-// Catalog — 聚合、信封结构、校验（catalog/ 子包）：
-// - export.go: 根 类型别名。
-// - catalog/snapshot.go: PublishedModelSnapshot、ModelDefinition、QuestionnaireBinding。
-// - catalog/aggregate.go: AssessmentModel、NewAssessmentModel。
-// - catalog/definition.go: DefinitionPayload。
-// - catalog/status.go: ModelStatus。
-// - catalog/validation.go: 领域校验问题。
+// # 子包（机制八包，已与磁盘对齐）
 //
-// Capability — API/目录操作守卫（capability/ 子包）：
-// - export.go: 根 类型别名。
-// - capability/capability.go、capability_role.go: KindCapability 矩阵。
-// - capability/operation.go: CatalogOperation。
-//
-// Legacy / 兼容性 — 迁移读取器和 behavior_ability 产品通道（legacy/ 子包）：
-// - legacy/alias.go: v1 Snapshot、Definition、RuleSetType 别名。
-// - legacy/adapter.go: LegacyKindMapping、PublishedFromLegacy。
-// - legacy/behavior_ability.go、behavior_ability_channel.go。
-// - legacy/kind_mapping.go。
-//
-// 共享：
-// - errors.go: 领域错误。
-// - export.go: 根包到子包的门面别名。
-// - architecture_test.go: 根包守卫（仅允许 doc/errors/export）。
-//
-// # 子包（按模型家族或机制元数据）
-//
-// - 身份/: 类型, 算法, 子类型, 判定类型, ProductChannel。
-// - 路由/: 算法家族, ExecutionPath, 载荷格式。
-// - 能力/: 类型能力, 目录操作。
-// - 因子/: 共享因子快照、层级、计分/分类规格。
-// - 常模ing/: 常模/复合 index 元数据（AlgorithmFamilyFactorNorm）。
-// - task_performance/: 任务元数据（AlgorithmFamilyTaskPerformance）。
-// - personality/: 类型学载荷、发布、校验器。
-// - scale/: 量表定义和快照。
-// - behavioral_rating/: behavioral_rating 快照（包括 Brief-2 画像）。
-// - cognitive/: cognitive 快照（包括 SPM 画像）。
-// - 目录/: AssessmentModel 聚合、已发布快照、校验。
-// - 旧版/: v1 信封结构、适配器、behavior_ability 通道。
+//   - binding/: 身份、产品通道、ModelFamilyCapability
+//   - publishing/: 发布聚合、快照构建、PayloadFormat
+//   - factor/: 共享因子图元数据
+//   - scoring/: 因子计分定义与快照
+//   - typology/: 类型学载荷、发布、校验
+//   - norming/: 常模/行为评定快照
+//   - taskperformance/: 任务表现快照
+//   - legacy/: v1 兼容读取
 package modelcatalog

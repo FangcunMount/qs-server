@@ -24,7 +24,7 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:        &personalityCommandStub{},
+				TypologyCommand:        &typologyCommandStub{},
 				TaskPerformanceCommand: &cognitiveCommandStub{},
 				NormingCommand:         &behavioralRatingCommandStub{},
 			})
@@ -54,7 +54,7 @@ func TestUpdateDefinitionRejectsUnknownModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		TypologyCommand:        &personalityCommandStub{},
+		TypologyCommand:        &typologyCommandStub{},
 		TaskPerformanceCommand: &cognitiveCommandStub{},
 	})
 
@@ -83,7 +83,7 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:        &personalityCommandStub{},
+				TypologyCommand:        &typologyCommandStub{},
 				TaskPerformanceCommand: &cognitiveCommandStub{},
 				NormingCommand:         &behavioralRatingCommandStub{},
 			})
@@ -119,7 +119,7 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:        &personalityCommandStub{},
+				TypologyCommand:        &typologyCommandStub{},
 				TaskPerformanceCommand: &cognitiveCommandStub{},
 				NormingCommand:         &behavioralRatingCommandStub{},
 			})

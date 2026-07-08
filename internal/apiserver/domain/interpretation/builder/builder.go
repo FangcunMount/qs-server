@@ -51,8 +51,8 @@ const (
 )
 
 // FactorScoringBuilder 构建 score-range reports。
-func FactorScoringBuilder(composer ReportBuilder, input reportscore.ScaleReportInput) (*report.InterpretReport, error) {
-	return reportscore.BuildScaleReport(composer, input)
+func FactorScoringBuilder(composer ReportBuilder, input reportscore.FactorScoringReportInput) (*report.InterpretReport, error) {
+	return reportscore.BuildFactorScoringReport(composer, input)
 }
 
 // TypologyBuilder 构建因子-分类 reports via 机制 templates。

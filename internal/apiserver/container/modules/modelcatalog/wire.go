@@ -1,7 +1,7 @@
 package modelcatalog
 
 import (
-	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
+	scoringLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	appTypologyModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -32,7 +32,7 @@ type WireInput struct {
 	RankCacheBuilder       *keyspace.Builder
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
-	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
+	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
 	ScaleInfra             *surveymod.ScaleInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService
@@ -52,14 +52,14 @@ func Wire(in WireInput) (*Module, error) {
 		surveyPorts.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
 	}
 	return Bootstrap(BootstrapInput{
-		Scale:    buildScaleDeps(in),
+		Scoring:  buildScoringDeps(in),
 		Typology: buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
 		Survey:   surveyPorts,
 	})
 }
 
-func buildScaleDeps(in WireInput) ScaleDeps {
-	deps := ScaleDeps{
+func buildScoringDeps(in WireInput) ScoringDeps {
+	deps := ScoringDeps{
 		EventPublisher:      in.EventPublisher,
 		RankRedisClient:     in.RankRedisClient,
 		RankCacheBuilder:    in.RankCacheBuilder,

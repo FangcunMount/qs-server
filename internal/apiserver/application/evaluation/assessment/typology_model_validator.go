@@ -9,16 +9,16 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PersonalityEvaluationModelValidator ensures personality assessments pin 已发布快照。
-type PersonalityEvaluationModelValidator struct {
+// TypologyEvaluationModelValidator ensures typology assessments pin published snapshots.
+type TypologyEvaluationModelValidator struct {
 	reader port.PublishedModelReader
 }
 
-func NewPersonalityEvaluationModelValidator(reader port.PublishedModelReader) evalassessment.EvaluationModelValidator {
-	return PersonalityEvaluationModelValidator{reader: reader}
+func NewTypologyEvaluationModelValidator(reader port.PublishedModelReader) evalassessment.EvaluationModelValidator {
+	return TypologyEvaluationModelValidator{reader: reader}
 }
 
-func (v PersonalityEvaluationModelValidator) ValidateEvaluationModel(
+func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 	ctx context.Context,
 	modelRef evalassessment.EvaluationModelRef,
 	questionnaireRef evalassessment.QuestionnaireRef,
@@ -54,4 +54,12 @@ func (v PersonalityEvaluationModelValidator) ValidateEvaluationModel(
 		return evalassessment.ErrEvaluationModelQuestionnaireMismatch
 	}
 	return nil
+}
+
+// PersonalityEvaluationModelValidator is a deprecated alias for TypologyEvaluationModelValidator.
+type PersonalityEvaluationModelValidator = TypologyEvaluationModelValidator
+
+// NewPersonalityEvaluationModelValidator is a deprecated alias for NewTypologyEvaluationModelValidator.
+func NewPersonalityEvaluationModelValidator(reader port.PublishedModelReader) evalassessment.EvaluationModelValidator {
+	return NewTypologyEvaluationModelValidator(reader)
 }

@@ -1,7 +1,7 @@
 package response
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 )
 
 // ============= Scale Response =============

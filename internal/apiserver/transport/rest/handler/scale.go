@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"

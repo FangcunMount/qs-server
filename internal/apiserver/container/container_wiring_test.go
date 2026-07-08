@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -103,12 +103,12 @@ func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 
 	c := NewContainer(nil, nil, nil)
 	module := &AssessmentModelModule{
-		Scale:    &ScaleModule{},
+		Scoring:  &ScaleModule{},
 		Typology: &PersonalityModelModule{},
 	}
 	c.SetAssessmentModelModule(module)
 
-	if c.ScaleModule != module.Scale || c.PersonalityModelModule != module.Typology {
+	if c.ScaleModule != module.Scoring || c.PersonalityModelModule != module.Typology {
 		t.Fatalf("legacy field aliases not wired to assessment model module")
 	}
 	got := c.GetLoadedModules()

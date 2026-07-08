@@ -28,4 +28,7 @@ func TestReportSpecForAlgorithmUsesLegacyDerivation(t *testing.T) {
 	if spec.AdapterKey != modeltypology.ReportAdapterTraitProfile {
 		t.Fatalf("adapter = %s, want trait_profile", spec.AdapterKey)
 	}
+	if spec.TemplateID != "bigfive" {
+		t.Fatalf("template_id = %q, want bigfive", spec.TemplateID)
+	}
 }

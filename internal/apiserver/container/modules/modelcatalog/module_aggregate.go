@@ -2,9 +2,9 @@ package modelcatalog
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 
-// Module is the assessment-model composition root (scale + typology/norming/taskperformance catalog).
+// Module is the assessment-model composition root (scoring + typology/norming/taskperformance catalog).
 type Module struct {
-	Scale           *Scale
+	Scoring         *Scoring
 	Typology        *Typology
 	TaskPerformance *TaskPerformance
 	Norming         *Norming
@@ -12,15 +12,15 @@ type Module struct {
 
 // Deps groups constructor dependencies for both assessment-model capabilities.
 type Deps struct {
-	Scale           ScaleDeps
+	Scoring         ScoringDeps
 	Typology        TypologyDeps
 	TaskPerformance TaskPerformanceDeps
 	Norming         NormingDeps
 }
 
-// New assembles scale and personality catalog capabilities.
+// New assembles scoring and personality catalog capabilities.
 func New(deps Deps) (*Module, error) {
-	scale, err := NewScale(deps.Scale)
+	scoring, err := NewScoring(deps.Scoring)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 	return &Module{
-		Scale:           scale,
+		Scoring:         scoring,
 		Typology:        typology,
 		TaskPerformance: taskPerformance,
 		Norming:         norming,
@@ -49,8 +49,8 @@ func (m *Module) Cleanup() error {
 	if m == nil {
 		return nil
 	}
-	if m.Scale != nil {
-		if err := m.Scale.Cleanup(); err != nil {
+	if m.Scoring != nil {
+		if err := m.Scoring.Cleanup(); err != nil {
 			return err
 		}
 	}
@@ -75,8 +75,8 @@ func (m *Module) CheckHealth() error {
 	if m == nil {
 		return nil
 	}
-	if m.Scale != nil {
-		if err := m.Scale.CheckHealth(); err != nil {
+	if m.Scoring != nil {
+		if err := m.Scoring.CheckHealth(); err != nil {
 			return err
 		}
 	}

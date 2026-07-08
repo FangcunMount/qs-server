@@ -14,10 +14,10 @@ import (
 // PersonalityModelService exposes C-side personality model catalog reads over gRPC.
 type PersonalityModelService struct {
 	pb.UnimplementedPersonalityModelServiceServer
-	queryService appPersonalityModel.PersonalityModelQueryService
+	queryService appPersonalityModel.TypologyModelQueryService
 }
 
-func NewPersonalityModelService(queryService appPersonalityModel.PersonalityModelQueryService) *PersonalityModelService {
+func NewPersonalityModelService(queryService appPersonalityModel.TypologyModelQueryService) *PersonalityModelService {
 	return &PersonalityModelService{queryService: queryService}
 }
 
@@ -37,7 +37,7 @@ func (s *PersonalityModelService) GetPersonalityModel(ctx context.Context, req *
 }
 
 func (s *PersonalityModelService) ListPersonalityModels(ctx context.Context, req *pb.ListPersonalityModelsRequest) (*pb.ListPersonalityModelsResponse, error) {
-	result, err := s.queryService.ListPublished(ctx, appPersonalityModel.ListPersonalityModelsDTO{
+	result, err := s.queryService.ListPublished(ctx, appPersonalityModel.ListTypologyModelsDTO{
 		Page:      int(req.GetPage()),
 		PageSize:  int(req.GetPageSize()),
 		Algorithm: req.GetAlgorithm(),
@@ -73,7 +73,7 @@ func (s *PersonalityModelService) GetPersonalityModelCategories(ctx context.Cont
 	return &pb.GetPersonalityModelCategoriesResponse{Categories: categories}, nil
 }
 
-func toProtoPersonalityModelSummary(result *appPersonalityModel.PersonalityModelSummaryResult) *pb.PersonalityModelSummary {
+func toProtoPersonalityModelSummary(result *appPersonalityModel.TypologyModelSummaryResult) *pb.PersonalityModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func toProtoPersonalityModelSummary(result *appPersonalityModel.PersonalityModel
 	}
 }
 
-func toProtoPersonalityModel(result *appPersonalityModel.PersonalityModelResult) *pb.PersonalityModel {
+func toProtoPersonalityModel(result *appPersonalityModel.TypologyModelResult) *pb.PersonalityModel {
 	if result == nil {
 		return nil
 	}
@@ -113,7 +113,7 @@ func toProtoPersonalityModel(result *appPersonalityModel.PersonalityModelResult)
 		})
 	}
 	return &pb.PersonalityModel{
-		Summary:        toProtoPersonalityModelSummary(&result.PersonalityModelSummaryResult),
+		Summary:        toProtoPersonalityModelSummary(&result.TypologyModelSummaryResult),
 		DimensionOrder: append([]string(nil), result.DimensionOrder...),
 		Dimensions:     dimensions,
 		Outcomes:       outcomes,

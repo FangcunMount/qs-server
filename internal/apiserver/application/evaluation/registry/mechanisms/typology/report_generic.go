@@ -4,19 +4,20 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func buildPersonalityTypeReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	return buildMechanismPersonalityTypeReport(outcome, legacyAlgorithmFromOutcome(outcome))
+	spec, _, _ := resolveReportBuildContext(algorithmRunner{}, outcome)
+	return buildMechanismPersonalityTypeReport(outcome, spec)
 }
 
 func buildTraitProfileReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	return buildMechanismTraitProfileReport(outcome, legacyAlgorithmFromOutcome(outcome))
+	spec, _, _ := resolveReportBuildContext(algorithmRunner{}, outcome)
+	return buildMechanismTraitProfileReport(outcome, spec)
 }
 
-func buildMechanismPersonalityTypeReport(outcome evaloutcome.Outcome, algorithm modelcatalog.Algorithm) (*domainReport.InterpretReport, error) {
+func buildMechanismPersonalityTypeReport(outcome evaloutcome.Outcome, spec modeltypology.ReportSpec) (*domainReport.InterpretReport, error) {
 	if outcome.Assessment == nil {
 		return nil, errAssessmentRequired
 	}
@@ -35,11 +36,11 @@ func buildMechanismPersonalityTypeReport(outcome evaloutcome.Outcome, algorithm 
 			RiskLevel:    typologyRiskLevel(outcome.Execution),
 			Detail:       genericPersonalityTypeMechanismDetail(detail),
 		},
-		personalityTypeTemplateForAlgorithm(algorithm),
+		personalityTypeTemplateForSpec(spec),
 	)
 }
 
-func buildMechanismTraitProfileReport(outcome evaloutcome.Outcome, algorithm modelcatalog.Algorithm) (*domainReport.InterpretReport, error) {
+func buildMechanismTraitProfileReport(outcome evaloutcome.Outcome, spec modeltypology.ReportSpec) (*domainReport.InterpretReport, error) {
 	if outcome.Assessment == nil {
 		return nil, errAssessmentRequired
 	}
@@ -58,6 +59,6 @@ func buildMechanismTraitProfileReport(outcome evaloutcome.Outcome, algorithm mod
 			RiskLevel:    typologyRiskLevel(outcome.Execution),
 			Detail:       genericTraitProfileMechanismDetail(detail),
 		},
-		traitProfileTemplateForAlgorithm(algorithm),
+		traitProfileTemplateForSpec(spec),
 	)
 }

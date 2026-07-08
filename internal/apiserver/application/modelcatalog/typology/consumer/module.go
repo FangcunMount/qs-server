@@ -6,29 +6,48 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PersonalityModelQueryService 是C 端 人格模型 目录 查询端口。
-type PersonalityModelQueryService = query.PersonalityModelQueryService
+// TypologyModelQueryService 是 C 端 typology 模型目录查询端口。
+type TypologyModelQueryService = query.TypologyModelQueryService
 
-// NewQueryService 创建人格模型 查询服务。
-func NewQueryService(lister port.PublishedModelLister) PersonalityModelQueryService {
+// NewQueryService 创建 typology 模型查询服务。
+func NewQueryService(lister port.PublishedModelLister) TypologyModelQueryService {
 	return query.NewQueryService(lister)
 }
 
-// NewQueryServiceWithAlgorithmLister 创建查询服务 使用 动态分类支持。
+// NewQueryServiceWithAlgorithmLister 创建查询服务，支持动态分类。
 func NewQueryServiceWithAlgorithmLister(
 	lister port.PublishedModelLister,
 	algorithmLister port.PublishedAlgorithmLister,
-) PersonalityModelQueryService {
+) TypologyModelQueryService {
 	return query.NewQueryServiceWithAlgorithmLister(lister, algorithmLister)
 }
 
 type (
-	ListPersonalityModelsDTO          = shared.ListPersonalityModelsDTO
-	PersonalityModelSummaryResult     = shared.PersonalityModelSummaryResult
-	PersonalityModelSummaryListResult = shared.PersonalityModelSummaryListResult
-	PersonalityDimensionResult        = shared.PersonalityDimensionResult
-	PersonalityOutcomeSummaryResult   = shared.PersonalityOutcomeSummaryResult
-	PersonalityModelResult            = shared.PersonalityModelResult
-	PersonalityModelCategoryResult    = shared.PersonalityModelCategoryResult
-	PersonalityModelCategoriesResult  = shared.PersonalityModelCategoriesResult
+	ListTypologyModelsDTO          = shared.ListTypologyModelsDTO
+	TypologyModelSummaryResult     = shared.TypologyModelSummaryResult
+	TypologyModelSummaryListResult = shared.TypologyModelSummaryListResult
+	TypologyDimensionResult        = shared.TypologyDimensionResult
+	TypologyOutcomeSummaryResult   = shared.TypologyOutcomeSummaryResult
+	TypologyModelResult            = shared.TypologyModelResult
+	TypologyModelCategoryResult    = shared.TypologyModelCategoryResult
+	TypologyModelCategoriesResult  = shared.TypologyModelCategoriesResult
+
+	// Deprecated: use TypologyModelQueryService.
+	PersonalityModelQueryService = TypologyModelQueryService
+	// Deprecated: use ListTypologyModelsDTO.
+	ListPersonalityModelsDTO = ListTypologyModelsDTO
+	// Deprecated: use TypologyModelSummaryResult.
+	PersonalityModelSummaryResult = TypologyModelSummaryResult
+	// Deprecated: use TypologyModelSummaryListResult.
+	PersonalityModelSummaryListResult = TypologyModelSummaryListResult
+	// Deprecated: use TypologyDimensionResult.
+	PersonalityDimensionResult = TypologyDimensionResult
+	// Deprecated: use TypologyOutcomeSummaryResult.
+	PersonalityOutcomeSummaryResult = TypologyOutcomeSummaryResult
+	// Deprecated: use TypologyModelResult.
+	PersonalityModelResult = TypologyModelResult
+	// Deprecated: use TypologyModelCategoryResult.
+	PersonalityModelCategoryResult = TypologyModelCategoryResult
+	// Deprecated: use TypologyModelCategoriesResult.
+	PersonalityModelCategoriesResult = TypologyModelCategoriesResult
 )

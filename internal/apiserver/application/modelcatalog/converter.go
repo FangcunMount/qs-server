@@ -31,7 +31,7 @@ type personalityOutcomeDefinition struct {
 	Rarity      map[string]interface{} `json:"rarity,omitempty"`
 }
 
-func personalitySummaryFromSummary(result typologyconsumer.PersonalityModelSummaryResult) ModelSummary {
+func typologySummaryFromSummary(result typologyconsumer.TypologyModelSummaryResult) ModelSummary {
 	summary := ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindPersonality,
@@ -48,15 +48,15 @@ func personalitySummaryFromSummary(result typologyconsumer.PersonalityModelSumma
 	return summary
 }
 
-func personalitySummaryFromDetail(result *typologyconsumer.PersonalityModelResult) *ModelSummary {
+func typologySummaryFromDetail(result *typologyconsumer.TypologyModelResult) *ModelSummary {
 	if result == nil {
 		return nil
 	}
-	summary := personalitySummaryFromSummary(result.PersonalityModelSummaryResult)
+	summary := typologySummaryFromSummary(result.TypologyModelSummaryResult)
 	return &summary
 }
 
-func newPersonalityDefinitionPayload(result *typologyconsumer.PersonalityModelResult) personalityDefinitionPayload {
+func newTypologyDefinitionPayload(result *typologyconsumer.TypologyModelResult) personalityDefinitionPayload {
 	payload := personalityDefinitionPayload{
 		Dimensions:   make([]personalityDimensionDefinition, 0, len(result.Dimensions)),
 		Outcomes:     make([]personalityOutcomeDefinition, 0, len(result.Outcomes)),
@@ -80,7 +80,7 @@ func newPersonalityDefinitionPayload(result *typologyconsumer.PersonalityModelRe
 	return payload
 }
 
-func previewFromPersonality(result *typology.PreviewReportResult) *PreviewReportResult {
+func previewFromTypology(result *typology.PreviewReportResult) *PreviewReportResult {
 	if result == nil {
 		return nil
 	}
