@@ -1,4 +1,4 @@
-package evaluation
+package pipeline
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 

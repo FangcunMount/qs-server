@@ -20,8 +20,6 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 		"policy":     {},
 		"pipeline":   {},
 		"event":      {},
-		"scoring":    {}, // transitional ACL to calculation/scoring
-		"typology":   {}, // transitional ACL/orchestration; shrinking in later rounds
 	}
 	forbiddenAssessmentCodeFiles := []string{
 		"score_mbti.go",
@@ -38,7 +36,7 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 			rel, _ := filepath.Rel(evalRoot, path)
 			if !strings.Contains(rel, string(filepath.Separator)) {
 				if _, ok := allowedTopLevel[entry.Name()]; !ok {
-					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/policy/pipeline/event (+ transitional scoring/typology)", entry.Name())
+					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/policy/pipeline/event", entry.Name())
 				}
 			}
 			if entry.Name() == "norming" || entry.Name() == "task_performance" {

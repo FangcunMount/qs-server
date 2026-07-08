@@ -1,16 +1,6 @@
-package evaluation
+package pipeline
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-
-// ModelKind 区分scale 与 personality 类型学描述符。
-type ModelKind string
-
-const (
-	ModelKindScale            ModelKind = "scale"
-	ModelKindTypology         ModelKind = "typology"
-	ModelKindBehavioralRating ModelKind = "behavioral_rating"
-	ModelKindCognitive        ModelKind = "cognitive"
-)
 
 // ModelDescriptor 是规范 registration entry 用于 评估 model。
 type ModelDescriptor struct {
@@ -58,7 +48,7 @@ func ScaleModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{Kind: ModelKindScale}
 }
 
-// 默认ModelDescriptors 返回内置 scale 描述符 仅。
+// DefaultModelDescriptors 返回内置 scale 描述符 仅。
 // Typology 描述符 是 owned 按 application 类型学.默认Modules() at 组合根。
 func DefaultModelDescriptors() []ModelDescriptor {
 	return []ModelDescriptor{ScaleModelDescriptor()}
@@ -74,4 +64,9 @@ func TypologyAlgorithms(descs []ModelDescriptor) []modelcatalog.Algorithm {
 		out = append(out, desc.Algorithm)
 	}
 	return out
+}
+
+// ExecutionPathForDescriptor 映射运行时描述符 到 its 物化路径。
+func ExecutionPathForDescriptor(desc ModelDescriptor) (modelcatalog.ExecutionPath, error) {
+	return ExecutionPathForModelKind(desc.Kind)
 }
