@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
@@ -82,13 +83,14 @@ type NormSubjectSnapshot struct {
 }
 
 type ModelSnapshot struct {
-	Kind      EvaluationModelKind
-	SubKind   string
-	Algorithm string
-	Code      string
-	Version   string
-	Title     string
-	Payload   ModelPayload
+	Kind           EvaluationModelKind
+	SubKind        string
+	Algorithm      string
+	ProductChannel string
+	Code           string
+	Version        string
+	Title          string
+	Payload        ModelPayload
 }
 
 func (m *ModelSnapshot) ModelRef() ModelRef {
@@ -118,12 +120,13 @@ func NewScaleModelSnapshot(scale *scalesnapshot.ScaleSnapshot) *ModelSnapshot {
 		version = scale.QuestionnaireVersion
 	}
 	return &ModelSnapshot{
-		Kind:      EvaluationModelKindScale,
-		Algorithm: "scale_default",
-		Code:      scale.Code,
-		Version:   version,
-		Title:     scale.Title,
-		Payload:   ScaleModelPayload{Scale: scale},
+		Kind:           EvaluationModelKindScale,
+		Algorithm:      string(modelcatalog.AlgorithmScaleDefault),
+		ProductChannel: string(modelcatalog.ProductChannelMedicalScale),
+		Code:           scale.Code,
+		Version:        version,
+		Title:          scale.Title,
+		Payload:        ScaleModelPayload{Scale: scale},
 	}
 }
 
@@ -158,13 +161,14 @@ func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
 		return nil
 	}
 	return &ModelSnapshot{
-		Kind:      EvaluationModelKindPersonality,
-		SubKind:   "typology",
-		Algorithm: string(payload.Algorithm),
-		Code:      payload.Code,
-		Version:   payload.Version,
-		Title:     payload.Title,
-		Payload:   TypologyModelPayload{Payload: payload},
+		Kind:           EvaluationModelKindPersonality,
+		SubKind:        "typology",
+		Algorithm:      string(payload.Algorithm),
+		ProductChannel: string(modelcatalog.ProductChannelPersonality),
+		Code:           payload.Code,
+		Version:        payload.Version,
+		Title:          payload.Title,
+		Payload:        TypologyModelPayload{Payload: payload},
 	}
 }
 

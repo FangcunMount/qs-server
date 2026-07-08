@@ -101,6 +101,38 @@ func TestEvaluateReturnsRunPersistenceErrorBeforeExecuting(t *testing.T) {
 	}
 }
 
+func TestEvaluateReturnsCurrentRunPersistenceErrorBeforeExecuting(t *testing.T) {
+	t.Parallel()
+
+	persistErr := errors.New("current run id save failed")
+	a := splitPhaseAssessment(t)
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
+	registry, err := NewEvaluatorRegistry(evaluator)
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry: %v", err)
+	}
+	capture := &splitPhaseCapture{}
+	repo := &fakeAssessmentRepo{assessment: a, saveErr: persistErr}
+	svc := newSplitPhaseTestService(
+		repo,
+		stubInputResolver{},
+		capture,
+		WithEvaluatorRegistry(registry),
+		WithRunRepository(&stubRunRepo{}),
+	)
+
+	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	if !errors.Is(err, persistErr) {
+		t.Fatalf("Evaluate error = %v, want current run persistence error", err)
+	}
+	if evaluator.calls != 0 {
+		t.Fatalf("evaluator calls = %d, want 0 after current run persist failure", evaluator.calls)
+	}
+	if !a.Status().IsFailed() {
+		t.Fatalf("assessment status = %s, want failed for start persistence failure", a.Status())
+	}
+}
+
 func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T) {
 	t.Parallel()
 
@@ -132,6 +164,44 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
+	}
+}
+
+func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T) {
+	t.Parallel()
+
+	executeErr := errors.New("calculator failed")
+	persistErr := errors.New("failed run save failed")
+	a := splitPhaseAssessment(t)
+	registry, err := NewEvaluatorRegistry(evaluatorStub{
+		key: evaluation.ExecutionIdentityScaleDefault,
+		execute: func(context.Context, ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
+			return nil, executeErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry: %v", err)
+	}
+	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
+	svc := NewService(
+		&fakeAssessmentRepo{assessment: a},
+		stubInputResolver{},
+		WithEvaluatorRegistry(registry),
+		WithRunRepository(runRepo),
+	).(*service)
+
+	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	if !errors.Is(err, persistErr) {
+		t.Fatalf("Evaluate error = %v, want failed run persistence error", err)
+	}
+	if len(runRepo.saved) != 2 {
+		t.Fatalf("saved runs = %d, want running and failed", len(runRepo.saved))
+	}
+	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
+		t.Fatalf("last run status = %s, want failed", got)
+	}
+	if !a.Status().IsFailed() {
+		t.Fatalf("assessment status = %s, want failed after execution failure", a.Status())
 	}
 }
 
@@ -176,9 +246,12 @@ func TestEvaluateReturnsSucceededRunPersistenceErrorAfterScoring(t *testing.T) {
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusSucceeded {
 		t.Fatalf("last run status = %s, want succeeded", got)
 	}
+	if a.Status().IsFailed() {
+		t.Fatalf("assessment status = %s, terminal run persistence error must not mark assessment failed", a.Status())
+	}
 }
 
-func TestPersistEvaluationRunStateReturnsCurrentRunSaveError(t *testing.T) {
+func TestPersistStartedEvaluationRunReturnsCurrentRunSaveError(t *testing.T) {
 	t.Parallel()
 
 	persistErr := errors.New("assessment save failed")
@@ -191,8 +264,8 @@ func TestPersistEvaluationRunStateReturnsCurrentRunSaveError(t *testing.T) {
 		runRepo:        &stubRunRepo{},
 	}
 
-	err := svc.persistEvaluationRunState(context.Background(), a, run)
+	err := svc.persistStartedEvaluationRun(context.Background(), a, run)
 	if !errors.Is(err, persistErr) {
-		t.Fatalf("persistEvaluationRunState error = %v, want assessment save error", err)
+		t.Fatalf("persistStartedEvaluationRun error = %v, want assessment save error", err)
 	}
 }

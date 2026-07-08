@@ -118,12 +118,14 @@ func scaleReportBuilderStub(order *[]string, rpt *domainReport.InterpretReport, 
 type resultReportSaverStub struct {
 	order      *[]string
 	err        error
+	saveCalls  int
 	eventTypes []string
 	testeeID   testee.ID
 }
 
 func (s *resultReportSaverStub) SaveReportDurably(_ context.Context, _ *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
 	*s.order = append(*s.order, "report_save")
+	s.saveCalls++
 	s.testeeID = testeeID
 	for _, evt := range events {
 		s.eventTypes = append(s.eventTypes, evt.EventType())
@@ -311,12 +313,13 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order, err: saveErr}
+	reportSaver := &resultReportSaverStub{order: &order}
 	notifier := &resultNotifierStub{order: &order}
 	writer, err := NewWriter(
 		assessmentRepo,
 		scoreProjectors,
 		reportBuilders,
-		&resultReportSaverStub{order: &order},
+		reportSaver,
 		notifier,
 		nil,
 	)
@@ -330,6 +333,12 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 	}
 	if !a.Status().IsInterpreted() {
 		t.Fatalf("assessment in memory should be interpreted after ApplyEvaluation; status=%s", a.Status())
+	}
+	if reportSaver.saveCalls != 1 {
+		t.Fatalf("report save calls = %d, want 1 before assessment save failure", reportSaver.saveCalls)
+	}
+	if len(reportSaver.eventTypes) == 0 {
+		t.Fatal("report durable save should have received success events before assessment save failure")
 	}
 	if notifier.calls != 0 {
 		t.Fatalf("notifier calls = %d, want 0", notifier.calls)

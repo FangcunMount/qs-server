@@ -3,6 +3,7 @@ package evaluationinput
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
@@ -22,12 +23,13 @@ func NewCognitiveModelSnapshot(snapshot *cognitivesnapshot.Snapshot) *ModelSnaps
 		return nil
 	}
 	return &ModelSnapshot{
-		Kind:      EvaluationModelKindCognitive,
-		Algorithm: "spm",
-		Code:      snapshot.Code,
-		Version:   snapshot.Version,
-		Title:     snapshot.Title,
-		Payload:   CognitiveModelPayload{Snapshot: snapshot},
+		Kind:           EvaluationModelKindCognitive,
+		Algorithm:      string(modelcatalog.AlgorithmSPM),
+		ProductChannel: string(modelcatalog.ProductChannelCognitive),
+		Code:           snapshot.Code,
+		Version:        snapshot.Version,
+		Title:          snapshot.Title,
+		Payload:        CognitiveModelPayload{Snapshot: snapshot},
 	}
 }
 

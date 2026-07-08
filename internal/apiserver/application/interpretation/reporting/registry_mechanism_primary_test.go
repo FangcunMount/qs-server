@@ -106,9 +106,10 @@ func TestReportRoutingContextFromOutcomeCarriesAlgorithmAndProductChannel(t *tes
 	outcome := evaloutcome.Outcome{
 		Input: &evaluationinput.InputSnapshot{
 			Model: &evaluationinput.ModelSnapshot{
-				Kind:      evaluationinput.EvaluationModelKindScale,
-				Algorithm: string(modelcatalog.AlgorithmScaleDefault),
-				Code:      "PHQ9",
+				Kind:           evaluationinput.EvaluationModelKindScale,
+				Algorithm:      string(modelcatalog.AlgorithmScaleDefault),
+				ProductChannel: string(modelcatalog.ProductChannel("screening")),
+				Code:           "PHQ9",
 			},
 		},
 	}
@@ -125,12 +126,18 @@ func TestReportRoutingContextFromOutcomeCarriesAlgorithmAndProductChannel(t *tes
 	if ctx.Algorithm != modelcatalog.AlgorithmScaleDefault {
 		t.Fatalf("algorithm=%s", ctx.Algorithm)
 	}
-	if ctx.ProductChannel != modelcatalog.ProductChannelMedicalScale {
+	if ctx.ProductChannel != modelcatalog.ProductChannel("screening") {
 		t.Fatalf("product channel=%s", ctx.ProductChannel)
 	}
 	key, ok := ctx.MechanismKey()
 	if !ok {
 		t.Fatal("MechanismKey returned false")
+	}
+	if key.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
+		t.Fatalf("mechanism family=%s", key.AlgorithmFamily)
+	}
+	if key.DecisionKind != modelcatalog.DecisionKindScoreRange {
+		t.Fatalf("mechanism decision=%s", key.DecisionKind)
 	}
 	if key.ReportType != domainReport.ReportTypeStandard {
 		t.Fatalf("report type=%s", key.ReportType)

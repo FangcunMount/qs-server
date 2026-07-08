@@ -30,10 +30,14 @@ func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcata
 		decision.Kind = resolved
 	}
 
+	productChannel := modelcatalog.ProductChannel(model.ProductChannel)
+	if productChannel == "" {
+		productChannel = modelcatalog.DefaultProductChannelFor(kind)
+	}
 	payloadFormat := modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
 	return modelcatalog.PublishedModelSnapshot{
 		Model: modelcatalog.ModelDefinition{
-			ProductChannel: modelcatalog.DefaultProductChannelFor(kind),
+			ProductChannel: productChannel,
 			Kind:           kind,
 			SubKind:        subKind,
 			Algorithm:      algorithm,

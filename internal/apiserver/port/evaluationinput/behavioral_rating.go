@@ -28,12 +28,13 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot) *Mo
 		algorithm = string(modelcatalog.AlgorithmBrief2)
 	}
 	return &ModelSnapshot{
-		Kind:      EvaluationModelKindBehavioralRating,
-		Algorithm: algorithm,
-		Code:      snapshot.Code,
-		Version:   version,
-		Title:     snapshot.Title,
-		Payload:   BehavioralRatingModelPayload{Snapshot: snapshot},
+		Kind:           EvaluationModelKindBehavioralRating,
+		Algorithm:      algorithm,
+		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
+		Code:           snapshot.Code,
+		Version:        version,
+		Title:          snapshot.Title,
+		Payload:        BehavioralRatingModelPayload{Snapshot: snapshot},
 	}
 }
 
