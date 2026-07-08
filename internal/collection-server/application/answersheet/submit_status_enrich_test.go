@@ -80,3 +80,19 @@ func TestGetSubmitStatusOmitsAssessmentIDWhenNotReady(t *testing.T) {
 		t.Fatalf("expected done without assessment_id, got %+v", status)
 	}
 }
+
+func TestGetSubmitStatusSkipsResolverWhenNil(t *testing.T) {
+	t.Parallel()
+
+	service := &SubmissionService{
+		queue: &SubmitQueue{
+			statuses: newSubmitQueueStatusStore(0),
+		},
+	}
+	service.queue.setStatus("req-1", SubmitStatusDone, "42")
+
+	status, ok := service.GetSubmitStatus(context.Background(), "req-1")
+	if !ok || status == nil || status.AssessmentID != "" {
+		t.Fatalf("expected done without resolver, got %+v", status)
+	}
+}
