@@ -55,7 +55,7 @@ func TestModelCatalogExportOnlyImportsSubpackages(t *testing.T) {
 		}
 		sub := strings.TrimPrefix(path, modulePrefix)
 		if sub == "" || strings.Contains(sub, "/") && !isAllowedSubpackageRoot(sub) {
-			t.Fatalf("export.go imports %q; allowed subpackages are identity, routing, capability, catalog, legacy", path)
+			t.Fatalf("export.go imports %q; allowed subpackages are identity, routing, capability, catalog, legacy, scoring, typology, taskperformance, binding, publishing", path)
 		}
 	}
 }
@@ -83,10 +83,63 @@ func isAllowedSubpackageRoot(sub string) bool {
 		sub = sub[:idx]
 	}
 	switch sub {
-	case "identity", "routing", "capability", "catalog", "legacy":
+	case "identity", "routing", "capability", "catalog", "legacy",
+		"scoring", "typology", "taskperformance", "binding", "publishing",
+		"factor", "norming":
 		return true
 	default:
 		return false
+	}
+}
+
+func TestModelCatalogTopLevelPackages(t *testing.T) {
+	t.Parallel()
+
+	root := modelCatalogRoot(t)
+	required := []string{
+		"factor", "scoring", "norming", "typology", "taskperformance",
+		"binding", "publishing", "legacy",
+	}
+	transitional := map[string]struct{}{
+		"cognitive":         {},
+		"behavioral_rating": {},
+		"scale":             {},
+		"personality":       {},
+		"identity":          {},
+		"routing":           {},
+		"catalog":           {},
+		"capability":        {},
+		"task_performance":  {},
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := make(map[string]struct{})
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		seen[name] = struct{}{}
+		if _, ok := transitional[name]; ok {
+			continue
+		}
+		allowed := false
+		for _, req := range required {
+			if name == req {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			t.Fatalf("unexpected top-level package %q; canonical homes are %v (transitional: identity/routing/catalog/capability + family compat seams)", name, required)
+		}
+	}
+	for _, req := range required {
+		if _, ok := seen[req]; !ok {
+			t.Fatalf("missing required top-level package %q", req)
+		}
 	}
 }
 

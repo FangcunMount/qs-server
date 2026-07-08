@@ -496,3 +496,31 @@ type Algorithm = identity.Algorithm
 | R59 | 删除 domain `*_assembler` 薄包装；统一 `BuildPersonalityTypeReport` + mechanism template |
 | R60 | `application/architecture_transitional_test.go` 守卫 + 本文档 R51–R60 表 |
 
+## Round 61–77：终局对齐去测评 code 结构化（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R61 | 删除 `SPMProfile`；cognitive snapshot 仅 `taskperf.ApplyNormMetadata` 投影 |
+| R62 | `Brief2Profile` → 机制中性 `NormingProfile`；norm_enricher/port 改读 generic |
+| R63 | `PayloadFormatForCognitive/BehavioralRating` 去 Algorithm switch；legacy format 标 deprecated |
+| R64 | publish 侧 `normingDecisionSpec` 由 norming metadata 驱动 |
+| R65 | evaluation 根级 registry/execution_identity/runtime_path/input 归入 `pipeline/` |
+| R66 | 删 `domain/evaluation/scoring`；桥接下沉 application；直引 `calculation/scoring` |
+| R67 | typology patterns DTO 迁至 `application/evaluation/outcome/typology` |
+| R68 | configured/adapter 上移 application；删 `domain/evaluation/typology` 整树 |
+| R69 | interpretation `*_detail.go` 外迁 `application/.../legacy`；删 typology 薄包装 |
+| R70 | 删 descriptor/report evaluator fallback；三件套缺失显式 error |
+| R71 | modelcatalog 机制子包脚手架：`scoring/typology/taskperformance/binding/publishing` |
+| R72 | `cognitive/snapshot` → `taskperformance/snapshot`（cognitive 留 compat seam） |
+| R73 | `behavioral_rating/snapshot` → `norming/snapshot` |
+| R74 | `scale/snapshot` → `scoring/snapshot` |
+| R75 | `personality/typology` → `typology`（全量改 import；personality/typology 目录清空） |
+| R76 | `identity/routing/catalog/capability` 经 `binding/publishing/export.go` 收敛；`task_performance` → `taskperformance` |
+| R77 | modelcatalog 顶层包守卫 + 本文档 R61–R77 表；`系统设计文档` §19/§20.7 标注演进态 |
+
+过渡态说明（R77 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
+
+```text
+modelcatalog/{cognitive,behavioral_rating,scale,personality,identity,routing,catalog,capability,task_performance}
+```
+
