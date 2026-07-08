@@ -91,82 +91,6 @@ func isAllowedExportSubpackageRoot(sub string) bool {
 	}
 }
 
-func TestModelCatalogScalePackageOnlyCompatSeams(t *testing.T) {
-	t.Parallel()
-
-	root := modelCatalogRoot(t)
-	scaleRoot := filepath.Join(root, "scale")
-	entries, err := os.ReadDir(scaleRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allowedSubdirs := map[string]struct{}{
-		"definition": {},
-		"snapshot":   {},
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			t.Fatalf("unexpected top-level file %s in scale/; package must only contain compat seams", entry.Name())
-		}
-		name := entry.Name()
-		if _, ok := allowedSubdirs[name]; !ok {
-			t.Fatalf("unexpected scale subpackage %q; allowed compat seams are definition and snapshot", name)
-		}
-		subRoot := filepath.Join(scaleRoot, name)
-		subEntries, err := os.ReadDir(subRoot)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, subEntry := range subEntries {
-			if subEntry.IsDir() {
-				if name == "definition" && subEntry.Name() == "hotrank" {
-					continue
-				}
-				t.Fatalf("unexpected nested directory scale/%s/%s; compat seams must stay flat", name, subEntry.Name())
-			}
-			subName := subEntry.Name()
-			if !strings.HasSuffix(subName, ".go") || strings.HasSuffix(subName, "_test.go") {
-				continue
-			}
-			if subName != "compat.go" {
-				t.Fatalf("unexpected file scale/%s/%s; compat seams may only contain compat.go", name, subName)
-			}
-		}
-	}
-	assertScaleCompatReexportsScoring(t, scaleRoot)
-}
-
-func assertScaleCompatReexportsScoring(t *testing.T, scaleRoot string) {
-	t.Helper()
-
-	const scoringPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/"
-	err := filepath.WalkDir(scaleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || !strings.HasSuffix(path, "compat.go") {
-			return nil
-		}
-		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
-		if err != nil {
-			return err
-		}
-		if len(parsed.Imports) == 0 {
-			t.Fatalf("%s must re-export from scoring canonical home", path)
-		}
-		for _, imp := range parsed.Imports {
-			importPath := strings.Trim(imp.Path.Value, `"`)
-			if !strings.HasPrefix(importPath, scoringPrefix) {
-				t.Fatalf("%s imports %q; scale compat seams may only re-export scoring packages", path, importPath)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestModelCatalogTopLevelPackages(t *testing.T) {
 	t.Parallel()
 
@@ -178,7 +102,6 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 	transitional := map[string]struct{}{
 		"cognitive":         {},
 		"behavioral_rating": {},
-		"scale":             {}, // compat-only: definition + snapshot seams until callers fully migrate
 		"personality":       {},
 		"identity":          {},
 		"routing":           {},

@@ -2,7 +2,7 @@ package survey
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"

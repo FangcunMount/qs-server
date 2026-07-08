@@ -532,10 +532,16 @@ type Algorithm = identity.Algorithm
 | R85 | §20.5 `primary_dimension_code` 配置化；§20.6 `DecisionKind` 去 algorithm 推断 |
 | R86 | 终局守卫收口（顶层八包 + scale compat）+ 文档 §19/§20.7 转正 + 本文档 R78–R86 表 |
 
-过渡态说明（R86 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
+## Round 87+：过渡包清零（进行中）
+
+| Round | 动作 |
+|-------|------|
+| R87 | 剩余调用方改引 `scoring/definition`；删除 `modelcatalog/scale/` 整树；顶层守卫禁 `scale/` |
+
+过渡态说明（R87 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
 
 ```text
-modelcatalog/{identity,routing,catalog,capability,cognitive,behavioral_rating,scale,personality,task_performance}
+modelcatalog/{identity,routing,catalog,capability,cognitive,behavioral_rating,personality,task_performance}
 application/modelcatalog/{personality,behavioral_rating,cognitive}/  # 用例子包，非顶层 service 命名
 ```
 

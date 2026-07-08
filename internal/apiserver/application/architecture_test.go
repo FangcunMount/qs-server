@@ -115,7 +115,7 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
@@ -164,7 +164,7 @@ func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting"), func(path, importPath string) {
@@ -362,7 +362,7 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "catalog/read-model snapshot adapters",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                       "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
@@ -425,7 +425,7 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 		"github.com/FangcunMount/component-base/pkg/errors":                                         "domain-native errors",
 		"github.com/FangcunMount/component-base/pkg/code":                                           "domain-native errors",
 		"github.com/FangcunMount/qs-server/internal/pkg/code":                                       "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluation-local snapshots/value objects",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":         "report-local snapshots/value objects",
 	}
@@ -687,7 +687,7 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		"SubKindTrait",
 	}
 	scaleRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "scoring"),
 	}
