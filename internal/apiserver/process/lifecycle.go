@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -110,12 +111,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {
+	detail := err.Error()
+	if err != nil {
+		detail = fmt.Sprintf("%-v", err)
+	}
 	logger.L(context.Background()).Errorw("Failed to prepare api server",
 		"component", "apiserver",
 		"action", action,
-		"error", err.Error(),
+		"error", detail,
 	)
-	log.Fatalf("Failed to %s: %v", action, err)
+	log.Fatalf("Failed to %s: %s", action, detail)
 }
 
 func (s preparedServer) buildPreparedServerRunDeps() preparedServerRunDeps {

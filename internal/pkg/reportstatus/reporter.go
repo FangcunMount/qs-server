@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
@@ -25,13 +26,15 @@ func NewReporter(opsHandle *cacheplane.Handle, cfg Config) (*Reporter, error) {
 	if cfg.Signaling.Enabled && opsHandle != nil && opsHandle.Client != nil {
 		standalone, err := AsStandaloneClient(opsHandle.Client)
 		if err != nil {
-			return nil, err
+			log.Warnf("report status signaling disabled: %v", err)
+		} else {
+			s, err := NewSignaler(standalone, cfg.Signaling)
+			if err != nil {
+				log.Warnf("report status signaling disabled: %v", err)
+			} else {
+				signaler = s
+			}
 		}
-		s, err := NewSignaler(standalone, cfg.Signaling)
-		if err != nil {
-			return nil, err
-		}
-		signaler = s
 	}
 	return &Reporter{
 		cache:    cache,

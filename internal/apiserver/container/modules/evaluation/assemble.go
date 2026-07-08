@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -9,7 +10,6 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
@@ -48,7 +48,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
@@ -216,7 +215,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 	if normalized.InputResolver != nil {
 		reportStatusReporter, err := reportstatus.NewReporter(normalized.OpsHandle, normalized.ReportStatusConfig)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report status reporter: %v", err)
+			return fmt.Errorf("failed to initialize report status reporter: %w", err)
 		}
 		m.ReportStatusReporter = reportStatusReporter
 
@@ -230,7 +229,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		descs := normalized.ModelDescriptors
 		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
+			return fmt.Errorf("failed to build family evaluators: %w", err)
 		}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
@@ -242,18 +241,18 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		}
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
+			return fmt.Errorf("failed to initialize evaluation evaluator registry: %w", err)
 		}
 		scoreProjectors, err := MaterializeScoreProjectors(descs, wiringDeps)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation score projectors: %v", err)
+			return fmt.Errorf("failed to build evaluation score projectors: %w", err)
 		}
 		scoreProjectorRegistry, err := interpretationreporting.NewScoreProjectorRegistry(scoreProjectors...)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
+			return fmt.Errorf("failed to initialize evaluation score projector registry: %w", err)
 		}
 		if normalized.ReportBuilderRegistry == nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
+			return fmt.Errorf("report builder registry is required when input resolver is configured")
 		}
 		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
 			infra.assessmentRepo,
@@ -264,16 +263,17 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			reportStatusReporter,
 		)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation writer: %v", err)
+			return fmt.Errorf("failed to initialize interpretation writer: %w", err)
 		}
 		var opsRedis redis.UniversalClient
 		if normalized.OpsHandle != nil {
 			opsRedis = normalized.OpsHandle.Client
 		}
 		scoringSnapshotStore, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
-			AsyncInterpretation: normalized.AsyncInterpretation,
-			SingleProcessAsync:  normalized.SingleProcessAsyncInterpretation,
-			OpsRedis:            opsRedis,
+			AsyncInterpretation:  normalized.AsyncInterpretation,
+			SingleProcessAsync:   normalized.SingleProcessAsyncInterpretation,
+			OpsRedis:             opsRedis,
+			OpsUnavailableReason: opsUnavailableReason(normalized.OpsHandle),
 		})
 		if err != nil {
 			return err
@@ -377,9 +377,10 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 			opsRedis = normalized.OpsHandle.Client
 		}
 		resolved, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
-			AsyncInterpretation: normalized.AsyncInterpretation,
-			SingleProcessAsync:  normalized.SingleProcessAsyncInterpretation,
-			OpsRedis:            opsRedis,
+			AsyncInterpretation:  normalized.AsyncInterpretation,
+			SingleProcessAsync:   normalized.SingleProcessAsyncInterpretation,
+			OpsRedis:             opsRedis,
+			OpsUnavailableReason: opsUnavailableReason(normalized.OpsHandle),
 		})
 		if err != nil {
 			log.Warnf("evaluation consistency reconcile snapshot store unavailable: %v", err)
@@ -403,30 +404,30 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
+		return Deps{}, fmt.Errorf("MySQL database connection is nil or invalid")
 	}
 	if deps.MongoDB == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
+		return Deps{}, fmt.Errorf("MongoDB database connection is nil or invalid")
 	}
 	if deps.EventPublisher == nil {
 		deps.EventPublisher = event.NewNopEventPublisher()
 	}
 	if deps.InputResolver != nil {
 		if len(deps.ModelDescriptors) == 0 {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "model descriptors are required when input resolver is configured")
+			return Deps{}, fmt.Errorf("model descriptors are required when input resolver is configured")
 		}
 		if deps.TypologyRegistry.Len() == 0 {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when input resolver is configured")
+			return Deps{}, fmt.Errorf("typology registry is required when input resolver is configured")
 		}
 		if deps.ReportBuilderRegistry == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
+			return Deps{}, fmt.Errorf("report builder registry is required when input resolver is configured")
 		}
 		if deps.ReportDurableSaver == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report durable saver is required when input resolver is configured")
+			return Deps{}, fmt.Errorf("report durable saver is required when input resolver is configured")
 		}
 	}
 	if deps.ReportReader == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report reader is required")
+		return Deps{}, fmt.Errorf("report reader is required")
 	}
 	if !deps.AsyncInterpretation && asyncInterpretationFromEnv() {
 		deps.AsyncInterpretation = true

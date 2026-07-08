@@ -10,10 +10,8 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 
-	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
@@ -30,7 +28,7 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 	tests := []struct {
 		name               string
 		cfg                scoringSnapshotStoreConfig
-		wantErrCode        int
+		wantErrContains    string
 		wantMemoryFallback bool
 		wantRedisStore     bool
 	}{
@@ -44,9 +42,10 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 		{
 			name: "async mode rejects in-process store without explicit single-process opt-in",
 			cfg: scoringSnapshotStoreConfig{
-				AsyncInterpretation: true,
+				AsyncInterpretation:  true,
+				OpsUnavailableReason: "ops_runtime redis client is nil",
 			},
-			wantErrCode: code.ErrModuleInitializationFailed,
+			wantErrContains: "async interpretation requires durable scoring snapshot store",
 		},
 		{
 			name: "async mode allows in-process store when single-process opt-in is set",
@@ -80,12 +79,12 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 			t.Parallel()
 
 			store, err := resolveScoringSnapshotStore(tt.cfg)
-			if tt.wantErrCode != 0 {
+			if tt.wantErrContains != "" {
 				if err == nil {
 					t.Fatal("resolveScoringSnapshotStore() error = nil, want failure")
 				}
-				if !cberrors.IsCode(err, tt.wantErrCode) {
-					t.Fatalf("resolveScoringSnapshotStore() code = %v, want %v", cberrors.ParseCoder(err), tt.wantErrCode)
+				if !strings.Contains(err.Error(), tt.wantErrContains) {
+					t.Fatalf("resolveScoringSnapshotStore() error = %q, want substring %q", err.Error(), tt.wantErrContains)
 				}
 				return
 			}
