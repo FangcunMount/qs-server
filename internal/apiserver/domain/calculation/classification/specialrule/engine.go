@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestEngineApplyBeforeScoreMatchesDrinkTrigger(t *testing.T) {
