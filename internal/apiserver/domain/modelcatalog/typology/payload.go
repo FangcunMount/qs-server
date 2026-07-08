@@ -8,21 +8,21 @@ import (
 
 // Payload 是unified personality 类型学 model 载荷。
 type Payload struct {
-	Code                 string                 `json:"code"`
-	Version              string                 `json:"version"`
-	Title                string                 `json:"title"`
-	QuestionnaireCode    string                 `json:"questionnaire_code"`
-	QuestionnaireVersion string                 `json:"questionnaire_version"`
-	Status               string                 `json:"status"`
-	Source               Source                 `json:"source"`
-	Algorithm            binding.Algorithm `json:"algorithm"`
-	DimensionOrder       []string               `json:"dimension_order"`
-	Dimensions           map[string]Dimension   `json:"dimensions"`
-	QuestionMappings     []QuestionMapping      `json:"question_mappings"`
-	Outcomes             []Outcome              `json:"outcomes"`
-	MatchingSpec         MatchingSpec           `json:"matching_spec"`
-	SpecialTriggers      []SpecialTrigger       `json:"special_triggers"`
-	Runtime              *RuntimeSpec           `json:"runtime,omitempty"`
+	Code                 string               `json:"code"`
+	Version              string               `json:"version"`
+	Title                string               `json:"title"`
+	QuestionnaireCode    string               `json:"questionnaire_code"`
+	QuestionnaireVersion string               `json:"questionnaire_version"`
+	Status               string               `json:"status"`
+	Source               Source               `json:"source"`
+	Algorithm            binding.Algorithm    `json:"algorithm"`
+	DimensionOrder       []string             `json:"dimension_order"`
+	Dimensions           map[string]Dimension `json:"dimensions"`
+	QuestionMappings     []QuestionMapping    `json:"question_mappings"`
+	Outcomes             []Outcome            `json:"outcomes"`
+	MatchingSpec         MatchingSpec         `json:"matching_spec"`
+	SpecialTriggers      []SpecialTrigger     `json:"special_triggers"`
+	Runtime              *RuntimeSpec         `json:"runtime,omitempty"`
 }
 
 // HasExplicitRuntime 报告是否 载荷 携带 作者定义 运行时规格。
@@ -114,7 +114,7 @@ type Rarity struct {
 
 type MatchingSpec struct {
 	Kind                        binding.DecisionKind `json:"kind"`
-	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
+	FallbackSimilarityThreshold float64              `json:"fallback_similarity_threshold,omitempty"`
 }
 
 type SpecialTrigger struct {

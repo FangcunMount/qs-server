@@ -84,9 +84,9 @@ func (fg FactorGraphSpec) DecisionFactorOrder() []string {
 // PersonalityDecisionSpec 描述如何画像 向量转成 结果。
 type PersonalityDecisionSpec struct {
 	Kind                        binding.DecisionKind `json:"kind"`
-	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
-	FallbackCode                string                    `json:"fallback_code,omitempty"`
-	LevelRule                   *LevelRuleSpec            `json:"level_rule,omitempty"`
+	FallbackSimilarityThreshold float64              `json:"fallback_similarity_threshold,omitempty"`
+	FallbackCode                string               `json:"fallback_code,omitempty"`
+	LevelRule                   *LevelRuleSpec       `json:"level_rule,omitempty"`
 }
 
 // LevelRuleSpec 映射原始 因子 分数 到 离散等级 用于 模式匹配。
@@ -170,8 +170,8 @@ const (
 
 // OutcomeMappingSpec 描述如何计分 detail 转成 AssessmentOutcome 字段。
 type OutcomeMappingSpec struct {
-	DetailKind       OutcomeDetailKind      `json:"detail_kind"`
-	DetailAdapterKey DetailAdapterKey       `json:"detail_adapter_key,omitempty"`
+	DetailKind       OutcomeDetailKind `json:"detail_kind"`
+	DetailAdapterKey DetailAdapterKey  `json:"detail_adapter_key,omitempty"`
 	Algorithm        binding.Algorithm `json:"algorithm,omitempty"`
 }
 

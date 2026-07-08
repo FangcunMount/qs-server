@@ -52,9 +52,9 @@ func Wire(in WireInput) (*Module, error) {
 		surveyPorts.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
 	}
 	return Bootstrap(BootstrapInput{
-		Scale:       buildScaleDeps(in),
+		Scale:    buildScaleDeps(in),
 		Typology: buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
-		Survey:      surveyPorts,
+		Survey:   surveyPorts,
 	})
 }
 

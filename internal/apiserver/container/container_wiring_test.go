@@ -103,7 +103,7 @@ func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 
 	c := NewContainer(nil, nil, nil)
 	module := &AssessmentModelModule{
-		Scale:       &ScaleModule{},
+		Scale:    &ScaleModule{},
 		Typology: &PersonalityModelModule{},
 	}
 	c.SetAssessmentModelModule(module)

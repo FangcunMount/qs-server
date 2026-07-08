@@ -37,13 +37,13 @@ type Service interface {
 }
 
 type Dependencies struct {
-	NormingCommand norming.Service
-	TypologyCommand      typology.Service
-	TaskPerformanceCommand        taskperformance.Service
-	TypologyQuery        typologyconsumer.PersonalityModelQueryService
-	QuestionnaireQuery      questionnaireapp.QuestionnaireQueryService
-	Codes                   codes.CodesService
-	RawQRCodeGenerator      qrcode.QRCodeService
+	NormingCommand         norming.Service
+	TypologyCommand        typology.Service
+	TaskPerformanceCommand taskperformance.Service
+	TypologyQuery          typologyconsumer.PersonalityModelQueryService
+	QuestionnaireQuery     questionnaireapp.QuestionnaireQueryService
+	Codes                  codes.CodesService
+	RawQRCodeGenerator     qrcode.QRCodeService
 }
 
 type service struct {

@@ -36,7 +36,7 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 	scaleDeps := in.Scale
 	in.Survey.ApplySurveyPorts(&scaleDeps)
 	return New(Deps{
-		Scale:       scaleDeps,
+		Scale:    scaleDeps,
 		Typology: in.Typology,
 		TaskPerformance: TaskPerformanceDeps{
 			ModelRepo:     in.Typology.ModelRepo,

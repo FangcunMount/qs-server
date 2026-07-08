@@ -252,7 +252,7 @@ func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 func TestGetQRCodeDispatchesByKind(t *testing.T) {
 	personalityStub := &personalityCommandStub{}
 	svc := NewService(Dependencies{
-		TypologyCommand: personalityStub,
+		TypologyCommand:    personalityStub,
 		RawQRCodeGenerator: &personalityQRCodeGeneratorStub{},
 	})
 

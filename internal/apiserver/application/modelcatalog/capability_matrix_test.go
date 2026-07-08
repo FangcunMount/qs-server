@@ -157,9 +157,9 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 			cognitiveStub := &cognitiveCommandStub{}
 			behavioralRatingStub := &behavioralRatingCommandStub{}
 			svc := NewService(Dependencies{
-				TypologyCommand:      personalityStub,
-				TaskPerformanceCommand:        cognitiveStub,
-				NormingCommand: behavioralRatingStub,
+				TypologyCommand:        personalityStub,
+				TaskPerformanceCommand: cognitiveStub,
+				NormingCommand:         behavioralRatingStub,
 			})
 
 			_, err := svc.Create(context.Background(), CreateModelDTO{

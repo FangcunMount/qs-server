@@ -6,9 +6,9 @@ import (
 )
 
 type (
-	ValidationLevel         = binding.ValidationLevel
-	DomainValidationIssue   = binding.DomainValidationIssue
-	DomainValidationResult  = binding.DomainValidationResult
+	ValidationLevel        = binding.ValidationLevel
+	DomainValidationIssue  = binding.DomainValidationIssue
+	DomainValidationResult = binding.DomainValidationResult
 )
 
 const (

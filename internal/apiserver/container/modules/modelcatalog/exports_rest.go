@@ -32,13 +32,13 @@ func (m *Module) ExportRESTDeps(
 	var typologyQuery = m.typologyQuery()
 	var typologyCommand = m.typologyCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
-		TypologyCommand:      typologyCommand,
-		NormingCommand: m.normingCommand(),
-		TaskPerformanceCommand:        m.taskPerformanceCommand(),
-		TypologyQuery:        typologyQuery,
-		QuestionnaireQuery:      questionnaireQuery,
-		Codes:                   codesService,
-		RawQRCodeGenerator:      qrCodeService,
+		TypologyCommand:        typologyCommand,
+		NormingCommand:         m.normingCommand(),
+		TaskPerformanceCommand: m.taskPerformanceCommand(),
+		TypologyQuery:          typologyQuery,
+		QuestionnaireQuery:     questionnaireQuery,
+		Codes:                  codesService,
+		RawQRCodeGenerator:     qrCodeService,
 	})
 	return deps
 }

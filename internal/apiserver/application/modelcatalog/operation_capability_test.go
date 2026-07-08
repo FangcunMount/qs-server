@@ -24,9 +24,9 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:      &personalityCommandStub{},
-				TaskPerformanceCommand:        &cognitiveCommandStub{},
-				NormingCommand: &behavioralRatingCommandStub{},
+				TypologyCommand:        &personalityCommandStub{},
+				TaskPerformanceCommand: &cognitiveCommandStub{},
+				NormingCommand:         &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.UpdateDefinition(context.Background(), "capability_"+apiKind, DefinitionDTO{
@@ -54,8 +54,8 @@ func TestUpdateDefinitionRejectsUnknownModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		TypologyCommand: &personalityCommandStub{},
-		TaskPerformanceCommand:   &cognitiveCommandStub{},
+		TypologyCommand:        &personalityCommandStub{},
+		TaskPerformanceCommand: &cognitiveCommandStub{},
 	})
 
 	_, err := svc.UpdateDefinition(context.Background(), "missing_model", DefinitionDTO{
@@ -83,9 +83,9 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:      &personalityCommandStub{},
-				TaskPerformanceCommand:        &cognitiveCommandStub{},
-				NormingCommand: &behavioralRatingCommandStub{},
+				TypologyCommand:        &personalityCommandStub{},
+				TaskPerformanceCommand: &cognitiveCommandStub{},
+				NormingCommand:         &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.Publish(context.Background(), previewModelCode(apiKind))
@@ -119,9 +119,9 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 			t.Parallel()
 
 			svc := NewService(Dependencies{
-				TypologyCommand:      &personalityCommandStub{},
-				TaskPerformanceCommand:        &cognitiveCommandStub{},
-				NormingCommand: &behavioralRatingCommandStub{},
+				TypologyCommand:        &personalityCommandStub{},
+				TaskPerformanceCommand: &cognitiveCommandStub{},
+				NormingCommand:         &behavioralRatingCommandStub{},
 			})
 
 			_, err := svc.BindQuestionnaire(context.Background(), BindQuestionnaireDTO{
