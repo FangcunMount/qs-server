@@ -3,8 +3,8 @@ package ruleset
 import (
 	"testing"
 
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
@@ -16,7 +16,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := evaluationtypology.ScoreSBTIReference(model, sheet)
+		got, err := typologylegacy.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -35,7 +35,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := evaluationtypology.ScoreSBTIReference(&modelCopy, sheet)
+		got, err := typologylegacy.ScoreSBTIReference(&modelCopy, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -50,7 +50,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := evaluationtypology.ScoreSBTIReference(model, sheet)
+		got, err := typologylegacy.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}

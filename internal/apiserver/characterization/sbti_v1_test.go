@@ -6,8 +6,8 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
@@ -16,7 +16,7 @@ import (
 // outcome commentary, rarity, and dimension level descriptions.
 func TestV1SBTIPipelinePreservesOutcomeSimilarityAndReportFields(t *testing.T) {
 	model := sbtiCharacterizationModel()
-	detail, err := evaluationtypology.ScoreSBTIReference(model, sbtiHighAnswerSheet())
+	detail, err := typologylegacy.ScoreSBTIReference(model, sbtiHighAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}

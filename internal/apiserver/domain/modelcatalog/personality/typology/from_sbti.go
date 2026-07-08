@@ -1,5 +1,8 @@
 package typology
 
+// Legacy ACL: converts embedded SBTI ruleset assets into unified typology Payload.
+// New models should publish typology payload directly; do not add new From* converters.
+
 import (
 	"fmt"
 	"strings"

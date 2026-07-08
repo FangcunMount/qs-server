@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"slices"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
-func collectFactorValues(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {
-	switch ScoringStrategy(factor.ScoringStrategy) {
-	case ScoringStrategySum, ScoringStrategyAvg:
+func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) ([]float64, error) {
+	switch Strategy(factor.ScoringStrategy) {
+	case StrategySum, StrategyAvg:
 		return collectQuestionScores(factor, sheet), nil
-	case ScoringStrategyCnt:
+	case StrategyCnt:
 		if qnr == nil {
 			return nil, fmt.Errorf("questionnaire is required")
 		}
@@ -22,7 +21,7 @@ func collectFactorValues(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswer
 	}
 }
 
-func collectQuestionScores(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot) []float64 {
+func collectQuestionScores(factor Factor, sheet *AnswerSheet) []float64 {
 	answerMap := factorScoreAnswerMap(sheet)
 	scores := make([]float64, 0, len(factor.QuestionCodes))
 	for _, qCode := range factor.QuestionCodes {
@@ -33,7 +32,7 @@ func collectQuestionScores(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnsw
 	return scores
 }
 
-func collectCntMatches(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) []float64 {
+func collectCntMatches(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) []float64 {
 	targetContents := factor.ScoringParams.CntOptionContents
 	if len(targetContents) == 0 {
 		return nil
@@ -61,7 +60,7 @@ func collectCntMatches(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSh
 	return matchValues
 }
 
-func factorScoreOptionContentMap(qnr *ScaleQuestionnaireSnapshot) map[string]string {
+func factorScoreOptionContentMap(qnr *Questionnaire) map[string]string {
 	contentMap := make(map[string]string)
 	if qnr == nil {
 		return contentMap
@@ -74,8 +73,8 @@ func factorScoreOptionContentMap(qnr *ScaleQuestionnaireSnapshot) map[string]str
 	return contentMap
 }
 
-func factorScoreAnswerMap(sheet *ScaleAnswerSheetSnapshot) map[string]ScaleAnswerSnapshot {
-	answerMap := make(map[string]ScaleAnswerSnapshot)
+func factorScoreAnswerMap(sheet *AnswerSheet) map[string]Answer {
+	answerMap := make(map[string]Answer)
 	if sheet == nil {
 		return answerMap
 	}
@@ -85,7 +84,7 @@ func factorScoreAnswerMap(sheet *ScaleAnswerSheetSnapshot) map[string]ScaleAnswe
 	return answerMap
 }
 
-func factorScoreOptionID(answer ScaleAnswerSnapshot) string {
+func factorScoreOptionID(answer Answer) string {
 	raw := answer.Value
 	if raw == nil {
 		return ""

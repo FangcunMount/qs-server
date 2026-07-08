@@ -13,6 +13,9 @@ type ScaleReportInput struct {
 	FactorScores []FactorReportScore
 }
 
+// BuildFactorScoringReport assembles factor-scoring mechanism reports.
+var BuildFactorScoringReport = BuildScaleReport
+
 // BuildScaleReport 组装 scale 家族解读报告。
 // 当因子未携带结论/建议文案时，依据模型解读规则在解读侧生成，
 // 整体结论/建议在未显式给定时取自总分因子。

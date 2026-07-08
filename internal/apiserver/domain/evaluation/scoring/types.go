@@ -1,75 +1,98 @@
 package scoring
 
 import (
-	"context"
-
+	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// ScaleInterpretationInput 是量表解释执行的纯领域输入。
-type ScaleInterpretationInput struct {
-	Scale         ScaleInterpretationModel
-	AnswerSheet   *ScaleAnswerSheetSnapshot
-	Questionnaire *ScaleQuestionnaireSnapshot
+type RiskLevel = calcscoring.RiskLevel
+type ScoringStrategy = calcscoring.Strategy
+
+const (
+	RiskLevelNone   = calcscoring.RiskLevelNone
+	RiskLevelLow    = calcscoring.RiskLevelLow
+	RiskLevelMedium = calcscoring.RiskLevelMedium
+	RiskLevelHigh   = calcscoring.RiskLevelHigh
+	RiskLevelSevere = calcscoring.RiskLevelSevere
+
+	ScoringStrategySum = calcscoring.StrategySum
+	ScoringStrategyAvg = calcscoring.StrategyAvg
+	ScoringStrategyCnt = calcscoring.StrategyCnt
+)
+
+type ScaleInterpretationInput = calcscoring.Input
+type ScaleInterpretationModel = calcscoring.Model
+type ScaleAnswerSheetSnapshot = calcscoring.AnswerSheet
+type ScaleAnswerSnapshot = calcscoring.Answer
+type ScaleQuestionnaireSnapshot = calcscoring.Questionnaire
+type ScaleQuestionSnapshot = calcscoring.Question
+type ScaleOptionSnapshot = calcscoring.Option
+type ScaleInterpretationResult = calcscoring.Result
+type ScaleFactorScore = calcscoring.FactorScore
+
+type ScoringStrategyRegistry = calcscoring.StrategyRegistry
+type FactorScorer = calcscoring.FactorScorer
+type DefaultScoringStrategyRegistry = calcscoring.DefaultStrategyRegistry
+
+type Evaluator = calcscoring.Evaluator
+
+var (
+	NewEvaluator        = calcscoring.NewEvaluator
+	NewDefaultEvaluator = calcscoring.NewDefaultEvaluator
+)
+
+// FactorFromSnapshot adapts a published factor snapshot for calculation scoring.
+func FactorFromSnapshot(factor scalesnapshot.FactorSnapshot) calcscoring.Factor {
+	return factorFromSnapshot(factor)
 }
 
-type ScaleInterpretationModel struct {
-	Code                 string
-	ScaleVersion         string
-	Title                string
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	Status               string
-	Factors              []scalesnapshot.FactorSnapshot
+func factorFromSnapshot(factor scalesnapshot.FactorSnapshot) calcscoring.Factor {
+	return calcscoring.Factor{
+		Code:            factor.Code,
+		Title:           factor.Title,
+		ScoringStrategy: factor.ScoringStrategy,
+		ScoringParams: calcscoring.CntParams{
+			CntOptionContents: append([]string(nil), factor.ScoringParams.CntOptionContents...),
+		},
+		QuestionCodes:  append([]string(nil), factor.QuestionCodes...),
+		MaxScore:       factor.MaxScore,
+		IsTotalScore:   factor.IsTotalScore,
+		InterpretRules: interpretRulesFromSnapshot(factor.InterpretRules),
+	}
 }
 
-type ScaleAnswerSheetSnapshot struct {
-	ID                   uint64
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	Answers              []ScaleAnswerSnapshot
+func interpretRulesFromSnapshot(rules []scalesnapshot.InterpretRuleSnapshot) []calcscoring.InterpretRule {
+	if len(rules) == 0 {
+		return nil
+	}
+	out := make([]calcscoring.InterpretRule, 0, len(rules))
+	for _, rule := range rules {
+		out = append(out, calcscoring.InterpretRule{
+			Min:        rule.Min,
+			Max:        rule.Max,
+			RiskLevel:  rule.RiskLevel,
+			Conclusion: rule.Conclusion,
+			Suggestion: rule.Suggestion,
+		})
+	}
+	return out
 }
 
-type ScaleAnswerSnapshot struct {
-	QuestionCode meta.Code
-	Score        float64
-	Value        any
-}
-
-type ScaleQuestionnaireSnapshot struct {
-	Code      string
-	Version   string
-	Questions []ScaleQuestionSnapshot
-}
-
-type ScaleQuestionSnapshot struct {
-	Code    meta.Code
-	Options []ScaleOptionSnapshot
-}
-
-type ScaleOptionSnapshot struct {
-	Code    string
-	Content string
-	Score   float64
-}
-
-type ScaleInterpretationResult struct {
-	TotalScore   float64
-	RiskLevel    RiskLevel
-	FactorScores []ScaleFactorScore
-}
-
-type ScaleFactorScore struct {
-	FactorCode   string
-	FactorName   string
-	RawScore     float64
-	MaxScore     *float64
-	RiskLevel    RiskLevel
-	IsTotalScore bool
-}
-
-// ScoringStrategyRegistry 执行量表因子聚合策略。
-type ScoringStrategyRegistry interface {
-	ScoreFactor(ctx context.Context, factor scalesnapshot.FactorSnapshot, values []float64) (float64, error)
+func modelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) calcscoring.Model {
+	if snapshot == nil {
+		return calcscoring.Model{}
+	}
+	factors := make([]calcscoring.Factor, 0, len(snapshot.Factors))
+	for _, factor := range snapshot.Factors {
+		factors = append(factors, factorFromSnapshot(factor))
+	}
+	return calcscoring.Model{
+		Code:                 snapshot.Code,
+		ScaleVersion:         snapshot.ScaleVersion,
+		Title:                snapshot.Title,
+		QuestionnaireCode:    snapshot.QuestionnaireCode,
+		QuestionnaireVersion: snapshot.QuestionnaireVersion,
+		Status:               snapshot.Status,
+		Factors:              factors,
+	}
 }

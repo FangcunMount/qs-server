@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -37,5 +38,8 @@ func TestNewAssessmentSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 	}
 	if data.ModelAlgorithm != string(modelcatalog.AlgorithmMBTI) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
+	}
+	if evt.EventType() != evaldomainevent.TypeSubmitted {
+		t.Fatalf("event type = %q", evt.EventType())
 	}
 }

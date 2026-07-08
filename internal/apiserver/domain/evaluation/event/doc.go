@@ -1,3 +1,2 @@
-// Package event is the target home for evaluation domain events.
-// Event constructors currently live in assessment/events*.go and will migrate here incrementally.
+// Package event is the home for evaluation domain events.
 package event

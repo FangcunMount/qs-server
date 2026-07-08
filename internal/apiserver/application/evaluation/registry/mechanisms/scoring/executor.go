@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -77,7 +77,7 @@ type scoringRegistry struct {
 	scorer ruleengine.ScaleFactorScorer
 }
 
-func (r scoringRegistry) ScoreFactor(ctx context.Context, factor scalesnapshot.FactorSnapshot, values []float64) (float64, error) {
+func (r scoringRegistry) ScoreFactor(ctx context.Context, factor calcscoring.Factor, values []float64) (float64, error) {
 	if r.scorer == nil {
 		return domainfactor_scoring.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}

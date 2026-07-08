@@ -138,7 +138,7 @@ var (
 	DefaultProductChannelFor        = identity.DefaultProductChannelFor
 	ResolveProductChannel           = identity.ResolveProductChannel
 	CompleteProductChannel          = identity.CompleteProductChannel
-	AllProductChannels     = identity.AllProductChannels
+	AllProductChannels              = identity.AllProductChannels
 	FallbackPersonalityDecisionKind = legacypkg.FallbackPersonalityDecisionKind
 
 	AlgorithmFamilyFromDecisionKind = routing.AlgorithmFamilyFromDecisionKind

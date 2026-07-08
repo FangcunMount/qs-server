@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
@@ -15,18 +16,17 @@ type EvaluateInput struct {
 }
 
 type Handler struct {
-	evaluator *Evaluator
+	evaluator *calcscoring.Evaluator
 }
 
 func NewHandler(registry ScoringStrategyRegistry) *Handler {
-	return &Handler{evaluator: NewEvaluator(registry)}
+	return &Handler{evaluator: calcscoring.NewEvaluator(registry)}
 }
 
 func NewDefaultHandler() *Handler {
-	return &Handler{evaluator: NewDefaultEvaluator()}
+	return &Handler{evaluator: calcscoring.NewDefaultEvaluator()}
 }
 
-// Score 执行量表计分与风险分级，不生成解读文案。
 func (h *Handler) Score(ctx context.Context, input EvaluateInput) (*ScaleInterpretationResult, error) {
 	if h == nil || h.evaluator == nil {
 		return nil, fmt.Errorf("scale handler is not configured")

@@ -5,12 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestEvaluatorCalculatesSumAvgCntAndUsesTotalScoreFactor(t *testing.T) {
-	input := scaleInterpretationInputForTest()
+	input := scaleInputForTest()
 
 	result, err := NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
@@ -26,9 +25,9 @@ func TestEvaluatorCalculatesSumAvgCntAndUsesTotalScoreFactor(t *testing.T) {
 }
 
 func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
-	input := scaleInterpretationInputForTest()
-	for i := range input.Scale.Factors {
-		input.Scale.Factors[i].IsTotalScore = false
+	input := scaleInputForTest()
+	for i := range input.Model.Factors {
+		input.Model.Factors[i].IsTotalScore = false
 	}
 
 	result, err := NewDefaultEvaluator().Score(context.Background(), input)
@@ -41,7 +40,7 @@ func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
 }
 
 func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
-	input := scaleInterpretationInputForTest()
+	input := scaleInputForTest()
 	input.AnswerSheet.Answers[0].Score = 40
 	input.AnswerSheet.Answers[1].Score = 50
 
@@ -53,8 +52,8 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 		t.Fatalf("overall risk = %s, want severe from total factor rule", result.RiskLevel)
 	}
 
-	input.Scale.Factors[0].IsTotalScore = false
-	input.Scale.Factors[0].InterpretRules = nil
+	input.Model.Factors[0].IsTotalScore = false
+	input.Model.Factors[0].InterpretRules = nil
 	result, err = NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Score returned error: %v", err)
@@ -66,7 +65,7 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 
 func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 	t.Run("answer sheet required", func(t *testing.T) {
-		input := scaleInterpretationInputForTest()
+		input := scaleInputForTest()
 		input.AnswerSheet = nil
 
 		_, err := NewDefaultEvaluator().Score(context.Background(), input)
@@ -76,7 +75,7 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 	})
 
 	t.Run("cnt requires questionnaire", func(t *testing.T) {
-		input := scaleInterpretationInputForTest()
+		input := scaleInputForTest()
 		input.Questionnaire = nil
 
 		_, err := NewDefaultEvaluator().Score(context.Background(), input)
@@ -86,8 +85,8 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 	})
 
 	t.Run("unsupported strategy", func(t *testing.T) {
-		input := scaleInterpretationInputForTest()
-		input.Scale.Factors[0].ScoringStrategy = "unknown"
+		input := scaleInputForTest()
+		input.Model.Factors[0].ScoringStrategy = "unknown"
 
 		_, err := NewDefaultEvaluator().Score(context.Background(), input)
 		if err == nil || !strings.Contains(err.Error(), "unsupported factor scoring strategy") {
@@ -96,18 +95,18 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 	})
 }
 
-func scaleInterpretationInputForTest() ScaleInterpretationInput {
-	return ScaleInterpretationInput{
-		Scale: ScaleInterpretationModel{
+func scaleInputForTest() Input {
+	return Input{
+		Model: Model{
 			Code: "S-001",
-			Factors: []scalesnapshot.FactorSnapshot{
+			Factors: []Factor{
 				{
 					Code:            "total",
 					Title:           "total",
 					IsTotalScore:    true,
 					QuestionCodes:   []string{"q1", "q2"},
-					ScoringStrategy: string(ScoringStrategySum),
-					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
+					ScoringStrategy: string(StrategySum),
+					InterpretRules: []InterpretRule{
 						{Min: 0, Max: 10, RiskLevel: string(RiskLevelLow), Conclusion: "overall low", Suggestion: "keep"},
 						{Min: 10, Max: 100, RiskLevel: string(RiskLevelSevere), Conclusion: "overall severe", Suggestion: "help"},
 					},
@@ -116,33 +115,33 @@ func scaleInterpretationInputForTest() ScaleInterpretationInput {
 					Code:            "avg",
 					Title:           "avg",
 					QuestionCodes:   []string{"q1", "q2"},
-					ScoringStrategy: string(ScoringStrategyAvg),
+					ScoringStrategy: string(StrategyAvg),
 				},
 				{
 					Code:            "cnt",
 					Title:           "cnt",
 					QuestionCodes:   []string{"q1", "q2"},
-					ScoringStrategy: string(ScoringStrategyCnt),
-					ScoringParams:   scalesnapshot.ScoringParamsSnapshot{CntOptionContents: []string{"是"}},
+					ScoringStrategy: string(StrategyCnt),
+					ScoringParams:   CntParams{CntOptionContents: []string{"是"}},
 				},
 			},
 		},
-		AnswerSheet: &ScaleAnswerSheetSnapshot{
-			Answers: []ScaleAnswerSnapshot{
+		AnswerSheet: &AnswerSheet{
+			Answers: []Answer{
 				{QuestionCode: meta.NewCode("q1"), Score: 3, Value: "a"},
 				{QuestionCode: meta.NewCode("q2"), Score: 5, Value: "b"},
 			},
 		},
-		Questionnaire: &ScaleQuestionnaireSnapshot{
-			Questions: []ScaleQuestionSnapshot{
-				{Code: meta.NewCode("q1"), Options: []ScaleOptionSnapshot{{Code: "a", Content: "是"}}},
-				{Code: meta.NewCode("q2"), Options: []ScaleOptionSnapshot{{Code: "b", Content: "否"}}},
+		Questionnaire: &Questionnaire{
+			Questions: []Question{
+				{Code: meta.NewCode("q1"), Options: []Option{{Code: "a", Content: "是"}}},
+				{Code: meta.NewCode("q2"), Options: []Option{{Code: "b", Content: "否"}}},
 			},
 		},
 	}
 }
 
-func assertFactorScore(t *testing.T, scores []ScaleFactorScore, code string, want float64) {
+func assertFactorScore(t *testing.T, scores []FactorScore, code string, want float64) {
 	t.Helper()
 	got := findFactorScoreForTest(scores, code)
 	if got.RawScore != want {
@@ -150,11 +149,11 @@ func assertFactorScore(t *testing.T, scores []ScaleFactorScore, code string, wan
 	}
 }
 
-func findFactorScoreForTest(scores []ScaleFactorScore, code string) ScaleFactorScore {
+func findFactorScoreForTest(scores []FactorScore, code string) FactorScore {
 	for _, score := range scores {
 		if score.FactorCode == code {
 			return score
 		}
 	}
-	return ScaleFactorScore{}
+	return FactorScore{}
 }

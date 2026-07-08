@@ -468,3 +468,18 @@ type Algorithm = identity.Algorithm
 | R39 | `MechanismReportBuilderKey` 扩展 `Algorithm`/`ProductChannel`；registry 逐级 fallback |
 | R40 | `domain/evaluation/run/checkpoint.go` 定义 `CheckpointSeam` 契约；合表迁移后续轮次 |
 
+## Round 41–50：终局对齐去测评类型包（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R41 | `domain/evaluation/event` 落地事件构造；`assessment` 保留 compat 适配 |
+| R42 | `domain/calculation/scoring` 承接量表计分；`evaluation/scoring` 瘦身为 ACL |
+| R43 | `domain/calculation/classification` 承接 trait 机制；legacy MBTI/SBTI scorer 迁至 application typology/legacy |
+| R44 | 删除 `evaluation/norming`、`evaluation/task_performance` 占位包；新增 evaluation 架构守卫 |
+| R45 | `policy/report_type.go` 承接 `ResolveReportType`；interpretation 子包结构守卫 |
+| R46 | `interpretation/scoring` 暴露 `BuildFactorScoringReport` 机制入口 |
+| R47 | typology patterns 以 `mechanism_assembler` 为主；legacy `*_assembler` 标记 transitional |
+| R48 | reporting 架构守卫禁止新增测评 code builder 名；`legacy_report_aliases` 保留 deprecated ACL |
+| R49 | `legacy_sbti_payload` / `from_sbti` 标注 legacy ACL |
+| R50 | `domain/architecture_test.go` 锁死 domain 层新增测评 code 文件名 |
+

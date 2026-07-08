@@ -1,0 +1,17 @@
+package legacy
+
+import (
+	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+)
+
+// ScoreMBTIReference exposes the legacy MBTI scorer baseline for equivalence and characterization tests.
+func ScoreMBTIReference(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (evaluationtypology.MBTIResultDetail, error) {
+	return ScoreMBTI(model, answerSheet)
+}
+
+// ScoreSBTIReference exposes the legacy SBTI scorer baseline for equivalence and characterization tests.
+func ScoreSBTIReference(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (evaluationtypology.SBTIResultDetail, error) {
+	return ScoreSBTI(model, answerSheet)
+}

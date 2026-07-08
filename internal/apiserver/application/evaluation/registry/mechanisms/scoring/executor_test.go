@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
@@ -203,6 +204,6 @@ func (s *stubValidator) Validate(input ExecutionInput) error {
 
 type stubScoringRegistry struct{}
 
-func (stubScoringRegistry) ScoreFactor(context.Context, scalesnapshot.FactorSnapshot, []float64) (float64, error) {
+func (stubScoringRegistry) ScoreFactor(context.Context, calcscoring.Factor, []float64) (float64, error) {
 	return 1, nil
 }

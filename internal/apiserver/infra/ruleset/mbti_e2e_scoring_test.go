@@ -3,8 +3,8 @@ package ruleset
 import (
 	"testing"
 
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
@@ -16,7 +16,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := evaluationtypology.ScoreMBTIReference(model, sheet)
+		got, err := typologylegacy.ScoreMBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -49,7 +49,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := evaluationtypology.ScoreMBTIReference(model, sheet)
+		got, err := typologylegacy.ScoreMBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}

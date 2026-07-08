@@ -1,4 +1,4 @@
-package patterns
+package legacy
 
 import (
 	"fmt"
@@ -6,16 +6,17 @@ import (
 	"strings"
 
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // Deprecated: 改用 sbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。
-func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (SBTIResultDetail, error) {
+func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (evaluationtypology.SBTIResultDetail, error) {
 	if model == nil {
-		return SBTIResultDetail{}, fmt.Errorf("sbti model is required")
+		return evaluationtypology.SBTIResultDetail{}, fmt.Errorf("sbti model is required")
 	}
 	if answerSheet == nil {
-		return SBTIResultDetail{}, fmt.Errorf("answer sheet is required")
+		return evaluationtypology.SBTIResultDetail{}, fmt.Errorf("answer sheet is required")
 	}
 	if outcome, ok := triggeredDrinkOutcome(model, answerSheet.Answers); ok {
 		return sbtiResultDetailFromOutcome(model, outcome, nil, 1, strings.TrimSpace(outcome.Trigger)), nil
@@ -23,19 +24,19 @@ func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinpu
 
 	rawScores, err := collectSBTIDimensionScores(model, answerSheet.Answers)
 	if err != nil {
-		return SBTIResultDetail{}, err
+		return evaluationtypology.SBTIResultDetail{}, err
 	}
 	dimensions := buildSBTIDimensionResults(model, rawScores)
 	outcome, similarity, err := bestSBTIOutcome(model, dimensions)
 	if err != nil {
-		return SBTIResultDetail{}, err
+		return evaluationtypology.SBTIResultDetail{}, err
 	}
 	trigger := ""
 	threshold := sbtiFallbackThreshold(model)
 	if similarity < threshold {
 		fallback, ok := findSBTIOutcome(model.SpecialOutcomes, "HHHH")
 		if !ok {
-			return SBTIResultDetail{}, fmt.Errorf("sbti fallback outcome HHHH is not configured")
+			return evaluationtypology.SBTIResultDetail{}, fmt.Errorf("sbti fallback outcome HHHH is not configured")
 		}
 		outcome = fallback
 		trigger = fallback.Trigger
@@ -104,12 +105,12 @@ func scoreForSBTIAnswer(mapping modeltypology.SBTILegacyQuestionMapping, answer 
 	return 0, fmt.Errorf("invalid sbti answer for question %s: %v", mapping.QuestionCode, answer.Value)
 }
 
-func buildSBTIDimensionResults(model *modeltypology.SBTILegacyModel, rawScores map[string]float64) []SBTIDimensionResult {
-	results := make([]SBTIDimensionResult, 0, len(model.DimensionOrder))
+func buildSBTIDimensionResults(model *modeltypology.SBTILegacyModel, rawScores map[string]float64) []evaluationtypology.SBTIDimensionResult {
+	results := make([]evaluationtypology.SBTIDimensionResult, 0, len(model.DimensionOrder))
 	for _, dimCode := range model.DimensionOrder {
 		meta := model.Dimensions[dimCode]
 		raw := rawScores[dimCode]
-		results = append(results, SBTIDimensionResult{
+		results = append(results, evaluationtypology.SBTIDimensionResult{
 			Code:     dimCode,
 			Name:     meta.Name,
 			Model:    meta.Model,
@@ -131,7 +132,7 @@ func sbtiLevelForScore(score float64) string {
 	}
 }
 
-func bestSBTIOutcome(model *modeltypology.SBTILegacyModel, dimensions []SBTIDimensionResult) (modeltypology.SBTILegacyOutcome, float64, error) {
+func bestSBTIOutcome(model *modeltypology.SBTILegacyModel, dimensions []evaluationtypology.SBTIDimensionResult) (modeltypology.SBTILegacyOutcome, float64, error) {
 	if len(model.NormalOutcomes) == 0 {
 		return modeltypology.SBTILegacyOutcome{}, 0, fmt.Errorf("sbti normal outcomes are not configured")
 	}
@@ -171,11 +172,11 @@ func bestSBTIOutcome(model *modeltypology.SBTILegacyModel, dimensions []SBTIDime
 func sbtiResultDetailFromOutcome(
 	model *modeltypology.SBTILegacyModel,
 	outcome modeltypology.SBTILegacyOutcome,
-	dimensions []SBTIDimensionResult,
+	dimensions []evaluationtypology.SBTIDimensionResult,
 	similarity float64,
 	trigger string,
-) SBTIResultDetail {
-	return SBTIResultDetail{
+) evaluationtypology.SBTIResultDetail {
+	return evaluationtypology.SBTIResultDetail{
 		TypeCode:       outcome.Code,
 		TypeName:       outcome.Name,
 		OneLiner:       outcome.OneLiner,

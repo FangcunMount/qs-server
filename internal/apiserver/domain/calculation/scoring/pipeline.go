@@ -5,30 +5,29 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
-func (e *Evaluator) runScoring(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, RiskLevel, error) {
+func (e *Evaluator) runScoring(ctx context.Context, input Input) ([]FactorScore, float64, RiskLevel, error) {
 	factorScores, totalScore, err := e.calculateScores(ctx, input)
 	if err != nil {
 		return nil, 0, "", err
 	}
-	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
+	factorScores, riskLevel := classifyRisk(input.Model, factorScores)
 	return factorScores, totalScore, riskLevel, nil
 }
 
-func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, error) {
-	factorScores := make([]ScaleFactorScore, 0, len(input.Scale.Factors))
-	for _, factor := range input.Scale.Factors {
+func (e *Evaluator) calculateScores(ctx context.Context, input Input) ([]FactorScore, float64, error) {
+	factorScores := make([]FactorScore, 0, len(input.Model.Factors))
+	for _, factor := range input.Model.Factors {
 		rawScore, err := e.calculateFactorRawScore(ctx, factor, input.AnswerSheet, input.Questionnaire)
 		if err != nil {
 			return nil, 0, err
 		}
-		factorScores = append(factorScores, ScaleFactorScore{
+		factorScores = append(factorScores, FactorScore{
 			FactorCode:   factor.Code,
 			FactorName:   factor.Title,
 			RawScore:     rawScore,
-			MaxScore:     cloneEvaluationFloat64Ptr(factor.MaxScore),
+			MaxScore:     cloneFloat64Ptr(factor.MaxScore),
 			RiskLevel:    RiskLevelNone,
 			IsTotalScore: factor.IsTotalScore,
 		})
@@ -36,7 +35,7 @@ func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretati
 	return factorScores, calculateTotalScore(factorScores), nil
 }
 
-func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) (float64, error) {
+func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor Factor, sheet *AnswerSheet, qnr *Questionnaire) (float64, error) {
 	if sheet == nil {
 		return 0, fmt.Errorf("answer sheet is required for scale factor scoring")
 	}
@@ -60,7 +59,7 @@ func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scalesna
 	return score, nil
 }
 
-func calculateTotalScore(factorScores []ScaleFactorScore) float64 {
+func calculateTotalScore(factorScores []FactorScore) float64 {
 	var totalScore float64
 	for _, fs := range factorScores {
 		if fs.IsTotalScore {
@@ -71,7 +70,7 @@ func calculateTotalScore(factorScores []ScaleFactorScore) float64 {
 	return totalScore
 }
 
-func cloneEvaluationFloat64Ptr(value *float64) *float64 {
+func cloneFloat64Ptr(value *float64) *float64 {
 	if value == nil {
 		return nil
 	}

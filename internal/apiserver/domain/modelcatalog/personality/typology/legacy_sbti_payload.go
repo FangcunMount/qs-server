@@ -1,5 +1,8 @@
 package typology
 
+// Legacy ACL: SBTI ruleset payload shapes for migration/characterization only.
+// Runtime wiring must use configured Payload from published model snapshots.
+
 // SBTILegacyModel 是只读 ruleset.sbti.v1 载荷 结构 用于 迁移。
 type SBTILegacyModel struct {
 	Code                        string                         `json:"code"`

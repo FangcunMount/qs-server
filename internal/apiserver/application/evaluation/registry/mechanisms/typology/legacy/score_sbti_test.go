@@ -1,4 +1,4 @@
-package patterns
+package legacy
 
 import (
 	"testing"

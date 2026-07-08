@@ -1,9 +1,7 @@
 package scoring
 
-import scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-
-func (*Evaluator) classifyRisk(model ScaleInterpretationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, RiskLevel) {
-	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
+func classifyRisk(model Model, factorScores []FactorScore) ([]FactorScore, RiskLevel) {
+	updatedScores := make([]FactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
 		fs.RiskLevel = calculateFactorRiskLevel(model, fs.FactorCode, fs.RawScore)
 		updatedScores = append(updatedScores, fs)
@@ -11,7 +9,7 @@ func (*Evaluator) classifyRisk(model ScaleInterpretationModel, factorScores []Sc
 	return updatedScores, calculateOverallRiskLevel(model, updatedScores)
 }
 
-func calculateFactorRiskLevel(model ScaleInterpretationModel, factorCode string, score float64) RiskLevel {
+func calculateFactorRiskLevel(model Model, factorCode string, score float64) RiskLevel {
 	if factor, found := findFactor(model, factorCode); found {
 		if rule := findInterpretRule(factor, score); rule != nil {
 			return RiskLevel(rule.RiskLevel)
@@ -20,7 +18,7 @@ func calculateFactorRiskLevel(model ScaleInterpretationModel, factorCode string,
 	return defaultRiskLevelByScore(score)
 }
 
-func calculateOverallRiskLevel(model ScaleInterpretationModel, factorScores []ScaleFactorScore) RiskLevel {
+func calculateOverallRiskLevel(model Model, factorScores []FactorScore) RiskLevel {
 	for _, fs := range factorScores {
 		if fs.IsTotalScore {
 			if factor, found := findFactor(model, fs.FactorCode); found {
@@ -72,11 +70,11 @@ func riskLevelOrder(level RiskLevel) int {
 	}
 }
 
-func findFactor(model ScaleInterpretationModel, factorCode string) (scalesnapshot.FactorSnapshot, bool) {
+func findFactor(model Model, factorCode string) (Factor, bool) {
 	for _, factor := range model.Factors {
 		if factor.Code == factorCode {
 			return factor, true
 		}
 	}
-	return scalesnapshot.FactorSnapshot{}, false
+	return Factor{}, false
 }

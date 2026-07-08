@@ -1,4 +1,4 @@
-package patterns
+package legacy
 
 import (
 	"fmt"
@@ -6,16 +6,17 @@ import (
 	"strings"
 
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // Deprecated: 改用 mbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。
-func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (MBTIResultDetail, error) {
+func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (evaluationtypology.MBTIResultDetail, error) {
 	if model == nil {
-		return MBTIResultDetail{}, fmt.Errorf("mbti model is required")
+		return evaluationtypology.MBTIResultDetail{}, fmt.Errorf("mbti model is required")
 	}
 	if answerSheet == nil {
-		return MBTIResultDetail{}, fmt.Errorf("answer sheet is required")
+		return evaluationtypology.MBTIResultDetail{}, fmt.Errorf("answer sheet is required")
 	}
 
 	answerByQuestion := make(map[string]evaluationinput.Answer, len(answerSheet.Answers))
@@ -32,16 +33,16 @@ func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinpu
 	for _, mapping := range model.QuestionMappings {
 		answer, ok := answerByQuestion[mapping.QuestionCode]
 		if !ok {
-			return MBTIResultDetail{}, fmt.Errorf("missing mbti answer for question %s", mapping.QuestionCode)
+			return evaluationtypology.MBTIResultDetail{}, fmt.Errorf("missing mbti answer for question %s", mapping.QuestionCode)
 		}
 		value, err := answerLikertValue(answer)
 		if err != nil {
-			return MBTIResultDetail{}, err
+			return evaluationtypology.MBTIResultDetail{}, err
 		}
 		dimensionScores[mapping.Dimension] += mapping.Sign * value
 	}
 
-	dimensions := make([]MBTIDimensionResult, 0, len(model.DimensionOrder))
+	dimensions := make([]evaluationtypology.MBTIDimensionResult, 0, len(model.DimensionOrder))
 	typeLetters := make([]string, 0, len(model.DimensionOrder))
 	var strengthSum float64
 
@@ -49,7 +50,7 @@ func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinpu
 		meta := model.Dimensions[dimCode]
 		raw := dimensionScores[dimCode]
 		preference, strength := resolveMBTIPreference(meta, raw, model.QuestionMappings)
-		dimensions = append(dimensions, MBTIDimensionResult{
+		dimensions = append(dimensions, evaluationtypology.MBTIDimensionResult{
 			Code:       dimCode,
 			Name:       meta.Name,
 			LeftPole:   meta.LeftPole,
@@ -65,7 +66,7 @@ func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinpu
 	typeCode := strings.Join(typeLetters, "")
 	profile, ok := model.FindTypeProfile(typeCode)
 	if !ok {
-		return MBTIResultDetail{}, fmt.Errorf("mbti type profile not found for %s", typeCode)
+		return evaluationtypology.MBTIResultDetail{}, fmt.Errorf("mbti type profile not found for %s", typeCode)
 	}
 
 	matchPercent := 0.0
@@ -73,7 +74,7 @@ func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinpu
 		matchPercent = strengthSum / float64(len(dimensions))
 	}
 
-	return MBTIResultDetail{
+	return evaluationtypology.MBTIResultDetail{
 		TypeCode:     typeCode,
 		TypeName:     profile.TypeName,
 		OneLiner:     profile.OneLiner,

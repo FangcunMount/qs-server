@@ -6,16 +6,16 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // V1 contract: typology executor scores legacy MBTI payload identically to domain scorer.
 func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	model := mbtiINTJModel()
-	want, err := evaluationtypology.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
+	want, err := typologylegacy.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
 	if err != nil {
 		t.Fatalf("domain Score: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 // V1 contract: typology executor scores legacy SBTI payload identically to domain scorer.
 func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	model := sbtiCharacterizationModel()
-	want, err := evaluationtypology.ScoreSBTIReference(model, sbtiHighAnswerSheet())
+	want, err := typologylegacy.ScoreSBTIReference(model, sbtiHighAnswerSheet())
 	if err != nil {
 		t.Fatalf("domain Score: %v", err)
 	}

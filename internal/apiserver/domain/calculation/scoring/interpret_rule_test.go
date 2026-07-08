@@ -1,14 +1,10 @@
 package scoring
 
-import (
-	"testing"
-
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-)
+import "testing"
 
 func TestFindInterpretRuleUsesLeftClosedRightOpenIntervals(t *testing.T) {
-	factor := scalesnapshot.FactorSnapshot{
-		InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
+	factor := Factor{
+		InterpretRules: []InterpretRule{
 			{Min: 0, Max: 10, RiskLevel: string(RiskLevelLow)},
 			{Min: 10, Max: 100, RiskLevel: string(RiskLevelSevere)},
 		},

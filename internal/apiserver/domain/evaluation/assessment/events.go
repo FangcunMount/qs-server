@@ -5,54 +5,29 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// ==================== 事件类型常量 ====================
-// 从 eventcatalog 包导入，保持事件类型的单一来源
-
 const (
-	// EventTypeSubmitted 测评已提交
-	EventTypeSubmitted = eventcatalog.AssessmentSubmitted
-	// EventTypeEvaluated 测评已计分
-	EventTypeEvaluated = eventcatalog.AssessmentEvaluated
-	// EventTypeInterpreted 测评已解读（结果 投影见 events_结果.go）
-	EventTypeInterpreted = eventcatalog.AssessmentInterpreted
-	// EventTypeFailed 测评失败
-	EventTypeFailed = eventcatalog.AssessmentFailed
+	EventTypeSubmitted   = evaldomainevent.TypeSubmitted
+	EventTypeEvaluated   = evaldomainevent.TypeEvaluated
+	EventTypeInterpreted = evaldomainevent.TypeInterpreted
+	EventTypeFailed      = evaldomainevent.TypeFailed
 )
 
-// AggregateType 聚合根类型
-const AggregateType = "Assessment"
+const AggregateType = evaldomainevent.AggregateType
 
-// 重新导出共享内核的 DomainEvent 接口
-type DomainEvent = event.DomainEvent
+type DomainEvent = evaldomainevent.DomainEvent
 
-// ==================== 事件 Payload 定义 ====================
-
-// AssessmentSubmittedData 测评已提交事件数据
 type AssessmentSubmittedData = eventpayload.AssessmentSubmittedData
-
-// AssessmentFailedData 测评失败事件数据
 type AssessmentFailedData = eventpayload.AssessmentFailedData
-
-// ==================== 事件类型别名 ====================
-
-// AssessmentSubmittedEvent 测评已提交事件
-type AssessmentSubmittedEvent = event.Event[AssessmentSubmittedData]
-
-// AssessmentFailedEvent 测评失败事件
-type AssessmentFailedEvent = event.Event[AssessmentFailedData]
-
-// AssessmentEvaluatedData 测评已计分事件数据
 type AssessmentEvaluatedData = eventpayload.AssessmentEvaluatedData
 
-// AssessmentEvaluatedEvent 测评已计分事件
+type AssessmentSubmittedEvent = event.Event[AssessmentSubmittedData]
+type AssessmentFailedEvent = event.Event[AssessmentFailedData]
 type AssessmentEvaluatedEvent = event.Event[AssessmentEvaluatedData]
-
-// ==================== 事件构造函数 ====================
 
 // NewAssessmentSubmittedEvent 创建测评已提交事件
 func NewAssessmentSubmittedEvent(
@@ -65,7 +40,7 @@ func NewAssessmentSubmittedEvent(
 	medicalScaleRef *MedicalScaleRef,
 	submittedAt time.Time,
 ) AssessmentSubmittedEvent {
-	data := AssessmentSubmittedData{
+	in := evaldomainevent.SubmittedInput{
 		OrgID:             orgID,
 		AssessmentID:      int64(assessmentID),
 		TesteeID:          testeeID.Uint64(),
@@ -75,27 +50,26 @@ func NewAssessmentSubmittedEvent(
 		SubmittedAt:       submittedAt,
 	}
 	if modelRef != nil && !modelRef.IsEmpty() {
-		data.ModelKind = modelRef.Kind().String()
+		in.ModelKind = modelRef.Kind().String()
 		if subKind := modelRef.SubKind(); subKind != "" {
-			data.ModelSubKind = string(subKind)
+			in.ModelSubKind = string(subKind)
 		}
 		if algorithm := modelRef.Algorithm(); algorithm != "" {
-			data.ModelAlgorithm = string(algorithm)
+			in.ModelAlgorithm = string(algorithm)
 		}
-		data.ModelCode = modelRef.Code().String()
-		data.ModelVersion = modelRef.Version()
+		in.ModelCode = modelRef.Code().String()
+		in.ModelVersion = modelRef.Version()
 	}
 	if medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
-		data.ScaleCode = string(medicalScaleRef.Code())
-		data.ScaleVersion = medicalScaleRef.Version()
-		if data.ModelKind == "" {
-			data.ModelKind = EvaluationModelKindScale.String()
-			data.ModelCode = data.ScaleCode
-			data.ModelVersion = data.ScaleVersion
+		in.ScaleCode = string(medicalScaleRef.Code())
+		in.ScaleVersion = medicalScaleRef.Version()
+		if in.ModelKind == "" {
+			in.ModelKind = EvaluationModelKindScale.String()
+			in.ModelCode = in.ScaleCode
+			in.ModelVersion = in.ScaleVersion
 		}
 	}
-
-	return event.New(EventTypeSubmitted, AggregateType, strconv.FormatInt(int64(assessmentID), 10), data)
+	return evaldomainevent.NewSubmittedEvent(in)
 }
 
 // NewAssessmentFailedEvent 创建测评失败事件
@@ -106,15 +80,7 @@ func NewAssessmentFailedEvent(
 	reason string,
 	failedAt time.Time,
 ) AssessmentFailedEvent {
-	return event.New(EventTypeFailed, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
-		AssessmentFailedData{
-			OrgID:        orgID,
-			AssessmentID: int64(assessmentID),
-			TesteeID:     testeeID.Uint64(),
-			Reason:       reason,
-			FailedAt:     failedAt,
-		},
-	)
+	return evaldomainevent.NewFailedEvent(orgID, int64(assessmentID), testeeID.Uint64(), reason, failedAt)
 }
 
 // NewAssessmentEvaluatedEvent 创建测评已计分事件
@@ -124,12 +90,5 @@ func NewAssessmentEvaluatedEvent(
 	testeeID testee.ID,
 	evaluatedAt time.Time,
 ) AssessmentEvaluatedEvent {
-	return event.New(EventTypeEvaluated, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
-		AssessmentEvaluatedData{
-			OrgID:        orgID,
-			AssessmentID: int64(assessmentID),
-			TesteeID:     testeeID.Uint64(),
-			EvaluatedAt:  evaluatedAt,
-		},
-	)
+	return evaldomainevent.NewEvaluatedEvent(orgID, int64(assessmentID), testeeID.Uint64(), evaluatedAt)
 }

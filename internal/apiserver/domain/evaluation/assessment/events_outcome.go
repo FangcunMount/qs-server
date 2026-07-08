@@ -1,19 +1,17 @@
 package assessment
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-const EventTypeInterpretedOutcome = EventTypeInterpreted
+const EventTypeInterpretedOutcome = evaldomainevent.TypeInterpretedOutcome
 
-// AssessmentInterpretedOutcomeData 是结果-enriched interpreted 事件载荷。
 type AssessmentInterpretedOutcomeData = eventoutcome.AssessmentInterpretedPayload
-
 type AssessmentInterpretedOutcomeEvent = event.Event[AssessmentInterpretedOutcomeData]
 
 // NewAssessmentInterpretedOutcomeEvent 创建结果-enriched interpreted event。
@@ -26,15 +24,13 @@ func NewAssessmentInterpretedOutcomeEvent(
 	level *EventResultLevel,
 	interpretedAt time.Time,
 ) AssessmentInterpretedOutcomeEvent {
-	return event.New(EventTypeInterpretedOutcome, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
-		AssessmentInterpretedOutcomeData{
-			OrgID:         orgID,
-			AssessmentID:  int64(assessmentID),
-			TesteeID:      testeeID.Uint64(),
-			Model:         model,
-			PrimaryScore:  primary,
-			Level:         level,
-			InterpretedAt: interpretedAt,
-		},
+	return evaldomainevent.NewInterpretedOutcomeEvent(
+		orgID,
+		int64(assessmentID),
+		testeeID.Uint64(),
+		model,
+		primary,
+		level,
+		interpretedAt,
 	)
 }
