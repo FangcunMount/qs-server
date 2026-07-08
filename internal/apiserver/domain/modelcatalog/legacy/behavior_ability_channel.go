@@ -1,5 +1,8 @@
 package legacy
 
+// Product-channel taxonomy only (§20.4): behavior_ability aggregates behavioral_rating + cognitive
+// for list/options APIs. Must not drive evaluation/pipeline execution routing.
+
 import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 
 // IsBehaviorAbilityProductChannelAPIKind 报告是否 api类型 是 behavior-ability 产品通道。

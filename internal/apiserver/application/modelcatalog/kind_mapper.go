@@ -5,6 +5,7 @@ import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/model
 const AlgorithmCustomTypology = "custom_typology"
 
 // APIKindToDomainKind 映射外部 API 类型值 到 规范领域类型。
+// behavior_ability 是产品通道聚合槽位，不映射为领域 Kind（列表 API 专用）。
 func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	switch kind {
 	case KindPersonality:
