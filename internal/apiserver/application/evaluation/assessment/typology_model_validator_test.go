@@ -24,8 +24,8 @@ func (s publishedModelReaderStub) FindPublishedModelByQuestionnaire(context.Cont
 	return nil, domainmodel.ErrNotFound
 }
 
-func TestPersonalityEvaluationModelValidatorRequiresPublishedSnapshot(t *testing.T) {
-	validator := NewPersonalityEvaluationModelValidator(publishedModelReaderStub{
+func TestTypologyEvaluationModelValidatorRequiresPublishedSnapshot(t *testing.T) {
+	validator := NewTypologyEvaluationModelValidator(publishedModelReaderStub{
 		snapshot: &domainmodel.PublishedModelSnapshot{
 			Model: domainmodel.ModelDefinition{Code: "personality_e2e"},
 			Binding: domainmodel.QuestionnaireBinding{
@@ -50,8 +50,8 @@ func TestPersonalityEvaluationModelValidatorRequiresPublishedSnapshot(t *testing
 	}
 }
 
-func TestPersonalityEvaluationModelValidatorRejectsMissingPublishedSnapshot(t *testing.T) {
-	validator := NewPersonalityEvaluationModelValidator(publishedModelReaderStub{err: domainmodel.ErrNotFound})
+func TestTypologyEvaluationModelValidatorRejectsMissingPublishedSnapshot(t *testing.T) {
+	validator := NewTypologyEvaluationModelValidator(publishedModelReaderStub{err: domainmodel.ErrNotFound})
 	modelRef := evalassessment.NewEvaluationModelRefByCode(
 		evalassessment.EvaluationModelKindPersonality,
 		meta.NewCode("missing_model"),
@@ -66,8 +66,8 @@ func TestPersonalityEvaluationModelValidatorRejectsMissingPublishedSnapshot(t *t
 	}
 }
 
-func TestPersonalityEvaluationModelValidatorRejectsQuestionnaireMismatch(t *testing.T) {
-	validator := NewPersonalityEvaluationModelValidator(publishedModelReaderStub{
+func TestTypologyEvaluationModelValidatorRejectsQuestionnaireMismatch(t *testing.T) {
+	validator := NewTypologyEvaluationModelValidator(publishedModelReaderStub{
 		snapshot: &domainmodel.PublishedModelSnapshot{
 			Binding: domainmodel.QuestionnaireBinding{
 				QuestionnaireCode:    "Q_OTHER",

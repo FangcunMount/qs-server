@@ -203,13 +203,3 @@ func RowToOutcomeResult(row evaluationreadmodel.AssessmentRow) (*AssessmentOutco
 func RowsToOutcomeResults(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
 	return assessmentRowsToOutcomeResults(rows)
 }
-
-// Deprecated: 使用 RowToOutcomeResult。
-func RowToV2Result(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
-	return RowToOutcomeResult(row)
-}
-
-// Deprecated: 使用 RowsToOutcomeResults。
-func RowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
-	return RowsToOutcomeResults(rows)
-}

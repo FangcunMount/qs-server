@@ -339,18 +339,6 @@ func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
 	return nil
 }
 
-// ApplyEvaluation 应用评估结果
-// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型
-// 后置条件：状态变为 interpreted，记录评估结果
-//
-// Deprecated: 使用 ApplyOutcome。为生命周期/基础设施测试和旧适配器保留。
-//
-// 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
-// 因此这里不直接添加领域事件。
-func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
-	return a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result))
-}
-
 // MarkAsFailed 标记评估失败
 // 前置条件：submitted、evaluated 或 interpreted 状态可以标记失败
 // 后置条件：状态变为 failed，记录失败原因，发布 AssessmentFailedEvent

@@ -79,15 +79,3 @@ type ReportOutcomeListResult struct {
 	PageSize   int                    `json:"page_size"`
 	TotalPages int                    `json:"total_pages"`
 }
-
-// Deprecated: 使用 AssessmentOutcomeResult。
-type AssessmentV2Result = AssessmentOutcomeResult
-
-// Deprecated: 使用 AssessmentOutcomeListResult。
-type AssessmentV2ListResult = AssessmentOutcomeListResult
-
-// Deprecated: 使用 ReportOutcomeResult。
-type ReportV2Result = ReportOutcomeResult
-
-// Deprecated: 使用 ReportOutcomeListResult。
-type ReportV2ListResult = ReportOutcomeListResult

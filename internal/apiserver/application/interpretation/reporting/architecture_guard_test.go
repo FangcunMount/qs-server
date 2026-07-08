@@ -13,13 +13,19 @@ func TestReportingUsesMechanismBuilderNames(t *testing.T) {
 
 	root := repoRoot(t)
 	reportingRoot := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting")
-	forbidden := []string{"NewMBTIReportBuilder", "NewSBTIReportBuilder", "NewScaleReportBuilder("}
+	forbidden := []string{
+		"NewMBTIReportBuilder",
+		"NewSBTIReportBuilder",
+		"NewScaleReportBuilder(",
+		"NewScaleScoreProjector(",
+		"NewBehavioralRatingReportBuilder(",
+		"NewBehavioralRatingScoreProjector(",
+		"NewCognitiveReportBuilder(",
+		"NewCognitiveScoreProjector(",
+	}
 	err := filepath.WalkDir(reportingRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return err
-		}
-		if filepath.Base(path) == "legacy_report_aliases.go" {
-			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -35,6 +41,16 @@ func TestReportingUsesMechanismBuilderNames(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReportingDoesNotReintroduceLegacyReportAliasesFile(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting", "legacy_report_aliases.go")
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("legacy_report_aliases.go must not exist; use mechanism-oriented builder names")
 	}
 }
 

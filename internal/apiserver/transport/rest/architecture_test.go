@@ -33,6 +33,31 @@ func TestRESTTransportDoesNotDependOnLegacyRESTImplementation(t *testing.T) {
 	}
 }
 
+func TestEvaluationRESTTransportDoesNotExposeV2OutcomeAliases(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("response", "evaluation_outcome.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"AssessmentV2Response",
+		"AssessmentV2ListResponse",
+		"ReportV2Response",
+		"ReportV2ListResponse",
+		"NewAssessmentV2Response",
+		"NewAssessmentV2ListResponse",
+		"NewReportV2Response",
+		"NewReportV2ListResponse",
+	} {
+		if strings.Contains(text, token) {
+			t.Fatalf("%s contains deprecated R118 token %q; use Outcome naming", path, token)
+		}
+	}
+}
+
 func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 	t.Parallel()
 

@@ -55,11 +55,3 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 	}
 	return nil
 }
-
-// PersonalityEvaluationModelValidator is a deprecated alias for TypologyEvaluationModelValidator.
-type PersonalityEvaluationModelValidator = TypologyEvaluationModelValidator
-
-// NewPersonalityEvaluationModelValidator is a deprecated alias for NewTypologyEvaluationModelValidator.
-func NewPersonalityEvaluationModelValidator(reader port.PublishedModelReader) evalassessment.EvaluationModelValidator {
-	return NewTypologyEvaluationModelValidator(reader)
-}

@@ -119,7 +119,7 @@ func (s *creatorModelValidatorStub) ValidateEvaluationModel(_ context.Context, m
 	return s.err
 }
 
-func TestApplyEvaluationDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) {
+func TestApplyOutcomeDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) {
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1003),
@@ -145,8 +145,8 @@ func TestApplyEvaluationDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.
 		"follow up",
 		nil,
 	)
-	if err := a.ApplyEvaluation(result); err != nil {
-		t.Fatalf("ApplyEvaluation returned error: %v", err)
+	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
+		t.Fatalf("ApplyOutcome returned error: %v", err)
 	}
 	if !a.Status().IsInterpreted() {
 		t.Fatalf("expected interpreted status, got %s", a.Status())
@@ -255,7 +255,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 	}
 }
 
-func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
+func TestApplyOutcomeValidatesEvaluationModelRef(t *testing.T) {
 	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := NewAssessment(
 		1,
@@ -277,8 +277,8 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 		Kind:    EvaluationModelKindPersonality,
 		Payload: "INTJ",
 	})
-	if err := a.ApplyEvaluation(result); err != nil {
-		t.Fatalf("ApplyEvaluation returned error: %v", err)
+	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
+		t.Fatalf("ApplyOutcome returned error: %v", err)
 	}
 	if !a.Status().IsInterpreted() {
 		t.Fatalf("expected interpreted status, got %s", a.Status())
@@ -288,7 +288,7 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 	}
 }
 
-func TestApplyEvaluationRejectsMismatchedEvaluationModelRef(t *testing.T) {
+func TestApplyOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1006),
@@ -307,7 +307,7 @@ func TestApplyEvaluationRejectsMismatchedEvaluationModelRef(t *testing.T) {
 
 	result := NewEvaluationResult(0, RiskLevelNone, "", "", nil).
 		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS"))
-	if err := a.ApplyEvaluation(result); err != ErrEvaluationModelMismatch {
-		t.Fatalf("ApplyEvaluation error = %v, want ErrEvaluationModelMismatch", err)
+	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != ErrEvaluationModelMismatch {
+		t.Fatalf("ApplyOutcome error = %v, want ErrEvaluationModelMismatch", err)
 	}
 }

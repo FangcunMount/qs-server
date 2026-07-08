@@ -912,6 +912,53 @@ func TestApplicationEvaluationDoesNotCallApplyEvaluation(t *testing.T) {
 	}
 }
 
+func TestR118DeprecatedOutcomeAliasesNotReintroduced(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"AssessmentV2Result",
+		"AssessmentV2ListResult",
+		"ReportV2Result",
+		"ReportV2ListResult",
+		"RowToV2Result",
+		"RowsToV2Results",
+		"PersonalityEvaluationModelValidator",
+		"NewPersonalityEvaluationModelValidator",
+	}
+	scanRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "assessment"),
+		filepath.Join(root, "internal", "apiserver", "transport", "rest", "response"),
+	}
+	for _, scanRoot := range scanRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			if filepath.Base(path) == "architecture_test.go" {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbiddenTokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains deprecated R118 token %q", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 	t.Parallel()
 

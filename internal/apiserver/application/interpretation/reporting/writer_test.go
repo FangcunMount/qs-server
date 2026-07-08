@@ -147,7 +147,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	outcome := scaleOutcomeForWriterTest(a)
-	scoreProjectors, err := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	scoreProjectors, err := NewScoreProjectorRegistry(NewFactorScoringScoreProjector(&resultScoreRepoStub{order: &order}))
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry returned error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testin
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	buildErr := errors.New("report build failed")
-	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewFactorScoringScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, nil, buildErr))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	writer, err := NewWriter(
@@ -237,7 +237,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	reportErr := errors.New("report save failed")
-	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewFactorScoringScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	writer, err := NewWriter(
@@ -272,7 +272,7 @@ func TestWriterScoreProjectionFailureKeepsAssessmentUninterpreted(t *testing.T) 
 	a := submittedScaleAssessment(t)
 	scoreErr := errors.New("score save failed")
 	scoreRepo := &resultScoreRepoStub{order: &order, err: scoreErr}
-	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(scoreRepo))
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewFactorScoringScoreProjector(scoreRepo))
 	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	notifier := &resultNotifierStub{order: &order}
@@ -310,7 +310,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	saveErr := errors.New("assessment save failed")
-	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewFactorScoringScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil), nil))
 	assessmentRepo := &resultAssessmentRepoStub{order: &order, err: saveErr}
 	reportSaver := &resultReportSaverStub{order: &order}
@@ -332,7 +332,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 		t.Fatalf("Write error = %v, want assessment save failure", err)
 	}
 	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment in memory should be interpreted after ApplyEvaluation; status=%s", a.Status())
+		t.Fatalf("assessment in memory should be interpreted after ApplyOutcome; status=%s", a.Status())
 	}
 	if reportSaver.saveCalls != 1 {
 		t.Fatalf("report save calls = %d, want 1 before assessment save failure", reportSaver.saveCalls)

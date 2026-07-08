@@ -263,35 +263,3 @@ func newModelExtraResponse(extra *assessment.ModelExtraResult) *ModelExtraRespon
 	}
 	return resp
 }
-
-// Deprecated: use AssessmentOutcomeResponse.
-type AssessmentV2Response = AssessmentOutcomeResponse
-
-// Deprecated: use AssessmentOutcomeListResponse.
-type AssessmentV2ListResponse = AssessmentOutcomeListResponse
-
-// Deprecated: use ReportOutcomeResponse.
-type ReportV2Response = ReportOutcomeResponse
-
-// Deprecated: use ReportOutcomeListResponse.
-type ReportV2ListResponse = ReportOutcomeListResponse
-
-// Deprecated: use NewAssessmentOutcomeResponse.
-func NewAssessmentV2Response(result *assessment.AssessmentV2Result) *AssessmentV2Response {
-	return NewAssessmentOutcomeResponse(result)
-}
-
-// Deprecated: use NewAssessmentOutcomeListResponse.
-func NewAssessmentV2ListResponse(result *assessment.AssessmentV2ListResult) *AssessmentV2ListResponse {
-	return NewAssessmentOutcomeListResponse(result)
-}
-
-// Deprecated: use NewReportOutcomeResponse.
-func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
-	return NewReportOutcomeResponse(result)
-}
-
-// Deprecated: use NewReportOutcomeListResponse.
-func NewReportV2ListResponse(result *assessment.ReportV2ListResult) *ReportV2ListResponse {
-	return NewReportOutcomeListResponse(result)
-}

@@ -60,6 +60,32 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 	}
 }
 
+func TestDomainAssessmentDoesNotDefineApplyEvaluation(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "assessment")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "func (a *Assessment) ApplyEvaluation(") {
+			t.Fatalf("%s defines ApplyEvaluation; use ApplyOutcome instead", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
