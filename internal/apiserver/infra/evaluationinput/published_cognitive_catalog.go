@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -19,7 +19,7 @@ func NewPublishedCognitiveCatalog(reader rulesetport.PublishedModelReader) Publi
 	return PublishedCognitiveCatalog{reader: reader}
 }
 
-func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref port.ModelRef) (*cognitivesnapshot.Snapshot, error) {
+func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref port.ModelRef) (*taskperfsnapshot.Snapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("published cognitive reader is not configured")
 	}
@@ -33,7 +33,7 @@ func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref po
 	return decodePublishedCognitiveModel(snapshot)
 }
 
-func (c PublishedCognitiveCatalog) FindCognitiveByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*cognitivesnapshot.Snapshot, error) {
+func (c PublishedCognitiveCatalog) FindCognitiveByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*taskperfsnapshot.Snapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("published cognitive reader is not configured")
 	}
@@ -58,7 +58,7 @@ func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
 	}
 }
 
-func decodePublishedCognitiveModel(snapshot *domain.PublishedModelSnapshot) (*cognitivesnapshot.Snapshot, error) {
+func decodePublishedCognitiveModel(snapshot *domain.PublishedModelSnapshot) (*taskperfsnapshot.Snapshot, error) {
 	if snapshot == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -68,7 +68,7 @@ func decodePublishedCognitiveModel(snapshot *domain.PublishedModelSnapshot) (*co
 	if !domain.IsCognitivePayloadFormat(snapshot.PayloadFormat) {
 		return nil, fmt.Errorf("unsupported cognitive payload format: %s", snapshot.PayloadFormat)
 	}
-	payload, err := cognitivesnapshot.ParsePublishedPayload(
+	payload, err := taskperfsnapshot.ParsePublishedPayload(
 		snapshot.PayloadFormat,
 		snapshot.Model.Code,
 		snapshot.Model.Version,

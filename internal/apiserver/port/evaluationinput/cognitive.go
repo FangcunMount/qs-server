@@ -4,21 +4,21 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 )
 
 const EvaluationModelKindCognitive EvaluationModelKind = "cognitive"
 
 type CognitiveModelPayload struct {
-	Snapshot *cognitivesnapshot.Snapshot
+	Snapshot *taskperfsnapshot.Snapshot
 }
 
 func (CognitiveModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindCognitive
 }
 
-func NewCognitiveModelSnapshot(snapshot *cognitivesnapshot.Snapshot) *ModelSnapshot {
+func NewCognitiveModelSnapshot(snapshot *taskperfsnapshot.Snapshot) *ModelSnapshot {
 	if snapshot == nil {
 		return nil
 	}
@@ -57,6 +57,6 @@ func CognitiveScaleSnapshot(input *InputSnapshot) (*scalesnapshot.ScaleSnapshot,
 }
 
 type CognitiveModelCatalog interface {
-	GetCognitiveByRef(ctx context.Context, ref ModelRef) (*cognitivesnapshot.Snapshot, error)
-	FindCognitiveByQuestionnaire(ctx context.Context, code, version string) (*cognitivesnapshot.Snapshot, error)
+	GetCognitiveByRef(ctx context.Context, ref ModelRef) (*taskperfsnapshot.Snapshot, error)
+	FindCognitiveByQuestionnaire(ctx context.Context, code, version string) (*taskperfsnapshot.Snapshot, error)
 }

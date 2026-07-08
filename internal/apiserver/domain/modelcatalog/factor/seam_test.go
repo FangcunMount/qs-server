@@ -3,10 +3,10 @@ package factor_test
 import (
 	"testing"
 
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
-	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 )
 
 func TestBehavioralRatingParseUsesSharedFactorShape(t *testing.T) {
@@ -36,7 +36,7 @@ func TestCognitiveParseUsesSharedFactorShape(t *testing.T) {
 		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]}]
 	}`)
-	got, err := cognitivesnapshot.ParseDefinitionPayload("COG-001", "1.0.0", "认知", "published", raw)
+	got, err := taskperfsnapshot.ParseDefinitionPayload("COG-001", "1.0.0", "认知", "published", raw)
 	if err != nil {
 		t.Fatalf("ParseDefinitionPayload: %v", err)
 	}
