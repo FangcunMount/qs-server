@@ -61,7 +61,7 @@ func TestBuildPublishedSnapshotCoversRuntimeExecutableKinds(t *testing.T) {
 
 	covered := map[binding.Kind]struct{}{
 		binding.KindScale:            {},
-		binding.KindPersonality:      {},
+		binding.KindTypology:         {},
 		binding.KindBehavioralRating: {},
 		binding.KindCognitive:        {},
 	}

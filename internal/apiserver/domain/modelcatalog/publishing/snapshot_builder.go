@@ -15,7 +15,7 @@ func BuildPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, er
 	switch model.Kind {
 	case binding.KindScale:
 		return buildScoringPublishedSnapshot(model)
-	case binding.KindPersonality:
+	case binding.KindTypology:
 		return buildTypologyPublishedSnapshot(model)
 	case binding.KindBehavioralRating:
 		return buildNormingPublishedSnapshot(model)

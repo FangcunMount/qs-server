@@ -49,7 +49,7 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 			})
 		}
 	}
-	if m.Kind == binding.KindPersonality {
+	if binding.IsTypologyKind(m.Kind) {
 		if m.SubKind != binding.SubKindTypology {
 			issues = append(issues, DomainValidationIssue{Field: "sub_kind", Message: "typology models require sub_kind typology", Code: "sub_kind.typology.required", Level: ValidationLevelError})
 		}

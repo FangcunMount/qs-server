@@ -61,7 +61,7 @@ func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorit
 	switch kind {
 	case binding.KindScale:
 		return binding.DecisionKindScoreRange, true
-	case binding.KindPersonality:
+	case binding.KindTypology:
 		if subKind != binding.SubKindTypology {
 			return "", false
 		}
@@ -79,7 +79,7 @@ func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorit
 
 // AlgorithmFamilyFromIdentity 推导执行家族 from draft model binding.
 func AlgorithmFamilyFromIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) (AlgorithmFamily, bool) {
-	if kind == binding.KindPersonality && subKind == binding.SubKindTypology {
+	if binding.IsTypologyKind(kind) && subKind == binding.SubKindTypology {
 		return AlgorithmFamilyFactorClassification, true
 	}
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)

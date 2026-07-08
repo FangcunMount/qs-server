@@ -2,12 +2,11 @@ package modelcatalog
 
 // Root facade: thin aliases over mechanism subpackages. Deep-import factor/scoring/typology
 // when mechanism-specific types are required; use this package for cross-mechanism identity
-// and publishing surfaces. Legacy symbols are grouped at the bottom.
+// and publishing surfaces.
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	factorpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	legacypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	typologypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
@@ -64,16 +63,11 @@ type (
 	ValidationLevel         = publishing.ValidationLevel
 	DomainValidationIssue   = publishing.DomainValidationIssue
 	DomainValidationResult  = publishing.DomainValidationResult
-
-	RuleSetKind       = legacypkg.RuleSetKind
-	Definition        = legacypkg.Definition
-	Snapshot          = legacypkg.Snapshot
-	RuleSetDefinition = legacypkg.RuleSetDefinition
-	RuleSetSnapshot   = legacypkg.RuleSetSnapshot
 )
 
 const (
 	KindScale            = binding.KindScale
+	KindTypology         = binding.KindTypology
 	KindPersonality      = binding.KindPersonality
 	KindBehavioralRating = binding.KindBehavioralRating
 	KindCognitive        = binding.KindCognitive
@@ -101,6 +95,7 @@ const (
 	DecisionKindScoreRangeInterpretation DecisionKind = binding.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
 
 	ProductChannelMedicalScale    = binding.ProductChannelMedicalScale
+	ProductChannelTypology        = binding.ProductChannelTypology
 	ProductChannelPersonality     = binding.ProductChannelPersonality
 	ProductChannelBehaviorAbility = binding.ProductChannelBehaviorAbility
 	ProductChannelCognitive       = binding.ProductChannelCognitive
@@ -146,15 +141,10 @@ const (
 	CatalogOpPreview           = binding.CatalogOpPreview
 	CatalogOpQRCode            = binding.CatalogOpQRCode
 
-	SchemaVersionV1        = publishing.SchemaVersionV1
-	SchemaVersionV2        = publishing.SchemaVersionV2
-	RuleSetSchemaVersionV1 = legacypkg.RuleSetSchemaVersionV1
+	SchemaVersionV1 = publishing.SchemaVersionV1
+	SchemaVersionV2 = publishing.SchemaVersionV2
 
-	RuleSetKindScale = legacypkg.RuleSetKindScale
-	RuleSetKindMBTI  = legacypkg.RuleSetKindMBTI
-	RuleSetKindSBTI  = legacypkg.RuleSetKindSBTI
-
-	APIKindBehaviorAbility = legacypkg.APIKindBehaviorAbility
+	APIKindBehaviorAbility = binding.APIKindBehaviorAbility
 
 	ModelStatusDraft     = publishing.ModelStatusDraft
 	ModelStatusPublished = publishing.ModelStatusPublished
@@ -165,11 +155,23 @@ const (
 )
 
 var (
-	DefaultProductChannelFor        = binding.DefaultProductChannelFor
-	ResolveProductChannel           = binding.ResolveProductChannel
-	CompleteProductChannel          = binding.CompleteProductChannel
-	AllProductChannels              = binding.AllProductChannels
-	FallbackPersonalityDecisionKind = legacypkg.FallbackPersonalityDecisionKind
+	NormalizeKind                          = binding.NormalizeKind
+	KindsEqual                             = binding.KindsEqual
+	IsTypologyKind                         = binding.IsTypologyKind
+	KindQueryValues                        = binding.KindQueryValues
+	NormalizeProductChannel                = binding.NormalizeProductChannel
+	ProductChannelsEqual                   = binding.ProductChannelsEqual
+	IsTypologyProductChannel               = binding.IsTypologyProductChannel
+	ProductChannelQueryValues              = binding.ProductChannelQueryValues
+	DefaultProductChannelFor               = binding.DefaultProductChannelFor
+	ResolveProductChannel                  = binding.ResolveProductChannel
+	CompleteProductChannel                 = binding.CompleteProductChannel
+	AllProductChannels                     = binding.AllProductChannels
+	LegacyKindMapping                      = binding.LegacyKindMapping
+	IsBehaviorAbilityProductChannelAPIKind = binding.IsBehaviorAbilityProductChannelAPIKind
+	BehaviorAbilityChannelModelFamilies    = binding.BehaviorAbilityChannelModelFamilies
+	IsBehaviorAbilityChannelFamily         = binding.IsBehaviorAbilityChannelFamily
+	ResolveBehaviorAbilityChannelFamily    = binding.ResolveBehaviorAbilityChannelFamily
 
 	AlgorithmFamilyFromDecisionKind = publishing.AlgorithmFamilyFromDecisionKind
 	DecisionKindForIdentity         = publishing.DecisionKindForIdentity
@@ -189,15 +191,6 @@ var (
 
 	FamilyCapabilityByKind = binding.FamilyCapabilityByKind
 	RuntimeExecutableKinds = binding.RuntimeExecutableKinds
-
-	LegacyKindMapping                      = legacypkg.LegacyKindMapping
-	ModelDefinitionFromLegacy              = legacypkg.ModelDefinitionFromLegacy
-	PublishedFromLegacy                    = legacypkg.PublishedFromLegacy
-	LegacyFromPublished                    = legacypkg.LegacyFromPublished
-	IsBehaviorAbilityProductChannelAPIKind = legacypkg.IsBehaviorAbilityProductChannelAPIKind
-	BehaviorAbilityChannelModelFamilies    = legacypkg.BehaviorAbilityChannelModelFamilies
-	IsBehaviorAbilityChannelFamily         = legacypkg.IsBehaviorAbilityChannelFamily
-	ResolveBehaviorAbilityChannelFamily    = legacypkg.ResolveBehaviorAbilityChannelFamily
 
 	NewAssessmentModel = publishing.NewAssessmentModel
 	ParseModelStatus   = publishing.ParseModelStatus

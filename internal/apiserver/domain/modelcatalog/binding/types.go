@@ -5,7 +5,8 @@ type Kind string
 
 const (
 	KindScale            Kind = "scale"
-	KindPersonality      Kind = "personality"
+	KindTypology         Kind = "typology"
+	KindPersonality      Kind = "personality" // Deprecated: persisted read-compat; use KindTypology.
 	KindBehavioralRating Kind = "behavioral_rating"
 	KindCognitive        Kind = "cognitive"
 	KindCustom           Kind = "custom"
@@ -37,8 +38,8 @@ const (
 func (k Kind) String() string { return string(k) }
 
 func (k Kind) IsValid() bool {
-	switch k {
-	case KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom:
+	switch NormalizeKind(k) {
+	case KindScale, KindTypology, KindBehavioralRating, KindCognitive, KindCustom:
 		return true
 	default:
 		return false

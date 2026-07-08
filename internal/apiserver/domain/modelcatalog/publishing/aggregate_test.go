@@ -11,7 +11,7 @@ func TestPersonalityModelLifecycle(t *testing.T) {
 	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_mbti_v1",
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Title:     "MBTI",
@@ -57,7 +57,7 @@ func TestPublishedModelCanBeRepublished(t *testing.T) {
 	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_republish",
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Title:     "Republish",
@@ -86,7 +86,7 @@ func TestArchiveCannotEdit(t *testing.T) {
 	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:  "personality_sbti_v1",
-		Kind:  domain.KindPersonality,
+		Kind:  domain.KindTypology,
 		Title: "SBTI",
 		Now:   now,
 	})
@@ -112,7 +112,7 @@ func TestArchiveCannotEdit(t *testing.T) {
 func TestPersonalityDefinitionValidation(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:  "personality_missing_algo",
-		Kind:  domain.KindPersonality,
+		Kind:  domain.KindTypology,
 		Title: "Missing algorithm",
 	})
 	if err != nil {

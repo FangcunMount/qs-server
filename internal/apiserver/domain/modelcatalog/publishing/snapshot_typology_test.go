@@ -2,6 +2,7 @@ package publishing_test
 
 import (
 	"encoding/json"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -12,7 +13,7 @@ import (
 func TestBuildPublishedSnapshot(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_mbti_test",
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Title:     "MBTI Test",
@@ -67,8 +68,8 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 	if len(payload.Outcomes) != 1 || payload.Outcomes[0].Code != "INTJ" {
 		t.Fatalf("snapshot payload outcomes = %#v, want INTJ preserved", payload.Outcomes)
 	}
-	legacy := domain.LegacyFromPublished(snapshot)
-	if legacy.Definition.Kind != domain.KindPersonality {
+	legacy := v1envelope.V1FromPublished(snapshot)
+	if legacy.Definition.Kind != domain.KindTypology {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}
 }
@@ -76,7 +77,7 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_mbti_trait_profile",
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Title:     "MBTI Trait Profile Override",
@@ -119,7 +120,7 @@ func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
 func TestBuildPublishedSnapshotUsesExplicitRuntimeDecisionKind(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_mbti_explicit_decision",
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Title:     "MBTI Explicit Decision",

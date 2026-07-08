@@ -55,7 +55,7 @@ func TestModelCatalogExportOnlyImportsSubpackages(t *testing.T) {
 		}
 		sub := strings.TrimPrefix(path, modulePrefix)
 		if sub == "" || strings.Contains(sub, "/") && !isAllowedExportSubpackageRoot(sub) {
-			t.Fatalf("export.go imports %q; allowed subpackages are factor, scoring, norming, typology, taskperformance, binding, publishing, legacy", path)
+			t.Fatalf("export.go imports %q; allowed subpackages are factor, scoring, norming, typology, taskperformance, binding, publishing", path)
 		}
 	}
 }
@@ -84,7 +84,7 @@ func isAllowedExportSubpackageRoot(sub string) bool {
 	}
 	switch sub {
 	case "factor", "scoring", "norming", "typology", "taskperformance",
-		"binding", "publishing", "legacy":
+		"binding", "publishing":
 		return true
 	default:
 		return false
@@ -97,7 +97,7 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 	root := modelCatalogRoot(t)
 	required := []string{
 		"factor", "scoring", "norming", "typology", "taskperformance",
-		"binding", "publishing", "legacy",
+		"binding", "publishing",
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {

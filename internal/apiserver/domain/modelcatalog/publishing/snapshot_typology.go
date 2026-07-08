@@ -9,8 +9,8 @@ import (
 )
 
 func buildTypologyPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, error) {
-	if model.Kind != binding.KindPersonality {
-		return nil, fmt.Errorf("model kind %s is not personality", model.Kind)
+	if !binding.IsTypologyKind(model.Kind) {
+		return nil, fmt.Errorf("model kind %s is not typology", model.Kind)
 	}
 	if model.SubKind != binding.SubKindTypology {
 		return nil, fmt.Errorf("typology model sub_kind %s is not typology", model.SubKind)
@@ -36,7 +36,7 @@ func buildTypologyPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnap
 		PayloadFormat: PayloadFormatPersonalityTypologyV1,
 		Model: ModelDefinition{
 			ProductChannel: binding.ResolveProductChannel(model.Kind, model.ProductChannel),
-			Kind:           binding.KindPersonality,
+			Kind:           binding.KindTypology,
 			SubKind:        binding.SubKindTypology,
 			Algorithm:      model.Algorithm,
 			Code:           model.Code,

@@ -30,7 +30,7 @@ func (c ModelFamilyCapability) AllowsNewDraft() bool {
 
 var defaultFamilyCapabilities = []ModelFamilyCapability{
 	{
-		Kind:                      KindPersonality,
+		Kind:                      KindTypology,
 		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,

@@ -8,7 +8,8 @@ func TestDefaultProductChannelFor(t *testing.T) {
 		want ProductChannel
 	}{
 		{KindScale, ProductChannelMedicalScale},
-		{KindPersonality, ProductChannelPersonality},
+		{KindTypology, ProductChannelTypology},
+		{KindPersonality, ProductChannelTypology},
 		{KindBehavioralRating, ProductChannelBehaviorAbility},
 		{KindCognitive, ProductChannelCognitive},
 		{KindCustom, ProductChannelCustom},

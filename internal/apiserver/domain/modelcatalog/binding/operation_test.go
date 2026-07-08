@@ -5,9 +5,9 @@ import "testing"
 func TestModelFamilyCapabilityAllowsOperations(t *testing.T) {
 	t.Parallel()
 
-	personality, ok := FamilyCapabilityByKind(KindPersonality)
+	typology, ok := FamilyCapabilityByKind(KindTypology)
 	if !ok {
-		t.Fatal("missing personality capability")
+		t.Fatal("missing typology capability")
 	}
 	for _, op := range []CatalogOperation{
 		CatalogOpCreate,
@@ -16,8 +16,8 @@ func TestModelFamilyCapabilityAllowsOperations(t *testing.T) {
 		CatalogOpBindQuestionnaire,
 		CatalogOpUpdateDefinition,
 	} {
-		if !personality.Allows(op) {
-			t.Fatalf("personality should allow %s", op)
+		if !typology.Allows(op) {
+			t.Fatalf("typology should allow %s", op)
 		}
 	}
 	for _, kind := range []Kind{

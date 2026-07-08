@@ -41,9 +41,9 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		wantOK    bool
 	}{
 		{name: "scale", kind: binding.KindScale, algorithm: binding.AlgorithmScaleDefault, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
-		{name: "personality_mbti", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmMBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
-		{name: "personality_sbti", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmSBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
-		{name: "personality_bigfive", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmBigFive, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
+		{name: "personality_mbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmMBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
+		{name: "personality_sbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmSBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
+		{name: "personality_bigfive", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmBigFive, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "behavioral_rating_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "behavioral_rating_default", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBehavioralRatingDefault, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
@@ -103,10 +103,10 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 }
 
 func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
-	if _, ok := publishing.DecisionKindForIdentity(binding.KindPersonality, binding.SubKindTypology, binding.AlgorithmMBTI); ok {
+	if _, ok := publishing.DecisionKindForIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmMBTI); ok {
 		t.Fatal("personality typology must not infer decision.kind from algorithm")
 	}
-	family, ok := publishing.AlgorithmFamilyFromIdentity(binding.KindPersonality, binding.SubKindTypology, binding.AlgorithmMBTI)
+	family, ok := publishing.AlgorithmFamilyFromIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmMBTI)
 	if !ok || family != publishing.AlgorithmFamilyFactorClassification {
 		t.Fatalf("family = %s ok=%v, want factor_classification", family, ok)
 	}

@@ -7,7 +7,8 @@ type ProductChannel string
 
 const (
 	ProductChannelMedicalScale    ProductChannel = "medical_scale"
-	ProductChannelPersonality     ProductChannel = "personality"
+	ProductChannelTypology        ProductChannel = "typology"
+	ProductChannelPersonality     ProductChannel = "personality" // Deprecated: persisted read-compat; use ProductChannelTypology.
 	ProductChannelBehaviorAbility ProductChannel = "behavior_ability"
 	ProductChannelCognitive       ProductChannel = "cognitive"
 	ProductChannelScreening       ProductChannel = "screening"
@@ -18,9 +19,9 @@ const (
 func (pc ProductChannel) String() string { return string(pc) }
 
 func (pc ProductChannel) IsValid() bool {
-	switch pc {
+	switch NormalizeProductChannel(pc) {
 	case ProductChannelMedicalScale,
-		ProductChannelPersonality,
+		ProductChannelTypology,
 		ProductChannelBehaviorAbility,
 		ProductChannelCognitive,
 		ProductChannelScreening,
@@ -36,11 +37,11 @@ func (pc ProductChannel) IsValid() bool {
 // 这是UI/创建表单 默认 仅; 它是 不 领域 constraint。
 // 使用 ResolveProductChannel 使用 显式 channel when product 分类体系 matters。
 func DefaultProductChannelFor(kind Kind) ProductChannel {
-	switch kind {
+	switch NormalizeKind(kind) {
 	case KindScale:
 		return ProductChannelMedicalScale
-	case KindPersonality:
-		return ProductChannelPersonality
+	case KindTypology:
+		return ProductChannelTypology
 	case KindBehavioralRating:
 		return ProductChannelBehaviorAbility
 	case KindCognitive:
@@ -76,7 +77,7 @@ func CompleteProductChannel(kind Kind, channel ProductChannel) (ProductChannel, 
 func AllProductChannels() []ProductChannel {
 	return []ProductChannel{
 		ProductChannelMedicalScale,
-		ProductChannelPersonality,
+		ProductChannelTypology,
 		ProductChannelBehaviorAbility,
 		ProductChannelCognitive,
 		ProductChannelScreening,
