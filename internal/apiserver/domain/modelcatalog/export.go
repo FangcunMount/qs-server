@@ -1,40 +1,38 @@
 package modelcatalog
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/capability"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	legacypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 type (
-	Kind           = identity.Kind
-	SubKind        = identity.SubKind
-	Algorithm      = identity.Algorithm
-	DecisionKind   = identity.DecisionKind
-	ProductChannel = identity.ProductChannel
+	Kind           = binding.Kind
+	SubKind        = binding.SubKind
+	Algorithm      = binding.Algorithm
+	DecisionKind   = binding.DecisionKind
+	ProductChannel = binding.ProductChannel
 
-	AlgorithmFamily = routing.AlgorithmFamily
-	ExecutionPath   = routing.ExecutionPath
+	AlgorithmFamily = publishing.AlgorithmFamily
+	ExecutionPath   = publishing.ExecutionPath
 
-	KindCapability   = capability.ModelFamilyCapability
-	CapabilityRole   = capability.CapabilityRole
-	CatalogOperation = capability.CatalogOperation
+	KindCapability   = binding.KindCapability
+	CapabilityRole   = binding.CapabilityRole
+	CatalogOperation = publishing.CatalogOperation
 
-	QuestionnaireBinding   = catalog.QuestionnaireBinding
-	ModelDefinition        = catalog.ModelDefinition
-	DecisionSpec           = catalog.DecisionSpec
-	SourceRef              = catalog.SourceRef
-	PublishedModelSnapshot = catalog.PublishedModelSnapshot
+	QuestionnaireBinding   = binding.QuestionnaireBinding
+	ModelDefinition        = publishing.ModelDefinition
+	DecisionSpec           = publishing.DecisionSpec
+	SourceRef              = publishing.SourceRef
+	PublishedModelSnapshot = publishing.PublishedModelSnapshot
 
-	AssessmentModel         = catalog.AssessmentModel
-	NewAssessmentModelInput = catalog.NewAssessmentModelInput
-	DefinitionPayload       = catalog.DefinitionPayload
-	ModelStatus             = catalog.ModelStatus
-	ValidationLevel         = catalog.ValidationLevel
-	DomainValidationIssue   = catalog.DomainValidationIssue
-	DomainValidationResult  = catalog.DomainValidationResult
+	AssessmentModel         = publishing.AssessmentModel
+	NewAssessmentModelInput = publishing.NewAssessmentModelInput
+	DefinitionPayload       = publishing.DefinitionPayload
+	ModelStatus             = publishing.ModelStatus
+	ValidationLevel         = publishing.ValidationLevel
+	DomainValidationIssue   = publishing.DomainValidationIssue
+	DomainValidationResult  = publishing.DomainValidationResult
 
 	RuleSetKind       = legacypkg.RuleSetKind
 	Definition        = legacypkg.Definition
@@ -44,80 +42,80 @@ type (
 )
 
 const (
-	KindScale            = identity.KindScale
-	KindPersonality      = identity.KindPersonality
-	KindBehavioralRating = identity.KindBehavioralRating
-	KindCognitive        = identity.KindCognitive
-	KindCustom           = identity.KindCustom
+	KindScale            = binding.KindScale
+	KindPersonality      = binding.KindPersonality
+	KindBehavioralRating = binding.KindBehavioralRating
+	KindCognitive        = binding.KindCognitive
+	KindCustom           = binding.KindCustom
 
-	SubKindEmpty    = identity.SubKindEmpty
-	SubKindTypology = identity.SubKindTypology
-	SubKindTrait    = identity.SubKindTrait
+	SubKindEmpty    = binding.SubKindEmpty
+	SubKindTypology = binding.SubKindTypology
+	SubKindTrait    = binding.SubKindTrait
 
-	AlgorithmScaleDefault            = identity.AlgorithmScaleDefault
-	AlgorithmPersonalityTypology     = identity.AlgorithmPersonalityTypology
-	AlgorithmBigFive                 = identity.AlgorithmBigFive
-	AlgorithmMBTI                    = identity.AlgorithmMBTI
-	AlgorithmSBTI                    = identity.AlgorithmSBTI
-	AlgorithmBrief2                  = identity.AlgorithmBrief2
-	AlgorithmSPM                     = identity.AlgorithmSPM
-	AlgorithmBehavioralRatingDefault = identity.AlgorithmBehavioralRatingDefault
+	AlgorithmScaleDefault            = binding.AlgorithmScaleDefault
+	AlgorithmPersonalityTypology     = binding.AlgorithmPersonalityTypology
+	AlgorithmBigFive                 = binding.AlgorithmBigFive
+	AlgorithmMBTI                    = binding.AlgorithmMBTI
+	AlgorithmSBTI                    = binding.AlgorithmSBTI
+	AlgorithmBrief2                  = binding.AlgorithmBrief2
+	AlgorithmSPM                     = binding.AlgorithmSPM
+	AlgorithmBehavioralRatingDefault = binding.AlgorithmBehavioralRatingDefault
 
-	DecisionKindScoreRange                            = identity.DecisionKindScoreRange
-	DecisionKindPoleComposition                       = identity.DecisionKindPoleComposition
-	DecisionKindTraitProfile                          = identity.DecisionKindTraitProfile
-	DecisionKindNearestPattern                        = identity.DecisionKindNearestPattern
-	DecisionKindNormLookup                            = identity.DecisionKindNormLookup
-	DecisionKindAbilityLevel                          = identity.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation DecisionKind = "score_range_interpretation"
+	DecisionKindScoreRange                            = binding.DecisionKindScoreRange
+	DecisionKindPoleComposition                       = binding.DecisionKindPoleComposition
+	DecisionKindTraitProfile                          = binding.DecisionKindTraitProfile
+	DecisionKindNearestPattern                        = binding.DecisionKindNearestPattern
+	DecisionKindNormLookup                            = binding.DecisionKindNormLookup
+	DecisionKindAbilityLevel                          = binding.DecisionKindAbilityLevel
+	DecisionKindScoreRangeInterpretation DecisionKind = publishing.DecisionKindScoreRangeInterpretation
 
-	ProductChannelMedicalScale    = identity.ProductChannelMedicalScale
-	ProductChannelPersonality     = identity.ProductChannelPersonality
-	ProductChannelBehaviorAbility = identity.ProductChannelBehaviorAbility
-	ProductChannelCognitive       = identity.ProductChannelCognitive
-	ProductChannelCustom          = identity.ProductChannelCustom
+	ProductChannelMedicalScale    = binding.ProductChannelMedicalScale
+	ProductChannelPersonality     = binding.ProductChannelPersonality
+	ProductChannelBehaviorAbility = binding.ProductChannelBehaviorAbility
+	ProductChannelCognitive       = binding.ProductChannelCognitive
+	ProductChannelCustom          = binding.ProductChannelCustom
 
-	AlgorithmFamilyFactorScoring        = routing.AlgorithmFamilyFactorScoring
-	AlgorithmFamilyFactorClassification = routing.AlgorithmFamilyFactorClassification
-	AlgorithmFamilyFactorNorm           = routing.AlgorithmFamilyFactorNorm
-	AlgorithmFamilyTaskPerformance      = routing.AlgorithmFamilyTaskPerformance
+	AlgorithmFamilyFactorScoring        = publishing.AlgorithmFamilyFactorScoring
+	AlgorithmFamilyFactorClassification = publishing.AlgorithmFamilyFactorClassification
+	AlgorithmFamilyFactorNorm           = publishing.AlgorithmFamilyFactorNorm
+	AlgorithmFamilyTaskPerformance      = publishing.AlgorithmFamilyTaskPerformance
 
-	ExecutionPathNone                       = routing.ExecutionPathNone
-	ExecutionPathScaleDescriptor            = routing.ExecutionPathScaleDescriptor
-	ExecutionPathTypologyDescriptor         = routing.ExecutionPathTypologyDescriptor
-	ExecutionPathBehavioralRatingDescriptor = routing.ExecutionPathBehavioralRatingDescriptor
-	ExecutionPathCognitiveDescriptor        = routing.ExecutionPathCognitiveDescriptor
+	ExecutionPathNone                       = publishing.ExecutionPathNone
+	ExecutionPathScaleDescriptor            = publishing.ExecutionPathScaleDescriptor
+	ExecutionPathTypologyDescriptor         = publishing.ExecutionPathTypologyDescriptor
+	ExecutionPathBehavioralRatingDescriptor = publishing.ExecutionPathBehavioralRatingDescriptor
+	ExecutionPathCognitiveDescriptor        = publishing.ExecutionPathCognitiveDescriptor
 
-	PayloadFormatAssessmentScaleV1         = routing.PayloadFormatAssessmentScaleV1
-	PayloadFormatPersonalityTypologyV1     = routing.PayloadFormatPersonalityTypologyV1
-	PayloadFormatBehavioralRatingDefaultV1 = routing.PayloadFormatBehavioralRatingDefaultV1
-	PayloadFormatBehavioralRatingBrief2V1  = routing.PayloadFormatBehavioralRatingBrief2V1
-	PayloadFormatCognitiveDefaultV1        = routing.PayloadFormatCognitiveDefaultV1
-	PayloadFormatCognitiveSPMV1            = routing.PayloadFormatCognitiveSPMV1
-	PayloadFormatScaleV1                   = routing.PayloadFormatScaleV1
-	PayloadFormatMBTIV1                    = routing.PayloadFormatMBTIV1
-	PayloadFormatSBTIV1                    = routing.PayloadFormatSBTIV1
-	PayloadFormatScaleV1Legacy             = routing.PayloadFormatScaleV1Legacy
-	PayloadFormatMBTIV1Legacy              = routing.PayloadFormatMBTIV1Legacy
-	PayloadFormatSBTIV1Legacy              = routing.PayloadFormatSBTIV1Legacy
+	PayloadFormatAssessmentScaleV1         = publishing.PayloadFormatAssessmentScaleV1
+	PayloadFormatPersonalityTypologyV1     = publishing.PayloadFormatPersonalityTypologyV1
+	PayloadFormatBehavioralRatingDefaultV1 = publishing.PayloadFormatBehavioralRatingDefaultV1
+	PayloadFormatBehavioralRatingBrief2V1  = publishing.PayloadFormatBehavioralRatingBrief2V1
+	PayloadFormatCognitiveDefaultV1        = publishing.PayloadFormatCognitiveDefaultV1
+	PayloadFormatCognitiveSPMV1            = publishing.PayloadFormatCognitiveSPMV1
+	PayloadFormatScaleV1                   = publishing.PayloadFormatScaleV1
+	PayloadFormatMBTIV1                    = publishing.PayloadFormatMBTIV1
+	PayloadFormatSBTIV1                    = publishing.PayloadFormatSBTIV1
+	PayloadFormatScaleV1Legacy             = publishing.PayloadFormatScaleV1Legacy
+	PayloadFormatMBTIV1Legacy              = publishing.PayloadFormatMBTIV1Legacy
+	PayloadFormatSBTIV1Legacy              = publishing.PayloadFormatSBTIV1Legacy
 
-	CapabilityRoleProductChannel = capability.CapabilityRoleProductChannel
-	CapabilityRoleModelFamily    = capability.CapabilityRoleModelFamily
+	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
+	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
 
-	CatalogOpCreate            = capability.CatalogOpCreate
-	CatalogOpList              = capability.CatalogOpList
-	CatalogOpUpdateBasicInfo   = capability.CatalogOpUpdateBasicInfo
-	CatalogOpDelete            = capability.CatalogOpDelete
-	CatalogOpPublish           = capability.CatalogOpPublish
-	CatalogOpUnpublish         = capability.CatalogOpUnpublish
-	CatalogOpArchive           = capability.CatalogOpArchive
-	CatalogOpBindQuestionnaire = capability.CatalogOpBindQuestionnaire
-	CatalogOpUpdateDefinition  = capability.CatalogOpUpdateDefinition
-	CatalogOpPreview           = capability.CatalogOpPreview
-	CatalogOpQRCode            = capability.CatalogOpQRCode
+	CatalogOpCreate            = publishing.CatalogOpCreate
+	CatalogOpList              = publishing.CatalogOpList
+	CatalogOpUpdateBasicInfo   = publishing.CatalogOpUpdateBasicInfo
+	CatalogOpDelete            = publishing.CatalogOpDelete
+	CatalogOpPublish           = publishing.CatalogOpPublish
+	CatalogOpUnpublish         = publishing.CatalogOpUnpublish
+	CatalogOpArchive           = publishing.CatalogOpArchive
+	CatalogOpBindQuestionnaire = publishing.CatalogOpBindQuestionnaire
+	CatalogOpUpdateDefinition  = publishing.CatalogOpUpdateDefinition
+	CatalogOpPreview           = publishing.CatalogOpPreview
+	CatalogOpQRCode            = publishing.CatalogOpQRCode
 
-	SchemaVersionV1        = catalog.SchemaVersionV1
-	SchemaVersionV2        = catalog.SchemaVersionV2
+	SchemaVersionV1        = publishing.SchemaVersionV1
+	SchemaVersionV2        = publishing.SchemaVersionV2
 	RuleSetSchemaVersionV1 = legacypkg.RuleSetSchemaVersionV1
 
 	RuleSetKindScale = legacypkg.RuleSetKindScale
@@ -126,39 +124,39 @@ const (
 
 	APIKindBehaviorAbility = legacypkg.APIKindBehaviorAbility
 
-	ModelStatusDraft     = catalog.ModelStatusDraft
-	ModelStatusPublished = catalog.ModelStatusPublished
-	ModelStatusArchived  = catalog.ModelStatusArchived
+	ModelStatusDraft     = publishing.ModelStatusDraft
+	ModelStatusPublished = publishing.ModelStatusPublished
+	ModelStatusArchived  = publishing.ModelStatusArchived
 
-	ValidationLevelError   = catalog.ValidationLevelError
-	ValidationLevelWarning = catalog.ValidationLevelWarning
+	ValidationLevelError   = publishing.ValidationLevelError
+	ValidationLevelWarning = publishing.ValidationLevelWarning
 )
 
 var (
-	DefaultProductChannelFor        = identity.DefaultProductChannelFor
-	ResolveProductChannel           = identity.ResolveProductChannel
-	CompleteProductChannel          = identity.CompleteProductChannel
-	AllProductChannels              = identity.AllProductChannels
+	DefaultProductChannelFor        = binding.DefaultProductChannelFor
+	ResolveProductChannel           = binding.ResolveProductChannel
+	CompleteProductChannel          = binding.CompleteProductChannel
+	AllProductChannels              = binding.AllProductChannels
 	FallbackPersonalityDecisionKind = legacypkg.FallbackPersonalityDecisionKind
 
-	AlgorithmFamilyFromDecisionKind = routing.AlgorithmFamilyFromDecisionKind
-	DecisionKindForIdentity         = routing.DecisionKindForIdentity
-	AlgorithmFamilyFromIdentity     = routing.AlgorithmFamilyFromIdentity
-	AllAlgorithmFamilies            = routing.AllAlgorithmFamilies
+	AlgorithmFamilyFromDecisionKind = publishing.AlgorithmFamilyFromDecisionKind
+	DecisionKindForIdentity         = publishing.DecisionKindForIdentity
+	AlgorithmFamilyFromIdentity     = publishing.AlgorithmFamilyFromIdentity
+	AllAlgorithmFamilies            = publishing.AllAlgorithmFamilies
 
-	IsScalePayloadFormat               = routing.IsScalePayloadFormat
-	IsMBTIPayloadFormat                = routing.IsMBTIPayloadFormat
-	IsSBTIPayloadFormat                = routing.IsSBTIPayloadFormat
-	IsPersonalityTypologyPayloadFormat = routing.IsPersonalityTypologyPayloadFormat
-	AlgorithmFromTypologyPayload       = routing.AlgorithmFromTypologyPayload
-	PayloadFormatForBehavioralRating   = routing.PayloadFormatForBehavioralRating
-	PayloadFormatForCognitive          = routing.PayloadFormatForCognitive
-	IsBehavioralRatingPayloadFormat    = routing.IsBehavioralRatingPayloadFormat
-	IsCognitivePayloadFormat           = routing.IsCognitivePayloadFormat
-	DraftPayloadFormatForModel         = routing.DraftPayloadFormatForModel
+	IsScalePayloadFormat               = publishing.IsScalePayloadFormat
+	IsMBTIPayloadFormat                = publishing.IsMBTIPayloadFormat
+	IsSBTIPayloadFormat                = publishing.IsSBTIPayloadFormat
+	IsPersonalityTypologyPayloadFormat = publishing.IsPersonalityTypologyPayloadFormat
+	AlgorithmFromTypologyPayload       = publishing.AlgorithmFromTypologyPayload
+	PayloadFormatForBehavioralRating   = publishing.PayloadFormatForBehavioralRating
+	PayloadFormatForCognitive          = publishing.PayloadFormatForCognitive
+	IsBehavioralRatingPayloadFormat    = publishing.IsBehavioralRatingPayloadFormat
+	IsCognitivePayloadFormat           = publishing.IsCognitivePayloadFormat
+	DraftPayloadFormatForModel         = publishing.DraftPayloadFormatForModel
 
-	FamilyCapabilityByKind = capability.FamilyCapabilityByKind
-	RuntimeExecutableKinds = capability.RuntimeExecutableKinds
+	FamilyCapabilityByKind = binding.FamilyCapabilityByKind
+	RuntimeExecutableKinds = binding.RuntimeExecutableKinds
 
 	LegacyKindMapping                      = legacypkg.LegacyKindMapping
 	ModelDefinitionFromLegacy              = legacypkg.ModelDefinitionFromLegacy
@@ -169,6 +167,6 @@ var (
 	IsBehaviorAbilityChannelFamily         = legacypkg.IsBehaviorAbilityChannelFamily
 	ResolveBehaviorAbilityChannelFamily    = legacypkg.ResolveBehaviorAbilityChannelFamily
 
-	NewAssessmentModel = catalog.NewAssessmentModel
-	ParseModelStatus   = catalog.ParseModelStatus
+	NewAssessmentModel = publishing.NewAssessmentModel
+	ParseModelStatus   = publishing.ParseModelStatus
 )
