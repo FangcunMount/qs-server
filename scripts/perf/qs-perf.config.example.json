@@ -1220,7 +1220,6 @@
     ],
     "submit": "/api/v1/answersheets",
     "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
-    "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "reportEvents": "/api/v1/report-events",
     "typologySession": "/api/v1/typology-assessment-sessions",

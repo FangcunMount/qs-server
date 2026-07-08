@@ -359,6 +359,8 @@ paths:
       tags:
       - AssessmentModel
       summary: 获取测评模型列表
+      description: 管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受
+        personality 读兼容别名。
       operationId: 获取测评模型列表
       parameters:
       - type: string
@@ -366,7 +368,14 @@ paths:
         name: Authorization
         in: header
         required: true
-      - type: string
+      - enum:
+        - typology
+        - personality
+        - behavioral_rating
+        - cognitive
+        - custom
+        - medical_scale
+        type: string
         description: 模型类型
         name: kind
         in: query
@@ -414,6 +423,8 @@ paths:
       tags:
       - AssessmentModel
       summary: 创建测评模型
+      description: 新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用
+        typology。
       operationId: 创建测评模型
       parameters:
       - type: string
@@ -444,6 +455,8 @@ paths:
       tags:
       - AssessmentModel
       summary: 获取测评模型选项
+      description: kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为
+        personality。
       operationId: 获取测评模型选项
       parameters:
       - type: string
@@ -451,7 +464,14 @@ paths:
         name: Authorization
         in: header
         required: true
-      - type: string
+      - enum:
+        - typology
+        - personality
+        - behavioral_rating
+        - cognitive
+        - custom
+        - medical_scale
+        type: string
         description: 模型类型
         name: kind
         in: query
@@ -6187,9 +6207,19 @@ components:
         description:
           type: string
         kind:
+          description: 模型族；R128b canonical 为 typology，读兼容 personality。
           type: string
+          enum:
+          - typology
+          - personality
+          example: typology
         product_channel:
+          description: 产品通道；R128b canonical 为 typology，读兼容 personality。
           type: string
+          enum:
+          - typology
+          - personality
+          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -6198,6 +6228,7 @@ components:
           type: string
         sub_kind:
           type: string
+          example: typology
         tags:
           type: array
           items:
@@ -6397,15 +6428,29 @@ components:
         description:
           type: string
         kind:
+          description: 模型族；R128b canonical 为 typology，读兼容 personality。
           type: string
+          enum:
+          - typology
+          - personality
+          - behavioral_rating
+          - cognitive
+          - custom
+          example: typology
         product_channel:
+          description: 产品通道；人格测评为 typology。
           type: string
+          enum:
+          - typology
+          - personality
+          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
           type: string
         sub_kind:
           type: string
+          example: typology
         tags:
           type: array
           items:
@@ -6980,9 +7025,19 @@ components:
         description:
           type: string
         kind:
+          description: 模型族；R128b canonical 为 typology，读兼容 personality。
           type: string
+          enum:
+          - typology
+          - personality
+          example: typology
         product_channel:
+          description: 产品通道；R128b canonical 为 typology，读兼容 personality。
           type: string
+          enum:
+          - typology
+          - personality
+          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -6991,6 +7046,7 @@ components:
           type: string
         sub_kind:
           type: string
+          example: typology
         tags:
           type: array
           items:
@@ -7490,11 +7546,17 @@ components:
         code:
           type: string
         kind:
+          description: 测评层 kind；人格线当前输出 personality，读兼容 typology。
           type: string
+          enum:
+          - personality
+          - typology
+          example: personality
         product_channel:
           type: string
         sub_kind:
           type: string
+          example: typology
         title:
           type: string
         version:

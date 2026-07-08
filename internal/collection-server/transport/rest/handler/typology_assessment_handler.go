@@ -39,9 +39,10 @@ func NewTypologyAssessmentHandler(
 
 // List lists typology assessments for a testee.
 // @Summary 查询类型学测评列表
+// @Description 返回受试者人格测评列表。提交答卷后可用 items[].answer_sheet_id 与 submit-status 返回的 answersheet_id 匹配，取得 assessment_id（id 字段）。R121 后不再支持按答卷反查测评。
 // @Tags 类型学测评
 // @Produce json
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID（建议字符串）"
 // @Success 200 {object} core.Response{data=typologyassessment.ListAssessmentsResponse}
 // @Router /api/v1/typology-assessments [get]
 func (h *TypologyAssessmentHandler) List(c *gin.Context) {
@@ -66,7 +67,7 @@ func (h *TypologyAssessmentHandler) List(c *gin.Context) {
 // @Tags 类型学测评
 // @Produce json
 // @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID（建议字符串）"
 // @Success 200 {object} core.Response{data=typologyassessment.AssessmentDetailResponse}
 // @Router /api/v1/typology-assessments/{id} [get]
 func (h *TypologyAssessmentHandler) Get(c *gin.Context) {
@@ -96,10 +97,11 @@ func (h *TypologyAssessmentHandler) Get(c *gin.Context) {
 
 // GetReport returns a typology assessment report.
 // @Summary 获取类型学测评报告
+// @Description 仅在 report-status 终态 interpreted 后调用。model.kind 当前为 personality（测评层），与目录层 typology 并存。
 // @Tags 类型学测评
 // @Produce json
 // @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID（建议字符串）"
 // @Success 200 {object} core.Response{data=typologyassessment.AssessmentReportResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
@@ -136,10 +138,11 @@ func (h *TypologyAssessmentHandler) GetReport(c *gin.Context) {
 
 // GetReportStatus 短轮询查询类型学测评报告状态（非阻塞）。
 // @Summary 查询类型学测评报告状态
+// @Description 推荐报告等待方式（优于 wait-report 长轮询）。非终态按 next_poll_after_ms 退避；亦可选用 WSS /api/v1/report-events（subscribe.kind=personality，需 report_events.enabled）。
 // @Tags 类型学测评
 // @Produce json
 // @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID（建议字符串）"
 // @Success 200 {object} core.Response{data=typologyassessment.AssessmentStatusResponse}
 // @Router /api/v1/typology-assessments/{id}/report-status [get]
 func (h *TypologyAssessmentHandler) GetReportStatus(c *gin.Context) {
@@ -161,10 +164,11 @@ func (h *TypologyAssessmentHandler) GetReportStatus(c *gin.Context) {
 
 // WaitReport waits for a typology assessment report.
 // @Summary 长轮询等待类型学测评报告
+// @Description legacy 兼容；高并发下占连接。新接入请优先 report-status 短轮询或 WSS /report-events。
 // @Tags 类型学测评
 // @Produce json
 // @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID（建议字符串）"
 // @Param timeout query int false "超时时间（秒）" default(20)
 // @Success 200 {object} core.Response{data=typologyassessment.AssessmentStatusResponse}
 // @Router /api/v1/typology-assessments/{id}/wait-report [get]

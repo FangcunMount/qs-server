@@ -44,7 +44,7 @@ func (h *TypologyModelHandler) Get(c *gin.Context) {
 
 // List returns published typology model summaries.
 // @Summary 获取类型学模型列表
-// @Description 浏览已发布类型学模型目录。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
+// @Description 浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
 // @Tags 类型学模型
 // @Produce json
 // @Param page query int false "页码" default(1)

@@ -141,8 +141,18 @@ definitions:
       description:
         type: string
       kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       questionnaire_code:
         type: string
@@ -151,6 +161,7 @@ definitions:
       status:
         type: string
       sub_kind:
+        example: typology
         type: string
       tags:
         items:
@@ -351,14 +362,28 @@ definitions:
       description:
         type: string
       kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        - behavioral_rating
+        - cognitive
+        - custom
+        example: typology
         type: string
       product_channel:
+        description: 产品通道；人格测评为 typology。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       questionnaire_code:
         type: string
       questionnaire_version:
         type: string
       sub_kind:
+        example: typology
         type: string
       tags:
         items:
@@ -934,8 +959,18 @@ definitions:
       description:
         type: string
       kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       questionnaire_code:
         type: string
@@ -944,6 +979,7 @@ definitions:
       status:
         type: string
       sub_kind:
+        example: typology
         type: string
       tags:
         items:
@@ -1444,10 +1480,16 @@ definitions:
       code:
         type: string
       kind:
+        description: 测评层 kind；人格线当前输出 personality，读兼容 typology。
+        enum:
+        - personality
+        - typology
+        example: personality
         type: string
       product_channel:
         type: string
       sub_kind:
+        example: typology
         type: string
       title:
         type: string
@@ -3230,6 +3272,8 @@ paths:
       - AssessmentEntry
   /api/v1/assessment-models:
     get:
+      description: 管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受
+        personality 读兼容别名。
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3237,6 +3281,13 @@ paths:
         required: true
         type: string
       - description: 模型类型
+        enum:
+        - typology
+        - personality
+        - behavioral_rating
+        - cognitive
+        - custom
+        - medical_scale
         in: query
         name: kind
         type: string
@@ -3286,6 +3337,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: 新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用
+        typology。
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3531,6 +3584,8 @@ paths:
       - AssessmentModel
   /api/v1/assessment-models/options:
     get:
+      description: kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为
+        personality。
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3538,6 +3593,13 @@ paths:
         required: true
         type: string
       - description: 模型类型
+        enum:
+        - typology
+        - personality
+        - behavioral_rating
+        - cognitive
+        - custom
+        - medical_scale
         in: query
         name: kind
         type: string

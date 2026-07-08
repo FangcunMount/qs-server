@@ -53,6 +53,13 @@ func TestCollectionOpenAPITypologyModelSchemaHasRoutingFields(t *testing.T) {
 			t.Fatalf("TypologyModelSummaryResponse missing field %q", field)
 		}
 	}
+	kindProp, ok := props["kind"].(map[string]any)
+	if !ok {
+		t.Fatal("kind property must be an object")
+	}
+	if example, _ := kindProp["example"].(string); example != "typology" {
+		t.Fatalf("kind example = %v, want typology", kindProp["example"])
+	}
 }
 
 func TestCollectionOpenAPIModelIdentityHasRoutingFields(t *testing.T) {

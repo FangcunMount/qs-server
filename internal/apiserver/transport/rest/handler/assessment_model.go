@@ -27,10 +27,11 @@ func NewAssessmentModelHandler(service modelcatalog.Service) *AssessmentModelHan
 
 // List 获取测评模型列表
 // @Summary 获取测评模型列表
+// @Description 管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受 personality 读兼容别名。
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param kind query string false "模型类型"
+// @Param kind query string false "模型类型" Enums(typology,personality,behavioral_rating,cognitive,custom,medical_scale)
 // @Param sub_kind query string false "子类型"
 // @Param status query string false "状态"
 // @Param keyword query string false "关键词"
@@ -70,6 +71,7 @@ func (h *AssessmentModelHandler) List(c *gin.Context) {
 
 // Create 创建测评模型
 // @Summary 创建测评模型
+// @Description 新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用 typology。
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
@@ -270,10 +272,11 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 
 // Options 获取测评模型选项
 // @Summary 获取测评模型选项
+// @Description kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为 personality。
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param kind query string false "模型类型"
+// @Param kind query string false "模型类型" Enums(typology,personality,behavioral_rating,cognitive,custom,medical_scale)
 // @Success 200 {object} core.Response{data=response.AssessmentModelOptionsResponse}
 // @Router /api/v1/assessment-models/options [get]
 func (h *AssessmentModelHandler) Options(c *gin.Context) {

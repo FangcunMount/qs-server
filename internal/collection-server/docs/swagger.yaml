@@ -158,6 +158,7 @@ definitions:
   evaluation.AssessmentSummaryResponse:
     properties:
       answer_sheet_id:
+        description: 关联答卷 ID；提交后可用其与 answersheet_id 匹配取得 assessment_id（R121 后推荐方式）。
         type: string
       created_at:
         type: string
@@ -310,10 +311,16 @@ definitions:
       code:
         type: string
       kind:
+        description: 测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。
+        enum:
+        - personality
+        - typology
+        example: personality
         type: string
       product_channel:
         type: string
       sub_kind:
+        example: typology
         type: string
       title:
         type: string
@@ -1008,10 +1015,16 @@ definitions:
       code:
         type: string
       kind:
+        description: 测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。
+        enum:
+        - personality
+        - typology
+        example: personality
         type: string
       product_channel:
         type: string
       sub_kind:
+        example: typology
         type: string
       title:
         type: string
@@ -1073,6 +1086,11 @@ definitions:
           $ref: '#/definitions/typologymodel.TypologyDimensionResponse'
         type: array
       kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       outcomes:
         items:
@@ -1081,6 +1099,11 @@ definitions:
       payload_format:
         type: string
       product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       question_count:
         type: integer
@@ -1091,6 +1114,8 @@ definitions:
       status:
         type: string
       sub_kind:
+        description: 子机制，人格测评固定 typology。
+        example: typology
         type: string
       title:
         type: string
@@ -1110,10 +1135,20 @@ definitions:
       description:
         type: string
       kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       payload_format:
         type: string
       product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
         type: string
       question_count:
         type: integer
@@ -1124,6 +1159,8 @@ definitions:
       status:
         type: string
       sub_kind:
+        description: 子机制，人格测评固定 typology。
+        example: typology
         type: string
       title:
         type: string
@@ -1144,20 +1181,26 @@ definitions:
   typologysession.SessionEndpointsResponse:
     properties:
       assessment_by_answer_sheet:
+        description: 已下线（R121）端点 URL 模板，勿调用。assessment_id 请用 GET /typology-assessments
+          列表按 answer_sheet_id 匹配。
         type: string
       report:
         type: string
       submit_answer_sheet:
         type: string
       wait_report:
+        description: legacy 长轮询；推荐改用 report-status 短轮询或 WSS /report-events（kind=personality）。
         type: string
     type: object
   typologysession.StartSessionRequest:
     properties:
       model_code:
+        example: MBTI_OEJTS
         type: string
       testee_id:
-        type: integer
+        description: 受试者 ID；JSON 可传字符串或数字（小程序大整数建议字符串）。
+        example: "618855887087350318"
+        type: string
     required:
     - model_code
     - testee_id
@@ -1180,6 +1223,23 @@ definitions:
       questionnaire_version:
         type: string
       testee_id:
+        type: string
+    type: object
+  ws.ReportEventsStatusFrame:
+    properties:
+      data:
+        properties:
+          status:
+            enum:
+            - pending
+            - submitted
+            - interpreted
+            - failed
+            example: interpreted
+            type: string
+        type: object
+      op:
+        example: status
         type: string
     type: object
 info:
@@ -1696,6 +1756,36 @@ paths:
       summary: 获取问卷详情
       tags:
       - 问卷
+  /api/v1/report-events:
+    get:
+      consumes:
+      - application/json
+      description: 升级 WebSocket 后发送 subscribe 帧等待测评终态。每条连接仅允许一次 subscribe。人格线 kind=personality；量表线
+        kind=medical。需 report_events.enabled=true。
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            $ref: '#/definitions/ws.ReportEventsStatusFrame'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: report_events 未开启
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 报告状态 WebSocket 推送
+      tags:
+      - 报告事件
   /api/v1/scales:
     get:
       description: |-
@@ -2138,8 +2228,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session
-        → POST /answersheets → wait-report → report。
+      description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session
+        → POST /answersheets → GET /answersheets/submit-status → GET /typology-assessments（按
+        answer_sheet_id 取 assessment_id）→ GET .../report-status（或 WSS /report-events，subscribe.kind=personality）→
+        GET .../report。模型目录 kind/product_channel 为 typology；报告 model.kind 仍为 personality。
       parameters:
       - description: 开始会话请求
         in: body
@@ -2176,12 +2268,14 @@ paths:
       - 类型学测评
   /api/v1/typology-assessments:
     get:
+      description: 返回受试者人格测评列表。提交答卷后可用 items[].answer_sheet_id 与 submit-status 返回的
+        answersheet_id 匹配，取得 assessment_id（id 字段）。R121 后不再支持按答卷反查测评。
       parameters:
-      - description: 受试者ID
+      - description: 受试者ID（建议字符串）
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2205,11 +2299,11 @@ paths:
         name: id
         required: true
         type: integer
-      - description: 受试者ID
+      - description: 受试者ID（建议字符串）
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2227,17 +2321,19 @@ paths:
       - 类型学测评
   /api/v1/typology-assessments/{id}/report:
     get:
+      description: 仅在 report-status 终态 interpreted 后调用。model.kind 当前为 personality（测评层），与目录层
+        typology 并存。
       parameters:
       - description: 测评ID
         in: path
         name: id
         required: true
         type: integer
-      - description: 受试者ID
+      - description: 受试者ID（建议字符串）
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2267,17 +2363,19 @@ paths:
       - 类型学测评
   /api/v1/typology-assessments/{id}/report-status:
     get:
+      description: 推荐报告等待方式（优于 wait-report 长轮询）。非终态按 next_poll_after_ms 退避；亦可选用 WSS
+        /api/v1/report-events（subscribe.kind=personality，需 report_events.enabled）。
       parameters:
       - description: 测评ID
         in: path
         name: id
         required: true
         type: integer
-      - description: 受试者ID
+      - description: 受试者ID（建议字符串）
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2295,17 +2393,18 @@ paths:
       - 类型学测评
   /api/v1/typology-assessments/{id}/wait-report:
     get:
+      description: legacy 兼容；高并发下占连接。新接入请优先 report-status 短轮询或 WSS /report-events。
       parameters:
       - description: 测评ID
         in: path
         name: id
         required: true
         type: integer
-      - description: 受试者ID
+      - description: 受试者ID（建议字符串）
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       - default: 20
         description: 超时时间（秒）
         in: query
@@ -2328,8 +2427,8 @@ paths:
       - 类型学测评
   /api/v1/typology-models:
     get:
-      description: 浏览已发布类型学模型目录。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST
-        /typology-assessment-sessions。
+      description: 浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用
+        GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
       parameters:
       - default: 1
         description: 页码

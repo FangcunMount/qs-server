@@ -47,6 +47,13 @@ type openAPISpec struct {
 	Paths map[string]map[string]any `yaml:"paths"`
 }
 
+type openAPIRoot struct {
+	Paths      map[string]map[string]any `yaml:"paths"`
+	Components struct {
+		Schemas map[string]any `yaml:"schemas"`
+	} `yaml:"components"`
+}
+
 func loadOpenAPISpec(t *testing.T, path string) openAPISpec {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -61,6 +68,22 @@ func loadOpenAPISpec(t *testing.T, path string) openAPISpec {
 		t.Fatalf("%s has no OpenAPI paths", path)
 	}
 	return spec
+}
+
+func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root openAPIRoot
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	if len(root.Components.Schemas) == 0 {
+		t.Fatalf("%s has no OpenAPI schemas", path)
+	}
+	return root.Components.Schemas
 }
 
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {

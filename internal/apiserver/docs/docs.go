@@ -410,6 +410,7 @@ const docTemplate = `{
         },
         "/api/v1/assessment-models": {
             "get": {
+                "description": "管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受 personality 读兼容别名。",
                 "produces": [
                     "application/json"
                 ],
@@ -426,6 +427,14 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "typology",
+                            "personality",
+                            "behavioral_rating",
+                            "cognitive",
+                            "custom",
+                            "medical_scale"
+                        ],
                         "type": "string",
                         "description": "模型类型",
                         "name": "kind",
@@ -496,6 +505,7 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "description": "新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用 typology。",
                 "consumes": [
                     "application/json"
                 ],
@@ -548,6 +558,7 @@ const docTemplate = `{
         },
         "/api/v1/assessment-models/options": {
             "get": {
+                "description": "kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为 personality。",
                 "produces": [
                     "application/json"
                 ],
@@ -564,6 +575,14 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "typology",
+                            "personality",
+                            "behavioral_rating",
+                            "cognitive",
+                            "custom",
+                            "medical_scale"
+                        ],
                         "type": "string",
                         "description": "模型类型",
                         "name": "kind",
@@ -9202,10 +9221,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
                 },
                 "product_channel": {
-                    "type": "string"
+                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -9217,7 +9248,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "sub_kind": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -9521,10 +9553,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality",
+                        "behavioral_rating",
+                        "cognitive",
+                        "custom"
+                    ],
+                    "example": "typology"
                 },
                 "product_channel": {
-                    "type": "string"
+                    "description": "产品通道；人格测评为 typology。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -9533,7 +9580,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "sub_kind": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -10398,10 +10446,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
                 },
                 "product_channel": {
-                    "type": "string"
+                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -10413,7 +10473,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "sub_kind": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -11146,13 +11207,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "description": "测评层 kind；人格线当前输出 personality，读兼容 typology。",
+                    "type": "string",
+                    "enum": [
+                        "personality",
+                        "typology"
+                    ],
+                    "example": "personality"
                 },
                 "product_channel": {
                     "type": "string"
                 },
                 "sub_kind": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "typology"
                 },
                 "title": {
                     "type": "string"

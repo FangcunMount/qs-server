@@ -27,7 +27,9 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/typology-models/categories", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/report", "get")
+	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/report-status", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/wait-report", "get")
+	assertOpenAPIOperation(t, spec, "/report-events", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}/care-context", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
 }

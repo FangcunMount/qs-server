@@ -4,10 +4,12 @@ import "encoding/json"
 
 type CreateAssessmentModelRequest struct {
 	Code                 string   `json:"code"`
-	Kind                 string   `json:"kind" valid:"required~模型类型不能为空"`
-	SubKind              string   `json:"sub_kind"`
+	// 模型族；R128b canonical 为 typology，读兼容 personality。
+	Kind                 string   `json:"kind" valid:"required~模型类型不能为空" example:"typology" enums:"typology,personality,behavioral_rating,cognitive,custom"`
+	SubKind              string   `json:"sub_kind" example:"typology"`
 	Algorithm            string   `json:"algorithm"`
-	ProductChannel       string   `json:"product_channel"`
+	// 产品通道；人格测评为 typology。
+	ProductChannel       string   `json:"product_channel" example:"typology" enums:"typology,personality"`
 	Title                string   `json:"title" valid:"required~模型标题不能为空"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`

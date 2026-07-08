@@ -10,8 +10,9 @@ import (
 )
 
 type StartSessionRequest struct {
-	ModelCode string `json:"model_code" binding:"required"`
-	TesteeID  uint64 `json:"testee_id" binding:"required"`
+	ModelCode string `json:"model_code" binding:"required" example:"MBTI_OEJTS"`
+	// 受试者 ID；JSON 可传字符串或数字（小程序大整数建议字符串）。
+	TesteeID uint64 `json:"testee_id" binding:"required" swaggertype:"primitive,string" example:"618855887087350318"`
 }
 
 // UnmarshalJSON 支持 testee_id 为字符串或数字（小程序侧大整数常以字符串传输）。
@@ -60,10 +61,12 @@ type SubmitContractResponse struct {
 }
 
 type SessionEndpointsResponse struct {
-	SubmitAnswerSheet       string `json:"submit_answer_sheet"`
+	SubmitAnswerSheet string `json:"submit_answer_sheet"`
+	// 已下线（R121）端点 URL 模板，勿调用。assessment_id 请用 GET /typology-assessments 列表按 answer_sheet_id 匹配。
 	AssessmentByAnswerSheet string `json:"assessment_by_answer_sheet"`
-	WaitReport              string `json:"wait_report"`
-	Report                  string `json:"report"`
+	// legacy 长轮询；推荐改用 report-status 短轮询或 WSS /report-events（kind=personality）。
+	WaitReport string `json:"wait_report"`
+	Report     string `json:"report"`
 }
 
 type StartSessionResponse struct {

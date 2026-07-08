@@ -1,9 +1,10 @@
 package evaluation
 
-// ModelIdentityResponse 已发布模型引用。
+// ModelIdentityResponse 已发布模型引用（测评/报告层）。
 type ModelIdentityResponse struct {
-	Kind            string `json:"kind"`
-	SubKind         string `json:"sub_kind,omitempty"`
+	// 测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。
+	Kind            string `json:"kind" example:"personality" enums:"personality,typology"`
+	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm       string `json:"algorithm,omitempty"`
 	Code            string `json:"code"`
 	Version         string `json:"version,omitempty"`
@@ -32,7 +33,8 @@ type AssessmentSummaryResponse struct {
 	ID                   string                `json:"id"`
 	QuestionnaireCode    string                `json:"questionnaire_code"`
 	QuestionnaireVersion string                `json:"questionnaire_version"`
-	AnswerSheetID        string                `json:"answer_sheet_id,omitempty"`
+	// 关联答卷 ID；提交后可用其与 answersheet_id 匹配取得 assessment_id（R121 后推荐方式）。
+	AnswerSheetID string `json:"answer_sheet_id,omitempty"`
 	Model                ModelIdentityResponse `json:"model"`
 	PrimaryScore         *ScoreValueResponse   `json:"primary_score,omitempty"`
 	Level                *ResultLevelResponse  `json:"level,omitempty"`

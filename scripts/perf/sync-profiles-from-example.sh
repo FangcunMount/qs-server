@@ -18,18 +18,34 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+migrate_legacy_typology_paths() {
+  jq '
+    def migrate_path:
+      gsub("/api/v1/personality-models"; "/api/v1/typology-models")
+      | gsub("/api/v1/personality-assessment-sessions"; "/api/v1/typology-assessment-sessions")
+      | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments");
+    walk(if type == "string" then migrate_path else . end)
+  '
+}
+
 before="$(jq -c . "$LOCAL")"
 before_profile_keys="$(jq -c '.qpsProfiles // {} | keys' "$LOCAL")"
 before_path_keys="$(jq -c '.paths // {} | keys' "$LOCAL")"
 next="$(jq -c --slurpfile ex "$EXAMPLE" '
   .qpsProfiles = (($ex[0].qpsProfiles // {}) + (.qpsProfiles // {}))
   | .paths = (($ex[0].paths // {}) + (.paths // {}))
-' "$LOCAL")"
+' "$LOCAL" | migrate_legacy_typology_paths)"
 
 if [[ "$next" == "$before" ]]; then
   echo "qs-perf.config.json already up to date: $LOCAL"
   exit 0
 fi
+
+migrated_paths="$(jq -n --argjson before "$before" --argjson after "$next" '
+  [ $before, $after ]
+  | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
+  | if (.[0] | length) > 0 and (.[0] != .[1]) then "typology path migration applied" else empty end
+')"
 
 added_profiles="$(jq -n --argjson before "$before_profile_keys" --argjson after "$(jq -c '.qpsProfiles // {} | keys' <<<"$next")" '
   [$after[] | select(. as $k | ($before | index($k) | not))]
@@ -44,6 +60,9 @@ jq . <<<"$next" > "${LOCAL}.tmp"
 mv "${LOCAL}.tmp" "$LOCAL"
 
 echo "merged qpsProfiles/paths from example -> $LOCAL"
+if [[ -n "$migrated_paths" ]]; then
+  echo "  $migrated_paths"
+fi
 if [[ -n "$added_profiles" ]]; then
   echo "  new profiles: $added_profiles"
 fi

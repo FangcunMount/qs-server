@@ -8,8 +8,9 @@ import (
 
 // ModelIdentityResponse is the outcome published-model reference on REST responses.
 type ModelIdentityResponse struct {
-	Kind            string `json:"kind"`
-	SubKind         string `json:"sub_kind,omitempty"`
+	// 测评层 kind；人格线当前输出 personality，读兼容 typology。
+	Kind            string `json:"kind" example:"personality" enums:"personality,typology"`
+	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm       string `json:"algorithm,omitempty"`
 	Code            string `json:"code"`
 	Version         string `json:"version,omitempty"`

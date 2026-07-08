@@ -77,8 +77,9 @@ type BindQuestionnaireDTO struct {
 }
 
 type DefinitionDTO struct {
-	Kind            string          `json:"kind"`
-	SubKind         string          `json:"sub_kind,omitempty"`
+	// 模型族；R128b canonical 为 typology，读兼容 personality。
+	Kind            string          `json:"kind" example:"typology" enums:"typology,personality"`
+	SubKind         string          `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm       string          `json:"algorithm,omitempty"`
 	ProductChannel  string          `json:"product_channel,omitempty"`
 	AlgorithmFamily string          `json:"algorithm_family,omitempty"`
@@ -94,10 +95,12 @@ type ApplyCodesDTO struct {
 
 type ModelSummary struct {
 	Code                 string   `json:"code"`
-	Kind                 string   `json:"kind"`
-	SubKind              string   `json:"sub_kind,omitempty"`
+	// 模型族；R128b canonical 为 typology，读兼容 personality。
+	Kind                 string   `json:"kind" example:"typology" enums:"typology,personality"`
+	SubKind              string   `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm            string   `json:"algorithm,omitempty"`
-	ProductChannel       string   `json:"product_channel,omitempty"`
+	// 产品通道；R128b canonical 为 typology，读兼容 personality。
+	ProductChannel       string   `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
 	AlgorithmFamily      string   `json:"algorithm_family,omitempty"`
 	Title                string   `json:"title"`
 	Description          string   `json:"description,omitempty"`
