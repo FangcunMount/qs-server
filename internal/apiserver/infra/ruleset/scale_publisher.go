@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // ScaleRuleSetPublisher 将已发布量表同步到 evaluation_rule_sets。
+// Deprecated: legacy ACL over v2 publishing; prefer publishing.BuildScoringPublishedSnapshotFromScale.
 type ScaleRuleSetPublisher struct {
 	writer rulesetport.PublishedRuleSetWriter
 }
@@ -28,9 +31,11 @@ func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale
 	if scale.GetStatus() != scaledefinition.StatusPublished {
 		return fmt.Errorf("scale %s is not published", scale.GetCode().String())
 	}
-	snapshot, err := ScaleRuleSetSnapshot(evaluationinputInfra.MedicalScaleToSnapshot(scale))
+	published, err := publishing.BuildScoringPublishedSnapshotFromScale(
+		evaluationinputInfra.MedicalScaleToSnapshot(scale),
+	)
 	if err != nil {
 		return err
 	}
-	return p.writer.UpsertPublished(ctx, snapshot)
+	return p.writer.UpsertPublished(ctx, legacy.LegacyFromPublished(published))
 }

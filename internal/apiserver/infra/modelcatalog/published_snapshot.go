@@ -1,9 +1,8 @@
 package modelcatalog
 
 import (
-	"fmt"
-
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
@@ -11,42 +10,7 @@ import (
 )
 
 func BuildScalePublishedSnapshot(model *scalesnapshot.ScaleSnapshot) (*domain.PublishedModelSnapshot, error) {
-	if model == nil {
-		return nil, fmt.Errorf("scale model is nil")
-	}
-	payload, format, err := codec.EncodeScale(model)
-	if err != nil {
-		return nil, err
-	}
-	status := model.Status
-	if status == "" {
-		status = "published"
-	}
-	version := model.ScaleVersion
-	if version == "" {
-		version = model.QuestionnaireVersion
-	}
-	return &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: format,
-		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelMedicalScale,
-			Kind:           domain.KindScale,
-			SubKind:        domain.SubKindEmpty,
-			Algorithm:      domain.AlgorithmScaleDefault,
-			Code:           model.Code,
-			Version:        version,
-			Title:          model.Title,
-			Status:         status,
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    model.QuestionnaireCode,
-			QuestionnaireVersion: model.QuestionnaireVersion,
-		},
-		Decision: domain.DecisionSpec{Kind: domain.DecisionKindScoreRange},
-		Source:   domain.SourceRef{},
-		Payload:  payload,
-	}, nil
+	return publishing.BuildScoringPublishedSnapshotFromScale(model)
 }
 
 func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.PublishedModelSnapshot, error) {

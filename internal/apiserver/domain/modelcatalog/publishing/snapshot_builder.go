@@ -13,6 +13,8 @@ func BuildPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, er
 		return nil, fmt.Errorf("assessment model is nil")
 	}
 	switch model.Kind {
+	case binding.KindScale:
+		return buildScoringPublishedSnapshot(model)
 	case binding.KindPersonality:
 		return buildTypologyPublishedSnapshot(model)
 	case binding.KindBehavioralRating:
