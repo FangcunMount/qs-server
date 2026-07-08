@@ -238,18 +238,17 @@ func (flow assessmentFlow) EvaluateAssessment(
 	l.Infow("执行评估成功",
 		"action", "evaluate_assessment",
 		"assessment_id", req.AssessmentId,
+		"outcome", outcomeSummaryFromAssessmentResult(result),
 		"total_score", totalScore,
 		"risk_level", riskLevel,
 		"result", "success",
 	)
 
 	resp := &pb.EvaluateAssessmentResponse{
-		Success:    true,
-		Status:     assessmentResultStatus(result),
-		Message:    "评估完成",
-		TotalScore: totalScore,
-		RiskLevel:  riskLevel,
-		Outcome:    outcomeSummaryFromAssessmentResult(result),
+		Success: true,
+		Status:  assessmentResultStatus(result),
+		Message: "评估完成",
+		Outcome: outcomeSummaryFromAssessmentResult(result),
 	}
 	applyLatestRunAuditMetadata(ctx, s.runQueryService, req.AssessmentId, func(traceID, inputSnapshotRef string) {
 		resp.TraceId = traceID
@@ -346,45 +345,5 @@ func (flow assessmentFlow) SyncAssessmentAttention(
 		Success:        true,
 		KeyFocusMarked: result.KeyFocusMarked,
 		Message:        "测评后置关注同步完成",
-	}, nil
-}
-
-func (flow assessmentFlow) TagTestee(
-	ctx context.Context,
-	req *pb.TagTesteeRequest,
-) (*pb.TagTesteeResponse, error) {
-	s := flow.service
-	l := logger.L(ctx)
-
-	l.Warnw("gRPC: TagTestee 已废弃，桥接为测评后置关注同步",
-		"action", "tag_testee_deprecated",
-		"testee_id", req.TesteeId,
-		"risk_level", req.RiskLevel,
-		"mark_key_focus", req.MarkKeyFocus,
-	)
-
-	if req.TesteeId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
-	}
-
-	result, err := s.assessmentAttentionService.SyncAssessmentAttention(
-		ctx,
-		req.TesteeId,
-		req.RiskLevel,
-		req.MarkKeyFocus,
-	)
-	if err != nil {
-		l.Errorw("TagTestee deprecated 桥接失败",
-			"testee_id", req.TesteeId,
-			"risk_level", req.RiskLevel,
-			"error", err.Error(),
-		)
-		return nil, status.Errorf(codes.Internal, "同步测评后置关注失败: %v", err)
-	}
-
-	return &pb.TagTesteeResponse{
-		Success:        true,
-		KeyFocusMarked: result.KeyFocusMarked,
-		Message:        "TagTestee 已废弃，已桥接为测评后置关注同步",
 	}, nil
 }

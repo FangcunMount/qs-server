@@ -15,10 +15,9 @@ type (
 )
 
 type ListAssessmentsRequest struct {
-	Status    string `form:"status"`
-	Algorithm string `form:"algorithm"`
-	Page      int32  `form:"page"`
-	PageSize  int32  `form:"page_size"`
+	Status   string `form:"status"`
+	Page     int32  `form:"page"`
+	PageSize int32  `form:"page_size"`
 }
 
 type AssessmentStatusResponse struct {

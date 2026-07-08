@@ -281,23 +281,22 @@ func (c *EvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assess
 func (c *EvaluationClient) ListMyAssessments(
 	ctx context.Context,
 	testeeID uint64,
-	status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, modelAlgorithm string,
+	status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string,
 	page, pageSize int32,
 ) (*ListAssessmentsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	resp, err := c.grpcClient.ListMyAssessments(ctx, &pb.ListMyAssessmentsRequest{
-		TesteeId:       testeeID,
-		Status:         status,
-		Page:           page,
-		PageSize:       pageSize,
-		ScaleCode:      scaleCode,
-		RiskLevel:      riskLevel,
-		DateFrom:       dateFrom,
-		DateTo:         dateTo,
-		ModelKind:      modelKind,
-		ModelAlgorithm: modelAlgorithm,
+		TesteeId:  testeeID,
+		Status:    status,
+		Page:      page,
+		PageSize:  pageSize,
+		ScaleCode: scaleCode,
+		RiskLevel: riskLevel,
+		DateFrom:  dateFrom,
+		DateTo:    dateTo,
+		ModelKind: modelKind,
 	})
 	if err != nil {
 		return nil, err

@@ -42,7 +42,6 @@ func NewTypologyAssessmentHandler(
 // @Tags 类型学测评
 // @Produce json
 // @Param testee_id query int true "受试者ID"
-// @Param algorithm query string false "算法过滤（legacy，推荐改用 model.code 或 categories）"
 // @Success 200 {object} core.Response{data=typologyassessment.ListAssessmentsResponse}
 // @Router /api/v1/typology-assessments [get]
 func (h *TypologyAssessmentHandler) List(c *gin.Context) {

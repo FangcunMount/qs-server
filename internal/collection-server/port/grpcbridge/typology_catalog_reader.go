@@ -25,13 +25,13 @@ func (r *TypologyCatalogReader) GetTypologyModel(ctx context.Context, code strin
 	)
 }
 
-func (r *TypologyCatalogReader) ListTypologyModels(ctx context.Context, page, pageSize int32, algorithm string) (*typologymodel.ListTypologyModelsResponse, error) {
+func (r *TypologyCatalogReader) ListTypologyModels(ctx context.Context, page, pageSize int32) (*typologymodel.ListTypologyModelsResponse, error) {
 	if r == nil {
 		return nil, nil
 	}
 	return CallBridge(r.inner,
 		func() (*ListTypologyModelsOutput, error) {
-			return r.inner.ListTypologyModels(ctx, page, pageSize, algorithm)
+			return r.inner.ListTypologyModels(ctx, page, pageSize)
 		},
 		toListTypologyModelsResponse,
 	)

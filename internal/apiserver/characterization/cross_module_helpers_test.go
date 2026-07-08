@@ -286,13 +286,33 @@ func (b *charBridgeInternalClient) evaluateResponse(ctx context.Context, assessm
 		Status:  status,
 		Message: "评估完成",
 	}
-	if a != nil && a.TotalScore() != nil {
-		resp.TotalScore = *a.TotalScore()
-	}
-	if a != nil && a.RiskLevel() != nil {
-		resp.RiskLevel = string(*a.RiskLevel())
+	if a != nil {
+		resp.Outcome = charEvaluateOutcomeSummary(a)
 	}
 	return resp
+}
+
+func charEvaluateOutcomeSummary(a *assessment.Assessment) *pb.OutcomeSummary {
+	if a == nil {
+		return nil
+	}
+	outcome := &pb.OutcomeSummary{}
+	if score := a.TotalScore(); score != nil {
+		outcome.PrimaryScore = &pb.ScoreValue{
+			Kind:  domainreport.ScoreKindRawTotal,
+			Value: *score,
+		}
+	}
+	if risk := a.RiskLevel(); risk != nil && *risk != "" {
+		if lv := domainreport.LevelFromRisk(domainreport.RiskLevel(*risk)); lv != nil {
+			outcome.Level = &pb.ResultLevel{
+				Code:     lv.Code,
+				Label:    lv.Label,
+				Severity: lv.Severity,
+			}
+		}
+	}
+	return outcome
 }
 
 func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(

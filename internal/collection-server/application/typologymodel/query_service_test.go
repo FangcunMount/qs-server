@@ -20,7 +20,7 @@ func (s *stubTypologyModelClient) GetTypologyModel(ctx context.Context, code str
 	return &TypologyModelResponse{Code: code, Title: "sample"}, nil
 }
 
-func (s *stubTypologyModelClient) ListTypologyModels(context.Context, int32, int32, string) (*ListTypologyModelsResponse, error) {
+func (s *stubTypologyModelClient) ListTypologyModels(context.Context, int32, int32) (*ListTypologyModelsResponse, error) {
 	return &ListTypologyModelsResponse{}, nil
 }
 

@@ -57,7 +57,6 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.DateFrom,
 		req.DateTo,
 		modelKind,
-		"",
 		req.Page,
 		req.PageSize,
 	)

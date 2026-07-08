@@ -2,9 +2,8 @@ package shared
 
 // ListTypologyModelsDTO 列出 published typology 模型，用于 C 端目录。
 type ListTypologyModelsDTO struct {
-	Page      int
-	PageSize  int
-	Algorithm string
+	Page     int
+	PageSize int
 }
 
 // TypologyModelSummaryResult 是 list 条目投影。

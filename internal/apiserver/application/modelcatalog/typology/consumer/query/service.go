@@ -60,9 +60,6 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListTypolog
 		Page:     page,
 		PageSize: pageSize,
 	}
-	if dto.Algorithm != "" {
-		filter.Algorithm = domain.Algorithm(dto.Algorithm)
-	}
 	snapshots, total, err := s.lister.ListPublishedModels(ctx, filter)
 	if err != nil {
 		return nil, err

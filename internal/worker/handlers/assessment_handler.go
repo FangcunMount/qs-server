@@ -104,8 +104,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			slog.Int64("assessment_id", data.AssessmentID),
 			"success", resp.Success,
 			"status", resp.Status,
-			"total_score", resp.TotalScore,
-			"risk_level", resp.RiskLevel,
+			"outcome", resp.GetOutcome(),
 			"message", resp.Message,
 		)
 

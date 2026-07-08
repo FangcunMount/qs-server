@@ -2259,10 +2259,6 @@ paths:
         name: testee_id
         required: true
         type: integer
-      - description: 算法过滤（legacy，推荐改用 model.code 或 categories）
-        in: query
-        name: algorithm
-        type: string
       produces:
       - application/json
       responses:
@@ -2422,10 +2418,6 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 算法过滤（legacy，推荐改用 categories 或按 code 精确查询）
-        in: query
-        name: algorithm
-        type: string
       produces:
       - application/json
       responses:

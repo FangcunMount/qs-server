@@ -5,10 +5,10 @@ export const REPORT_MODE_LONG_POLL = 'long_poll';
 export const LONG_POLL_MEDICAL_REPORT_PATH =
   '/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
 export const LONG_POLL_PERSONALITY_REPORT_PATH =
-  '/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
+  '/api/v1/typology-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
 export const SHORT_POLL_MEDICAL_REPORT_PATH = '/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}';
 export const SHORT_POLL_PERSONALITY_REPORT_PATH =
-  '/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}';
+  '/api/v1/typology-assessments/{assessment_id}/report-status?testee_id={testee_id}';
 
 export function normalizeReportMode(raw) {
   const value = String(raw || '')

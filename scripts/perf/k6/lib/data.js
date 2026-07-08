@@ -606,7 +606,7 @@ export function discoverPersonalityCases(testeeIDs) {
   }
 
   const discoveredModelCodes = [];
-  const models = getCollectionData('/api/v1/personality-models?page=1&page_size=50', 'discover_personality_models');
+  const models = getCollectionData('/api/v1/typology-models?page=1&page_size=50', 'discover_personality_models');
   responseItems(models).forEach((item) => {
     const code = String(item.code || '');
     if (code) {
@@ -766,7 +766,7 @@ export function discoverPersonalityReportSamples(testeeIDs) {
     if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
       return;
     }
-    const data = getCollectionData(`/api/v1/personality-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_personality_assessments');
+    const data = getCollectionData(`/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_personality_assessments');
     responseItems(data).forEach((item) => {
       const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
       const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);

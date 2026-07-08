@@ -19,7 +19,7 @@ type QuestionnaireReader interface {
 // TypologyModelReader 类型学模型目录读端口。
 type TypologyModelReader interface {
 	GetTypologyModel(ctx context.Context, code string) (*TypologyModelOutput, error)
-	ListTypologyModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListTypologyModelsOutput, error)
+	ListTypologyModels(ctx context.Context, page, pageSize int32) (*ListTypologyModelsOutput, error)
 	GetTypologyModelCategories(ctx context.Context) (*TypologyModelCategoriesOutput, error)
 }
 
@@ -29,7 +29,7 @@ type EvaluationReader interface {
 	GetFactorTrend(ctx context.Context, testeeID uint64, factorCode string, limit int32) ([]TrendPointOutput, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error)
-	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, algorithm string, page, pageSize int32) (*ListAssessmentsOutput, error)
+	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*ListAssessmentsOutput, error)
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error)
 	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
 }

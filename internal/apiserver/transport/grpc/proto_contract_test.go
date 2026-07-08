@@ -94,6 +94,96 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 	}
 }
 
+func TestInternalProtoHasNoTagTesteeRPC(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/internalapi/internal.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, forbidden := range []string{
+		"rpc TagTestee(",
+		"message TagTesteeRequest",
+		"message TagTesteeResponse",
+	} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("internal.proto still contains legacy TagTestee contract: %s", forbidden)
+		}
+	}
+}
+
+func TestInternalProtoEvaluateAssessmentResponseHasNoLegacyFields(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/internalapi/internal.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	msgStart := strings.Index(source, "message EvaluateAssessmentResponse {")
+	if msgStart < 0 {
+		t.Fatal("missing EvaluateAssessmentResponse message")
+	}
+	msgEnd := strings.Index(source[msgStart:], "\n}")
+	if msgEnd < 0 {
+		t.Fatal("unterminated EvaluateAssessmentResponse message")
+	}
+	body := source[msgStart : msgStart+msgEnd]
+	for _, forbidden := range []string{
+		"total_score = 4",
+		"risk_level = 5",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("EvaluateAssessmentResponse still contains legacy field: %s", forbidden)
+		}
+	}
+}
+
+func TestListTypologyModelsRequestHasNoAlgorithmFilter(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/typologymodel/typology_model.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	msgStart := strings.Index(source, "message ListTypologyModelsRequest {")
+	if msgStart < 0 {
+		t.Fatal("missing ListTypologyModelsRequest message")
+	}
+	msgEnd := strings.Index(source[msgStart:], "\n}")
+	if msgEnd < 0 {
+		t.Fatal("unterminated ListTypologyModelsRequest message")
+	}
+	body := source[msgStart : msgStart+msgEnd]
+	if strings.Contains(body, "algorithm =") {
+		t.Fatal("ListTypologyModelsRequest still contains legacy algorithm filter")
+	}
+}
+
+func TestListMyAssessmentsRequestHasNoModelAlgorithmFilter(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/evaluation/evaluation.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	msgStart := strings.Index(source, "message ListMyAssessmentsRequest {")
+	if msgStart < 0 {
+		t.Fatal("missing ListMyAssessmentsRequest message")
+	}
+	msgEnd := strings.Index(source[msgStart:], "\n}")
+	if msgEnd < 0 {
+		t.Fatal("unterminated ListMyAssessmentsRequest message")
+	}
+	body := source[msgStart : msgStart+msgEnd]
+	if strings.Contains(body, "model_algorithm =") {
+		t.Fatal("ListMyAssessmentsRequest still contains legacy model_algorithm filter")
+	}
+}
+
 func TestGRPCRegistryImportsTransportOwnedServiceFacade(t *testing.T) {
 	t.Parallel()
 

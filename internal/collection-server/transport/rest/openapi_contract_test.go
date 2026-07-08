@@ -70,6 +70,32 @@ func TestCollectionOpenAPIHasNoLegacyAssessmentSchemas(t *testing.T) {
 	}
 }
 
+func TestCollectionOpenAPIHasNoLegacyAlgorithmQueryParam(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	for _, path := range []string{"/typology-assessments", "/typology-models"} {
+		ops, ok := spec.Paths[path]
+		if !ok {
+			t.Fatalf("OpenAPI missing path %s", path)
+		}
+		getOps, ok := ops["get"].(map[string]any)
+		if !ok {
+			t.Fatalf("OpenAPI path %s missing GET operation", path)
+		}
+		params, _ := getOps["parameters"].([]any)
+		for _, raw := range params {
+			param, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			if param["in"] == "query" && param["name"] == "algorithm" {
+				t.Fatalf("legacy algorithm query param still in OpenAPI: %s", path)
+			}
+		}
+	}
+}
+
 func TestCollectionOpenAPIHasNoLegacyPersonalitySessionSchemas(t *testing.T) {
 	t.Parallel()
 

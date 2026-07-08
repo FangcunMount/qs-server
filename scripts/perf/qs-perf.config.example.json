@@ -70,7 +70,7 @@
         "questionnaireDetail": [],
         "questionnaireQuery": [
           "/api/v1/scales/{scale_code}",
-          "/api/v1/personality-models?page=1&page_size=20"
+          "/api/v1/typology-models?page=1&page_size=20"
         ]
       },
       "vusers": {
@@ -1193,9 +1193,9 @@
       "/api/v1/scales/{scale_code}"
     ],
     "personalityModelQuery": [
-      "/api/v1/personality-models?page=1&page_size=20",
-      "/api/v1/personality-models/categories",
-      "/api/v1/personality-models/{model_code}"
+      "/api/v1/typology-models?page=1&page_size=20",
+      "/api/v1/typology-models/categories",
+      "/api/v1/typology-models/{model_code}"
     ],
     "questionnaireDetail": [
       "/api/v1/questionnaires/{questionnaire_code}"
@@ -1208,9 +1208,9 @@
       "/api/v1/scales/categories",
       "/api/v1/scales/hot?limit=5",
       "/api/v1/scales/{scale_code}",
-      "/api/v1/personality-models?page=1&page_size=20",
-      "/api/v1/personality-models/categories",
-      "/api/v1/personality-models/{model_code}",
+      "/api/v1/typology-models?page=1&page_size=20",
+      "/api/v1/typology-models/categories",
+      "/api/v1/typology-models/{model_code}",
       "/api/v1/questionnaires/{questionnaire_code}"
     ],
     "statistics": [
@@ -1223,8 +1223,8 @@
     "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "reportEvents": "/api/v1/report-events",
-    "personalitySession": "/api/v1/personality-assessment-sessions",
-    "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}",
-    "personalityReport": "/api/v1/personality-assessments/{assessment_id}/report?testee_id={testee_id}"
+    "typologySession": "/api/v1/typology-assessment-sessions",
+    "typologyReportStatus": "/api/v1/typology-assessments/{assessment_id}/report-status?testee_id={testee_id}",
+    "typologyReport": "/api/v1/typology-assessments/{assessment_id}/report?testee_id={testee_id}"
   }
 }

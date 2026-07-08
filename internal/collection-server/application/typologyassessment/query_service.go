@@ -31,7 +31,7 @@ func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *repor
 
 func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
 	page, pageSize := evaluationapp.NormalizeListPage(req.Page, req.PageSize, evaluationapp.AssessmentListPageDefault)
-	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", personalityModelKind, req.Algorithm, "", "", page, pageSize)
+	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", "", "", personalityModelKind, page, pageSize)
 	if err != nil {
 		logTypologyAssessmentError("list typology assessments failed", err)
 		return nil, err

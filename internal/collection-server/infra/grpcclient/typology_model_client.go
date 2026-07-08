@@ -84,14 +84,13 @@ func (c *TypologyModelClient) GetTypologyModel(ctx context.Context, code string)
 	return convertTypologyModel(model), nil
 }
 
-func (c *TypologyModelClient) ListTypologyModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListTypologyModelsOutput, error) {
+func (c *TypologyModelClient) ListTypologyModels(ctx context.Context, page, pageSize int32) (*ListTypologyModelsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	resp, err := c.grpcClient.ListTypologyModels(ctx, &pb.ListTypologyModelsRequest{
-		Page:      page,
-		PageSize:  pageSize,
-		Algorithm: algorithm,
+		Page:     page,
+		PageSize: pageSize,
 	})
 	if err != nil {
 		return nil, err

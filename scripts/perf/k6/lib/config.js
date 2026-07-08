@@ -453,12 +453,12 @@ export const MEDICAL_QUERY_PATHS = envOrConfigList(
 export const PERSONALITY_QUERY_PATHS = envOrConfigList(
   'PERSONALITY_QUERY_PATHS',
   ['personalityQueryPaths', 'personality_query_paths', 'paths.personalityModelQuery', 'paths.personality_model_query'],
-  '/api/v1/personality-models?page=1&page_size=20,/api/v1/personality-models/categories,/api/v1/personality-models/{model_code}'
+  '/api/v1/typology-models?page=1&page_size=20,/api/v1/typology-models/categories,/api/v1/typology-models/{model_code}'
 );
 
 const SMOKE_PROFILE_QUERY_PATHS = [
   '/api/v1/scales/{scale_code}',
-  '/api/v1/personality-models?page=1&page_size=20',
+  '/api/v1/typology-models?page=1&page_size=20',
 ];
 
 function isSmokeProfile() {
@@ -560,12 +560,12 @@ export const REPORT_EVENTS_PATH = envOrConfigString(
 export const PERSONALITY_REPORT_PATH = envOrConfigString(
   'PERSONALITY_REPORT_PATH',
   ['personalityReportPath', 'personality_report_path', 'paths.personalityReport', 'paths.personality_report'],
-  '/api/v1/personality-assessments/{assessment_id}/report?testee_id={testee_id}'
+  '/api/v1/typology-assessments/{assessment_id}/report?testee_id={testee_id}'
 );
 export const PERSONALITY_SESSION_PATH = envOrConfigString(
   'PERSONALITY_SESSION_PATH',
   ['personalitySessionPath', 'personality_session_path', 'paths.personalitySession', 'paths.personality_session'],
-  '/api/v1/personality-assessment-sessions'
+  '/api/v1/typology-assessment-sessions'
 );
 export const SUBMIT_STATUS_PATH = envOrConfigString(
   'SUBMIT_STATUS_PATH',

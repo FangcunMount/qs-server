@@ -159,9 +159,9 @@ http_status "collection scales list" "${collection_base_url%/}/api/v1/scales?pag
 http_status "collection scales categories" "${collection_base_url%/}/api/v1/scales/categories" "$collection_token"
 http_status "collection scales hot" "${collection_base_url%/}/api/v1/scales/hot?limit=5" "$collection_token"
 http_status "collection scale ${scale_code}" "${collection_base_url%/}/api/v1/scales/${scale_code}" "$collection_token"
-http_status "collection personality models" "${collection_base_url%/}/api/v1/personality-models?page=1&page_size=1" "$collection_token"
-http_status "collection personality categories" "${collection_base_url%/}/api/v1/personality-models/categories" "$collection_token"
-http_status "collection personality model ${personality_model_code}" "${collection_base_url%/}/api/v1/personality-models/${personality_model_code}" "$collection_token"
+http_status "collection typology models" "${collection_base_url%/}/api/v1/typology-models?page=1&page_size=1" "$collection_token"
+http_status "collection typology categories" "${collection_base_url%/}/api/v1/typology-models/categories" "$collection_token"
+http_status "collection typology model ${personality_model_code}" "${collection_base_url%/}/api/v1/typology-models/${personality_model_code}" "$collection_token"
 if [[ -n "$questionnaire_code" ]]; then
   http_status "collection questionnaire ${questionnaire_code}" "${collection_base_url%/}/api/v1/questionnaires/${questionnaire_code}" "$collection_token"
 else

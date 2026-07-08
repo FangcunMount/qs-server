@@ -205,7 +205,8 @@ message ListMyAssessmentsRequest {
   string date_from = 7;
   string date_to = 8;
   string model_kind = 9;
-  string model_algorithm = 10;
+  reserved 10;
+  reserved "model_algorithm";
   string model_code = 11;
 }
 

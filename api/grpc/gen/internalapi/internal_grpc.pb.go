@@ -24,7 +24,6 @@ const (
 	InternalService_EvaluateAssessment_FullMethodName                      = "/internalapi.InternalService/EvaluateAssessment"
 	InternalService_GenerateReportFromAssessment_FullMethodName            = "/internalapi.InternalService/GenerateReportFromAssessment"
 	InternalService_SyncAssessmentAttention_FullMethodName                 = "/internalapi.InternalService/SyncAssessmentAttention"
-	InternalService_TagTestee_FullMethodName                               = "/internalapi.InternalService/TagTestee"
 	InternalService_GenerateQuestionnaireQRCode_FullMethodName             = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
 	InternalService_HandleQuestionnairePublishedPostActions_FullMethodName = "/internalapi.InternalService/HandleQuestionnairePublishedPostActions"
 	InternalService_GenerateScaleQRCode_FullMethodName                     = "/internalapi.InternalService/GenerateScaleQRCode"
@@ -61,10 +60,6 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
 	SyncAssessmentAttention(ctx context.Context, in *SyncAssessmentAttentionRequest, opts ...grpc.CallOption) (*SyncAssessmentAttentionResponse, error)
-	// Deprecated: Do not use.
-	// 旧版后置同步入口
-	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
-	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
@@ -141,17 +136,6 @@ func (c *internalServiceClient) SyncAssessmentAttention(ctx context.Context, in 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SyncAssessmentAttentionResponse)
 	err := c.cc.Invoke(ctx, InternalService_SyncAssessmentAttention_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// Deprecated: Do not use.
-func (c *internalServiceClient) TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagTesteeResponse)
-	err := c.cc.Invoke(ctx, InternalService_TagTestee_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -255,10 +239,6 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
 	SyncAssessmentAttention(context.Context, *SyncAssessmentAttentionRequest) (*SyncAssessmentAttentionResponse, error)
-	// Deprecated: Do not use.
-	// 旧版后置同步入口
-	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
-	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
@@ -305,9 +285,6 @@ func (UnimplementedInternalServiceServer) GenerateReportFromAssessment(context.C
 }
 func (UnimplementedInternalServiceServer) SyncAssessmentAttention(context.Context, *SyncAssessmentAttentionRequest) (*SyncAssessmentAttentionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncAssessmentAttention not implemented")
-}
-func (UnimplementedInternalServiceServer) TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TagTestee not implemented")
 }
 func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateQuestionnaireQRCode not implemented")
@@ -437,24 +414,6 @@ func _InternalService_SyncAssessmentAttention_Handler(srv interface{}, ctx conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InternalServiceServer).SyncAssessmentAttention(ctx, req.(*SyncAssessmentAttentionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _InternalService_TagTestee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TagTesteeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(InternalServiceServer).TagTestee(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: InternalService_TagTestee_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InternalServiceServer).TagTestee(ctx, req.(*TagTesteeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -611,10 +570,6 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncAssessmentAttention",
 			Handler:    _InternalService_SyncAssessmentAttention_Handler,
-		},
-		{
-			MethodName: "TagTestee",
-			Handler:    _InternalService_TagTestee_Handler,
 		},
 		{
 			MethodName: "GenerateQuestionnaireQRCode",

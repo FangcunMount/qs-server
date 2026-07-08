@@ -54,9 +54,8 @@ type TypologyModelSummaryResponse struct {
 }
 
 type ListTypologyModelsRequest struct {
-	Page      int32  `form:"page"`
-	PageSize  int32  `form:"page_size"`
-	Algorithm string `form:"algorithm"`
+	Page     int32 `form:"page"`
+	PageSize int32 `form:"page_size"`
 }
 
 type ListTypologyModelsResponse struct {

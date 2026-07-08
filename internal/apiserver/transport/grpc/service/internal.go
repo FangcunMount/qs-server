@@ -461,19 +461,6 @@ func (s *InternalService) SyncAssessmentAttention(
 	return newAssessmentFlow(s).SyncAssessmentAttention(ctx, req)
 }
 
-// TagTestee 兼容旧 RPC
-//
-// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
-// 场景：worker 处理 report.generated 事件后调用
-// 职责：协议转换，将 gRPC 请求转换为应用服务调用
-// 业务逻辑：由 TesteeAssessmentAttentionService 处理
-func (s *InternalService) TagTestee(
-	ctx context.Context,
-	req *pb.TagTesteeRequest,
-) (*pb.TagTesteeResponse, error) {
-	return newAssessmentFlow(s).TagTestee(ctx, req)
-}
-
 // ==================== 小程序码生成操作 ====================
 
 // GenerateQuestionnaireQRCode 生成问卷小程序码

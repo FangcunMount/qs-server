@@ -42,38 +42,6 @@ func TestInternalServiceSyncAssessmentAttentionRejectsMissingTesteeID(t *testing
 	}
 }
 
-func TestInternalServiceDeprecatedTagTesteeBridgesToAssessmentAttention(t *testing.T) {
-	fake := &fakeAssessmentAttentionService{
-		result: &testeeApp.AssessmentAttentionResult{KeyFocusMarked: true},
-	}
-	svc := &InternalService{assessmentAttentionService: fake}
-
-	resp, err := svc.TagTestee(context.Background(), &pb.TagTesteeRequest{
-		TesteeId:        20,
-		RiskLevel:       "high",
-		ScaleCode:       "scale-a",
-		MarkKeyFocus:    true,
-		HighRiskFactors: []string{"factor-a"},
-	})
-	if err != nil {
-		t.Fatalf("TagTestee returned error: %v", err)
-	}
-
-	if !resp.Success || !resp.KeyFocusMarked {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	tagsAddedField := resp.ProtoReflect().Descriptor().Fields().ByName("tags_added")
-	if tagsAddedField == nil {
-		t.Fatal("tags_added field descriptor not found")
-	}
-	if got := resp.ProtoReflect().Get(tagsAddedField).List().Len(); got != 0 {
-		t.Fatalf("tags_added length = %d, want 0", got)
-	}
-	if fake.calls != 1 || fake.testeeID != 20 || fake.riskLevel != "high" || !fake.markKeyFocus {
-		t.Fatalf("unexpected service call: %#v", fake)
-	}
-}
-
 type fakeAssessmentAttentionService struct {
 	calls        int
 	testeeID     uint64

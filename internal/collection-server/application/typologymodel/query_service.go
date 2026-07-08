@@ -99,7 +99,7 @@ func (s *QueryService) List(ctx context.Context, req *ListTypologyModelsRequest)
 		},
 		func(resp *ListTypologyModelsResponse) { s.cache.SetListByRequest(req, resp) },
 		func() (*ListTypologyModelsResponse, error) {
-			result, err := s.client.ListTypologyModels(ctx, req.Page, req.PageSize, req.Algorithm)
+			result, err := s.client.ListTypologyModels(ctx, req.Page, req.PageSize)
 			if err != nil {
 				logTypologyGRPCError("Failed to list typology models via gRPC", err)
 				return nil, err

@@ -38,9 +38,8 @@ func (s *TypologyModelService) GetTypologyModel(ctx context.Context, req *pb.Get
 
 func (s *TypologyModelService) ListTypologyModels(ctx context.Context, req *pb.ListTypologyModelsRequest) (*pb.ListTypologyModelsResponse, error) {
 	result, err := s.queryService.ListPublished(ctx, appTypologyModel.ListTypologyModelsDTO{
-		Page:      int(req.GetPage()),
-		PageSize:  int(req.GetPageSize()),
-		Algorithm: req.GetAlgorithm(),
+		Page:     int(req.GetPage()),
+		PageSize: int(req.GetPageSize()),
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

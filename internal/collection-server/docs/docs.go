@@ -1603,12 +1603,6 @@ const docTemplate = `{
                         "name": "testee_id",
                         "in": "query",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "算法过滤（legacy，推荐改用 model.code 或 categories）",
-                        "name": "algorithm",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1869,12 +1863,6 @@ const docTemplate = `{
                         "default": 20,
                         "description": "每页数量",
                         "name": "page_size",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）",
-                        "name": "algorithm",
                         "in": "query"
                     }
                 ],

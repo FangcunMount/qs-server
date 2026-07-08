@@ -49,7 +49,6 @@ func (h *TypologyModelHandler) Get(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Param algorithm query string false "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）"
 // @Success 200 {object} core.Response{data=typologymodel.ListTypologyModelsResponse}
 // @Router /api/v1/typology-models [get]
 func (h *TypologyModelHandler) List(c *gin.Context) {

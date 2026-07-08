@@ -107,24 +107,6 @@ func (c *InternalClient) SyncAssessmentAttention(
 	return resp, nil
 }
 
-// TagTestee 兼容旧版后置同步 RPC。
-//
-// Deprecated: use SyncAssessmentAttention. 当前仅用于兼容旧调用方。
-func (c *InternalClient) TagTestee(
-	ctx context.Context,
-	req *pb.TagTesteeRequest,
-) (*pb.TagTesteeResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
-	defer cancel()
-
-	resp, err := c.client.TagTestee(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to tag testee: %w", err)
-	}
-
-	return resp, nil
-}
-
 // GenerateQuestionnaireQRCode 生成问卷小程序码
 func (c *InternalClient) GenerateQuestionnaireQRCode(
 	ctx context.Context,

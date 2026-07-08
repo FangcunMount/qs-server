@@ -58,7 +58,7 @@ func listCacheKey(req *ListTypologyModelsRequest) string {
 	if req == nil {
 		req = &ListTypologyModelsRequest{}
 	}
-	return fmt.Sprintf("%sp%d:ps%d:a:%s", cacheKeyPrefixList, req.Page, req.PageSize, strings.ToLower(strings.TrimSpace(req.Algorithm)))
+	return fmt.Sprintf("%sp%d:ps%d", cacheKeyPrefixList, req.Page, req.PageSize)
 }
 
 func (c *LocalCatalogCache) GetDetail(code string) (*TypologyModelResponse, bool) {

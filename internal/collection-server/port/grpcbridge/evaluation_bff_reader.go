@@ -60,11 +60,11 @@ func (r *EvaluationBFFReader) GetMyAssessment(ctx context.Context, testeeID, ass
 	return toAssessmentDetailResponse(out), nil
 }
 
-func (r *EvaluationBFFReader) ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, algorithm string, page, pageSize int32) (*evaluation.ListAssessmentsResponse, error) {
+func (r *EvaluationBFFReader) ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*evaluation.ListAssessmentsResponse, error) {
 	if r == nil || r.inner == nil {
 		return nil, nil
 	}
-	out, err := r.inner.ListMyAssessments(ctx, testeeID, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, algorithm, page, pageSize)
+	out, err := r.inner.ListMyAssessments(ctx, testeeID, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
