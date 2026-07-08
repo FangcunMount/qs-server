@@ -5,12 +5,12 @@ import (
 	"math"
 	"strings"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // Deprecated: 改用 mbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。
-func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (MBTIResultDetail, error) {
+func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evalinput.AnswerSheet) (MBTIResultDetail, error) {
 	if model == nil {
 		return MBTIResultDetail{}, fmt.Errorf("mbti model is required")
 	}
@@ -18,7 +18,7 @@ func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinpu
 		return MBTIResultDetail{}, fmt.Errorf("answer sheet is required")
 	}
 
-	answerByQuestion := make(map[string]evaluationinput.Answer, len(answerSheet.Answers))
+	answerByQuestion := make(map[string]evalinput.Answer, len(answerSheet.Answers))
 	for _, answer := range answerSheet.Answers {
 		answerByQuestion[answer.QuestionCode] = answer
 	}
@@ -131,11 +131,11 @@ func mbtiDimensionMaxDeviation(meta modeltypology.MBTILegacyDimension, mappings 
 	return math.Max(threshold-minScore, maxScore-threshold)
 }
 
-func answerLikertValue(answer evaluationinput.Answer) (float64, error) {
+func answerLikertValue(answer evalinput.Answer) (float64, error) {
 	if answer.Score >= 1 && answer.Score <= 5 {
 		return answer.Score, nil
 	}
-	value := evaluationinput.AnswerValueKey(answer.Value)
+	value := evalinput.AnswerValueKey(answer.Value)
 	if value == "" {
 		return 0, fmt.Errorf("invalid mbti answer for question %s: %v", answer.QuestionCode, answer.Value)
 	}

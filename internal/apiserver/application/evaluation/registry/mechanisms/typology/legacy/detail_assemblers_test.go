@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 )
 
 func TestRegisterLegacyDetailAssemblersRestoresLegacyKeys(t *testing.T) {

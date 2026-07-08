@@ -3,7 +3,7 @@ package evaluationinput
 import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {

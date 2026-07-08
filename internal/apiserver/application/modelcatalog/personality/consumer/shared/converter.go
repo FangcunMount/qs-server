@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Payload) PersonalityModelSummaryResult {

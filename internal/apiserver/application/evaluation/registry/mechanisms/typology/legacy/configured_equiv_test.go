@@ -3,11 +3,11 @@ package legacy_test
 import (
 	"testing"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
@@ -27,7 +27,7 @@ func TestConfiguredEvaluatorMatchesMBTIReference(t *testing.T) {
 		t.Fatalf("reference Score: %v", err)
 	}
 	wantGeneric := typologylegacy.PersonalityTypeDetailFromMBTI(wantLegacy)
-	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	gotGeneric, err := outcometypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestConfiguredEvaluatorMatchesSBTIReferenceSpecialPaths(t *testing.T) {
 	})
 	t.Run("DRUNK", func(t *testing.T) {
 		payload := modeltypology.FromSBTI(sbtiModel())
-		sheet := &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+		sheet := &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 			{QuestionCode: "drink_gate_q2", Value: "C"},
 		}}
 		assertSBTIReferenceEquivalence(t, evaluator, payload, sheet)
@@ -64,7 +64,7 @@ func assertSBTIReferenceEquivalence(
 	t *testing.T,
 	evaluator configured.Evaluator,
 	payload *modeltypology.Payload,
-	sheet *evaluationinput.AnswerSheet,
+	sheet *evalinput.AnswerSheet,
 ) {
 	t.Helper()
 	model, err := modeltypology.ToSBTI(payload)
@@ -80,7 +80,7 @@ func assertSBTIReferenceEquivalence(
 		t.Fatalf("reference Score: %v", err)
 	}
 	wantGeneric := typologylegacy.PersonalityTypeDetailFromSBTI(wantLegacy)
-	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	gotGeneric, err := outcometypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
@@ -112,8 +112,8 @@ func mbtiModel() *modeltypology.MBTILegacyModel {
 	}
 }
 
-func mbtiSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func mbtiSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q_EI", Score: 1},
 		{QuestionCode: "Q_SN", Score: 5},
 		{QuestionCode: "Q_TF", Score: 1},
@@ -151,8 +151,8 @@ func sbtiModel() *modeltypology.SBTILegacyModel {
 	}
 }
 
-func sbtiHighSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func sbtiHighSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Value: "C"},
 		{QuestionCode: "Q2", Value: "C"},
 		{QuestionCode: "Q3", Value: "C"},
@@ -160,8 +160,8 @@ func sbtiHighSheet() *evaluationinput.AnswerSheet {
 	}}
 }
 
-func sbtiLowSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func sbtiLowSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Value: "A"},
 		{QuestionCode: "Q2", Value: "A"},
 		{QuestionCode: "Q3", Value: "A"},

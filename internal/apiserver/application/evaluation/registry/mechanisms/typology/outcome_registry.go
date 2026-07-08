@@ -3,12 +3,12 @@ package typology
 import (
 	"fmt"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-type outcomeAdapterFunc func(assessment.EvaluationModelRef, evaluationtypology.ScoringResult) (*assessment.AssessmentOutcome, error)
+type outcomeAdapterFunc func(assessment.EvaluationModelRef, outcometypology.ScoringResult) (*assessment.AssessmentOutcome, error)
 
 // OutcomeAdapterRegistry 解析测评结果 assemblers 按 detail adapter 键。
 type OutcomeAdapterRegistry struct {
@@ -43,7 +43,7 @@ func (r OutcomeAdapterRegistry) Register(key modeltypology.DetailAdapterKey, ada
 func (r OutcomeAdapterRegistry) Assemble(
 	key modeltypology.DetailAdapterKey,
 	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
+	result outcometypology.ScoringResult,
 ) (*assessment.AssessmentOutcome, error) {
 	if key == "" {
 		return nil, fmt.Errorf("detail adapter key is required")

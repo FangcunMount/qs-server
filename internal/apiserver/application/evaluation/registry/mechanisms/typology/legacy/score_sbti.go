@@ -5,12 +5,12 @@ import (
 	"math"
 	"strings"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // Deprecated: 改用 sbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。
-func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (SBTIResultDetail, error) {
+func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evalinput.AnswerSheet) (SBTIResultDetail, error) {
 	if model == nil {
 		return SBTIResultDetail{}, fmt.Errorf("sbti model is required")
 	}
@@ -43,17 +43,17 @@ func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinpu
 	return sbtiResultDetailFromOutcome(model, outcome, dimensions, similarity, trigger), nil
 }
 
-func triggeredDrinkOutcome(model *modeltypology.SBTILegacyModel, answers []evaluationinput.Answer) (modeltypology.SBTILegacyOutcome, bool) {
+func triggeredDrinkOutcome(model *modeltypology.SBTILegacyModel, answers []evalinput.Answer) (modeltypology.SBTILegacyOutcome, bool) {
 	if model == nil || len(model.DrinkTrigger.QuestionCodes) == 0 || len(model.DrinkTrigger.OptionValues) == 0 {
 		return modeltypology.SBTILegacyOutcome{}, false
 	}
-	questionCodes := evaluationinput.StringSet(model.DrinkTrigger.QuestionCodes)
-	values := evaluationinput.StringSet(model.DrinkTrigger.OptionValues)
+	questionCodes := evalinput.StringSet(model.DrinkTrigger.QuestionCodes)
+	values := evalinput.StringSet(model.DrinkTrigger.OptionValues)
 	for _, answer := range answers {
 		if !questionCodes[answer.QuestionCode] {
 			continue
 		}
-		if values[evaluationinput.AnswerValueKey(answer.Value)] {
+		if values[evalinput.AnswerValueKey(answer.Value)] {
 			outcome, ok := findSBTIOutcome(model.SpecialOutcomes, "DRUNK")
 			return outcome, ok
 		}
@@ -61,8 +61,8 @@ func triggeredDrinkOutcome(model *modeltypology.SBTILegacyModel, answers []evalu
 	return modeltypology.SBTILegacyOutcome{}, false
 }
 
-func collectSBTIDimensionScores(model *modeltypology.SBTILegacyModel, answers []evaluationinput.Answer) (map[string]float64, error) {
-	answerByQuestion := make(map[string]evaluationinput.Answer, len(answers))
+func collectSBTIDimensionScores(model *modeltypology.SBTILegacyModel, answers []evalinput.Answer) (map[string]float64, error) {
+	answerByQuestion := make(map[string]evalinput.Answer, len(answers))
 	for _, answer := range answers {
 		answerByQuestion[answer.QuestionCode] = answer
 	}
@@ -88,8 +88,8 @@ func collectSBTIDimensionScores(model *modeltypology.SBTILegacyModel, answers []
 	return rawScores, nil
 }
 
-func scoreForSBTIAnswer(mapping modeltypology.SBTILegacyQuestionMapping, answer evaluationinput.Answer) (float64, error) {
-	value := evaluationinput.AnswerValueKey(answer.Value)
+func scoreForSBTIAnswer(mapping modeltypology.SBTILegacyQuestionMapping, answer evalinput.Answer) (float64, error) {
+	value := evalinput.AnswerValueKey(answer.Value)
 	if value != "" {
 		if score, ok := mapping.OptionScores[value]; ok {
 			return score, nil
@@ -153,7 +153,7 @@ func bestSBTIOutcome(model *modeltypology.SBTILegacyModel, dimensions []SBTIDime
 		}
 		distance := 0
 		for i := range actual {
-			distance += evaluationinput.AbsInt(sbtiLevelValue(actual[i]) - sbtiLevelValue(expected[i]))
+			distance += evalinput.AbsInt(sbtiLevelValue(actual[i]) - sbtiLevelValue(expected[i]))
 		}
 		similarity := 1 - float64(distance)/maxDistance
 		if !hasBest || similarity > bestScore {

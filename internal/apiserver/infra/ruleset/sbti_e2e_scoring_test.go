@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
@@ -45,8 +45,8 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	})
 
 	t.Run("hidden_DRUNK", func(t *testing.T) {
-		sheet := &evaluationinputdomain.AnswerSheet{
-			Answers: []evaluationinputdomain.Answer{
+		sheet := &evalinput.AnswerSheet{
+			Answers: []evalinput.Answer{
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
@@ -63,36 +63,36 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	})
 }
 
-func sbtiAllThreesAnswerSheet(model *modeltypology.SBTILegacyModel) *evaluationinputdomain.AnswerSheet {
-	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
+func sbtiAllThreesAnswerSheet(model *modeltypology.SBTILegacyModel) *evalinput.AnswerSheet {
+	answers := make([]evalinput.Answer, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
-		answers = append(answers, evaluationinputdomain.Answer{
+		answers = append(answers, evalinput.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        "3",
 			Score:        3,
 		})
 	}
-	return &evaluationinputdomain.AnswerSheet{
+	return &evalinput.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }
 
-func sbtiAlternatingAnswerSheet(model *modeltypology.SBTILegacyModel) *evaluationinputdomain.AnswerSheet {
-	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
+func sbtiAlternatingAnswerSheet(model *modeltypology.SBTILegacyModel) *evalinput.AnswerSheet {
+	answers := make([]evalinput.Answer, 0, len(model.QuestionMappings))
 	for i, mapping := range model.QuestionMappings {
 		value := "1"
 		if i%2 == 1 {
 			value = "3"
 		}
-		answers = append(answers, evaluationinputdomain.Answer{
+		answers = append(answers, evalinput.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
 			Score:        float64((i % 2) + 1),
 		})
 	}
-	return &evaluationinputdomain.AnswerSheet{
+	return &evalinput.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Answers:              answers,

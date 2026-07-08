@@ -1,12 +1,12 @@
 package legacy
 
 import (
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 )
 
 // AssemblePersonalityTypeOutcome builds assessment outcome from mechanism-neutral detail.
-func AssemblePersonalityTypeOutcome(modelRef assessment.EvaluationModelRef, detail evaluationtypology.PersonalityTypeDetail) *assessment.AssessmentOutcome {
+func AssemblePersonalityTypeOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.PersonalityTypeDetail) *assessment.AssessmentOutcome {
 	score := detail.MatchPercent
 	if score == 0 && detail.Similarity > 0 {
 		score = detail.Similarity * 100
@@ -42,7 +42,7 @@ func AssemblePersonalityTypeOutcome(modelRef assessment.EvaluationModelRef, deta
 }
 
 // AssembleTraitProfileOutcome builds assessment outcome from mechanism-neutral trait profile.
-func AssembleTraitProfileOutcome(modelRef assessment.EvaluationModelRef, detail evaluationtypology.TraitProfileDetail) *assessment.AssessmentOutcome {
+func AssembleTraitProfileOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.TraitProfileDetail) *assessment.AssessmentOutcome {
 	primaryLabel := "trait_profile"
 	if len(detail.Traits) > 0 {
 		primaryLabel = detail.Traits[0].Code

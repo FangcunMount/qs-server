@@ -3,10 +3,10 @@ package typology
 import (
 	"fmt"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // OutcomeAssembler 映射计分结果 到 测评结果 using 结果 mapping spec。
@@ -27,14 +27,14 @@ func NewOutcomeAssemblerWithRegistry(registry OutcomeAdapterRegistry) OutcomeAss
 // Assemble 转换计分结果 为 AssessmentOutcome。
 func (a OutcomeAssembler) Assemble(
 	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
+	result outcometypology.ScoringResult,
 	mapping modeltypology.OutcomeMappingSpec,
 ) (*assessment.AssessmentOutcome, error) {
 	adapterKey := mapping.ResolvedDetailAdapterKey(decisionKindFromResult(result))
 	return a.registry.Assemble(adapterKey, modelRef, result)
 }
 
-func decisionKindFromResult(result evaluationtypology.ScoringResult) modelcatalog.DecisionKind {
+func decisionKindFromResult(result outcometypology.ScoringResult) modelcatalog.DecisionKind {
 	if result.Runtime != nil {
 		return result.Runtime.Decision.Kind
 	}
@@ -43,9 +43,9 @@ func decisionKindFromResult(result evaluationtypology.ScoringResult) modelcatalo
 
 func assembleGenericTraitProfileOutcome(
 	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
+	result outcometypology.ScoringResult,
 ) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.TraitProfileDetailFromPayload(result.Detail)
+	detail, err := outcometypology.TraitProfileDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +54,9 @@ func assembleGenericTraitProfileOutcome(
 
 func assembleGenericPersonalityTypeOutcome(
 	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
+	result outcometypology.ScoringResult,
 ) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(result.Detail)
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func assembleGenericPersonalityTypeOutcome(
 func (a OutcomeAssembler) AssembleFromPayload(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,
-	result evaluationtypology.ScoringResult,
+	result outcometypology.ScoringResult,
 ) (*assessment.AssessmentOutcome, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is required")

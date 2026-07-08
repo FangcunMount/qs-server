@@ -2,7 +2,7 @@ package main
 
 import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 const enneagramQuestionnairePath = "scripts/oneoff/seed_personality_typology/data/enneagram_45_questionnaire.json"

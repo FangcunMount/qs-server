@@ -486,10 +486,10 @@ func isEvaluationRulesetPayloadImport(importPath string) bool {
 		return true
 	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
 			return true
@@ -688,7 +688,6 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 	}
 	scaleRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
-		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "scoring"),
 	}

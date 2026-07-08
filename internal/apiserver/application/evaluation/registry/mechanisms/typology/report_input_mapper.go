@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -15,11 +15,11 @@ var (
 	errEvaluationOutcomeRequired = fmt.Errorf("evaluation outcome is required")
 )
 
-func personalityTypeDetailForReport(payload any) (evaluationtypology.PersonalityTypeDetail, error) {
+func personalityTypeDetailForReport(payload any) (outcometypology.PersonalityTypeDetail, error) {
 	return typologylegacy.PersonalityTypeDetailForReport(payload)
 }
 
-func traitProfileDetailForReport(payload any) (evaluationtypology.TraitProfileDetail, error) {
+func traitProfileDetailForReport(payload any) (outcometypology.TraitProfileDetail, error) {
 	return typologylegacy.TraitProfileDetailForReport(payload)
 }
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
@@ -62,20 +62,20 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 }
 
-func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *evaluationinputdomain.AnswerSheet {
-	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
+func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *evalinput.AnswerSheet {
+	answers := make([]evalinput.Answer, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		meta := model.Dimensions[mapping.Dimension]
 		wantRight := prefs[mapping.Dimension] == meta.RightPole
 		value := mbtiLikertValueForSign(mapping.Sign, wantRight)
 		score := float64(value[0] - '0')
-		answers = append(answers, evaluationinputdomain.Answer{
+		answers = append(answers, evalinput.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
 			Score:        score,
 		})
 	}
-	return &evaluationinputdomain.AnswerSheet{
+	return &evalinput.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Answers:              answers,
@@ -95,17 +95,17 @@ func mbtiLikertValueForSign(sign float64, wantRight bool) string {
 	return "5"
 }
 
-func mbtiLikertAnswerSheet(model *modeltypology.MBTILegacyModel, value string) *evaluationinputdomain.AnswerSheet {
-	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
+func mbtiLikertAnswerSheet(model *modeltypology.MBTILegacyModel, value string) *evalinput.AnswerSheet {
+	answers := make([]evalinput.Answer, 0, len(model.QuestionMappings))
 	score := float64(value[0] - '0')
 	for _, mapping := range model.QuestionMappings {
-		answers = append(answers, evaluationinputdomain.Answer{
+		answers = append(answers, evalinput.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
 			Score:        score,
 		})
 	}
-	return &evaluationinputdomain.AnswerSheet{
+	return &evalinput.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Answers:              answers,

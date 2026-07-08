@@ -1,11 +1,11 @@
 package typology
 
 import (
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 )
 
-func genericPersonalityTypeMechanismDetail(detail evaluationtypology.PersonalityTypeDetail) reporttypology.PersonalityTypeReportDetail {
+func genericPersonalityTypeMechanismDetail(detail outcometypology.PersonalityTypeDetail) reporttypology.PersonalityTypeReportDetail {
 	dimensions := make([]reporttypology.PersonalityTypeDimensionReport, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
 		dimensions = append(dimensions, reporttypology.PersonalityTypeDimensionReport{
@@ -33,7 +33,7 @@ func genericPersonalityTypeMechanismDetail(detail evaluationtypology.Personality
 	}
 }
 
-func genericTraitProfileMechanismDetail(detail evaluationtypology.TraitProfileDetail) reporttypology.TraitProfileReportDetail {
+func genericTraitProfileMechanismDetail(detail outcometypology.TraitProfileDetail) reporttypology.TraitProfileReportDetail {
 	traits := make([]reporttypology.TraitProfileFactorReport, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
 		traits = append(traits, reporttypology.TraitProfileFactorReport(trait))

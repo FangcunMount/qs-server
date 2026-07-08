@@ -1,8 +1,8 @@
 package ruleset
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"

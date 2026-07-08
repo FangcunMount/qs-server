@@ -1,12 +1,12 @@
 package legacy
 
 import (
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // MBTIResultDetailFromPersonalityType 投影通用人格类型明细 为 旧 MBTI 结构。
-func MBTIResultDetailFromPersonalityType(detail evaluationtypology.PersonalityTypeDetail) MBTIResultDetail {
+func MBTIResultDetailFromPersonalityType(detail outcometypology.PersonalityTypeDetail) MBTIResultDetail {
 	dimensions := make([]MBTIDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
 		dimensions = append(dimensions, MBTIDimensionResult{
@@ -49,7 +49,7 @@ func MBTIResultDetailFromPersonalityType(detail evaluationtypology.PersonalityTy
 }
 
 // SBTIResultDetailFromPersonalityType 投影通用人格类型明细 为 旧 SBTI 结构。
-func SBTIResultDetailFromPersonalityType(detail evaluationtypology.PersonalityTypeDetail) SBTIResultDetail {
+func SBTIResultDetailFromPersonalityType(detail outcometypology.PersonalityTypeDetail) SBTIResultDetail {
 	dimensions := make([]SBTIDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
 		dimensions = append(dimensions, SBTIDimensionResult{
@@ -80,7 +80,7 @@ func SBTIResultDetailFromPersonalityType(detail evaluationtypology.PersonalityTy
 }
 
 // BigFiveResultDetailFromTraitProfile 投影通用特质画像 为 旧 BigFive 结构。
-func BigFiveResultDetailFromTraitProfile(detail evaluationtypology.TraitProfileDetail) BigFiveResultDetail {
+func BigFiveResultDetailFromTraitProfile(detail outcometypology.TraitProfileDetail) BigFiveResultDetail {
 	traits := make([]BigFiveTraitResult, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
 		traits = append(traits, BigFiveTraitResult(trait))
@@ -89,10 +89,10 @@ func BigFiveResultDetailFromTraitProfile(detail evaluationtypology.TraitProfileD
 }
 
 // PersonalityTypeDetailFromMBTI 转换旧版 MBTI 明细 为 通用人格类型结构。
-func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) evaluationtypology.PersonalityTypeDetail {
-	dimensions := make([]evaluationtypology.PersonalityDimensionResult, 0, len(detail.Dimensions))
+func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) outcometypology.PersonalityTypeDetail {
+	dimensions := make([]outcometypology.PersonalityDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		dimensions = append(dimensions, evaluationtypology.PersonalityDimensionResult{
+		dimensions = append(dimensions, outcometypology.PersonalityDimensionResult{
 			Code:       dim.Code,
 			Name:       dim.Name,
 			LeftPole:   dim.LeftPole,
@@ -102,7 +102,7 @@ func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) evaluationtypology.P
 			Strength:   dim.Strength,
 		})
 	}
-	return evaluationtypology.PersonalityTypeDetail{
+	return outcometypology.PersonalityTypeDetail{
 		TypeCode:     detail.TypeCode,
 		TypeName:     detail.TypeName,
 		OneLiner:     detail.OneLiner,
@@ -129,10 +129,10 @@ func PersonalityTypeDetailFromMBTI(detail MBTIResultDetail) evaluationtypology.P
 }
 
 // PersonalityTypeDetailFromSBTI 转换旧版 SBTI 明细 为 通用人格类型结构。
-func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) evaluationtypology.PersonalityTypeDetail {
-	dimensions := make([]evaluationtypology.PersonalityDimensionResult, 0, len(detail.Dimensions))
+func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) outcometypology.PersonalityTypeDetail {
+	dimensions := make([]outcometypology.PersonalityDimensionResult, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		dimensions = append(dimensions, evaluationtypology.PersonalityDimensionResult{
+		dimensions = append(dimensions, outcometypology.PersonalityDimensionResult{
 			Code:     dim.Code,
 			Name:     dim.Name,
 			Model:    dim.Model,
@@ -140,7 +140,7 @@ func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) evaluationtypology.P
 			Level:    dim.Level,
 		})
 	}
-	return evaluationtypology.PersonalityTypeDetail{
+	return outcometypology.PersonalityTypeDetail{
 		TypeCode:       detail.TypeCode,
 		TypeName:       detail.TypeName,
 		OneLiner:       detail.OneLiner,
@@ -159,12 +159,12 @@ func PersonalityTypeDetailFromSBTI(detail SBTIResultDetail) evaluationtypology.P
 }
 
 // TraitProfileDetailFromBigFive 转换旧版 BigFive 明细 为 通用特质画像结构。
-func TraitProfileDetailFromBigFive(detail BigFiveResultDetail) evaluationtypology.TraitProfileDetail {
-	traits := make([]evaluationtypology.TraitProfileFactorResult, 0, len(detail.Traits))
+func TraitProfileDetailFromBigFive(detail BigFiveResultDetail) outcometypology.TraitProfileDetail {
+	traits := make([]outcometypology.TraitProfileFactorResult, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
-		traits = append(traits, evaluationtypology.TraitProfileFactorResult(trait))
+		traits = append(traits, outcometypology.TraitProfileFactorResult(trait))
 	}
-	return evaluationtypology.TraitProfileDetail{Traits: traits, Source: detail.Source}
+	return outcometypology.TraitProfileDetail{Traits: traits, Source: detail.Source}
 }
 
 func convertRarityFromGeneric(rarity modeltypology.Rarity) modeltypology.SBTILegacyRarity {

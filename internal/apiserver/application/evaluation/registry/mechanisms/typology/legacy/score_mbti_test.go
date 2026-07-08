@@ -3,8 +3,8 @@ package legacy
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestResolveMBTIPreference_tieAtThresholdPrefersLeftPole(t *testing.T) {
@@ -68,7 +68,7 @@ func TestResolveMBTIPreference_belowThresholdPrefersLeftPole(t *testing.T) {
 }
 
 func TestAnswerLikertValue_prefersScore(t *testing.T) {
-	value, err := answerLikertValue(evaluationinput.Answer{
+	value, err := answerLikertValue(evalinput.Answer{
 		QuestionCode: "MBTI_Q01",
 		Value:        "1",
 		Score:        4,
@@ -82,7 +82,7 @@ func TestAnswerLikertValue_prefersScore(t *testing.T) {
 }
 
 func TestAnswerLikertValue_fromOptionCode(t *testing.T) {
-	value, err := answerLikertValue(evaluationinput.Answer{
+	value, err := answerLikertValue(evalinput.Answer{
 		QuestionCode: "MBTI_Q01",
 		Value:        "5",
 	})

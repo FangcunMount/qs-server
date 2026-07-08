@@ -6,13 +6,13 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -28,7 +28,7 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 	detailRegistry := personalityconfigured.DefaultDetailAssemblerRegistry().Register(
 		contractDetailAdapter,
 		func(_ personalityconfigured.DetailInput) (any, error) {
-			return evaluationtypology.PersonalityTypeDetail{
+			return outcometypology.PersonalityTypeDetail{
 				TypeCode:     "INJECTED",
 				MatchPercent: 42,
 			}, nil
@@ -84,7 +84,7 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := outcome.Detail.Payload.(evaluationtypology.PersonalityTypeDetail)
+	detail, ok := outcome.Detail.Payload.(outcometypology.PersonalityTypeDetail)
 	if !ok {
 		t.Fatalf("detail type = %T, want PersonalityTypeDetail", outcome.Detail.Payload)
 	}

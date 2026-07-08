@@ -175,7 +175,7 @@ func (s *behavioralRatingCommandStub) GetDefinition(context.Context, string) (*b
 }
 
 func (s *behavioralRatingCommandStub) UpdateDefinition(_ context.Context, modelCode string, input behavioral_rating.DefinitionInput) (*behavioral_rating.DefinitionResult, error) {
-	return &behavioral_rating.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1, Payload: input.Payload}, nil
+	return &behavioral_rating.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1, Payload: input.Payload}, nil
 }
 
 func (s *behavioralRatingCommandStub) Publish(_ context.Context, modelCode string) (*behavioral_rating.ModelSummary, error) {

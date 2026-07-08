@@ -1,6 +1,6 @@
 package legacy
 
-import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 
 type BigFiveTraitResult struct {
 	Code     string  `json:"code"`

@@ -10,10 +10,10 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
-	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -192,12 +192,12 @@ func (evalFakeBehavioralRatingCatalog) FindBehavioralRatingByQuestionnaire(conte
 
 type evalFakeCognitiveCatalog struct{}
 
-func (evalFakeCognitiveCatalog) GetCognitiveByRef(context.Context, port.ModelRef) (*cognitivesnapshot.Snapshot, error) {
-	return &cognitivesnapshot.Snapshot{}, nil
+func (evalFakeCognitiveCatalog) GetCognitiveByRef(context.Context, port.ModelRef) (*taskperfsnapshot.Snapshot, error) {
+	return &taskperfsnapshot.Snapshot{}, nil
 }
 
-func (evalFakeCognitiveCatalog) FindCognitiveByQuestionnaire(context.Context, string, string) (*cognitivesnapshot.Snapshot, error) {
-	return &cognitivesnapshot.Snapshot{}, nil
+func (evalFakeCognitiveCatalog) FindCognitiveByQuestionnaire(context.Context, string, string) (*taskperfsnapshot.Snapshot, error) {
+	return &taskperfsnapshot.Snapshot{}, nil
 }
 
 type evalFakeAnswerSheetReader struct{}

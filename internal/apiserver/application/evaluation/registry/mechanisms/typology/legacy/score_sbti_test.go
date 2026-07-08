@@ -3,13 +3,13 @@ package legacy
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestScoreSBTIMatchesClosestOutcome(t *testing.T) {
 	model := sbtiScorerTestModel()
-	sheet := &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+	sheet := &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Value: "C"},
 		{QuestionCode: "Q2", Value: "C"},
 		{QuestionCode: "Q3", Value: "C"},
@@ -34,7 +34,7 @@ func TestScoreSBTIMatchesClosestOutcome(t *testing.T) {
 func TestScoreSBTIUsesFallbackWhenBestSimilarityIsLow(t *testing.T) {
 	model := sbtiScorerTestModel()
 	model.FallbackSimilarityThreshold = 0.9
-	sheet := &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+	sheet := &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Value: "A"},
 		{QuestionCode: "Q2", Value: "A"},
 		{QuestionCode: "Q3", Value: "A"},
@@ -55,7 +55,7 @@ func TestScoreSBTIUsesFallbackWhenBestSimilarityIsLow(t *testing.T) {
 
 func TestScoreSBTIUsesDrinkHiddenOutcome(t *testing.T) {
 	model := sbtiScorerTestModel()
-	sheet := &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+	sheet := &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "drink_gate_q2", Value: "C"},
 	}}
 

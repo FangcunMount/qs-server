@@ -4,16 +4,16 @@ import (
 	"strings"
 	"testing"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestOutcomeAdapterRegistryRejectsUnknownAdapter(t *testing.T) {
 	_, err := DefaultOutcomeAdapterRegistry().Assemble(
 		modeltypology.DetailAdapterKey("custom_unknown"),
 		assessment.EvaluationModelRef{},
-		evaluationtypology.ScoringResult{},
+		outcometypology.ScoringResult{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "unsupported detail adapter key") {
 		t.Fatalf("Assemble error = %v, want unsupported detail adapter key", err)
@@ -30,7 +30,7 @@ func TestDefaultOutcomeAdapterRegistryOnlyRegistersMechanismKeys(t *testing.T) {
 		modeltypology.DetailAdapterSBTI,
 		modeltypology.DetailAdapterBigFive,
 	} {
-		if _, err := registry.Assemble(key, assessment.EvaluationModelRef{}, evaluationtypology.ScoringResult{}); err == nil {
+		if _, err := registry.Assemble(key, assessment.EvaluationModelRef{}, outcometypology.ScoringResult{}); err == nil {
 			t.Fatalf("default registry should not register legacy adapter %s", key)
 		}
 	}
