@@ -154,6 +154,44 @@ func (o RegisteredOption) catalogOption() ModelCatalogOption {
 	}
 }
 
+func catalogOperationsFromCapability(cap binding.ModelFamilyCapability) CatalogOperations {
+	return CatalogOperations{
+		CreateSupported:           cap.CreateSupported,
+		ListSupported:             cap.ListSupported,
+		PublishSupported:          cap.PublishSupported,
+		BindQuestionnaire:         cap.BindQuestionnaire,
+		DefinitionUpdateSupported: cap.DefinitionUpdateSupported,
+		RuntimeExecutable:         cap.RuntimeExecutable,
+		ExecutionPath:             cap.ExecutionPath,
+	}
+}
+
+type registeredPresentation struct {
+	apiKind          string
+	displayName      string
+	optionsEnabled   bool
+	previewSupported bool
+	qrCodeSupported  bool
+}
+
+func registeredModelFamily(kind binding.Kind, presentation registeredPresentation) RegisteredOption {
+	cap, ok := binding.FamilyCapabilityByKind(kind)
+	if !ok {
+		cap = binding.ModelFamilyCapability{Kind: kind, Role: binding.CapabilityRoleModelFamily}
+	}
+	ops := catalogOperationsFromCapability(cap)
+	ops.PreviewSupported = presentation.previewSupported
+	ops.QRCodeSupported = presentation.qrCodeSupported
+	return RegisteredOption{
+		Kind:           kind,
+		Role:           binding.CapabilityRoleModelFamily,
+		APIKind:        presentation.apiKind,
+		DisplayName:    presentation.displayName,
+		OptionsEnabled: presentation.optionsEnabled,
+		Operations:     ops,
+	}
+}
+
 // IsProductChannel 报告是否 API 类型 是 产品聚合槽位。
 func (o RegisteredOption) IsProductChannel() bool {
 	return o.Role == binding.CapabilityRoleProductChannel
@@ -168,78 +206,24 @@ func (o RegisteredOption) ProductChannelKind() binding.Kind {
 }
 
 var defaultRegisteredOptions = []RegisteredOption{
-	{
-		Kind:           binding.KindPersonality,
-		Role:           binding.CapabilityRoleModelFamily,
-		APIKind:        "personality",
-		DisplayName:    "人格测评",
-		OptionsEnabled: true,
-		Operations: CatalogOperations{
-			CreateSupported:           true,
-			ListSupported:             true,
-			PublishSupported:          true,
-			BindQuestionnaire:         true,
-			DefinitionUpdateSupported: true,
-			PreviewSupported:          true,
-			QRCodeSupported:           true,
-			RuntimeExecutable:         true,
-			ExecutionPath:             publishing.ExecutionPathTypologyDescriptor,
-		},
-	},
-	{
-		Kind:           binding.KindBehavioralRating,
-		Role:           binding.CapabilityRoleModelFamily,
-		APIKind:        string(binding.KindBehavioralRating),
-		DisplayName:    "行为评分",
-		OptionsEnabled: true,
-		Operations: CatalogOperations{
-			CreateSupported:           true,
-			ListSupported:             true,
-			PublishSupported:          true,
-			BindQuestionnaire:         true,
-			DefinitionUpdateSupported: true,
-			QRCodeSupported:           true,
-			RuntimeExecutable:         true,
-			ExecutionPath:             publishing.ExecutionPathBehavioralRatingDescriptor,
-		},
-	},
-	{
-		Kind:           binding.KindScale,
-		Role:           binding.CapabilityRoleModelFamily,
-		APIKind:        "medical_scale",
-		DisplayName:    "医学量表",
-		OptionsEnabled: true,
-		Operations: CatalogOperations{
-			RuntimeExecutable: true,
-			ExecutionPath:     publishing.ExecutionPathScaleDescriptor,
-		},
-	},
-	{
-		Kind:           binding.KindCognitive,
-		Role:           binding.CapabilityRoleModelFamily,
-		APIKind:        "cognitive",
-		DisplayName:    "认知测评",
-		OptionsEnabled: true,
-		Operations: CatalogOperations{
-			CreateSupported:           true,
-			ListSupported:             true,
-			PublishSupported:          true,
-			BindQuestionnaire:         true,
-			DefinitionUpdateSupported: true,
-			QRCodeSupported:           true,
-			RuntimeExecutable:         true,
-			ExecutionPath:             publishing.ExecutionPathCognitiveDescriptor,
-		},
-	},
-	{
-		Kind:        binding.KindCustom,
-		Role:        binding.CapabilityRoleModelFamily,
-		APIKind:     "custom",
-		DisplayName: "自定义测评",
-		Operations: CatalogOperations{
-			ExecutionPath: publishing.ExecutionPathNone,
-		},
-	},
+	registeredModelFamily(binding.KindPersonality, registeredPresentation{
+		apiKind: "personality", displayName: "人格测评", optionsEnabled: true,
+		previewSupported: true, qrCodeSupported: true,
+	}),
+	registeredModelFamily(binding.KindBehavioralRating, registeredPresentation{
+		apiKind: string(binding.KindBehavioralRating), displayName: "行为评分", optionsEnabled: true,
+		qrCodeSupported: true,
+	}),
+	registeredModelFamily(binding.KindScale, registeredPresentation{
+		apiKind: "medical_scale", displayName: "医学量表", optionsEnabled: true,
+	}),
+	registeredModelFamily(binding.KindCognitive, registeredPresentation{
+		apiKind: "cognitive", displayName: "认知测评", optionsEnabled: true,
+		qrCodeSupported: true,
+	}),
+	registeredModelFamily(binding.KindCustom, registeredPresentation{
+		apiKind: "custom", displayName: "自定义测评",
+	}),
 	{
 		Kind:        binding.Kind(legacy.APIKindBehaviorAbility),
 		Role:        binding.CapabilityRoleProductChannel,
