@@ -46,9 +46,9 @@ type SubmissionService struct {
 	profileAccess      *ProfileAccessResolver
 	answerConverter    AnswerConverter
 	committer          *SubmissionCommitter
-	queue                *SubmitQueue
-	submitGuard          IdempotencyGuard
-	assessmentResolver   SubmitAssessmentResolver
+	queue              *SubmitQueue
+	submitGuard        IdempotencyGuard
+	assessmentResolver SubmitAssessmentResolver
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -62,15 +62,15 @@ func NewSubmissionService(
 	assessmentResolver SubmitAssessmentResolver,
 ) *SubmissionService {
 	service := &SubmissionService{
-		answerSheetWriter:    answerSheetWriter,
-		answerSheetReader:    answerSheetReader,
-		actorClient:          actorClient,
-		profileLinkService:   profileLinkService,
-		profileAccess:        NewProfileAccessResolver(actorClient, profileLinkService),
-		answerConverter:      AnswerConverter{},
-		committer:            NewSubmissionCommitter(answerSheetWriter),
-		submitGuard:          submitGuard,
-		assessmentResolver:   assessmentResolver,
+		answerSheetWriter:  answerSheetWriter,
+		answerSheetReader:  answerSheetReader,
+		actorClient:        actorClient,
+		profileLinkService: profileLinkService,
+		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
+		answerConverter:    AnswerConverter{},
+		committer:          NewSubmissionCommitter(answerSheetWriter),
+		submitGuard:        submitGuard,
+		assessmentResolver: assessmentResolver,
 	}
 
 	if queueOptions == nil {
