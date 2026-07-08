@@ -6,9 +6,11 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type scoringSnapshotStoreConfig struct {
@@ -27,7 +29,8 @@ func resolveScoringSnapshotStore(cfg scoringSnapshotStoreConfig) (outcomescoring
 		if reason == "" {
 			reason = "ops_runtime redis client is unavailable"
 		}
-		return nil, fmt.Errorf(
+		return nil, cberrors.WithCode(
+			code.ErrModuleInitializationFailed,
 			"async interpretation requires durable scoring snapshot store (ops redis): %s; "+
 				"set EVALUATION_SINGLE_PROCESS_ASYNC=true for single-process dev/test only",
 			reason,

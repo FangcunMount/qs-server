@@ -97,43 +97,6 @@ definitions:
         description: Reference 返回参考文档（错误时使用）
         type: string
     type: object
-  evaluation.AssessmentDetailResponse:
-    properties:
-      answer_sheet_id:
-        type: string
-      created_at:
-        type: string
-      failed_at:
-        type: string
-      failure_reason:
-        type: string
-      id:
-        type: string
-      interpreted_at:
-        type: string
-      level:
-        $ref: '#/definitions/evaluation.ResultLevelResponse'
-      model:
-        $ref: '#/definitions/evaluation.ModelIdentityResponse'
-      org_id:
-        type: string
-      origin_id:
-        type: string
-      origin_type:
-        type: string
-      primary_score:
-        $ref: '#/definitions/evaluation.ScoreValueResponse'
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      status:
-        type: string
-      submitted_at:
-        type: string
-      testee_id:
-        type: string
-    type: object
   evaluation.AssessmentFactorChangeResponse:
     properties:
       current_score:
@@ -169,31 +132,6 @@ definitions:
       points:
         items:
           $ref: '#/definitions/evaluation.AssessmentFactorTrendPointResponse'
-        type: array
-    type: object
-  evaluation.AssessmentReportResponse:
-    properties:
-      assessment_id:
-        type: string
-      conclusion:
-        type: string
-      created_at:
-        type: string
-      dimensions:
-        items:
-          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
-        type: array
-      level:
-        $ref: '#/definitions/evaluation.ResultLevelResponse'
-      model:
-        $ref: '#/definitions/evaluation.ModelIdentityResponse'
-      model_extra:
-        $ref: '#/definitions/evaluation.ModelExtraResponse'
-      primary_score:
-        $ref: '#/definitions/evaluation.ScoreValueResponse'
-      suggestions:
-        items:
-          $ref: '#/definitions/evaluation.SuggestionResponse'
         type: array
     type: object
   evaluation.AssessmentStatusResponse:
@@ -339,21 +277,6 @@ definitions:
         type: string
       suggestion:
         type: string
-    type: object
-  evaluation.ListAssessmentsResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
     type: object
   evaluation.ModelExtraResponse:
     properties:
@@ -2473,100 +2396,6 @@ paths:
       summary: 获取类型学模型分类
       tags:
       - 类型学模型
-  /api/v2/assessments:
-    get:
-      description: 分页查询测评列表，响应使用 model/primary_score/level 投影
-      parameters:
-      - description: 受试者ID
-        in: query
-        name: testee_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/evaluation.ListAssessmentsResponse'
-              type: object
-      summary: 查询测评列表
-      tags:
-      - 测评
-  /api/v2/assessments/{id}:
-    get:
-      description: 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
-      parameters:
-      - description: 测评ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 受试者ID
-        in: query
-        name: testee_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
-              type: object
-      summary: 获取测评详情
-      tags:
-      - 测评
-  /api/v2/assessments/{id}/report:
-    get:
-      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
-      parameters:
-      - description: 测评ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 受试者ID
-        in: query
-        name: testee_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/evaluation.AssessmentReportResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取测评报告
-      tags:
-      - 测评
   /health:
     get:
       description: 检查服务健康状态

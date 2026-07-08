@@ -184,6 +184,25 @@ func TestListMyAssessmentsRequestHasNoModelAlgorithmFilter(t *testing.T) {
 	}
 }
 
+func TestEvaluationProtoHasNoDeprecatedAnswerSheetDetailRPC(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/evaluation/evaluation.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, forbidden := range []string{
+		"rpc GetMyAssessmentByAnswerSheetID",
+		"message GetMyAssessmentByAnswerSheetIDRequest",
+		"message GetMyAssessmentByAnswerSheetIDResponse",
+	} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("evaluation.proto still contains deprecated answer-sheet detail contract: %s", forbidden)
+		}
+	}
+}
+
 func TestGRPCRegistryImportsTransportOwnedServiceFacade(t *testing.T) {
 	t.Parallel()
 

@@ -101,11 +101,9 @@ collection RegisterRoutes 先设置：
 
 > **R108**：`/api/v1/personality-*` 已下线；类型学目录与测评统一使用 `/api/v1/typology-*`（见 `api/rest/collection.yaml`）。
 >
-> **R110**：v1 量表投影读端点 `GET /api/v1/assessments`（列表）、`/:id`（详情）、`/:id/report`（报告）与 `GET /api/v1/answersheets/:id/assessment`（按答卷解析）已下线。测评详情/列表/报告统一走 `/api/v2/assessments*`（报告已内置量表可见因子过滤）或 `/api/v1/typology-assessments*`。`LegacyAssessment*` response 形状不再提供。
-
-| 资源 | v2（deprecated） |
-| ---- | ---- |
-| assessment | `GET /api/v2/assessments`、`/:id`、`/:id/report`（请迁移到 typology-assessments） |
+> **R110**：v1 量表投影读端点 `GET /api/v1/assessments`（列表）、`/:id`（详情）、`/:id/report`（报告）与 `GET /api/v1/answersheets/:id/assessment`（按答卷解析）已下线。`LegacyAssessment*` response 形状不再提供。
+>
+> **R121**：过渡期 `/api/v2/assessments*` outcome 读端点已下线。测评详情/列表/报告统一走 `/api/v1/typology-assessments*`；因子得分、趋势、report-status、wait-report 等仍在用子资源继续保留在 `/api/v1/assessments/{id}/...`。
 
 ---
 

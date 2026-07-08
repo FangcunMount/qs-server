@@ -562,7 +562,7 @@ type Algorithm = identity.Algorithm
 
 | 轮次 | 内容 |
 |------|------|
-| R110 | breaking 下线 collection v1 量表投影读端点 `GET /api/v1/assessments`（列表/`:id`/`:id/report`）与 `GET /api/v1/answersheets/:id/assessment`；删除 `LegacyAssessment*` DTO 与 `v1_projection` 投影层；报告可见因子过滤下沉到 v2 `GetAssessmentReport`；`ResolveAssessmentByAnswerSheetID` gRPC 消费端下线（reader 能力暂留）；`algorithm` REST 查询过滤此前已不存在。测评读统一 `/api/v2/assessments*` 与 `/api/v1/typology-assessments*` |
+| R110 | breaking 下线 collection v1 量表投影读端点 `GET /api/v1/assessments`（列表/`:id`/`:id/report`）与 `GET /api/v1/answersheets/:id/assessment`；删除 `LegacyAssessment*` DTO 与 `v1_projection` 投影层；报告可见因子过滤下沉到当轮过渡的 v2 `GetAssessmentReport`；`ResolveAssessmentByAnswerSheetID` gRPC 消费端下线（reader 能力暂留）；`algorithm` REST 查询过滤此前已不存在。当轮测评读暂统一 `/api/v2/assessments*` 与 `/api/v1/typology-assessments*`，R121 已继续删除 v2 过渡面 |
 
 ## Round 109：内部旧命名闭环（R109）
 
@@ -647,3 +647,9 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R120 | `systemgovernance` 基于 `infra/mysql/checkpoint` 暴露 `runtime_checkpoint` 证据视图；修正 `mechanism-oriented-migration.md` R113 表述与 `scripts/oneoff/README.md` 旧表名；docs hygiene test 禁止非 archive 文档将退役表名当作现行表 |
+
+## Round 121：REST/gRPC public 旧契约删除（R121）
+
+| 轮次 | 内容 |
+|------|------|
+| R121 | 删除 collection `/api/v2/assessments*` outcome 兼容路由、swagger 注解与 OpenAPI 输出；删除 evaluation gRPC `GetMyAssessmentByAnswerSheetID` RPC / message / service 实现并重生成 proto；保留 `ResolveAssessmentByAnswerSheetID + GetMyAssessment` 组合路径和内部 answer-sheet lookup 能力；新增 REST/OpenAPI/proto contract guard |

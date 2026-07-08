@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,8 +11,10 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
@@ -29,6 +32,7 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 		name               string
 		cfg                scoringSnapshotStoreConfig
 		wantErrContains    string
+		wantErrCode        int
 		wantMemoryFallback bool
 		wantRedisStore     bool
 	}{
@@ -46,6 +50,7 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 				OpsUnavailableReason: "ops_runtime redis client is nil",
 			},
 			wantErrContains: "async interpretation requires durable scoring snapshot store",
+			wantErrCode:     code.ErrModuleInitializationFailed,
 		},
 		{
 			name: "async mode allows in-process store when single-process opt-in is set",
@@ -83,8 +88,12 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 				if err == nil {
 					t.Fatal("resolveScoringSnapshotStore() error = nil, want failure")
 				}
-				if !strings.Contains(err.Error(), tt.wantErrContains) {
-					t.Fatalf("resolveScoringSnapshotStore() error = %q, want substring %q", err.Error(), tt.wantErrContains)
+				verbose := fmt.Sprintf("%-v", err)
+				if !strings.Contains(verbose, tt.wantErrContains) {
+					t.Fatalf("resolveScoringSnapshotStore() error = %q, want substring %q", verbose, tt.wantErrContains)
+				}
+				if tt.wantErrCode != 0 && !cberrors.IsCode(err, tt.wantErrCode) {
+					t.Fatalf("resolveScoringSnapshotStore() error code = %v, want %d", cberrors.ParseCoder(err), tt.wantErrCode)
 				}
 				return
 			}

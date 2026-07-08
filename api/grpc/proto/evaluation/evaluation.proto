@@ -13,9 +13,6 @@ service EvaluationService {
   // 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
   rpc ResolveAssessmentByAnswerSheetID(ResolveAssessmentByAnswerSheetIDRequest) returns (ResolveAssessmentByAnswerSheetIDResponse);
 
-  // Deprecated: 优先使用 ResolveAssessmentByAnswerSheetID + GetMyAssessment
-  rpc GetMyAssessmentByAnswerSheetID(GetMyAssessmentByAnswerSheetIDRequest) returns (GetMyAssessmentByAnswerSheetIDResponse);
-
   // 获取我的测评列表（含 outcome 投影）
   rpc ListMyAssessments(ListMyAssessmentsRequest) returns (ListMyAssessmentsResponse);
 
@@ -185,14 +182,6 @@ message ResolveAssessmentByAnswerSheetIDRequest {
 message ResolveAssessmentByAnswerSheetIDResponse {
   uint64 testee_id = 1;
   uint64 assessment_id = 2;
-}
-
-message GetMyAssessmentByAnswerSheetIDRequest {
-  uint64 answer_sheet_id = 1;
-}
-
-message GetMyAssessmentByAnswerSheetIDResponse {
-  AssessmentDetail assessment = 1;
 }
 
 message ListMyAssessmentsRequest {

@@ -59,6 +59,17 @@ func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
 	}
 }
 
+func TestCollectionOpenAPIHasNoLegacyV2AssessmentOutcomePaths(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	for path := range spec.Paths {
+		if strings.HasPrefix(path, "/api/v2/assessments") {
+			t.Fatalf("legacy v2 assessment outcome path still in OpenAPI: %s", path)
+		}
+	}
+}
+
 func TestCollectionOpenAPIHasNoLegacyAssessmentSchemas(t *testing.T) {
 	t.Parallel()
 
@@ -104,6 +115,40 @@ func TestCollectionOpenAPIHasNoLegacyPersonalitySessionSchemas(t *testing.T) {
 		if strings.Contains(name, "personalitysession.") {
 			t.Fatalf("legacy personality session schema still in OpenAPI: %s", name)
 		}
+	}
+}
+
+func TestCollectionRESTDoesNotRegisterLegacyV2AssessmentOutcomeRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	c := container.NewContainer(
+		options.NewOptions(),
+		nil,
+		nil,
+		observability.NewFamilyStatusRegistry("collection-server"),
+	)
+	if err := c.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+
+	router := gin.New()
+	NewRouter(c).RegisterRoutes(router)
+	for _, route := range router.Routes() {
+		if strings.HasPrefix(route.Path, "/api/v2/assessments") {
+			t.Fatalf("legacy v2 assessment outcome route still registered: %s %s", route.Method, route.Path)
+		}
+	}
+}
+
+func TestCollectionRESTDoesNotDocumentLegacyTypologyAssessmentCompatibility(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("handler/evaluation_handler.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "Deprecated: 请优先使用 /api/v1/typology-assessments") {
+		t.Fatal("legacy typology assessment compatibility handler comment still exists")
 	}
 }
 
@@ -221,7 +266,7 @@ func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
 }
 
 func normalizeCollectionOpenAPIPath(path string) string {
-	// basePath 为 /api/v1，OpenAPI 生成时仅剥离 v1 前缀；/api/v2 作为完整路径保留。
+	// basePath 为 /api/v1，OpenAPI 生成时仅剥离 v1 前缀。
 	path = strings.TrimPrefix(path, "/api/v1")
 	if path == "" {
 		path = "/"

@@ -1385,109 +1385,6 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologymodel.TypologyModelResponse'
-  /api/v2/assessments:
-    get:
-      tags:
-      - 测评
-      summary: 查询测评列表
-      description: 分页查询测评列表，响应使用 model/primary_score/level 投影
-      operationId: 查询测评列表
-      parameters:
-      - type: integer
-        description: 受试者ID
-        name: testee_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/evaluation.ListAssessmentsResponse'
-  /api/v2/assessments/{id}:
-    get:
-      tags:
-      - 测评
-      summary: 获取测评详情
-      description: 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
-      operationId: 获取测评详情
-      parameters:
-      - type: integer
-        description: 测评ID
-        name: id
-        in: path
-        required: true
-      - type: integer
-        description: 受试者ID
-        name: testee_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/evaluation.AssessmentDetailResponse'
-  /api/v2/assessments/{id}/report:
-    get:
-      tags:
-      - 测评
-      summary: 获取测评报告
-      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
-      operationId: 获取测评报告
-      parameters:
-      - type: integer
-        description: 测评ID
-        name: id
-        in: path
-        required: true
-      - type: integer
-        description: 受试者ID
-        name: testee_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/evaluation.AssessmentReportResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /health:
     get:
       tags:
@@ -1615,43 +1512,6 @@ components:
         reference:
           description: Reference 返回参考文档（错误时使用）
           type: string
-    evaluation.AssessmentDetailResponse:
-      type: object
-      properties:
-        answer_sheet_id:
-          type: string
-        created_at:
-          type: string
-        failed_at:
-          type: string
-        failure_reason:
-          type: string
-        id:
-          type: string
-        interpreted_at:
-          type: string
-        level:
-          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
-        model:
-          $ref: '#/components/schemas/evaluation.ModelIdentityResponse'
-        org_id:
-          type: string
-        origin_id:
-          type: string
-        origin_type:
-          type: string
-        primary_score:
-          $ref: '#/components/schemas/evaluation.ScoreValueResponse'
-        questionnaire_code:
-          type: string
-        questionnaire_version:
-          type: string
-        status:
-          type: string
-        submitted_at:
-          type: string
-        testee_id:
-          type: string
     evaluation.AssessmentFactorChangeResponse:
       type: object
       properties:
@@ -1689,31 +1549,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/evaluation.AssessmentFactorTrendPointResponse'
-    evaluation.AssessmentReportResponse:
-      type: object
-      properties:
-        assessment_id:
-          type: string
-        conclusion:
-          type: string
-        created_at:
-          type: string
-        dimensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/evaluation.DimensionInterpretResponse'
-        level:
-          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
-        model:
-          $ref: '#/components/schemas/evaluation.ModelIdentityResponse'
-        model_extra:
-          $ref: '#/components/schemas/evaluation.ModelExtraResponse'
-        primary_score:
-          $ref: '#/components/schemas/evaluation.ScoreValueResponse'
-        suggestions:
-          type: array
-          items:
-            $ref: '#/components/schemas/evaluation.SuggestionResponse'
     evaluation.AssessmentStatusResponse:
       type: object
       properties:
@@ -1858,21 +1693,6 @@ components:
           type: string
         suggestion:
           type: string
-    evaluation.ListAssessmentsResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/evaluation.AssessmentSummaryResponse'
-        page:
-          type: integer
-        page_size:
-          type: integer
-        total:
-          type: integer
-        total_pages:
-          type: integer
     evaluation.ModelExtraResponse:
       type: object
       properties:

@@ -111,7 +111,7 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {
-	detail := err.Error()
+	detail := "unknown error"
 	if err != nil {
 		detail = fmt.Sprintf("%-v", err)
 	}

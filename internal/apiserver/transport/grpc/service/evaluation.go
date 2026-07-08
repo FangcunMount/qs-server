@@ -81,30 +81,6 @@ func (s *EvaluationService) ResolveAssessmentByAnswerSheetID(ctx context.Context
 	}, nil
 }
 
-// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
-func (s *EvaluationService) GetMyAssessmentByAnswerSheetID(ctx context.Context, req *pb.GetMyAssessmentByAnswerSheetIDRequest) (*pb.GetMyAssessmentByAnswerSheetIDResponse, error) {
-	if req.AnswerSheetId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "answer_sheet_id 不能为空")
-	}
-
-	result, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswerSheetId)
-	if err != nil {
-		return nil, toAssessmentQueryGRPCError(err)
-	}
-
-	if result == nil {
-		return nil, status.Error(codes.NotFound, "测评不存在")
-	}
-
-	outcome, err := s.loadAssessmentOutcomeRow(ctx, result.ID)
-	if err != nil {
-		outcome = legacyAssessmentOutcomeResult(result)
-	}
-	return &pb.GetMyAssessmentByAnswerSheetIDResponse{
-		Assessment: toProtoAssessmentDetailFromOutcome(outcome),
-	}, nil
-}
-
 // ListMyAssessments 获取我的测评列表（含 outcome 投影）
 func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListMyAssessmentsRequest) (*pb.ListMyAssessmentsResponse, error) {
 	if req.TesteeId == 0 {

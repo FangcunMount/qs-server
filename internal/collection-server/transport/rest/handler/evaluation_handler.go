@@ -22,8 +22,6 @@ type evaluationQueryService interface {
 	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
-	ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
-	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
 type waitReportService interface {
@@ -267,85 +265,6 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	result, err := h.queryService.GetHighRiskFactors(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get high risk factors failed", err)
-		return
-	}
-	h.Success(c, result)
-}
-
-// GetMyAssessment 获取测评详情（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/typology-assessments。
-// @Summary 获取测评详情
-// @Description 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
-// @Tags 测评
-// @Produce json
-// @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
-// @Success 200 {object} core.Response{data=evaluation.AssessmentDetailResponse}
-// @Router /api/v2/assessments/{id} [get]
-func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
-	testeeID, assessmentID, ok := h.parseTesteeAndAssessmentID(c)
-	if !ok {
-		return
-	}
-	result, err := h.queryService.GetMyAssessment(c.Request.Context(), testeeID, assessmentID)
-	if err != nil {
-		h.InternalErrorResponse(c, "get assessment failed", err)
-		return
-	}
-	if result == nil {
-		h.NotFoundResponse(c, "assessment not found", nil)
-		return
-	}
-	h.Success(c, result)
-}
-
-// ListMyAssessments 查询测评列表（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/typology-assessments。
-// @Summary 查询测评列表
-// @Description 分页查询测评列表，响应使用 model/primary_score/level 投影
-// @Tags 测评
-// @Produce json
-// @Param testee_id query int true "受试者ID"
-// @Success 200 {object} core.Response{data=evaluation.ListAssessmentsResponse}
-// @Router /api/v2/assessments [get]
-func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
-	testeeID, req, ok := h.bindAssessmentListQuery(c)
-	if !ok {
-		return
-	}
-	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
-	if err != nil {
-		respondAssessmentListError(h, c, err)
-		return
-	}
-	h.Success(c, result)
-}
-
-// GetAssessmentReport 获取测评报告（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/typology-assessments/{id}/report。
-// @Summary 获取测评报告
-// @Description 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
-// @Tags 测评
-// @Produce json
-// @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
-// @Success 200 {object} core.Response{data=evaluation.AssessmentReportResponse}
-// @Failure 400 {object} core.ErrResponse
-// @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
-// @Router /api/v2/assessments/{id}/report [get]
-func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
-	testeeID, assessmentID, ok := h.parseTesteeAndAssessmentID(c)
-	if !ok {
-		return
-	}
-	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), testeeID, assessmentID)
-	if err != nil {
-		respondOutcomeAssessmentReportError(h, c, err)
-		return
-	}
-	if result == nil {
-		h.NotFoundResponse(c, "report not found", nil)
 		return
 	}
 	h.Success(c, result)
