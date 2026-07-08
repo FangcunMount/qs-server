@@ -4,6 +4,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -14,6 +15,8 @@ type ReportRoutingContext struct {
 	ReportType      domainReport.ReportType
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
+	Audience        policy.Audience
+	ReportProfile   policy.ReportProfile
 }
 
 // ReportRoutingContextFromOutcome 从评估结果推导报告路由上下文。
@@ -66,6 +69,8 @@ func (c ReportRoutingContext) MechanismKey() (MechanismReportBuilderKey, bool) {
 		ReportType:      reportType,
 		Algorithm:       c.Algorithm,
 		ProductChannel:  c.ProductChannel,
+		Audience:        c.Audience,
+		ReportProfile:   c.ReportProfile,
 	}, true
 }
 

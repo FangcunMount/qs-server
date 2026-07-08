@@ -22,6 +22,11 @@ func executionInputFromContext(ctx context.Context) (ExecutionInput, bool) {
 	return input, ok
 }
 
+// ExecutionInputFromContext reads execute-time input attached by ContextWithExecutionInput.
+func ExecutionInputFromContext(ctx context.Context) (ExecutionInput, bool) {
+	return executionInputFromContext(ctx)
+}
+
 type snapshotInputAssembler struct{}
 
 func (snapshotInputAssembler) Assemble(snapshot modelcatalog.PublishedModelSnapshot) (evalpipeline.CalculationInput, error) {

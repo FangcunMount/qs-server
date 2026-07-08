@@ -98,13 +98,43 @@ func MechanismKeyFallbackCandidates(key MechanismReportBuilderKey) []MechanismRe
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
-	return []MechanismReportBuilderKey{
+	base := []MechanismReportBuilderKey{
 		key,
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel, Audience: key.Audience, ReportProfile: key.ReportProfile},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel, Audience: key.Audience},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel, ReportProfile: key.ReportProfile},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, Audience: key.Audience, ReportProfile: key.ReportProfile},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, Audience: key.Audience},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ReportProfile: key.ReportProfile},
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel, Audience: key.Audience, ReportProfile: key.ReportProfile},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel, Audience: key.Audience},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel, ReportProfile: key.ReportProfile},
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Audience: key.Audience, ReportProfile: key.ReportProfile},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Audience: key.Audience},
+		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ReportProfile: key.ReportProfile},
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType},
 		{AlgorithmFamily: key.AlgorithmFamily, ReportType: key.ReportType},
 	}
+	return dedupeMechanismKeys(base)
+}
+
+func dedupeMechanismKeys(keys []MechanismReportBuilderKey) []MechanismReportBuilderKey {
+	if len(keys) == 0 {
+		return nil
+	}
+	out := make([]MechanismReportBuilderKey, 0, len(keys))
+	seen := make(map[MechanismReportBuilderKey]struct{}, len(keys))
+	for _, key := range keys {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out
 }
 
 func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {

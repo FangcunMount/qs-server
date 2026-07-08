@@ -2,16 +2,19 @@ package registry
 
 import (
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// MechanismReportBuilderKey 路由报告构建器按执行机制，可选 algorithm/productChannel 细化。
+// MechanismReportBuilderKey 路由报告构建器按执行机制，可选 algorithm/productChannel/audience/reportProfile 细化。
 type MechanismReportBuilderKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      domainReport.ReportType
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
+	Audience        policy.Audience
+	ReportProfile   policy.ReportProfile
 }
 
 func (k MechanismReportBuilderKey) String() string {
@@ -21,6 +24,12 @@ func (k MechanismReportBuilderKey) String() string {
 	}
 	if k.ProductChannel != "" {
 		base += "/" + string(k.ProductChannel)
+	}
+	if k.Audience != "" {
+		base += "/" + string(k.Audience)
+	}
+	if k.ReportProfile != "" {
+		base += "/" + string(k.ReportProfile)
 	}
 	return base
 }

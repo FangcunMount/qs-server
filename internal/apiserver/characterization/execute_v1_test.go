@@ -53,7 +53,14 @@ func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescript
 	if err != nil {
 		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
 	}
-	evalruntime.AttachEvaluatorPipelines(registry, newV1FamilyEvaluators(t))
+	evalruntime.AttachNativePipelines(registry, evalruntime.NativePipelineDeps{
+		ScaleScorer: factorscoring.NewPipelineComponents(nil),
+	})
+	evalruntime.AttachEvaluatorPipelines(
+		registry,
+		newV1FamilyEvaluators(t),
+		modelcatalog.AlgorithmFamilyFactorScoring,
+	)
 	return registry
 }
 

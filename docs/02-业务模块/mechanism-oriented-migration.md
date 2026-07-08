@@ -550,7 +550,7 @@ type Algorithm = identity.Algorithm
 | Round | 动作 |
 |-------|------|
 | R106 | modelcatalog 机制包结构收官（见 `docs/系统设计文档.md` §19） |
-| R107 | `EvaluationRun` 补齐 `trace_id` / `input_snapshot_ref`；evaluation 与 typology catalog 的 `ModelIdentity` 暴露 `product_channel` / `algorithm_family`；report routing 已支持 Algorithm/ProductChannel key 精确命中与 broad fallback 测试；Audience/ReportProfile 仍未入选择键 |
+| R107 | `EvaluationRun` 补齐 `trace_id` / `input_snapshot_ref`；evaluation 与 typology catalog 的 `ModelIdentity` 暴露 `product_channel` / `algorithm_family`；report routing 已支持 Algorithm/ProductChannel key 精确命中与 broad fallback 测试；Audience/ReportProfile 在 R112 入键 |
 
 ## Round 108：旧接口与兼容层下线（R108）
 
@@ -569,3 +569,21 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R109 | `collection-server/application/personalitysession` 迁移为 `typologysession`；OpenAPI schema 不再导出 `personalitysession.*`；collection container 字段、cache signal、governance warmup、L1 cache 配置从 `PersonalityModel*` / `personality_model_cache_changed` / `static.personality_model` / `personality_cache` 收敛为 typology 命名；新增架构/契约测试防止旧命名回流 |
+
+## Round 111：factor_scoring 原生 RuntimeDescriptor triple（R111）
+
+| 轮次 | 内容 |
+|------|------|
+| R111 | `registry/mechanisms/scoring/pipeline_components.go` 实现原生 `InputAssembler/Calculator/OutcomeAssembler`；`runtime.AttachNativePipelines` 仅对 `AlgorithmFamilyFactorScoring` 装配；`AttachEvaluatorPipelines` 跳过已原生化 family；`scoring.Executor` 与 `pipeline_bridge` 保留供 fallback/characterization；norming/task_performance/typology 仍 evaluator-backed |
+
+## Round 112：报告 Audience / ReportProfile 路由入键（R112）
+
+| 轮次 | 内容 |
+|------|------|
+| R112 | 新增 `domain/interpretation/policy.ReportProfile`；`MechanismReportBuilderKey` / `ReportRoutingContext` additive 扩展 `Audience` / `ReportProfile`；`MechanismKeyFallbackCandidates` 扩展逐级剥离并 dedupe；v1 生成路径默认空值，broad builder 行为不变；生产注册未新增 audience/profile 专用 builder |
+
+## Round 113：跨库写入对账与补偿（R113）
+
+| 轮次 | 内容 |
+|------|------|
+| R113 | 新增 `application/evaluation/consistency`：`Scan` 检测 report 已出站但 MySQL status 未 interpreted、计分产物已落库但 status 仍 submitted；`RepairInterpretedFinalization` 幂等重放 reporting 末步（`ApplyOutcome` + assessment Save）；`evaluation_run` 与 `analytics_projector_checkpoint` 仍未物理合并 |
