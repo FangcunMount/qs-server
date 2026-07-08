@@ -104,11 +104,11 @@ func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 	c := NewContainer(nil, nil, nil)
 	module := &AssessmentModelModule{
 		Scale:       &ScaleModule{},
-		Personality: &PersonalityModelModule{},
+		Typology: &PersonalityModelModule{},
 	}
 	c.SetAssessmentModelModule(module)
 
-	if c.ScaleModule != module.Scale || c.PersonalityModelModule != module.Personality {
+	if c.ScaleModule != module.Scale || c.PersonalityModelModule != module.Typology {
 		t.Fatalf("legacy field aliases not wired to assessment model module")
 	}
 	got := c.GetLoadedModules()

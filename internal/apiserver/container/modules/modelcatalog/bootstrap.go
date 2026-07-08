@@ -7,9 +7,9 @@ import (
 
 // BootstrapInput carries container integration inputs for assessment-model bootstrap.
 type BootstrapInput struct {
-	Scale       ScaleDeps
-	Personality PersonalityDeps
-	Survey      SurveyBootstrapPorts
+	Scale    ScaleDeps
+	Typology TypologyDeps
+	Survey   SurveyBootstrapPorts
 }
 
 // SurveyBootstrapPorts are survey-side ports required when wiring scale lifecycle.
@@ -37,14 +37,14 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 	in.Survey.ApplySurveyPorts(&scaleDeps)
 	return New(Deps{
 		Scale:       scaleDeps,
-		Personality: in.Personality,
-		Cognitive: CognitiveDeps{
-			ModelRepo:     in.Personality.ModelRepo,
-			PublishedRepo: in.Personality.PublishedRepo,
+		Typology: in.Typology,
+		TaskPerformance: TaskPerformanceDeps{
+			ModelRepo:     in.Typology.ModelRepo,
+			PublishedRepo: in.Typology.PublishedRepo,
 		},
-		BehavioralRating: BehavioralRatingDeps{
-			ModelRepo:     in.Personality.ModelRepo,
-			PublishedRepo: in.Personality.PublishedRepo,
+		Norming: NormingDeps{
+			ModelRepo:     in.Typology.ModelRepo,
+			PublishedRepo: in.Typology.PublishedRepo,
 		},
 	})
 }

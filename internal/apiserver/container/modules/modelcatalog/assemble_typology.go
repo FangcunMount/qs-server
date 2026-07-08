@@ -11,14 +11,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// Personality hosts C-side personality model catalog services.
-type Personality struct {
+// Typology hosts C-side typology model catalog services.
+type Typology struct {
 	QueryService   appTypologyCatalog.PersonalityModelQueryService
 	CommandService appTypologyModel.Service
 }
 
-// PersonalityDeps defines explicit construction dependencies.
-type PersonalityDeps struct {
+// TypologyDeps defines explicit construction dependencies.
+type TypologyDeps struct {
 	PublishedLister          port.PublishedModelLister
 	PublishedAlgorithmLister port.PublishedAlgorithmLister
 	ModelRepo                port.ModelRepository
@@ -27,8 +27,8 @@ type PersonalityDeps struct {
 	CacheSignalNotifier      appTypologyModel.CacheSignalNotifier
 }
 
-// NewPersonality assembles the personality-model catalog capability.
-func NewPersonality(deps PersonalityDeps) (*Personality, error) {
+// NewTypology assembles the personality-model catalog capability.
+func NewTypology(deps TypologyDeps) (*Typology, error) {
 	if deps.PublishedLister == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "personality model published lister is required")
 	}
@@ -48,19 +48,19 @@ func NewPersonality(deps PersonalityDeps) (*Personality, error) {
 			ReportPreviewer:     previewadapter.NewPreviewer(),
 		})
 	}
-	return &Personality{
+	return &Typology{
 		QueryService:   queryService,
 		CommandService: commandService,
 	}, nil
 }
 
 // Cleanup releases module resources.
-func (m *Personality) Cleanup() error { return nil }
+func (m *Typology) Cleanup() error { return nil }
 
 // CheckHealth verifies module health.
-func (m *Personality) CheckHealth() error { return nil }
+func (m *Typology) CheckHealth() error { return nil }
 
 // ModuleInfo returns legacy personality-model module metadata.
-func (m *Personality) ModuleInfo() modules.ModuleInfo {
+func (m *Typology) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{Name: "personalitymodel", Version: "1.0.0"}
 }

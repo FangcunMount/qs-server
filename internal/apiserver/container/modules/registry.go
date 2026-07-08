@@ -93,7 +93,7 @@ var MigratedModulePackages = []PackageName{
 // MigratedModuleAssembleFiles lists assembly entry files for migrated packages.
 var MigratedModuleAssembleFiles = map[PackageName][]string{
 	PackageSurvey:         {"assemble.go", "scale_infra.go", "wire.go", "install.go"},
-	PackageModelCatalog:   {"module_aggregate.go", "module_ports.go", "assemble_scale.go", "assemble_personality.go", "default_descriptors.go", "wire.go", "install.go"},
+	PackageModelCatalog:   {"module_aggregate.go", "module_ports.go", "assemble_scale.go", "assemble_typology.go", "assemble_norming.go", "assemble_taskperformance.go", "default_descriptors.go", "wire.go", "install.go"},
 	PackageActor:          {"assemble.go", "wire.go", "install.go"},
 	PackagePlan:           {"assemble.go", "wire.go", "install.go"},
 	PackageStatistics:     {"assemble.go", "wire.go", "install.go"},

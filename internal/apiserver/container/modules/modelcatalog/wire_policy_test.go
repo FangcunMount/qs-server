@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestPersonalityDepsUseSeparatePublishedWriteRepository(t *testing.T) {
+func TestTypologyDepsUseSeparatePublishedWriteRepository(t *testing.T) {
 	content, err := os.ReadFile("wire.go")
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)

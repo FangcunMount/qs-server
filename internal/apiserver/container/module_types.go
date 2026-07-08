@@ -27,7 +27,7 @@ type (
 	AnswerSheetSubModule    = surveymod.AnswerSheetSubModule
 	AssessmentModelModule   = ammod.Module
 	ScaleModule             = ammod.Scale
-	PersonalityModelModule  = ammod.Personality
+	PersonalityModelModule  = ammod.Typology
 	ActorModule             = actormod.Module
 	EvaluationModule        = evalmod.Module
 	ReportModule            = reportmod.Module

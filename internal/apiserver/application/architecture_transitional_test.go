@@ -53,6 +53,37 @@ func TestMechanismTypologyDoesNotAddAssessmentCodeReportFiles(t *testing.T) {
 	}
 }
 
+func TestModelCatalogContainerDoesNotReintroduceModelFamilyAssembleFiles(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	modelCatalogRoot := filepath.Join(root, "internal/apiserver/container/modules/modelcatalog")
+	forbiddenBasenames := []string{
+		"assemble_personality",
+		"assemble_cognitive",
+		"assemble_behavioral_rating",
+	}
+	err := filepath.WalkDir(modelCatalogRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		base := strings.TrimSuffix(filepath.Base(path), ".go")
+		for _, forbidden := range forbiddenBasenames {
+			if base == forbidden {
+				t.Fatalf("%s reintroduces forbidden model-family assemble file %q; use mechanism-oriented names",
+					filepath.ToSlash(mustRel(t, root, path)), forbidden+".go")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestModelCatalogApplicationDoesNotReintroduceModelFamilyTopLevelDirs(t *testing.T) {
 	t.Parallel()
 

@@ -540,10 +540,7 @@ type Algorithm = identity.Algorithm
 | R88 | `identity/routing/catalog/capability` 调用方改引 `binding/publishing`；删除四过渡包 |
 | R89 | `personality publish` 迁入 `publishing.SnapshotBuilder`；`typology` 去 `modelcatalog` 根依赖；删 `cognitive/behavioral_rating/task_performance` domain 包 |
 | R90 | `application/modelcatalog/{personality,behavioral_rating,cognitive}` → `{typology,norming,taskperformance}`；删 `personality/seed`；seed 调用方直引 `legacy`；守卫禁回退目录 |
+| R91 | `container/modules/modelcatalog` 装配机制化：`assemble_{typology,norming,taskperformance}`；`Module.{Typology,Norming,TaskPerformance}`；守卫禁回退 assemble 文件名 |
 
-过渡态说明（R90 后 application 层已无模型族用例目录；container 层 `assemble_personality` 等待 R91+ 机制化）：
-
-```text
-container/modules/modelcatalog/assemble_{personality,behavioral_rating,cognitive}.go  # 装配文件名，非 application 包
-```
+过渡态说明（R91 后 container 内部已机制化；对外仍保留 `PersonalityModelModule` / `personalitymodel` 注册名作为兼容别名）：
 

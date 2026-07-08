@@ -5,19 +5,19 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// BehavioralRating hosts behavioral_rating model catalog command services.
-type BehavioralRating struct {
+// Norming hosts norming model catalog command services.
+type Norming struct {
 	CommandService appNorming.Service
 }
 
-// BehavioralRatingDeps defines explicit construction dependencies.
-type BehavioralRatingDeps struct {
+// NormingDeps defines explicit construction dependencies.
+type NormingDeps struct {
 	ModelRepo     port.ModelRepository
 	PublishedRepo port.PublishedModelRepository
 }
 
-// NewBehavioralRating assembles the behavioral_rating catalog capability.
-func NewBehavioralRating(deps BehavioralRatingDeps) (*BehavioralRating, error) {
+// NewNorming assembles the behavioral_rating catalog capability.
+func NewNorming(deps NormingDeps) (*Norming, error) {
 	var commandService appNorming.Service
 	if deps.ModelRepo != nil {
 		commandService = appNorming.NewService(appNorming.Dependencies{
@@ -25,11 +25,11 @@ func NewBehavioralRating(deps BehavioralRatingDeps) (*BehavioralRating, error) {
 			PublishedRepo: deps.PublishedRepo,
 		})
 	}
-	return &BehavioralRating{CommandService: commandService}, nil
+	return &Norming{CommandService: commandService}, nil
 }
 
 // Cleanup releases module resources.
-func (m *BehavioralRating) Cleanup() error { return nil }
+func (m *Norming) Cleanup() error { return nil }
 
 // CheckHealth verifies module health.
-func (m *BehavioralRating) CheckHealth() error { return nil }
+func (m *Norming) CheckHealth() error { return nil }

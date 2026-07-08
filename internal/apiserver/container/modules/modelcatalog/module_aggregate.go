@@ -2,20 +2,20 @@ package modelcatalog
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 
-// Module is the assessment-model composition root (scale + personality catalog).
+// Module is the assessment-model composition root (scale + typology/norming/taskperformance catalog).
 type Module struct {
-	Scale            *Scale
-	Personality      *Personality
-	Cognitive        *Cognitive
-	BehavioralRating *BehavioralRating
+	Scale           *Scale
+	Typology        *Typology
+	TaskPerformance *TaskPerformance
+	Norming         *Norming
 }
 
 // Deps groups constructor dependencies for both assessment-model capabilities.
 type Deps struct {
-	Scale            ScaleDeps
-	Personality      PersonalityDeps
-	Cognitive        CognitiveDeps
-	BehavioralRating BehavioralRatingDeps
+	Scale           ScaleDeps
+	Typology        TypologyDeps
+	TaskPerformance TaskPerformanceDeps
+	Norming         NormingDeps
 }
 
 // New assembles scale and personality catalog capabilities.
@@ -24,23 +24,23 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	personality, err := NewPersonality(deps.Personality)
+	typology, err := NewTypology(deps.Typology)
 	if err != nil {
 		return nil, err
 	}
-	cognitive, err := NewCognitive(deps.Cognitive)
+	taskPerformance, err := NewTaskPerformance(deps.TaskPerformance)
 	if err != nil {
 		return nil, err
 	}
-	behavioralRating, err := NewBehavioralRating(deps.BehavioralRating)
+	norming, err := NewNorming(deps.Norming)
 	if err != nil {
 		return nil, err
 	}
 	return &Module{
-		Scale:            scale,
-		Personality:      personality,
-		Cognitive:        cognitive,
-		BehavioralRating: behavioralRating,
+		Scale:           scale,
+		Typology:        typology,
+		TaskPerformance: taskPerformance,
+		Norming:         norming,
 	}, nil
 }
 
@@ -54,18 +54,18 @@ func (m *Module) Cleanup() error {
 			return err
 		}
 	}
-	if m.Personality != nil {
-		if err := m.Personality.Cleanup(); err != nil {
+	if m.Typology != nil {
+		if err := m.Typology.Cleanup(); err != nil {
 			return err
 		}
 	}
-	if m.Cognitive != nil {
-		if err := m.Cognitive.Cleanup(); err != nil {
+	if m.TaskPerformance != nil {
+		if err := m.TaskPerformance.Cleanup(); err != nil {
 			return err
 		}
 	}
-	if m.BehavioralRating != nil {
-		return m.BehavioralRating.Cleanup()
+	if m.Norming != nil {
+		return m.Norming.Cleanup()
 	}
 	return nil
 }
@@ -80,18 +80,18 @@ func (m *Module) CheckHealth() error {
 			return err
 		}
 	}
-	if m.Personality != nil {
-		if err := m.Personality.CheckHealth(); err != nil {
+	if m.Typology != nil {
+		if err := m.Typology.CheckHealth(); err != nil {
 			return err
 		}
 	}
-	if m.Cognitive != nil {
-		if err := m.Cognitive.CheckHealth(); err != nil {
+	if m.TaskPerformance != nil {
+		if err := m.TaskPerformance.CheckHealth(); err != nil {
 			return err
 		}
 	}
-	if m.BehavioralRating != nil {
-		return m.BehavioralRating.CheckHealth()
+	if m.Norming != nil {
+		return m.Norming.CheckHealth()
 	}
 	return nil
 }

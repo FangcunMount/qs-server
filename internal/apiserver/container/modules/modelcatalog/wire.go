@@ -53,7 +53,7 @@ func Wire(in WireInput) (*Module, error) {
 	}
 	return Bootstrap(BootstrapInput{
 		Scale:       buildScaleDeps(in),
-		Personality: buildPersonalityDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, personalityCacheConfig(in)),
+		Typology: buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
 		Survey:      surveyPorts,
 	})
 }
@@ -82,17 +82,17 @@ func buildScaleDeps(in WireInput) ScaleDeps {
 	return deps
 }
 
-type personalityCacheWireConfig struct {
+type typologyCacheWireConfig struct {
 	rulesetInfra.PublishedModelCacheConfig
 	Notifier appTypologyModel.CacheSignalNotifier
 }
 
-func personalityCacheConfig(in WireInput) personalityCacheWireConfig {
+func typologyCacheConfig(in WireInput) typologyCacheWireConfig {
 	var notifier appTypologyModel.CacheSignalNotifier
 	if n, ok := in.CacheSignalNotifier.(appTypologyModel.CacheSignalNotifier); ok {
 		notifier = n
 	}
-	return personalityCacheWireConfig{
+	return typologyCacheWireConfig{
 		PublishedModelCacheConfig: rulesetInfra.PublishedModelCacheConfig{
 			Redis:    in.StaticRedisClient,
 			Builder:  in.StaticCacheBuilder,
@@ -103,14 +103,14 @@ func personalityCacheConfig(in WireInput) personalityCacheWireConfig {
 	}
 }
 
-func buildPersonalityDeps(
+func buildTypologyDeps(
 	mongoDB *mongo.Database,
 	mongoLimiter backpressure.Acquirer,
 	questionnaireQuery quesApp.QuestionnaireQueryService,
-	cacheCfg personalityCacheWireConfig,
-) PersonalityDeps {
+	cacheCfg typologyCacheWireConfig,
+) TypologyDeps {
 	if mongoDB == nil {
-		return PersonalityDeps{}
+		return TypologyDeps{}
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
@@ -126,7 +126,7 @@ func buildPersonalityDeps(
 		algorithmLister = cached
 		publishedRepo = cache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
-	return PersonalityDeps{
+	return TypologyDeps{
 		PublishedLister:          publishedLister,
 		PublishedAlgorithmLister: algorithmLister,
 		ModelRepo:                draftRepo,

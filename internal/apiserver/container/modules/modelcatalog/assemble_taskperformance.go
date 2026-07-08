@@ -5,19 +5,19 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// Cognitive hosts cognitive model catalog command services.
-type Cognitive struct {
+// TaskPerformance hosts task performance model catalog command services.
+type TaskPerformance struct {
 	CommandService appTaskPerformance.Service
 }
 
-// CognitiveDeps defines explicit construction dependencies.
-type CognitiveDeps struct {
+// TaskPerformanceDeps defines explicit construction dependencies.
+type TaskPerformanceDeps struct {
 	ModelRepo     port.ModelRepository
 	PublishedRepo port.PublishedModelRepository
 }
 
-// NewCognitive assembles the cognitive-model catalog capability.
-func NewCognitive(deps CognitiveDeps) (*Cognitive, error) {
+// NewTaskPerformance assembles the cognitive-model catalog capability.
+func NewTaskPerformance(deps TaskPerformanceDeps) (*TaskPerformance, error) {
 	var commandService appTaskPerformance.Service
 	if deps.ModelRepo != nil {
 		commandService = appTaskPerformance.NewService(appTaskPerformance.Dependencies{
@@ -25,11 +25,11 @@ func NewCognitive(deps CognitiveDeps) (*Cognitive, error) {
 			PublishedRepo: deps.PublishedRepo,
 		})
 	}
-	return &Cognitive{CommandService: commandService}, nil
+	return &TaskPerformance{CommandService: commandService}, nil
 }
 
 // Cleanup releases module resources.
-func (m *Cognitive) Cleanup() error { return nil }
+func (m *TaskPerformance) Cleanup() error { return nil }
 
 // CheckHealth verifies module health.
-func (m *Cognitive) CheckHealth() error { return nil }
+func (m *TaskPerformance) CheckHealth() error { return nil }

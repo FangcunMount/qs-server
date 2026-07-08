@@ -29,13 +29,13 @@ func (m *Module) ExportRESTDeps(
 		return deps
 	}
 	deps.Scale = m.Scale.ExportRESTDeps(qrCodeService)
-	var personalityQuery = m.personalityQuery()
-	var personalityCommand = m.personalityCommand()
+	var typologyQuery = m.typologyQuery()
+	var typologyCommand = m.typologyCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
-		TypologyCommand:      personalityCommand,
-		NormingCommand: m.behavioralRatingCommand(),
-		TaskPerformanceCommand:        m.cognitiveCommand(),
-		TypologyQuery:        personalityQuery,
+		TypologyCommand:      typologyCommand,
+		NormingCommand: m.normingCommand(),
+		TaskPerformanceCommand:        m.taskPerformanceCommand(),
+		TypologyQuery:        typologyQuery,
 		QuestionnaireQuery:      questionnaireQuery,
 		Codes:                   codesService,
 		RawQRCodeGenerator:      qrCodeService,
@@ -57,30 +57,30 @@ func (s *Scale) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttransp
 	return deps
 }
 
-func (m *Module) personalityQuery() typologyModelApp.PersonalityModelQueryService {
-	if m == nil || m.Personality == nil {
+func (m *Module) typologyQuery() typologyModelApp.PersonalityModelQueryService {
+	if m == nil || m.Typology == nil {
 		return nil
 	}
-	return m.Personality.QueryService
+	return m.Typology.QueryService
 }
 
-func (m *Module) cognitiveCommand() appTaskPerformance.Service {
-	if m == nil || m.Cognitive == nil {
+func (m *Module) taskPerformanceCommand() appTaskPerformance.Service {
+	if m == nil || m.TaskPerformance == nil {
 		return nil
 	}
-	return m.Cognitive.CommandService
+	return m.TaskPerformance.CommandService
 }
 
-func (m *Module) behavioralRatingCommand() appNorming.Service {
-	if m == nil || m.BehavioralRating == nil {
+func (m *Module) normingCommand() appNorming.Service {
+	if m == nil || m.Norming == nil {
 		return nil
 	}
-	return m.BehavioralRating.CommandService
+	return m.Norming.CommandService
 }
 
-func (m *Module) personalityCommand() assessmentModelAppTypology.Service {
-	if m == nil || m.Personality == nil {
+func (m *Module) typologyCommand() assessmentModelAppTypology.Service {
+	if m == nil || m.Typology == nil {
 		return nil
 	}
-	return m.Personality.CommandService
+	return m.Typology.CommandService
 }

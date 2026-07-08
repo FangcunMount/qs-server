@@ -17,8 +17,8 @@ func (m *Module) ExportGRPCDeps() GRPCExports {
 	if m.Scale != nil {
 		exports.Scale = m.Scale.ExportGRPCDeps()
 	}
-	if m.Personality != nil {
-		exports.PersonalityModel = m.Personality.ExportGRPCDeps()
+	if m.Typology != nil {
+		exports.PersonalityModel = m.Typology.ExportGRPCDeps()
 	}
 	return exports
 }
@@ -35,7 +35,7 @@ func (s *Scale) ExportGRPCDeps() grpctransport.ScaleDeps {
 }
 
 // ExportGRPCDeps exposes personality-model capabilities to gRPC transport.
-func (p *Personality) ExportGRPCDeps() grpctransport.PersonalityModelDeps {
+func (p *Typology) ExportGRPCDeps() grpctransport.PersonalityModelDeps {
 	deps := grpctransport.PersonalityModelDeps{}
 	if p == nil {
 		return deps

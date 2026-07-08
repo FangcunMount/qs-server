@@ -286,10 +286,10 @@ func (a cacheGovernanceAdapter) warmScaleListTarget(ctx context.Context) error {
 
 func (a cacheGovernanceAdapter) warmPublishedPersonalityModel(ctx context.Context, code string) error {
 	c := a.container
-	if c == nil || c.AssessmentModelModule == nil || c.AssessmentModelModule.Personality == nil {
+	if c == nil || c.AssessmentModelModule == nil || c.AssessmentModelModule.Typology == nil {
 		return nil
 	}
-	query := c.AssessmentModelModule.Personality.QueryService
+	query := c.AssessmentModelModule.Typology.QueryService
 	if query == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
