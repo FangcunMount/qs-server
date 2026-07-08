@@ -63,12 +63,14 @@ type DimensionInterpretPO struct {
 }
 
 type ModelIdentityPO struct {
-	Kind      string `bson:"kind,omitempty" json:"kind,omitempty"`
-	SubKind   string `bson:"sub_kind,omitempty" json:"sub_kind,omitempty"`
-	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
-	Code      string `bson:"code,omitempty" json:"code,omitempty"`
-	Version   string `bson:"version,omitempty" json:"version,omitempty"`
-	Title     string `bson:"title,omitempty" json:"title,omitempty"`
+	Kind            string `bson:"kind,omitempty" json:"kind,omitempty"`
+	SubKind         string `bson:"sub_kind,omitempty" json:"sub_kind,omitempty"`
+	Algorithm       string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	Code            string `bson:"code,omitempty" json:"code,omitempty"`
+	Version         string `bson:"version,omitempty" json:"version,omitempty"`
+	Title           string `bson:"title,omitempty" json:"title,omitempty"`
+	ProductChannel  string `bson:"product_channel,omitempty" json:"product_channel,omitempty"`
+	AlgorithmFamily string `bson:"algorithm_family,omitempty" json:"algorithm_family,omitempty"`
 }
 
 type ScoreValuePO struct {

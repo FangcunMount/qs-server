@@ -22,15 +22,17 @@ const (
 )
 
 type ModelIdentity struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	SubKind       string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
-	Algorithm     string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	Code          string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
-	Version       string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
-	Title         string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Kind            string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubKind         string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
+	Algorithm       string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Code            string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	Version         string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	Title           string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
+	ProductChannel  string                 `protobuf:"bytes,7,opt,name=product_channel,json=productChannel,proto3" json:"product_channel,omitempty"`
+	AlgorithmFamily string                 `protobuf:"bytes,8,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ModelIdentity) Reset() {
@@ -101,6 +103,20 @@ func (x *ModelIdentity) GetVersion() string {
 func (x *ModelIdentity) GetTitle() string {
 	if x != nil {
 		return x.Title
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetProductChannel() string {
+	if x != nil {
+		return x.ProductChannel
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetAlgorithmFamily() string {
+	if x != nil {
+		return x.AlgorithmFamily
 	}
 	return ""
 }
@@ -2314,14 +2330,16 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xa0\x01\n" +
+	"evaluation\"\xf4\x01\n" +
 	"\rModelIdentity\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
 	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
 	"\x04code\x18\x04 \x01(\tR\x04code\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x14\n" +
-	"\x05title\x18\x06 \x01(\tR\x05title\"k\n" +
+	"\x05title\x18\x06 \x01(\tR\x05title\x12'\n" +
+	"\x0fproduct_channel\x18\a \x01(\tR\x0eproductChannel\x12)\n" +
+	"\x10algorithm_family\x18\b \x01(\tR\x0falgorithmFamily\"k\n" +
 	"\n" +
 	"ScoreValue\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +

@@ -137,6 +137,10 @@ func runToPO(run evalrun.EvaluationRun) *EvaluationRunPO {
 		traceID := run.TraceID
 		po.TraceID = &traceID
 	}
+	if run.InputSnapshotRef != "" {
+		inputSnapshotRef := run.InputSnapshotRef
+		po.InputSnapshotRef = &inputSnapshotRef
+	}
 	if run.Failure != nil {
 		code := run.Failure.Kind.String()
 		message := run.Failure.Message
@@ -160,6 +164,9 @@ func runFromPO(po EvaluationRunPO) evalrun.EvaluationRun {
 	}
 	if po.TraceID != nil {
 		run.TraceID = *po.TraceID
+	}
+	if po.InputSnapshotRef != nil {
+		run.InputSnapshotRef = *po.InputSnapshotRef
 	}
 	if po.ErrorCode != nil || po.ErrorMessage != nil {
 		failure := evalrun.Failure{Retryable: po.Retryable}

@@ -274,12 +274,14 @@ func modelIdentityToPO(model report.ModelIdentity) *ModelIdentityPO {
 		return nil
 	}
 	return &ModelIdentityPO{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
+		Kind:            model.Kind,
+		SubKind:         model.SubKind,
+		Algorithm:       model.Algorithm,
+		Code:            model.Code,
+		Version:         model.Version,
+		Title:           model.Title,
+		ProductChannel:  model.ProductChannel,
+		AlgorithmFamily: model.AlgorithmFamily,
 	}
 }
 
@@ -288,12 +290,14 @@ func modelIdentityToDomain(po *ModelIdentityPO) report.ModelIdentity {
 		return report.ModelIdentity{}
 	}
 	return report.ModelIdentity{
-		Kind:      po.Kind,
-		SubKind:   po.SubKind,
-		Algorithm: po.Algorithm,
-		Code:      po.Code,
-		Version:   po.Version,
-		Title:     po.Title,
+		Kind:            po.Kind,
+		SubKind:         po.SubKind,
+		Algorithm:       po.Algorithm,
+		Code:            po.Code,
+		Version:         po.Version,
+		Title:           po.Title,
+		ProductChannel:  po.ProductChannel,
+		AlgorithmFamily: po.AlgorithmFamily,
 	}
 }
 

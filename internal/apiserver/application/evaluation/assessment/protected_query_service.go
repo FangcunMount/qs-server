@@ -296,16 +296,17 @@ func assessmentRunFromQuery(result *runquery.RunResult) *AssessmentRunResult {
 		return nil
 	}
 	return &AssessmentRunResult{
-		RunID:        result.RunID,
-		AssessmentID: result.AssessmentID,
-		AttemptNo:    result.AttemptNo,
-		Status:       result.Status,
-		Retryable:    result.Retryable,
-		ErrorCode:    result.ErrorCode,
-		ErrorMessage: result.ErrorMessage,
-		StartedAt:    result.StartedAt,
-		FinishedAt:   result.FinishedAt,
-		TraceID:      result.TraceID,
+		RunID:            result.RunID,
+		AssessmentID:     result.AssessmentID,
+		AttemptNo:        result.AttemptNo,
+		Status:           result.Status,
+		Retryable:        result.Retryable,
+		ErrorCode:        result.ErrorCode,
+		ErrorMessage:     result.ErrorMessage,
+		StartedAt:        result.StartedAt,
+		FinishedAt:       result.FinishedAt,
+		TraceID:          result.TraceID,
+		InputSnapshotRef: result.InputSnapshotRef,
 	}
 }
 

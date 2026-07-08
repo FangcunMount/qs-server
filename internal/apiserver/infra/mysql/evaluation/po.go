@@ -125,19 +125,20 @@ func (AssessmentScorePO) TableName() string {
 
 // EvaluationRunPO persists one evaluation execution attempt.
 type EvaluationRunPO struct {
-	ID           uint64     `gorm:"column:id;primaryKey"`
-	RunID        string     `gorm:"column:run_id;size:100;not null;uniqueIndex:uk_evaluation_run_id"`
-	AssessmentID uint64     `gorm:"column:assessment_id;not null;index:idx_evaluation_run_assessment_id"`
-	AttemptNo    uint       `gorm:"column:attempt_no;not null"`
-	Status       string     `gorm:"column:status;size:50;not null;index:idx_evaluation_run_status"`
-	StartedAt    time.Time  `gorm:"column:started_at;not null"`
-	FinishedAt   *time.Time `gorm:"column:finished_at"`
-	ErrorCode    *string    `gorm:"column:error_code;size:50"`
-	ErrorMessage *string    `gorm:"column:error_message;size:500"`
-	Retryable    bool       `gorm:"column:retryable;not null;default:false"`
-	TraceID      *string    `gorm:"column:trace_id;size:100"`
-	CreatedAt    time.Time  `gorm:"column:created_at"`
-	UpdatedAt    time.Time  `gorm:"column:updated_at"`
+	ID               uint64     `gorm:"column:id;primaryKey"`
+	RunID            string     `gorm:"column:run_id;size:100;not null;uniqueIndex:uk_evaluation_run_id"`
+	AssessmentID     uint64     `gorm:"column:assessment_id;not null;index:idx_evaluation_run_assessment_id"`
+	AttemptNo        uint       `gorm:"column:attempt_no;not null"`
+	Status           string     `gorm:"column:status;size:50;not null;index:idx_evaluation_run_status"`
+	StartedAt        time.Time  `gorm:"column:started_at;not null"`
+	FinishedAt       *time.Time `gorm:"column:finished_at"`
+	ErrorCode        *string    `gorm:"column:error_code;size:50"`
+	ErrorMessage     *string    `gorm:"column:error_message;size:500"`
+	Retryable        bool       `gorm:"column:retryable;not null;default:false"`
+	TraceID          *string    `gorm:"column:trace_id;size:100"`
+	InputSnapshotRef *string    `gorm:"column:input_snapshot_ref;size:200"`
+	CreatedAt        time.Time  `gorm:"column:created_at"`
+	UpdatedAt        time.Time  `gorm:"column:updated_at"`
 }
 
 func (EvaluationRunPO) TableName() string {

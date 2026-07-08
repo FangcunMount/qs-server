@@ -18,10 +18,12 @@ func evaluateFailureResponse(
 		Status:  "failed",
 		Message: message,
 	}
-	applyLatestRunFailureMetadata(ctx, runQuery, assessmentID, func(retryable bool, runID, failureKind string) {
+	applyLatestRunFailureMetadata(ctx, runQuery, assessmentID, func(retryable bool, runID, failureKind, traceID, inputSnapshotRef string) {
 		resp.Retryable = retryable
 		resp.RunId = runID
 		resp.FailureKind = failureKind
+		resp.TraceId = traceID
+		resp.InputSnapshotRef = inputSnapshotRef
 	})
 	return resp
 }
@@ -37,26 +39,10 @@ func generateReportFailureResponse(
 		Status:  "failed",
 		Message: message,
 	}
-	applyLatestRunFailureMetadata(ctx, runQuery, assessmentID, func(retryable bool, runID, failureKind string) {
+	applyLatestRunFailureMetadata(ctx, runQuery, assessmentID, func(retryable bool, runID, failureKind, _, _ string) {
 		resp.Retryable = retryable
 		resp.RunId = runID
 		resp.FailureKind = failureKind
 	})
 	return resp
-}
-
-func applyLatestRunFailureMetadata(
-	ctx context.Context,
-	runQuery runqueryApp.Service,
-	assessmentID uint64,
-	apply func(retryable bool, runID, failureKind string),
-) {
-	if runQuery == nil || assessmentID == 0 || apply == nil {
-		return
-	}
-	run, err := runQuery.FindLatestByAssessmentID(ctx, assessmentID)
-	if err != nil || run == nil {
-		return
-	}
-	apply(run.Retryable, run.RunID, run.ErrorCode)
 }

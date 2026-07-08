@@ -20,12 +20,14 @@ func toInternalOutcomeSummary(result *assessmentApp.AssessmentOutcomeResult) *in
 
 func toInternalProtoModelIdentity(model assessmentApp.ModelIdentityResult) *internalpb.ModelIdentity {
 	return &internalpb.ModelIdentity{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
+		Kind:            model.Kind,
+		SubKind:         model.SubKind,
+		Algorithm:       model.Algorithm,
+		Code:            model.Code,
+		Version:         model.Version,
+		Title:           model.Title,
+		ProductChannel:  model.ProductChannel,
+		AlgorithmFamily: model.AlgorithmFamily,
 	}
 }
 
@@ -67,7 +69,7 @@ func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *asse
 	if result == nil {
 		return nil
 	}
-	model := assessmentApp.ModelIdentityResult{Kind: "scale", Algorithm: "scale_default"}
+	model := assessmentApp.EnrichModelIdentityResult(assessmentApp.ModelIdentityResult{Kind: "scale", Algorithm: "scale_default"}, "")
 	if result.MedicalScaleCode != nil {
 		model.Code = *result.MedicalScaleCode
 	}
@@ -106,12 +108,14 @@ func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *asse
 
 func toEvaluationProtoModelIdentity(model assessmentApp.ModelIdentityResult) *evaluationpb.ModelIdentity {
 	return &evaluationpb.ModelIdentity{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
+		Kind:            model.Kind,
+		SubKind:         model.SubKind,
+		Algorithm:       model.Algorithm,
+		Code:            model.Code,
+		Version:         model.Version,
+		Title:           model.Title,
+		ProductChannel:  model.ProductChannel,
+		AlgorithmFamily: model.AlgorithmFamily,
 	}
 }
 

@@ -18,6 +18,12 @@ type TypologyModelSummaryResult struct {
 	QuestionnaireVersion string
 	Status               string
 	QuestionCount        int
+	Kind                 string
+	SubKind              string
+	ProductChannel       string
+	AlgorithmFamily      string
+	PayloadFormat        string
+	DecisionKind         string
 }
 
 // TypologyModelSummaryListResult 是 paginated summary list。

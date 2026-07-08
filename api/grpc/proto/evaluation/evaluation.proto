@@ -37,6 +37,8 @@ message ModelIdentity {
   string code = 4;
   string version = 5;
   string title = 6;
+  string product_channel = 7;
+  string algorithm_family = 8;
 }
 
 message ScoreValue {

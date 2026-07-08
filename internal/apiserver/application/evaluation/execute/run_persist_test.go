@@ -159,8 +159,8 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 	if !errors.Is(err, executeErr) {
 		t.Fatalf("Evaluate error = %v, want original execution error", err)
 	}
-	if len(runRepo.saved) != 2 {
-		t.Fatalf("saved runs = %d, want running and failed", len(runRepo.saved))
+	if len(runRepo.saved) != 3 {
+		t.Fatalf("saved runs = %d, want running, input snapshot, and failed", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
@@ -182,7 +182,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
-	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
+	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
 	svc := NewService(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
@@ -194,8 +194,8 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want failed run persistence error", err)
 	}
-	if len(runRepo.saved) != 2 {
-		t.Fatalf("saved runs = %d, want running and failed", len(runRepo.saved))
+	if len(runRepo.saved) != 3 {
+		t.Fatalf("saved runs = %d, want running, input snapshot, and failed", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
@@ -221,7 +221,7 @@ func TestEvaluateReturnsSucceededRunPersistenceErrorAfterScoring(t *testing.T) {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
 	capture := &splitPhaseCapture{}
-	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
+	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
@@ -240,8 +240,8 @@ func TestEvaluateReturnsSucceededRunPersistenceErrorAfterScoring(t *testing.T) {
 	if capture.ScoringCalls != 1 || capture.InterpretationCalls != 1 {
 		t.Fatalf("split phase calls = scoring:%d interpretation:%d, want 1 each", capture.ScoringCalls, capture.InterpretationCalls)
 	}
-	if len(runRepo.saved) != 2 {
-		t.Fatalf("saved runs = %d, want running and succeeded attempt", len(runRepo.saved))
+	if len(runRepo.saved) != 3 {
+		t.Fatalf("saved runs = %d, want running, input snapshot, and succeeded attempt", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusSucceeded {
 		t.Fatalf("last run status = %s, want succeeded", got)

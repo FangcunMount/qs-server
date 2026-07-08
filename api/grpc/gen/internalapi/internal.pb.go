@@ -2065,18 +2065,20 @@ func (x *EvaluateAssessmentRequest) GetAssessmentId() uint64 {
 
 // 执行测评评估响应
 type EvaluateAssessmentResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                           // 是否成功
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                              // 处理后的状态：interpreted/failed/skipped
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                            // 描述信息
-	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`  // 总分（成功时，legacy）
-	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`       // 风险等级（成功时，legacy）
-	Outcome       *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                            // v2 outcome 投影
-	Retryable     bool                   `protobuf:"varint,7,opt,name=retryable,proto3" json:"retryable,omitempty"`                       // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
-	RunId         string                 `protobuf:"bytes,8,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                   // 失败时关联的 evaluation_run id
-	FailureKind   string                 `protobuf:"bytes,9,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"` // 失败分类：validation/calculation/timeout/internal
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Success          bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                             // 是否成功
+	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                                                // 处理后的状态：interpreted/failed/skipped
+	Message          string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                                              // 描述信息
+	TotalScore       float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`                    // 总分（成功时，legacy）
+	RiskLevel        string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`                         // 风险等级（成功时，legacy）
+	Outcome          *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                                              // v2 outcome 投影
+	Retryable        bool                   `protobuf:"varint,7,opt,name=retryable,proto3" json:"retryable,omitempty"`                                         // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
+	RunId            string                 `protobuf:"bytes,8,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                                     // 失败时关联的 evaluation_run id
+	FailureKind      string                 `protobuf:"bytes,9,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`                   // 失败分类：validation/calculation/timeout/internal
+	TraceId          string                 `protobuf:"bytes,10,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`                              // 关联 evaluation_run trace_id
+	InputSnapshotRef string                 `protobuf:"bytes,11,opt,name=input_snapshot_ref,json=inputSnapshotRef,proto3" json:"input_snapshot_ref,omitempty"` // 关联 evaluation_run input_snapshot_ref
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *EvaluateAssessmentResponse) Reset() {
@@ -2172,6 +2174,20 @@ func (x *EvaluateAssessmentResponse) GetFailureKind() string {
 	return ""
 }
 
+func (x *EvaluateAssessmentResponse) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *EvaluateAssessmentResponse) GetInputSnapshotRef() string {
+	if x != nil {
+		return x.InputSnapshotRef
+	}
+	return ""
+}
+
 type OutcomeSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Model         *ModelIdentity         `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
@@ -2233,15 +2249,17 @@ func (x *OutcomeSummary) GetLevel() *ResultLevel {
 }
 
 type ModelIdentity struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	SubKind       string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
-	Algorithm     string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	Code          string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
-	Version       string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
-	Title         string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Kind            string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubKind         string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
+	Algorithm       string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Code            string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	Version         string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	Title           string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
+	ProductChannel  string                 `protobuf:"bytes,7,opt,name=product_channel,json=productChannel,proto3" json:"product_channel,omitempty"`
+	AlgorithmFamily string                 `protobuf:"bytes,8,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ModelIdentity) Reset() {
@@ -2312,6 +2330,20 @@ func (x *ModelIdentity) GetVersion() string {
 func (x *ModelIdentity) GetTitle() string {
 	if x != nil {
 		return x.Title
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetProductChannel() string {
+	if x != nil {
+		return x.ProductChannel
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetAlgorithmFamily() string {
+	if x != nil {
+		return x.AlgorithmFamily
 	}
 	return ""
 }
@@ -3736,7 +3768,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x12\x18\n" +
 	"\asuccess\x18\x05 \x01(\bR\asuccess\"@\n" +
 	"\x19EvaluateAssessmentRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xb7\x02\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\x80\x03\n" +
 	"\x1aEvaluateAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -3748,18 +3780,23 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\aoutcome\x18\x06 \x01(\v2\x1b.internalapi.OutcomeSummaryR\aoutcome\x12\x1c\n" +
 	"\tretryable\x18\a \x01(\bR\tretryable\x12\x15\n" +
 	"\x06run_id\x18\b \x01(\tR\x05runId\x12!\n" +
-	"\ffailure_kind\x18\t \x01(\tR\vfailureKind\"\xb0\x01\n" +
+	"\ffailure_kind\x18\t \x01(\tR\vfailureKind\x12\x19\n" +
+	"\btrace_id\x18\n" +
+	" \x01(\tR\atraceId\x12,\n" +
+	"\x12input_snapshot_ref\x18\v \x01(\tR\x10inputSnapshotRef\"\xb0\x01\n" +
 	"\x0eOutcomeSummary\x120\n" +
 	"\x05model\x18\x01 \x01(\v2\x1a.internalapi.ModelIdentityR\x05model\x12<\n" +
 	"\rprimary_score\x18\x02 \x01(\v2\x17.internalapi.ScoreValueR\fprimaryScore\x12.\n" +
-	"\x05level\x18\x03 \x01(\v2\x18.internalapi.ResultLevelR\x05level\"\xa0\x01\n" +
+	"\x05level\x18\x03 \x01(\v2\x18.internalapi.ResultLevelR\x05level\"\xf4\x01\n" +
 	"\rModelIdentity\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
 	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
 	"\x04code\x18\x04 \x01(\tR\x04code\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x14\n" +
-	"\x05title\x18\x06 \x01(\tR\x05title\"k\n" +
+	"\x05title\x18\x06 \x01(\tR\x05title\x12'\n" +
+	"\x0fproduct_channel\x18\a \x01(\tR\x0eproductChannel\x12)\n" +
+	"\x10algorithm_family\x18\b \x01(\tR\x0falgorithmFamily\"k\n" +
 	"\n" +
 	"ScoreValue\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +

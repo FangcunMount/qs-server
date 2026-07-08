@@ -80,6 +80,12 @@ func toPersonalitySummary(model PersonalityModelSummaryOutput) typologymodel.Per
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Status:               model.Status,
 		QuestionCount:        model.QuestionCount,
+		Kind:                 model.Kind,
+		SubKind:              model.SubKind,
+		ProductChannel:       model.ProductChannel,
+		AlgorithmFamily:      model.AlgorithmFamily,
+		PayloadFormat:        model.PayloadFormat,
+		DecisionKind:         model.DecisionKind,
 	}
 }
 
@@ -113,6 +119,12 @@ func toPersonalityModelResponse(model *PersonalityModelOutput) *typologymodel.Pe
 		QuestionnaireVersion: summary.QuestionnaireVersion,
 		Status:               summary.Status,
 		QuestionCount:        summary.QuestionCount,
+		Kind:                 summary.Kind,
+		SubKind:              summary.SubKind,
+		ProductChannel:       summary.ProductChannel,
+		AlgorithmFamily:      summary.AlgorithmFamily,
+		PayloadFormat:        summary.PayloadFormat,
+		DecisionKind:         summary.DecisionKind,
 		DimensionOrder:       append([]string(nil), model.DimensionOrder...),
 		Dimensions:           dimensions,
 		Outcomes:             outcomes,

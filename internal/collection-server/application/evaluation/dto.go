@@ -2,12 +2,14 @@ package evaluation
 
 // ModelIdentityResponse 已发布模型引用。
 type ModelIdentityResponse struct {
-	Kind      string `json:"kind"`
-	SubKind   string `json:"sub_kind,omitempty"`
-	Algorithm string `json:"algorithm,omitempty"`
-	Code      string `json:"code"`
-	Version   string `json:"version,omitempty"`
-	Title     string `json:"title,omitempty"`
+	Kind            string `json:"kind"`
+	SubKind         string `json:"sub_kind,omitempty"`
+	Algorithm       string `json:"algorithm,omitempty"`
+	Code            string `json:"code"`
+	Version         string `json:"version,omitempty"`
+	Title           string `json:"title,omitempty"`
+	ProductChannel  string `json:"product_channel,omitempty"`
+	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 }
 
 // ScoreValueResponse 主分投影。

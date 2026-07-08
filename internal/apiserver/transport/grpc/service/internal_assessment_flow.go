@@ -214,11 +214,16 @@ func (flow assessmentFlow) EvaluateAssessment(
 			"assessment_id", req.AssessmentId,
 			"error", err.Error(),
 		)
-		return &pb.EvaluateAssessmentResponse{
+		resp := &pb.EvaluateAssessmentResponse{
 			Success: true,
 			Status:  "interpreted",
 			Message: "评估完成，但获取结果失败",
-		}, nil
+		}
+		applyLatestRunAuditMetadata(ctx, s.runQueryService, req.AssessmentId, func(traceID, inputSnapshotRef string) {
+			resp.TraceId = traceID
+			resp.InputSnapshotRef = inputSnapshotRef
+		})
+		return resp, nil
 	}
 
 	var totalScore float64
@@ -238,14 +243,19 @@ func (flow assessmentFlow) EvaluateAssessment(
 		"result", "success",
 	)
 
-	return &pb.EvaluateAssessmentResponse{
+	resp := &pb.EvaluateAssessmentResponse{
 		Success:    true,
 		Status:     assessmentResultStatus(result),
 		Message:    "评估完成",
 		TotalScore: totalScore,
 		RiskLevel:  riskLevel,
 		Outcome:    outcomeSummaryFromAssessmentResult(result),
-	}, nil
+	}
+	applyLatestRunAuditMetadata(ctx, s.runQueryService, req.AssessmentId, func(traceID, inputSnapshotRef string) {
+		resp.TraceId = traceID
+		resp.InputSnapshotRef = inputSnapshotRef
+	})
+	return resp, nil
 }
 
 func (flow assessmentFlow) GenerateReportFromAssessment(

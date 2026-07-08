@@ -4,6 +4,8 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIdentity {
@@ -14,13 +16,16 @@ func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIde
 		return modelIdentityFromRef(*outcome.Assessment.EvaluationModelRef())
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
+		kind := binding.Kind(outcome.Input.Model.Kind)
 		return domainreport.ModelIdentity{
-			Kind:      string(outcome.Input.Model.Kind),
-			SubKind:   outcome.Input.Model.SubKind,
-			Algorithm: outcome.Input.Model.Algorithm,
-			Code:      outcome.Input.Model.Code,
-			Version:   outcome.Input.Model.Version,
-			Title:     outcome.Input.Model.Title,
+			Kind:            string(outcome.Input.Model.Kind),
+			SubKind:         outcome.Input.Model.SubKind,
+			Algorithm:       outcome.Input.Model.Algorithm,
+			Code:            outcome.Input.Model.Code,
+			Version:         outcome.Input.Model.Version,
+			Title:           outcome.Input.Model.Title,
+			ProductChannel:  publishing.ProductChannelForIdentity(kind, outcome.Input.Model.ProductChannel),
+			AlgorithmFamily: publishing.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(outcome.Input.Model.SubKind), binding.Algorithm(outcome.Input.Model.Algorithm)),
 		}
 	}
 	return domainreport.ModelIdentity{}
@@ -28,13 +33,16 @@ func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIde
 
 func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelIdentity {
 	id := ref.ExecutionIdentity()
+	kind := id.Kind
 	return domainreport.ModelIdentity{
-		Kind:      string(id.Kind),
-		SubKind:   string(id.SubKind),
-		Algorithm: string(id.Algorithm),
-		Code:      ref.Code().String(),
-		Version:   ref.Version(),
-		Title:     ref.Title(),
+		Kind:            string(kind),
+		SubKind:         string(id.SubKind),
+		Algorithm:       string(id.Algorithm),
+		Code:            ref.Code().String(),
+		Version:         ref.Version(),
+		Title:           ref.Title(),
+		ProductChannel:  publishing.ProductChannelForIdentity(kind, ""),
+		AlgorithmFamily: publishing.AlgorithmFamilyStringFromIdentity(kind, id.SubKind, id.Algorithm),
 	}
 }
 

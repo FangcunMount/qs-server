@@ -2,12 +2,14 @@ package eventoutcome
 
 // ModelIdentity is the wire projection of model identity on outcome-enriched events.
 type ModelIdentity struct {
-	Kind      string `json:"kind"`
-	SubKind   string `json:"sub_kind,omitempty"`
-	Algorithm string `json:"algorithm,omitempty"`
-	Code      string `json:"code"`
-	Version   string `json:"version,omitempty"`
-	Title     string `json:"title,omitempty"`
+	Kind            string `json:"kind"`
+	SubKind         string `json:"sub_kind,omitempty"`
+	Algorithm       string `json:"algorithm,omitempty"`
+	Code            string `json:"code"`
+	Version         string `json:"version,omitempty"`
+	Title           string `json:"title,omitempty"`
+	ProductChannel  string `json:"product_channel,omitempty"`
+	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 }
 
 // ScoreValue is the wire projection of primary score on outcome-enriched events.

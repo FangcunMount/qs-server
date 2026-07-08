@@ -152,12 +152,14 @@ func toAssessmentReportResponse(report *AssessmentReportOutput) *evaluation.Asse
 
 func toModelIdentityResponse(model ModelIdentityOutput) evaluation.ModelIdentityResponse {
 	return evaluation.ModelIdentityResponse{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
+		Kind:            model.Kind,
+		SubKind:         model.SubKind,
+		Algorithm:       model.Algorithm,
+		Code:            model.Code,
+		Version:         model.Version,
+		Title:           model.Title,
+		ProductChannel:  model.ProductChannel,
+		AlgorithmFamily: model.AlgorithmFamily,
 	}
 }
 

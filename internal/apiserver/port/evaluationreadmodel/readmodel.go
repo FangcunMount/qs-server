@@ -191,12 +191,14 @@ type ReportRow struct {
 }
 
 type ModelIdentityRow struct {
-	Kind      string
-	SubKind   string
-	Algorithm string
-	Code      string
-	Version   string
-	Title     string
+	Kind            string
+	SubKind         string
+	Algorithm       string
+	Code            string
+	Version         string
+	Title           string
+	ProductChannel  string
+	AlgorithmFamily string
 }
 
 type ScoreValueRow struct {

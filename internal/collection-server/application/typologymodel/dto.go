@@ -10,6 +10,12 @@ type PersonalityModelResponse struct {
 	QuestionnaireVersion string                         `json:"questionnaire_version"`
 	Status               string                         `json:"status"`
 	QuestionCount        int32                          `json:"question_count"`
+	Kind                 string                         `json:"kind,omitempty"`
+	SubKind              string                         `json:"sub_kind,omitempty"`
+	ProductChannel       string                         `json:"product_channel,omitempty"`
+	AlgorithmFamily      string                         `json:"algorithm_family,omitempty"`
+	PayloadFormat        string                         `json:"payload_format,omitempty"`
+	DecisionKind         string                         `json:"decision_kind,omitempty"`
 	DimensionOrder       []string                       `json:"dimension_order,omitempty"`
 	Dimensions           []PersonalityDimensionResponse `json:"dimensions,omitempty"`
 	Outcomes             []PersonalityOutcomeResponse   `json:"outcomes,omitempty"`
@@ -39,6 +45,12 @@ type PersonalityModelSummaryResponse struct {
 	QuestionnaireVersion string `json:"questionnaire_version"`
 	Status               string `json:"status"`
 	QuestionCount        int32  `json:"question_count"`
+	Kind                 string `json:"kind,omitempty"`
+	SubKind              string `json:"sub_kind,omitempty"`
+	ProductChannel       string `json:"product_channel,omitempty"`
+	AlgorithmFamily      string `json:"algorithm_family,omitempty"`
+	PayloadFormat        string `json:"payload_format,omitempty"`
+	DecisionKind         string `json:"decision_kind,omitempty"`
 }
 
 type ListPersonalityModelsRequest struct {

@@ -4,12 +4,14 @@ import "time"
 
 // ModelIdentityResult 是published-模型引用 on 结果 read APIs。
 type ModelIdentityResult struct {
-	Kind      string `json:"kind"`
-	SubKind   string `json:"sub_kind,omitempty"`
-	Algorithm string `json:"algorithm,omitempty"`
-	Code      string `json:"code"`
-	Version   string `json:"version,omitempty"`
-	Title     string `json:"title,omitempty"`
+	Kind            string `json:"kind"`
+	SubKind         string `json:"sub_kind,omitempty"`
+	Algorithm       string `json:"algorithm,omitempty"`
+	Code            string `json:"code"`
+	Version         string `json:"version,omitempty"`
+	Title           string `json:"title,omitempty"`
+	ProductChannel  string `json:"product_channel,omitempty"`
+	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 }
 
 // ScoreValueResult 是主 score 投影 on 结果 read APIs。

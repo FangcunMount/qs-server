@@ -87,6 +87,12 @@ func toProtoPersonalityModelSummary(result *appPersonalityModel.TypologyModelSum
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		Status:               result.Status,
 		QuestionCount:        int32(result.QuestionCount),
+		Kind:                 result.Kind,
+		SubKind:              result.SubKind,
+		ProductChannel:       result.ProductChannel,
+		AlgorithmFamily:      result.AlgorithmFamily,
+		PayloadFormat:        result.PayloadFormat,
+		DecisionKind:         result.DecisionKind,
 	}
 }
 

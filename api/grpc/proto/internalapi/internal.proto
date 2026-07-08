@@ -336,6 +336,8 @@ message EvaluateAssessmentResponse {
   bool retryable = 7;                // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
   string run_id = 8;                 // 失败时关联的 evaluation_run id
   string failure_kind = 9;           // 失败分类：validation/calculation/timeout/internal
+  string trace_id = 10;              // 关联 evaluation_run trace_id
+  string input_snapshot_ref = 11;    // 关联 evaluation_run input_snapshot_ref
 }
 
 message OutcomeSummary {
@@ -351,6 +353,8 @@ message ModelIdentity {
   string code = 4;
   string version = 5;
   string title = 6;
+  string product_channel = 7;
+  string algorithm_family = 8;
 }
 
 message ScoreValue {

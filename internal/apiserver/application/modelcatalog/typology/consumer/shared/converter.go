@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -35,6 +37,7 @@ func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Paylo
 	if result.Status == "" {
 		result.Status = "published"
 	}
+	applyLegacySnapshotRouting(&result, snapshot, payload)
 	return result
 }
 
@@ -60,6 +63,7 @@ func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (Typolog
 		QuestionnaireVersion: snapshot.Binding.QuestionnaireVersion,
 	}
 	applyPayloadSummary(&result, payload)
+	applyPublishedModelRouting(&result, snapshot)
 	return result, nil
 }
 
@@ -222,4 +226,40 @@ func countPayloadQuestions(payload *modeltypology.Payload) int {
 		}
 	}
 	return len(seen)
+}
+
+func applyPublishedModelRouting(result *TypologyModelSummaryResult, snapshot *domain.PublishedModelSnapshot) {
+	if result == nil || snapshot == nil {
+		return
+	}
+	result.Kind = string(snapshot.Model.Kind)
+	result.SubKind = string(snapshot.Model.SubKind)
+	result.ProductChannel = publishing.ProductChannelForIdentity(snapshot.Model.Kind, string(snapshot.Model.ProductChannel))
+	result.PayloadFormat = snapshot.PayloadFormat
+	result.DecisionKind = string(snapshot.Decision.Kind)
+	result.AlgorithmFamily = publishing.AlgorithmFamilyStringFromIdentity(
+		snapshot.Model.Kind,
+		snapshot.Model.SubKind,
+		snapshot.Model.Algorithm,
+	)
+}
+
+func applyLegacySnapshotRouting(result *TypologyModelSummaryResult, snapshot *domain.Snapshot, payload *modeltypology.Payload) {
+	if result == nil || snapshot == nil {
+		return
+	}
+	kind := snapshot.Definition.Kind
+	subKind := binding.SubKindTypology
+	algorithm := binding.Algorithm("")
+	if payload != nil {
+		algorithm = payload.Algorithm
+	}
+	result.Kind = string(kind)
+	if kind == binding.KindPersonality {
+		result.SubKind = string(subKind)
+	}
+	result.ProductChannel = publishing.ProductChannelForIdentity(kind, "")
+	result.PayloadFormat = snapshot.PayloadFormat
+	result.DecisionKind = string(snapshot.DecisionKind)
+	result.AlgorithmFamily = publishing.AlgorithmFamilyStringFromIdentity(kind, subKind, algorithm)
 }

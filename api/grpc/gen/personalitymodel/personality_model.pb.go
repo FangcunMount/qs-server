@@ -32,6 +32,12 @@ type PersonalityModelSummary struct {
 	QuestionnaireVersion string                 `protobuf:"bytes,7,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Status               string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
 	QuestionCount        int32                  `protobuf:"varint,9,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"`
+	Kind                 string                 `protobuf:"bytes,10,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubKind              string                 `protobuf:"bytes,11,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
+	ProductChannel       string                 `protobuf:"bytes,12,opt,name=product_channel,json=productChannel,proto3" json:"product_channel,omitempty"`
+	AlgorithmFamily      string                 `protobuf:"bytes,13,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
+	PayloadFormat        string                 `protobuf:"bytes,14,opt,name=payload_format,json=payloadFormat,proto3" json:"payload_format,omitempty"`
+	DecisionKind         string                 `protobuf:"bytes,15,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -127,6 +133,48 @@ func (x *PersonalityModelSummary) GetQuestionCount() int32 {
 		return x.QuestionCount
 	}
 	return 0
+}
+
+func (x *PersonalityModelSummary) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PersonalityModelSummary) GetSubKind() string {
+	if x != nil {
+		return x.SubKind
+	}
+	return ""
+}
+
+func (x *PersonalityModelSummary) GetProductChannel() string {
+	if x != nil {
+		return x.ProductChannel
+	}
+	return ""
+}
+
+func (x *PersonalityModelSummary) GetAlgorithmFamily() string {
+	if x != nil {
+		return x.AlgorithmFamily
+	}
+	return ""
+}
+
+func (x *PersonalityModelSummary) GetPayloadFormat() string {
+	if x != nil {
+		return x.PayloadFormat
+	}
+	return ""
+}
+
+func (x *PersonalityModelSummary) GetDecisionKind() string {
+	if x != nil {
+		return x.DecisionKind
+	}
+	return ""
 }
 
 type PersonalityDimension struct {
@@ -693,7 +741,7 @@ var File_personalitymodel_personality_model_proto protoreflect.FileDescriptor
 
 const file_personalitymodel_personality_model_proto_rawDesc = "" +
 	"\n" +
-	"(personalitymodel/personality_model.proto\x12\x10personalitymodel\"\xc0\x02\n" +
+	"(personalitymodel/personality_model.proto\x12\x10personalitymodel\"\x8f\x04\n" +
 	"\x17PersonalityModelSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x14\n" +
@@ -703,7 +751,14 @@ const file_personalitymodel_personality_model_proto_rawDesc = "" +
 	"\x12questionnaire_code\x18\x06 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\a \x01(\tR\x14questionnaireVersion\x12\x16\n" +
 	"\x06status\x18\b \x01(\tR\x06status\x12%\n" +
-	"\x0equestion_count\x18\t \x01(\x05R\rquestionCount\"z\n" +
+	"\x0equestion_count\x18\t \x01(\x05R\rquestionCount\x12\x12\n" +
+	"\x04kind\x18\n" +
+	" \x01(\tR\x04kind\x12\x19\n" +
+	"\bsub_kind\x18\v \x01(\tR\asubKind\x12'\n" +
+	"\x0fproduct_channel\x18\f \x01(\tR\x0eproductChannel\x12)\n" +
+	"\x10algorithm_family\x18\r \x01(\tR\x0falgorithmFamily\x12%\n" +
+	"\x0epayload_format\x18\x0e \x01(\tR\rpayloadFormat\x12#\n" +
+	"\rdecision_kind\x18\x0f \x01(\tR\fdecisionKind\"z\n" +
 	"\x14PersonalityDimension\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +

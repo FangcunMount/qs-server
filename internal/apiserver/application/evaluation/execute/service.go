@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
@@ -187,6 +188,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err != nil {
 		return err
 	}
+	evaluationRun.TraceID = log.ExtractTraceID(ctx)
 	evaluationRun.Start(time.Now())
 	a.SetCurrentRunID(evaluationRun.RunID)
 	if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
@@ -206,6 +208,13 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			return persistErr
 		}
 		return err
+	}
+
+	if ref := inputSnapshotRefFromResolvedInput(a, input); ref != "" {
+		evaluationRun.AttachInputSnapshot(ref)
+		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
+			return err
+		}
 	}
 
 	// 解析并执行评估模型

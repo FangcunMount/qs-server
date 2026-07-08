@@ -8,12 +8,14 @@ import (
 
 // ModelIdentityResponse is the outcome published-model reference on REST responses.
 type ModelIdentityResponse struct {
-	Kind      string `json:"kind"`
-	SubKind   string `json:"sub_kind,omitempty"`
-	Algorithm string `json:"algorithm,omitempty"`
-	Code      string `json:"code"`
-	Version   string `json:"version,omitempty"`
-	Title     string `json:"title,omitempty"`
+	Kind            string `json:"kind"`
+	SubKind         string `json:"sub_kind,omitempty"`
+	Algorithm       string `json:"algorithm,omitempty"`
+	Code            string `json:"code"`
+	Version         string `json:"version,omitempty"`
+	Title           string `json:"title,omitempty"`
+	ProductChannel  string `json:"product_channel,omitempty"`
+	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 }
 
 // ScoreValueResponse is the outcome primary score projection.
@@ -203,12 +205,14 @@ func NewReportOutcomeListResponse(result *assessment.ReportOutcomeListResult) *R
 
 func newModelIdentityResponse(model assessment.ModelIdentityResult) ModelIdentityResponse {
 	return ModelIdentityResponse{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
+		Kind:            model.Kind,
+		SubKind:         model.SubKind,
+		Algorithm:       model.Algorithm,
+		Code:            model.Code,
+		Version:         model.Version,
+		Title:           model.Title,
+		ProductChannel:  model.ProductChannel,
+		AlgorithmFamily: model.AlgorithmFamily,
 	}
 }
 

@@ -169,12 +169,14 @@ func fromProtoSuggestions(protoSuggestions []*pb.Suggestion) []SuggestionOutput 
 }
 
 type ModelIdentityOutput struct {
-	Kind      string
-	SubKind   string
-	Algorithm string
-	Code      string
-	Version   string
-	Title     string
+	Kind            string
+	SubKind         string
+	Algorithm       string
+	Code            string
+	Version         string
+	Title           string
+	ProductChannel  string
+	AlgorithmFamily string
 }
 
 type ScoreValueOutput struct {
@@ -423,12 +425,14 @@ func convertModelIdentity(model *pb.ModelIdentity) ModelIdentityOutput {
 		return ModelIdentityOutput{}
 	}
 	return ModelIdentityOutput{
-		Kind:      model.GetKind(),
-		SubKind:   model.GetSubKind(),
-		Algorithm: model.GetAlgorithm(),
-		Code:      model.GetCode(),
-		Version:   model.GetVersion(),
-		Title:     model.GetTitle(),
+		Kind:            model.GetKind(),
+		SubKind:         model.GetSubKind(),
+		Algorithm:       model.GetAlgorithm(),
+		Code:            model.GetCode(),
+		Version:         model.GetVersion(),
+		Title:           model.GetTitle(),
+		ProductChannel:  model.GetProductChannel(),
+		AlgorithmFamily: model.GetAlgorithmFamily(),
 	}
 }
 

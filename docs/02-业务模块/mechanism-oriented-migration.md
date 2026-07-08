@@ -545,3 +545,10 @@ type Algorithm = identity.Algorithm
 
 过渡态说明（R92 后 domain/application/container 内部均已机制化；对外 API 字符串与 gRPC `personalitymodel` 注册名保持不变）：
 
+## Round 106–107：运行审计与 API 身份补全（R107）
+
+| Round | 动作 |
+|-------|------|
+| R106 | modelcatalog 机制包结构收官（见 `docs/系统设计文档.md` §19） |
+| R107 | `EvaluationRun` 补齐 `trace_id` / `input_snapshot_ref`；evaluation 与 personality catalog 的 `ModelIdentity` additive 暴露 `product_channel` / `algorithm_family`；report routing 已支持 Algorithm/ProductChannel key 精确命中与 broad fallback 测试；Audience/ReportProfile 仍未入选择键 |
+

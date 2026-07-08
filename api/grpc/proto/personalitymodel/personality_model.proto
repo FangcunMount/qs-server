@@ -21,6 +21,12 @@ message PersonalityModelSummary {
   string questionnaire_version = 7;
   string status = 8;
   int32 question_count = 9;
+  string kind = 10;
+  string sub_kind = 11;
+  string product_channel = 12;
+  string algorithm_family = 13;
+  string payload_format = 14;
+  string decision_kind = 15;
 }
 
 message PersonalityDimension {

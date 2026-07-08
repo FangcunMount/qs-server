@@ -78,32 +78,34 @@ func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) Model
 		kind = string(modelcatalog.KindScale)
 		algorithm = string(modelcatalog.AlgorithmScaleDefault)
 	}
-	return ModelIdentityResult{
+	return EnrichModelIdentityResult(ModelIdentityResult{
 		Kind:      kind,
 		SubKind:   subKind,
 		Algorithm: algorithm,
 		Code:      firstNonEmpty(derefString(row.EvaluationModelCode), derefString(row.MedicalScaleCode)),
 		Version:   derefString(row.EvaluationModelVersion),
 		Title:     firstNonEmpty(derefString(row.EvaluationModelTitle), derefString(row.MedicalScaleName)),
-	}
+	}, "")
 }
 
 func modelIdentityFromReportRow(row evaluationreadmodel.ReportRow) ModelIdentityResult {
 	if row.Model.Kind != "" || row.Model.Code != "" {
-		return ModelIdentityResult{
-			Kind:      row.Model.Kind,
-			SubKind:   row.Model.SubKind,
-			Algorithm: row.Model.Algorithm,
-			Code:      row.Model.Code,
-			Version:   row.Model.Version,
-			Title:     row.Model.Title,
-		}
+		return EnrichModelIdentityResult(ModelIdentityResult{
+			Kind:            row.Model.Kind,
+			SubKind:         row.Model.SubKind,
+			Algorithm:       row.Model.Algorithm,
+			Code:            row.Model.Code,
+			Version:         row.Model.Version,
+			Title:           row.Model.Title,
+			ProductChannel:  row.Model.ProductChannel,
+			AlgorithmFamily: row.Model.AlgorithmFamily,
+		}, row.Model.ProductChannel)
 	}
-	return ModelIdentityResult{
+	return EnrichModelIdentityResult(ModelIdentityResult{
 		Kind:  string(modelcatalog.KindScale),
 		Code:  row.ModelCode,
 		Title: row.ModelName,
-	}
+	}, "")
 }
 
 func primaryScoreFromAssessmentRow(row evaluationreadmodel.AssessmentRow) *ScoreValueResult {

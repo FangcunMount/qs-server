@@ -13,13 +13,14 @@ func (id ID) String() string { return string(id) }
 
 // EvaluationRun 记录一个评估执行 尝试 用于 assessment。
 type EvaluationRun struct {
-	RunID        ID
-	AssessmentID uint64
-	Attempt      Attempt
-	Failure      *Failure
-	TraceID      string
-	StartedAt    time.Time
-	FinishedAt   *time.Time
+	RunID            ID
+	AssessmentID     uint64
+	Attempt          Attempt
+	Failure          *Failure
+	TraceID          string
+	InputSnapshotRef string
+	StartedAt        time.Time
+	FinishedAt       *time.Time
 }
 
 // NewEvaluationRun 创建首个 in-memory run 用于 测评执行。
@@ -42,6 +43,14 @@ func NewEvaluationRunWithAttempt(assessmentID uint64, attemptNo int) EvaluationR
 // NextEvaluationRun 创建下一个 尝试 在之后 失败 可重试 run。
 func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
 	return NewEvaluationRunWithAttempt(latest.AssessmentID, latest.Attempt.Number+1)
+}
+
+// AttachInputSnapshot records a stable audit reference to the resolved input snapshot.
+func (r *EvaluationRun) AttachInputSnapshot(ref string) {
+	if r == nil {
+		return
+	}
+	r.InputSnapshotRef = ref
 }
 
 // Start 标记run 作为 活跃ly executing。

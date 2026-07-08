@@ -157,12 +157,14 @@ func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
 	}
 	if po.Model != nil {
 		row.Model = evaluationreadmodel.ModelIdentityRow{
-			Kind:      po.Model.Kind,
-			SubKind:   po.Model.SubKind,
-			Algorithm: po.Model.Algorithm,
-			Code:      po.Model.Code,
-			Version:   po.Model.Version,
-			Title:     po.Model.Title,
+			Kind:            po.Model.Kind,
+			SubKind:         po.Model.SubKind,
+			Algorithm:       po.Model.Algorithm,
+			Code:            po.Model.Code,
+			Version:         po.Model.Version,
+			Title:           po.Model.Title,
+			ProductChannel:  po.Model.ProductChannel,
+			AlgorithmFamily: po.Model.AlgorithmFamily,
 		}
 	}
 	if po.PrimaryScore != nil {

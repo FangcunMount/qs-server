@@ -23,6 +23,12 @@ type PersonalityModelSummaryOutput struct {
 	QuestionnaireVersion string
 	Status               string
 	QuestionCount        int32
+	Kind                 string
+	SubKind              string
+	ProductChannel       string
+	AlgorithmFamily      string
+	PayloadFormat        string
+	DecisionKind         string
 }
 
 type PersonalityDimensionOutput struct {
@@ -165,5 +171,11 @@ func convertPersonalityModelSummary(summary *pb.PersonalityModelSummary) Persona
 		QuestionnaireVersion: summary.GetQuestionnaireVersion(),
 		Status:               summary.GetStatus(),
 		QuestionCount:        summary.GetQuestionCount(),
+		Kind:                 summary.GetKind(),
+		SubKind:              summary.GetSubKind(),
+		ProductChannel:       summary.GetProductChannel(),
+		AlgorithmFamily:      summary.GetAlgorithmFamily(),
+		PayloadFormat:        summary.GetPayloadFormat(),
+		DecisionKind:         summary.GetDecisionKind(),
 	}
 }
