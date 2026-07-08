@@ -55,12 +55,26 @@ func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIden
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
+	switch key.Kind {
+	case modelcatalog.KindBehavioralRating:
+		return MechanismReportBuilderKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+			DecisionKind:    modelcatalog.DecisionKindNormLookup,
+			ReportType:      reportType,
+		}, true
+	case modelcatalog.KindCognitive:
+		return MechanismReportBuilderKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
+			DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
+			ReportType:      reportType,
+		}, true
+	}
 	family, ok := modelcatalog.AlgorithmFamilyFromIdentity(key.Kind, key.SubKind, key.Algorithm)
 	if !ok {
 		return MechanismReportBuilderKey{}, false
 	}
-	decision, ok := modelcatalog.DecisionKindForIdentity(key.Kind, key.SubKind, key.Algorithm)
-	if !ok {
+	decision := defaultDecisionKindForFamily(family)
+	if decision == "" {
 		return MechanismReportBuilderKey{}, false
 	}
 	return MechanismReportBuilderKey{
@@ -97,30 +111,9 @@ func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.Execu
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
-	if mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, reportType); ok {
-		if builder, err := r.ResolveByMechanism(mechanismKey); err == nil {
-			return builder, nil
-		}
+	mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, reportType)
+	if !ok {
+		return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
 	}
-	return r.resolveByEvaluatorKey(key, reportType)
-}
-
-func (r *mutableReportBuilderRegistry) resolveByEvaluatorKey(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
-	registryKey := reportBuilderKey{key: key, reportType: reportType}
-	if builder, ok := r.items[registryKey]; ok {
-		return builder, nil
-	}
-	if routed := evaluation.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
-		registryKey.key = routed
-		if builder, ok := r.items[registryKey]; ok {
-			return builder, nil
-		}
-	}
-	if routed := evaluation.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
-		registryKey.key = routed
-		if builder, ok := r.items[registryKey]; ok {
-			return builder, nil
-		}
-	}
-	return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
+	return r.ResolveByMechanism(mechanismKey)
 }

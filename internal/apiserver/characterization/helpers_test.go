@@ -8,13 +8,11 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -71,14 +69,13 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	}
 	interpretationService := interpretationapp.NewService(interpretationWriter)
 
-	runtimeDescriptorRegistry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
-	if err != nil {
-		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
-	}
+	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
+	familyEvaluators := newV1FamilyEvaluators(t)
 
 	opts := []evaluationexecute.ServiceOption{
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
+		evaluationexecute.WithFamilyEvaluators(familyEvaluators),
 		evaluationexecute.WithScoringWriter(scoringWriter),
 		evaluationexecute.WithInterpretationService(interpretationService),
 	}
@@ -174,7 +171,8 @@ func newV1RecordingExecuteService(
 		&charAssessmentRepo{assessment: a},
 		input,
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
-		evaluationexecute.WithRuntimeDescriptorRegistry(mustV1RuntimeDescriptorRegistry(t)),
+		evaluationexecute.WithRuntimeDescriptorRegistry(wireV1RuntimeDescriptorRegistry(t)),
+		evaluationexecute.WithFamilyEvaluators(newV1FamilyEvaluators(t)),
 		evaluationexecute.WithScoringWriter(charRecordingScoring{}),
 		evaluationexecute.WithInterpretationService(&charRecordingInterpretation{cap: capture}),
 	)
@@ -216,16 +214,6 @@ type charEventStagerFunc func(ctx context.Context, events ...event.DomainEvent) 
 func (f charEventStagerFunc) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return f(ctx, events...)
 }
-
-func mustV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescriptorRegistry {
-	t.Helper()
-	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
-	if err != nil {
-		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
-	}
-	return registry
-}
-
 func mustConfiguredReportBuilder(t *testing.T) typologyeval.ReportBuilder {
 	t.Helper()
 	builder, err := typologyeval.NewConfiguredReportBuilder()

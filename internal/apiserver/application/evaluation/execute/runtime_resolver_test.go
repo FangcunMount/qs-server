@@ -34,9 +34,12 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:             evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
-		ExecutionPath:   modelcatalog.ExecutionPathScaleDescriptor,
+		Key:              evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
+		InputAssembler:   runtimeStubInputAssembler{},
+		Calculator:       runtimeStubCalculator{},
+		OutcomeAssembler: runtimeStubOutcomeAssembler{},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -118,4 +121,22 @@ func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(
 	if err == nil {
 		t.Fatal("Execute error = nil, want descriptor resolve error when registry is configured")
 	}
+}
+
+type runtimeStubInputAssembler struct{}
+
+func (runtimeStubInputAssembler) Assemble(snapshot modelcatalog.PublishedModelSnapshot) (evalpipeline.CalculationInput, error) {
+	return evalpipeline.CalculationInput{Snapshot: snapshot}, nil
+}
+
+type runtimeStubCalculator struct{}
+
+func (runtimeStubCalculator) Calculate(context.Context, evalpipeline.CalculationInput) (any, error) {
+	return struct{}{}, nil
+}
+
+type runtimeStubOutcomeAssembler struct{}
+
+func (runtimeStubOutcomeAssembler) Assemble(any) (any, error) {
+	return assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{}), nil
 }

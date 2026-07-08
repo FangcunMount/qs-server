@@ -63,22 +63,9 @@ func (r *mutableScoreProjectorRegistry) Resolve(key evaluation.ExecutionIdentity
 	if r == nil {
 		return noopScoreProjector{}
 	}
-	if projector, ok := r.items[key]; ok {
-		return projector
-	}
 	if mechanismKey, ok := registry.MechanismReportBuilderKeyFromExecutionIdentity(key, domainReport.ReportTypeStandard); ok {
 		projector := r.ResolveByMechanism(mechanismKey)
 		if _, ok := projector.(noopScoreProjector); !ok {
-			return projector
-		}
-	}
-	if routed := evaluation.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
-		if projector, ok := r.items[routed]; ok {
-			return projector
-		}
-	}
-	if routed := evaluation.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
-		if projector, ok := r.items[routed]; ok {
 			return projector
 		}
 	}

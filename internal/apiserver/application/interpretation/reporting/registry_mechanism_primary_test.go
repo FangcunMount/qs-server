@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -61,6 +61,11 @@ func TestResolveLegacyTypologyStillWorksAfterMechanismPrimary(t *testing.T) {
 
 	registry, err := NewReportBuilderRegistry(registryReportBuilderStub{
 		key: evaluation.ExecutionIdentityPersonalityTypology,
+		mechanism: MechanismReportBuilderKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+			ReportType:      domainReport.ReportTypeStandard,
+		},
 	})
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)

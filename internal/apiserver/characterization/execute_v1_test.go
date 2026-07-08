@@ -9,7 +9,10 @@ import (
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance"
 	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
@@ -27,6 +30,30 @@ func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
+	return registry
+}
+
+func newV1FamilyEvaluators(t *testing.T) map[modelcatalog.AlgorithmFamily]evaluationexecute.Evaluator {
+	t.Helper()
+	configured, err := factorclassification.NewConfiguredTypologyExecutor()
+	if err != nil {
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
+	}
+	return map[modelcatalog.AlgorithmFamily]evaluationexecute.Evaluator{
+		modelcatalog.AlgorithmFamilyFactorScoring:        factorscoring.NewExecutor(nil),
+		modelcatalog.AlgorithmFamilyFactorClassification: configured,
+		modelcatalog.AlgorithmFamilyFactorNorm:           factornorm.NewExecutor(nil),
+		modelcatalog.AlgorithmFamilyTaskPerformance:      taskperformance.NewExecutor(nil),
+	}
+}
+
+func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescriptorRegistry {
+	t.Helper()
+	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
+	if err != nil {
+		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
+	}
+	evalruntime.AttachEvaluatorPipelines(registry, newV1FamilyEvaluators(t))
 	return registry
 }
 

@@ -108,11 +108,7 @@ func (r *RuntimeResolver) resolveDescriptorExecutor(resolved ResolvedExecution) 
 		}
 		return nil, fmt.Errorf("unsupported evaluation algorithm family: %s", resolved.Descriptor.AlgorithmFamily)
 	}
-	evaluator, err := r.resolveEvaluator(resolved.ExecutionIdentity)
-	if err != nil {
-		return nil, err
-	}
-	return descriptorDrivenExecutor{fallback: evaluator}, nil
+	return nil, fmt.Errorf("unsupported evaluation algorithm family: %s", resolved.Descriptor.AlgorithmFamily)
 }
 
 func (r *RuntimeResolver) resolveEvaluator(key evaluation.ExecutionIdentity) (Evaluator, error) {
