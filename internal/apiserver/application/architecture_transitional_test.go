@@ -53,6 +53,39 @@ func TestMechanismTypologyDoesNotAddAssessmentCodeReportFiles(t *testing.T) {
 	}
 }
 
+func TestModelCatalogApplicationDoesNotReintroduceModelFamilyServiceFiles(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	modelCatalogRoot := filepath.Join(root, "internal/apiserver/application/modelcatalog")
+	forbiddenBasenames := []string{
+		"service_personality",
+		"service_cognitive",
+		"service_behavioral_rating",
+		"personality_bridge",
+		"personality_gateway",
+	}
+	err := filepath.WalkDir(modelCatalogRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		base := strings.TrimSuffix(filepath.Base(path), ".go")
+		for _, forbidden := range forbiddenBasenames {
+			if base == forbidden {
+				t.Fatalf("%s reintroduces forbidden model-family service file %q; use mechanism-oriented names",
+					filepath.ToSlash(mustRel(t, root, path)), forbidden+".go")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationApplicationDoesNotAddModelFamilyTopLevelDirs(t *testing.T) {
 	t.Parallel()
 

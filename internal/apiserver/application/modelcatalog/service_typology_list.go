@@ -8,19 +8,19 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )
 
-func (s *service) listPersonality(ctx context.Context, dto ListModelsDTO) ([]ModelSummary, int64, error) {
+func (s *service) listTypology(ctx context.Context, dto ListModelsDTO) ([]ModelSummary, int64, error) {
 	seen := make(map[string]struct{})
 	var items []ModelSummary
 	var total int64
 
-	if s.personality.cmd != nil && dto.Status != StatusPublished {
-		result, err := s.personality.cmd.List(ctx, personalityListInput(dto))
+	if s.typologyKind.cmd != nil && dto.Status != StatusPublished {
+		result, err := s.typologyKind.cmd.List(ctx, typologyListInput(dto))
 		if err != nil {
 			return nil, 0, err
 		}
 		if result != nil {
 			total += result.Total
-			for _, item := range summariesFromPersonalityList(result) {
+			for _, item := range summariesFromTypologyList(result) {
 				items = append(items, item)
 				seen[item.Code] = struct{}{}
 			}
@@ -57,7 +57,7 @@ func (s *service) listPersonality(ctx context.Context, dto ListModelsDTO) ([]Mod
 	return items, total, nil
 }
 
-func (s *service) getPersonalityQRCode(ctx context.Context, modelCode string) (string, error) {
+func (s *service) getTypologyQRCode(ctx context.Context, modelCode string) (string, error) {
 	if s.deps.RawQRCodeGenerator == nil {
 		return fmt.Sprintf("/personality/assessment/%s", modelCode), nil
 	}

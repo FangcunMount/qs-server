@@ -47,18 +47,18 @@ type Dependencies struct {
 }
 
 type service struct {
-	deps             Dependencies
-	behavioralRating behavioralRatingGateway
-	personality      personalityGateway
-	cognitive        cognitiveGateway
+	deps                Dependencies
+	normingKind         normingKindGateway
+	typologyKind        typologyKindGateway
+	taskPerformanceKind taskPerformanceKindGateway
 }
 
 func NewService(deps Dependencies) Service {
 	return &service{
-		deps:             deps,
-		behavioralRating: behavioralRatingGateway{cmd: deps.BehavioralRatingCommand},
-		personality:      personalityGateway{cmd: deps.PersonalityCommand},
-		cognitive:        cognitiveGateway{cmd: deps.CognitiveCommand},
+		deps:                deps,
+		normingKind:         normingKindGateway{cmd: deps.BehavioralRatingCommand},
+		typologyKind:        typologyKindGateway{cmd: deps.PersonalityCommand},
+		taskPerformanceKind: taskPerformanceKindGateway{cmd: deps.CognitiveCommand},
 	}
 }
 
@@ -80,7 +80,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
 	if shouldListModelKind(dto.Kind, KindPersonality) {
-		items, total, err := s.listPersonality(ctx, dto)
+		items, total, err := s.listTypology(ctx, dto)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	}
 	switch dto.Kind {
 	case KindPersonality:
-		return s.personality.create(ctx, dto)
+		return s.typologyKind.create(ctx, dto)
 	case KindCognitive:
 		return s.createCognitive(ctx, dto)
 	case KindBehavioralRating:
@@ -132,18 +132,18 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 	if modelCode == "" {
 		return nil, invalidArgument("模型编码不能为空")
 	}
-	if s.personality.cmd != nil {
-		if result, err := s.personality.cmd.Get(ctx, modelCode); err == nil && result != nil {
-			return summaryFromPersonality(result), nil
+	if s.typologyKind.cmd != nil {
+		if result, err := s.typologyKind.cmd.Get(ctx, modelCode); err == nil && result != nil {
+			return summaryFromTypology(result), nil
 		}
 	}
-	if s.cognitive.cmd != nil {
-		if result, err := s.cognitive.cmd.Get(ctx, modelCode); err == nil && result != nil {
+	if s.taskPerformanceKind.cmd != nil {
+		if result, err := s.taskPerformanceKind.cmd.Get(ctx, modelCode); err == nil && result != nil {
 			return cognitiveSummaryFromResult(result), nil
 		}
 	}
-	if s.behavioralRating.cmd != nil {
-		if result, err := s.behavioralRating.cmd.Get(ctx, modelCode); err == nil && result != nil {
+	if s.normingKind.cmd != nil {
+		if result, err := s.normingKind.cmd.Get(ctx, modelCode); err == nil && result != nil {
 			return behavioralRatingSummaryFromResult(result), nil
 		}
 	}
@@ -162,11 +162,11 @@ func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.updateBasicInfo(ctx, dto)
+		return s.typologyKind.updateBasicInfo(ctx, dto)
 	case KindCognitive:
-		return s.cognitive.updateBasicInfo(ctx, dto)
+		return s.taskPerformanceKind.updateBasicInfo(ctx, dto)
 	case KindBehavioralRating:
-		return s.behavioralRating.updateBasicInfo(ctx, dto)
+		return s.normingKind.updateBasicInfo(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -179,11 +179,11 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.delete(ctx, modelCode)
+		return s.typologyKind.delete(ctx, modelCode)
 	case KindCognitive:
-		return s.cognitive.delete(ctx, modelCode)
+		return s.taskPerformanceKind.delete(ctx, modelCode)
 	case KindBehavioralRating:
-		return s.behavioralRating.delete(ctx, modelCode)
+		return s.normingKind.delete(ctx, modelCode)
 	default:
 		return invalidArgument("模型类型无效")
 	}
@@ -196,11 +196,11 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.publish(ctx, modelCode)
+		return s.typologyKind.publish(ctx, modelCode)
 	case KindCognitive:
-		return s.cognitive.publish(ctx, modelCode)
+		return s.taskPerformanceKind.publish(ctx, modelCode)
 	case KindBehavioralRating:
-		return s.behavioralRating.publish(ctx, modelCode)
+		return s.normingKind.publish(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -213,11 +213,11 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.unpublish(ctx, modelCode)
+		return s.typologyKind.unpublish(ctx, modelCode)
 	case KindCognitive:
-		return s.cognitive.unpublish(ctx, modelCode)
+		return s.taskPerformanceKind.unpublish(ctx, modelCode)
 	case KindBehavioralRating:
-		return s.behavioralRating.unpublish(ctx, modelCode)
+		return s.normingKind.unpublish(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -230,11 +230,11 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.archive(ctx, modelCode)
+		return s.typologyKind.archive(ctx, modelCode)
 	case KindCognitive:
-		return s.cognitive.archive(ctx, modelCode)
+		return s.taskPerformanceKind.archive(ctx, modelCode)
 	case KindBehavioralRating:
-		return s.behavioralRating.archive(ctx, modelCode)
+		return s.normingKind.archive(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -247,11 +247,11 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.bindQuestionnaire(ctx, dto)
+		return s.typologyKind.bindQuestionnaire(ctx, dto)
 	case KindCognitive:
-		return s.cognitive.bindQuestionnaire(ctx, dto)
+		return s.taskPerformanceKind.bindQuestionnaire(ctx, dto)
 	case KindBehavioralRating:
-		return s.behavioralRating.bindQuestionnaire(ctx, dto)
+		return s.normingKind.bindQuestionnaire(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -264,9 +264,9 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.getQuestionnaire(ctx, modelCode)
+		return s.typologyKind.getQuestionnaire(ctx, modelCode)
 	case KindBehavioralRating:
-		cmd, err := s.behavioralRating.require()
+		cmd, err := s.normingKind.require()
 		if err != nil {
 			return nil, err
 		}
@@ -276,7 +276,7 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 		}
 		return s.questionnaireBinding(ctx, model.QuestionnaireCode, model.QuestionnaireVersion)
 	case KindCognitive:
-		cmd, err := s.cognitive.require()
+		cmd, err := s.taskPerformanceKind.require()
 		if err != nil {
 			return nil, err
 		}
@@ -292,13 +292,13 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 
 func (s *service) GetDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.getDefinition(ctx, modelCode)
+		return s.typologyKind.getDefinition(ctx, modelCode)
 	}
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindCognitive {
-		return s.cognitive.getDefinition(ctx, modelCode)
+		return s.taskPerformanceKind.getDefinition(ctx, modelCode)
 	}
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindBehavioralRating {
-		return s.behavioralRating.getDefinition(ctx, modelCode)
+		return s.normingKind.getDefinition(ctx, modelCode)
 	}
 	if s.deps.PersonalityQuery != nil {
 		personality, err := s.deps.PersonalityQuery.GetPublishedByCode(ctx, modelCode)
@@ -326,11 +326,11 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 	}
 	switch kind {
 	case KindPersonality:
-		return s.personality.updateDefinition(ctx, modelCode, dto)
+		return s.typologyKind.updateDefinition(ctx, modelCode, dto)
 	case KindCognitive:
-		return s.cognitive.updateDefinition(ctx, modelCode, dto)
+		return s.taskPerformanceKind.updateDefinition(ctx, modelCode, dto)
 	case KindBehavioralRating:
-		return s.behavioralRating.updateDefinition(ctx, modelCode, dto)
+		return s.normingKind.updateDefinition(ctx, modelCode, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -382,7 +382,7 @@ func (s *service) ApplyCodes(ctx context.Context, dto ApplyCodesDTO) ([]string, 
 
 func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationResult, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.validate(ctx, modelCode)
+		return s.typologyKind.validate(ctx, modelCode)
 	}
 	def, err := s.GetDefinition(ctx, modelCode)
 	if err != nil {
@@ -411,7 +411,7 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	if kind != KindPersonality {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
 	}
-	return s.personality.previewReport(ctx, modelCode, payload)
+	return s.typologyKind.previewReport(ctx, modelCode, payload)
 }
 
 func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, error) {
@@ -425,7 +425,7 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	if kind != KindPersonality {
 		return "", invalidArgument("模型类型不支持二维码")
 	}
-	return s.getPersonalityQRCode(ctx, modelCode)
+	return s.getTypologyQRCode(ctx, modelCode)
 }
 
 func behaviorAbilityProductChannelModelFamilyOptions() []Option {

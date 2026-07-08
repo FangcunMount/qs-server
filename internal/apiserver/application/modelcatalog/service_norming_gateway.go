@@ -3,27 +3,27 @@ package modelcatalog
 import (
 	"context"
 
-	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	appBehavioralRating "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-type cognitiveGateway struct {
-	cmd appCognitive.Service
+type normingKindGateway struct {
+	cmd appBehavioralRating.Service
 }
 
-func (g cognitiveGateway) require() (appCognitive.Service, error) {
+func (g normingKindGateway) require() (appBehavioralRating.Service, error) {
 	if g.cmd == nil {
-		return nil, invalidArgument("认知模型服务未配置")
+		return nil, invalidArgument("行为评定模型服务未配置")
 	}
 	return g.cmd, nil
 }
 
-func (s *service) createCognitive(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
-	cmd, err := s.cognitive.require()
+func (s *service) createBehavioralRating(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
+	cmd, err := s.normingKind.require()
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.Create(ctx, appCognitive.CreateInput{
+	result, err := cmd.Create(ctx, appBehavioralRating.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
@@ -36,15 +36,15 @@ func (s *service) createCognitive(ctx context.Context, dto CreateModelDTO) (*Mod
 	if err != nil {
 		return nil, err
 	}
-	return cognitiveSummaryFromResult(result), nil
+	return behavioralRatingSummaryFromResult(result), nil
 }
 
-func (g cognitiveGateway) updateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
+func (g normingKindGateway) updateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateBasicInfo(ctx, appCognitive.UpdateBasicInfoInput{
+	result, err := cmd.UpdateBasicInfo(ctx, appBehavioralRating.UpdateBasicInfoInput{
 		Code:           dto.Code,
 		Title:          dto.Title,
 		Description:    dto.Description,
@@ -55,10 +55,10 @@ func (g cognitiveGateway) updateBasicInfo(ctx context.Context, dto UpdateBasicIn
 	if err != nil {
 		return nil, err
 	}
-	return cognitiveSummaryFromResult(result), nil
+	return behavioralRatingSummaryFromResult(result), nil
 }
 
-func (g cognitiveGateway) delete(ctx context.Context, modelCode string) error {
+func (g normingKindGateway) delete(ctx context.Context, modelCode string) error {
 	cmd, err := g.require()
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (g cognitiveGateway) delete(ctx context.Context, modelCode string) error {
 	return cmd.Delete(ctx, modelCode)
 }
 
-func (g cognitiveGateway) publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
+func (g normingKindGateway) publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
@@ -75,10 +75,10 @@ func (g cognitiveGateway) publish(ctx context.Context, modelCode string) (*Model
 	if err != nil {
 		return nil, err
 	}
-	return cognitiveSummaryFromResult(result), nil
+	return behavioralRatingSummaryFromResult(result), nil
 }
 
-func (g cognitiveGateway) unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
+func (g normingKindGateway) unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
@@ -87,10 +87,10 @@ func (g cognitiveGateway) unpublish(ctx context.Context, modelCode string) (*Mod
 	if err != nil {
 		return nil, err
 	}
-	return cognitiveSummaryFromResult(result), nil
+	return behavioralRatingSummaryFromResult(result), nil
 }
 
-func (g cognitiveGateway) archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
+func (g normingKindGateway) archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
@@ -99,15 +99,15 @@ func (g cognitiveGateway) archive(ctx context.Context, modelCode string) (*Model
 	if err != nil {
 		return nil, err
 	}
-	return cognitiveSummaryFromResult(result), nil
+	return behavioralRatingSummaryFromResult(result), nil
 }
 
-func (g cognitiveGateway) bindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
+func (g normingKindGateway) bindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.BindQuestionnaire(ctx, appCognitive.BindQuestionnaireInput{
+	result, err := cmd.BindQuestionnaire(ctx, appBehavioralRating.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
 		QuestionnaireVersion: dto.QuestionnaireVersion,
@@ -121,7 +121,7 @@ func (g cognitiveGateway) bindQuestionnaire(ctx context.Context, dto BindQuestio
 	}, nil
 }
 
-func (g cognitiveGateway) getDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
+func (g normingKindGateway) getDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
@@ -137,16 +137,16 @@ func (g cognitiveGateway) getDefinition(ctx context.Context, modelCode string) (
 		PayloadFormat:  result.PayloadFormat,
 		Payload:        result.Payload,
 	}
-	populateDefinitionIdentity(dto, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	populateDefinitionIdentity(dto, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
 	return dto, nil
 }
 
-func (g cognitiveGateway) updateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
+func (g normingKindGateway) updateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
 	cmd, err := g.require()
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateDefinition(ctx, modelCode, appCognitive.DefinitionInput{Payload: dto.Payload})
+	result, err := cmd.UpdateDefinition(ctx, modelCode, appBehavioralRating.DefinitionInput{Payload: dto.Payload})
 	if err != nil {
 		return nil, err
 	}
@@ -157,11 +157,11 @@ func (g cognitiveGateway) updateDefinition(ctx context.Context, modelCode string
 		PayloadFormat:  result.PayloadFormat,
 		Payload:        result.Payload,
 	}
-	populateDefinitionIdentity(out, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	populateDefinitionIdentity(out, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
 	return out, nil
 }
 
-func cognitiveSummaryFromResult(result *appCognitive.ModelSummary) *ModelSummary {
+func behavioralRatingSummaryFromResult(result *appBehavioralRating.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -180,16 +180,16 @@ func cognitiveSummaryFromResult(result *appCognitive.ModelSummary) *ModelSummary
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
-	populateModelSummaryIdentity(summary, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	populateModelSummaryIdentity(summary, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
 	return summary
 }
 
-func (s *service) listCognitive(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
-	cmd, err := s.cognitive.require()
+func (s *service) listBehavioralRating(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
+	cmd, err := s.normingKind.require()
 	if err != nil {
 		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
 	}
-	result, err := cmd.List(ctx, appCognitive.ListInput{
+	result, err := cmd.List(ctx, appBehavioralRating.ListInput{
 		Status:   dto.Status,
 		Keyword:  dto.Keyword,
 		Page:     dto.Page,
@@ -200,7 +200,7 @@ func (s *service) listCognitive(ctx context.Context, dto ListModelsDTO) (*ModelL
 	}
 	out := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize, Total: result.Total}
 	for _, item := range result.Items {
-		out.Items = append(out.Items, *cognitiveSummaryFromResult(&item))
+		out.Items = append(out.Items, *behavioralRatingSummaryFromResult(&item))
 	}
 	return out, nil
 }

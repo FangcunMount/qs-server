@@ -5,7 +5,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func personalityListInput(dto ListModelsDTO) personality.ListInput {
+func typologyListInput(dto ListModelsDTO) personality.ListInput {
 	return personality.ListInput{
 		Kind:      dto.Kind,
 		SubKind:   dto.SubKind,
@@ -18,7 +18,7 @@ func personalityListInput(dto ListModelsDTO) personality.ListInput {
 	}
 }
 
-func personalityCreateInput(dto CreateModelDTO) personality.CreateInput {
+func typologyCreateInput(dto CreateModelDTO) personality.CreateInput {
 	return personality.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
@@ -33,7 +33,7 @@ func personalityCreateInput(dto CreateModelDTO) personality.CreateInput {
 	}
 }
 
-func personalityUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateBasicInfoInput {
+func typologyUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateBasicInfoInput {
 	return personality.UpdateBasicInfoInput{
 		Code:           dto.Code,
 		Title:          dto.Title,
@@ -46,7 +46,7 @@ func personalityUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateB
 	}
 }
 
-func personalityBindInput(dto BindQuestionnaireDTO) personality.BindQuestionnaireInput {
+func typologyBindInput(dto BindQuestionnaireDTO) personality.BindQuestionnaireInput {
 	return personality.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
@@ -54,7 +54,7 @@ func personalityBindInput(dto BindQuestionnaireDTO) personality.BindQuestionnair
 	}
 }
 
-func personalityDefinitionInput(dto DefinitionDTO) personality.DefinitionInput {
+func typologyDefinitionInput(dto DefinitionDTO) personality.DefinitionInput {
 	return personality.DefinitionInput{
 		SubKind:       dto.SubKind,
 		Algorithm:     dto.Algorithm,
@@ -63,7 +63,7 @@ func personalityDefinitionInput(dto DefinitionDTO) personality.DefinitionInput {
 	}
 }
 
-func summaryFromPersonality(result *personality.ModelSummary) *ModelSummary {
+func summaryFromTypology(result *personality.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -87,7 +87,7 @@ func summaryFromPersonality(result *personality.ModelSummary) *ModelSummary {
 	return summary
 }
 
-func definitionFromPersonality(result *personality.DefinitionResult) *DefinitionDTO {
+func definitionFromTypology(result *personality.DefinitionResult) *DefinitionDTO {
 	if result == nil {
 		return nil
 	}
@@ -103,7 +103,7 @@ func definitionFromPersonality(result *personality.DefinitionResult) *Definition
 	return dto
 }
 
-func validationFailedFromPersonalityIssues(issues []personality.ValidationIssue) error {
+func validationFailedFromTypologyIssues(issues []personality.ValidationIssue) error {
 	mapped := make([]ValidationIssue, 0, len(issues))
 	for _, issue := range issues {
 		mapped = append(mapped, ValidationIssue{
@@ -116,7 +116,7 @@ func validationFailedFromPersonalityIssues(issues []personality.ValidationIssue)
 	return NewValidationFailedError(mapped)
 }
 
-func validationFromPersonality(result *personality.ValidationResult) *ValidationResult {
+func validationFromTypology(result *personality.ValidationResult) *ValidationResult {
 	if result == nil {
 		return NewValidationResult(nil)
 	}
@@ -132,7 +132,7 @@ func validationFromPersonality(result *personality.ValidationResult) *Validation
 	return NewValidationResult(issues)
 }
 
-func questionnaireFromPersonality(result *personality.QuestionnaireBindingResult) *QuestionnaireBindingResult {
+func questionnaireFromTypology(result *personality.QuestionnaireBindingResult) *QuestionnaireBindingResult {
 	if result == nil {
 		return nil
 	}
@@ -144,13 +144,13 @@ func questionnaireFromPersonality(result *personality.QuestionnaireBindingResult
 	}
 }
 
-func summariesFromPersonalityList(result *personality.ModelListResult) []ModelSummary {
+func summariesFromTypologyList(result *personality.ModelListResult) []ModelSummary {
 	if result == nil {
 		return nil
 	}
 	items := make([]ModelSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, *summaryFromPersonality(&item))
+		items = append(items, *summaryFromTypology(&item))
 	}
 	return items
 }
