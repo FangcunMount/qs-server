@@ -2,7 +2,7 @@
 package template
 
 import (
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	typologytemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 )
 
@@ -30,7 +30,7 @@ var BuildPersonalityTypeReport = typologytemplate.BuildPersonalityTypeReport
 // BuildTraitProfileReport renders trait-画像 report 从 机制无关 detail。
 var BuildTraitProfileReport = typologytemplate.BuildTraitProfileReport
 
-// 默认ReportBuilder 是共享 默认 report composer。
-type DefaultReportBuilder = domainreport.DefaultReportBuilder
+// DefaultReportBuilder 是共享默认 report composer。
+type DefaultReportBuilder = builder.DefaultReportBuilder
 
-var NewDefaultInterpretReportBuilder = domainreport.NewDefaultInterpretReportBuilder
+var NewDefaultInterpretReportBuilder = builder.NewDefaultInterpretReportBuilder

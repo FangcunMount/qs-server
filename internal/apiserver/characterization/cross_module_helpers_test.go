@@ -12,7 +12,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -91,7 +91,7 @@ func buildCharCrossModuleHarnessCore(
 	splitCfg.Assessment = initialAssessment
 	if async {
 		splitCfg.Async = true
-		splitCfg.SnapshotStore = evaluationscoring.NewMemoryScoringSnapshotStore()
+		splitCfg.SnapshotStore = outcomescoring.NewMemorySnapshotStore()
 		splitCfg.StageEvaluated = func(_ context.Context, events ...event.DomainEvent) error {
 			h.evaluateStaged = append(h.evaluateStaged, events...)
 			return nil

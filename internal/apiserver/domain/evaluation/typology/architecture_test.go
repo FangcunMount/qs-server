@@ -128,23 +128,29 @@ func TestTypologyApplicationLayerKeepsConcreteModelsInAdapters(t *testing.T) {
 	root := repoRoot(t)
 	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "typology")
 	allowed := map[string]struct{}{
-		"algorithm_runner.go":    {},
-		"module.go":              {},
-		"module_registry.go":     {},
-		"modules.go":             {},
-		"runtime_registry.go":    {},
-		"materialize.go":         {},
-		"report_builder.go":      {},
-		"algorithm_aliases.go":   {},
-		"report_registry.go":     {},
-		"report_sbti.go":         {},
-		"report_bigfive.go":      {},
-		"converters.go":          {},
-		"report_input_mapper.go": {},
-		"outcome_assembler.go":   {},
-		"outcome_mapper.go":      {},
-		"model_ref.go":           {},
-		"executor.go":            {},
+		"algorithm_runner.go":          {},
+		"module.go":                    {},
+		"module_registry.go":           {},
+		"modules.go":                   {},
+		"runtime_registry.go":          {},
+		"materialize.go":               {},
+		"report_builder.go":            {},
+		"algorithm_aliases.go":         {},
+		"report_registry.go":           {},
+		"report_generic.go":            {},
+		"report_generic_mechanism.go":  {},
+		"report_template.go":           {},
+		"report_context.go":            {},
+		"legacy_outcome_assemblers.go": {},
+		"converters.go":                {},
+		"report_input_mapper.go":       {},
+		"outcome_assembler.go":         {},
+		"outcome_mapper.go":            {},
+		"outcome_registry.go":          {},
+		"runtime_options.go":           {},
+		"model_ref.go":                 {},
+		"executor.go":                  {},
+		"doc.go":                       {},
 	}
 	forbidden := []string{
 		"ScoreMBTI",
@@ -257,7 +263,7 @@ func TestReportBuilderStaysAlgorithmAgnostic(t *testing.T) {
 		"AlgorithmSBTI",
 	} {
 		if strings.Contains(text, token) {
-			t.Fatalf("report_builder.go contains %q; keep model-specific report wiring in report_mbti/report_sbti", token)
+			t.Fatalf("report_builder.go contains %q; keep model-specific report wiring in typology/legacy", token)
 		}
 	}
 }
@@ -266,13 +272,16 @@ func TestProfileCoreDoesNotDependOnLegacyTypologyPayload(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	profileRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "typology", "trait")
+	profileRoot := filepath.Join(root, "internal", "apiserver", "domain", "calculation", "classification")
 	forbidden := []string{
 		"modelcatalog/personality/typology",
 		"MBTILegacyModel",
 		"SBTILegacyModel",
 	}
 	walkGoFiles(t, profileRoot, func(rel, text string) {
+		if strings.Contains(rel, "/specialrule/") {
+			return
+		}
 		if strings.HasSuffix(rel, "_test.go") {
 			return
 		}

@@ -1,20 +1,17 @@
-// Package rule 负责interpretation rules 独立于 测评编码。
 package rule
 
-import (
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-)
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 
-// LevelRule matches score ranges 到 结果 等级。
+// LevelRule matches score ranges 到结果等级。
 type LevelRule struct {
 	Min        float64
 	Max        float64
-	RiskLevel  domainreport.RiskLevel
+	RiskLevel  report.RiskLevel
 	Conclusion string
 	Suggestion string
 }
 
-// DimensionRule matches 维度分 到 interpretive text。
+// DimensionRule matches 维度分到 interpretive text。
 type DimensionRule struct {
 	Code       string
 	Min        float64
@@ -23,7 +20,5 @@ type DimensionRule struct {
 	Suggestion string
 }
 
-// SuggestionRule 是strategy contract 用于 generating report suggestions。
-type SuggestionRule = domainreport.SuggestionStrategy
-
-var NewFactorInterpretationSuggestionStrategy = domainreport.NewFactorInterpretationSuggestionStrategy
+// SuggestionRule 是 strategy contract 用于 generating report suggestions。
+type SuggestionRule = SuggestionStrategy

@@ -26,7 +26,7 @@ func TestConfiguredEvaluatorMatchesMBTIReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reference Score: %v", err)
 	}
-	wantGeneric := evaluationtypology.PersonalityTypeDetailFromMBTI(wantLegacy)
+	wantGeneric := typologylegacy.PersonalityTypeDetailFromMBTI(wantLegacy)
 	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
@@ -79,7 +79,7 @@ func assertSBTIReferenceEquivalence(
 	if err != nil {
 		t.Fatalf("reference Score: %v", err)
 	}
-	wantGeneric := evaluationtypology.PersonalityTypeDetailFromSBTI(wantLegacy)
+	wantGeneric := typologylegacy.PersonalityTypeDetailFromSBTI(wantLegacy)
 	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)

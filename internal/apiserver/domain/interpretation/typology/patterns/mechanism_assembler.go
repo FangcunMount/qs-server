@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reportfactorclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology"
 )
 
@@ -29,7 +29,7 @@ type TraitProfileReportTemplate struct {
 }
 
 // BuildPersonalityTypeReport 组装personality-type report 从 机制无关 detail。
-func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl PersonalityTypeReportTemplate) (*domainreport.InterpretReport, error) {
+func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl PersonalityTypeReportTemplate) (*report.InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")
 	}
@@ -77,7 +77,7 @@ func mechanismConclusionSuffix(tmpl PersonalityTypeReportTemplate, detail Person
 }
 
 // BuildTraitProfileReport 组装trait-画像 report 从 机制无关 detail。
-func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileReportTemplate) (*domainreport.InterpretReport, error) {
+func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileReportTemplate) (*report.InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")
 	}
@@ -125,18 +125,18 @@ func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileRep
 }
 
 type PersonalityTypeReportInput struct {
-	AssessmentID domainreport.ID
+	AssessmentID report.ID
 	ModelCode    string
 	TotalScore   float64
-	RiskLevel    domainreport.RiskLevel
+	RiskLevel    report.RiskLevel
 	Detail       PersonalityTypeReportDetail
 }
 
 type TraitProfileReportInput struct {
-	AssessmentID domainreport.ID
+	AssessmentID report.ID
 	ModelCode    string
 	TotalScore   float64
-	RiskLevel    domainreport.RiskLevel
+	RiskLevel    report.RiskLevel
 	Detail       TraitProfileReportDetail
 }
 
@@ -199,11 +199,11 @@ type TraitProfileSourceReport struct {
 	NonCommercial bool
 }
 
-func mechanismPersonalityDimensions(detail PersonalityTypeReportDetail, tmpl PersonalityTypeReportTemplate) []domainreport.DimensionInterpret {
+func mechanismPersonalityDimensions(detail PersonalityTypeReportDetail, tmpl PersonalityTypeReportTemplate) []report.DimensionInterpret {
 	if len(detail.Dimensions) == 0 {
 		return nil
 	}
-	dimensions := make([]domainreport.DimensionInterpret, 0, len(detail.Dimensions))
+	dimensions := make([]report.DimensionInterpret, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
 		name := firstNonEmptyMechanism(dim.Name, dim.Code)
 		description := fmt.Sprintf("%s: raw %.0f", name, dim.RawScore)
@@ -218,31 +218,31 @@ func mechanismPersonalityDimensions(detail PersonalityTypeReportDetail, tmpl Per
 		if tmpl.DimensionMaxScore != nil {
 			maxScore = tmpl.DimensionMaxScore
 		}
-		kind := domainreport.DimensionKindFactor
+		kind := report.DimensionKindFactor
 		if dim.Preference != "" {
-			kind = domainreport.DimensionKindPole
+			kind = report.DimensionKindPole
 		}
 		if maxScore != nil {
-			dimensions = append(dimensions, domainreport.NewDimensionInterpret(
-				domainreport.FactorCode(dim.Code), name, dim.RawScore, maxScore, domainreport.RiskLevelNone, description, "",
+			dimensions = append(dimensions, report.NewDimensionInterpret(
+				report.FactorCode(dim.Code), name, dim.RawScore, maxScore, report.RiskLevelNone, description, "",
 			))
 			continue
 		}
-		dimensions = append(dimensions, domainreport.NewNeutralDimensionInterpret(
-			domainreport.NewDimensionCode(dim.Code), kind, name, dim.RawScore, nil, nil, description, "",
+		dimensions = append(dimensions, report.NewNeutralDimensionInterpret(
+			report.NewDimensionCode(dim.Code), kind, name, dim.RawScore, nil, nil, description, "",
 		))
 	}
 	return dimensions
 }
 
-func mechanismPersonalitySuggestions(detail PersonalityTypeReportDetail) []domainreport.Suggestion {
-	suggestions := make([]domainreport.Suggestion, 0, 8)
+func mechanismPersonalitySuggestions(detail PersonalityTypeReportDetail) []report.Suggestion {
+	suggestions := make([]report.Suggestion, 0, 8)
 	add := func(content string) {
 		content = strings.TrimSpace(content)
 		if content == "" {
 			return
 		}
-		suggestions = append(suggestions, domainreport.Suggestion{Category: domainreport.SuggestionCategoryGeneral, Content: content})
+		suggestions = append(suggestions, report.Suggestion{Category: report.SuggestionCategoryGeneral, Content: content})
 	}
 	add(detail.Profile.Summary)
 	for _, s := range detail.Profile.Strengths {
@@ -273,30 +273,30 @@ func mechanismTraitSummary(detail TraitProfileReportDetail) string {
 	return strings.Join(parts, " / ")
 }
 
-func mechanismTraitDimensions(detail TraitProfileReportDetail) []domainreport.DimensionInterpret {
+func mechanismTraitDimensions(detail TraitProfileReportDetail) []report.DimensionInterpret {
 	if len(detail.Traits) == 0 {
 		return nil
 	}
-	dimensions := make([]domainreport.DimensionInterpret, 0, len(detail.Traits))
+	dimensions := make([]report.DimensionInterpret, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
 		label := firstNonEmptyMechanism(trait.Name, trait.Code)
 		description := fmt.Sprintf("%s：原始分 %.0f", label, trait.RawScore)
-		dimensions = append(dimensions, domainreport.NewNeutralDimensionInterpret(
-			domainreport.NewDimensionCode(trait.Code), domainreport.DimensionKindTrait, label, trait.RawScore, nil, nil, description, "",
+		dimensions = append(dimensions, report.NewNeutralDimensionInterpret(
+			report.NewDimensionCode(trait.Code), report.DimensionKindTrait, label, trait.RawScore, nil, nil, description, "",
 		))
 	}
 	return dimensions
 }
 
-func mechanismTraitSuggestions(detail TraitProfileReportDetail) []domainreport.Suggestion {
+func mechanismTraitSuggestions(detail TraitProfileReportDetail) []report.Suggestion {
 	summary := mechanismTraitSummary(detail)
-	suggestions := make([]domainreport.Suggestion, 0, 2)
+	suggestions := make([]report.Suggestion, 0, 2)
 	if summary != "" {
-		suggestions = append(suggestions, domainreport.Suggestion{Category: domainreport.SuggestionCategoryGeneral, Content: "特质分布：" + summary})
+		suggestions = append(suggestions, report.Suggestion{Category: report.SuggestionCategoryGeneral, Content: "特质分布：" + summary})
 	}
 	if detail.Source.Attribution != "" {
-		suggestions = append(suggestions, domainreport.Suggestion{
-			Category: domainreport.SuggestionCategoryGeneral,
+		suggestions = append(suggestions, report.Suggestion{
+			Category: report.SuggestionCategoryGeneral,
 			Content: fmt.Sprintf("来源与授权：%s；License: %s；非商业使用: %t。",
 				detail.Source.Attribution, detail.Source.License, detail.Source.NonCommercial),
 		})
@@ -307,11 +307,11 @@ func mechanismTraitSuggestions(detail TraitProfileReportDetail) []domainreport.S
 	return suggestions
 }
 
-func mechanismReportRarity(rarity PersonalityTypeRarityReport) *domainreport.ModelRarity {
+func mechanismReportRarity(rarity PersonalityTypeRarityReport) *report.ModelRarity {
 	if rarity.Percent == 0 && rarity.Label == "" && rarity.OneInX == 0 {
 		return nil
 	}
-	return &domainreport.ModelRarity{Percent: rarity.Percent, Label: rarity.Label, OneInX: rarity.OneInX}
+	return &report.ModelRarity{Percent: rarity.Percent, Label: rarity.Label, OneInX: rarity.OneInX}
 }
 
 func firstNonEmptyMechanism(values ...string) string {

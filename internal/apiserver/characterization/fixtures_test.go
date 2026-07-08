@@ -3,6 +3,7 @@ package characterization_test
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -736,16 +737,16 @@ func scoreBigFiveCharacterization(
 	t *testing.T,
 	payload *modeltypology.Payload,
 	sheet *evaluationinputdomain.AnswerSheet,
-) (evaluationtypology.BigFiveResultDetail, error) {
+) (legacy.BigFiveResultDetail, error) {
 	t.Helper()
 	evaluator := configured.NewEvaluator()
 	result, err := evaluator.Score(payload, sheet)
 	if err != nil {
-		return evaluationtypology.BigFiveResultDetail{}, err
+		return legacy.BigFiveResultDetail{}, err
 	}
 	generic, err := evaluationtypology.TraitProfileDetailFromPayload(result.Detail)
 	if err != nil {
-		return evaluationtypology.BigFiveResultDetail{}, err
+		return legacy.BigFiveResultDetail{}, err
 	}
-	return evaluationtypology.BigFiveResultDetailFromTraitProfile(generic), nil
+	return legacy.BigFiveResultDetailFromTraitProfile(generic), nil
 }

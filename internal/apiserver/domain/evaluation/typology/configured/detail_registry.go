@@ -3,7 +3,7 @@ package configured
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/trait"
+	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
@@ -11,9 +11,9 @@ import (
 type DetailInput struct {
 	Payload   *modeltypology.Payload
 	Spec      *modeltypology.RuntimeSpec
-	Vector    trait.ProfileVector
-	Decision  trait.DecisionSpec
-	Candidate trait.OutcomeCandidate
+	Vector    calcclassification.ProfileVector
+	Decision  calcclassification.DecisionSpec
+	Candidate calcclassification.OutcomeCandidate
 	Selected  SelectedOutcome
 	Adapter   modeltypology.DetailAdapterKey
 }

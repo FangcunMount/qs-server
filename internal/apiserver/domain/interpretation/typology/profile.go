@@ -3,7 +3,7 @@ package typology
 import (
 	"strings"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
 // Profile 人格类报告展示配置。
@@ -18,20 +18,20 @@ type Profile struct {
 	MatchPercent     float64
 	IsSpecial        bool
 	SpecialTrigger   string
-	Rarity           *domainreport.ModelRarity
+	Rarity           *report.ModelRarity
 	Commentary       string
 }
 
 // Input 人格类报告组装输入。
 type Input struct {
-	AssessmentID domainreport.ID
+	AssessmentID report.ID
 	ModelCode    string
 	TotalScore   float64
-	RiskLevel    domainreport.RiskLevel
+	RiskLevel    report.RiskLevel
 	Profile      Profile
 	Conclusion   string
-	Dimensions   []domainreport.DimensionInterpret
-	Suggestions  []domainreport.Suggestion
+	Dimensions   []report.DimensionInterpret
+	Suggestions  []report.Suggestion
 }
 
 // ReportModelName 返回展示用模型名称。
@@ -66,8 +66,8 @@ func (p Profile) Conclusion(suffix string) string {
 }
 
 // ModelExtra 返回人格类扩展信息。
-func (p Profile) ModelExtra() *domainreport.ModelExtra {
-	extra := &domainreport.ModelExtra{
+func (p Profile) ModelExtra() *report.ModelExtra {
+	extra := &report.ModelExtra{
 		Kind:           p.Kind,
 		TypeCode:       p.TypeCode,
 		TypeName:       p.TypeName,

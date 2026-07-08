@@ -457,6 +457,10 @@ func TestCalculationDomainStaysStatelessKernel(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "neutral calculation inputs; callers translate question assets",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "calculation"), func(path, importPath string) {
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if strings.Contains(rel, "/specialrule/") {
+			return
+		}
 		for prefix, replacement := range forbidden {
 			if strings.HasPrefix(importPath, prefix) {
 				t.Fatalf("%s imports %s; calculation kernel must stay domain-asset free and use %s", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)

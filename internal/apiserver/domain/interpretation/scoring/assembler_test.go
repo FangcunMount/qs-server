@@ -1,31 +1,33 @@
-package scoring
+package scoring_test
 
 import (
 	"testing"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 )
 
 func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {
 	totalMax := 27.0
-	report, err := BuildReport(domainreport.NewDefaultInterpretReportBuilder(nil), ReportInput{
-		AssessmentID: domainreport.ID(9001),
-		Model: &ReportModel{
+	got, err := scoring.BuildReport(builder.NewDefaultInterpretReportBuilder(nil), scoring.ReportInput{
+		AssessmentID: report.ID(9001),
+		Model: &scoring.ReportModel{
 			Code:  "PHQ9",
 			Title: "抑郁筛查",
-			Factors: []FactorReportModel{
+			Factors: []scoring.FactorReportModel{
 				{Code: "TOTAL", Title: "总分", MaxScore: &totalMax},
 			},
 		},
 		TotalScore: 8,
-		RiskLevel:  domainreport.RiskLevelLow,
+		RiskLevel:  report.RiskLevelLow,
 		Conclusion: "总体轻度风险",
 		Suggestion: "持续观察整体状态",
-		FactorScores: []FactorReportScore{
+		FactorScores: []scoring.FactorReportScore{
 			{
 				FactorCode:   "TOTAL",
 				RawScore:     8,
-				RiskLevel:    domainreport.RiskLevelLow,
+				RiskLevel:    report.RiskLevelLow,
 				Conclusion:   "总分提示轻度风险",
 				Suggestion:   "保持规律作息",
 				IsTotalScore: true,
@@ -35,16 +37,16 @@ func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildReport: %v", err)
 	}
-	if report.ModelName() != "抑郁筛查" || report.ModelCode() != "PHQ9" {
-		t.Fatalf("model = %q/%q", report.ModelName(), report.ModelCode())
+	if got.ModelName() != "抑郁筛查" || got.ModelCode() != "PHQ9" {
+		t.Fatalf("model = %q/%q", got.ModelName(), got.ModelCode())
 	}
-	if report.TotalScore() != 8 || report.RiskLevel() != domainreport.RiskLevelLow {
-		t.Fatalf("summary = score:%v risk:%s", report.TotalScore(), report.RiskLevel())
+	if got.TotalScore() != 8 || got.RiskLevel() != report.RiskLevelLow {
+		t.Fatalf("summary = score:%v risk:%s", got.TotalScore(), got.RiskLevel())
 	}
-	if report.Conclusion() != "总分提示轻度风险" {
-		t.Fatalf("Conclusion = %q", report.Conclusion())
+	if got.Conclusion() != "总分提示轻度风险" {
+		t.Fatalf("Conclusion = %q", got.Conclusion())
 	}
-	dimensions := report.Dimensions()
+	dimensions := got.Dimensions()
 	if len(dimensions) != 1 || dimensions[0].Name() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != totalMax {
 		t.Fatalf("unexpected dimensions: %#v", dimensions)
 	}

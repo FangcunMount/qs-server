@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -72,7 +72,7 @@ func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 // and GenerateReport completes interpretation from stored snapshot.
 func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) {
 	a := submittedScaleAssessment(t)
-	snapshotStore := evaluationscoring.NewMemoryScoringSnapshotStore()
+	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 	var staged []string
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,

@@ -8,7 +8,7 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -38,9 +38,9 @@ type service struct {
 	familyEvaluators      map[modelcatalog.AlgorithmFamily]Evaluator
 	runtimeResolver       *RuntimeResolver
 	runRepo               evaluationrun.Repository
-	scoringWriter         evaluationscoring.Writer
+	scoringWriter         outcomescoring.Writer
 	interpretationService interpretationapp.Service
-	scoringSnapshotStore  evaluationscoring.ScoringSnapshotStore
+	scoringSnapshotStore  outcomescoring.SnapshotStore
 	asyncInterpretation   bool
 	reportStatus          *reportstatus.Reporter
 }
@@ -112,7 +112,7 @@ func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
 }
 
 // WithScoringWriter 配置计分结果写入器 用于 分阶段 评估。
-func WithScoringWriter(writer evaluationscoring.Writer) ServiceOption {
+func WithScoringWriter(writer outcomescoring.Writer) ServiceOption {
 	return func(s *service) {
 		s.scoringWriter = writer
 	}
@@ -133,7 +133,7 @@ func WithAsyncInterpretation(enabled bool) ServiceOption {
 }
 
 // WithScoringSnapshotStore 配置持久化计分快照 用于 异步报告生成。
-func WithScoringSnapshotStore(store evaluationscoring.ScoringSnapshotStore) ServiceOption {
+func WithScoringSnapshotStore(store outcomescoring.SnapshotStore) ServiceOption {
 	return func(s *service) {
 		s.scoringSnapshotStore = store
 	}

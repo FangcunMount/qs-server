@@ -481,5 +481,18 @@ type Algorithm = identity.Algorithm
 | R47 | typology patterns 以 `mechanism_assembler` 为主；legacy `*_assembler` 标记 transitional |
 | R48 | reporting 架构守卫禁止新增测评 code builder 名；`legacy_report_aliases` 保留 deprecated ACL |
 | R49 | `legacy_sbti_payload` / `from_sbti` 标注 legacy ACL |
-| R50 | `domain/architecture_test.go` 锁死 domain 层新增测评 code 文件名 |
+## Round 51–60：瘦 transitional 包 + Application 层重组（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R51 | patterns 测评 DTO/converters 迁至 `application/.../typology/legacy`；domain patterns 仅保留 generic detail |
+| R52 | `specialrule` 下沉 `calculation/classification`；configured 改引 calculation |
+| R53 | 删除 `evaluation/typology/trait` ACL；调用方直引 `calculation/classification` |
+| R54 | `InterpretReport` 等实现迁入 `interpretation/report`、`rule`、`builder`；根包 facade re-export |
+| R55 | `application/evaluation/scoring` 写路径迁入 `outcome/scoring`；消除与 mechanisms/scoring 命名冲突 |
+| R56 | 删除 `report_sbti`/`report_bigfive`；`report_input_mapper` 仅机制 detail + legacy 适配 |
+| R57 | legacy outcome 装配收口至 `legacy/outcome_*`；`algorithm_aliases` 标记 deprecated |
+| R58 | `interpretation/reporting` 拆 `registry`/`writer`/`projection` 子包 + 根 facade |
+| R59 | 删除 domain `*_assembler` 薄包装；统一 `BuildPersonalityTypeReport` + mechanism template |
+| R60 | `application/architecture_transitional_test.go` 守卫 + 本文档 R51–R60 表 |
 

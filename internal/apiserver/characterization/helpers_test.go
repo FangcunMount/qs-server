@@ -6,9 +6,10 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -27,7 +28,7 @@ type v1SplitPhaseConfig struct {
 	ReportBuilder interpretationreporting.ReportBuilder
 
 	Async          bool
-	SnapshotStore  evaluationscoring.ScoringSnapshotStore
+	SnapshotStore  outcomescoring.SnapshotStore
 	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
 }
 
@@ -51,7 +52,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)
 	}
-	scoringWriter := evaluationscoring.NewWriter(repo, scoreProjectors, cfg.SnapshotStore)
+	scoringWriter := outcomescoring.NewWriter(repo, scoreProjectors, cfg.SnapshotStore)
 
 	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(cfg.ReportBuilder)
 	if err != nil {

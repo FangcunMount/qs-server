@@ -1,99 +1,70 @@
 package interpretation
 
-import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rule"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
-// ==================== ID 类型定义 ====================
+type (
+	ID                 = report.ID
+	AssessmentID       = report.AssessmentID
+	RiskLevel          = report.RiskLevel
+	FactorCode         = report.FactorCode
+	DimensionCode      = report.DimensionCode
+	DimensionKind      = report.DimensionKind
+	FactorScoreInput   = report.FactorScoreInput
+	InterpretReport    = report.InterpretReport
+	DimensionInterpret = report.DimensionInterpret
+	ScoreValue         = report.ScoreValue
+	ResultLevel        = report.ResultLevel
+	ModelIdentity      = report.ModelIdentity
+	ModelExtra         = report.ModelExtra
+	ModelRarity        = report.ModelRarity
+	SuggestionCategory = report.SuggestionCategory
+	Suggestion         = report.Suggestion
 
-// ID 报告ID类型（与 AssessmentID 一致，使用 meta.ID）
-type ID = meta.ID
+	ReportBuilder                          = report.ReportBuilder
+	DefaultReportBuilder                   = builder.DefaultReportBuilder
+	GenerateReportInput                    = report.GenerateReportInput
+	SuggestionStrategy                     = rule.SuggestionStrategy
+	SuggestionGenerator                    = rule.SuggestionGenerator
+	SuggestionInput                        = rule.SuggestionInput
+	RuleBasedSuggestionGenerator           = rule.RuleBasedSuggestionGenerator
+	FactorInterpretationSuggestionStrategy = rule.FactorInterpretationSuggestionStrategy
+)
 
-// AssessmentID 测评ID类型（用于关联 assessment 聚合）
-type AssessmentID = ID
+const (
+	RiskLevelNone   = report.RiskLevelNone
+	RiskLevelLow    = report.RiskLevelLow
+	RiskLevelMedium = report.RiskLevelMedium
+	RiskLevelHigh   = report.RiskLevelHigh
+	RiskLevelSevere = report.RiskLevelSevere
 
-// NewID 创建报告ID
+	DimensionKindFactor  = report.DimensionKindFactor
+	DimensionKindPole    = report.DimensionKindPole
+	DimensionKindTrait   = report.DimensionKindTrait
+	DimensionKindIndex   = report.DimensionKindIndex
+	DimensionKindAbility = report.DimensionKindAbility
+
+	ScoreKindRawTotal     = report.ScoreKindRawTotal
+	ScoreKindMatchPercent = report.ScoreKindMatchPercent
+
+	SuggestionCategoryGeneral   = report.SuggestionCategoryGeneral
+	SuggestionCategoryFamily    = report.SuggestionCategoryFamily
+	SuggestionCategoryStudy     = report.SuggestionCategoryStudy
+	SuggestionCategorySocial    = report.SuggestionCategorySocial
+	SuggestionCategoryHealth    = report.SuggestionCategoryHealth
+	SuggestionCategoryDimension = report.SuggestionCategoryDimension
+)
+
+// NewID 创建报告ID（根包兼容导出）。
 func NewID(id uint64) ID {
 	return meta.FromUint64(id)
 }
 
-// ParseID 解析报告ID
+// ParseID 解析报告ID（根包兼容导出）。
 func ParseID(s string) (ID, error) {
 	return meta.ParseID(s)
 }
-
-// ==================== 风险等级 ====================
-
-// RiskLevel 风险等级
-type RiskLevel string
-
-const (
-	RiskLevelNone   RiskLevel = "none"
-	RiskLevelLow    RiskLevel = "low"
-	RiskLevelMedium RiskLevel = "medium"
-	RiskLevelHigh   RiskLevel = "high"
-	RiskLevelSevere RiskLevel = "severe"
-)
-
-func (r RiskLevel) String() string {
-	return string(r)
-}
-
-// IsHighRisk 是否高风险（包含 high 和 severe）
-func IsHighRisk(r RiskLevel) bool {
-	return r == RiskLevelHigh || r == RiskLevelSevere
-}
-
-// ==================== 因子编码 ====================
-
-// FactorCode 因子编码
-type FactorCode string
-
-// NewFactorCode 创建因子编码
-func NewFactorCode(code string) FactorCode {
-	return FactorCode(code)
-}
-
-func (c FactorCode) Value() string {
-	return string(c)
-}
-
-func (c FactorCode) String() string {
-	return string(c)
-}
-
-func (c FactorCode) IsEmpty() bool {
-	return c == ""
-}
-
-func (c FactorCode) Equals(other FactorCode) bool {
-	return c == other
-}
-
-// DimensionCode 是中性 维度 identifier on reports。
-type DimensionCode string
-
-func NewDimensionCode(code string) DimensionCode {
-	return DimensionCode(code)
-}
-
-func (c DimensionCode) String() string {
-	return string(c)
-}
-
-func (c DimensionCode) IsEmpty() bool {
-	return c == ""
-}
-
-func (c DimensionCode) Equals(other DimensionCode) bool {
-	return c == other
-}
-
-// DimensionKind 划分report 维度 独立于 scale 因子 semantics。
-type DimensionKind string
-
-const (
-	DimensionKindFactor  DimensionKind = "factor"
-	DimensionKindPole    DimensionKind = "pole"
-	DimensionKindTrait   DimensionKind = "trait"
-	DimensionKindIndex   DimensionKind = "index"
-	DimensionKindAbility DimensionKind = "ability"
-)

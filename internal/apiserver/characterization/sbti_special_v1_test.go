@@ -38,7 +38,7 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want hidden trigger", detail.SpecialTrigger)
 	}
 
-	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
+	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),
@@ -88,7 +88,7 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want fallback trigger", detail.SpecialTrigger)
 	}
 
-	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
+	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),

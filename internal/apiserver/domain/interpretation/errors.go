@@ -1,17 +1,9 @@
 package interpretation
 
-import "errors"
-
-// ==================== 领域错误（哨兵错误）====================
-// 设计原则：领域层只定义哨兵错误，错误码由 pkg/code 统一管理
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 
 var (
-	// ErrReportNotFound 报告不存在
-	ErrReportNotFound = errors.New("report not found")
-
-	// ErrInvalidArgument 无效参数
-	ErrInvalidArgument = errors.New("invalid argument")
-
-	// ErrReportAlreadyExists 报告已存在
-	ErrReportAlreadyExists = errors.New("report already exists")
+	ErrReportNotFound      = report.ErrReportNotFound
+	ErrInvalidArgument     = report.ErrInvalidArgument
+	ErrReportAlreadyExists = report.ErrReportAlreadyExists
 )

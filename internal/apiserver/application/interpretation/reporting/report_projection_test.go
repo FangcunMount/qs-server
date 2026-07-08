@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -27,7 +27,7 @@ func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testin
 		Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
 		Detail: assessment.EvaluationDetail{
 			Kind: assessment.EvaluationModelKindPersonality,
-			Payload: evaluationtypology.MBTIResultDetail{
+			Payload: typologylegacy.MBTIResultDetail{
 				TypeCode:     "INTJ",
 				MatchPercent: 40,
 			},

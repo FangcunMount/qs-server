@@ -4,7 +4,8 @@ import (
 	"context"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -53,6 +54,6 @@ func newSplitPhaseTestService(
 }
 
 var (
-	_ evaluationscoring.Writer  = (*recordingSplitPhaseScoringWriter)(nil)
+	_ outcomescoring.Writer     = (*recordingSplitPhaseScoringWriter)(nil)
 	_ interpretationapp.Service = (*recordingSplitPhaseInterpretationService)(nil)
 )

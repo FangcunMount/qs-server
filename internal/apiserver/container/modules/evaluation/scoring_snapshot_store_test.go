@@ -11,7 +11,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -96,7 +96,7 @@ func TestResolveScoringSnapshotStoreCapabilityMatrix(t *testing.T) {
 				t.Fatal("resolveScoringSnapshotStore() store = nil")
 			}
 
-			_, isMemory := store.(*evaluationscoring.MemoryScoringSnapshotStore)
+			_, isMemory := store.(*outcomescoring.MemorySnapshotStore)
 			_, isRedis := store.(*rediseval.RedisScoringSnapshotStore)
 			if tt.wantMemoryFallback && !isMemory {
 				t.Fatalf("store type = %T, want memory fallback", store)

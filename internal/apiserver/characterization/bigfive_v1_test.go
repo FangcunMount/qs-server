@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
@@ -36,7 +35,7 @@ func TestV1BigFivePipelinePreservesTraitScoresAndReportFields(t *testing.T) {
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 	)
 
-	report, err := typologyapp.NewBigFiveReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
+	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

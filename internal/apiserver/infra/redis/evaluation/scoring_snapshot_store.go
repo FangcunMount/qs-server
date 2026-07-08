@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -18,7 +18,7 @@ type RedisScoringSnapshotStore struct {
 	client redis.UniversalClient
 }
 
-func NewRedisScoringSnapshotStore(client redis.UniversalClient) evaluationscoring.ScoringSnapshotStore {
+func NewRedisScoringSnapshotStore(client redis.UniversalClient) outcomescoring.SnapshotStore {
 	return &RedisScoringSnapshotStore{client: client}
 }
 

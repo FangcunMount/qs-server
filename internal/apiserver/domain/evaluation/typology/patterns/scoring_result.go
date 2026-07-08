@@ -1,15 +1,15 @@
 package patterns
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/trait"
+	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // ScoringResult 是领域-本地 output of 人格模型适配器。
 type ScoringResult struct {
 	Runtime         *modeltypology.RuntimeSpec
-	Vector          trait.ProfileVector
-	Candidate       trait.OutcomeCandidate
+	Vector          calcclassification.ProfileVector
+	Candidate       calcclassification.OutcomeCandidate
 	SelectedOutcome SelectedOutcome
 	SpecialMatch    *ScoringSpecialMatch
 	Detail          any

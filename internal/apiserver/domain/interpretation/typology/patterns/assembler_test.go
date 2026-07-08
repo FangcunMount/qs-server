@@ -3,7 +3,7 @@ package patterns
 import (
 	"testing"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
 func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
@@ -37,43 +37,43 @@ func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
 		},
 	}
 
-	report, err := BuildMBTIReport(MBTIReportInput{
-		AssessmentID: domainreport.ID(7001),
+	got, err := BuildPersonalityTypeReport(PersonalityTypeReportInput{
+		AssessmentID: report.ID(7001),
 		ModelCode:    "MBTI_OEJTS",
-		Detail:       detail,
-	})
+		Detail:       mbtiMechanismDetail(detail),
+	}, MBTIPersonalityTypeTemplate())
 	if err != nil {
 		t.Fatalf("BuildMBTIReport: %v", err)
 	}
-	if report.ModelName() != "MBTI 人格类型测评 - 建筑师" {
-		t.Fatalf("ModelName = %q", report.ModelName())
+	if got.ModelName() != "MBTI 人格类型测评 - 建筑师" {
+		t.Fatalf("ModelName = %q", got.ModelName())
 	}
-	if report.ModelCode() != "MBTI_OEJTS" {
-		t.Fatalf("ModelCode = %q", report.ModelCode())
+	if got.ModelCode() != "MBTI_OEJTS" {
+		t.Fatalf("ModelCode = %q", got.ModelCode())
 	}
-	if report.Conclusion() != "INTJ 建筑师 - 独立战略家" {
-		t.Fatalf("Conclusion = %q", report.Conclusion())
+	if got.Conclusion() != "INTJ 建筑师 - 独立战略家" {
+		t.Fatalf("Conclusion = %q", got.Conclusion())
 	}
-	dimensions := report.Dimensions()
+	dimensions := got.Dimensions()
 	if len(dimensions) != 1 {
 		t.Fatalf("len(Dimensions) = %d, want 1", len(dimensions))
 	}
-	if dimensions[0].Code() != domainreport.DimensionCode("E_I") ||
+	if dimensions[0].Code() != report.NewDimensionCode("E_I") ||
 		dimensions[0].Name() != "外向-内向" ||
 		dimensions[0].RawScore() != 31 ||
-		dimensions[0].Severity() != string(domainreport.RiskLevelNone) ||
+		dimensions[0].Severity() != string(report.RiskLevelNone) ||
 		dimensions[0].Description() != "外向-内向：倾向 I（原始分 31，偏好强度 78%）" {
 		t.Fatalf("unexpected dimension: %#v", dimensions[0])
 	}
 	if dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != 40 {
 		t.Fatalf("dimension MaxScore = %v, want 40", dimensions[0].MaxScore())
 	}
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "善于长远规划")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "优势：系统思考")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "注意：容易忽略情绪")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "建议：保留沟通余量")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "来源与授权：OEJTS；License: CC BY-NC-SA 4.0；非商业使用: true。")
-	extra := report.ModelExtra()
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "善于长远规划")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "优势：系统思考")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "注意：容易忽略情绪")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "建议：保留沟通余量")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "来源与授权：OEJTS；License: CC BY-NC-SA 4.0；非商业使用: true。")
+	extra := got.ModelExtra()
 	if extra == nil {
 		t.Fatal("expected model extra")
 	}
@@ -123,40 +123,40 @@ func TestBuildSBTIReportSetsModelExtra(t *testing.T) {
 		SpecialTrigger: "全维度高匹配",
 	}
 
-	report, err := BuildSBTIReport(SBTIReportInput{
-		AssessmentID: domainreport.ID(7001),
+	got, err := BuildPersonalityTypeReport(PersonalityTypeReportInput{
+		AssessmentID: report.ID(7001),
 		ModelCode:    "SBTI_FUN",
-		Detail:       detail,
-	})
+		Detail:       sbtiMechanismDetail(detail),
+	}, SBTIPersonalityTypeTemplate())
 	if err != nil {
 		t.Fatalf("BuildSBTIReport: %v", err)
 	}
-	if report.ModelName() != "SBTI 趣味人格测评 - 拿捏者" {
-		t.Fatalf("ModelName = %q", report.ModelName())
+	if got.ModelName() != "SBTI 趣味人格测评 - 拿捏者" {
+		t.Fatalf("ModelName = %q", got.ModelName())
 	}
-	if report.ModelCode() != "SBTI_FUN" {
-		t.Fatalf("ModelCode = %q", report.ModelCode())
+	if got.ModelCode() != "SBTI_FUN" {
+		t.Fatalf("ModelCode = %q", got.ModelCode())
 	}
-	if report.Conclusion() != "CTRL 拿捏者 - 人形自走任务管理器（匹配度 92%）" {
-		t.Fatalf("Conclusion = %q", report.Conclusion())
+	if got.Conclusion() != "CTRL 拿捏者 - 人形自走任务管理器（匹配度 92%）" {
+		t.Fatalf("Conclusion = %q", got.Conclusion())
 	}
-	dimensions := report.Dimensions()
+	dimensions := got.Dimensions()
 	if len(dimensions) != 1 {
 		t.Fatalf("len(Dimensions) = %d, want 1", len(dimensions))
 	}
-	if dimensions[0].Code() != domainreport.DimensionCode("SOCIAL") ||
+	if dimensions[0].Code() != report.NewDimensionCode("SOCIAL") ||
 		dimensions[0].Name() != "社交姿态" ||
 		dimensions[0].RawScore() != 5 ||
-		dimensions[0].Severity() != string(domainreport.RiskLevelNone) ||
+		dimensions[0].Severity() != string(report.RiskLevelNone) ||
 		dimensions[0].Description() != "狗塑 / 社交姿态：高 档，原始分 5/6" {
 		t.Fatalf("unexpected dimension: %#v", dimensions[0])
 	}
 	if dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != 6 {
 		t.Fatalf("dimension MaxScore = %v, want 6", dimensions[0].MaxScore())
 	}
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "测试解读")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "来源与授权：SBTI Wiki；License: CC BY-NC-SA 4.0；非商业使用: true。")
-	extra := report.ModelExtra()
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "测试解读")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "来源与授权：SBTI Wiki；License: CC BY-NC-SA 4.0；非商业使用: true。")
+	extra := got.ModelExtra()
 	if extra == nil {
 		t.Fatal("expected model extra")
 	}
@@ -193,37 +193,37 @@ func TestBuildBigFiveReportFillsTraitDimensions(t *testing.T) {
 		},
 	}
 
-	report, err := BuildBigFiveReport(BigFiveReportInput{
-		AssessmentID: domainreport.ID(7001),
+	got, err := BuildTraitProfileReport(TraitProfileReportInput{
+		AssessmentID: report.ID(7001),
 		ModelCode:    "BIGFIVE_V1",
-		Detail:       detail,
-	})
+		Detail:       bigFiveMechanismDetail(detail),
+	}, BigFiveTraitProfileTemplate())
 	if err != nil {
 		t.Fatalf("BuildBigFiveReport: %v", err)
 	}
-	if report.ModelName() != "Big Five 五大人格特质测评 - 五大人格特质" {
-		t.Fatalf("ModelName = %q", report.ModelName())
+	if got.ModelName() != "Big Five 五大人格特质测评 - 五大人格特质" {
+		t.Fatalf("ModelName = %q", got.ModelName())
 	}
-	if report.ModelCode() != "BIGFIVE_V1" {
-		t.Fatalf("ModelCode = %q", report.ModelCode())
+	if got.ModelCode() != "BIGFIVE_V1" {
+		t.Fatalf("ModelCode = %q", got.ModelCode())
 	}
-	if report.Conclusion() != "五大人格特质画像 - Openness 6 / Conscientiousness 8" {
-		t.Fatalf("Conclusion = %q", report.Conclusion())
+	if got.Conclusion() != "五大人格特质画像 - Openness 6 / Conscientiousness 8" {
+		t.Fatalf("Conclusion = %q", got.Conclusion())
 	}
-	dimensions := report.Dimensions()
+	dimensions := got.Dimensions()
 	if len(dimensions) != 2 {
 		t.Fatalf("len(Dimensions) = %d, want 2", len(dimensions))
 	}
-	if dimensions[0].Code() != domainreport.DimensionCode("O") ||
+	if dimensions[0].Code() != report.NewDimensionCode("O") ||
 		dimensions[0].Name() != "Openness" ||
 		dimensions[0].RawScore() != 6 ||
-		dimensions[0].Kind() != domainreport.DimensionKindTrait ||
+		dimensions[0].Kind() != report.DimensionKindTrait ||
 		dimensions[0].Description() != "Openness：原始分 6" {
 		t.Fatalf("unexpected dimension[0]: %#v", dimensions[0])
 	}
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "特质分布：Openness 6 / Conscientiousness 8")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "来源与授权：IPIP；License: CC0；非商业使用: false。")
-	extra := report.ModelExtra()
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "特质分布：Openness 6 / Conscientiousness 8")
+	assertReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "来源与授权：IPIP；License: CC0；非商业使用: false。")
+	extra := got.ModelExtra()
 	if extra == nil {
 		t.Fatal("expected model extra")
 	}
@@ -237,9 +237,9 @@ func TestBuildBigFiveReportFillsTraitDimensions(t *testing.T) {
 
 func assertReportSuggestion(
 	t *testing.T,
-	suggestions []domainreport.Suggestion,
-	category domainreport.SuggestionCategory,
-	factorCode *domainreport.FactorCode,
+	suggestions []report.Suggestion,
+	category report.SuggestionCategory,
+	factorCode *report.FactorCode,
 	content string,
 ) {
 	t.Helper()

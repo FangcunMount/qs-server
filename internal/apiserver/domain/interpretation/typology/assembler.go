@@ -1,10 +1,10 @@
 package typology
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 
 // Build 组装人格类解读报告。
-func Build(input Input) *domainreport.InterpretReport {
-	return domainreport.NewInterpretReport(
+func Build(input Input) *report.InterpretReport {
+	return report.NewInterpretReport(
 		input.AssessmentID,
 		input.Profile.ReportModelName(),
 		input.Profile.ReportModelCode(input.ModelCode),

@@ -1,12 +1,14 @@
 package scoring
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+)
 
 type FactorReportScore struct {
 	FactorCode     string
 	FactorName     string
 	RawScore       float64
-	RiskLevel      domainreport.RiskLevel
+	RiskLevel      report.RiskLevel
 	Conclusion     string
 	Suggestion     string
 	IsTotalScore   bool
@@ -17,10 +19,10 @@ type FactorReportScore struct {
 }
 
 type ReportInput struct {
-	AssessmentID domainreport.ID
+	AssessmentID report.ID
 	Model        *ReportModel
 	TotalScore   float64
-	RiskLevel    domainreport.RiskLevel
+	RiskLevel    report.RiskLevel
 	Conclusion   string
 	Suggestion   string
 	FactorScores []FactorReportScore

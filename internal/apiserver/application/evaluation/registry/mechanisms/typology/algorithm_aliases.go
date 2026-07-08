@@ -12,6 +12,8 @@ var defaultAlgorithmAliases = []modelcatalog.Algorithm{
 }
 
 // DefaultAlgorithmAliases returns built-in typology algorithm aliases for migration read paths.
+//
+// Deprecated: use MechanismReportBuilderKey / DecisionKind routing instead.
 func DefaultAlgorithmAliases() []modelcatalog.Algorithm {
 	out := make([]modelcatalog.Algorithm, len(defaultAlgorithmAliases))
 	copy(out, defaultAlgorithmAliases)

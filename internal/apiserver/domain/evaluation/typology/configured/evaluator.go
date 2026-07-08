@@ -3,16 +3,16 @@ package configured
 import (
 	"fmt"
 
+	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
+	calcspecialrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/specialrule"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/trait"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // Evaluator 计算类型学载荷 通过 配置化运行时 pipeline。
 type Evaluator struct {
-	rules   specialrule.Engine
+	rules   calcspecialrule.Engine
 	details DetailAssemblerRegistry
 }
 
@@ -24,7 +24,7 @@ func NewEvaluator() Evaluator {
 // NewEvaluatorWithDetails 返回配置化 evaluator that resolves 明细组装 通过 注册表。
 func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	return Evaluator{
-		rules:   specialrule.Engine{},
+		rules:   calcspecialrule.Engine{},
 		details: details,
 	}
 }
@@ -43,8 +43,8 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 	}
 	adapterKey := spec.OutcomeMapping.ResolvedDetailAdapterKey(spec.Decision.Kind)
 
-	if match, ok := e.rules.ApplyBeforeScore(spec.SpecialRules, payload, sheet.Answers); ok {
-		return e.assembleResult(payload, spec, trait.ProfileVector{}, trait.DecisionSpec{}, trait.OutcomeCandidate{}, SelectedOutcome{
+	if match, ok := e.rules.ApplyBeforeScore(spec.SpecialRules, payload, classificationAnswers(sheet)); ok {
+		return e.assembleResult(payload, spec, calcclassification.ProfileVector{}, calcclassification.DecisionSpec{}, calcclassification.OutcomeCandidate{}, SelectedOutcome{
 			Code:       match.OutcomeCode,
 			Similarity: 1,
 			Trigger:    match.Trigger,
@@ -59,11 +59,11 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 	if err != nil {
 		return evaluationtypology.ScoringResult{}, err
 	}
-	vector, err := trait.ScoreGraph(graph, sheet)
+	vector, err := calcclassification.ScoreGraph(graph, classificationAnswerSheet(sheet))
 	if err != nil {
 		return evaluationtypology.ScoringResult{}, err
 	}
-	candidate, err := trait.SelectOutcome(vector, decision)
+	candidate, err := calcclassification.SelectOutcome(vector, decision)
 	if err != nil {
 		return evaluationtypology.ScoringResult{}, err
 	}
@@ -88,9 +88,9 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 func (e Evaluator) assembleResult(
 	payload *modeltypology.Payload,
 	spec *modeltypology.RuntimeSpec,
-	vector trait.ProfileVector,
-	decision trait.DecisionSpec,
-	candidate trait.OutcomeCandidate,
+	vector calcclassification.ProfileVector,
+	decision calcclassification.DecisionSpec,
+	candidate calcclassification.OutcomeCandidate,
 	selected SelectedOutcome,
 	specialMatch *evaluationtypology.ScoringSpecialMatch,
 	adapterKey modeltypology.DetailAdapterKey,

@@ -6,7 +6,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -17,7 +17,7 @@ type scoringSnapshotStoreConfig struct {
 	OpsRedis            redis.UniversalClient
 }
 
-func resolveScoringSnapshotStore(cfg scoringSnapshotStoreConfig) (evaluationscoring.ScoringSnapshotStore, error) {
+func resolveScoringSnapshotStore(cfg scoringSnapshotStoreConfig) (outcomescoring.SnapshotStore, error) {
 	if cfg.OpsRedis != nil {
 		return rediseval.NewRedisScoringSnapshotStore(cfg.OpsRedis), nil
 	}
@@ -28,7 +28,7 @@ func resolveScoringSnapshotStore(cfg scoringSnapshotStoreConfig) (evaluationscor
 				"set EVALUATION_SINGLE_PROCESS_ASYNC=true for single-process dev/test only",
 		)
 	}
-	return evaluationscoring.NewMemoryScoringSnapshotStore(), nil
+	return outcomescoring.NewMemorySnapshotStore(), nil
 }
 
 func singleProcessAsyncFromEnv() bool {

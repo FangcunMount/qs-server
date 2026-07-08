@@ -8,7 +8,7 @@ import (
 )
 
 func TestResolveReportTypeReturnsStandard(t *testing.T) {
-	if got := resolveReportType(evaloutcome.Outcome{}); got != domainReport.ReportTypeStandard {
+	if got := OutcomeReportType(evaloutcome.Outcome{}); got != domainReport.ReportTypeStandard {
 		t.Fatalf("resolveReportType() = %s, want %s", got, domainReport.ReportTypeStandard)
 	}
 }

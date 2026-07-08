@@ -17,7 +17,6 @@ func TestDomainPackagesDoNotIntroduceAssessmentCodeFilenames(t *testing.T) {
 		"/characterization/",
 		"/legacy/",
 		"/ruleset/",
-		"/typology/patterns/",
 		"_test.go",
 		"legacy_",
 		"from_sbti",

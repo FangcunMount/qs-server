@@ -62,3 +62,36 @@ func repoRoot(t *testing.T) string {
 		dir = parent
 	}
 }
+
+func TestInterpretationRootPackageOnlyFacadeFiles(t *testing.T) {
+	t.Parallel()
+
+	interpRoot := filepath.Join(repoRoot(t), "internal", "apiserver", "domain", "interpretation")
+	allowed := map[string]struct{}{
+		"doc.go":            {},
+		"types.go":          {},
+		"export.go":         {},
+		"errors.go":         {},
+		"events.go":         {},
+		"events_outcome.go": {},
+		"event_wire.go":     {},
+		"repository.go":     {},
+		"strategy.go":       {},
+	}
+	entries, err := os.ReadDir(interpRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		if _, ok := allowed[name]; !ok {
+			t.Fatalf("unexpected root file %s; interpretation root must only contain facade files", name)
+		}
+	}
+}

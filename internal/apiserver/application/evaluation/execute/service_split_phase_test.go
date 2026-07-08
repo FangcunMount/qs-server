@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -121,7 +122,7 @@ func TestEvaluateAsyncSplitPhaseStagesEvaluatedWithoutInterpretation(t *testing.
 	scoring := &phaseRecordingScoringWriter{rec: rec}
 	interp := &phaseRecordingInterpretationService{rec: rec}
 	stager := &engineRecordingEventStager{}
-	snapshotStore := evaluationscoring.NewMemoryScoringSnapshotStore()
+	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 
 	evaluator := &countingEvaluator{
 		key: evaluation.ExecutionIdentityScaleDefault,
@@ -183,4 +184,4 @@ func splitPhaseAssessment(t *testing.T) *domainAssessment.Assessment {
 	return a
 }
 
-var _ evaluationscoring.Writer = (*phaseRecordingScoringWriter)(nil)
+var _ outcomescoring.Writer = (*phaseRecordingScoringWriter)(nil)

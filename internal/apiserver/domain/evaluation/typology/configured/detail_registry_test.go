@@ -45,10 +45,3 @@ func TestDefaultDetailAssemblerRegistryOnlyRegistersMechanismKeys(t *testing.T) 
 		}
 	}
 }
-
-func TestRegisterLegacyDetailAssemblersRestoresLegacyKeys(t *testing.T) {
-	registry := RegisterLegacyDetailAssemblers(DefaultDetailAssemblerRegistry())
-	if registry.Len() != 5 {
-		t.Fatalf("registry len = %d, want 5 with legacy adapters", registry.Len())
-	}
-}

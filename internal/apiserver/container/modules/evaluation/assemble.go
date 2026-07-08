@@ -13,10 +13,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
@@ -268,7 +268,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return err
 		}
-		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectorRegistry, scoringSnapshotStore)
+		scoringWriter := outcomescoring.NewWriter(infra.assessmentRepo, scoreProjectorRegistry, scoringSnapshotStore)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
 
 		m.EvaluationService = execute.NewService(

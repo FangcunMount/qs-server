@@ -112,6 +112,7 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 		"internal/apiserver/application/evaluation/registry/mechanisms/scoring",
 		"internal/apiserver/application/evaluation/registry/mechanisms/typology",
 		"internal/apiserver/application/evaluation/registry/mechanisms/norming",
+		"internal/apiserver/application/evaluation/outcome/scoring",
 		"internal/apiserver/application/evaluation/registry/mechanisms/task_performance",
 	}
 	for _, rel := range required {

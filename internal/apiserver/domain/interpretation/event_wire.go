@@ -2,13 +2,13 @@ package interpretation
 
 import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 
-// EventModelIdentity 是线缆投影 of Model身份 on 领域事件。
+// EventModelIdentity 是线缆投影 of ModelIdentity on 领域事件。
 type EventModelIdentity = eventoutcome.ModelIdentity
 
 // EventScoreValue 是线缆投影 of ScoreValue on 领域事件。
 type EventScoreValue = eventoutcome.ScoreValue
 
-// EventResultLevel 是线缆投影 of Result等级 on 领域事件。
+// EventResultLevel 是线缆投影 of ResultLevel on 领域事件。
 type EventResultLevel = eventoutcome.ResultLevel
 
 func EventModelIdentityFrom(model ModelIdentity) EventModelIdentity {

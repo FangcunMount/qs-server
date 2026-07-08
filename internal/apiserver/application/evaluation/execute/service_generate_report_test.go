@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -81,7 +82,7 @@ func TestGenerateReportUsesStoredScoringSnapshotWithoutReExecute(t *testing.T) {
 	}
 
 	repo := &fakeAssessmentRepo{assessment: assessmentEntity}
-	snapshotStore := evaluationscoring.NewMemoryScoringSnapshotStore()
+	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 	if err := snapshotStore.Save(context.Background(), assessmentEntity.ID().Uint64(), storedOutcome); err != nil {
 		t.Fatalf("Save snapshot: %v", err)
 	}

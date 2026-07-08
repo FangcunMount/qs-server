@@ -1,13 +1,15 @@
 package scoring
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+)
 
 // ScaleReportInput 是 scale 家族报告组装输入。
 type ScaleReportInput struct {
-	AssessmentID domainreport.ID
+	AssessmentID report.ID
 	Scale        *ReportModel
 	TotalScore   float64
-	RiskLevel    domainreport.RiskLevel
+	RiskLevel    report.RiskLevel
 	Conclusion   string
 	Suggestion   string
 	FactorScores []FactorReportScore
@@ -19,7 +21,7 @@ var BuildFactorScoringReport = BuildScaleReport
 // BuildScaleReport 组装 scale 家族解读报告。
 // 当因子未携带结论/建议文案时，依据模型解读规则在解读侧生成，
 // 整体结论/建议在未显式给定时取自总分因子。
-func BuildScaleReport(composer domainreport.ReportBuilder, input ScaleReportInput) (*domainreport.InterpretReport, error) {
+func BuildScaleReport(composer report.ReportBuilder, input ScaleReportInput) (*report.InterpretReport, error) {
 	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
 	for _, fs := range input.FactorScores {
 		if fs.Conclusion == "" && fs.Suggestion == "" {
@@ -49,15 +51,15 @@ func BuildScaleReport(composer domainreport.ReportBuilder, input ScaleReportInpu
 	})
 }
 
-func BuildReport(composer domainreport.ReportBuilder, input ReportInput) (*domainreport.InterpretReport, error) {
+func BuildReport(composer report.ReportBuilder, input ReportInput) (*report.InterpretReport, error) {
 	if composer == nil {
-		return nil, domainreport.ErrInvalidArgument
+		return nil, report.ErrInvalidArgument
 	}
 	return composer.Build(generateReportInput(input))
 }
 
-func generateReportInput(input ReportInput) domainreport.GenerateReportInput {
-	reportInput := domainreport.GenerateReportInput{
+func generateReportInput(input ReportInput) report.GenerateReportInput {
+	reportInput := report.GenerateReportInput{
 		AssessmentID: input.AssessmentID,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
@@ -75,14 +77,14 @@ func generateReportInput(input ReportInput) domainreport.GenerateReportInput {
 func factorScoreInputs(
 	factorScores []FactorReportScore,
 	model *ReportModel,
-) []domainreport.FactorScoreInput {
+) []report.FactorScoreInput {
 	factorMeta := make(map[string]FactorReportModel)
 	if model != nil {
 		for _, f := range model.Factors {
 			factorMeta[f.Code] = f
 		}
 	}
-	inputs := make([]domainreport.FactorScoreInput, 0, len(factorScores))
+	inputs := make([]report.FactorScoreInput, 0, len(factorScores))
 	for _, fs := range factorScores {
 		meta, ok := factorMeta[fs.FactorCode]
 		factorName := fs.FactorName
@@ -96,8 +98,8 @@ func factorScoreInputs(
 		if factorName == "" {
 			factorName = fs.FactorCode
 		}
-		inputs = append(inputs, domainreport.FactorScoreInput{
-			FactorCode:     domainreport.FactorCode(fs.FactorCode),
+		inputs = append(inputs, report.FactorScoreInput{
+			FactorCode:     report.FactorCode(fs.FactorCode),
 			FactorName:     factorName,
 			RawScore:       fs.RawScore,
 			MaxScore:       maxScore,

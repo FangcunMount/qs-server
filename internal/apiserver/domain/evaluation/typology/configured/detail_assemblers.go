@@ -3,8 +3,8 @@ package configured
 import (
 	"fmt"
 
+	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/trait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -58,9 +58,9 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("trait metadata for factor %s is not defined", dimCode)
 		}
-		raw, ok := input.Candidate.TraitScores[trait.FactorID(dimCode)]
+		raw, ok := input.Candidate.TraitScores[calcclassification.FactorID(dimCode)]
 		if !ok {
-			score, scoreOK := input.Vector.Scores[trait.FactorID(dimCode)]
+			score, scoreOK := input.Vector.Scores[calcclassification.FactorID(dimCode)]
 			if !scoreOK {
 				return nil, fmt.Errorf("missing trait score for %s", dimCode)
 			}
@@ -78,11 +78,29 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 	}, nil
 }
 
+// AssemblePersonalityTypeDetail 暴露机制中性人格类型明细组装，供 legacy adapter 使用。
+func AssemblePersonalityTypeDetail(input DetailInput) (evaluationtypology.PersonalityTypeDetail, error) {
+	generic, err := assemblePersonalityTypeDetail(input)
+	if err != nil {
+		return evaluationtypology.PersonalityTypeDetail{}, err
+	}
+	return generic.(evaluationtypology.PersonalityTypeDetail), nil
+}
+
+// AssembleTraitProfileDetail 暴露机制中性特质画像明细组装，供 legacy adapter 使用。
+func AssembleTraitProfileDetail(input DetailInput) (evaluationtypology.TraitProfileDetail, error) {
+	generic, err := assembleTraitProfileDetail(input)
+	if err != nil {
+		return evaluationtypology.TraitProfileDetail{}, err
+	}
+	return generic.(evaluationtypology.TraitProfileDetail), nil
+}
+
 func buildPersonalityDimensions(input DetailInput) ([]evaluationtypology.PersonalityDimensionResult, error) {
-	if input.Decision.Kind == trait.DecisionKindPoleComposition || len(input.Decision.Poles) > 0 {
+	if input.Decision.Kind == calcclassification.DecisionKindPoleComposition || len(input.Decision.Poles) > 0 {
 		return buildPolePersonalityDimensions(input)
 	}
-	if input.Decision.Kind == trait.DecisionKindNearestPattern || len(input.Decision.PatternOrder) > 0 ||
+	if input.Decision.Kind == calcclassification.DecisionKindNearestPattern || len(input.Decision.PatternOrder) > 0 ||
 		input.Spec.Decision.Kind == modelcatalog.DecisionKindNearestPattern {
 		return buildPatternPersonalityDimensions(input)
 	}
@@ -103,7 +121,7 @@ func buildPolePersonalityDimensions(input DetailInput) ([]evaluationtypology.Per
 		if !ok {
 			return nil, fmt.Errorf("pole metadata for factor %s is not defined", pole.FactorID)
 		}
-		preference, strength := trait.ResolvePole(pole, score.Raw)
+		preference, strength := calcclassification.ResolvePole(pole, score.Raw)
 		dimensions = append(dimensions, evaluationtypology.PersonalityDimensionResult{
 			Code:       meta.Code,
 			Name:       meta.Name,
@@ -125,7 +143,7 @@ func buildPatternPersonalityDimensions(input DetailInput) ([]evaluationtypology.
 	order := input.Decision.PatternOrder
 	if len(order) == 0 {
 		for _, factorID := range input.Spec.FactorGraph.DecisionFactorOrder() {
-			order = append(order, trait.FactorID(factorID))
+			order = append(order, calcclassification.FactorID(factorID))
 		}
 	}
 	dimensions := make([]evaluationtypology.PersonalityDimensionResult, 0, len(order))
@@ -143,7 +161,7 @@ func buildPatternPersonalityDimensions(input DetailInput) ([]evaluationtypology.
 			Name:     meta.Name,
 			Model:    meta.Model,
 			RawScore: score.Raw,
-			Level:    trait.LevelForScore(score.Raw, input.Decision.LevelRule),
+			Level:    calcclassification.LevelForScore(score.Raw, input.Decision.LevelRule),
 		})
 	}
 	return dimensions, nil
