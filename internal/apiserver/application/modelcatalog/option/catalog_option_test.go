@@ -16,14 +16,14 @@ func TestDefaultOptionsExposePresentationFields(t *testing.T) {
 	}
 	found := false
 	for _, item := range opts {
-		if item.Kind == binding.KindPersonality {
+		if item.Kind == binding.KindTypology {
 			found = true
-			if item.APIKind != "personality" || item.DisplayName == "" {
+			if item.APIKind != "typology" || item.DisplayName == "" {
 				t.Fatalf("option = %#v", item)
 			}
 		}
 	}
 	if !found {
-		t.Fatal("personality option missing")
+		t.Fatal("typology option missing")
 	}
 }

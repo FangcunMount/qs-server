@@ -55,7 +55,7 @@ func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testin
 		nil,
 	))
 	model := rpt.Model()
-	if model.Kind != "personality" || model.SubKind != "typology" || model.Algorithm != "mbti" {
+	if model.Kind != "typology" || model.SubKind != "typology" || model.Algorithm != "mbti" {
 		t.Fatalf("model = %#v", model)
 	}
 	primary := rpt.PrimaryScore()

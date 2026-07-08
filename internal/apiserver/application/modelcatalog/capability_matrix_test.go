@@ -173,7 +173,7 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 					t.Fatalf("Create(%q) error = %v, want success", apiKind, err)
 				}
 				switch apiKind {
-				case KindPersonality:
+				case KindTypology, KindPersonality:
 					if !personalityStub.createCalled {
 						t.Fatal("personality command Create was not called")
 					}
@@ -201,7 +201,7 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 
 func previewModelCode(apiKind string) string {
 	switch apiKind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return "personality_demo"
 	case KindCognitive:
 		return "cognitive_demo"

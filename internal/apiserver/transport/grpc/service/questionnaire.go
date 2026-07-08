@@ -18,13 +18,13 @@ import (
 type QuestionnaireService struct {
 	pb.UnimplementedQuestionnaireServiceServer
 	queryService    questionnaire.QuestionnaireQueryService
-	publishedReader rulesetport.PublishedReader
+	publishedReader rulesetport.PublishedModelReader
 }
 
 // NewQuestionnaireService 创建问卷 gRPC 服务
 func NewQuestionnaireService(
 	queryService questionnaire.QuestionnaireQueryService,
-	publishedReader rulesetport.PublishedReader,
+	publishedReader rulesetport.PublishedModelReader,
 ) *QuestionnaireService {
 	return &QuestionnaireService{
 		queryService:    queryService,
@@ -116,7 +116,7 @@ func (s *QuestionnaireService) isConsumerAccessible(ctx context.Context, result 
 	if s.publishedReader == nil {
 		return false
 	}
-	snapshot, err := s.publishedReader.FindPublishedByQuestionnaire(ctx, result.Code, result.Version)
+	snapshot, err := s.publishedReader.FindPublishedModelByQuestionnaire(ctx, result.Code, result.Version)
 	return err == nil && snapshot != nil
 }
 

@@ -25,8 +25,8 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		qrcode         bool
 	}{
 		{
-			apiKind:        "personality",
-			kind:           binding.KindPersonality,
+			apiKind:        "typology",
+			kind:           binding.KindTypology,
 			displayName:    "人格测评",
 			optionsEnabled: true,
 			create:         true,

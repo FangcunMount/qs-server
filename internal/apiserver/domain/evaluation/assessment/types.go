@@ -201,8 +201,11 @@ const (
 	// EvaluationModelKindScale 医学/心理量表模型。
 	EvaluationModelKindScale EvaluationModelKind = modelcatalog.KindScale
 
-	// EvaluationModelKindPersonality 人格类模型（typology/trait 等子形态由 SubKind/Algorithm 区分）。
-	EvaluationModelKindPersonality EvaluationModelKind = modelcatalog.KindPersonality
+	// EvaluationModelKindTypology 类型学模型（trait 等子形态由 SubKind/Algorithm 区分）。
+	EvaluationModelKindTypology EvaluationModelKind = modelcatalog.KindTypology
+
+	// EvaluationModelKindPersonality is a deprecated alias for EvaluationModelKindTypology.
+	EvaluationModelKindPersonality EvaluationModelKind = EvaluationModelKindTypology
 )
 
 // EvaluationModelRef 表示执行期模型引用（含计分与解读规则快照）。

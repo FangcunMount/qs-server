@@ -197,7 +197,7 @@ func applyAssessmentBinding(
 		return nil
 	}
 	switch binding.Ref.Kind {
-	case domainruleset.RuleSetKindScale:
+	case domainruleset.KindScale:
 		dto.MedicalScaleID = binding.MedicalScaleID
 		dto.MedicalScaleCode = binding.MedicalScaleCode
 		dto.MedicalScaleName = binding.MedicalScaleName

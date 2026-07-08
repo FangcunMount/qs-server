@@ -11,18 +11,18 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-type stubScaleRuleReader struct {
-	snapshot *domain.RuleSetSnapshot
+type stubScalePublishedReader struct {
+	snapshot *domain.PublishedModelSnapshot
 }
 
-func (s stubScaleRuleReader) GetPublishedByRef(context.Context, rulesetport.Ref) (*domain.RuleSetSnapshot, error) {
+func (s stubScalePublishedReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
 	if s.snapshot == nil {
 		return nil, domain.ErrNotFound
 	}
 	return s.snapshot, nil
 }
 
-func (s stubScaleRuleReader) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.RuleSetSnapshot, error) {
+func (s stubScalePublishedReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
 	return nil, domain.ErrNotFound
 }
 
@@ -41,7 +41,7 @@ func (s stubScaleFallbackCatalog) GetScaleByRef(context.Context, port.ModelRef) 
 	return s.byRef, nil
 }
 
-func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
+func TestPublishedScaleCatalogPrefersPublishedPayload(t *testing.T) {
 	fromMongo := &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",
 		ScaleVersion: "2.0.0",
@@ -52,13 +52,15 @@ func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeScale: %v", err)
 	}
-	reader := stubScaleRuleReader{snapshot: &domain.RuleSetSnapshot{
-		SchemaVersion: domain.RuleSetSchemaVersionV1,
+	reader := stubScalePublishedReader{snapshot: &domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: format,
-		Definition: domain.RuleSetDefinition{
-			Kind:    domain.RuleSetKindScale,
+		Model: domain.ModelDefinition{
+			Kind:    domain.KindScale,
 			Code:    fromMongo.Code,
 			Version: fromMongo.ScaleVersion,
+			Title:   fromMongo.Title,
+			Status:  fromMongo.Status,
 		},
 		Payload: payload,
 	}}
@@ -68,7 +70,7 @@ func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
 		Title:        "Repo Scale",
 		Status:       "published",
 	}}
-	catalog := NewRuleSetScaleCatalog(reader, fallback)
+	catalog := NewPublishedScaleCatalog(reader, fallback)
 	got, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
 		Code:    "SCL-MONGO",
@@ -82,14 +84,14 @@ func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
 	}
 }
 
-func TestRuleSetScaleCatalogFallsBackToRepo(t *testing.T) {
+func TestPublishedScaleCatalogFallsBackToRepo(t *testing.T) {
 	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-REPO",
 		ScaleVersion: "1.0.0",
 		Title:        "Repo Scale",
 		Status:       "published",
 	}}
-	catalog := NewRuleSetScaleCatalog(stubScaleRuleReader{}, fallback)
+	catalog := NewPublishedScaleCatalog(stubScalePublishedReader{}, fallback)
 	got, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
 		Code:    "SCL-REPO",

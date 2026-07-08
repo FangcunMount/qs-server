@@ -44,7 +44,7 @@ func TestDefinitionFromModelNormalizesFullPayloadToEditorShape(t *testing.T) {
 	}
 
 	model := &domain.AssessmentModel{
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Definition: domain.DefinitionPayload{
@@ -205,7 +205,7 @@ func TestDefinitionFromModelSynthesizesTraitProfileOutcomes(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 	model := &domain.AssessmentModel{
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmBigFive,
 		Definition: domain.DefinitionPayload{

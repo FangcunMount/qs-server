@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	KindPersonality         = "personality"
+	KindTypology            = "typology"
+	KindPersonality         = "personality" // Deprecated API alias; use KindTypology.
 	SubKindTypology         = "typology"
 	StatusDraft             = "draft"
 	StatusPublished         = "published"

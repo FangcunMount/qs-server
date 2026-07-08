@@ -83,7 +83,7 @@ func summaryFromTypology(result *typology.ModelSummary) *ModelSummary {
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
-	populateModelSummaryIdentity(summary, domain.KindPersonality, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	populateModelSummaryIdentity(summary, domain.KindTypology, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
 	return summary
 }
 
@@ -99,7 +99,7 @@ func definitionFromTypology(result *typology.DefinitionResult) *DefinitionDTO {
 		PayloadFormat:  result.PayloadFormat,
 		Payload:        result.Payload,
 	}
-	populateDefinitionIdentity(dto, domain.KindPersonality, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	populateDefinitionIdentity(dto, domain.KindTypology, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
 	return dto
 }
 

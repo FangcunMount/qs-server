@@ -16,7 +16,7 @@ var (
 		Algorithm: modelcatalog.AlgorithmScaleDefault,
 	}
 	ExecutionIdentityPersonalityTypology = ExecutionIdentity{
-		Kind:      modelcatalog.KindPersonality,
+		Kind:      modelcatalog.KindTypology,
 		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
@@ -35,7 +35,7 @@ var (
 // PersonalityTypologyIdentity 构建执行路由身份 用于 类型学算法。
 func PersonalityTypologyIdentity(algorithm modelcatalog.Algorithm) ExecutionIdentity {
 	return ExecutionIdentity{
-		Kind:      modelcatalog.KindPersonality,
+		Kind:      modelcatalog.KindTypology,
 		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: algorithm,
 	}
@@ -54,7 +54,7 @@ func (id ExecutionIdentity) IsZero() bool {
 
 // IsPersonalityTypologyLegacyIdentity 报告是否 身份 是 内置 类型学算法 别名。
 func (id ExecutionIdentity) IsPersonalityTypologyLegacyIdentity() bool {
-	if id.Kind != modelcatalog.KindPersonality || id.SubKind != modelcatalog.SubKindTypology {
+	if !modelcatalog.IsTypologyKind(id.Kind) || id.SubKind != modelcatalog.SubKindTypology {
 		return false
 	}
 	switch id.Algorithm {
@@ -105,7 +105,7 @@ func ModelDescriptorFromIdentity(id ExecutionIdentity) ModelDescriptor {
 			Kind:      ModelKindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		}
-	case id.Kind == modelcatalog.KindPersonality && id.SubKind == modelcatalog.SubKindTypology && id.Algorithm != "":
+	case modelcatalog.IsTypologyKind(id.Kind) && id.SubKind == modelcatalog.SubKindTypology && id.Algorithm != "":
 		return ModelDescriptor{Kind: ModelKindTypology, Algorithm: id.Algorithm}
 	default:
 		return ModelDescriptor{}

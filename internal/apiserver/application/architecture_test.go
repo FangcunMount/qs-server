@@ -1015,6 +1015,64 @@ func TestR123DeprecatedAliasesNotReintroduced(t *testing.T) {
 	}
 }
 
+func TestR127RuleSetSymbolsNotReintroduced(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"EnsureRuleSetCatalog",
+		"RuleSetScaleCatalog",
+		"RuleSetRefFromPublished",
+		"NewRuleSetScaleCatalog",
+		"ScaleRuleSetPublisher",
+		"NewScaleRuleSetPublisher",
+	}
+	allowPrefixes := []string{
+		"scripts/",
+		"internal/apiserver/infra/ruleset/static_composite_catalog",
+		"internal/apiserver/infra/ruleset/scale_publisher_test.go",
+		"internal/apiserver/domain/modelcatalog/export.go",
+		"internal/apiserver/domain/modelcatalog/legacy/",
+	}
+	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if strings.Contains(path, string(filepath.Separator)+"architecture_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		for _, prefix := range allowPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains deprecated R127 token %q", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 	t.Parallel()
 
@@ -1025,11 +1083,12 @@ func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "Kind:           EvaluationModelKindPersonality") {
-		t.Fatal("port/evaluationinput typology snapshots must set Kind=personality")
+	if !strings.Contains(text, "Kind:           EvaluationModelKindTypology") &&
+		!strings.Contains(text, "Kind:           EvaluationModelKindPersonality") {
+		t.Fatal("port/evaluationinput typology snapshots must set Kind=typology")
 	}
 	for _, want := range []string{
-		"func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
+		"func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindTypology",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("port/evaluationinput missing v2 RuleSetKind: %q", want)

@@ -27,14 +27,14 @@ func (s *typologyCommandStub) Create(_ context.Context, input typology.CreateInp
 	s.createCalled = true
 	return &typology.ModelSummary{
 		Code:  input.Code,
-		Kind:  typology.KindPersonality,
+		Kind:  typology.KindTypology,
 		Title: input.Title,
 	}, nil
 }
 
 func (s *typologyCommandStub) Get(_ context.Context, modelCode string) (*typology.ModelSummary, error) {
 	if modelCode == "personality_demo" {
-		return &typology.ModelSummary{Code: modelCode, Kind: typology.KindPersonality}, nil
+		return &typology.ModelSummary{Code: modelCode, Kind: typology.KindTypology}, nil
 	}
 	return nil, stderrors.New("not found")
 }
@@ -234,7 +234,7 @@ func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 	})
 
 	result, err := svc.Create(context.Background(), CreateModelDTO{
-		Kind:  KindPersonality,
+		Kind:  KindTypology,
 		Code:  "personality_create",
 		Title: "Personality",
 	})
@@ -244,8 +244,8 @@ func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 	if !personalityStub.createCalled {
 		t.Fatal("personality command Create was not called")
 	}
-	if result.Kind != KindPersonality {
-		t.Fatalf("result kind = %s, want %s", result.Kind, KindPersonality)
+	if result.Kind != KindTypology {
+		t.Fatalf("result kind = %s, want %s", result.Kind, KindTypology)
 	}
 }
 

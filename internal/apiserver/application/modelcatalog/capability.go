@@ -7,7 +7,7 @@ func registeredOptionForAPIKind(apiKind string) (catalogoption.RegisteredOption,
 }
 
 func shouldListModelKind(filterKind, apiKind string) bool {
-	if filterKind != "" && filterKind != apiKind {
+	if filterKind != "" && normalizeAPIKind(filterKind) != normalizeAPIKind(apiKind) {
 		return false
 	}
 	entry, ok := registeredOptionForAPIKind(apiKind)

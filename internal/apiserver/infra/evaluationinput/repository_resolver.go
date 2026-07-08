@@ -42,7 +42,7 @@ func NewRepositoryResolver(
 	if modelCatalog == nil {
 		return nil, fmt.Errorf("ruleset catalog is required")
 	}
-	interpretationScaleCatalog := NewRuleSetScaleCatalog(modelCatalog, scaleCatalog)
+	interpretationScaleCatalog := NewPublishedScaleCatalog(modelCatalog, scaleCatalog)
 	var (
 		typologyCatalog         port.TypologyModelCatalog
 		behavioralRatingCatalog port.BehavioralRatingModelCatalog

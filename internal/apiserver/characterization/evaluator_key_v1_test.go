@@ -38,7 +38,7 @@ func TestV1ModelRefExecutionIdentityFromLegacyKind(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 	v2 := evaluationinput.ModelRef{
-		Kind:      "personality",
+		Kind:      "typology",
 		SubKind:   "typology",
 		Algorithm: "mbti",
 		Code:      "MBTI_TEST",
@@ -55,8 +55,8 @@ func TestV1ModelSnapshotCarriesV2IdentityFields(t *testing.T) {
 		t.Fatalf("snapshot identity = sub:%s algo:%s", snapshot.SubKind, snapshot.Algorithm)
 	}
 	ref := snapshot.ModelRef()
-	if got := ref.ExecutionIdentity().String(); got != "personality/typology/mbti" {
-		t.Fatalf("ref identity = %s, want personality/typology/mbti", got)
+	if got := ref.ExecutionIdentity().String(); got != "typology/typology/mbti" {
+		t.Fatalf("ref identity = %s, want typology/typology/mbti", got)
 	}
 }
 

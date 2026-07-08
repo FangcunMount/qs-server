@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-func TestSummaryFromSnapshotTypologyPayload(t *testing.T) {
+func TestSummaryFromPublishedModelTypologyPayload(t *testing.T) {
 	payload, err := json.Marshal(&modeltypology.Payload{
 		Code:                 "MBTI_OEJTS",
 		Version:              "1.0.0",
@@ -22,25 +21,28 @@ func TestSummaryFromSnapshotTypologyPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := &domain.Snapshot{
+	snapshot := &domain.PublishedModelSnapshot{
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
-		Definition: domain.Definition{
-			Code:    "MBTI_OEJTS",
-			Version: "1.0.0",
-			Title:   "MBTI",
-			Status:  "published",
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindTypology,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: domain.AlgorithmMBTI,
+			Code:      "MBTI_OEJTS",
+			Version:   "1.0.0",
+			Title:     "MBTI",
+			Status:    "published",
 		},
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    "MBTI_OEJTS",
 			QuestionnaireVersion: "1.0.0",
 		},
-		Payload: payload,
+		Decision: domain.DecisionSpec{Kind: domain.DecisionKindPoleComposition},
+		Payload:  payload,
 	}
-	decoded, err := legacy.DecodeTypologyFromSnapshot(snapshot)
+	summary, err := SummaryFromPublishedModel(snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	summary := SummaryFromSnapshot(snapshot, decoded)
 	if summary.Algorithm != string(domain.AlgorithmMBTI) || summary.QuestionCount != 1 {
 		t.Fatalf("summary = %#v", summary)
 	}

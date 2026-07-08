@@ -146,12 +146,12 @@ func (c *Container) DefaultEvaluationCatalog() (compose.EvaluationCatalog, error
 	return ammod.ExportEvaluationCatalog()
 }
 
-func (c *Container) RuleSetCatalog() rulesetport.Catalog {
-	return c.ruleSetCatalog
+func (c *Container) PublishedModelCatalog() rulesetport.Catalog {
+	return c.publishedModelCatalog
 }
 
-func (c *Container) SetRuleSetCatalog(catalog rulesetport.Catalog) {
-	c.ruleSetCatalog = catalog
+func (c *Container) SetPublishedModelCatalog(catalog rulesetport.Catalog) {
+	c.publishedModelCatalog = catalog
 }
 
 func (c *Container) SurveyPorts() compose.SurveyPorts {
@@ -299,28 +299,28 @@ func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
 	return infra, nil
 }
 
-func (c *Container) ensureRuleSetCatalog() (rulesetport.Catalog, error) {
+func (c *Container) ensurePublishedModelCatalog() (rulesetport.Catalog, error) {
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
-	if c.ruleSetCatalog != nil {
-		return c.ruleSetCatalog, nil
+	if c.publishedModelCatalog != nil {
+		return c.publishedModelCatalog, nil
 	}
-	catalog, err := evalmod.EnsureRuleSetCatalog(evalmod.RuleSetCatalogInput{
+	catalog, err := evalmod.EnsurePublishedModelCatalog(evalmod.PublishedModelCatalogInput{
 		MongoDB:              c.mongoDB,
 		MongoLimiter:         c.backpressure.Mongo,
 		ScaleInfra:           c.surveyScaleInfra,
-		Existing:             c.ruleSetCatalog,
+		Existing:             c.publishedModelCatalog,
 		StaticRedisClient:    c.CacheClient(cacheplane.FamilyStatic),
 		StaticCacheBuilder:   c.CacheBuilder(cacheplane.FamilyStatic),
 		PublishedModelPolicy: c.CachePolicy(cachepolicy.PolicyPublishedModel),
 		Observer:             c.cacheObserver(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize ruleset catalog: %w", err)
+		return nil, fmt.Errorf("failed to initialize published model catalog: %w", err)
 	}
-	c.ruleSetCatalog = catalog
-	return c.ruleSetCatalog, nil
+	c.publishedModelCatalog = catalog
+	return c.publishedModelCatalog, nil
 }
 
 func (c *Container) resolveIdentityService() *iam.IdentityService {

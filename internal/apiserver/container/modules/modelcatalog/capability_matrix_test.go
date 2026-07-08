@@ -14,7 +14,7 @@ func descriptorDomainKinds(descs []evaldomain.ModelDescriptor) map[domain.Kind]b
 		case evaldomain.ModelKindScale:
 			out[domain.KindScale] = true
 		case evaldomain.ModelKindTypology:
-			out[domain.KindPersonality] = true
+			out[domain.KindTypology] = true
 		case evaldomain.ModelKindBehavioralRating:
 			out[domain.KindBehavioralRating] = true
 		case evaldomain.ModelKindCognitive:

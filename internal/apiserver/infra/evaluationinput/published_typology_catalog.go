@@ -96,7 +96,7 @@ func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {
 func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
 	if algorithm != "" {
 		return []rulesetport.Ref{{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: algorithm,
 			Code:      ref.Code,
@@ -106,7 +106,7 @@ func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []ruleset
 	refs := make([]rulesetport.Ref, 0, 3)
 	if ref.SubKind != "" {
 		refs = append(refs, rulesetport.Ref{
-			Kind:    domain.KindPersonality,
+			Kind:    domain.KindTypology,
 			SubKind: domain.SubKind(ref.SubKind),
 			Code:    ref.Code,
 			Version: ref.Version,
@@ -114,12 +114,12 @@ func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []ruleset
 	}
 	refs = append(refs,
 		rulesetport.Ref{
-			Kind:    domain.KindPersonality,
+			Kind:    domain.KindTypology,
 			Code:    ref.Code,
 			Version: ref.Version,
 		},
 		rulesetport.Ref{
-			Kind:    domain.KindPersonality,
+			Kind:    domain.KindTypology,
 			SubKind: domain.SubKindTypology,
 			Code:    ref.Code,
 			Version: ref.Version,

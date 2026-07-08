@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	KindTypology = "typology"
+	// KindPersonality is a deprecated API alias accepted for read-compat.
 	KindPersonality = "personality"
 	// KindBehaviorAbility 是 API 产品通道类型；List 聚合已移除，Options 仍暴露 channel 元数据。
 	KindBehaviorAbility                = domain.APIKindBehaviorAbility

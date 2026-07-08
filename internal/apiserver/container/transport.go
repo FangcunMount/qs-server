@@ -194,13 +194,13 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		QRCodeService:                      c.QRCodeService,
 		MiniProgramTaskNotificationService: c.MiniProgramTaskNotificationService,
 		AuthzSnapshotLoader:                c.exportGRPCAuthzSnapshotLoader(),
-		RuleSetCatalog:                     c.exportGRPCRuleSetCatalog(),
+		PublishedModelCatalog:              c.exportGRPCPublishedModelCatalog(),
 	})
 	deps.WarmupCoordinator = platformDeps.WarmupCoordinator
 	deps.QRCodeService = platformDeps.QRCodeService
 	deps.MiniProgramTaskNotificationService = platformDeps.MiniProgramTaskNotificationService
 	deps.IAM = platformDeps.IAM
-	deps.RuleSet = platformDeps.RuleSet
+	deps.PublishedModelCatalog = platformDeps.PublishedModelCatalog
 
 	if c.SurveyModule != nil {
 		deps.Survey = c.SurveyModule.ExportGRPCDeps()
@@ -240,19 +240,19 @@ func (c *Container) exportGRPCAuthzSnapshotLoader() *iaminfra.AuthzSnapshotLoade
 	return c.IAMModule.AuthzSnapshotLoader()
 }
 
-func (c *Container) exportGRPCRuleSetCatalog() rulesetport.Catalog {
+func (c *Container) exportGRPCPublishedModelCatalog() rulesetport.Catalog {
 	if c == nil {
 		return nil
 	}
-	if c.ruleSetCatalog != nil {
-		return c.ruleSetCatalog
+	if c.publishedModelCatalog != nil {
+		return c.publishedModelCatalog
 	}
-	catalog, err := c.ensureRuleSetCatalog()
+	catalog, err := c.ensurePublishedModelCatalog()
 	if err != nil {
 		return nil
 	}
 	if catalog != nil {
-		c.ruleSetCatalog = catalog
+		c.publishedModelCatalog = catalog
 	}
 	return catalog
 }

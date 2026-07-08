@@ -59,7 +59,7 @@ func (s *service) List(ctx context.Context, input ListInput) (*ModelListResult, 
 		return &ModelListResult{Page: input.Page, PageSize: input.PageSize}, nil
 	}
 	models, total, err := s.deps.ModelRepo.List(ctx, port.ListFilter{
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKind(input.SubKind),
 		Status:    domain.ModelStatus(input.Status),
 		Keyword:   input.Keyword,
@@ -94,7 +94,7 @@ func (s *service) Create(ctx context.Context, input CreateInput) (*ModelSummary,
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           input.Code,
-		Kind:           domain.KindPersonality,
+		Kind:           domain.KindTypology,
 		SubKind:        subKind,
 		Algorithm:      algorithm,
 		ProductChannel: domain.ProductChannel(input.ProductChannel),
@@ -259,14 +259,14 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
-	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
+	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode); err != nil {
 		return nil, err
 	}
 	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
 		return nil, err
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode)
+		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode)
 		return nil, err
 	}
 	s.notifyCacheChanged(ctx, modelCode, "publish")
@@ -284,7 +284,7 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 		return nil, mapDomainError(err)
 	}
 	if s.deps.PublishedRepo != nil {
-		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
+		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode); err != nil {
 			return nil, err
 		}
 	}
@@ -310,7 +310,7 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 		return nil, mapDomainError(err)
 	}
 	if wasPublished && s.deps.PublishedRepo != nil {
-		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
+		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode); err != nil {
 			return nil, err
 		}
 	}

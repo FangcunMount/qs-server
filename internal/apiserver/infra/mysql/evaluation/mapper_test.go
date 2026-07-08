@@ -69,8 +69,8 @@ func TestAssessmentMapperWritesModelOnlyAssessmentWithoutLegacyScaleFields(t *te
 
 	mapper := NewAssessmentMapper()
 	po := mapper.ToPO(a)
-	if po.EvaluationModelKind == nil || *po.EvaluationModelKind != "personality" {
-		t.Fatalf("evaluation model kind = %v, want personality", po.EvaluationModelKind)
+	if po.EvaluationModelKind == nil || *po.EvaluationModelKind != "typology" {
+		t.Fatalf("evaluation model kind = %v, want typology", po.EvaluationModelKind)
 	}
 	if po.EvaluationModelCode == nil || *po.EvaluationModelCode != "MBTI-16P" {
 		t.Fatalf("evaluation model code = %v, want MBTI-16P", po.EvaluationModelCode)

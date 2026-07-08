@@ -32,7 +32,7 @@ type lifecycleService struct {
 	eventPublisher          event.EventPublisher
 	listCache               scalelistcache.PublishedListCache
 	cacheSignalNotifier     CacheSignalNotifier
-	interpretationPublisher RuleSetPublisher
+	interpretationPublisher ScalePublisher
 }
 
 type lifecycleRepository interface {
@@ -46,8 +46,8 @@ type lifecycleRepository interface {
 	Remove(ctx context.Context, code string) error
 }
 
-// RuleSetPublisher 将已发布量表同步到统一规则目录。
-type RuleSetPublisher interface {
+// ScalePublisher syncs published scales into published_assessment_models.
+type ScalePublisher interface {
 	PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
@@ -75,8 +75,8 @@ func WithCacheSignalNotifier(notifier CacheSignalNotifier) ServiceOption {
 	}
 }
 
-// WithRuleSetPublisher 注入interpretation model 同步端口。
-func WithRuleSetPublisher(publisher RuleSetPublisher) ServiceOption {
+// WithScalePublisher injects the published-model sync port for scale publish.
+func WithScalePublisher(publisher ScalePublisher) ServiceOption {
 	return func(s *lifecycleService) {
 		s.interpretationPublisher = publisher
 	}

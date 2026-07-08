@@ -34,7 +34,7 @@ type personalityOutcomeDefinition struct {
 func typologySummaryFromSummary(result typologyconsumer.TypologyModelSummaryResult) ModelSummary {
 	summary := ModelSummary{
 		Code:                 result.Code,
-		Kind:                 KindPersonality,
+		Kind:                 KindTypology,
 		SubKind:              SubKindTypology,
 		Algorithm:            result.Algorithm,
 		Title:                result.Title,
@@ -44,7 +44,7 @@ func typologySummaryFromSummary(result typologyconsumer.TypologyModelSummaryResu
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 	}
-	populateModelSummaryIdentity(&summary, domain.KindPersonality, domain.SubKindTypology, domain.Algorithm(result.Algorithm), domain.ProductChannelPersonality)
+	populateModelSummaryIdentity(&summary, domain.KindTypology, domain.SubKindTypology, domain.Algorithm(result.Algorithm), domain.ProductChannelTypology)
 	return summary
 }
 

@@ -84,7 +84,7 @@ func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *domain.Published
 }
 
 func (r *memoryPublishedRepo) FindPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
-	return r.FindLatestPublishedByModelCode(context.Background(), domain.KindPersonality, code)
+	return r.FindLatestPublishedByModelCode(context.Background(), domain.KindTypology, code)
 }
 
 func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
@@ -424,7 +424,7 @@ func TestPublishPersonalityModelRequiresDefinition(t *testing.T) {
 func TestUnpublishPersonalityModel(t *testing.T) {
 	now := time.Now().UTC()
 	model, _ := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "personality_unpublish", Kind: domain.KindPersonality,
+		Code: "personality_unpublish", Kind: domain.KindTypology,
 		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Unpublish", Now: now,
 	})
 	_ = model.BindQuestionnaire(domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"}, now)
@@ -593,7 +593,7 @@ func TestPublishCompensatesWhenDraftUpdateFails(t *testing.T) {
 func TestUnpublishDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 	now := time.Now().UTC()
 	model, _ := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "personality_unpublish_delete_failed", Kind: domain.KindPersonality,
+		Code: "personality_unpublish_delete_failed", Kind: domain.KindTypology,
 		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Unpublish Delete Failed", Now: now,
 	})
 	_ = model.MarkPublished(now)
@@ -619,7 +619,7 @@ func TestUnpublishDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 func TestArchiveDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 	now := time.Now().UTC()
 	model, _ := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "personality_archive_delete_failed", Kind: domain.KindPersonality,
+		Code: "personality_archive_delete_failed", Kind: domain.KindTypology,
 		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Archive Delete Failed", Now: now,
 	})
 	_ = model.MarkPublished(now)

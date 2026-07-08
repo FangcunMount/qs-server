@@ -4,12 +4,23 @@ import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/model
 
 const AlgorithmCustomTypology = "custom_typology"
 
-// APIKindToDomainKind 映射外部 API 类型值 到 规范领域类型。
+// normalizeAPIKind maps deprecated API aliases to canonical catalog API kinds.
+func normalizeAPIKind(kind string) string {
+	if kind == KindPersonality {
+		return KindTypology
+	}
+	return kind
+}
+
+func isTypologyAPIKind(kind string) bool {
+	return kind == KindTypology || kind == KindPersonality
+}
+
 // behavior_ability 是产品通道聚合槽位，不映射为领域 Kind（列表 API 专用）。
 func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	switch kind {
-	case KindPersonality:
-		return domain.KindPersonality, true
+	case KindTypology, KindPersonality:
+		return domain.KindTypology, true
 	case string(domain.KindBehavioralRating):
 		return domain.KindBehavioralRating, true
 	case KindMedicalScale, "scale":
@@ -29,8 +40,8 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 		return entry.APIKind
 	}
 	switch kind {
-	case domain.KindPersonality:
-		return KindPersonality
+	case domain.KindTypology:
+		return KindTypology
 	case domain.KindBehavioralRating:
 		return string(domain.KindBehavioralRating)
 	case domain.KindScale:

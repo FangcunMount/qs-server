@@ -89,7 +89,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 
 	model, err := domainmodel.NewAssessmentModel(domainmodel.NewAssessmentModelInput{
 		Code:      tc.code,
-		Kind:      domainmodel.KindPersonality,
+		Kind:      domainmodel.KindTypology,
 		SubKind:   domainmodel.SubKindTypology,
 		Algorithm: draftPayload.Algorithm,
 		Title:     tc.title,

@@ -15,7 +15,7 @@ func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
 	}
-	if executor.Key().String() != "personality/typology/personality_typology" {
+	if executor.Key().String() != "typology/typology/personality_typology" {
 		t.Fatalf("executor key = %s", executor.Key().String())
 	}
 }
@@ -42,7 +42,7 @@ func TestBigFiveModuleCanBeRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
 	}
-	if executor.Key().String() != "personality/typology/personality_typology" {
+	if executor.Key().String() != "typology/typology/personality_typology" {
 		t.Fatalf("key = %s", executor.Key().String())
 	}
 }

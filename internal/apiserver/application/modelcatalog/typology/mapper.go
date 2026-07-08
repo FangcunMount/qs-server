@@ -13,7 +13,7 @@ func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
 	}
 	return &ModelSummary{
 		Code:                 model.Code,
-		Kind:                 KindPersonality,
+		Kind:                 KindTypology,
 		SubKind:              string(model.SubKind),
 		Algorithm:            string(model.Algorithm),
 		ProductChannel:       string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
@@ -34,7 +34,7 @@ func definitionFromModel(model *domain.AssessmentModel) *DefinitionResult {
 		return nil
 	}
 	return &DefinitionResult{
-		Kind:           KindPersonality,
+		Kind:           KindTypology,
 		SubKind:        string(model.SubKind),
 		Algorithm:      string(model.Algorithm),
 		ProductChannel: string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),

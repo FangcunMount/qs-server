@@ -11,13 +11,13 @@ func TestPersonalityTypologyIdentity(t *testing.T) {
 	if got != ExecutionIdentityMBTI {
 		t.Fatalf("identity = %#v, want %#v", got, ExecutionIdentityMBTI)
 	}
-	if got.String() != "personality/typology/mbti" {
+	if got.String() != "typology/typology/mbti" {
 		t.Fatalf("identity string = %s", got.String())
 	}
 }
 
 func TestExecutionIdentityPersonalityTypology(t *testing.T) {
-	if ExecutionIdentityPersonalityTypology.String() != "personality/typology/personality_typology" {
+	if ExecutionIdentityPersonalityTypology.String() != "typology/typology/personality_typology" {
 		t.Fatalf("identity string = %s", ExecutionIdentityPersonalityTypology.String())
 	}
 	if !ExecutionIdentityMBTI.IsPersonalityTypologyLegacyIdentity() {

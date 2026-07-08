@@ -66,8 +66,8 @@ type Host interface {
 	ActorIAMPorts() ActorIAMPorts
 
 	DefaultEvaluationCatalog() (EvaluationCatalog, error)
-	RuleSetCatalog() rulesetport.Catalog
-	SetRuleSetCatalog(catalog rulesetport.Catalog)
+	PublishedModelCatalog() rulesetport.Catalog
+	SetPublishedModelCatalog(catalog rulesetport.Catalog)
 
 	SurveyPorts() SurveyPorts
 	ActorPorts() ActorPorts

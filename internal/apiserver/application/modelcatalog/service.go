@@ -79,7 +79,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	}
 
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
-	if shouldListModelKind(dto.Kind, KindPersonality) {
+	if shouldListModelKind(dto.Kind, KindTypology) {
 		items, total, err := s.listTypology(ctx, dto)
 		if err != nil {
 			return nil, err
@@ -117,7 +117,7 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 		return nil, err
 	}
 	switch dto.Kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.create(ctx, dto)
 	case KindCognitive:
 		return s.createCognitive(ctx, dto)
@@ -161,7 +161,7 @@ func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.updateBasicInfo(ctx, dto)
 	case KindCognitive:
 		return s.taskPerformanceKind.updateBasicInfo(ctx, dto)
@@ -178,7 +178,7 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 		return err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.delete(ctx, modelCode)
 	case KindCognitive:
 		return s.taskPerformanceKind.delete(ctx, modelCode)
@@ -195,7 +195,7 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.publish(ctx, modelCode)
 	case KindCognitive:
 		return s.taskPerformanceKind.publish(ctx, modelCode)
@@ -212,7 +212,7 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.unpublish(ctx, modelCode)
 	case KindCognitive:
 		return s.taskPerformanceKind.unpublish(ctx, modelCode)
@@ -229,7 +229,7 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.archive(ctx, modelCode)
 	case KindCognitive:
 		return s.taskPerformanceKind.archive(ctx, modelCode)
@@ -246,7 +246,7 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.bindQuestionnaire(ctx, dto)
 	case KindCognitive:
 		return s.taskPerformanceKind.bindQuestionnaire(ctx, dto)
@@ -263,7 +263,7 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 		return nil, modelNotFoundError()
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.getQuestionnaire(ctx, modelCode)
 	case KindBehavioralRating:
 		cmd, err := s.normingKind.require()
@@ -291,7 +291,7 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 }
 
 func (s *service) GetDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
+	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && isTypologyAPIKind(kind) {
 		return s.typologyKind.getDefinition(ctx, modelCode)
 	}
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindCognitive {
@@ -308,7 +308,7 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 				return nil, marshalErr
 			}
 			return &DefinitionDTO{
-				Kind:          KindPersonality,
+				Kind:          KindTypology,
 				SubKind:       SubKindTypology,
 				Algorithm:     personality.Algorithm,
 				PayloadFormat: PayloadFormatPersonalityTypologyV1,
@@ -325,7 +325,7 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 		return nil, err
 	}
 	switch kind {
-	case KindPersonality:
+	case KindTypology, KindPersonality:
 		return s.typologyKind.updateDefinition(ctx, modelCode, dto)
 	case KindCognitive:
 		return s.taskPerformanceKind.updateDefinition(ctx, modelCode, dto)
@@ -381,7 +381,7 @@ func (s *service) ApplyCodes(ctx context.Context, dto ApplyCodesDTO) ([]string, 
 }
 
 func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationResult, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
+	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && isTypologyAPIKind(kind) {
 		return s.typologyKind.validate(ctx, modelCode)
 	}
 	def, err := s.GetDefinition(ctx, modelCode)
@@ -408,7 +408,7 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 		}
 		return nil, err
 	}
-	if kind != KindPersonality {
+	if !isTypologyAPIKind(kind) {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
 	}
 	return s.typologyKind.previewReport(ctx, modelCode, payload)
@@ -422,7 +422,7 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	if kind != KindPersonality {
+	if !isTypologyAPIKind(kind) {
 		return "", invalidArgument("模型类型不支持二维码")
 	}
 	return s.getTypologyQRCode(ctx, modelCode)

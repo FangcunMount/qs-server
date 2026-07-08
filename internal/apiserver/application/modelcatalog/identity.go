@@ -27,7 +27,7 @@ func productChannelOptions() []Option {
 	options := make([]Option, 0, len(channels))
 	labels := map[domain.ProductChannel]string{
 		domain.ProductChannelMedicalScale:    "医学量表",
-		domain.ProductChannelPersonality:     "人格探索",
+		domain.ProductChannelTypology:        "人格探索",
 		domain.ProductChannelBehaviorAbility: "行为能力",
 		domain.ProductChannelCognitive:       "认知能力",
 		domain.ProductChannelCustom:          "自定义",

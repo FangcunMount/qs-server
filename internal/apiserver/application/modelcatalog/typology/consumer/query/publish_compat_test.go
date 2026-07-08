@@ -39,7 +39,7 @@ func TestPublishedModelSnapshotReadableByCollectionQuery(t *testing.T) {
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Model: domain.ModelDefinition{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: domain.AlgorithmMBTI,
 			Code:      "MBTI_OEJTS",

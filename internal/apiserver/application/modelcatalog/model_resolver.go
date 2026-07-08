@@ -5,7 +5,7 @@ import "context"
 func (s *service) resolveModelKind(ctx context.Context, modelCode string) (string, bool) {
 	if s.typologyKind.cmd != nil {
 		if _, err := s.typologyKind.cmd.Get(ctx, modelCode); err == nil {
-			return KindPersonality, true
+			return KindTypology, true
 		}
 	}
 	if s.normingKind.cmd != nil {

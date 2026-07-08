@@ -13,30 +13,31 @@ type EvaluationModelKind string
 
 const (
 	EvaluationModelKindScale       EvaluationModelKind = "scale"
-	EvaluationModelKindPersonality EvaluationModelKind = "personality"
+	EvaluationModelKindTypology    EvaluationModelKind = "typology"
+	EvaluationModelKindPersonality EvaluationModelKind = EvaluationModelKindTypology
 )
 
 const (
-	// Deprecated: use domain/modelcatalog/legacy.SBTIModelCode. Kept for legacy reader compatibility only.
+	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelCode.
 	DefaultSBTIModelCode = "SBTI_FUN"
-	// Deprecated: use domain/modelcatalog/legacy.SBTIModelVersion.
+	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelVersion.
 	DefaultSBTIModelVersion = "1.0.0"
-	// Deprecated: use domain/modelcatalog/legacy.SBTIModelTitle.
+	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelTitle.
 	DefaultSBTIModelTitle = "SBTI 趣味人格测评"
-	// Deprecated: use domain/modelcatalog/legacy.SBTIQuestionnaireCode.
+	// Deprecated: use infra/ruleset/seedfixtures.SBTIQuestionnaireCode.
 	DefaultSBTIQuestionnaireCode = "SBTI_FUN"
-	// Deprecated: use domain/modelcatalog/legacy.SBTIQuestionnaireTitle.
+	// Deprecated: use infra/ruleset/seedfixtures.SBTIQuestionnaireTitle.
 	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
 
-	// Deprecated: use domain/modelcatalog/legacy.MBTIModelCode. Kept for legacy reader compatibility only.
+	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelCode.
 	DefaultMBTIModelCode = "MBTI_OEJTS"
-	// Deprecated: use domain/modelcatalog/legacy.MBTIModelVersion.
+	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelVersion.
 	DefaultMBTIModelVersion = "2.0.1"
-	// Deprecated: use domain/modelcatalog/legacy.MBTIModelTitle.
+	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelTitle.
 	DefaultMBTIModelTitle = "MBTI 人格类型测评（OEJTS）"
-	// Deprecated: use domain/modelcatalog/legacy.MBTIQuestionnaireCode.
+	// Deprecated: use infra/ruleset/seedfixtures.MBTIQuestionnaireCode.
 	DefaultMBTIQuestionnaireCode = "MBTI_OEJTS"
-	// Deprecated: use domain/modelcatalog/legacy.MBTIQuestionnaireTitle.
+	// Deprecated: use infra/ruleset/seedfixtures.MBTIQuestionnaireTitle.
 	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"
 )
 
@@ -164,7 +165,7 @@ func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
 		Kind:           EvaluationModelKindPersonality,
 		SubKind:        "typology",
 		Algorithm:      string(payload.Algorithm),
-		ProductChannel: string(modelcatalog.ProductChannelPersonality),
+		ProductChannel: string(modelcatalog.ProductChannelTypology),
 		Code:           payload.Code,
 		Version:        payload.Version,
 		Title:          payload.Title,
@@ -181,11 +182,11 @@ type TypologyModelPayload struct {
 }
 
 func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindPersonality
+	return EvaluationModelKindTypology
 }
 
 func (TypologyModelPayload) ModelKind() EvaluationModelKind {
-	return EvaluationModelKindPersonality
+	return EvaluationModelKindTypology
 }
 
 func NewMBTIModelSnapshot(model *typology.MBTILegacyModel) *ModelSnapshot {

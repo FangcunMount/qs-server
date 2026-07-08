@@ -40,9 +40,9 @@ func WithCacheSignalNotifier(notifier lifecycle.CacheSignalNotifier) lifecycle.S
 	return lifecycle.WithCacheSignalNotifier(notifier)
 }
 
-// WithRuleSetPublisher 注入interpretation model 同步端口。
-func WithRuleSetPublisher(publisher lifecycle.RuleSetPublisher) lifecycle.ServiceOption {
-	return lifecycle.WithRuleSetPublisher(publisher)
+// WithScalePublisher injects the published-model sync port for scale publish.
+func WithScalePublisher(publisher lifecycle.ScalePublisher) lifecycle.ServiceOption {
+	return lifecycle.WithScalePublisher(publisher)
 }
 
 // QuestionnairePublisherFunc 适配函数 到 scale lifecycle's。

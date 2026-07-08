@@ -44,7 +44,7 @@ func TestExecutionRoutingFromSnapshotUsesKindPrimaryFamilies(t *testing.T) {
 			name: "typology_mbti",
 			snapshot: modelcatalog.PublishedModelSnapshot{
 				Model: modelcatalog.ModelDefinition{
-					Kind:      modelcatalog.KindPersonality,
+					Kind:      modelcatalog.KindTypology,
 					SubKind:   modelcatalog.SubKindTypology,
 					Algorithm: modelcatalog.AlgorithmMBTI,
 				},

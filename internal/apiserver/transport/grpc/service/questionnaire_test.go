@@ -21,8 +21,8 @@ func TestQuestionnaireServiceGetQuestionnaireByVersion(t *testing.T) {
 			Status:  "published",
 		},
 	}
-	svc := NewQuestionnaireService(query, &fakePublishedReader{
-		snapshot: &domain.Snapshot{},
+	svc := NewQuestionnaireService(query, &fakePublishedModelReader{
+		snapshot: &domain.PublishedModelSnapshot{},
 	})
 
 	resp, err := svc.GetQuestionnaire(context.Background(), &pb.GetQuestionnaireRequest{
@@ -49,7 +49,7 @@ func TestQuestionnaireServiceGetQuestionnaireRejectsUnboundSurvey(t *testing.T) 
 			Status:  "published",
 		},
 	}
-	svc := NewQuestionnaireService(query, &fakePublishedReader{})
+	svc := NewQuestionnaireService(query, &fakePublishedModelReader{})
 
 	_, err := svc.GetQuestionnaire(context.Background(), &pb.GetQuestionnaireRequest{
 		Code:    "SURVEY_X",
@@ -97,14 +97,14 @@ func (s *fakeQuestionnaireQueryService) ListPublished(context.Context, questionn
 	return nil, nil
 }
 
-type fakePublishedReader struct {
-	snapshot *domain.Snapshot
+type fakePublishedModelReader struct {
+	snapshot *domain.PublishedModelSnapshot
 }
 
-func (r *fakePublishedReader) GetPublishedByRef(context.Context, rulesetport.Ref) (*domain.Snapshot, error) {
+func (r *fakePublishedModelReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
 	return nil, nil
 }
 
-func (r *fakePublishedReader) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.Snapshot, error) {
+func (r *fakePublishedModelReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
 	return r.snapshot, nil
 }

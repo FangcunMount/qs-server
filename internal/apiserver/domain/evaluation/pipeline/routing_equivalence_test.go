@@ -56,7 +56,7 @@ func TestRuntimeDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
 		},
 		{
 			Model: modelcatalog.ModelDefinition{
-				Kind:      modelcatalog.KindPersonality,
+				Kind:      modelcatalog.KindTypology,
 				SubKind:   modelcatalog.SubKindTypology,
 				Algorithm: modelcatalog.AlgorithmMBTI,
 			},

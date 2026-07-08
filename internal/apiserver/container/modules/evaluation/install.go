@@ -46,7 +46,7 @@ func InstallFrom(host InstallHost) error {
 		OpsHandle:                                   host.CacheHandle(cacheplane.FamilyOps),
 		ReportStatusConfig:                          host.ReportStatusConfig(),
 		ScaleInfra:                                  host.SurveyScaleInfra(),
-		RuleSetCatalog:                              host.RuleSetCatalog(),
+		PublishedModelCatalog:                       host.PublishedModelCatalog(),
 		StaticRedisClient:                           host.CacheClient(cacheplane.FamilyStatic),
 		StaticCacheBuilder:                          host.CacheBuilder(cacheplane.FamilyStatic),
 		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.PolicyPublishedModel),
@@ -58,8 +58,8 @@ func InstallFrom(host InstallHost) error {
 	if err != nil {
 		return err
 	}
-	if result.RuleSetCatalog != nil {
-		host.SetRuleSetCatalog(result.RuleSetCatalog)
+	if result.PublishedModelCatalog != nil {
+		host.SetPublishedModelCatalog(result.PublishedModelCatalog)
 	}
 	host.SetEvaluationModule(result.Module)
 	host.RegisterModule("evaluation", result.Module)

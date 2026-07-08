@@ -2,6 +2,7 @@ package characterization_test
 
 import (
 	"encoding/json"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -19,14 +20,14 @@ func TestV1CodecLegacyDecodeAndV2EncodeFormats(t *testing.T) {
 		wantFormat string
 		wantKind   domain.Kind
 		wantCode   string
-		build      func(t *testing.T) (*domain.Snapshot, func(t *testing.T, snapshot *domain.Snapshot) error)
+		build      func(t *testing.T) (*v1envelope.V1Snapshot, func(t *testing.T, snapshot *v1envelope.V1Snapshot) error)
 	}{
 		{
 			name:       "legacy scale decode",
 			wantFormat: domain.PayloadFormatScaleV1,
 			wantKind:   domain.KindScale,
 			wantCode:   "PHQ9",
-			build: func(t *testing.T) (*domain.Snapshot, func(t *testing.T, snapshot *domain.Snapshot) error) {
+			build: func(t *testing.T) (*v1envelope.V1Snapshot, func(t *testing.T, snapshot *v1envelope.V1Snapshot) error) {
 				payload, err := json.Marshal(&scalesnapshot.ScaleSnapshot{
 					Code:         "PHQ9",
 					ScaleVersion: "1.0.0",
@@ -36,13 +37,13 @@ func TestV1CodecLegacyDecodeAndV2EncodeFormats(t *testing.T) {
 				if err != nil {
 					t.Fatalf("marshal: %v", err)
 				}
-				snapshot := &domain.Snapshot{
+				snapshot := &v1envelope.V1Snapshot{
 					SchemaVersion: domain.SchemaVersionV1,
 					PayloadFormat: domain.PayloadFormatScaleV1,
-					Definition:    domain.Definition{Kind: domain.KindScale, Code: "PHQ9"},
+					Definition:    v1envelope.V1Definition{Kind: domain.KindScale, Code: "PHQ9"},
 					Payload:       payload,
 				}
-				return snapshot, func(t *testing.T, snapshot *domain.Snapshot) error {
+				return snapshot, func(t *testing.T, snapshot *v1envelope.V1Snapshot) error {
 					got, err := codec.DecodeScale(snapshot)
 					if err != nil {
 						return err

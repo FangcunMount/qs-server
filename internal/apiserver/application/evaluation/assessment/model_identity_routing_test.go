@@ -10,7 +10,7 @@ func TestEnrichModelIdentityResultDerivesRoutingFromKind(t *testing.T) {
 	t.Parallel()
 
 	got := EnrichModelIdentityResult(ModelIdentityResult{
-		Kind:      string(binding.KindPersonality),
+		Kind:      string(binding.KindTypology),
 		SubKind:   string(binding.SubKindTypology),
 		Algorithm: string(binding.AlgorithmMBTI),
 		Code:      "MBTI-16P",
@@ -29,7 +29,7 @@ func TestEnrichModelIdentityResultPreservesExplicitProductChannel(t *testing.T) 
 
 	explicit := "behavior_ability"
 	got := EnrichModelIdentityResult(ModelIdentityResult{
-		Kind:           string(binding.KindPersonality),
+		Kind:           string(binding.KindTypology),
 		SubKind:        string(binding.SubKindTypology),
 		Algorithm:      string(binding.AlgorithmMBTI),
 		ProductChannel: "from_row",

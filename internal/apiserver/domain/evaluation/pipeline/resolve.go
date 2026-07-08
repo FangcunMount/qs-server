@@ -68,7 +68,7 @@ func executionFamilyFromModelKind(model modelcatalog.ModelDefinition) (modelcata
 	switch model.Kind {
 	case modelcatalog.KindScale:
 		return modelcatalog.AlgorithmFamilyFactorScoring, true
-	case modelcatalog.KindPersonality:
+	case modelcatalog.KindTypology, modelcatalog.KindPersonality:
 		if model.SubKind == modelcatalog.SubKindTypology || model.SubKind == "" {
 			return modelcatalog.AlgorithmFamilyFactorClassification, true
 		}

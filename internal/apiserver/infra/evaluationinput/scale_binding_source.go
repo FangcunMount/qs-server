@@ -41,35 +41,35 @@ func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, v
 	})
 }
 
-// RuleSetScaleCatalog 优先从统一规则目录解码 scale payload，未命中时回退量表 repo。
-type RuleSetScaleCatalog struct {
-	reader   rulesetport.PublishedReader
+// PublishedScaleCatalog prefers published scale snapshots from the model catalog, then falls back to the scale repo.
+type PublishedScaleCatalog struct {
+	reader   rulesetport.PublishedModelReader
 	fallback port.ScaleModelCatalog
 }
 
-func NewRuleSetScaleCatalog(reader rulesetport.PublishedReader, fallback port.ScaleModelCatalog) RuleSetScaleCatalog {
-	return RuleSetScaleCatalog{reader: reader, fallback: fallback}
+func NewPublishedScaleCatalog(reader rulesetport.PublishedModelReader, fallback port.ScaleModelCatalog) PublishedScaleCatalog {
+	return PublishedScaleCatalog{reader: reader, fallback: fallback}
 }
 
-func (c RuleSetScaleCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
+func (c PublishedScaleCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
 	if c.fallback == nil {
 		return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("scale catalog is not configured"), "量表不存在", "加载量表失败")
 	}
 	return c.fallback.GetScale(ctx, code)
 }
 
-func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
+func (c PublishedScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	if ref.Version != "" && c.reader != nil {
-		snapshot, err := c.reader.GetPublishedByRef(ctx, rulesetport.Ref{
-			Kind:    domain.RuleSetKindScale,
+		snapshot, err := c.reader.GetPublishedModelByRef(ctx, rulesetport.Ref{
+			Kind:    domain.KindScale,
 			Code:    ref.Code,
 			Version: ref.Version,
 		})
 		if err == nil {
-			if snapshot.Definition.Kind != domain.RuleSetKindScale {
+			if snapshot.Model.Kind != domain.KindScale {
 				return nil, domain.ErrNotFound
 			}
-			decoded, decodeErr := aminfrac.DecodeScaleFromRuleSetSnapshot(snapshot)
+			decoded, decodeErr := aminfrac.DecodeScaleFromPublished(snapshot)
 			if decodeErr != nil {
 				return nil, port.NewResolveError(port.FailureKindModelNotFound, decodeErr, "解释模型不存在", "加载解释模型失败")
 			}

@@ -52,7 +52,7 @@ type WireInput struct {
 	OpsHandle                                   *cacheplane.Handle
 	ReportStatusConfig                          reportstatus.Config
 	ScaleInfra                                  *surveymod.ScaleInfra
-	RuleSetCatalog                              rulesetport.Catalog
+	PublishedModelCatalog                       rulesetport.Catalog
 	StaticRedisClient                           redis.UniversalClient
 	StaticCacheBuilder                          *keyspace.Builder
 	PublishedModelPolicy                        cachepolicy.CachePolicy
@@ -64,12 +64,12 @@ type WireInput struct {
 
 // WireResult carries evaluation module and shared catalog side effects.
 type WireResult struct {
-	Module         *Module
-	RuleSetCatalog rulesetport.Catalog
+	Module                *Module
+	PublishedModelCatalog rulesetport.Catalog
 }
 
-// EnsureRuleSetCatalog builds the shared ruleset catalog used by evaluation and gRPC export.
-func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.Catalog, error) {
+// EnsurePublishedModelCatalog builds the shared published-model catalog used by evaluation and gRPC export.
+func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Catalog, error) {
 	if in.Existing != nil {
 		return in.Existing, nil
 	}
@@ -85,8 +85,8 @@ func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.Catalog, error) {
 	})
 }
 
-// RuleSetCatalogInput collects dependencies for ruleset catalog construction.
-type RuleSetCatalogInput struct {
+// PublishedModelCatalogInput collects dependencies for published-model catalog construction.
+type PublishedModelCatalogInput struct {
 	MongoDB              *mongo.Database
 	MongoLimiter         backpressure.Acquirer
 	ScaleInfra           *surveymod.ScaleInfra
@@ -107,13 +107,13 @@ func Wire(in WireInput) (WireResult, error) {
 		return WireResult{}, fmt.Errorf("typology registry is required")
 	}
 
-	catalog := in.RuleSetCatalog
+	catalog := in.PublishedModelCatalog
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra := in.ScaleInfra; infra != nil {
 		var err error
 		if catalog == nil {
-			catalog, err = EnsureRuleSetCatalog(RuleSetCatalogInput{
+			catalog, err = EnsurePublishedModelCatalog(PublishedModelCatalogInput{
 				MongoDB:              in.MongoDB,
 				MongoLimiter:         in.MongoLimiter,
 				ScaleInfra:           infra,
@@ -195,5 +195,5 @@ func Wire(in WireInput) (WireResult, error) {
 	if err != nil {
 		return WireResult{}, err
 	}
-	return WireResult{Module: module, RuleSetCatalog: catalog}, nil
+	return WireResult{Module: module, PublishedModelCatalog: catalog}, nil
 }

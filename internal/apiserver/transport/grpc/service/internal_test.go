@@ -8,8 +8,8 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -38,7 +38,7 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -94,7 +94,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    cataloglegacy.SBTIQuestionnaireCode,
+		QuestionnaireCode:    seedfixtures.SBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -112,7 +112,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "sbti" {
 		t.Fatalf("ModelAlgorithm = %#v, want sbti", dto.ModelAlgorithm)
 	}
-	if dto.ModelCode == nil || *dto.ModelCode != cataloglegacy.SBTIModelCode {
+	if dto.ModelCode == nil || *dto.ModelCode != seedfixtures.SBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want SBTI_FUN", dto.ModelCode)
 	}
 	if !shouldAutoSubmitAssessment(dto) {
@@ -124,8 +124,8 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
-		QuestionnaireVersion: cataloglegacy.MBTIModelVersion,
+		QuestionnaireCode:    seedfixtures.MBTIQuestionnaireCode,
+		QuestionnaireVersion: seedfixtures.MBTIModelVersion,
 		AnswersheetId:        202,
 	}
 
@@ -142,14 +142,14 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "mbti" {
 		t.Fatalf("ModelAlgorithm = %#v, want mbti", dto.ModelAlgorithm)
 	}
-	if dto.ModelCode == nil || *dto.ModelCode != cataloglegacy.MBTIModelCode {
+	if dto.ModelCode == nil || *dto.ModelCode != seedfixtures.MBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want MBTI_OEJTS", dto.ModelCode)
 	}
-	if dto.ModelVersion == nil || *dto.ModelVersion != cataloglegacy.MBTIModelVersion {
-		t.Fatalf("ModelVersion = %#v, want %s", dto.ModelVersion, cataloglegacy.MBTIModelVersion)
+	if dto.ModelVersion == nil || *dto.ModelVersion != seedfixtures.MBTIModelVersion {
+		t.Fatalf("ModelVersion = %#v, want %s", dto.ModelVersion, seedfixtures.MBTIModelVersion)
 	}
-	if dto.ModelTitle == nil || *dto.ModelTitle != cataloglegacy.MBTIModelTitle {
-		t.Fatalf("ModelTitle = %#v, want %s", dto.ModelTitle, cataloglegacy.MBTIModelTitle)
+	if dto.ModelTitle == nil || *dto.ModelTitle != seedfixtures.MBTIModelTitle {
+		t.Fatalf("ModelTitle = %#v, want %s", dto.ModelTitle, seedfixtures.MBTIModelTitle)
 	}
 	if !shouldAutoSubmitAssessment(dto) {
 		t.Fatal("shouldAutoSubmitAssessment() = false, want true for MBTI model")
@@ -160,7 +160,7 @@ func TestBuildCreateAssessmentDTOPropagatesResolverError(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    cataloglegacy.SBTIQuestionnaireCode,
+		QuestionnaireCode:    seedfixtures.SBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -192,7 +192,7 @@ func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -236,7 +236,7 @@ func TestBuildCreateAssessmentDTOSkipsBindingWhenUnresolved(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
+		QuestionnaireCode:    seedfixtures.MBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -254,13 +254,13 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
+		QuestionnaireCode:    seedfixtures.MBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})

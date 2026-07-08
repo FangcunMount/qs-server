@@ -76,7 +76,7 @@ func buildScoringDeps(in WireInput) ScoringDeps {
 	if in.MongoDB != nil {
 		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
 		v2Repo := mongomodelcatalog.NewRepository(in.MongoDB, mongoOpts)
-		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(v2Repo)
+		deps.ScalePublisher = rulesetInfra.NewScalePublisher(v2Repo)
 	}
 	return deps
 }

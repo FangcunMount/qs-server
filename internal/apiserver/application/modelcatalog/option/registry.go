@@ -76,6 +76,9 @@ func NewRegistry() *Registry {
 			continue
 		}
 		byAPIKind[entry.APIKind] = entry
+		if entry.APIKind == "typology" {
+			byAPIKind["personality"] = entry
+		}
 	}
 	return &Registry{byAPIKind: byAPIKind, ordered: ordered}
 }
@@ -99,6 +102,9 @@ func (r *Registry) ByAPIKind(apiKind string) (RegisteredOption, bool) {
 // Allows 报告是否 API 类型 supports 操作。
 func (r *Registry) Allows(apiKind string, op binding.CatalogOperation) bool {
 	entry, ok := r.ByAPIKind(apiKind)
+	if !ok && apiKind == "personality" {
+		entry, ok = r.ByAPIKind("typology")
+	}
 	if !ok {
 		return false
 	}
@@ -206,8 +212,8 @@ func (o RegisteredOption) ProductChannelKind() binding.Kind {
 }
 
 var defaultRegisteredOptions = []RegisteredOption{
-	registeredModelFamily(binding.KindPersonality, registeredPresentation{
-		apiKind: "personality", displayName: "人格测评", optionsEnabled: true,
+	registeredModelFamily(binding.KindTypology, registeredPresentation{
+		apiKind: "typology", displayName: "人格测评", optionsEnabled: true,
 		previewSupported: true, qrCodeSupported: true,
 	}),
 	registeredModelFamily(binding.KindBehavioralRating, registeredPresentation{

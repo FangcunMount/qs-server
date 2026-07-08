@@ -36,7 +36,7 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*sh
 	if s == nil || s.lister == nil {
 		return nil, domain.ErrNotFound
 	}
-	snapshot, err := s.lister.FindPublishedModelByCode(ctx, domain.KindPersonality, code)
+	snapshot, err := s.lister.FindPublishedModelByCode(ctx, domain.KindTypology, code)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListTypolog
 		pageSize = 10
 	}
 	filter := port.ListPublishedFilter{
-		Kind:     domain.KindPersonality,
+		Kind:     domain.KindTypology,
 		Page:     page,
 		PageSize: pageSize,
 	}

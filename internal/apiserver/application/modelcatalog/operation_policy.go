@@ -9,7 +9,7 @@ import (
 )
 
 func requireCatalogOperation(apiKind string, op domain.CatalogOperation) error {
-	if !catalogRegistry.Allows(apiKind, op) {
+	if !catalogRegistry.Allows(normalizeAPIKind(apiKind), op) {
 		return invalidArgument("模型类型无效")
 	}
 	return nil

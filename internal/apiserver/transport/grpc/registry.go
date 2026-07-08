@@ -36,15 +36,15 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey        SurveyDeps
-	Actor         ActorDeps
-	Evaluation    EvaluationDeps
-	Scale         ScaleDeps
-	TypologyModel TypologyModelDeps
-	Plan          PlanDeps
-	Statistics    StatisticsDeps
-	IAM           IAMDeps
-	RuleSet       RuleSetDeps
+	Survey                SurveyDeps
+	Actor                 ActorDeps
+	Evaluation            EvaluationDeps
+	Scale                 ScaleDeps
+	TypologyModel         TypologyModelDeps
+	Plan                  PlanDeps
+	Statistics            StatisticsDeps
+	IAM                   IAMDeps
+	PublishedModelCatalog rulesetport.Catalog
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
@@ -102,10 +102,6 @@ type PlanDeps struct {
 
 type StatisticsDeps struct {
 	BehaviorProjectorService statisticsApp.BehaviorProjectorService
-}
-
-type RuleSetDeps struct {
-	RuleSetCatalog rulesetport.Catalog
 }
 
 type IAMDeps struct {
@@ -181,7 +177,7 @@ func (r *Registry) registerQuestionnaireService() error {
 
 	questionnaireService := service.NewQuestionnaireService(
 		r.deps.Survey.QuestionnaireQueryService,
-		r.deps.RuleSet.RuleSetCatalog,
+		r.deps.PublishedModelCatalog,
 	)
 	r.server.RegisterService(questionnaireService)
 	log.Info("   📝 Questionnaire service registered (read-only)")
@@ -292,7 +288,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
 		r.deps.Evaluation.RunQueryService,
-		rulesetInfra.NewAssessmentBindingResolver(r.deps.RuleSet.RuleSetCatalog),
+		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,

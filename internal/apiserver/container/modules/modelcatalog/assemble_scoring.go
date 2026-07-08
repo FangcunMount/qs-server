@@ -46,7 +46,7 @@ type ScoringDeps struct {
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
 	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
-	RuleSetPublisher       scoringLifecycle.RuleSetPublisher
+	ScalePublisher         scoringLifecycle.ScalePublisher
 }
 
 // NewScoring assembles the scoring capability.
@@ -66,7 +66,7 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 		normalized.ListCache,
 		scoringApp.WithQuestionnairePublisher(newScoringQuestionnairePublisher(normalized.QuestionnairePublisher)),
 		scoringApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
-		scoringApp.WithRuleSetPublisher(normalized.RuleSetPublisher),
+		scoringApp.WithScalePublisher(normalized.ScalePublisher),
 	)
 	module.FactorService = scoringApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)

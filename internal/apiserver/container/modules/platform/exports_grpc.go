@@ -14,7 +14,7 @@ type GRPCIntegrationDeps struct {
 	QRCodeService                      grpctransport.SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 	AuthzSnapshotLoader                *iaminfra.AuthzSnapshotLoader
-	RuleSetCatalog                     rulesetport.Catalog
+	PublishedModelCatalog              rulesetport.Catalog
 }
 
 // ExportGRPCIntegrationDeps maps platform integration ports to gRPC transport fields.
@@ -26,8 +26,6 @@ func ExportGRPCIntegrationDeps(in GRPCIntegrationDeps) grpctransport.Deps {
 		IAM: grpctransport.IAMDeps{
 			AuthzSnapshotLoader: in.AuthzSnapshotLoader,
 		},
-		RuleSet: grpctransport.RuleSetDeps{
-			RuleSetCatalog: in.RuleSetCatalog,
-		},
+		PublishedModelCatalog: in.PublishedModelCatalog,
 	}
 }
