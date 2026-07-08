@@ -134,8 +134,8 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindLatestPublishedByModelCode: %v", err)
 	}
-	if snapshot.PayloadFormat != domain.PayloadFormatCognitiveSPMV1 {
-		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatCognitiveSPMV1)
+	if snapshot.PayloadFormat != domain.PayloadFormatCognitiveDefaultV1 {
+		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatCognitiveDefaultV1)
 	}
 	if snapshot.Model.Kind != domain.KindCognitive || snapshot.Model.Algorithm != domain.AlgorithmSPM {
 		t.Fatalf("model identity = %#v", snapshot.Model)

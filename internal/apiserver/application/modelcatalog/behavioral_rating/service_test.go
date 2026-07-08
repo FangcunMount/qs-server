@@ -6,7 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -145,8 +145,8 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindLatestPublishedByModelCode: %v", err)
 	}
-	if snapshot.PayloadFormat != domain.PayloadFormatBehavioralRatingBrief2V1 {
-		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatBehavioralRatingBrief2V1)
+	if snapshot.PayloadFormat != domain.PayloadFormatBehavioralRatingDefaultV1 {
+		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatBehavioralRatingDefaultV1)
 	}
 	if snapshot.Model.Kind != domain.KindBehavioralRating || snapshot.Model.Algorithm != domain.AlgorithmBrief2 {
 		t.Fatalf("model identity = %#v", snapshot.Model)
@@ -166,8 +166,8 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	if runtimeSnapshot.Brief2 == nil || runtimeSnapshot.Brief2.FormVariant != "parent" {
-		t.Fatalf("brief2 profile = %#v", runtimeSnapshot.Brief2)
+	if runtimeSnapshot.Norming == nil || runtimeSnapshot.Norming.Variant != "parent" {
+		t.Fatalf("norming profile = %#v", runtimeSnapshot.Norming)
 	}
 }
 

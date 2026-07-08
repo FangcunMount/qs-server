@@ -9,38 +9,38 @@ import (
 func TestPayloadFormatForBehavioralRating(t *testing.T) {
 	t.Parallel()
 
-	if got := PayloadFormatForBehavioralRating(identity.AlgorithmBrief2); got != PayloadFormatBehavioralRatingBrief2V1 {
-		t.Fatalf("brief2 format = %q, want %q", got, PayloadFormatBehavioralRatingBrief2V1)
+	if got := PayloadFormatForBehavioralRating(identity.AlgorithmBrief2); got != PayloadFormatBehavioralRatingDefaultV1 {
+		t.Fatalf("brief2 algorithm format = %q, want family default %q", got, PayloadFormatBehavioralRatingDefaultV1)
 	}
 	if got := PayloadFormatForBehavioralRating(identity.AlgorithmBehavioralRatingDefault); got != PayloadFormatBehavioralRatingDefaultV1 {
 		t.Fatalf("default format = %q", got)
 	}
-	if PayloadFormatBehavioralRatingBrief2V1 == PayloadFormatBehavioralRatingDefaultV1 {
-		t.Fatal("brief2 and default payload formats must differ")
+	if !IsBehavioralRatingPayloadFormat(PayloadFormatBehavioralRatingBrief2V1) {
+		t.Fatal("legacy brief2 format must remain decodable")
 	}
 }
 
 func TestPayloadFormatForCognitive(t *testing.T) {
 	t.Parallel()
 
-	if got := PayloadFormatForCognitive(identity.AlgorithmSPM); got != PayloadFormatCognitiveSPMV1 {
-		t.Fatalf("spm format = %q, want %q", got, PayloadFormatCognitiveSPMV1)
+	if got := PayloadFormatForCognitive(identity.AlgorithmSPM); got != PayloadFormatCognitiveDefaultV1 {
+		t.Fatalf("spm algorithm format = %q, want family default %q", got, PayloadFormatCognitiveDefaultV1)
 	}
 	if got := PayloadFormatForCognitive(identity.AlgorithmScaleDefault); got != PayloadFormatCognitiveDefaultV1 {
 		t.Fatalf("unknown cognitive algorithm format = %q", got)
 	}
-	if PayloadFormatCognitiveSPMV1 == PayloadFormatCognitiveDefaultV1 {
-		t.Fatal("spm and default cognitive payload formats must differ")
+	if !IsCognitivePayloadFormat(PayloadFormatCognitiveSPMV1) {
+		t.Fatal("legacy spm format must remain decodable")
 	}
 }
 
 func TestDraftPayloadFormatForModel(t *testing.T) {
 	t.Parallel()
 
-	if got := DraftPayloadFormatForModel(identity.KindBehavioralRating, identity.AlgorithmBrief2); got != PayloadFormatBehavioralRatingBrief2V1 {
+	if got := DraftPayloadFormatForModel(identity.KindBehavioralRating, identity.AlgorithmBrief2); got != PayloadFormatBehavioralRatingDefaultV1 {
 		t.Fatalf("behavioral_rating draft format = %q", got)
 	}
-	if got := DraftPayloadFormatForModel(identity.KindCognitive, identity.AlgorithmSPM); got != PayloadFormatCognitiveSPMV1 {
+	if got := DraftPayloadFormatForModel(identity.KindCognitive, identity.AlgorithmSPM); got != PayloadFormatCognitiveDefaultV1 {
 		t.Fatalf("cognitive draft format = %q", got)
 	}
 }

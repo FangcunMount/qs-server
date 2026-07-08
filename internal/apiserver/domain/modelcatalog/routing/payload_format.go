@@ -12,14 +12,18 @@ const (
 	PayloadFormatAssessmentScaleV1         = "assessmentmodel.scale.v1"
 	PayloadFormatPersonalityTypologyV1     = "assessmentmodel.personality.typology.v1"
 	PayloadFormatBehavioralRatingDefaultV1 = "assessmentmodel.behavioral_rating.default.v1"
-	PayloadFormatBehavioralRatingBrief2V1  = "assessmentmodel.behavioral_rating.brief2.v1"
-	PayloadFormatCognitiveDefaultV1        = "assessmentmodel.cognitive.default.v1"
-	PayloadFormatCognitiveSPMV1            = "assessmentmodel.cognitive.spm.v1"
+	// PayloadFormatBehavioralRatingBrief2V1 is legacy-decode-only; new drafts use DefaultV1.
+	PayloadFormatBehavioralRatingBrief2V1 = "assessmentmodel.behavioral_rating.brief2.v1"
+	PayloadFormatCognitiveDefaultV1       = "assessmentmodel.cognitive.default.v1"
+	// PayloadFormatCognitiveSPMV1 is legacy-decode-only; new drafts use DefaultV1.
+	PayloadFormatCognitiveSPMV1 = "assessmentmodel.cognitive.spm.v1"
 
-	// Legacy 只读 载荷格式 (迁移 / outbox drain)。
+	// Legacy read-only payload formats (migration / outbox drain).
 	PayloadFormatScaleV1 = "ruleset.scale.v1"
-	PayloadFormatMBTIV1  = "ruleset.mbti.v1"
-	PayloadFormatSBTIV1  = "ruleset.sbti.v1"
+	// Deprecated: legacy-decode-only MBTI format; production draft uses personality.typology.v1.
+	PayloadFormatMBTIV1 = "ruleset.mbti.v1"
+	// Deprecated: legacy-decode-only SBTI format; production draft uses personality.typology.v1.
+	PayloadFormatSBTIV1 = "ruleset.sbti.v1"
 
 	PayloadFormatScaleV1Legacy = "evaluationinput.scale.v1"
 	PayloadFormatMBTIV1Legacy  = "evaluationinput.mbti.v1"
@@ -78,26 +82,16 @@ func AlgorithmFromTypologyPayload(payload []byte) (identity.Algorithm, error) {
 	return envelope.Algorithm, nil
 }
 
-// PayloadFormatForBehavioralRating 解析published 载荷格式 用于 behavioral_rating 算法。
-func PayloadFormatForBehavioralRating(algorithm identity.Algorithm) string {
-	switch algorithm {
-	case identity.AlgorithmBrief2:
-		return PayloadFormatBehavioralRatingBrief2V1
-	case identity.AlgorithmBehavioralRatingDefault, "":
-		return PayloadFormatBehavioralRatingDefaultV1
-	default:
-		return PayloadFormatBehavioralRatingDefaultV1
-	}
+// PayloadFormatForBehavioralRating returns the family draft/publish format (norming mechanism).
+// Algorithm is ignored; legacy brief2.v1 remains decodable via IsBehavioralRatingPayloadFormat.
+func PayloadFormatForBehavioralRating(_ identity.Algorithm) string {
+	return PayloadFormatBehavioralRatingDefaultV1
 }
 
-// PayloadFormatForCognitive 解析published 载荷格式 用于 cognitive 算法。
-func PayloadFormatForCognitive(algorithm identity.Algorithm) string {
-	switch algorithm {
-	case identity.AlgorithmSPM:
-		return PayloadFormatCognitiveSPMV1
-	default:
-		return PayloadFormatCognitiveDefaultV1
-	}
+// PayloadFormatForCognitive returns the family draft/publish format (task_performance mechanism).
+// Algorithm is ignored; legacy spm.v1 remains decodable via IsCognitivePayloadFormat.
+func PayloadFormatForCognitive(_ identity.Algorithm) string {
+	return PayloadFormatCognitiveDefaultV1
 }
 
 // IsBehavioralRatingPayloadFormat 报告是否 格式 是 supported behavioral_rating 载荷。
