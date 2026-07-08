@@ -8,9 +8,11 @@ import (
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"gorm.io/gorm"
 )
 
 // RESTSystemGovernanceInput collects dependencies for the governance facade.
@@ -20,6 +22,7 @@ type RESTSystemGovernanceInput struct {
 	EventOutboxes           []appEventing.NamedOutboxStatusReader
 	CacheGovernance         statisticsApp.GovernanceFacade
 	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
+	MySQLDB                 *gorm.DB
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -36,6 +39,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
 		CacheGovernance:         in.CacheGovernance,
 		LocalResilienceSnapshot: in.LocalResilienceSnapshot,
+		CheckpointReader:        NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
 		Metrics:                 metrics,
 		Components:              components,
 		Actions:                 systemgov.NewActionExecutor(registry, in.CacheGovernance),

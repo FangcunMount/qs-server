@@ -76,6 +76,7 @@ func DomainSummaries(items []Signal) map[Domain]DomainSummary {
 		DomainEvents:     {Severity: SeverityHealthy},
 		DomainCache:      {Severity: SeverityHealthy},
 		DomainResilience: {Severity: SeverityHealthy},
+		DomainCheckpoint: {Severity: SeverityHealthy},
 	}
 	for _, item := range items {
 		summary := result[item.Domain]

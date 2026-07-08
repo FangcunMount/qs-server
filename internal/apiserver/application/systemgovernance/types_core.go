@@ -9,6 +9,7 @@ const (
 	DomainEvents     Domain = "events"
 	DomainCache      Domain = "cache"
 	DomainResilience Domain = "resilience"
+	DomainCheckpoint Domain = "checkpoint"
 	DomainActions    Domain = "actions"
 )
 
@@ -58,6 +59,7 @@ type OverviewResponse struct {
 	Metrics         MetricsSummary           `json:"metrics"`
 	Signals         []Signal                 `json:"signals"`
 	Domains         map[Domain]DomainSummary `json:"domains"`
+	Checkpoints     *CheckpointView          `json:"checkpoints,omitempty"`
 }
 
 // DomainSummary 汇总一个领域 in 概览。

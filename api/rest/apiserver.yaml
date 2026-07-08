@@ -8793,17 +8793,47 @@ components:
             $ref: '#/components/schemas/systemgovernance.ActionDescriptor'
         generated_at:
           type: string
+    systemgovernance.CheckpointGovernanceSnapshot:
+      type: object
+      properties:
+        analyticsProjectorProcessing:
+          type: integer
+        evaluationRunFailedRetryable:
+          type: integer
+        evaluationRunRunning:
+          type: integer
+    systemgovernance.CheckpointView:
+      type: object
+      properties:
+        available:
+          type: boolean
+        generated_at:
+          type: string
+        metrics:
+          $ref: '#/components/schemas/systemgovernance.MetricsSummary'
+        reason:
+          type: string
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/systemgovernance.Signal'
+        snapshot:
+          $ref: '#/components/schemas/systemgovernance.CheckpointGovernanceSnapshot'
+        window:
+          type: string
     systemgovernance.Domain:
       type: string
       enum:
       - events
       - cache
       - resilience
+      - checkpoint
       - actions
       x-enum-varnames:
       - DomainEvents
       - DomainCache
       - DomainResilience
+      - DomainCheckpoint
       - DomainActions
     systemgovernance.DomainSummary:
       type: object
@@ -8837,6 +8867,8 @@ components:
     systemgovernance.OverviewResponse:
       type: object
       properties:
+        checkpoints:
+          $ref: '#/components/schemas/systemgovernance.CheckpointView'
         domains:
           type: object
           additionalProperties:

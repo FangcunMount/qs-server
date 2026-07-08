@@ -604,7 +604,7 @@ type Algorithm = identity.Algorithm
 
 | 轮次 | 内容 |
 |------|------|
-| R113 | 新增 `application/evaluation/consistency`：`Scan` 检测 report 已出站但 MySQL status 未 interpreted、计分产物已落库但 status 仍 submitted；`RepairInterpretedFinalization` 幂等重放 reporting 末步（`ApplyOutcome` + assessment Save）；`evaluation_run` 与 `analytics_projector_checkpoint` 仍未物理合并 |
+| R113 | 新增 `application/evaluation/consistency`：`Scan` 检测 report 已出站但 MySQL status 未 interpreted、计分产物已落库但 status 仍 submitted；`RepairInterpretedFinalization` 幂等重放 reporting 末步（`ApplyOutcome` + assessment Save）；checkpoint 物理合表见 R115 |
 
 ## Round 114：四机制 Audience / ReportProfile 生产注册（R114）
 
@@ -617,3 +617,33 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R115 | migration `000040` 创建 `runtime_checkpoint` 并 backfill `evaluation_run` / `analytics_projector_checkpoint` 后 drop 旧表；`infra/mysql/checkpoint` 实现 `evaluationrun.Repository` + `CheckpointSeam` + analytics projector 幂等；statistics journey 与 evaluation execute/runquery 改读新表；cleanup 脚本同步 |
+
+## Round 116：REST/gRPC 旧契约硬删除（R116）
+
+| 轮次 | 内容 |
+|------|------|
+| R116 | 删除 collection `algorithm` query、internal gRPC `TagTestee` bridge、worker `TagTestee` client；`EvaluateAssessmentResponse` / typology model 响应移除 legacy 平行字段；perf 脚本改走现行 REST 路径；OpenAPI/proto contract test 守卫 |
+
+## Round 117：运行态一致性生产闭环（R117）
+
+| 轮次 | 内容 |
+|------|------|
+| R117 | `application/evaluation/consistency` 接入 container/governance/scheduler；暴露 repair scan 指标与治理动作；生产可触发 `RepairInterpretedFinalization` |
+
+## Round 118：内部 deprecated alias 清理（R118）
+
+| 轮次 | 内容 |
+|------|------|
+| R118 | 删除 `legacy_report_aliases`、`RowToV2Result`/`RowsToV2Results`、`PersonalityEvaluationModelValidator`、`ApplyEvaluation`、`AssessmentV2*` REST 别名；architecture guard 禁止重现 |
+
+## Round 119：legacy data ACL 退场（R119）
+
+| 轮次 | 内容 |
+|------|------|
+| R119 | `DualStore` / `PublishedTypologyCatalog` 改 v2-only 读；`layered_catalog` 静态回退保留并打点 `qs_modelcatalog_legacy_fallback_hits_total`；删除生产 `infra/mongo/ruleset` 运行态读路径；architecture test 守卫 |
+
+## Round 120：checkpoint 审计与文档闭环（R120）
+
+| 轮次 | 内容 |
+|------|------|
+| R120 | `systemgovernance` 基于 `infra/mysql/checkpoint` 暴露 `runtime_checkpoint` 证据视图；修正 `mechanism-oriented-migration.md` R113 表述与 `scripts/oneoff/README.md` 旧表名；docs hygiene test 禁止非 archive 文档将退役表名当作现行表 |

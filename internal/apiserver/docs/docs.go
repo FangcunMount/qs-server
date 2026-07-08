@@ -13086,18 +13086,63 @@ const docTemplate = `{
                 }
             }
         },
+        "systemgovernance.CheckpointGovernanceSnapshot": {
+            "type": "object",
+            "properties": {
+                "analyticsProjectorProcessing": {
+                    "type": "integer"
+                },
+                "evaluationRunFailedRetryable": {
+                    "type": "integer"
+                },
+                "evaluationRunRunning": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.CheckpointView": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/systemgovernance.MetricsSummary"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.Signal"
+                    }
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/systemgovernance.CheckpointGovernanceSnapshot"
+                },
+                "window": {
+                    "type": "string"
+                }
+            }
+        },
         "systemgovernance.Domain": {
             "type": "string",
             "enum": [
                 "events",
                 "cache",
                 "resilience",
+                "checkpoint",
                 "actions"
             ],
             "x-enum-varnames": [
                 "DomainEvents",
                 "DomainCache",
                 "DomainResilience",
+                "DomainCheckpoint",
                 "DomainActions"
             ]
         },
@@ -13149,6 +13194,9 @@ const docTemplate = `{
         "systemgovernance.OverviewResponse": {
             "type": "object",
             "properties": {
+                "checkpoints": {
+                    "$ref": "#/definitions/systemgovernance.CheckpointView"
+                },
                 "domains": {
                     "type": "object",
                     "additionalProperties": {

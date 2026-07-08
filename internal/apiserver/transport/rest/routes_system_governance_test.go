@@ -12,10 +12,11 @@ import (
 )
 
 type stubSystemGovernanceFacade struct {
-	overview   *systemgov.OverviewResponse
-	events     *systemgov.EventsView
-	cache      *systemgov.CacheView
-	resilience *systemgov.ResilienceView
+	overview    *systemgov.OverviewResponse
+	events      *systemgov.EventsView
+	cache       *systemgov.CacheView
+	resilience  *systemgov.ResilienceView
+	checkpoints *systemgov.CheckpointView
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -41,6 +42,13 @@ func (s stubSystemGovernanceFacade) GetResilience(context.Context, string) (*sys
 		return s.resilience, nil
 	}
 	return &systemgov.ResilienceView{}, nil
+}
+
+func (s stubSystemGovernanceFacade) GetCheckpoints(context.Context, string) (*systemgov.CheckpointView, error) {
+	if s.checkpoints != nil {
+		return s.checkpoints, nil
+	}
+	return &systemgov.CheckpointView{}, nil
 }
 
 func (s stubSystemGovernanceFacade) ListActions(context.Context) (*systemgov.ActionsView, error) {

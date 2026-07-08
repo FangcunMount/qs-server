@@ -2748,17 +2748,47 @@ definitions:
       generated_at:
         type: string
     type: object
+  systemgovernance.CheckpointGovernanceSnapshot:
+    properties:
+      analyticsProjectorProcessing:
+        type: integer
+      evaluationRunFailedRetryable:
+        type: integer
+      evaluationRunRunning:
+        type: integer
+    type: object
+  systemgovernance.CheckpointView:
+    properties:
+      available:
+        type: boolean
+      generated_at:
+        type: string
+      metrics:
+        $ref: '#/definitions/systemgovernance.MetricsSummary'
+      reason:
+        type: string
+      signals:
+        items:
+          $ref: '#/definitions/systemgovernance.Signal'
+        type: array
+      snapshot:
+        $ref: '#/definitions/systemgovernance.CheckpointGovernanceSnapshot'
+      window:
+        type: string
+    type: object
   systemgovernance.Domain:
     enum:
     - events
     - cache
     - resilience
+    - checkpoint
     - actions
     type: string
     x-enum-varnames:
     - DomainEvents
     - DomainCache
     - DomainResilience
+    - DomainCheckpoint
     - DomainActions
   systemgovernance.DomainSummary:
     properties:
@@ -2791,6 +2821,8 @@ definitions:
     type: object
   systemgovernance.OverviewResponse:
     properties:
+      checkpoints:
+        $ref: '#/definitions/systemgovernance.CheckpointView'
       domains:
         additionalProperties:
           $ref: '#/definitions/systemgovernance.DomainSummary'

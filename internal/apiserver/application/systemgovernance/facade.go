@@ -17,6 +17,7 @@ type Facade interface {
 	GetEvents(ctx context.Context, window string) (*EventsView, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
+	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
 	ListActions(ctx context.Context) (*ActionsView, error)
 	RunAction(ctx context.Context, orgID int64, actionID string, req ActionRunRequest) (*ActionRunResult, error)
 }
@@ -33,6 +34,7 @@ type FacadeDeps struct {
 	EventTypeSources        []EventTypeStatusSource
 	CacheGovernance         statisticsApp.GovernanceFacade
 	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
+	CheckpointReader        CheckpointStatusReader
 	Metrics                 MetricsClient
 	Components              *govcomponent.Adapter
 	Actions                 *ActionExecutor
@@ -80,7 +82,11 @@ func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewRespo
 	if err != nil {
 		return nil, err
 	}
-	allSignals := append(append(events.Signals, cache.Signals...), resilience.Signals...)
+	checkpoints, err := f.checkpointCollector().Collect(ctx, evalCtx)
+	if err != nil {
+		return nil, err
+	}
+	allSignals := append(append(append(events.Signals, cache.Signals...), resilience.Signals...), checkpoints.Signals...)
 	return &OverviewResponse{
 		GeneratedAt:     evalCtx.evalAt,
 		Window:          evalCtx.windowLabel,
@@ -88,6 +94,7 @@ func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewRespo
 		Metrics:         evalCtx.metrics,
 		Signals:         SortSignals(allSignals),
 		Domains:         DomainSummaries(allSignals),
+		Checkpoints:     checkpoints,
 	}, nil
 }
 
@@ -115,6 +122,14 @@ func (f *facade) GetResilience(ctx context.Context, window string) (*ResilienceV
 	return f.resilienceCollector().Collect(ctx, evalCtx)
 }
 
+func (f *facade) GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error) {
+	evalCtx, err := f.newEvaluationContext(ctx, window)
+	if err != nil {
+		return nil, err
+	}
+	return f.checkpointCollector().Collect(ctx, evalCtx)
+}
+
 func (f *facade) eventCollector() eventGovernanceCollector {
 	return eventGovernanceCollector{
 		statusService: f.deps.EventStatusService,
@@ -137,6 +152,10 @@ func (f *facade) resilienceCollector() resilienceGovernanceCollector {
 		components:    f.deps.Components,
 		metrics:       f.deps.Metrics,
 	}
+}
+
+func (f *facade) checkpointCollector() checkpointGovernanceCollector {
+	return checkpointGovernanceCollector{reader: f.deps.CheckpointReader}
 }
 
 func (f *facade) ListActions(ctx context.Context) (*ActionsView, error) {

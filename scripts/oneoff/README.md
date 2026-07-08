@@ -220,7 +220,7 @@ db.assessment_models.find(
 - MySQL `testee`、`assessment`、`assessment_score`、`assessment_task`。
 - MySQL `clinician_relation`、`assessment_entry_intake_log`。
 - MySQL `behavior_footprint`、`assessment_episode`、旧版 testee 维度 `statistics_daily` / `statistics_accumulated`。
-- MySQL `domain_event_outbox`、`analytics_pending_event`、`analytics_projector_checkpoint`。
+- MySQL `domain_event_outbox`、`analytics_pending_event`、`runtime_checkpoint`。
 - MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox`。
 
 脚本默认 dry-run，只输出命中数量和受试者预览。执行 `--apply` 时会先创建备份表和备份集合，除非显式传入 `--skip-backup`。
@@ -292,7 +292,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--derive-ids-from-facts`：额外从 MySQL `behavior_footprint` / `assessment_episode` 反查关联 ID；大事实表上较慢，默认关闭。事实表本身仍会按 `testee_id` 清理。
 - `--scan-event-payloads`：额外扫描 MySQL outbox / pending 的 `payload_json` 兜底匹配 `testee_id`；大 outbox 表上很慢，默认关闭。
 - `--skip-counts`：跳过行数统计和 affected source date window 计算；在已有外部备份保护、只想快速执行清理时使用。
-- `--skip-mongo-outbox-event-scope`：跳过从 Mongo `domain_event_outbox` 读取 `event_id` 并回灌 MySQL 临时表。Mongo outbox 文档仍会按聚合 ID 分批删除，但 MySQL `analytics_pending_event` / `analytics_projector_checkpoint` 只会清理 MySQL outbox 已发现的事件 ID；这属于快速清理模式，不是“零残留”模式。如需清理 Mongo outbox 对应的 pending/checkpoint，可后续按事件类型和时间窗单独处理。
+- `--skip-mongo-outbox-event-scope`：跳过从 Mongo `domain_event_outbox` 读取 `event_id` 并回灌 MySQL 临时表。Mongo outbox 文档仍会按聚合 ID 分批删除，但 MySQL `analytics_pending_event` / `runtime_checkpoint`（`scope=analytics_projector`）只会清理 MySQL outbox 已发现的事件 ID；这属于快速清理模式，不是“零残留”模式。如需清理 Mongo outbox 对应的 pending/checkpoint，可后续按事件类型和时间窗单独处理。
 - `--backup-suffix`：备份表/集合后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
 
