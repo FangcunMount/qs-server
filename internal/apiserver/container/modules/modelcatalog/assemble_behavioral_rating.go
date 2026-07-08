@@ -1,13 +1,13 @@
 package modelcatalog
 
 import (
-	appBehavioralRating "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
+	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // BehavioralRating hosts behavioral_rating model catalog command services.
 type BehavioralRating struct {
-	CommandService appBehavioralRating.Service
+	CommandService appNorming.Service
 }
 
 // BehavioralRatingDeps defines explicit construction dependencies.
@@ -18,9 +18,9 @@ type BehavioralRatingDeps struct {
 
 // NewBehavioralRating assembles the behavioral_rating catalog capability.
 func NewBehavioralRating(deps BehavioralRatingDeps) (*BehavioralRating, error) {
-	var commandService appBehavioralRating.Service
+	var commandService appNorming.Service
 	if deps.ModelRepo != nil {
-		commandService = appBehavioralRating.NewService(appBehavioralRating.Dependencies{
+		commandService = appNorming.NewService(appNorming.Dependencies{
 			ModelRepo:     deps.ModelRepo,
 			PublishedRepo: deps.PublishedRepo,
 		})

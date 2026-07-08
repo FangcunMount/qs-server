@@ -1,4 +1,4 @@
-package personality
+package typology
 
 import (
 	"context"

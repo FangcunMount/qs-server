@@ -1,10 +1,10 @@
-package behavioral_rating_test
+package norming_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -83,12 +83,12 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 
 	modelRepo := &memoryModelRepo{}
 	publishedRepo := &memoryPublishedRepo{}
-	svc := behavioral_rating.NewService(behavioral_rating.Dependencies{
+	svc := norming.NewService(norming.Dependencies{
 		ModelRepo:     modelRepo,
 		PublishedRepo: publishedRepo,
 	})
 
-	created, err := svc.Create(context.Background(), behavioral_rating.CreateInput{
+	created, err := svc.Create(context.Background(), norming.CreateInput{
 		Code:  "BR-001",
 		Title: "BRIEF-2",
 	})
@@ -122,10 +122,10 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 			"validity_codes": ["inconsistency", "negativity"]
 		}
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, behavioral_rating.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
-	if _, err := svc.BindQuestionnaire(context.Background(), behavioral_rating.BindQuestionnaireInput{
+	if _, err := svc.BindQuestionnaire(context.Background(), norming.BindQuestionnaireInput{
 		Code:                 created.Code,
 		QuestionnaireCode:    "MBRIEF2",
 		QuestionnaireVersion: "1.0.0",
@@ -176,12 +176,12 @@ func TestPublishRejectsInvalidFactorHierarchy(t *testing.T) {
 
 	modelRepo := &memoryModelRepo{}
 	publishedRepo := &memoryPublishedRepo{}
-	svc := behavioral_rating.NewService(behavioral_rating.Dependencies{
+	svc := norming.NewService(norming.Dependencies{
 		ModelRepo:     modelRepo,
 		PublishedRepo: publishedRepo,
 	})
 
-	created, err := svc.Create(context.Background(), behavioral_rating.CreateInput{
+	created, err := svc.Create(context.Background(), norming.CreateInput{
 		Code:  "BR-BAD-HIER",
 		Title: "无效层级",
 	})
@@ -196,10 +196,10 @@ func TestPublishRejectsInvalidFactorHierarchy(t *testing.T) {
 			"parent_code": "gec"
 		}]
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, behavioral_rating.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
-	if _, err := svc.BindQuestionnaire(context.Background(), behavioral_rating.BindQuestionnaireInput{
+	if _, err := svc.BindQuestionnaire(context.Background(), norming.BindQuestionnaireInput{
 		Code:                 created.Code,
 		QuestionnaireCode:    "Q-001",
 		QuestionnaireVersion: "1.0.0",

@@ -3,15 +3,15 @@ package modelcatalog
 import (
 	"context"
 
-	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type taskPerformanceKindGateway struct {
-	cmd appCognitive.Service
+	cmd appTaskPerformance.Service
 }
 
-func (g taskPerformanceKindGateway) require() (appCognitive.Service, error) {
+func (g taskPerformanceKindGateway) require() (appTaskPerformance.Service, error) {
 	if g.cmd == nil {
 		return nil, invalidArgument("认知模型服务未配置")
 	}
@@ -23,7 +23,7 @@ func (s *service) createCognitive(ctx context.Context, dto CreateModelDTO) (*Mod
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.Create(ctx, appCognitive.CreateInput{
+	result, err := cmd.Create(ctx, appTaskPerformance.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
@@ -44,7 +44,7 @@ func (g taskPerformanceKindGateway) updateBasicInfo(ctx context.Context, dto Upd
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateBasicInfo(ctx, appCognitive.UpdateBasicInfoInput{
+	result, err := cmd.UpdateBasicInfo(ctx, appTaskPerformance.UpdateBasicInfoInput{
 		Code:           dto.Code,
 		Title:          dto.Title,
 		Description:    dto.Description,
@@ -107,7 +107,7 @@ func (g taskPerformanceKindGateway) bindQuestionnaire(ctx context.Context, dto B
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.BindQuestionnaire(ctx, appCognitive.BindQuestionnaireInput{
+	result, err := cmd.BindQuestionnaire(ctx, appTaskPerformance.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
 		QuestionnaireVersion: dto.QuestionnaireVersion,
@@ -146,7 +146,7 @@ func (g taskPerformanceKindGateway) updateDefinition(ctx context.Context, modelC
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateDefinition(ctx, modelCode, appCognitive.DefinitionInput{Payload: dto.Payload})
+	result, err := cmd.UpdateDefinition(ctx, modelCode, appTaskPerformance.DefinitionInput{Payload: dto.Payload})
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (g taskPerformanceKindGateway) updateDefinition(ctx context.Context, modelC
 	return out, nil
 }
 
-func cognitiveSummaryFromResult(result *appCognitive.ModelSummary) *ModelSummary {
+func cognitiveSummaryFromResult(result *appTaskPerformance.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -189,7 +189,7 @@ func (s *service) listCognitive(ctx context.Context, dto ListModelsDTO) (*ModelL
 	if err != nil {
 		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
 	}
-	result, err := cmd.List(ctx, appCognitive.ListInput{
+	result, err := cmd.List(ctx, appTaskPerformance.ListInput{
 		Status:   dto.Status,
 		Keyword:  dto.Keyword,
 		Page:     dto.Page,

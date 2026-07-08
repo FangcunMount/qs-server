@@ -3,8 +3,8 @@ package modelcatalog
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
+	typologyconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -31,7 +31,7 @@ type personalityOutcomeDefinition struct {
 	Rarity      map[string]interface{} `json:"rarity,omitempty"`
 }
 
-func personalitySummaryFromSummary(result personalityconsumer.PersonalityModelSummaryResult) ModelSummary {
+func personalitySummaryFromSummary(result typologyconsumer.PersonalityModelSummaryResult) ModelSummary {
 	summary := ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindPersonality,
@@ -48,7 +48,7 @@ func personalitySummaryFromSummary(result personalityconsumer.PersonalityModelSu
 	return summary
 }
 
-func personalitySummaryFromDetail(result *personalityconsumer.PersonalityModelResult) *ModelSummary {
+func personalitySummaryFromDetail(result *typologyconsumer.PersonalityModelResult) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -56,7 +56,7 @@ func personalitySummaryFromDetail(result *personalityconsumer.PersonalityModelRe
 	return &summary
 }
 
-func newPersonalityDefinitionPayload(result *personalityconsumer.PersonalityModelResult) personalityDefinitionPayload {
+func newPersonalityDefinitionPayload(result *typologyconsumer.PersonalityModelResult) personalityDefinitionPayload {
 	payload := personalityDefinitionPayload{
 		Dimensions:   make([]personalityDimensionDefinition, 0, len(result.Dimensions)),
 		Outcomes:     make([]personalityOutcomeDefinition, 0, len(result.Outcomes)),
@@ -80,7 +80,7 @@ func newPersonalityDefinitionPayload(result *personalityconsumer.PersonalityMode
 	return payload
 }
 
-func previewFromPersonality(result *personality.PreviewReportResult) *PreviewReportResult {
+func previewFromPersonality(result *typology.PreviewReportResult) *PreviewReportResult {
 	if result == nil {
 		return nil
 	}

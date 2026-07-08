@@ -45,8 +45,8 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 	}
 }
 
-func TestPersonalityCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
-	root := filepath.Join("personality")
+func TestTypologyCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
+	root := filepath.Join("typology")
 	forbiddenImports := []string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset",
@@ -75,7 +75,7 @@ func TestPersonalityCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
 		text := string(content)
 		for _, importPath := range forbiddenImports {
 			if strings.Contains(text, importPath) {
-				t.Fatalf("%s must not import %s; personality command writes only v2 published snapshots", path, importPath)
+				t.Fatalf("%s must not import %s; typology command writes only v2 published snapshots", path, importPath)
 			}
 		}
 		for _, token := range forbiddenTokens {
@@ -90,9 +90,9 @@ func TestPersonalityCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
 	}
 }
 
-func TestRuntimePersonalityReadsDoNotUseDraftModelRepository(t *testing.T) {
+func TestRuntimeTypologyReadsDoNotUseDraftModelRepository(t *testing.T) {
 	scanRoots := []string{
-		"personality/consumer",
+		"typology/consumer",
 		"../evaluation",
 		"../../collection-server/application",
 		"../../infra/evaluationinput",
@@ -113,7 +113,7 @@ func TestRuntimePersonalityReadsDoNotUseDraftModelRepository(t *testing.T) {
 			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			if strings.Contains(path, string(filepath.Separator)+"modelcatalog"+string(filepath.Separator)+"personality"+string(filepath.Separator)) {
+			if strings.Contains(path, string(filepath.Separator)+"modelcatalog"+string(filepath.Separator)+"typology"+string(filepath.Separator)) {
 				return nil
 			}
 			content, err := os.ReadFile(path)

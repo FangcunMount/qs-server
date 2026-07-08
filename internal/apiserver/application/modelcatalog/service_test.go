@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -19,68 +19,68 @@ type personalityCommandStub struct {
 	createCalled bool
 }
 
-func (s *personalityCommandStub) List(context.Context, personality.ListInput) (*personality.ModelListResult, error) {
+func (s *personalityCommandStub) List(context.Context, typology.ListInput) (*typology.ModelListResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Create(_ context.Context, input personality.CreateInput) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) Create(_ context.Context, input typology.CreateInput) (*typology.ModelSummary, error) {
 	s.createCalled = true
-	return &personality.ModelSummary{
+	return &typology.ModelSummary{
 		Code:  input.Code,
-		Kind:  personality.KindPersonality,
+		Kind:  typology.KindPersonality,
 		Title: input.Title,
 	}, nil
 }
 
-func (s *personalityCommandStub) Get(_ context.Context, modelCode string) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) Get(_ context.Context, modelCode string) (*typology.ModelSummary, error) {
 	if modelCode == "personality_demo" {
-		return &personality.ModelSummary{Code: modelCode, Kind: personality.KindPersonality}, nil
+		return &typology.ModelSummary{Code: modelCode, Kind: typology.KindPersonality}, nil
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *personalityCommandStub) UpdateBasicInfo(context.Context, personality.UpdateBasicInfoInput) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) UpdateBasicInfo(context.Context, typology.UpdateBasicInfoInput) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
 func (s *personalityCommandStub) Delete(context.Context, string) error { return nil }
 
-func (s *personalityCommandStub) BindQuestionnaire(_ context.Context, input personality.BindQuestionnaireInput) (*personality.QuestionnaireBindingResult, error) {
-	return &personality.QuestionnaireBindingResult{
+func (s *personalityCommandStub) BindQuestionnaire(_ context.Context, input typology.BindQuestionnaireInput) (*typology.QuestionnaireBindingResult, error) {
+	return &typology.QuestionnaireBindingResult{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 	}, nil
 }
 
-func (s *personalityCommandStub) GetQuestionnaire(context.Context, string) (*personality.QuestionnaireBindingResult, error) {
+func (s *personalityCommandStub) GetQuestionnaire(context.Context, string) (*typology.QuestionnaireBindingResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) GetDefinition(context.Context, string) (*personality.DefinitionResult, error) {
+func (s *personalityCommandStub) GetDefinition(context.Context, string) (*typology.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) UpdateDefinition(context.Context, string, personality.DefinitionInput) (*personality.DefinitionResult, error) {
+func (s *personalityCommandStub) UpdateDefinition(context.Context, string, typology.DefinitionInput) (*typology.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Validate(context.Context, string) (*personality.ValidationResult, error) {
+func (s *personalityCommandStub) Validate(context.Context, string) (*typology.ValidationResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) PreviewReport(context.Context, string, json.RawMessage) (*personality.PreviewReportResult, error) {
+func (s *personalityCommandStub) PreviewReport(context.Context, string, json.RawMessage) (*typology.PreviewReportResult, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Publish(context.Context, string) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) Publish(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Unpublish(context.Context, string) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) Unpublish(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *personalityCommandStub) Archive(context.Context, string) (*personality.ModelSummary, error) {
+func (s *personalityCommandStub) Archive(context.Context, string) (*typology.ModelSummary, error) {
 	return nil, nil
 }
 
@@ -88,52 +88,52 @@ type cognitiveCommandStub struct {
 	createCalled bool
 }
 
-func (s *cognitiveCommandStub) List(context.Context, cognitive.ListInput) (*cognitive.ModelListResult, error) {
+func (s *cognitiveCommandStub) List(context.Context, taskperformance.ListInput) (*taskperformance.ModelListResult, error) {
 	return nil, nil
 }
 
-func (s *cognitiveCommandStub) Create(_ context.Context, input cognitive.CreateInput) (*cognitive.ModelSummary, error) {
+func (s *cognitiveCommandStub) Create(_ context.Context, input taskperformance.CreateInput) (*taskperformance.ModelSummary, error) {
 	s.createCalled = true
-	return &cognitive.ModelSummary{Code: input.Code, Kind: cognitive.KindCognitive, Title: input.Title, Status: "draft"}, nil
+	return &taskperformance.ModelSummary{Code: input.Code, Kind: taskperformance.KindCognitive, Title: input.Title, Status: "draft"}, nil
 }
 
-func (s *cognitiveCommandStub) Get(_ context.Context, modelCode string) (*cognitive.ModelSummary, error) {
+func (s *cognitiveCommandStub) Get(_ context.Context, modelCode string) (*taskperformance.ModelSummary, error) {
 	if strings.Contains(modelCode, "cognitive") || strings.Contains(modelCode, "COG") {
-		return &cognitive.ModelSummary{Code: modelCode, Kind: cognitive.KindCognitive}, nil
+		return &taskperformance.ModelSummary{Code: modelCode, Kind: taskperformance.KindCognitive}, nil
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *cognitiveCommandStub) UpdateBasicInfo(context.Context, cognitive.UpdateBasicInfoInput) (*cognitive.ModelSummary, error) {
+func (s *cognitiveCommandStub) UpdateBasicInfo(context.Context, taskperformance.UpdateBasicInfoInput) (*taskperformance.ModelSummary, error) {
 	return nil, nil
 }
 
 func (s *cognitiveCommandStub) Delete(context.Context, string) error { return nil }
 
-func (s *cognitiveCommandStub) BindQuestionnaire(_ context.Context, input cognitive.BindQuestionnaireInput) (*cognitive.QuestionnaireBindingResult, error) {
-	return &cognitive.QuestionnaireBindingResult{
+func (s *cognitiveCommandStub) BindQuestionnaire(_ context.Context, input taskperformance.BindQuestionnaireInput) (*taskperformance.QuestionnaireBindingResult, error) {
+	return &taskperformance.QuestionnaireBindingResult{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 	}, nil
 }
 
-func (s *cognitiveCommandStub) GetDefinition(context.Context, string) (*cognitive.DefinitionResult, error) {
+func (s *cognitiveCommandStub) GetDefinition(context.Context, string) (*taskperformance.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *cognitiveCommandStub) UpdateDefinition(_ context.Context, modelCode string, input cognitive.DefinitionInput) (*cognitive.DefinitionResult, error) {
-	return &cognitive.DefinitionResult{Payload: input.Payload}, nil
+func (s *cognitiveCommandStub) UpdateDefinition(_ context.Context, modelCode string, input taskperformance.DefinitionInput) (*taskperformance.DefinitionResult, error) {
+	return &taskperformance.DefinitionResult{Payload: input.Payload}, nil
 }
 
-func (s *cognitiveCommandStub) Publish(_ context.Context, modelCode string) (*cognitive.ModelSummary, error) {
-	return &cognitive.ModelSummary{Code: modelCode, Kind: cognitive.KindCognitive, Status: "published"}, nil
+func (s *cognitiveCommandStub) Publish(_ context.Context, modelCode string) (*taskperformance.ModelSummary, error) {
+	return &taskperformance.ModelSummary{Code: modelCode, Kind: taskperformance.KindCognitive, Status: "published"}, nil
 }
 
-func (s *cognitiveCommandStub) Unpublish(context.Context, string) (*cognitive.ModelSummary, error) {
+func (s *cognitiveCommandStub) Unpublish(context.Context, string) (*taskperformance.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *cognitiveCommandStub) Archive(context.Context, string) (*cognitive.ModelSummary, error) {
+func (s *cognitiveCommandStub) Archive(context.Context, string) (*taskperformance.ModelSummary, error) {
 	return nil, nil
 }
 
@@ -141,52 +141,52 @@ type behavioralRatingCommandStub struct {
 	createCalled bool
 }
 
-func (s *behavioralRatingCommandStub) List(context.Context, behavioral_rating.ListInput) (*behavioral_rating.ModelListResult, error) {
+func (s *behavioralRatingCommandStub) List(context.Context, norming.ListInput) (*norming.ModelListResult, error) {
 	return nil, nil
 }
 
-func (s *behavioralRatingCommandStub) Create(_ context.Context, input behavioral_rating.CreateInput) (*behavioral_rating.ModelSummary, error) {
+func (s *behavioralRatingCommandStub) Create(_ context.Context, input norming.CreateInput) (*norming.ModelSummary, error) {
 	s.createCalled = true
-	return &behavioral_rating.ModelSummary{Code: input.Code, Kind: behavioral_rating.KindBehavioralRating, Title: input.Title, Status: "draft"}, nil
+	return &norming.ModelSummary{Code: input.Code, Kind: norming.KindBehavioralRating, Title: input.Title, Status: "draft"}, nil
 }
 
-func (s *behavioralRatingCommandStub) Get(_ context.Context, modelCode string) (*behavioral_rating.ModelSummary, error) {
+func (s *behavioralRatingCommandStub) Get(_ context.Context, modelCode string) (*norming.ModelSummary, error) {
 	if strings.Contains(modelCode, "behavioral") || strings.Contains(modelCode, "BR-") {
-		return &behavioral_rating.ModelSummary{Code: modelCode, Kind: behavioral_rating.KindBehavioralRating}, nil
+		return &norming.ModelSummary{Code: modelCode, Kind: norming.KindBehavioralRating}, nil
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *behavioralRatingCommandStub) UpdateBasicInfo(context.Context, behavioral_rating.UpdateBasicInfoInput) (*behavioral_rating.ModelSummary, error) {
+func (s *behavioralRatingCommandStub) UpdateBasicInfo(context.Context, norming.UpdateBasicInfoInput) (*norming.ModelSummary, error) {
 	return nil, nil
 }
 
 func (s *behavioralRatingCommandStub) Delete(context.Context, string) error { return nil }
 
-func (s *behavioralRatingCommandStub) BindQuestionnaire(_ context.Context, input behavioral_rating.BindQuestionnaireInput) (*behavioral_rating.QuestionnaireBindingResult, error) {
-	return &behavioral_rating.QuestionnaireBindingResult{
+func (s *behavioralRatingCommandStub) BindQuestionnaire(_ context.Context, input norming.BindQuestionnaireInput) (*norming.QuestionnaireBindingResult, error) {
+	return &norming.QuestionnaireBindingResult{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 	}, nil
 }
 
-func (s *behavioralRatingCommandStub) GetDefinition(context.Context, string) (*behavioral_rating.DefinitionResult, error) {
+func (s *behavioralRatingCommandStub) GetDefinition(context.Context, string) (*norming.DefinitionResult, error) {
 	return nil, nil
 }
 
-func (s *behavioralRatingCommandStub) UpdateDefinition(_ context.Context, modelCode string, input behavioral_rating.DefinitionInput) (*behavioral_rating.DefinitionResult, error) {
-	return &behavioral_rating.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1, Payload: input.Payload}, nil
+func (s *behavioralRatingCommandStub) UpdateDefinition(_ context.Context, modelCode string, input norming.DefinitionInput) (*norming.DefinitionResult, error) {
+	return &norming.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1, Payload: input.Payload}, nil
 }
 
-func (s *behavioralRatingCommandStub) Publish(_ context.Context, modelCode string) (*behavioral_rating.ModelSummary, error) {
-	return &behavioral_rating.ModelSummary{Code: modelCode, Kind: behavioral_rating.KindBehavioralRating, Status: "published"}, nil
+func (s *behavioralRatingCommandStub) Publish(_ context.Context, modelCode string) (*norming.ModelSummary, error) {
+	return &norming.ModelSummary{Code: modelCode, Kind: norming.KindBehavioralRating, Status: "published"}, nil
 }
 
-func (s *behavioralRatingCommandStub) Unpublish(context.Context, string) (*behavioral_rating.ModelSummary, error) {
+func (s *behavioralRatingCommandStub) Unpublish(context.Context, string) (*norming.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *behavioralRatingCommandStub) Archive(context.Context, string) (*behavioral_rating.ModelSummary, error) {
+func (s *behavioralRatingCommandStub) Archive(context.Context, string) (*norming.ModelSummary, error) {
 	return nil, nil
 }
 
@@ -215,7 +215,7 @@ func (s *personalityQRCodeGeneratorStub) GeneratePersonalityAssessmentQRCode(_ c
 
 func TestCreateRequiresKind(t *testing.T) {
 	svc := NewService(Dependencies{
-		PersonalityCommand: &personalityCommandStub{},
+		TypologyCommand: &personalityCommandStub{},
 	})
 
 	_, err := svc.Create(context.Background(), CreateModelDTO{Title: "No Kind"})
@@ -227,10 +227,10 @@ func TestCreateRequiresKind(t *testing.T) {
 	}
 }
 
-func TestCreatePersonalityUsesPersonalityCommand(t *testing.T) {
+func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 	personalityStub := &personalityCommandStub{}
 	svc := NewService(Dependencies{
-		PersonalityCommand: personalityStub,
+		TypologyCommand: personalityStub,
 	})
 
 	result, err := svc.Create(context.Background(), CreateModelDTO{
@@ -252,7 +252,7 @@ func TestCreatePersonalityUsesPersonalityCommand(t *testing.T) {
 func TestGetQRCodeDispatchesByKind(t *testing.T) {
 	personalityStub := &personalityCommandStub{}
 	svc := NewService(Dependencies{
-		PersonalityCommand: personalityStub,
+		TypologyCommand: personalityStub,
 		RawQRCodeGenerator: &personalityQRCodeGeneratorStub{},
 	})
 
@@ -280,7 +280,7 @@ func TestGetQRCodeDispatchesByKind(t *testing.T) {
 
 func TestGetPersonalityQRCodeFallsBackToEntryURL(t *testing.T) {
 	svc := NewService(Dependencies{
-		PersonalityCommand: &personalityCommandStub{},
+		TypologyCommand: &personalityCommandStub{},
 	})
 
 	got, err := svc.GetQRCode(context.Background(), "personality_demo")

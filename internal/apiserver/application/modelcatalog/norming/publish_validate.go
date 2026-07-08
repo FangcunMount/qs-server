@@ -1,4 +1,4 @@
-package behavioral_rating
+package norming
 
 import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"

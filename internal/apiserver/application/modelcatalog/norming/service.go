@@ -1,4 +1,4 @@
-package cognitive
+package norming
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -28,9 +27,8 @@ type Service interface {
 }
 
 type Dependencies struct {
-	ModelRepo          port.ModelRepository
-	PublishedRepo      port.PublishedModelRepository
-	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+	ModelRepo     port.ModelRepository
+	PublishedRepo port.PublishedModelRepository
 }
 
 type service struct {
@@ -46,7 +44,7 @@ func (s *service) List(ctx context.Context, input ListInput) (*ModelListResult, 
 		return &ModelListResult{Page: input.Page, PageSize: input.PageSize}, nil
 	}
 	models, total, err := s.deps.ModelRepo.List(ctx, port.ListFilter{
-		Kind:     domain.KindCognitive,
+		Kind:     domain.KindBehavioralRating,
 		Status:   domain.ModelStatus(input.Status),
 		Keyword:  input.Keyword,
 		Page:     input.Page,
@@ -69,13 +67,13 @@ func (s *service) List(ctx context.Context, input ListInput) (*ModelListResult, 
 
 func (s *service) Create(ctx context.Context, input CreateInput) (*ModelSummary, error) {
 	if s.deps.ModelRepo == nil {
-		return nil, unavailable("认知模型仓储未配置")
+		return nil, unavailable("行为评定模型仓储未配置")
 	}
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           input.Code,
-		Kind:           domain.KindCognitive,
-		Algorithm:      domain.AlgorithmSPM,
+		Kind:           domain.KindBehavioralRating,
+		Algorithm:      domain.AlgorithmBrief2,
 		ProductChannel: domain.ProductChannel(input.ProductChannel),
 		Title:          input.Title,
 		Description:    input.Description,
@@ -134,7 +132,7 @@ func (s *service) UpdateBasicInfo(ctx context.Context, input UpdateBasicInfoInpu
 
 func (s *service) Delete(ctx context.Context, modelCode string) error {
 	if s.deps.ModelRepo == nil {
-		return unavailable("认知模型仓储未配置")
+		return unavailable("行为评定模型仓储未配置")
 	}
 	return s.deps.ModelRepo.Delete(ctx, modelCode)
 }
@@ -188,7 +186,7 @@ func definitionResultFromModel(model *domain.AssessmentModel) *DefinitionResult 
 		return nil
 	}
 	return &DefinitionResult{
-		Kind:           KindCognitive,
+		Kind:           KindBehavioralRating,
 		Algorithm:      string(model.Algorithm),
 		ProductChannel: string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		PayloadFormat:  draftPayloadFormat(model),
@@ -199,21 +197,21 @@ func definitionResultFromModel(model *domain.AssessmentModel) *DefinitionResult 
 func draftPayloadFormat(model *domain.AssessmentModel) string {
 	algorithm := model.Algorithm
 	if algorithm == "" {
-		algorithm = domain.AlgorithmSPM
+		algorithm = domain.AlgorithmBehavioralRatingDefault
 	}
-	return domain.DraftPayloadFormatForModel(domain.KindCognitive, algorithm)
+	return domain.DraftPayloadFormatForModel(domain.KindBehavioralRating, algorithm)
 }
 
 func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	if s.deps.PublishedRepo == nil {
-		return nil, unavailable("认知模型发布仓储未配置")
+		return nil, unavailable("行为评定模型发布仓储未配置")
 	}
 	model, err := s.loadModel(ctx, modelCode)
 	if err != nil {
 		return nil, err
 	}
 	if model.Definition.IsEmpty() {
-		return nil, invalidArgument("认知模型定义不能为空")
+		return nil, invalidArgument("行为评定模型定义不能为空")
 	}
 	if err := publishValidationError(model); err != nil {
 		return nil, err
@@ -226,14 +224,17 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
-	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindCognitive, modelCode); err != nil {
+	if err := validatePublishedScoreNodes(snapshot); err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
+	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode); err != nil {
 		return nil, err
 	}
 	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
 		return nil, err
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindCognitive, modelCode)
+		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode)
 		return nil, err
 	}
 	return summaryFromModel(model), nil
@@ -246,7 +247,7 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 	}
 	now := time.Now().UTC()
 	if s.deps.PublishedRepo != nil {
-		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindCognitive, modelCode); err != nil {
+		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode); err != nil {
 			return nil, err
 		}
 	}
@@ -266,7 +267,7 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 	}
 	now := time.Now().UTC()
 	if s.deps.PublishedRepo != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindCognitive, modelCode)
+		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode)
 	}
 	if err := model.MarkArchived(now); err != nil {
 		return nil, mapDomainError(err)
@@ -282,7 +283,7 @@ func (s *service) loadModel(ctx context.Context, modelCode string) (*domain.Asse
 		return nil, invalidArgument("模型编码不能为空")
 	}
 	if s.deps.ModelRepo == nil {
-		return nil, unavailable("认知模型仓储未配置")
+		return nil, unavailable("行为评定模型仓储未配置")
 	}
 	model, err := s.deps.ModelRepo.FindByCode(ctx, modelCode)
 	if err != nil {
@@ -291,7 +292,7 @@ func (s *service) loadModel(ctx context.Context, modelCode string) (*domain.Asse
 		}
 		return nil, err
 	}
-	if model.Kind != domain.KindCognitive {
+	if model.Kind != domain.KindBehavioralRating {
 		return nil, errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
 	}
 	return model, nil

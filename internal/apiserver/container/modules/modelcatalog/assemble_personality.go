@@ -3,8 +3,8 @@ package modelcatalog
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
-	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	appPersonalityCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
+	appTypologyModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
+	appTypologyCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -13,8 +13,8 @@ import (
 
 // Personality hosts C-side personality model catalog services.
 type Personality struct {
-	QueryService   appPersonalityCatalog.PersonalityModelQueryService
-	CommandService appPersonalityModel.Service
+	QueryService   appTypologyCatalog.PersonalityModelQueryService
+	CommandService appTypologyModel.Service
 }
 
 // PersonalityDeps defines explicit construction dependencies.
@@ -24,7 +24,7 @@ type PersonalityDeps struct {
 	ModelRepo                port.ModelRepository
 	PublishedRepo            port.PublishedModelRepository
 	QuestionnaireQuery       questionnaireapp.QuestionnaireQueryService
-	CacheSignalNotifier      appPersonalityModel.CacheSignalNotifier
+	CacheSignalNotifier      appTypologyModel.CacheSignalNotifier
 }
 
 // NewPersonality assembles the personality-model catalog capability.
@@ -32,15 +32,15 @@ func NewPersonality(deps PersonalityDeps) (*Personality, error) {
 	if deps.PublishedLister == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "personality model published lister is required")
 	}
-	var queryService appPersonalityCatalog.PersonalityModelQueryService
+	var queryService appTypologyCatalog.PersonalityModelQueryService
 	if deps.PublishedAlgorithmLister != nil {
-		queryService = appPersonalityCatalog.NewQueryServiceWithAlgorithmLister(deps.PublishedLister, deps.PublishedAlgorithmLister)
+		queryService = appTypologyCatalog.NewQueryServiceWithAlgorithmLister(deps.PublishedLister, deps.PublishedAlgorithmLister)
 	} else {
-		queryService = appPersonalityCatalog.NewQueryService(deps.PublishedLister)
+		queryService = appTypologyCatalog.NewQueryService(deps.PublishedLister)
 	}
-	var commandService appPersonalityModel.Service
+	var commandService appTypologyModel.Service
 	if deps.ModelRepo != nil {
-		commandService = appPersonalityModel.NewService(appPersonalityModel.Dependencies{
+		commandService = appTypologyModel.NewService(appTypologyModel.Dependencies{
 			ModelRepo:           deps.ModelRepo,
 			PublishedRepo:       deps.PublishedRepo,
 			QuestionnaireQuery:  deps.QuestionnaireQuery,

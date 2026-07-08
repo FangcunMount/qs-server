@@ -1,10 +1,10 @@
-package cognitive_test
+package taskperformance_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -82,12 +82,12 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 
 	modelRepo := &memoryModelRepo{}
 	publishedRepo := &memoryPublishedRepo{}
-	svc := cognitive.NewService(cognitive.Dependencies{
+	svc := taskperformance.NewService(taskperformance.Dependencies{
 		ModelRepo:     modelRepo,
 		PublishedRepo: publishedRepo,
 	})
 
-	created, err := svc.Create(context.Background(), cognitive.CreateInput{
+	created, err := svc.Create(context.Background(), taskperformance.CreateInput{
 		Code:  "COG-001",
 		Title: "认知测评",
 	})
@@ -111,10 +111,10 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]
 		}]
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, cognitive.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, taskperformance.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
-	if _, err := svc.BindQuestionnaire(context.Background(), cognitive.BindQuestionnaireInput{
+	if _, err := svc.BindQuestionnaire(context.Background(), taskperformance.BindQuestionnaireInput{
 		Code:                 created.Code,
 		QuestionnaireCode:    "SPM",
 		QuestionnaireVersion: "1.0.0",

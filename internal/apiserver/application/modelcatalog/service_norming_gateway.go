@@ -3,15 +3,15 @@ package modelcatalog
 import (
 	"context"
 
-	appBehavioralRating "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
+	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type normingKindGateway struct {
-	cmd appBehavioralRating.Service
+	cmd appNorming.Service
 }
 
-func (g normingKindGateway) require() (appBehavioralRating.Service, error) {
+func (g normingKindGateway) require() (appNorming.Service, error) {
 	if g.cmd == nil {
 		return nil, invalidArgument("行为评定模型服务未配置")
 	}
@@ -23,7 +23,7 @@ func (s *service) createBehavioralRating(ctx context.Context, dto CreateModelDTO
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.Create(ctx, appBehavioralRating.CreateInput{
+	result, err := cmd.Create(ctx, appNorming.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
@@ -44,7 +44,7 @@ func (g normingKindGateway) updateBasicInfo(ctx context.Context, dto UpdateBasic
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateBasicInfo(ctx, appBehavioralRating.UpdateBasicInfoInput{
+	result, err := cmd.UpdateBasicInfo(ctx, appNorming.UpdateBasicInfoInput{
 		Code:           dto.Code,
 		Title:          dto.Title,
 		Description:    dto.Description,
@@ -107,7 +107,7 @@ func (g normingKindGateway) bindQuestionnaire(ctx context.Context, dto BindQuest
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.BindQuestionnaire(ctx, appBehavioralRating.BindQuestionnaireInput{
+	result, err := cmd.BindQuestionnaire(ctx, appNorming.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
 		QuestionnaireVersion: dto.QuestionnaireVersion,
@@ -146,7 +146,7 @@ func (g normingKindGateway) updateDefinition(ctx context.Context, modelCode stri
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateDefinition(ctx, modelCode, appBehavioralRating.DefinitionInput{Payload: dto.Payload})
+	result, err := cmd.UpdateDefinition(ctx, modelCode, appNorming.DefinitionInput{Payload: dto.Payload})
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (g normingKindGateway) updateDefinition(ctx context.Context, modelCode stri
 	return out, nil
 }
 
-func behavioralRatingSummaryFromResult(result *appBehavioralRating.ModelSummary) *ModelSummary {
+func behavioralRatingSummaryFromResult(result *appNorming.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -189,7 +189,7 @@ func (s *service) listBehavioralRating(ctx context.Context, dto ListModelsDTO) (
 	if err != nil {
 		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
 	}
-	result, err := cmd.List(ctx, appBehavioralRating.ListInput{
+	result, err := cmd.List(ctx, appNorming.ListInput{
 		Status:   dto.Status,
 		Keyword:  dto.Keyword,
 		Page:     dto.Page,

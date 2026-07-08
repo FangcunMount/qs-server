@@ -1,8 +1,8 @@
 package consumer
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer/query"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer/query"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer/shared"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 

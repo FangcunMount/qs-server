@@ -1,12 +1,12 @@
 package modelcatalog
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func typologyListInput(dto ListModelsDTO) personality.ListInput {
-	return personality.ListInput{
+func typologyListInput(dto ListModelsDTO) typology.ListInput {
+	return typology.ListInput{
 		Kind:      dto.Kind,
 		SubKind:   dto.SubKind,
 		Status:    dto.Status,
@@ -18,8 +18,8 @@ func typologyListInput(dto ListModelsDTO) personality.ListInput {
 	}
 }
 
-func typologyCreateInput(dto CreateModelDTO) personality.CreateInput {
-	return personality.CreateInput{
+func typologyCreateInput(dto CreateModelDTO) typology.CreateInput {
+	return typology.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
@@ -33,8 +33,8 @@ func typologyCreateInput(dto CreateModelDTO) personality.CreateInput {
 	}
 }
 
-func typologyUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateBasicInfoInput {
-	return personality.UpdateBasicInfoInput{
+func typologyUpdateBasicInfoInput(dto UpdateBasicInfoDTO) typology.UpdateBasicInfoInput {
+	return typology.UpdateBasicInfoInput{
 		Code:           dto.Code,
 		Title:          dto.Title,
 		Description:    dto.Description,
@@ -46,16 +46,16 @@ func typologyUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateBasi
 	}
 }
 
-func typologyBindInput(dto BindQuestionnaireDTO) personality.BindQuestionnaireInput {
-	return personality.BindQuestionnaireInput{
+func typologyBindInput(dto BindQuestionnaireDTO) typology.BindQuestionnaireInput {
+	return typology.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
 		QuestionnaireVersion: dto.QuestionnaireVersion,
 	}
 }
 
-func typologyDefinitionInput(dto DefinitionDTO) personality.DefinitionInput {
-	return personality.DefinitionInput{
+func typologyDefinitionInput(dto DefinitionDTO) typology.DefinitionInput {
+	return typology.DefinitionInput{
 		SubKind:       dto.SubKind,
 		Algorithm:     dto.Algorithm,
 		PayloadFormat: dto.PayloadFormat,
@@ -63,7 +63,7 @@ func typologyDefinitionInput(dto DefinitionDTO) personality.DefinitionInput {
 	}
 }
 
-func summaryFromTypology(result *personality.ModelSummary) *ModelSummary {
+func summaryFromTypology(result *typology.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -87,7 +87,7 @@ func summaryFromTypology(result *personality.ModelSummary) *ModelSummary {
 	return summary
 }
 
-func definitionFromTypology(result *personality.DefinitionResult) *DefinitionDTO {
+func definitionFromTypology(result *typology.DefinitionResult) *DefinitionDTO {
 	if result == nil {
 		return nil
 	}
@@ -103,7 +103,7 @@ func definitionFromTypology(result *personality.DefinitionResult) *DefinitionDTO
 	return dto
 }
 
-func validationFailedFromTypologyIssues(issues []personality.ValidationIssue) error {
+func validationFailedFromTypologyIssues(issues []typology.ValidationIssue) error {
 	mapped := make([]ValidationIssue, 0, len(issues))
 	for _, issue := range issues {
 		mapped = append(mapped, ValidationIssue{
@@ -116,7 +116,7 @@ func validationFailedFromTypologyIssues(issues []personality.ValidationIssue) er
 	return NewValidationFailedError(mapped)
 }
 
-func validationFromTypology(result *personality.ValidationResult) *ValidationResult {
+func validationFromTypology(result *typology.ValidationResult) *ValidationResult {
 	if result == nil {
 		return NewValidationResult(nil)
 	}
@@ -132,7 +132,7 @@ func validationFromTypology(result *personality.ValidationResult) *ValidationRes
 	return NewValidationResult(issues)
 }
 
-func questionnaireFromTypology(result *personality.QuestionnaireBindingResult) *QuestionnaireBindingResult {
+func questionnaireFromTypology(result *typology.QuestionnaireBindingResult) *QuestionnaireBindingResult {
 	if result == nil {
 		return nil
 	}
@@ -144,7 +144,7 @@ func questionnaireFromTypology(result *personality.QuestionnaireBindingResult) *
 	}
 }
 
-func summariesFromTypologyList(result *personality.ModelListResult) []ModelSummary {
+func summariesFromTypologyList(result *typology.ModelListResult) []ModelSummary {
 	if result == nil {
 		return nil
 	}

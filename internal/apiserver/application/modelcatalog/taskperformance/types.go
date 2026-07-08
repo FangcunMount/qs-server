@@ -1,4 +1,4 @@
-package behavioral_rating
+package taskperformance
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-const KindBehavioralRating = "behavioral_rating"
+const KindCognitive = "cognitive"
 
 type ListInput struct {
 	Status   string
@@ -89,7 +89,7 @@ func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
 	}
 	return &ModelSummary{
 		Code:                 model.Code,
-		Kind:                 KindBehavioralRating,
+		Kind:                 KindCognitive,
 		Algorithm:            string(model.Algorithm),
 		ProductChannel:       string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		Title:                model.Title,

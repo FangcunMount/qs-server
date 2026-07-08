@@ -1,13 +1,13 @@
 package modelcatalog
 
 import (
-	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // Cognitive hosts cognitive model catalog command services.
 type Cognitive struct {
-	CommandService appCognitive.Service
+	CommandService appTaskPerformance.Service
 }
 
 // CognitiveDeps defines explicit construction dependencies.
@@ -18,9 +18,9 @@ type CognitiveDeps struct {
 
 // NewCognitive assembles the cognitive-model catalog capability.
 func NewCognitive(deps CognitiveDeps) (*Cognitive, error) {
-	var commandService appCognitive.Service
+	var commandService appTaskPerformance.Service
 	if deps.ModelRepo != nil {
-		commandService = appCognitive.NewService(appCognitive.Dependencies{
+		commandService = appTaskPerformance.NewService(appTaskPerformance.Dependencies{
 			ModelRepo:     deps.ModelRepo,
 			PublishedRepo: deps.PublishedRepo,
 		})

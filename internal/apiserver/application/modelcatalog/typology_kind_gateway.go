@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 )
 
 type typologyKindGateway struct {
-	cmd personality.Service
+	cmd typology.Service
 }
 
-func (g typologyKindGateway) require() (personality.Service, error) {
+func (g typologyKindGateway) require() (typology.Service, error) {
 	if g.cmd == nil {
 		return nil, unavailable("人格模型服务未配置")
 	}
@@ -153,7 +153,7 @@ func (g typologyKindGateway) previewReport(ctx context.Context, modelCode string
 	}
 	result, err := cmd.PreviewReport(ctx, modelCode, payload)
 	if err != nil {
-		if issues, ok := personality.AsValidationFailed(err); ok {
+		if issues, ok := typology.AsValidationFailed(err); ok {
 			return nil, validationFailedFromTypologyIssues(issues)
 		}
 		return nil, err

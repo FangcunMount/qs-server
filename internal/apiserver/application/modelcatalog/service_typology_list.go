@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
+	typologyconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )
 
@@ -28,8 +28,8 @@ func (s *service) listTypology(ctx context.Context, dto ListModelsDTO) ([]ModelS
 	}
 
 	if dto.Status == "" || dto.Status == StatusPublished {
-		if s.deps.PersonalityQuery != nil {
-			result, err := s.deps.PersonalityQuery.ListPublished(ctx, personalityconsumer.ListPersonalityModelsDTO{
+		if s.deps.TypologyQuery != nil {
+			result, err := s.deps.TypologyQuery.ListPublished(ctx, typologyconsumer.ListPersonalityModelsDTO{
 				Page:     dto.Page,
 				PageSize: dto.PageSize,
 			})

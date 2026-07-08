@@ -1,4 +1,4 @@
-package behavioral_rating
+package taskperformance
 
 import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 

@@ -539,11 +539,11 @@ type Algorithm = identity.Algorithm
 | R87 | 剩余调用方改引 `scoring/definition`；删除 `modelcatalog/scale/` 整树；顶层守卫禁 `scale/` |
 | R88 | `identity/routing/catalog/capability` 调用方改引 `binding/publishing`；删除四过渡包 |
 | R89 | `personality publish` 迁入 `publishing.SnapshotBuilder`；`typology` 去 `modelcatalog` 根依赖；删 `cognitive/behavioral_rating/task_performance` domain 包 |
+| R90 | `application/modelcatalog/{personality,behavioral_rating,cognitive}` → `{typology,norming,taskperformance}`；删 `personality/seed`；seed 调用方直引 `legacy`；守卫禁回退目录 |
 
-过渡态说明（R89 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
+过渡态说明（R90 后 application 层已无模型族用例目录；container 层 `assemble_personality` 等待 R91+ 机制化）：
 
 ```text
-modelcatalog/personality/seed  # legacy seed 常量 compat，待 R90+ 迁入 legacy
-application/modelcatalog/{personality,behavioral_rating,cognitive}/  # 用例子包
+container/modules/modelcatalog/assemble_{personality,behavioral_rating,cognitive}.go  # 装配文件名，非 application 包
 ```
 

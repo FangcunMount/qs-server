@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	personalityseed "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/seed"
+	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 )
 
@@ -18,8 +18,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		personalityseed.SBTIQuestionnaireCode,
-		personalityseed.SBTIModelVersion,
+		cataloglegacy.SBTIQuestionnaireCode,
+		cataloglegacy.SBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -46,8 +46,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		personalityseed.MBTIQuestionnaireCode,
-		personalityseed.MBTIModelVersion,
+		cataloglegacy.MBTIQuestionnaireCode,
+		cataloglegacy.MBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -55,7 +55,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Code != personalityseed.MBTIModelCode {
+	if binding.Ref.Code != cataloglegacy.MBTIModelCode {
 		t.Fatalf("code = %s", binding.Ref.Code)
 	}
 }

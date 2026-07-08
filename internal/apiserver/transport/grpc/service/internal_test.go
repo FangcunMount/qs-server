@@ -8,7 +8,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	personalityseed "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/seed"
+	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -94,7 +94,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    personalityseed.SBTIQuestionnaireCode,
+		QuestionnaireCode:    cataloglegacy.SBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -112,7 +112,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "sbti" {
 		t.Fatalf("ModelAlgorithm = %#v, want sbti", dto.ModelAlgorithm)
 	}
-	if dto.ModelCode == nil || *dto.ModelCode != personalityseed.SBTIModelCode {
+	if dto.ModelCode == nil || *dto.ModelCode != cataloglegacy.SBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want SBTI_FUN", dto.ModelCode)
 	}
 	if !shouldAutoSubmitAssessment(dto) {
@@ -124,8 +124,8 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
-		QuestionnaireVersion: personalityseed.MBTIModelVersion,
+		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
+		QuestionnaireVersion: cataloglegacy.MBTIModelVersion,
 		AnswersheetId:        202,
 	}
 
@@ -142,14 +142,14 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "mbti" {
 		t.Fatalf("ModelAlgorithm = %#v, want mbti", dto.ModelAlgorithm)
 	}
-	if dto.ModelCode == nil || *dto.ModelCode != personalityseed.MBTIModelCode {
+	if dto.ModelCode == nil || *dto.ModelCode != cataloglegacy.MBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want MBTI_OEJTS", dto.ModelCode)
 	}
-	if dto.ModelVersion == nil || *dto.ModelVersion != personalityseed.MBTIModelVersion {
-		t.Fatalf("ModelVersion = %#v, want %s", dto.ModelVersion, personalityseed.MBTIModelVersion)
+	if dto.ModelVersion == nil || *dto.ModelVersion != cataloglegacy.MBTIModelVersion {
+		t.Fatalf("ModelVersion = %#v, want %s", dto.ModelVersion, cataloglegacy.MBTIModelVersion)
 	}
-	if dto.ModelTitle == nil || *dto.ModelTitle != personalityseed.MBTIModelTitle {
-		t.Fatalf("ModelTitle = %#v, want %s", dto.ModelTitle, personalityseed.MBTIModelTitle)
+	if dto.ModelTitle == nil || *dto.ModelTitle != cataloglegacy.MBTIModelTitle {
+		t.Fatalf("ModelTitle = %#v, want %s", dto.ModelTitle, cataloglegacy.MBTIModelTitle)
 	}
 	if !shouldAutoSubmitAssessment(dto) {
 		t.Fatal("shouldAutoSubmitAssessment() = false, want true for MBTI model")
@@ -160,7 +160,7 @@ func TestBuildCreateAssessmentDTOPropagatesResolverError(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    personalityseed.SBTIQuestionnaireCode,
+		QuestionnaireCode:    cataloglegacy.SBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -236,7 +236,7 @@ func TestBuildCreateAssessmentDTOSkipsBindingWhenUnresolved(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
+		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
@@ -254,7 +254,7 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
 		TesteeId:             101,
-		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
+		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}

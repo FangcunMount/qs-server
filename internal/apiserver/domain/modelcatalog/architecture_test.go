@@ -99,9 +99,6 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 		"factor", "scoring", "norming", "typology", "taskperformance",
 		"binding", "publishing", "legacy",
 	}
-	transitional := map[string]struct{}{
-		"personality": {},
-	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
@@ -113,9 +110,6 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 		}
 		name := entry.Name()
 		seen[name] = struct{}{}
-		if _, ok := transitional[name]; ok {
-			continue
-		}
 		allowed := false
 		for _, req := range required {
 			if name == req {

@@ -1,4 +1,4 @@
-package personality_test
+package typology_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -31,29 +31,29 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 	questionnaire := frontendMBTIQuestionnaire()
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
 	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
-	svc := personality.NewService(personality.Dependencies{
+	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
 		QuestionnaireQuery: questionnaireQueryStub{questionnaire: questionnaire},
 		ReportPreviewer:    previewadapter.NewPreviewer(),
 	})
 
-	created, err := svc.Create(context.Background(), personality.CreateInput{
+	created, err := svc.Create(context.Background(), typology.CreateInput{
 		Code:                 "personality_e2e_mbti",
 		Title:                "E2E MBTI",
 		Algorithm:            "mbti",
-		SubKind:              personality.SubKindTypology,
+		SubKind:              typology.SubKindTypology,
 		QuestionnaireCode:    questionnaire.Code,
 		QuestionnaireVersion: questionnaire.Version,
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if created.Status != personality.StatusDraft {
+	if created.Status != typology.StatusDraft {
 		t.Fatalf("status = %s, want draft", created.Status)
 	}
 
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, typology.DefinitionInput{
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Payload:       payload,
 	}); err != nil {
@@ -68,13 +68,13 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 		t.Fatalf("Validate() passed = false, issues = %#v", validation)
 	}
 
-	previewAnswers := []personality.PreviewAnswer{
+	previewAnswers := []typology.PreviewAnswer{
 		{QuestionCode: "Q_EI", Score: floatPtr(1)},
 		{QuestionCode: "Q_SN", Score: floatPtr(5)},
 		{QuestionCode: "Q_TF", Score: floatPtr(1)},
 		{QuestionCode: "Q_JP", Score: floatPtr(1)},
 	}
-	previewPayload, err := json.Marshal(personality.PreviewReportInput{Answers: previewAnswers})
+	previewPayload, err := json.Marshal(typology.PreviewReportInput{Answers: previewAnswers})
 	if err != nil {
 		t.Fatalf("Marshal preview payload: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
-	if publishedSummary.Status != personality.StatusPublished {
+	if publishedSummary.Status != typology.StatusPublished {
 		t.Fatalf("published status = %s, want published", publishedSummary.Status)
 	}
 
@@ -138,7 +138,7 @@ func executePublishedPersonalityAssessment(
 	model *domain.AssessmentModel,
 	snapshot *domain.PublishedModelSnapshot,
 	questionnaire *questionnaireapp.QuestionnaireResult,
-	answers []personality.PreviewAnswer,
+	answers []typology.PreviewAnswer,
 ) (*assessment.AssessmentOutcome, *domainreport.InterpretReport, error) {
 	var typologyPayload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &typologyPayload); err != nil {
@@ -182,7 +182,7 @@ func publishedExecutionInput(
 	model *domain.AssessmentModel,
 	questionnaire *questionnaireapp.QuestionnaireResult,
 	payload *modeltypology.Payload,
-	answers []personality.PreviewAnswer,
+	answers []typology.PreviewAnswer,
 ) *evaluationinput.InputSnapshot {
 	answerSnapshots := make([]evaluationinput.AnswerSnapshot, 0, len(answers))
 	for _, answer := range answers {
@@ -268,7 +268,7 @@ func publishedSubmittedAssessment(
 
 func assertPreviewMatchesExecution(
 	t *testing.T,
-	preview *personality.PreviewReportResult,
+	preview *typology.PreviewReportResult,
 	outcome *assessment.AssessmentOutcome,
 ) {
 	t.Helper()

@@ -157,9 +157,9 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 			cognitiveStub := &cognitiveCommandStub{}
 			behavioralRatingStub := &behavioralRatingCommandStub{}
 			svc := NewService(Dependencies{
-				PersonalityCommand:      personalityStub,
-				CognitiveCommand:        cognitiveStub,
-				BehavioralRatingCommand: behavioralRatingStub,
+				TypologyCommand:      personalityStub,
+				TaskPerformanceCommand:        cognitiveStub,
+				NormingCommand: behavioralRatingStub,
 			})
 
 			_, err := svc.Create(context.Background(), CreateModelDTO{
@@ -216,7 +216,7 @@ func TestPreviewReportCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
-		PersonalityCommand: &personalityCommandStub{},
+		TypologyCommand: &personalityCommandStub{},
 	})
 
 	for _, entry := range modelFamilyRegistryOptions() {

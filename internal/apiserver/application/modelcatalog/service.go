@@ -6,10 +6,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
+	typologyconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -37,10 +37,10 @@ type Service interface {
 }
 
 type Dependencies struct {
-	BehavioralRatingCommand behavioral_rating.Service
-	PersonalityCommand      personality.Service
-	CognitiveCommand        cognitive.Service
-	PersonalityQuery        personalityconsumer.PersonalityModelQueryService
+	NormingCommand norming.Service
+	TypologyCommand      typology.Service
+	TaskPerformanceCommand        taskperformance.Service
+	TypologyQuery        typologyconsumer.PersonalityModelQueryService
 	QuestionnaireQuery      questionnaireapp.QuestionnaireQueryService
 	Codes                   codes.CodesService
 	RawQRCodeGenerator      qrcode.QRCodeService
@@ -56,9 +56,9 @@ type service struct {
 func NewService(deps Dependencies) Service {
 	return &service{
 		deps:                deps,
-		normingKind:         normingKindGateway{cmd: deps.BehavioralRatingCommand},
-		typologyKind:        typologyKindGateway{cmd: deps.PersonalityCommand},
-		taskPerformanceKind: taskPerformanceKindGateway{cmd: deps.CognitiveCommand},
+		normingKind:         normingKindGateway{cmd: deps.NormingCommand},
+		typologyKind:        typologyKindGateway{cmd: deps.TypologyCommand},
+		taskPerformanceKind: taskPerformanceKindGateway{cmd: deps.TaskPerformanceCommand},
 	}
 }
 
@@ -147,8 +147,8 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 			return behavioralRatingSummaryFromResult(result), nil
 		}
 	}
-	if s.deps.PersonalityQuery != nil {
-		if result, err := s.deps.PersonalityQuery.GetPublishedByCode(ctx, modelCode); err == nil && result != nil {
+	if s.deps.TypologyQuery != nil {
+		if result, err := s.deps.TypologyQuery.GetPublishedByCode(ctx, modelCode); err == nil && result != nil {
 			return personalitySummaryFromDetail(result), nil
 		}
 	}
@@ -300,8 +300,8 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindBehavioralRating {
 		return s.normingKind.getDefinition(ctx, modelCode)
 	}
-	if s.deps.PersonalityQuery != nil {
-		personality, err := s.deps.PersonalityQuery.GetPublishedByCode(ctx, modelCode)
+	if s.deps.TypologyQuery != nil {
+		personality, err := s.deps.TypologyQuery.GetPublishedByCode(ctx, modelCode)
 		if err == nil && personality != nil {
 			payload, marshalErr := json.Marshal(newPersonalityDefinitionPayload(personality))
 			if marshalErr != nil {

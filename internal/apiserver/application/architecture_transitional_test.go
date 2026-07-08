@@ -53,6 +53,29 @@ func TestMechanismTypologyDoesNotAddAssessmentCodeReportFiles(t *testing.T) {
 	}
 }
 
+func TestModelCatalogApplicationDoesNotReintroduceModelFamilyTopLevelDirs(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	modelCatalogRoot := filepath.Join(root, "internal/apiserver/application/modelcatalog")
+	forbiddenDirs := []string{"personality", "behavioral_rating", "cognitive"}
+	entries, err := os.ReadDir(modelCatalogRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		for _, forbidden := range forbiddenDirs {
+			if name == forbidden {
+				t.Fatalf("application/modelcatalog/%s is forbidden; use typology/norming/taskperformance", forbidden)
+			}
+		}
+	}
+}
+
 func TestModelCatalogApplicationDoesNotReintroduceModelFamilyServiceFiles(t *testing.T) {
 	t.Parallel()
 

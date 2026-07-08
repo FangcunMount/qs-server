@@ -2,7 +2,7 @@ package modelcatalog
 
 import (
 	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
-	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	appTypologyModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -84,12 +84,12 @@ func buildScaleDeps(in WireInput) ScaleDeps {
 
 type personalityCacheWireConfig struct {
 	rulesetInfra.PublishedModelCacheConfig
-	Notifier appPersonalityModel.CacheSignalNotifier
+	Notifier appTypologyModel.CacheSignalNotifier
 }
 
 func personalityCacheConfig(in WireInput) personalityCacheWireConfig {
-	var notifier appPersonalityModel.CacheSignalNotifier
-	if n, ok := in.CacheSignalNotifier.(appPersonalityModel.CacheSignalNotifier); ok {
+	var notifier appTypologyModel.CacheSignalNotifier
+	if n, ok := in.CacheSignalNotifier.(appTypologyModel.CacheSignalNotifier); ok {
 		notifier = n
 	}
 	return personalityCacheWireConfig{

@@ -3,7 +3,7 @@ package query
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"

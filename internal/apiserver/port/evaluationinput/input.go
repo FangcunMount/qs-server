@@ -17,26 +17,26 @@ const (
 )
 
 const (
-	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelCode. Kept for legacy reader compatibility only.
+	// Deprecated: use domain/modelcatalog/legacy.SBTIModelCode. Kept for legacy reader compatibility only.
 	DefaultSBTIModelCode = "SBTI_FUN"
-	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelVersion.
+	// Deprecated: use domain/modelcatalog/legacy.SBTIModelVersion.
 	DefaultSBTIModelVersion = "1.0.0"
-	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelTitle.
+	// Deprecated: use domain/modelcatalog/legacy.SBTIModelTitle.
 	DefaultSBTIModelTitle = "SBTI 趣味人格测评"
-	// Deprecated: use domain/modelcatalog/personality/seed.SBTIQuestionnaireCode.
+	// Deprecated: use domain/modelcatalog/legacy.SBTIQuestionnaireCode.
 	DefaultSBTIQuestionnaireCode = "SBTI_FUN"
-	// Deprecated: use domain/modelcatalog/personality/seed.SBTIQuestionnaireTitle.
+	// Deprecated: use domain/modelcatalog/legacy.SBTIQuestionnaireTitle.
 	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
 
-	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelCode. Kept for legacy reader compatibility only.
+	// Deprecated: use domain/modelcatalog/legacy.MBTIModelCode. Kept for legacy reader compatibility only.
 	DefaultMBTIModelCode = "MBTI_OEJTS"
-	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelVersion.
+	// Deprecated: use domain/modelcatalog/legacy.MBTIModelVersion.
 	DefaultMBTIModelVersion = "2.0.1"
-	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelTitle.
+	// Deprecated: use domain/modelcatalog/legacy.MBTIModelTitle.
 	DefaultMBTIModelTitle = "MBTI 人格类型测评（OEJTS）"
-	// Deprecated: use domain/modelcatalog/personality/seed.MBTIQuestionnaireCode.
+	// Deprecated: use domain/modelcatalog/legacy.MBTIQuestionnaireCode.
 	DefaultMBTIQuestionnaireCode = "MBTI_OEJTS"
-	// Deprecated: use domain/modelcatalog/personality/seed.MBTIQuestionnaireTitle.
+	// Deprecated: use domain/modelcatalog/legacy.MBTIQuestionnaireTitle.
 	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"
 )
 
