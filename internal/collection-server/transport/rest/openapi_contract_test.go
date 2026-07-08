@@ -81,6 +81,31 @@ func TestCollectionOpenAPIHasNoLegacyAssessmentSchemas(t *testing.T) {
 	}
 }
 
+func TestCollectionOpenAPIAssessmentOutcomeSchemasHaveNoLegacyFields(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
+	for _, name := range []string{
+		"evaluation.AssessmentSummaryResponse",
+		"typologyassessment.AssessmentDetailResponse",
+		"typologyassessment.AssessmentReportResponse",
+	} {
+		schema, ok := schemas[name].(map[string]any)
+		if !ok {
+			t.Fatalf("missing outcome schema %s", name)
+		}
+		props, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatalf("schema %s has no properties", name)
+		}
+		for _, forbidden := range []string{"scale_code", "scale_name", "total_score", "risk_level"} {
+			if _, exists := props[forbidden]; exists {
+				t.Fatalf("schema %s still exposes legacy outcome field %q", name, forbidden)
+			}
+		}
+	}
+}
+
 func TestCollectionOpenAPIHasNoLegacyAlgorithmQueryParam(t *testing.T) {
 	t.Parallel()
 

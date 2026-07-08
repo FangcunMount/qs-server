@@ -254,12 +254,8 @@ type AssessmentSummary struct {
 	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	QuestionnaireCode    string                 `protobuf:"bytes,3,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,4,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	ScaleCode            string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
-	ScaleName            string                 `protobuf:"bytes,6,opt,name=scale_name,json=scaleName,proto3" json:"scale_name,omitempty"`
 	OriginType           string                 `protobuf:"bytes,7,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
 	Status               string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
-	TotalScore           float64                `protobuf:"fixed64,9,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`
-	RiskLevel            string                 `protobuf:"bytes,10,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	SubmittedAt          string                 `protobuf:"bytes,12,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
 	InterpretedAt        string                 `protobuf:"bytes,13,opt,name=interpreted_at,json=interpretedAt,proto3" json:"interpreted_at,omitempty"`
@@ -322,20 +318,6 @@ func (x *AssessmentSummary) GetQuestionnaireVersion() string {
 	return ""
 }
 
-func (x *AssessmentSummary) GetScaleCode() string {
-	if x != nil {
-		return x.ScaleCode
-	}
-	return ""
-}
-
-func (x *AssessmentSummary) GetScaleName() string {
-	if x != nil {
-		return x.ScaleName
-	}
-	return ""
-}
-
 func (x *AssessmentSummary) GetOriginType() string {
 	if x != nil {
 		return x.OriginType
@@ -346,20 +328,6 @@ func (x *AssessmentSummary) GetOriginType() string {
 func (x *AssessmentSummary) GetStatus() string {
 	if x != nil {
 		return x.Status
-	}
-	return ""
-}
-
-func (x *AssessmentSummary) GetTotalScore() float64 {
-	if x != nil {
-		return x.TotalScore
-	}
-	return 0
-}
-
-func (x *AssessmentSummary) GetRiskLevel() string {
-	if x != nil {
-		return x.RiskLevel
 	}
 	return ""
 }
@@ -421,13 +389,9 @@ type AssessmentDetail struct {
 	QuestionnaireCode    string                 `protobuf:"bytes,5,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,6,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	AnswerSheetId        uint64                 `protobuf:"varint,7,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"`
-	ScaleCode            string                 `protobuf:"bytes,8,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
-	ScaleName            string                 `protobuf:"bytes,9,opt,name=scale_name,json=scaleName,proto3" json:"scale_name,omitempty"`
 	OriginType           string                 `protobuf:"bytes,10,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
 	OriginId             string                 `protobuf:"bytes,11,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`
 	Status               string                 `protobuf:"bytes,12,opt,name=status,proto3" json:"status,omitempty"`
-	TotalScore           float64                `protobuf:"fixed64,13,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`
-	RiskLevel            string                 `protobuf:"bytes,14,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	SubmittedAt          string                 `protobuf:"bytes,16,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
 	InterpretedAt        string                 `protobuf:"bytes,17,opt,name=interpreted_at,json=interpretedAt,proto3" json:"interpreted_at,omitempty"`
@@ -512,20 +476,6 @@ func (x *AssessmentDetail) GetAnswerSheetId() uint64 {
 	return 0
 }
 
-func (x *AssessmentDetail) GetScaleCode() string {
-	if x != nil {
-		return x.ScaleCode
-	}
-	return ""
-}
-
-func (x *AssessmentDetail) GetScaleName() string {
-	if x != nil {
-		return x.ScaleName
-	}
-	return ""
-}
-
 func (x *AssessmentDetail) GetOriginType() string {
 	if x != nil {
 		return x.OriginType
@@ -543,20 +493,6 @@ func (x *AssessmentDetail) GetOriginId() string {
 func (x *AssessmentDetail) GetStatus() string {
 	if x != nil {
 		return x.Status
-	}
-	return ""
-}
-
-func (x *AssessmentDetail) GetTotalScore() float64 {
-	if x != nil {
-		return x.TotalScore
-	}
-	return 0
-}
-
-func (x *AssessmentDetail) GetRiskLevel() string {
-	if x != nil {
-		return x.RiskLevel
 	}
 	return ""
 }
@@ -1108,10 +1044,6 @@ func (x *ModelRarity) GetOneInX() int32 {
 type AssessmentReport struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
-	ScaleCode     string                 `protobuf:"bytes,2,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
-	ScaleName     string                 `protobuf:"bytes,3,opt,name=scale_name,json=scaleName,proto3" json:"scale_name,omitempty"`
-	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`
-	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
 	Conclusion    string                 `protobuf:"bytes,6,opt,name=conclusion,proto3" json:"conclusion,omitempty"`
 	Dimensions    []*DimensionInterpret  `protobuf:"bytes,7,rep,name=dimensions,proto3" json:"dimensions,omitempty"`
 	Suggestions   []*Suggestion          `protobuf:"bytes,8,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
@@ -1159,34 +1091,6 @@ func (x *AssessmentReport) GetAssessmentId() uint64 {
 		return x.AssessmentId
 	}
 	return 0
-}
-
-func (x *AssessmentReport) GetScaleCode() string {
-	if x != nil {
-		return x.ScaleCode
-	}
-	return ""
-}
-
-func (x *AssessmentReport) GetScaleName() string {
-	if x != nil {
-		return x.ScaleName
-	}
-	return ""
-}
-
-func (x *AssessmentReport) GetTotalScore() float64 {
-	if x != nil {
-		return x.TotalScore
-	}
-	return 0
-}
-
-func (x *AssessmentReport) GetRiskLevel() string {
-	if x != nil {
-		return x.RiskLevel
-	}
-	return ""
 }
 
 func (x *AssessmentReport) GetConclusion() string {
@@ -2254,23 +2158,14 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\vResultLevel\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
-	"\bseverity\x18\x03 \x01(\tR\bseverity\"\xec\x04\n" +
+	"\bseverity\x18\x03 \x01(\tR\bseverity\"\xb7\x04\n" +
 	"\x11AssessmentSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x03 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x04 \x01(\tR\x14questionnaireVersion\x12\x1d\n" +
-	"\n" +
-	"scale_code\x18\x05 \x01(\tR\tscaleCode\x12\x1d\n" +
-	"\n" +
-	"scale_name\x18\x06 \x01(\tR\tscaleName\x12\x1f\n" +
+	"\x15questionnaire_version\x18\x04 \x01(\tR\x14questionnaireVersion\x12\x1f\n" +
 	"\vorigin_type\x18\a \x01(\tR\n" +
 	"originType\x12\x16\n" +
-	"\x06status\x18\b \x01(\tR\x06status\x12\x1f\n" +
-	"\vtotal_score\x18\t \x01(\x01R\n" +
-	"totalScore\x12\x1d\n" +
-	"\n" +
-	"risk_level\x18\n" +
-	" \x01(\tR\triskLevel\x12\x1d\n" +
+	"\x06status\x18\b \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\v \x01(\tR\tcreatedAt\x12!\n" +
 	"\fsubmitted_at\x18\f \x01(\tR\vsubmittedAt\x12%\n" +
@@ -2278,27 +2173,24 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0fanswer_sheet_id\x18\x0e \x01(\x04R\ranswerSheetId\x12/\n" +
 	"\x05model\x18\x0f \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
 	"\rprimary_score\x18\x10 \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
-	"\x05level\x18\x11 \x01(\v2\x17.evaluation.ResultLevelR\x05level\"\x80\x06\n" +
+	"\x05level\x18\x11 \x01(\v2\x17.evaluation.ResultLevelR\x05levelJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
+	"J\x04\b\n" +
+	"\x10\vR\n" +
+	"scale_codeR\n" +
+	"scale_nameR\vtotal_scoreR\n" +
+	"risk_level\"\xcb\x05\n" +
 	"\x10AssessmentDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
 	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1b\n" +
 	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12-\n" +
 	"\x12questionnaire_code\x18\x05 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x06 \x01(\tR\x14questionnaireVersion\x12&\n" +
-	"\x0fanswer_sheet_id\x18\a \x01(\x04R\ranswerSheetId\x12\x1d\n" +
-	"\n" +
-	"scale_code\x18\b \x01(\tR\tscaleCode\x12\x1d\n" +
-	"\n" +
-	"scale_name\x18\t \x01(\tR\tscaleName\x12\x1f\n" +
+	"\x0fanswer_sheet_id\x18\a \x01(\x04R\ranswerSheetId\x12\x1f\n" +
 	"\vorigin_type\x18\n" +
 	" \x01(\tR\n" +
 	"originType\x12\x1b\n" +
 	"\torigin_id\x18\v \x01(\tR\boriginId\x12\x16\n" +
-	"\x06status\x18\f \x01(\tR\x06status\x12\x1f\n" +
-	"\vtotal_score\x18\r \x01(\x01R\n" +
-	"totalScore\x12\x1d\n" +
-	"\n" +
-	"risk_level\x18\x0e \x01(\tR\triskLevel\x12\x1d\n" +
+	"\x06status\x18\f \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x0f \x01(\tR\tcreatedAt\x12!\n" +
 	"\fsubmitted_at\x18\x10 \x01(\tR\vsubmittedAt\x12%\n" +
@@ -2307,7 +2199,11 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0efailure_reason\x18\x13 \x01(\tR\rfailureReason\x12/\n" +
 	"\x05model\x18\x14 \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
 	"\rprimary_score\x18\x15 \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
-	"\x05level\x18\x16 \x01(\v2\x17.evaluation.ResultLevelR\x05level\"\xf1\x01\n" +
+	"\x05level\x18\x16 \x01(\v2\x17.evaluation.ResultLevelR\x05levelJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
+	"J\x04\b\r\x10\x0eJ\x04\b\x0e\x10\x0fR\n" +
+	"scale_codeR\n" +
+	"scale_nameR\vtotal_scoreR\n" +
+	"risk_level\"\xf1\x01\n" +
 	"\vFactorScore\x12\x1f\n" +
 	"\vfactor_code\x18\x01 \x01(\tR\n" +
 	"factorCode\x12\x1f\n" +
@@ -2369,17 +2265,9 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\vModelRarity\x12\x18\n" +
 	"\apercent\x18\x01 \x01(\x01R\apercent\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x18\n" +
-	"\bone_in_x\x18\x03 \x01(\x05R\x06oneInX\"\xc4\x04\n" +
+	"\bone_in_x\x18\x03 \x01(\x05R\x06oneInX\"\x8f\x04\n" +
 	"\x10AssessmentReport\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
-	"\n" +
-	"scale_code\x18\x02 \x01(\tR\tscaleCode\x12\x1d\n" +
-	"\n" +
-	"scale_name\x18\x03 \x01(\tR\tscaleName\x12\x1f\n" +
-	"\vtotal_score\x18\x04 \x01(\x01R\n" +
-	"totalScore\x12\x1d\n" +
-	"\n" +
-	"risk_level\x18\x05 \x01(\tR\triskLevel\x12\x1e\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1e\n" +
 	"\n" +
 	"conclusion\x18\x06 \x01(\tR\n" +
 	"conclusion\x12>\n" +
@@ -2394,7 +2282,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"modelExtra\x12/\n" +
 	"\x05model\x18\v \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
 	"\rprimary_score\x18\f \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
-	"\x05level\x18\r \x01(\v2\x17.evaluation.ResultLevelR\x05level\"Z\n" +
+	"\x05level\x18\r \x01(\v2\x17.evaluation.ResultLevelR\x05levelJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\n" +
+	"scale_codeR\n" +
+	"scale_nameR\vtotal_scoreR\n" +
+	"risk_level\"Z\n" +
 	"\x16GetMyAssessmentRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"W\n" +

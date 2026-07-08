@@ -162,8 +162,7 @@ func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeR
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}
-	fillLegacyAssessmentDetailFields(detail, result)
-	if result.OriginID != nil {
+	if result.SubmittedAt != nil {
 		detail.OriginId = *result.OriginID
 	}
 	if result.SubmittedAt != nil {
@@ -196,7 +195,6 @@ func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcome
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}
-	fillLegacyAssessmentSummaryFields(summary, result)
 	if result.SubmittedAt != nil {
 		summary.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
 	}
@@ -217,18 +215,6 @@ func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResul
 		Level:        toEvaluationProtoResultLevel(result.Level),
 		Conclusion:   result.Conclusion,
 		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
-	}
-	if result.Model.Code != "" {
-		report.ScaleCode = result.Model.Code
-	}
-	if result.Model.Title != "" {
-		report.ScaleName = result.Model.Title
-	}
-	if result.PrimaryScore != nil {
-		report.TotalScore = result.PrimaryScore.Value
-	}
-	if result.Level != nil {
-		report.RiskLevel = resultLevelToRiskLevel(result.Level)
 	}
 	for _, d := range result.Dimensions {
 		report.Dimensions = append(report.Dimensions, &evaluationpb.DimensionInterpret{
@@ -252,49 +238,6 @@ func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResul
 		report.ModelExtra = toProtoModelExtra(result.ModelExtra)
 	}
 	return report
-}
-
-func fillLegacyAssessmentDetailFields(detail *evaluationpb.AssessmentDetail, result *assessmentApp.AssessmentOutcomeResult) {
-	if detail == nil || result == nil {
-		return
-	}
-	if result.Model.Code != "" {
-		detail.ScaleCode = result.Model.Code
-	}
-	if result.Model.Title != "" {
-		detail.ScaleName = result.Model.Title
-	}
-	if result.PrimaryScore != nil {
-		detail.TotalScore = result.PrimaryScore.Value
-	}
-	if result.Level != nil {
-		detail.RiskLevel = resultLevelToRiskLevel(result.Level)
-	}
-}
-
-func fillLegacyAssessmentSummaryFields(summary *evaluationpb.AssessmentSummary, result *assessmentApp.AssessmentOutcomeResult) {
-	if summary == nil || result == nil {
-		return
-	}
-	if result.Model.Code != "" {
-		summary.ScaleCode = result.Model.Code
-	}
-	if result.Model.Title != "" {
-		summary.ScaleName = result.Model.Title
-	}
-	if result.PrimaryScore != nil {
-		summary.TotalScore = result.PrimaryScore.Value
-	}
-	if result.Level != nil {
-		summary.RiskLevel = resultLevelToRiskLevel(result.Level)
-	}
-}
-
-func resultLevelToRiskLevel(level *assessmentApp.ResultLevelResult) string {
-	if level == nil {
-		return ""
-	}
-	return level.Code
 }
 
 func derefFloat64(v *float64) float64 {

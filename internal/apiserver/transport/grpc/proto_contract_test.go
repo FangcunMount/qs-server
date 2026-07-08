@@ -184,6 +184,37 @@ func TestListMyAssessmentsRequestHasNoModelAlgorithmFilter(t *testing.T) {
 	}
 }
 
+func TestEvaluationProtoAssessmentOutcomeHasNoLegacyFields(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/grpc/proto/evaluation/evaluation.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, msgName := range []string{"AssessmentSummary", "AssessmentDetail", "AssessmentReport"} {
+		msgStart := strings.Index(source, "message "+msgName+" {")
+		if msgStart < 0 {
+			t.Fatalf("missing %s message", msgName)
+		}
+		msgEnd := strings.Index(source[msgStart:], "\n}")
+		if msgEnd < 0 {
+			t.Fatalf("unterminated %s message", msgName)
+		}
+		body := source[msgStart : msgStart+msgEnd]
+		for _, forbidden := range []string{
+			"scale_code =",
+			"scale_name =",
+			"total_score =",
+			"risk_level =",
+		} {
+			if strings.Contains(body, forbidden) {
+				t.Fatalf("%s still contains legacy outcome field: %s", msgName, forbidden)
+			}
+		}
+	}
+}
+
 func TestEvaluationProtoHasNoDeprecatedAnswerSheetDetailRPC(t *testing.T) {
 	t.Parallel()
 

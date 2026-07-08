@@ -12,7 +12,6 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -510,10 +509,12 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 
 	return &pb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
-		ScaleCode:    compat.ReportScaleCode(result.ModelCode),
-		ScaleName:    compat.ReportScaleName(result.ModelName),
-		TotalScore:   result.TotalScore,
-		RiskLevel:    result.RiskLevel,
+		Model: &pb.ModelIdentity{
+			Code:  result.ModelCode,
+			Title: result.ModelName,
+		},
+		PrimaryScore: &pb.ScoreValue{Value: result.TotalScore},
+		Level:        &pb.ResultLevel{Code: result.RiskLevel, Label: result.RiskLevel},
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  toProtoSuggestions(result.Suggestions),

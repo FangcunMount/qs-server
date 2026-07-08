@@ -54,15 +54,13 @@ message ResultLevel {
 // ==================== 测评消息 ====================
 
 message AssessmentSummary {
+  reserved 5, 6, 9, 10;
+  reserved "scale_code", "scale_name", "total_score", "risk_level";
   uint64 id = 1;
   string questionnaire_code = 3;
   string questionnaire_version = 4;
-  string scale_code = 5;
-  string scale_name = 6;
   string origin_type = 7;
   string status = 8;
-  double total_score = 9;
-  string risk_level = 10;
   string created_at = 11;
   string submitted_at = 12;
   string interpreted_at = 13;
@@ -73,19 +71,17 @@ message AssessmentSummary {
 }
 
 message AssessmentDetail {
+  reserved 8, 9, 13, 14;
+  reserved "scale_code", "scale_name", "total_score", "risk_level";
   uint64 id = 1;
   uint64 org_id = 2;
   uint64 testee_id = 3;
   string questionnaire_code = 5;
   string questionnaire_version = 6;
   uint64 answer_sheet_id = 7;
-  string scale_code = 8;
-  string scale_name = 9;
   string origin_type = 10;
   string origin_id = 11;
   string status = 12;
-  double total_score = 13;
-  string risk_level = 14;
   string created_at = 15;
   string submitted_at = 16;
   string interpreted_at = 17;
@@ -149,11 +145,9 @@ message ModelRarity {
 }
 
 message AssessmentReport {
+  reserved 2, 3, 4, 5;
+  reserved "scale_code", "scale_name", "total_score", "risk_level";
   uint64 assessment_id = 1;
-  string scale_code = 2;
-  string scale_name = 3;
-  double total_score = 4;
-  string risk_level = 5;
   string conclusion = 6;
   repeated DimensionInterpret dimensions = 7;
   repeated Suggestion suggestions = 8;
