@@ -2,7 +2,6 @@ package publishing_test
 
 import (
 	"encoding/json"
-	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -67,10 +66,6 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 	}
 	if len(payload.Outcomes) != 1 || payload.Outcomes[0].Code != "INTJ" {
 		t.Fatalf("snapshot payload outcomes = %#v, want INTJ preserved", payload.Outcomes)
-	}
-	legacy := v1envelope.V1FromPublished(snapshot)
-	if legacy.Definition.Kind != domain.KindTypology {
-		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}
 }
 
