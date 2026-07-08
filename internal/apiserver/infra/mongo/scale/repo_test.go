@@ -3,7 +3,7 @@ package scale
 import (
 	"testing"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

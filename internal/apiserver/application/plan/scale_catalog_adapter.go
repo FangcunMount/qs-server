@@ -3,7 +3,7 @@ package plan
 import (
 	"context"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 )
 
 type repositoryScaleCatalog struct {
