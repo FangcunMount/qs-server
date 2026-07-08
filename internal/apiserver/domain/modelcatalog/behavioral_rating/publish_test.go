@@ -8,7 +8,7 @@ import (
 	behavioralratingdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating"
 )
 
-func TestBuildPublishedSnapshotRequiresBrief2PrimaryDimension(t *testing.T) {
+func TestBuildPublishedSnapshotRequiresNormingPrimaryDimension(t *testing.T) {
 	t.Parallel()
 
 	model := &domain.AssessmentModel{

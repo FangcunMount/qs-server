@@ -27,7 +27,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	if algorithm == "" {
 		algorithm = domain.AlgorithmBrief2
 	}
-	encoded, err := requireBrief2PrimaryDimensionCode(encoded, algorithm)
+	encoded, err := requireNormingPrimaryDimensionCode(encoded)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 			Status:         string(domain.ModelStatusPublished),
 		},
 		Binding:  model.Binding,
-		Decision: brief2DecisionSpec(algorithm),
+		Decision: normingDecisionSpecFromPayload(encoded),
 		Source:   domain.SourceRef{},
 		Payload:  encoded,
 	}, nil
@@ -55,25 +55,34 @@ func modelVersionString(model *domain.AssessmentModel) string {
 	return "v" + strconv.FormatInt(model.Version, 10)
 }
 
-func brief2DecisionSpec(algorithm domain.Algorithm) domain.DecisionSpec {
-	if algorithm == domain.AlgorithmBrief2 {
+func normingDecisionSpecFromPayload(payload []byte) domain.DecisionSpec {
+	if hasNormingExtension(payload) {
 		return domain.DecisionSpec{Kind: domain.DecisionKindNormLookup}
 	}
 	return domain.DecisionSpec{Kind: domain.DecisionKindScoreRange}
 }
 
-func requireBrief2PrimaryDimensionCode(payload []byte, algorithm domain.Algorithm) ([]byte, error) {
-	if algorithm != domain.AlgorithmBrief2 {
+func hasNormingExtension(payload []byte) bool {
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return false
+	}
+	_, ok := body["brief2"]
+	return ok
+}
+
+func requireNormingPrimaryDimensionCode(payload []byte) ([]byte, error) {
+	if !hasNormingExtension(payload) {
 		return payload, nil
 	}
 	var body map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &body); err != nil {
-		return nil, fmt.Errorf("decode behavioral_rating brief2 payload: %w", err)
+		return nil, fmt.Errorf("decode behavioral_rating norming payload: %w", err)
 	}
 	brief2 := map[string]json.RawMessage{}
 	if raw, ok := body["brief2"]; ok {
 		if err := json.Unmarshal(raw, &brief2); err != nil {
-			return nil, fmt.Errorf("decode behavioral_rating brief2 extension: %w", err)
+			return nil, fmt.Errorf("decode behavioral_rating norming extension: %w", err)
 		}
 	}
 	var primaryDimensionCode string
