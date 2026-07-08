@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	reportfactorclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology"
 )
 
 // PersonalityTypeReportTemplate 携带呈现 labels 用于 面向机制 reports。
@@ -43,7 +43,7 @@ func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl Personali
 		tmpl.DefaultModelCode = "PERSONALITY_TYPE"
 	}
 	detail := input.Detail
-	profile := reportfactorclassification.Profile{
+	profile := reporttypology.Profile{
 		Kind:             tmpl.Kind,
 		DefaultModelName: tmpl.DefaultModelName,
 		DefaultModelCode: tmpl.DefaultModelCode,
@@ -57,16 +57,17 @@ func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl Personali
 		Rarity:           mechanismReportRarity(detail.Rarity),
 		Commentary:       firstNonEmptyMechanism(detail.Profile.Summary, detail.Commentary),
 	}
-	return reportfactorclassification.Build(reportfactorclassification.Input{
-		AssessmentID: input.AssessmentID,
-		ModelCode:    input.ModelCode,
-		TotalScore:   input.TotalScore,
-		RiskLevel:    input.RiskLevel,
-		Profile:      profile,
-		Conclusion:   profile.Conclusion(mechanismConclusionSuffix(tmpl, detail)),
-		Dimensions:   mechanismPersonalityDimensions(detail, tmpl),
-		Suggestions:  mechanismPersonalitySuggestions(detail),
-	}), nil
+	return report.NewInterpretReport(
+		input.AssessmentID,
+		profile.ReportModelName(),
+		profile.ReportModelCode(input.ModelCode),
+		input.TotalScore,
+		input.RiskLevel,
+		profile.Conclusion(mechanismConclusionSuffix(tmpl, detail)),
+		mechanismPersonalityDimensions(detail, tmpl),
+		mechanismPersonalitySuggestions(detail),
+		profile.ModelExtra(),
+	), nil
 }
 
 func mechanismConclusionSuffix(tmpl PersonalityTypeReportTemplate, detail PersonalityTypeReportDetail) string {
@@ -97,7 +98,7 @@ func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileRep
 		tmpl.OneLiner = "基于各因子原始分展示人格特质分布"
 	}
 	detail := input.Detail
-	profile := reportfactorclassification.Profile{
+	profile := reporttypology.Profile{
 		Kind:             tmpl.Kind,
 		DefaultModelName: tmpl.DefaultModelName,
 		DefaultModelCode: tmpl.DefaultModelCode,
@@ -112,16 +113,17 @@ func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileRep
 	if summary := mechanismTraitSummary(detail); summary != "" {
 		conclusion += " - " + summary
 	}
-	return reportfactorclassification.Build(reportfactorclassification.Input{
-		AssessmentID: input.AssessmentID,
-		ModelCode:    input.ModelCode,
-		TotalScore:   input.TotalScore,
-		RiskLevel:    input.RiskLevel,
-		Profile:      profile,
-		Conclusion:   conclusion,
-		Dimensions:   mechanismTraitDimensions(detail),
-		Suggestions:  mechanismTraitSuggestions(detail),
-	}), nil
+	return report.NewInterpretReport(
+		input.AssessmentID,
+		profile.ReportModelName(),
+		profile.ReportModelCode(input.ModelCode),
+		input.TotalScore,
+		input.RiskLevel,
+		conclusion,
+		mechanismTraitDimensions(detail),
+		mechanismTraitSuggestions(detail),
+		profile.ModelExtra(),
+	), nil
 }
 
 type PersonalityTypeReportInput struct {

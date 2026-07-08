@@ -1,4 +1,4 @@
-package patterns
+package legacy
 
 type MBTIDimensionReport struct {
 	Code       string

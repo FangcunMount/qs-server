@@ -29,6 +29,8 @@ func TestDomainPackagesDoNotIntroduceAssessmentCodeFilenames(t *testing.T) {
 		"/brief2_",
 		"/spm_",
 		"/phq9_",
+		"_detail.go",
+		"_profile.go",
 		"score_mbti",
 		"score_sbti",
 	}

@@ -1,4 +1,4 @@
-package patterns
+package legacy
 
 type SBTIDimensionReport struct {
 	Code     string
