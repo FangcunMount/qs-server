@@ -67,13 +67,6 @@ func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorit
 		}
 		return "", false
 	case binding.KindBehavioralRating:
-		algo := algorithm
-		if algo == "" {
-			algo = binding.AlgorithmBrief2
-		}
-		if algo == binding.AlgorithmBrief2 {
-			return binding.DecisionKindNormLookup, true
-		}
 		return binding.DecisionKindScoreRange, true
 	case binding.KindCognitive:
 		return binding.DecisionKindScoreRange, true

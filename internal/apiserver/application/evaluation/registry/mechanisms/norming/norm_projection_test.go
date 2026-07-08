@@ -21,7 +21,7 @@ func TestPrimaryDimensionUsesConfiguredCode(t *testing.T) {
 	}
 }
 
-func TestPrimaryDimensionFallsBackToLegacyGEC(t *testing.T) {
+func TestPrimaryDimensionRequiresConfiguredCode(t *testing.T) {
 	t.Parallel()
 
 	result := calcnorm.Projection{}.Apply(&calculation.Result{
@@ -30,7 +30,7 @@ func TestPrimaryDimensionFallsBackToLegacyGEC(t *testing.T) {
 			{Code: "gec", Level: &calculation.ResultLevel{Code: "legacy", Label: "legacy label"}},
 		},
 	})
-	if result.Level == nil || result.Level.Code != "legacy" {
-		t.Fatalf("result level = %#v, want legacy gec fallback", result.Level)
+	if result.Level != nil {
+		t.Fatalf("result level = %#v, want nil without configured primary_dimension_code", result.Level)
 	}
 }

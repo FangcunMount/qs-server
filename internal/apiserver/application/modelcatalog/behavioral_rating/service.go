@@ -197,7 +197,7 @@ func definitionResultFromModel(model *domain.AssessmentModel) *DefinitionResult 
 func draftPayloadFormat(model *domain.AssessmentModel) string {
 	algorithm := model.Algorithm
 	if algorithm == "" {
-		algorithm = domain.AlgorithmBrief2
+		algorithm = domain.AlgorithmBehavioralRatingDefault
 	}
 	return domain.DraftPayloadFormatForModel(domain.KindBehavioralRating, algorithm)
 }

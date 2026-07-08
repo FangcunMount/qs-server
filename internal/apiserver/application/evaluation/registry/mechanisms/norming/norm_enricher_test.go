@@ -21,6 +21,7 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	}
 	snapshot := &behavioralsnapshot.Snapshot{
 		Norming: &behavioralsnapshot.NormingProfile{
+			PrimaryDimensionCode: "gec",
 			NormTables: &calcnorm.NormTables{
 				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",

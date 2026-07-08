@@ -145,7 +145,7 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 			NormTableVersion:     body.Brief2.NormTableVersion,
 			IndexCodes:           append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:        append([]string(nil), body.Brief2.ValidityCodes...),
-			PrimaryDimensionCode: body.Brief2.PrimaryDimensionCode,
+			PrimaryDimensionCode: legacyPrimaryDimensionCode(body.Brief2, factors),
 			NormTables:           normTablesFromPayload(body.Brief2),
 		}
 	}
@@ -226,6 +226,23 @@ func compositeSpecsFromPayload(body *brief2Extension) []factornorm.CompositeInde
 
 func (s *Snapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
+}
+
+func legacyPrimaryDimensionCode(body *brief2Extension, factors []FactorSnapshot) string {
+	if body == nil {
+		return ""
+	}
+	if body.PrimaryDimensionCode != "" {
+		return body.PrimaryDimensionCode
+	}
+	for _, code := range []string{"gec", "total"} {
+		for _, factor := range factors {
+			if factor.Code == code {
+				return code
+			}
+		}
+	}
+	return ""
 }
 
 // ToScaleSnapshot 投影behavioral_rating 因子 为 scale execution 结构。

@@ -51,7 +51,7 @@ func buildBehavioralRatingPublishedSnapshot(model *AssessmentModel) (*PublishedM
 	}
 	algorithm := model.Algorithm
 	if algorithm == "" {
-		algorithm = binding.AlgorithmBrief2
+		algorithm = binding.AlgorithmBehavioralRatingDefault
 	}
 	var err error
 	encoded, err = norming.RequirePrimaryDimensionCodeForPublish(encoded)

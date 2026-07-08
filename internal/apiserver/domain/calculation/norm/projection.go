@@ -54,21 +54,13 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 }
 
 func primaryDimension(dimensions []calculation.DimensionResult, configuredCode string) *calculation.DimensionResult {
-	if configuredCode != "" {
-		for i := range dimensions {
-			if dimensions[i].Code == configuredCode {
-				return &dimensions[i]
-			}
-		}
+	if configuredCode == "" {
+		return nil
 	}
-	// Deprecated: 发布时未配置 primary_dimension_code 时的旧版兜底。
 	for i := range dimensions {
-		if dimensions[i].Code == "total" || dimensions[i].Code == "gec" {
+		if dimensions[i].Code == configuredCode {
 			return &dimensions[i]
 		}
-	}
-	if len(dimensions) == 1 {
-		return &dimensions[0]
 	}
 	return nil
 }

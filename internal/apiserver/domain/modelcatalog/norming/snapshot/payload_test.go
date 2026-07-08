@@ -139,6 +139,28 @@ func TestParseBrief2PayloadAnnotatesFactorNormMetadata(t *testing.T) {
 	}
 }
 
+func TestParseBrief2PayloadLegacyPrimaryDimensionFallback(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+		"dimensions": [{"code": "gec", "title": "GEC", "question_codes": ["q1"], "scoring_strategy": "sum"}],
+		"brief2": {
+			"norm_table_version": "2024",
+			"norms": [{"factor_code": "gec", "lookup": [{"raw_min": 0, "raw_max": 8, "t_score": 45, "percentile": 30}]}]
+		}
+	}`)
+	got, err := snapshot.ParsePublishedPayload(
+		"assessmentmodel.behavioral_rating.brief2.v1",
+		"BR-LEGACY", "v1", "BRIEF-2", "published", raw,
+	)
+	if err != nil {
+		t.Fatalf("ParsePublishedPayload: %v", err)
+	}
+	if got.Norming == nil || got.Norming.PrimaryDimensionCode != "gec" {
+		t.Fatalf("primary dimension = %#v, want legacy gec fallback", got.Norming)
+	}
+}
+
 func TestParseBrief2PayloadNormTables(t *testing.T) {
 	t.Parallel()
 

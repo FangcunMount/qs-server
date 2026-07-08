@@ -44,9 +44,9 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		{name: "personality_mbti", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmMBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "personality_sbti", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmSBTI, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "personality_bigfive", kind: binding.KindPersonality, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmBigFive, want: publishing.AlgorithmFamilyFactorClassification, wantOK: true},
-		{name: "behavioral_rating_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: publishing.AlgorithmFamilyFactorNorm, wantOK: true},
+		{name: "behavioral_rating_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "behavioral_rating_default", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBehavioralRatingDefault, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
-		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: publishing.AlgorithmFamilyFactorNorm, wantOK: true},
+		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "cognitive_spm", kind: binding.KindCognitive, algorithm: binding.AlgorithmSPM, want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "cognitive_empty_algo", kind: binding.KindCognitive, algorithm: "", want: publishing.AlgorithmFamilyFactorScoring, wantOK: true},
 		{name: "custom", kind: binding.KindCustom, wantOK: false},
@@ -75,9 +75,9 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 		decision  binding.DecisionKind
 	}{
 		{binding.KindScale, binding.SubKindEmpty, binding.AlgorithmScaleDefault, binding.DecisionKindScoreRange},
-		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBrief2, binding.DecisionKindNormLookup},
+		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBrief2, binding.DecisionKindScoreRange},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBehavioralRatingDefault, binding.DecisionKindScoreRange},
-		{binding.KindBehavioralRating, binding.SubKindEmpty, "", binding.DecisionKindNormLookup},
+		{binding.KindBehavioralRating, binding.SubKindEmpty, "", binding.DecisionKindScoreRange},
 		{binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM, binding.DecisionKindScoreRange},
 	}
 	for _, tc := range cases {

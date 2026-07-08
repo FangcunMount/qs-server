@@ -70,7 +70,9 @@ type typologyAlgorithmEnvelope struct {
 	Algorithm binding.Algorithm `json:"algorithm"`
 }
 
-// AlgorithmFromTypologyPayload reads 算法 身份 从 v2 类型学载荷。
+// AlgorithmFromTypologyPayload reads algorithm identity from typology payload envelopes.
+// Legacy-decode-only: published typology drafts must carry explicit decision.kind; do not use
+// this helper to infer production DecisionKind or AlgorithmFamily routing.
 func AlgorithmFromTypologyPayload(payload []byte) (binding.Algorithm, error) {
 	var envelope typologyAlgorithmEnvelope
 	if err := json.Unmarshal(payload, &envelope); err != nil {
