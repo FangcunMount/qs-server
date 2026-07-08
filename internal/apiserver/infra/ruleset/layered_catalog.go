@@ -2,8 +2,10 @@ package ruleset
 
 import (
 	"context"
+	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	catalogobs "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -43,6 +45,8 @@ func (c *LayeredCatalog) ResolveByQuestionnaire(
 	if c.fallback == nil {
 		return port.RuleSetRef{}, false, nil
 	}
+	catalogobs.RecordLegacyFallback(ctx, catalogobs.CatalogStoreLayeredStatic, "resolve_by_questionnaire",
+		fmt.Sprintf("questionnaire=%s@%s", questionnaireCode, questionnaireVersion))
 	return c.fallback.ResolveByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
@@ -65,6 +69,8 @@ func (c *LayeredCatalog) GetPublishedByRef(ctx context.Context, ref port.RuleSet
 	if c.fallback == nil {
 		return nil, domain.ErrNotFound
 	}
+	catalogobs.RecordLegacyFallback(ctx, catalogobs.CatalogStoreLayeredStatic, "get_published_by_ref",
+		fmt.Sprintf("code=%s version=%s", ref.Code, ref.Version))
 	return c.fallback.GetPublishedByRef(ctx, ref)
 }
 
@@ -109,6 +115,8 @@ func (c *LayeredCatalog) FindPublishedByQuestionnaire(
 	if c.fallback == nil {
 		return nil, domain.ErrNotFound
 	}
+	catalogobs.RecordLegacyFallback(ctx, catalogobs.CatalogStoreLayeredStatic, "find_published_by_questionnaire",
+		fmt.Sprintf("questionnaire=%s@%s", questionnaireCode, questionnaireVersion))
 	return c.fallback.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 

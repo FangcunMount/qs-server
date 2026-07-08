@@ -2,18 +2,15 @@ package modelcatalog
 
 import (
 	"context"
-	"sort"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
-	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// DualStore writes v2 published_assessment_models and reads v2 first, then legacy evaluation_rule_sets.
+// DualStore writes and reads v2 published_assessment_models only.
 type DualStore struct {
-	v2     dualStoreV2Repository
-	legacy dualStoreLegacyRepository
+	v2 dualStoreV2Repository
 }
 
 type dualStoreV2Repository interface {
@@ -25,12 +22,6 @@ type dualStoreV2Repository interface {
 	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
 }
 
-type dualStoreLegacyRepository interface {
-	GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error)
-	FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error)
-	ListPublished(ctx context.Context) ([]*domain.Snapshot, error)
-}
-
 var (
 	_ port.PublishedReader          = (*DualStore)(nil)
 	_ port.PublishedLister          = (*DualStore)(nil)
@@ -40,8 +31,8 @@ var (
 	_ port.PublishedAlgorithmLister = (*DualStore)(nil)
 )
 
-func NewDualStore(v2 *mongomodelcatalog.Repository, legacy *mongoruleset.Repository) *DualStore {
-	return &DualStore{v2: v2, legacy: legacy}
+func NewDualStore(v2 *mongomodelcatalog.Repository) *DualStore {
+	return &DualStore{v2: v2}
 }
 
 func (s *DualStore) UpsertPublished(ctx context.Context, snapshot *domain.Snapshot) error {
@@ -52,22 +43,10 @@ func (s *DualStore) UpsertPublished(ctx context.Context, snapshot *domain.Snapsh
 }
 
 func (s *DualStore) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error) {
-	if s == nil {
+	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
-	if s.v2 != nil {
-		snapshot, err := s.v2.GetPublishedByRef(ctx, ref)
-		if err == nil {
-			return snapshot, nil
-		}
-		if !domain.IsNotFound(err) {
-			return nil, err
-		}
-	}
-	if s.legacy == nil {
-		return nil, domain.ErrNotFound
-	}
-	return s.legacy.GetPublishedByRef(ctx, ref)
+	return s.v2.GetPublishedByRef(ctx, ref)
 }
 
 func (s *DualStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
@@ -79,22 +58,10 @@ func (s *DualStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*
 }
 
 func (s *DualStore) FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error) {
-	if s == nil {
+	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
-	if s.v2 != nil {
-		snapshot, err := s.v2.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-		if err == nil {
-			return snapshot, nil
-		}
-		if !domain.IsNotFound(err) {
-			return nil, err
-		}
-	}
-	if s.legacy == nil {
-		return nil, domain.ErrNotFound
-	}
-	return s.legacy.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	return s.v2.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
 func (s *DualStore) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
@@ -106,40 +73,10 @@ func (s *DualStore) FindPublishedModelByQuestionnaire(ctx context.Context, quest
 }
 
 func (s *DualStore) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
-	if s == nil {
+	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
-	if s.v2 != nil {
-		snapshot, err := s.v2.FindLatestPublishedByModelCode(ctx, kind, code)
-		if err == nil {
-			return snapshot, nil
-		}
-		if !domain.IsNotFound(err) {
-			return nil, err
-		}
-	}
-	if s.legacy == nil {
-		return nil, domain.ErrNotFound
-	}
-	snapshots, err := s.legacy.ListPublished(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, snapshot := range snapshots {
-		if snapshot == nil || snapshot.Definition.Code != code {
-			continue
-		}
-		if kind == domain.KindPersonality {
-			if isLegacyPersonalityEnvelope(snapshot) {
-				return snapshot, nil
-			}
-			continue
-		}
-		if snapshot.Definition.Kind == kind {
-			return snapshot, nil
-		}
-	}
-	return nil, domain.ErrNotFound
+	return s.v2.FindLatestPublishedByModelCode(ctx, kind, code)
 }
 
 func (s *DualStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
@@ -151,47 +88,10 @@ func (s *DualStore) FindPublishedModelByCode(ctx context.Context, kind domain.Ki
 }
 
 func (s *DualStore) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
-	if s == nil {
+	if s == nil || s.v2 == nil {
 		return nil, 0, domain.ErrNotFound
 	}
-	if s.v2 != nil {
-		snapshots, total, err := s.v2.ListPublished(ctx, filter)
-		if err != nil {
-			return nil, 0, err
-		}
-		if total > 0 || s.legacy == nil {
-			return snapshots, total, nil
-		}
-	}
-	if s.legacy == nil {
-		return nil, 0, nil
-	}
-	all, err := s.legacy.ListPublished(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	filtered := filterLegacySnapshots(all, filter)
-	total := int64(len(filtered))
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := filter.PageSize
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	start := (page - 1) * pageSize
-	if start >= len(filtered) {
-		return []*domain.Snapshot{}, total, nil
-	}
-	end := start + pageSize
-	if end > len(filtered) {
-		end = len(filtered)
-	}
-	return filtered[start:end], total, nil
+	return s.v2.ListPublished(ctx, filter)
 }
 
 func (s *DualStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
@@ -209,116 +109,9 @@ func (s *DualStore) ListPublishedModels(ctx context.Context, filter port.ListPub
 	return out, total, nil
 }
 
-func filterLegacySnapshots(all []*domain.Snapshot, filter port.ListPublishedFilter) []*domain.Snapshot {
-	out := make([]*domain.Snapshot, 0, len(all))
-	for _, snapshot := range all {
-		if snapshot == nil {
-			continue
-		}
-		if filter.Kind == domain.KindPersonality {
-			if !isLegacyPersonalityEnvelope(snapshot) {
-				continue
-			}
-		} else if filter.Kind != "" && snapshot.Definition.Kind != filter.Kind {
-			continue
-		}
-		if filter.Algorithm != "" {
-			algorithm, err := resolveLegacyAlgorithm(snapshot)
-			if err != nil || algorithm != filter.Algorithm {
-				continue
-			}
-		}
-		out = append(out, snapshot)
-	}
-	return out
-}
-
-func resolveLegacyAlgorithm(snapshot *domain.Snapshot) (domain.Algorithm, error) {
-	if snapshot == nil {
-		return "", domain.ErrNotFound
-	}
-	if domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat) {
-		return domain.AlgorithmFromTypologyPayload(snapshot.Payload)
-	}
-	return "", nil
-}
-
-func isLegacyPersonalityEnvelope(snapshot *domain.Snapshot) bool {
-	if snapshot == nil {
-		return false
-	}
-	return snapshot.Definition.Kind == domain.KindPersonality ||
-		domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat)
-}
-
 func (s *DualStore) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {
-	if s == nil {
+	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
-	parts := make([][]domain.Algorithm, 0, 2)
-	if s.v2 != nil {
-		algorithms, err := s.v2.ListPublishedAlgorithms(ctx)
-		if err != nil {
-			return nil, err
-		}
-		parts = append(parts, algorithms)
-	}
-	if s.legacy != nil {
-		all, err := s.legacy.ListPublished(ctx)
-		if err != nil {
-			return nil, err
-		}
-		legacyAlgorithms := make([]domain.Algorithm, 0)
-		for _, snapshot := range all {
-			algorithm, err := resolveLegacyAlgorithm(snapshot)
-			if err != nil {
-				continue
-			}
-			if algorithm != "" {
-				legacyAlgorithms = append(legacyAlgorithms, algorithm)
-			}
-		}
-		parts = append(parts, legacyAlgorithms)
-	}
-	return mergeAlgorithmSets(parts...), nil
-}
-
-func mergeAlgorithmSets(parts ...[]domain.Algorithm) []domain.Algorithm {
-	seen := make(map[domain.Algorithm]struct{})
-	for _, algorithms := range parts {
-		for _, algorithm := range algorithms {
-			if algorithm == "" {
-				continue
-			}
-			seen[algorithm] = struct{}{}
-		}
-	}
-	out := make([]domain.Algorithm, 0, len(seen))
-	for algorithm := range seen {
-		out = append(out, algorithm)
-	}
-	sortAlgorithms(out)
-	return out
-}
-
-func sortAlgorithms(algorithms []domain.Algorithm) {
-	order := map[domain.Algorithm]int{
-		domain.AlgorithmMBTI:    0,
-		domain.AlgorithmSBTI:    1,
-		domain.AlgorithmBigFive: 2,
-	}
-	sort.Slice(algorithms, func(i, j int) bool {
-		left, okLeft := order[algorithms[i]]
-		right, okRight := order[algorithms[j]]
-		switch {
-		case okLeft && okRight:
-			return left < right
-		case okLeft:
-			return true
-		case okRight:
-			return false
-		default:
-			return algorithms[i] < algorithms[j]
-		}
-	})
+	return s.v2.ListPublishedAlgorithms(ctx)
 }

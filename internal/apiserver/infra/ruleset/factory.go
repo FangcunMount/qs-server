@@ -10,7 +10,6 @@ import (
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
-	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -53,8 +52,7 @@ func NewCatalog(
 		return static, nil
 	}
 	v2 := mongomodelcatalog.NewRepository(db, mongoOpts)
-	legacy := mongoruleset.NewRepository(db, mongoOpts)
-	dual := aminfra.NewDualStore(v2, legacy)
+	dual := aminfra.NewDualStore(v2)
 	var store publishedStore = dual
 	if cacheCfg.enabled() {
 		store = cache.NewCachedPublishedModelStore(dual, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)

@@ -49,7 +49,7 @@ func NewRepositoryResolver(
 		cognitiveCatalog        port.CognitiveModelCatalog
 	)
 	if publishedReader, ok := modelCatalog.(rulesetport.PublishedModelReader); ok {
-		typologyCatalog = NewPublishedTypologyCatalog(publishedReader, modelCatalog)
+		typologyCatalog = NewPublishedTypologyCatalog(publishedReader)
 		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader)
 		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader)
 	} else {

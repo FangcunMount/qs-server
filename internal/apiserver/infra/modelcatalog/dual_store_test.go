@@ -41,32 +41,11 @@ func (s *dualStoreV2Stub) ListPublishedAlgorithms(context.Context) ([]domain.Alg
 	return nil, nil
 }
 
-type dualStoreLegacyStub struct {
-	listCalled bool
-	snapshots  []*domain.Snapshot
-}
-
-func (s *dualStoreLegacyStub) GetPublishedByRef(context.Context, port.Ref) (*domain.Snapshot, error) {
-	return nil, domain.ErrNotFound
-}
-
-func (s *dualStoreLegacyStub) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.Snapshot, error) {
-	return nil, domain.ErrNotFound
-}
-
-func (s *dualStoreLegacyStub) ListPublished(context.Context) ([]*domain.Snapshot, error) {
-	s.listCalled = true
-	return s.snapshots, nil
-}
-
 func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
 	v2 := &dualStoreV2Stub{latest: &domain.Snapshot{
 		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
 	}}
-	legacy := &dualStoreLegacyStub{snapshots: []*domain.Snapshot{{
-		Definition: domain.Definition{Kind: domain.RuleSetKindMBTI, Code: "personality_demo", Version: "v1"},
-	}}}
-	store := &DualStore{v2: v2, legacy: legacy}
+	store := &DualStore{v2: v2}
 
 	got, err := store.FindPublishedByModelCode(context.Background(), domain.KindPersonality, "personality_demo")
 	if err != nil {
@@ -74,9 +53,6 @@ func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
 	}
 	if !v2.latestCalled {
 		t.Fatal("v2 latest lookup was not called")
-	}
-	if legacy.listCalled {
-		t.Fatal("legacy fallback should not be used when v2 latest succeeds")
 	}
 	if got.Definition.Version != "v4" {
 		t.Fatalf("version = %s, want v4", got.Definition.Version)
@@ -111,5 +87,15 @@ func TestDualStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 	}
 	if list[0].Model.Code != "personality_demo" || list[0].Model.Version != "v4" {
 		t.Fatalf("list model = %#v", list[0].Model)
+	}
+}
+
+func TestDualStoreReturnsNotFoundWhenV2Misses(t *testing.T) {
+	store := &DualStore{v2: &dualStoreV2Stub{}}
+	_, err := store.GetPublishedByRef(context.Background(), port.Ref{
+		Kind: domain.KindPersonality, Code: "missing", Version: "1.0.0",
+	})
+	if err == nil || !domain.IsNotFound(err) {
+		t.Fatalf("GetPublishedByRef() err = %v, want not found", err)
 	}
 }

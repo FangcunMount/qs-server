@@ -140,7 +140,7 @@ func TestPublishedTypologyCatalogDecodesPublishedModelSnapshot(t *testing.T) {
 		},
 		Payload: payloadBytes,
 	}}
-	catalog := NewPublishedTypologyCatalog(reader, nil)
+	catalog := NewPublishedTypologyCatalog(reader)
 	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
 		Kind:      port.EvaluationModelKindPersonality,
 		SubKind:   string(domain.SubKindTypology),
@@ -156,44 +156,16 @@ func TestPublishedTypologyCatalogDecodesPublishedModelSnapshot(t *testing.T) {
 	}
 }
 
-func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
-	model := &modeltypology.MBTILegacyModel{
-		Code:                 cataloglegacy.MBTIModelCode,
-		Version:              cataloglegacy.MBTIModelVersion,
-		QuestionnaireCode:    cataloglegacy.MBTIQuestionnaireCode,
-		QuestionnaireVersion: cataloglegacy.MBTIModelVersion,
-		Status:               "published",
-		DimensionOrder:       []string{"EI"},
-		Dimensions: map[string]modeltypology.MBTILegacyDimension{
-			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"},
-		},
-		TypeProfiles: []modeltypology.MBTILegacyTypeProfile{
-			{TypeCode: "INTJ", TypeName: "建筑师"},
-		},
-	}
-	payload, format, err := codec.EncodeMBTI(model)
-	if err != nil {
-		t.Fatalf("EncodeMBTI: %v", err)
-	}
-	legacy := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
-		PayloadFormat: format,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.KindPersonality, Code: model.Code, Version: model.Version,
-		},
-		Payload: payload,
-	}}
-	catalog := NewPublishedTypologyCatalog(stubPublishedModelReader{err: domain.ErrNotFound}, legacy)
-	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
+func TestPublishedTypologyCatalogReturnsNotFoundWhenReaderMisses(t *testing.T) {
+	catalog := NewPublishedTypologyCatalog(stubPublishedModelReader{err: domain.ErrNotFound})
+	_, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
 		Kind:      port.EvaluationModelKindPersonality,
 		Algorithm: string(domain.AlgorithmMBTI),
-		Code:      model.Code,
-		Version:   model.Version,
+		Code:      "MBTI_OEJTS",
+		Version:   "2.0.1",
 	})
-	if err != nil {
-		t.Fatalf("GetTypologyModelByRef: %v", err)
-	}
-	if got.Algorithm != domain.AlgorithmMBTI {
-		t.Fatalf("Algorithm = %s", got.Algorithm)
+	if err == nil || !domain.IsNotFound(err) {
+		t.Fatalf("GetTypologyModelByRef() err = %v, want not found", err)
 	}
 }
 

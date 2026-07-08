@@ -12,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
-	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -116,8 +115,7 @@ func buildTypologyDeps(
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
 	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
-	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
-	dualStore := modelcatalog.NewDualStore(v2Repo, legacyRepo)
+	dualStore := modelcatalog.NewDualStore(v2Repo)
 	publishedLister := port.PublishedModelLister(dualStore)
 	algorithmLister := port.PublishedAlgorithmLister(dualStore)
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {

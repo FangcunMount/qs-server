@@ -14,23 +14,16 @@ import (
 
 // PublishedTypologyCatalog loads personality typology payloads from v2 published-model snapshots.
 type PublishedTypologyCatalog struct {
-	reader   rulesetport.PublishedModelReader
-	fallback RuleSetTypologyCatalog
+	reader rulesetport.PublishedModelReader
 }
 
-func NewPublishedTypologyCatalog(
-	reader rulesetport.PublishedModelReader,
-	legacy rulesetport.PublishedReader,
-) PublishedTypologyCatalog {
-	return PublishedTypologyCatalog{
-		reader:   reader,
-		fallback: NewRuleSetTypologyCatalog(legacy),
-	}
+func NewPublishedTypologyCatalog(reader rulesetport.PublishedModelReader) PublishedTypologyCatalog {
+	return PublishedTypologyCatalog{reader: reader}
 }
 
 func (c PublishedTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref port.ModelRef) (*modeltypology.Payload, error) {
 	if c.reader == nil {
-		return c.fallback.GetTypologyModelByRef(ctx, ref)
+		return nil, fmt.Errorf("published typology catalog is not configured")
 	}
 	if ref.Version == "" {
 		return nil, domain.ErrVersionRequired
@@ -48,21 +41,18 @@ func (c PublishedTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref
 			return nil, err
 		}
 	}
-	return c.fallback.GetTypologyModelByRef(ctx, ref)
+	return nil, domain.ErrNotFound
 }
 
 func (c PublishedTypologyCatalog) FindTypologyModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*modeltypology.Payload, error) {
 	if c.reader == nil {
-		return c.fallback.FindTypologyModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+		return nil, fmt.Errorf("published typology catalog is not configured")
 	}
 	snapshot, err := c.reader.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-	if err == nil {
-		return decodePublishedTypologyModel(snapshot)
-	}
-	if !domain.IsNotFound(err) {
+	if err != nil {
 		return nil, err
 	}
-	return c.fallback.FindTypologyModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	return decodePublishedTypologyModel(snapshot)
 }
 
 func (c PublishedTypologyCatalog) decodePublishedModelRef(ctx context.Context, ref rulesetport.Ref) (*modeltypology.Payload, error) {
