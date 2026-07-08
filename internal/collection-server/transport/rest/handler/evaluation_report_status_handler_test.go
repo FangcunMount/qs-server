@@ -38,7 +38,7 @@ func (f *fakeWaitReportService) Wait(ctx context.Context, testeeID, assessmentID
 func TestEvaluationHandlerGetReportStatusReturnsInterpreted(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewEvaluationHandler(nil, nil, &fakeWaitReportService{
+	handler := NewEvaluationHandler(nil, &fakeWaitReportService{
 		getStatus: func(context.Context, uint64, uint64) (*evaluation.AssessmentStatusResponse, error) {
 			return &evaluation.AssessmentStatusResponse{
 				Status:          "completed",
@@ -76,7 +76,7 @@ func TestEvaluationHandlerGetReportStatusReturnsInterpreted(t *testing.T) {
 
 func TestEvaluationHandlerGetReportStatusRequiresTesteeID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewEvaluationHandler(nil, nil, &fakeWaitReportService{})
+	handler := NewEvaluationHandler(nil, &fakeWaitReportService{})
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/42/report-status", nil)

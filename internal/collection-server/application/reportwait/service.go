@@ -336,10 +336,10 @@ func fromAssessment(result *evaluation.AssessmentDetailResponse) *evaluation.Ass
 		NextPollAfterMs: nextPollAfterMs(mapAssessmentStage(result.Status), mapAssessmentStatus(result.Status)),
 		UpdatedAt:       time.Now().Unix(),
 	}
-	if total := evaluation.LegacyTotalScore(result.PrimaryScore); total != 0 {
+	if total := evaluation.OutcomeTotalScore(result.PrimaryScore); total != 0 {
 		resp.TotalScore = &total
 	}
-	if risk := evaluation.LegacyRiskLevel(result.Level); risk != "" {
+	if risk := evaluation.OutcomeRiskLevel(result.Level); risk != "" {
 		resp.RiskLevel = &risk
 	}
 	if resp.Status == "failed" {

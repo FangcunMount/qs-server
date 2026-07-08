@@ -15,10 +15,6 @@ func (h *EvaluationHandler) parseRequiredAssessmentID(c *gin.Context) (uint64, b
 	return h.parseRequiredUint64Path(c, "id", "invalid assessment id")
 }
 
-func (h *EvaluationHandler) parseRequiredAnswerSheetID(c *gin.Context) (uint64, bool) {
-	return h.parseRequiredUint64Path(c, "id", "invalid answer sheet id")
-}
-
 func (h *EvaluationHandler) parseRequiredUint64Query(c *gin.Context, key, emptyMsg, invalidMsg string) (uint64, bool) {
 	value := h.GetQueryParam(c, key)
 	if value == "" {

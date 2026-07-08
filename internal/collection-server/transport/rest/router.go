@@ -382,7 +382,6 @@ func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
 // registerAnswerSheetRoutes 注册答卷相关路由
 func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 	answerSheetHandler := r.container.AnswerSheetHandler()
-	evaluationHandler := r.container.EvaluationHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
 	answersheets := api.Group("/answersheets")
@@ -417,17 +416,6 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			answerSheetHandler.Get,
 		)...)
-		// 通过答卷ID获取测评详情
-		answersheets.GET("/:id/assessment", r.rateLimitedQueryHandlers(
-			r.container.RateLimitBackend(),
-			"query",
-			rateCfg,
-			rateCfg.QueryGlobalQPS,
-			rateCfg.QueryGlobalBurst,
-			rateCfg.QueryUserQPS,
-			rateCfg.QueryUserBurst,
-			evaluationHandler.GetLegacyMyAssessmentByAnswerSheetID,
-		)...)
 	}
 }
 
@@ -438,17 +426,6 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/assessments")
 	{
-		// 测评列表
-		assessments.GET("", r.rateLimitedQueryHandlers(
-			r.container.RateLimitBackend(),
-			"query",
-			rateCfg,
-			rateCfg.QueryGlobalQPS,
-			rateCfg.QueryGlobalBurst,
-			rateCfg.QueryUserQPS,
-			rateCfg.QueryUserBurst,
-			evaluationHandler.GetLegacyMyAssessmentList,
-		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
 		assessments.GET("/trend", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
@@ -471,17 +448,6 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetHighRiskFactors,
 		)...)
-		// 测评详情
-		assessments.GET("/:id", r.rateLimitedQueryHandlers(
-			r.container.RateLimitBackend(),
-			"query",
-			rateCfg,
-			rateCfg.QueryGlobalQPS,
-			rateCfg.QueryGlobalBurst,
-			rateCfg.QueryUserQPS,
-			rateCfg.QueryUserBurst,
-			evaluationHandler.GetLegacyMyAssessment,
-		)...)
 		// 测评得分
 		assessments.GET("/:id/scores", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
@@ -492,17 +458,6 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetAssessmentScores,
-		)...)
-		// 测评报告
-		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
-			r.container.RateLimitBackend(),
-			"query",
-			rateCfg,
-			rateCfg.QueryGlobalQPS,
-			rateCfg.QueryGlobalBurst,
-			rateCfg.QueryUserQPS,
-			rateCfg.QueryUserBurst,
-			evaluationHandler.GetLegacyAssessmentReport,
 		)...)
 		// 测评趋势摘要
 		assessments.GET("/:id/trend-summary", r.rateLimitedQueryHandlers(

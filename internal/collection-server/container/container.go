@@ -214,7 +214,7 @@ func (c *Container) initHandlers() {
 
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
-	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService, c.waitReportService)
+	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.waitReportService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
 	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.typologyAssessmentQueryService, c.waitReportService)

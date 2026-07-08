@@ -48,7 +48,7 @@ func (s *QueryService) GetAssessmentTrendSummary(ctx context.Context, testeeID, 
 		return nil, err
 	}
 
-	comparableItems, err := s.listComparableAssessments(ctx, testeeID, legacyScaleCode(current.Model), current.QuestionnaireCode, current.QuestionnaireVersion)
+	comparableItems, err := s.listComparableAssessments(ctx, testeeID, scaleCodeFromModel(current.Model), current.QuestionnaireCode, current.QuestionnaireVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -159,13 +159,13 @@ func (s *QueryService) listComparableAssessments(
 			submittedAt := firstNonEmpty(item.SubmittedAt, item.InterpretedAt, item.CreatedAt)
 			items = append(items, comparableAssessment{
 				AssessmentID:         item.ID,
-				ScaleCode:            legacyScaleCode(item.Model),
-				ScaleName:            legacyScaleName(item.Model),
+				ScaleCode:            scaleCodeFromModel(item.Model),
+				ScaleName:            scaleNameFromModel(item.Model),
 				QuestionnaireCode:    item.QuestionnaireCode,
 				QuestionnaireVersion: item.QuestionnaireVersion,
 				SubmittedAt:          submittedAt,
-				TotalScore:           LegacyTotalScore(item.PrimaryScore),
-				RiskLevel:            LegacyRiskLevel(item.Level),
+				TotalScore:           OutcomeTotalScore(item.PrimaryScore),
+				RiskLevel:            OutcomeRiskLevel(item.Level),
 				submittedTime:        parseTrendTime(submittedAt),
 			})
 		}
@@ -197,13 +197,13 @@ func ensureComparableAssessment(
 
 	items = append(items, comparableAssessment{
 		AssessmentID:         current.ID,
-		ScaleCode:            legacyScaleCode(current.Model),
-		ScaleName:            firstNonEmpty(legacyScaleName(current.Model), valueFromReport(currentReport, func(r *AssessmentReportResponse) string { return legacyScaleName(r.Model) })),
+		ScaleCode:            scaleCodeFromModel(current.Model),
+		ScaleName:            firstNonEmpty(scaleNameFromModel(current.Model), valueFromReport(currentReport, func(r *AssessmentReportResponse) string { return scaleNameFromModel(r.Model) })),
 		QuestionnaireCode:    current.QuestionnaireCode,
 		QuestionnaireVersion: current.QuestionnaireVersion,
 		SubmittedAt:          submittedAt,
-		TotalScore:           LegacyTotalScore(current.PrimaryScore),
-		RiskLevel:            LegacyRiskLevel(current.Level),
+		TotalScore:           OutcomeTotalScore(current.PrimaryScore),
+		RiskLevel:            OutcomeRiskLevel(current.Level),
 		submittedTime:        parseTrendTime(submittedAt),
 	})
 	return items
@@ -249,12 +249,12 @@ func toTrendSnapshot(current *AssessmentDetailResponse, report *AssessmentReport
 	}
 	return &AssessmentTrendSnapshotResponse{
 		AssessmentID:         current.ID,
-		ScaleCode:            legacyScaleCode(current.Model),
-		ScaleName:            firstNonEmpty(legacyScaleName(current.Model), valueFromReport(report, func(r *AssessmentReportResponse) string { return legacyScaleName(r.Model) })),
+		ScaleCode:            scaleCodeFromModel(current.Model),
+		ScaleName:            firstNonEmpty(scaleNameFromModel(current.Model), valueFromReport(report, func(r *AssessmentReportResponse) string { return scaleNameFromModel(r.Model) })),
 		QuestionnaireVersion: current.QuestionnaireVersion,
 		SubmittedAt:          firstNonEmpty(current.SubmittedAt, current.InterpretedAt, current.CreatedAt, valueFromReport(report, func(r *AssessmentReportResponse) string { return r.CreatedAt })),
-		TotalScore:           LegacyTotalScore(current.PrimaryScore),
-		RiskLevel:            LegacyRiskLevel(current.Level),
+		TotalScore:           OutcomeTotalScore(current.PrimaryScore),
+		RiskLevel:            OutcomeRiskLevel(current.Level),
 	}
 }
 

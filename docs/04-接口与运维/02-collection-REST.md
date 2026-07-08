@@ -90,7 +90,7 @@ collection RegisterRoutes 先设置：
 | ---- | ---- |
 | questionnaire | `GET /api/v1/questionnaires`、`GET /api/v1/questionnaires/:code` |
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
-| assessment | `GET /api/v1/assessments`、`/trend`、`/high-risk`、`/:id`、`/:id/scores`、`/:id/report`、`/:id/wait-report` |
+| assessment（因子/趋势/状态） | `GET /api/v1/assessments/trend`、`/:id/factors/high-risk`、`/:id/scores`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
 | scale | `GET /api/v1/scales`、`/hot`、`/categories`、`/:code` |
 | typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code` |
 | typology-session | `POST /api/v1/typology-assessment-sessions`（**小程序推荐入口**） |
@@ -100,6 +100,8 @@ collection RegisterRoutes 先设置：
 人格测评推荐流程见 **[小程序人格测评接入说明](./03-小程序人格测评接入.md)**。题版读取支持 `GET /questionnaires/:code?version=`；提交仍复用 `POST /answersheets`。
 
 > **R108**：`/api/v1/personality-*` 已下线；类型学目录与测评统一使用 `/api/v1/typology-*`（见 `api/rest/collection.yaml`）。
+>
+> **R110**：v1 量表投影读端点 `GET /api/v1/assessments`（列表）、`/:id`（详情）、`/:id/report`（报告）与 `GET /api/v1/answersheets/:id/assessment`（按答卷解析）已下线。测评详情/列表/报告统一走 `/api/v2/assessments*`（报告已内置量表可见因子过滤）或 `/api/v1/typology-assessments*`。`LegacyAssessment*` response 形状不再提供。
 
 | 资源 | v2（deprecated） |
 | ---- | ---- |
@@ -201,7 +203,7 @@ GET /api/v1/answersheets/submit-status?request_id=...
 
 ## 9. wait-report
 
-`GET /api/v1/assessments/:id/wait-report` 是长轮询类查询，使用单独 `wait-report` 限流 scope。
+`GET /api/v1/assessments/:id/wait-report`（report-status 短轮询同理）是长轮询类查询，使用单独 `wait-report` 限流 scope。
 
 排障时要区分：
 

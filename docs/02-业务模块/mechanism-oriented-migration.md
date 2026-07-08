@@ -558,6 +558,12 @@ type Algorithm = identity.Algorithm
 |------|------|
 | R108 | breaking 下线 `/api/v1/personality-*` REST、`personalitymodel` gRPC、application `Personality*` DTO/deprecated alias；唯一公开面为 `/api/v1/typology-*` + `typologymodel` gRPC；OpenAPI drift 字段已重生成修复；`KindPersonality` 数据值与 `PersonalityModel*` 缓存信号名在 R108 当轮仍保留 |
 
+## Round 110：v1 legacy 测评读端点下线（R110）
+
+| 轮次 | 内容 |
+|------|------|
+| R110 | breaking 下线 collection v1 量表投影读端点 `GET /api/v1/assessments`（列表/`:id`/`:id/report`）与 `GET /api/v1/answersheets/:id/assessment`；删除 `LegacyAssessment*` DTO 与 `v1_projection` 投影层；报告可见因子过滤下沉到 v2 `GetAssessmentReport`；`ResolveAssessmentByAnswerSheetID` gRPC 消费端下线（reader 能力暂留）；`algorithm` REST 查询过滤此前已不存在。测评读统一 `/api/v2/assessments*` 与 `/api/v1/typology-assessments*` |
+
 ## Round 109：内部旧命名闭环（R109）
 
 | 轮次 | 内容 |

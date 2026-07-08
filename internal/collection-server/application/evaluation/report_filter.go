@@ -16,22 +16,19 @@ func NewReportDimensionFilter(scaleCatalog scale.CatalogReader) *ReportDimension
 }
 
 // Apply 返回只包含可见因子的报告副本；report 为 nil 时返回 nil。
-func (f *ReportDimensionFilter) Apply(ctx context.Context, report *LegacyAssessmentReportResponse) (*LegacyAssessmentReportResponse, error) {
+// 仅量表类模型按 is_show 过滤维度；人格类模型无量表因子，维度保持不变。
+func (f *ReportDimensionFilter) Apply(ctx context.Context, report *AssessmentReportResponse) (*AssessmentReportResponse, error) {
 	if report == nil {
 		return nil, nil
 	}
-	visible := f.visibleFactorCodes(ctx, report.ScaleCode)
-	return &LegacyAssessmentReportResponse{
-		AssessmentID: report.AssessmentID,
-		ScaleCode:    report.ScaleCode,
-		ScaleName:    report.ScaleName,
-		TotalScore:   report.TotalScore,
-		RiskLevel:    report.RiskLevel,
-		Conclusion:   report.Conclusion,
-		Dimensions:   filterVisibleDimensions(report.Dimensions, visible),
-		Suggestions:  report.Suggestions,
-		CreatedAt:    report.CreatedAt,
-	}, nil
+	scaleCode := scaleCodeFromModel(report.Model)
+	if scaleCode == "" {
+		return report, nil
+	}
+	visible := f.visibleFactorCodes(ctx, scaleCode)
+	filtered := *report
+	filtered.Dimensions = filterVisibleDimensions(report.Dimensions, visible)
+	return &filtered, nil
 }
 
 func (f *ReportDimensionFilter) visibleFactorCodes(ctx context.Context, scaleCode string) map[string]bool {

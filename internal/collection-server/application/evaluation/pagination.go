@@ -7,10 +7,7 @@ type ListPageDefaults struct {
 	MaxSize  int32
 }
 
-var (
-	AssessmentListPageLegacy  = ListPageDefaults{Page: 1, PageSize: 50, MaxSize: 100}
-	AssessmentListPageDefault = ListPageDefaults{Page: 1, PageSize: 10, MaxSize: 100}
-)
+var AssessmentListPageDefault = ListPageDefaults{Page: 1, PageSize: 10, MaxSize: 100}
 
 // NormalizeListPage 规范化分页参数并返回页码与页大小。
 func NormalizeListPage(page, pageSize int32, defaults ListPageDefaults) (int32, int32) {

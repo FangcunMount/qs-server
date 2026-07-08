@@ -4,10 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestNormalizeAssessmentListRequestDefault(t *testing.T) {
@@ -20,22 +17,12 @@ func TestNormalizeAssessmentListRequestDefault(t *testing.T) {
 	}
 }
 
-func TestNormalizeAssessmentListRequestLegacy(t *testing.T) {
-	t.Parallel()
-
-	req := &ListAssessmentsRequest{}
-	NormalizeAssessmentListRequest(req, AssessmentListPageLegacy)
-	if req.Page != 1 || req.PageSize != 50 {
-		t.Fatalf("page=(%d,%d), want (1,50)", req.Page, req.PageSize)
-	}
-}
-
 func TestReportDimensionFilterKeepsVisibleFactors(t *testing.T) {
 	t.Parallel()
 
 	filter := NewReportDimensionFilter(stubScaleCatalog{factors: []string{"f1", "f2"}})
-	report := &LegacyAssessmentReportResponse{
-		ScaleCode: "scl-1",
+	report := &AssessmentReportResponse{
+		Model: ModelIdentityResponse{Kind: "scale", Code: "scl-1"},
 		Dimensions: []DimensionInterpretResponse{
 			{FactorCode: "f1"},
 			{FactorCode: "hidden"},
@@ -51,25 +38,24 @@ func TestReportDimensionFilterKeepsVisibleFactors(t *testing.T) {
 	}
 }
 
-func TestPendingAssessmentResolverAnswerSheetNotFound(t *testing.T) {
+func TestReportDimensionFilterSkipsPersonalityModels(t *testing.T) {
 	t.Parallel()
 
-	resolver := NewPendingAssessmentResolver(stubAnswerSheetLookup{
-		err: status.Error(codes.NotFound, "missing"),
-	})
-	_, err := resolver.PendingStatus(context.Background(), 1)
-	if err != ErrAnswerSheetNotFound {
-		t.Fatalf("err = %v, want ErrAnswerSheetNotFound", err)
+	filter := NewReportDimensionFilter(stubScaleCatalog{factors: []string{"f1"}})
+	report := &AssessmentReportResponse{
+		Model: ModelIdentityResponse{Kind: personalityModelKind, Code: "MBTI"},
+		Dimensions: []DimensionInterpretResponse{
+			{FactorCode: "d1"},
+			{FactorCode: "d2"},
+		},
 	}
-}
-
-type stubAnswerSheetLookup struct {
-	resp *answersheet.AnswerSheetResponse
-	err  error
-}
-
-func (s stubAnswerSheetLookup) Get(context.Context, uint64) (*answersheet.AnswerSheetResponse, error) {
-	return s.resp, s.err
+	out, err := filter.Apply(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Dimensions) != 2 {
+		t.Fatalf("personality dimensions must be untouched, got %d", len(out.Dimensions))
+	}
 }
 
 type stubScaleCatalog struct {

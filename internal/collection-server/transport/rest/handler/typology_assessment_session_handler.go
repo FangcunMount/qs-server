@@ -19,7 +19,7 @@ func NewTypologyAssessmentSessionHandler(service *typologysession.Service) *Typo
 
 // Start starts a stateless typology assessment session for mini-program clients.
 // @Summary 开始类型学测评会话
-// @Description 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。
+// @Description 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → wait-report → report。
 // @Tags 类型学测评
 // @Accept json
 // @Produce json

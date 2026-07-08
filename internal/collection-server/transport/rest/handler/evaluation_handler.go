@@ -2,13 +2,11 @@ package handler
 
 import (
 	"context"
-	stderrors "errors"
 	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
@@ -16,26 +14,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type evaluationQueryService interface {
-	GetLegacyMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.LegacyAssessmentDetailResponse, error)
-	GetLegacyMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*evaluation.LegacyAssessmentDetailResponse, error)
-	ListLegacyMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.LegacyListAssessmentsResponse, error)
 	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
-	GetLegacyAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.LegacyAssessmentReportResponse, error)
 	GetFactorTrend(ctx context.Context, testeeID uint64, req *evaluation.GetFactorTrendRequest) ([]evaluation.TrendPointResponse, error)
 	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
 	ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
-}
-
-type answerSheetLookupService interface {
-	Get(ctx context.Context, id uint64) (*answersheetapp.AnswerSheetResponse, error)
 }
 
 type waitReportService interface {
@@ -48,14 +36,12 @@ type waitReportService interface {
 type EvaluationHandler struct {
 	*BaseHandler
 	queryService      evaluationQueryService
-	pendingAssessment *evaluation.PendingAssessmentResolver
 	waitReportService waitReportService
 }
 
 // NewEvaluationHandler 创建测评处理器
 func NewEvaluationHandler(
 	queryService evaluationQueryService,
-	answerSheetService answerSheetLookupService,
 	waitReportService waitReportService,
 ) *EvaluationHandler {
 	if waitReportService == nil {
@@ -64,87 +50,8 @@ func NewEvaluationHandler(
 	return &EvaluationHandler{
 		BaseHandler:       NewBaseHandler(),
 		queryService:      queryService,
-		pendingAssessment: evaluation.NewPendingAssessmentResolver(answerSheetService),
 		waitReportService: waitReportService,
 	}
-}
-
-// GetLegacyMyAssessment 获取我的测评详情（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/typology-assessments。
-// @Summary 获取我的测评详情
-// @Description 根据测评ID获取测评详情
-// @Tags 测评
-// @Produce json
-// @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
-// @Success 200 {object} core.Response{data=evaluation.LegacyAssessmentDetailResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Failure 400 {object} core.ErrResponse
-// @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
-// @Security Bearer
-// @Router /api/v1/assessments/{id} [get]
-func (h *EvaluationHandler) GetLegacyMyAssessment(c *gin.Context) {
-	testeeID, ok := h.parseRequiredTesteeID(c)
-	if !ok {
-		return
-	}
-	assessmentID, ok := h.parseRequiredAssessmentID(c)
-	if !ok {
-		return
-	}
-
-	result, err := h.queryService.GetLegacyMyAssessment(c.Request.Context(), testeeID, assessmentID)
-	if err != nil {
-		if isGRPCNotFound(err) {
-			h.NotFoundResponse(c, "assessment not found", nil)
-			return
-		}
-		h.InternalErrorResponse(c, "get assessment failed", err)
-		return
-	}
-	if result == nil {
-		h.NotFoundResponse(c, "assessment not found", nil)
-		return
-	}
-	h.Success(c, result)
-}
-
-// GetLegacyMyAssessmentList 获取我的测评列表（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/typology-assessments。
-// @Summary 获取我的测评列表
-// @Description 分页获取当前用户的测评列表
-// @Tags 测评
-// @Produce json
-// @Param testee_id query int true "受试者ID"
-// @Param status query string false "状态筛选"
-// @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} core.Response{data=evaluation.LegacyListAssessmentsResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Failure 400 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
-// @Security Bearer
-// @Router /api/v1/assessments [get]
-func (h *EvaluationHandler) GetLegacyMyAssessmentList(c *gin.Context) {
-	testeeID, ok := h.parseRequiredTesteeID(c)
-	if !ok {
-		return
-	}
-	var req evaluation.ListAssessmentsRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		return
-	}
-	result, err := h.queryService.ListLegacyMyAssessments(c.Request.Context(), testeeID, &req)
-	if err != nil {
-		if stderrors.Is(err, evaluation.ErrInvalidAssessmentKind) {
-			h.BadRequestResponse(c, err.Error(), err)
-			return
-		}
-		h.InternalErrorResponse(c, "list assessments failed", err)
-		return
-	}
-	h.Success(c, result)
 }
 
 // GetAssessmentScores 获取测评得分详情
@@ -178,40 +85,6 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 	result, err := h.queryService.GetAssessmentScores(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get scores failed", err)
-		return
-	}
-	h.Success(c, result)
-}
-
-// GetLegacyAssessmentReport 获取测评报告（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 报告（/api/v2/assessments/{id}/report）或 typology-assessments 专用路由。
-// @Summary 获取测评报告
-// @Description 获取测评的解读报告。响应字段说明：
-// @Description - dimensions（维度列表）：只包含 is_show = true 的因子维度，每个维度包含 factor_code（因子编码）、factor_name（因子名称）、raw_score（原始分）、max_score（最大分，可选）、risk_level（风险等级）、description（解读描述）、suggestion（维度建议，字符串）字段
-// @Description - suggestions（建议列表）：报告级别的建议列表，每个建议包含 category（分类）、content（内容）、factor_code（关联因子编码，可选）字段
-// @Tags 测评
-// @Produce json
-// @Param testee_id query int true "受试者ID"
-// @Param id path int true "测评ID"
-// @Success 200 {object} core.Response{data=evaluation.LegacyAssessmentReportResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Failure 400 {object} core.ErrResponse
-// @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
-// @Security Bearer
-// @Router /api/v1/assessments/{id}/report [get]
-func (h *EvaluationHandler) GetLegacyAssessmentReport(c *gin.Context) {
-	testeeID, assessmentID, ok := h.parseTesteeAndAssessmentID(c)
-	if !ok {
-		return
-	}
-	result, err := h.queryService.GetLegacyAssessmentReport(c.Request.Context(), testeeID, assessmentID)
-	if err != nil {
-		h.InternalErrorResponse(c, "get report failed", err)
-		return
-	}
-	if result == nil {
-		h.NotFoundResponse(c, "report not found", nil)
 		return
 	}
 	h.Success(c, result)
@@ -397,57 +270,6 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 		return
 	}
 	h.Success(c, result)
-}
-
-// GetLegacyMyAssessmentByAnswerSheetID 通过答卷 ID 获取测评详情（deprecated 量表投影）。
-// @Summary 通过答卷ID获取测评详情
-// @Description 根据答卷ID获取对应的测评详情
-// @Tags 答卷
-// @Produce json
-// @Param id path int true "答卷ID"
-// @Success 200 {object} core.Response{data=evaluation.LegacyAssessmentDetailResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Failure 400 {object} core.ErrResponse
-// @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
-// @Security Bearer
-// @Router /api/v1/answersheets/{id}/assessment [get]
-func (h *EvaluationHandler) GetLegacyMyAssessmentByAnswerSheetID(c *gin.Context) {
-	answerSheetID, ok := h.parseRequiredAnswerSheetID(c)
-	if !ok {
-		return
-	}
-	result, err := h.queryService.GetLegacyMyAssessmentByAnswerSheetID(c.Request.Context(), answerSheetID)
-	if err != nil {
-		if isGRPCNotFound(err) {
-			h.respondPendingAssessmentByAnswerSheet(c, answerSheetID)
-			return
-		}
-		h.InternalErrorResponse(c, "get assessment by answer sheet failed", err)
-		return
-	}
-	if result == nil {
-		h.respondPendingAssessmentByAnswerSheet(c, answerSheetID)
-		return
-	}
-	h.Success(c, result)
-}
-
-func (h *EvaluationHandler) respondPendingAssessmentByAnswerSheet(c *gin.Context, answerSheetID uint64) {
-	statusResponse, err := h.pendingAssessment.PendingStatus(c.Request.Context(), answerSheetID)
-	if err != nil {
-		if stderrors.Is(err, evaluation.ErrAnswerSheetNotFound) {
-			h.NotFoundResponse(c, "answer sheet not found", nil)
-			return
-		}
-		h.InternalErrorResponse(c, "check answer sheet before assessment lookup failed", err)
-		return
-	}
-	h.Success(c, statusResponse)
-}
-
-func isGRPCNotFound(err error) bool {
-	return status.Code(err) == codes.NotFound
 }
 
 // GetMyAssessment 获取测评详情（outcome 投影，/api/v2）。

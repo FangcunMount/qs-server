@@ -18,7 +18,6 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	assertOpenAPIOperation(t, spec, "/answersheets", "post")
 	assertOpenAPIOperation(t, spec, "/answersheets/submit-status", "get")
-	assertOpenAPIOperation(t, spec, "/answersheets/{id}/assessment", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
@@ -40,6 +39,33 @@ func TestCollectionOpenAPIHasNoLegacyPersonalityPaths(t *testing.T) {
 	for path := range spec.Paths {
 		if strings.Contains(path, "/personality-") {
 			t.Fatalf("legacy personality path still in OpenAPI: %s", path)
+		}
+	}
+}
+
+func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	for _, path := range []string{
+		"/assessments",
+		"/assessments/{id}",
+		"/assessments/{id}/report",
+		"/answersheets/{id}/assessment",
+	} {
+		if _, ok := spec.Paths[path]; ok {
+			t.Fatalf("legacy v1 assessment read path still in OpenAPI: %s", path)
+		}
+	}
+}
+
+func TestCollectionOpenAPIHasNoLegacyAssessmentSchemas(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
+	for name := range schemas {
+		if strings.Contains(name, "LegacyAssessment") || strings.Contains(name, "LegacyList") {
+			t.Fatalf("legacy assessment schema still in OpenAPI: %s", name)
 		}
 	}
 }
@@ -169,8 +195,8 @@ func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
 }
 
 func normalizeCollectionOpenAPIPath(path string) string {
+	// basePath 为 /api/v1，OpenAPI 生成时仅剥离 v1 前缀；/api/v2 作为完整路径保留。
 	path = strings.TrimPrefix(path, "/api/v1")
-	path = strings.TrimPrefix(path, "/api/v2")
 	if path == "" {
 		path = "/"
 	}
