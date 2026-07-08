@@ -56,6 +56,7 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	behaviorProjector := &behaviorProjectorServiceStub{}
 	answerSheetRelay := &outboxRelayStub{}
 	assessmentRelay := &outboxRelayStub{}
+	consistencyReconcile := &evaluationConsistencyReconcileServiceStub{}
 
 	c.PlanModule = &PlanModule{CommandService: planCommand}
 	c.StatisticsModule = &StatisticsModule{
@@ -65,7 +66,10 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	c.SurveyModule = &SurveyModule{
 		AnswerSheet: &AnswerSheetSubModule{SubmittedEventRelay: answerSheetRelay},
 	}
-	c.EvaluationModule = &EvaluationModule{AssessmentOutboxRelay: assessmentRelay}
+	c.EvaluationModule = &EvaluationModule{
+		AssessmentOutboxRelay:       assessmentRelay,
+		ConsistencyReconcileService: consistencyReconcile,
+	}
 
 	deps := c.BuildServerRuntimeDeps()
 	if deps.LockBuilder != c.CacheBuilder(cacheplane.FamilyLock) {
@@ -91,6 +95,9 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	}
 	if deps.AssessmentOutboxRelay != assessmentRelay {
 		t.Fatalf("AssessmentOutboxRelay = %#v, want %#v", deps.AssessmentOutboxRelay, assessmentRelay)
+	}
+	if deps.EvaluationConsistencyReconcileService != consistencyReconcile {
+		t.Fatalf("EvaluationConsistencyReconcileService = %#v, want %#v", deps.EvaluationConsistencyReconcileService, consistencyReconcile)
 	}
 }
 
@@ -170,6 +177,12 @@ func (*behaviorProjectorServiceStub) ProjectBehaviorEvent(context.Context, stati
 	return statisticsApp.BehaviorProjectEventResult{}, nil
 }
 func (*behaviorProjectorServiceStub) ReconcilePendingBehaviorEvents(context.Context, int) (int, error) {
+	return 0, nil
+}
+
+type evaluationConsistencyReconcileServiceStub struct{}
+
+func (*evaluationConsistencyReconcileServiceStub) ReconcileOnce(context.Context, int) (int, error) {
 	return 0, nil
 }
 

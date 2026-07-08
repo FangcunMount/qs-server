@@ -170,6 +170,12 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.LockManager,
 			deps.LockBuilder,
 		),
+		runtimescheduler.NewEvaluationConsistencyReconcileRunner(
+			cfg.EvaluationConsistencyReconcile,
+			deps.EvaluationConsistencyReconcileService,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
 		runtimescheduler.NewBehaviorJourneyScanRunner(
 			cfg.BehaviorJourneyScan,
 			deps.BehaviorJourneyScanService,

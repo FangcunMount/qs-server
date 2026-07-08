@@ -136,6 +136,77 @@ func TestOptionsValidateBehaviorPendingReconcile(t *testing.T) {
 	}
 }
 
+func TestOptionsValidateEvaluationConsistencyReconcile(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Options)
+		wantErr string
+	}{
+		{
+			name: "disabled reconcile skips validation",
+			mutate: func(opts *Options) {
+				opts.EvaluationConsistencyReconcile.Enable = false
+				opts.EvaluationConsistencyReconcile.Interval = 0
+				opts.EvaluationConsistencyReconcile.BatchLimit = 0
+				opts.EvaluationConsistencyReconcile.LockKey = ""
+				opts.EvaluationConsistencyReconcile.LockTTL = 0
+			},
+		},
+		{
+			name: "enabled reconcile requires positive interval",
+			mutate: func(opts *Options) {
+				opts.EvaluationConsistencyReconcile.Interval = 0
+			},
+			wantErr: "evaluation_consistency_reconcile.interval must be greater than 0",
+		},
+		{
+			name: "enabled reconcile requires positive batch limit",
+			mutate: func(opts *Options) {
+				opts.EvaluationConsistencyReconcile.BatchLimit = 0
+			},
+			wantErr: "evaluation_consistency_reconcile.batch_limit must be greater than 0",
+		},
+		{
+			name: "enabled reconcile requires lock key",
+			mutate: func(opts *Options) {
+				opts.EvaluationConsistencyReconcile.LockKey = ""
+			},
+			wantErr: "evaluation_consistency_reconcile.lock_key cannot be empty when enabled",
+		},
+		{
+			name: "enabled reconcile requires positive lock ttl",
+			mutate: func(opts *Options) {
+				opts.EvaluationConsistencyReconcile.LockTTL = 0
+			},
+			wantErr: "evaluation_consistency_reconcile.lock_ttl must be greater than 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			tt.mutate(opts)
+
+			errs := opts.Validate()
+			if tt.wantErr == "" {
+				for _, err := range errs {
+					if strings.Contains(err.Error(), "evaluation_consistency_reconcile.") {
+						t.Fatalf("unexpected evaluation consistency reconcile validation error: %v", err)
+					}
+				}
+				return
+			}
+
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tt.wantErr) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q, got %v", tt.wantErr, errs)
+		})
+	}
+}
+
 func TestOptionsValidateOutboxRelay(t *testing.T) {
 	tests := []struct {
 		name    string

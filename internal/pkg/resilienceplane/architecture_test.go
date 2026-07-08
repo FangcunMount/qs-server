@@ -192,6 +192,7 @@ func TestLockLeaseSpecsHaveResilienceSemantics(t *testing.T) {
 		locklease.Specs.StatisticsSyncLeader,
 		locklease.Specs.StatisticsSync,
 		locklease.Specs.BehaviorPendingReconcile,
+		locklease.Specs.EvaluationConsistencyReconcile,
 		locklease.Specs.CollectionSubmit,
 	}
 	for _, spec := range specs {

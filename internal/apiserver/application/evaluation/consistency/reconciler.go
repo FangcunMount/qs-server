@@ -159,3 +159,43 @@ func (r *Reconciler) RepairInterpretedFinalization(ctx context.Context, assessme
 	}
 	return r.assessmentSaver.Save(ctx, a)
 }
+
+// RepairEvaluatedFinalization 幂等重放 scoring writer 末步：ApplyScoringOutcome + assessment Save。
+func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessmentID uint64) error {
+	if r == nil || r.assessments == nil || r.assessmentSaver == nil || r.snapshotStore == nil {
+		return fmt.Errorf("consistency reconciler repair dependencies are not configured")
+	}
+	a, err := r.assessments.FindByID(ctx, assessment.NewID(assessmentID))
+	if err != nil {
+		return err
+	}
+	if a == nil {
+		return fmt.Errorf("assessment %d not found", assessmentID)
+	}
+	if a.Status().IsEvaluated() || a.Status().IsInterpreted() {
+		return nil
+	}
+	if !a.Status().IsSubmitted() {
+		return fmt.Errorf("assessment %d status %s cannot finalize evaluated", assessmentID, a.Status())
+	}
+	if r.artifacts != nil {
+		hasArtifact, err := r.artifacts.HasScoringArtifact(ctx, assessmentID)
+		if err != nil {
+			return err
+		}
+		if !hasArtifact {
+			return fmt.Errorf("assessment %d has no scoring artifact to finalize", assessmentID)
+		}
+	}
+	execution, err := r.snapshotStore.Load(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
+	if execution == nil {
+		return fmt.Errorf("assessment %d has no scoring snapshot for evaluated finalization", assessmentID)
+	}
+	if err := a.ApplyScoringOutcome(execution); err != nil {
+		return err
+	}
+	return r.assessmentSaver.Save(ctx, a)
+}

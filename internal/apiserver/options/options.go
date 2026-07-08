@@ -12,67 +12,69 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                      *log.Options                            `json:"log"       mapstructure:"log"`
-	GenericServerRunOptions  *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
-	GRPCOptions              *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
-	InsecureServing          *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
-	SecureServing            *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
-	MySQLOptions             *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
-	MigrationOptions         *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
-	RedisOptions             *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
-	RedisProfiles            map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
-	RedisRuntime             *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
-	MongoDBOptions           *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
-	MessagingOptions         *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
-	IAMOptions               *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
-	OSSOptions               *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
-	WeChatOptions            *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
-	Plan                     *PlanOptions                            `json:"plan"      mapstructure:"plan"`
-	PlanScheduler            *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	BehaviorPendingReconcile *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
-	BehaviorJourneyScan      *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
-	BehaviorFootprint        *BehaviorFootprintOptions               `json:"behavior_footprint" mapstructure:"behavior_footprint"`
-	OutboxRelay              *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
-	RateLimit                *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
-	Backpressure             *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
-	Cache                    *CacheOptions                           `json:"cache"     mapstructure:"cache"`
-	StatisticsSync           *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
-	ReportStatus             *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
-	Signaling                *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
-	SystemGovernance         *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	Log                            *log.Options                            `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions        *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
+	GRPCOptions                    *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing                *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
+	SecureServing                  *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
+	MySQLOptions                   *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions               *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
+	RedisOptions                   *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
+	RedisProfiles                  map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime                   *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	MongoDBOptions                 *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions               *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
+	IAMOptions                     *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	OSSOptions                     *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
+	WeChatOptions                  *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
+	Plan                           *PlanOptions                            `json:"plan"      mapstructure:"plan"`
+	PlanScheduler                  *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
+	BehaviorPendingReconcile       *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
+	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
+	BehaviorJourneyScan            *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
+	BehaviorFootprint              *BehaviorFootprintOptions               `json:"behavior_footprint" mapstructure:"behavior_footprint"`
+	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
+	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure                   *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
+	Cache                          *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
+	ReportStatus                   *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
+	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
+	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
-		Log:                      log.NewOptions(),
-		GenericServerRunOptions:  genericoptions.NewServerRunOptions(),
-		GRPCOptions:              genericoptions.NewGRPCOptions(),
-		InsecureServing:          genericoptions.NewInsecureServingOptions(),
-		SecureServing:            genericoptions.NewSecureServingOptions(),
-		MySQLOptions:             genericoptions.NewMySQLOptions(),
-		MigrationOptions:         genericoptions.NewMigrationOptions(),
-		RedisOptions:             genericoptions.NewRedisOptions(),
-		RedisProfiles:            map[string]*genericoptions.RedisOptions{},
-		RedisRuntime:             defaultRedisRuntimeOptions(),
-		MongoDBOptions:           genericoptions.NewMongoDBOptions(),
-		MessagingOptions:         genericoptions.NewMessagingOptions(),
-		IAMOptions:               genericoptions.NewIAMOptions(),
-		OSSOptions:               genericoptions.NewOSSOptions(),
-		WeChatOptions:            genericoptions.NewWeChatOptions(),
-		Plan:                     NewPlanOptions(),
-		PlanScheduler:            NewPlanSchedulerOptions(),
-		BehaviorPendingReconcile: NewBehaviorPendingReconcileOptions(),
-		BehaviorJourneyScan:      NewBehaviorJourneyScanOptions(),
-		BehaviorFootprint:        NewBehaviorFootprintOptions(),
-		OutboxRelay:              NewOutboxRelayOptions(),
-		RateLimit:                NewRateLimitOptions(),
-		Backpressure:             NewBackpressureOptions(),
-		Cache:                    NewCacheOptions(),
-		StatisticsSync:           NewStatisticsSyncOptions(),
-		ReportStatus:             genericoptions.NewReportStatusOptions(),
-		Signaling:                genericoptions.NewSignalingOptions(),
-		SystemGovernance:         NewSystemGovernanceOptions(),
+		Log:                            log.NewOptions(),
+		GenericServerRunOptions:        genericoptions.NewServerRunOptions(),
+		GRPCOptions:                    genericoptions.NewGRPCOptions(),
+		InsecureServing:                genericoptions.NewInsecureServingOptions(),
+		SecureServing:                  genericoptions.NewSecureServingOptions(),
+		MySQLOptions:                   genericoptions.NewMySQLOptions(),
+		MigrationOptions:               genericoptions.NewMigrationOptions(),
+		RedisOptions:                   genericoptions.NewRedisOptions(),
+		RedisProfiles:                  map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:                   defaultRedisRuntimeOptions(),
+		MongoDBOptions:                 genericoptions.NewMongoDBOptions(),
+		MessagingOptions:               genericoptions.NewMessagingOptions(),
+		IAMOptions:                     genericoptions.NewIAMOptions(),
+		OSSOptions:                     genericoptions.NewOSSOptions(),
+		WeChatOptions:                  genericoptions.NewWeChatOptions(),
+		Plan:                           NewPlanOptions(),
+		PlanScheduler:                  NewPlanSchedulerOptions(),
+		BehaviorPendingReconcile:       NewBehaviorPendingReconcileOptions(),
+		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
+		BehaviorJourneyScan:            NewBehaviorJourneyScanOptions(),
+		BehaviorFootprint:              NewBehaviorFootprintOptions(),
+		OutboxRelay:                    NewOutboxRelayOptions(),
+		RateLimit:                      NewRateLimitOptions(),
+		Backpressure:                   NewBackpressureOptions(),
+		Cache:                          NewCacheOptions(),
+		StatisticsSync:                 NewStatisticsSyncOptions(),
+		ReportStatus:                   genericoptions.NewReportStatusOptions(),
+		Signaling:                      genericoptions.NewSignalingOptions(),
+		SystemGovernance:               NewSystemGovernanceOptions(),
 	}
 }
 
@@ -252,6 +254,38 @@ func (b *BehaviorPendingReconcileOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&b.BatchLimit, "behavior_pending_reconcile.batch-limit", b.BatchLimit, "Maximum pending behavior events to process in one reconcile tick.")
 	fs.StringVar(&b.LockKey, "behavior_pending_reconcile.lock-key", b.LockKey, "Redis distributed lock key used by the pending behavior reconcile scheduler.")
 	fs.DurationVar(&b.LockTTL, "behavior_pending_reconcile.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by the pending behavior reconcile scheduler.")
+}
+
+// EvaluationConsistencyReconcileOptions 控制 scoring/reporting 跨库终态对账补偿任务。
+type EvaluationConsistencyReconcileOptions struct {
+	Enable     bool          `json:"enable" mapstructure:"enable"`
+	Interval   time.Duration `json:"interval" mapstructure:"interval"`
+	BatchLimit int           `json:"batch_limit" mapstructure:"batch_limit"`
+	LockKey    string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL    time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+// NewEvaluationConsistencyReconcileOptions 创建默认 evaluation consistency reconcile 配置。
+func NewEvaluationConsistencyReconcileOptions() *EvaluationConsistencyReconcileOptions {
+	return &EvaluationConsistencyReconcileOptions{
+		Enable:     true,
+		Interval:   10 * time.Second,
+		BatchLimit: 100,
+		LockKey:    "qs:evaluation-consistency-reconcile:leader",
+		LockTTL:    30 * time.Second,
+	}
+}
+
+// AddFlags 注册 evaluation consistency reconcile 相关参数。
+func (e *EvaluationConsistencyReconcileOptions) AddFlags(fs *pflag.FlagSet) {
+	if e == nil {
+		return
+	}
+	fs.BoolVar(&e.Enable, "evaluation_consistency_reconcile.enable", e.Enable, "Enable scheduled evaluation cross-store consistency reconcile.")
+	fs.DurationVar(&e.Interval, "evaluation_consistency_reconcile.interval", e.Interval, "Interval for scanning evaluation consistency drift.")
+	fs.IntVar(&e.BatchLimit, "evaluation_consistency_reconcile.batch-limit", e.BatchLimit, "Maximum assessments to scan in one evaluation consistency reconcile tick.")
+	fs.StringVar(&e.LockKey, "evaluation_consistency_reconcile.lock-key", e.LockKey, "Redis distributed lock key used by the evaluation consistency reconcile scheduler.")
+	fs.DurationVar(&e.LockTTL, "evaluation_consistency_reconcile.lock-ttl", e.LockTTL, "Redis distributed lock TTL used by the evaluation consistency reconcile scheduler.")
 }
 
 // BehaviorJourneyScanOptions controls background behavior journey scan projection.
@@ -446,6 +480,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
 	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
+	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
 	o.BehaviorJourneyScan.AddFlags(fss.FlagSet("behavior_journey_scan"))
 	o.BehaviorFootprint.AddFlags(fss.FlagSet("behavior_footprint"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))

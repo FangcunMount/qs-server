@@ -19,6 +19,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateBehaviorPendingReconcile(o.BehaviorPendingReconcile)...)
+	errs = append(errs, validateEvaluationConsistencyReconcile(o.EvaluationConsistencyReconcile)...)
 	errs = append(errs, validateBehaviorJourneyScan(o.BehaviorJourneyScan)...)
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
@@ -144,6 +145,27 @@ func validateBehaviorPendingReconcile(opts *BehaviorPendingReconcileOptions) []e
 	}
 	if opts.LockTTL <= 0 {
 		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
+	}
+	return errs
+}
+
+func validateEvaluationConsistencyReconcile(opts *EvaluationConsistencyReconcileOptions) []error {
+	if opts == nil || !opts.Enable {
+		return nil
+	}
+
+	var errs []error
+	if opts.Interval <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.interval must be greater than 0"))
+	}
+	if opts.BatchLimit <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.batch_limit must be greater than 0"))
+	}
+	if opts.LockKey == "" {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_key cannot be empty when enabled"))
+	}
+	if opts.LockTTL <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_ttl must be greater than 0"))
 	}
 	return errs
 }

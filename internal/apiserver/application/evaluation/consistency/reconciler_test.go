@@ -152,3 +152,43 @@ func TestRepairInterpretedFinalizationRequiresSnapshot(t *testing.T) {
 		t.Fatal("RepairInterpretedFinalization error = nil, want missing snapshot")
 	}
 }
+
+func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	a := submittedAssessmentForConsistency(t, 7005)
+	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
+	snapshotStore := outcomescoring.NewMemorySnapshotStore()
+	execution := assessment.NewAssessmentOutcome(
+		*a.EvaluationModelRef(),
+		assessment.ResultSummary{PrimaryLabel: "ok"},
+		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	)
+	if err := snapshotStore.Save(context.Background(), a.ID().Uint64(), execution); err != nil {
+		t.Fatal(err)
+	}
+	reconciler := consistency.NewReconciler(repo, stubReportChecker{}, stubArtifactChecker{exists: true}, snapshotStore, repo)
+
+	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
+		t.Fatalf("RepairEvaluatedFinalization first: %v", err)
+	}
+	if !repo.byID[a.ID().Uint64()].Status().IsEvaluated() {
+		t.Fatalf("status after repair = %s, want evaluated", repo.byID[a.ID().Uint64()].Status())
+	}
+	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
+		t.Fatalf("RepairEvaluatedFinalization second: %v", err)
+	}
+}
+
+func TestRepairEvaluatedFinalizationRequiresSnapshot(t *testing.T) {
+	t.Parallel()
+
+	a := submittedAssessmentForConsistency(t, 7006)
+	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
+	reconciler := consistency.NewReconciler(repo, stubReportChecker{}, stubArtifactChecker{exists: true}, outcomescoring.NewMemorySnapshotStore(), repo)
+
+	err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64())
+	if err == nil {
+		t.Fatal("RepairEvaluatedFinalization error = nil, want missing snapshot")
+	}
+}

@@ -10,8 +10,10 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
@@ -70,8 +72,9 @@ type Module struct {
 	LatestRiskReader      evaluationreadmodel.LatestRiskReader
 	AssessmentReader      evaluationreadmodel.AssessmentReader
 
-	EvaluationService    execute.Service
-	ReportStatusReporter *reportstatus.Reporter
+	EvaluationService           execute.Service
+	ReportStatusReporter        *reportstatus.Reporter
+	ConsistencyReconcileService consistencyApp.Service
 
 	OutboxReadyIndex              *outboxready.Index
 	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
@@ -133,6 +136,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 	module.wireAssessmentApplications(normalized, infra)
+	module.wireConsistencyReconcile(normalized, infra)
 
 	return module, nil
 }
@@ -152,6 +156,7 @@ type evaluationInfra struct {
 	assessmentImmediate          *appEventing.ImmediateDispatcher
 	assessmentReadyIndex         *outboxready.Index
 	postCommitReadyIndexer       *appEventing.PostCommitReadyIndexer
+	scoringSnapshotStore         outcomescoring.SnapshotStore
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
@@ -273,6 +278,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return err
 		}
+		infra.scoringSnapshotStore = scoringSnapshotStore
 		scoringWriter := outcomescoring.NewWriter(infra.assessmentRepo, scoreProjectorRegistry, scoringSnapshotStore)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
 
@@ -361,6 +367,38 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	)
 	m.LatestRiskReader = infra.latestRiskReader
 	m.AssessmentReader = infra.assessmentReader
+}
+
+func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
+	snapshotStore := infra.scoringSnapshotStore
+	if snapshotStore == nil {
+		var opsRedis redis.UniversalClient
+		if normalized.OpsHandle != nil {
+			opsRedis = normalized.OpsHandle.Client
+		}
+		resolved, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
+			AsyncInterpretation: normalized.AsyncInterpretation,
+			SingleProcessAsync:  normalized.SingleProcessAsyncInterpretation,
+			OpsRedis:            opsRedis,
+		})
+		if err != nil {
+			log.Warnf("evaluation consistency reconcile snapshot store unavailable: %v", err)
+			return
+		}
+		snapshotStore = resolved
+	}
+
+	reconciler := consistencyApp.NewReconciler(
+		infra.assessmentRepo,
+		consistencyApp.ReportReaderExistenceChecker{Reader: normalized.ReportReader},
+		consistencyApp.CompositeScoringArtifactChecker{
+			SnapshotStore: snapshotStore,
+			ScoreReader:   infra.scoreReader,
+		},
+		snapshotStore,
+		infra.assessmentRepo,
+	)
+	m.ConsistencyReconcileService = consistencyApp.NewReconcileService(reconciler, infra.assessmentReader)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

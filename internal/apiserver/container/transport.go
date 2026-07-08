@@ -5,6 +5,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -116,6 +117,7 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 		EventStatusService: eventStatus,
 		EventOutboxes:      outboxes,
 		CacheGovernance:    cacheGovernance,
+		MySQLDB:            c.mysqlDB,
 		LocalResilienceSnapshot: platformmod.BuildLocalResilienceSnapshot(
 			"apiserver",
 			rateCfg != nil && rateCfg.Enabled,
@@ -292,15 +294,16 @@ type ServerGRPCBootstrapDeps struct {
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
 // background runtimes started from the apiserver process.
 type ServerRuntimeDeps struct {
-	LockBuilder                *keyspace.Builder
-	LockManager                locklease.Manager
-	WarmupCoordinator          cachegov.Coordinator
-	PlanCommandService         planApp.PlanCommandService
-	StatisticsSyncService      statisticsApp.StatisticsSyncService
-	BehaviorProjectorService   statisticsApp.BehaviorProjectorService
-	BehaviorJourneyScanService statisticsApp.BehaviorJourneyScanService
-	AnswerSheetSubmittedRelay  answersheetApp.SubmittedEventRelay
-	AssessmentOutboxRelay      appEventing.OutboxRelay
+	LockBuilder                           *keyspace.Builder
+	LockManager                           locklease.Manager
+	WarmupCoordinator                     cachegov.Coordinator
+	PlanCommandService                    planApp.PlanCommandService
+	StatisticsSyncService                 statisticsApp.StatisticsSyncService
+	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
+	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
+	EvaluationConsistencyReconcileService consistencyApp.Service
+	AnswerSheetSubmittedRelay             answersheetApp.SubmittedEventRelay
+	AssessmentOutboxRelay                 appEventing.OutboxRelay
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -342,6 +345,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.EvaluationModule != nil {
 		deps.AssessmentOutboxRelay = c.EvaluationModule.AssessmentOutboxRelay
+		deps.EvaluationConsistencyReconcileService = c.EvaluationModule.ConsistencyReconcileService
 	}
 
 	return deps
