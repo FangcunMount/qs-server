@@ -9,6 +9,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -16,11 +17,6 @@ type Repository struct {
 	mongoBase.BaseRepository
 	mapper *Mapper
 }
-
-var (
-	_ port.PublishedReader = (*Repository)(nil)
-	_ port.PublishedWriter = (*Repository)(nil)
-)
 
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
 	po := &EvaluationRuleSetPO{}
@@ -30,7 +26,7 @@ func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) 
 	}
 }
 
-func (r *Repository) UpsertPublished(ctx context.Context, snapshot *domain.RuleSetSnapshot) error {
+func (r *Repository) UpsertPublished(ctx context.Context, snapshot *v1envelope.V1Snapshot) error {
 	if snapshot == nil {
 		return mongo.ErrNilDocument
 	}
@@ -79,7 +75,7 @@ func (r *Repository) UpsertPublished(ctx context.Context, snapshot *domain.RuleS
 	return err
 }
 
-func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.RuleSetSnapshot, error) {
+func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.Ref) (*v1envelope.V1Snapshot, error) {
 	if ref.Version == "" {
 		return nil, domain.ErrVersionRequired
 	}
@@ -91,7 +87,7 @@ func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.Ref) (*doma
 	return r.findOne(ctx, filter)
 }
 
-func (r *Repository) FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.RuleSetSnapshot, error) {
+func (r *Repository) FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*v1envelope.V1Snapshot, error) {
 	filter := publishedFilter(bson.M{
 		"questionnaire_code": questionnaireCode,
 	})
@@ -101,7 +97,7 @@ func (r *Repository) FindPublishedByQuestionnaire(ctx context.Context, questionn
 	return r.findOne(ctx, filter)
 }
 
-func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.RuleSetSnapshot, error) {
+func (r *Repository) findOne(ctx context.Context, filter bson.M) (*v1envelope.V1Snapshot, error) {
 	count, err := r.Collection().CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -123,14 +119,14 @@ func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.RuleSe
 	return r.mapper.ToDomain(&po), nil
 }
 
-func (r *Repository) ListPublished(ctx context.Context) ([]*domain.Snapshot, error) {
+func (r *Repository) ListPublished(ctx context.Context) ([]*v1envelope.V1Snapshot, error) {
 	cursor, err := r.Collection().Find(ctx, publishedFilter(bson.M{}))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 
-	snapshots := make([]*domain.Snapshot, 0)
+	snapshots := make([]*v1envelope.V1Snapshot, 0)
 	for cursor.Next(ctx) {
 		var po EvaluationRuleSetPO
 		if err := cursor.Decode(&po); err != nil {

@@ -13,6 +13,7 @@ import (
 
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 )
 
 func main() {
@@ -48,11 +49,36 @@ func main() {
 		return
 	}
 
-	written, err := mongomodelcatalog.BackfillFromLegacy(ctx, legacy, target)
+	written, err := backfillFromLegacy(ctx, legacy, target)
 	if err != nil {
 		log.Fatalf("backfill failed after %d row(s): %v", written, err)
 	}
 	fmt.Printf("backfilled %d published assessment model(s)\n", written)
+}
+
+func backfillFromLegacy(ctx context.Context, legacy *mongoruleset.Repository, target *mongomodelcatalog.Repository) (int, error) {
+	if legacy == nil || target == nil {
+		return 0, fmt.Errorf("legacy and target repositories are required")
+	}
+	rows, err := legacy.ListPublished(ctx)
+	if err != nil {
+		return 0, err
+	}
+	written := 0
+	for _, snapshot := range rows {
+		if snapshot == nil {
+			continue
+		}
+		published := v1envelope.PublishedFromV1(snapshot)
+		if published == nil {
+			continue
+		}
+		if err := target.UpsertPublishedModel(ctx, published); err != nil {
+			return written, fmt.Errorf("upsert %s@%s: %w", published.Model.Code, published.Model.Version, err)
+		}
+		written++
+	}
+	return written, nil
 }
 
 func envOr(key, fallback string) string {

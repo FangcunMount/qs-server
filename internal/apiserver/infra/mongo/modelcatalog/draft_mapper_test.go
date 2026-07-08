@@ -8,7 +8,7 @@ import (
 
 func TestDraftMapperRoundTrip(t *testing.T) {
 	original, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "personality_demo", Kind: domain.KindPersonality,
+		Code: "personality_demo", Kind: domain.KindTypology,
 		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Demo",
 	})
 	if err != nil {

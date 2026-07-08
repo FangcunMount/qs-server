@@ -1,7 +1,9 @@
 package ruleset
 
 import (
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -11,7 +13,7 @@ func NewMapper() *Mapper {
 	return &Mapper{}
 }
 
-func (Mapper) ToPO(snapshot *domain.RuleSetSnapshot) *EvaluationRuleSetPO {
+func (Mapper) ToPO(snapshot *v1envelope.V1Snapshot) *EvaluationRuleSetPO {
 	if snapshot == nil {
 		return nil
 	}
@@ -39,7 +41,7 @@ func (Mapper) ToPO(snapshot *domain.RuleSetSnapshot) *EvaluationRuleSetPO {
 	}
 }
 
-func (Mapper) ToDomain(po *EvaluationRuleSetPO) *domain.RuleSetSnapshot {
+func (Mapper) ToDomain(po *EvaluationRuleSetPO) *v1envelope.V1Snapshot {
 	if po == nil {
 		return nil
 	}
@@ -47,21 +49,21 @@ func (Mapper) ToDomain(po *EvaluationRuleSetPO) *domain.RuleSetSnapshot {
 	for key, value := range po.Source {
 		source[key] = value
 	}
-	return &domain.RuleSetSnapshot{
+	return &v1envelope.V1Snapshot{
 		SchemaVersion: po.SchemaVersion,
 		PayloadFormat: po.PayloadFormat,
-		Definition: domain.RuleSetDefinition{
-			Kind:    domain.RuleSetKind(po.RuleSetKind),
+		Definition: v1envelope.V1Definition{
+			Kind:    v1envelope.RuleSetKind(po.RuleSetKind),
 			Code:    po.RuleSetCode,
 			Version: po.RuleSetVersion,
 			Title:   po.Title,
 			Status:  po.Status,
 		},
-		Binding: domain.QuestionnaireBinding{
+		Binding: publishing.QuestionnaireBinding{
 			QuestionnaireCode:    po.QuestionnaireCode,
 			QuestionnaireVersion: po.QuestionnaireVersion,
 		},
-		DecisionKind: domain.DecisionKind(po.DecisionKind),
+		DecisionKind: binding.DecisionKind(po.DecisionKind),
 		Source:       source,
 		Payload:      append([]byte(nil), po.Payload...),
 	}

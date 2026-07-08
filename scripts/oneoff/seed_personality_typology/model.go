@@ -55,7 +55,7 @@ func seedAssessmentModel(
 
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      plan.Code,
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: plan.Algorithm,
 		Title:     firstNonEmpty(plan.Title, payload.Title),
@@ -78,7 +78,7 @@ func seedAssessmentModel(
 	}
 
 	if force {
-		if err := publishedRepo.DeletePublished(ctx, domain.KindPersonality, plan.Code); err != nil {
+		if err := publishedRepo.DeletePublished(ctx, domain.KindTypology, plan.Code); err != nil {
 			return fmt.Errorf("delete published %s: %w", plan.Code, err)
 		}
 	}

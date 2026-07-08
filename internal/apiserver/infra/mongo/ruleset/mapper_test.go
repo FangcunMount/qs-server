@@ -1,15 +1,16 @@
 package ruleset
 
 import (
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestMapperRoundTrip(t *testing.T) {
-	snapshot := &domain.RuleSetSnapshot{
-		Definition: domain.RuleSetDefinition{
-			Kind:    domain.RuleSetKindMBTI,
+	snapshot := &v1envelope.V1Snapshot{
+		Definition: v1envelope.V1Definition{
+			Kind:    v1envelope.RuleSetKindMBTI,
 			Code:    "MBTI_OEJTS",
 			Version: "1.0.0",
 			Title:   "MBTI",

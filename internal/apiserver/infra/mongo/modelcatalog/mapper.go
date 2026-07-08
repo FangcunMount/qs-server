@@ -27,11 +27,13 @@ func (Mapper) ToPO(snapshot *domain.PublishedModelSnapshot) *PublishedAssessment
 	if schemaVersion == "" {
 		schemaVersion = domain.SchemaVersionV2
 	}
+	kind := domain.NormalizeKind(snapshot.Model.Kind)
+	productChannel := domain.NormalizeProductChannel(domain.ResolveProductChannel(kind, snapshot.Model.ProductChannel))
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:        schemaVersion,
 		PayloadFormat:        snapshot.PayloadFormat,
-		ModelProductChannel:  string(domain.ResolveProductChannel(snapshot.Model.Kind, snapshot.Model.ProductChannel)),
-		ModelKind:            string(snapshot.Model.Kind),
+		ModelProductChannel:  string(productChannel),
+		ModelKind:            string(kind),
 		ModelSubKind:         string(snapshot.Model.SubKind),
 		ModelAlgorithm:       string(snapshot.Model.Algorithm),
 		ModelCode:            snapshot.Model.Code,
@@ -54,8 +56,8 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *domain.PublishedModel
 	for key, value := range po.Source {
 		source[key] = value
 	}
-	kind := domain.Kind(po.ModelKind)
-	productChannel := domain.ProductChannel(po.ModelProductChannel)
+	kind := domain.NormalizeKind(domain.Kind(po.ModelKind))
+	productChannel := domain.NormalizeProductChannel(domain.ProductChannel(po.ModelProductChannel))
 	if productChannel == "" {
 		productChannel = domain.DefaultProductChannelFor(kind)
 	}
@@ -82,8 +84,4 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *domain.PublishedModel
 		Source:  source,
 		Payload: append([]byte(nil), po.Payload...),
 	}
-}
-
-func (m Mapper) ToLegacySnapshot(po *PublishedAssessmentModelPO) *domain.Snapshot {
-	return domain.LegacyFromPublished(m.ToPublished(po))
 }

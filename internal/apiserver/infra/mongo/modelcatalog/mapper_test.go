@@ -11,7 +11,7 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Model: domain.ModelDefinition{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: domain.AlgorithmMBTI,
 			Code:      "MBTI_OEJTS",
@@ -33,9 +33,5 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 	got := mapper.ToPublished(po)
 	if got.Model.Code != original.Model.Code || got.Model.Algorithm != domain.AlgorithmMBTI {
 		t.Fatalf("published round trip = %#v", got.Model)
-	}
-	legacy := mapper.ToLegacySnapshot(po)
-	if legacy.Definition.Kind != domain.KindPersonality {
-		t.Fatalf("legacy kind = %s, want personality", legacy.Definition.Kind)
 	}
 }

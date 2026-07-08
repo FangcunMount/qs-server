@@ -51,9 +51,9 @@ func run(cfg config) error {
 	}
 	for _, snapshot := range snapshots {
 		fmt.Printf("plan: upsert %s/%s@%s -> questionnaire %s@%s\n",
-			snapshot.Definition.Kind,
-			snapshot.Definition.Code,
-			snapshot.Definition.Version,
+			snapshot.Model.Kind,
+			snapshot.Model.Code,
+			snapshot.Model.Version,
 			snapshot.Binding.QuestionnaireCode,
 			snapshot.Binding.QuestionnaireVersion,
 		)
@@ -77,16 +77,16 @@ func run(cfg config) error {
 
 	repo := mongomodelcatalog.NewRepository(client.Database(cfg.mongoDB))
 	for _, snapshot := range snapshots {
-		if err := repo.UpsertPublished(applyCtx, snapshot); err != nil {
-			return fmt.Errorf("upsert %s@%s: %w", snapshot.Definition.Code, snapshot.Definition.Version, err)
+		if err := repo.UpsertPublishedModel(applyCtx, snapshot); err != nil {
+			return fmt.Errorf("upsert %s@%s: %w", snapshot.Model.Code, snapshot.Model.Version, err)
 		}
 	}
 	fmt.Printf("seeded %d published assessment model(s) into published_assessment_models\n", len(snapshots))
 	return nil
 }
 
-func collectSnapshots(ctx context.Context, cfg config) ([]*domain.RuleSetSnapshot, error) {
-	var snapshots []*domain.RuleSetSnapshot
+func collectSnapshots(ctx context.Context, cfg config) ([]*domain.PublishedModelSnapshot, error) {
+	var snapshots []*domain.PublishedModelSnapshot
 	if !cfg.skipEmbedded {
 		embedded, err := rulesetInfra.DefaultEmbeddedSnapshots(ctx)
 		if err != nil {
@@ -104,7 +104,7 @@ func collectSnapshots(ctx context.Context, cfg config) ([]*domain.RuleSetSnapsho
 	return append(snapshots, scaleSnapshots...), nil
 }
 
-func loadPublishedScaleSnapshots(ctx context.Context, cfg config) ([]*domain.RuleSetSnapshot, error) {
+func loadPublishedScaleSnapshots(ctx context.Context, cfg config) ([]*domain.PublishedModelSnapshot, error) {
 	applyCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 

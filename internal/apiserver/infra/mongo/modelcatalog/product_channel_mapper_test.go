@@ -70,7 +70,7 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 
 func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ModelKind:      string(domain.KindPersonality),
+		ModelKind:      string(domain.KindTypology),
 		ModelSubKind:   string(domain.SubKindTypology),
 		ModelAlgorithm: string(domain.AlgorithmMBTI),
 		ModelCode:      "mbti",
@@ -81,7 +81,7 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 		Payload:        []byte(`{}`),
 	}
 	got := NewMapper().ToPublished(po)
-	if got.Model.ProductChannel != domain.ProductChannelPersonality {
+	if got.Model.ProductChannel != domain.ProductChannelTypology {
 		t.Fatalf("derived product channel = %q, want personality", got.Model.ProductChannel)
 	}
 }

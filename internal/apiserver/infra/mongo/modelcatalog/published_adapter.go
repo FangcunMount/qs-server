@@ -63,7 +63,7 @@ func (a *PublishedModelRepoAdapter) DeletePublished(ctx context.Context, kind do
 	}
 	now := time.Now()
 	_, err := a.inner.Collection().UpdateMany(ctx, publishedFilter(bson.M{
-		"model_kind": string(kind),
+		"model_kind": kindBSONFilter(kind),
 		"model_code": code,
 	}), bson.M{"$set": bson.M{
 		"deleted_at": now,
