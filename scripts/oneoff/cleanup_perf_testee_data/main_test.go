@@ -187,7 +187,7 @@ func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 	for _, name := range []string{
 		"statistics_daily_testee",
 		"statistics_accumulated_testee",
-		"analytics_projector_checkpoint",
+		"runtime_checkpoint",
 		"analytics_pending_event",
 		"domain_event_outbox",
 		"behavior_footprint",

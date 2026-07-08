@@ -1,13 +1,14 @@
-package evaluation
+package checkpoint_test
 
 import (
 	"testing"
 	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 )
 
-func TestRunPORoundTrip(t *testing.T) {
+func TestRunCheckpointPORoundTrip(t *testing.T) {
 	t.Parallel()
 
 	started := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
@@ -16,7 +17,7 @@ func TestRunPORoundTrip(t *testing.T) {
 	message := "calculation failed"
 	traceID := "trace-1"
 	original := evalrun.EvaluationRun{
-		RunID:        evalrun.ID("run-abc"),
+		RunID:        evalrun.ID("42:2"),
 		AssessmentID: 42,
 		Attempt: evalrun.Attempt{
 			Number: 2,
@@ -31,8 +32,8 @@ func TestRunPORoundTrip(t *testing.T) {
 			Retryable: true,
 		},
 	}
-	po := runToPO(original)
-	if po.RunID != "run-abc" || po.AssessmentID != 42 || po.AttemptNo != 2 {
+	po := checkpoint.RunToPOForTest(original)
+	if po.ResourceID != "42:2" || po.AssessmentID == nil || *po.AssessmentID != 42 || po.AttemptNo != 2 {
 		t.Fatalf("unexpected po: %+v", po)
 	}
 	if po.ErrorCode == nil || *po.ErrorCode != code {
@@ -45,7 +46,7 @@ func TestRunPORoundTrip(t *testing.T) {
 		t.Fatal("retryable should be true")
 	}
 
-	roundTrip := runFromPO(*po)
+	roundTrip := checkpoint.RunFromPOForTest(*po)
 	if roundTrip.RunID != original.RunID {
 		t.Fatalf("run id = %s, want %s", roundTrip.RunID, original.RunID)
 	}
@@ -54,5 +55,19 @@ func TestRunPORoundTrip(t *testing.T) {
 	}
 	if roundTrip.Failure == nil || roundTrip.Failure.Message != message || !roundTrip.Failure.Retryable {
 		t.Fatalf("failure = %+v", roundTrip.Failure)
+	}
+}
+
+func TestAnalyticsStatusMappingRoundTrip(t *testing.T) {
+	t.Parallel()
+	for _, legacy := range []string{
+		evalrun.AnalyticsProjectorCheckpointStatusProcessing,
+		evalrun.AnalyticsProjectorCheckpointStatusCompleted,
+		evalrun.AnalyticsProjectorCheckpointStatusPending,
+	} {
+		unified := evalrun.UnifiedStatusForAnalytics(legacy)
+		if got := evalrun.AnalyticsStatusFromUnified(unified); got != legacy {
+			t.Fatalf("legacy %s -> unified %s -> %s", legacy, unified, got)
+		}
 	}
 }

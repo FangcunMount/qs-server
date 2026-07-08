@@ -52,6 +52,9 @@ func ReportRoutingContextFromOutcome(outcome evaloutcome.Outcome) (ReportRouting
 	if ctx.AlgorithmFamily == "" || ctx.DecisionKind == "" {
 		return ReportRoutingContext{}, false
 	}
+	if profile := policy.ReportProfileForDecisionKind(ctx.DecisionKind); profile != policy.ReportProfileDefault {
+		ctx.ReportProfile = profile
+	}
 	return ctx, true
 }
 

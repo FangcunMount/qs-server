@@ -5,6 +5,7 @@ import (
 	"time"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -202,34 +203,11 @@ func dateOnly(v time.Time) time.Time {
 }
 
 func (r *StatisticsRepository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error) {
-	if eventID == "" {
-		return "", nil
-	}
-	po := &AnalyticsProjectorCheckpointPO{
-		EventID:   eventID,
-		EventType: eventType,
-		Status:    AnalyticsProjectorCheckpointStatusProcessing,
-	}
-	if err := r.WithContext(ctx).Create(po).Error; err == nil {
-		return "", nil
-	}
-	var existing AnalyticsProjectorCheckpointPO
-	if err := r.WithContext(ctx).
-		Where("event_id = ? AND deleted_at IS NULL", eventID).
-		First(&existing).Error; err != nil {
-		return "", err
-	}
-	return existing.Status, nil
+	return checkpoint.NewRepository(r.db).TryBeginAnalyticsProjectorCheckpoint(ctx, eventID, eventType)
 }
 
 func (r *StatisticsRepository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error {
-	if eventID == "" {
-		return nil
-	}
-	return r.WithContext(ctx).
-		Model(&AnalyticsProjectorCheckpointPO{}).
-		Where("event_id = ?", eventID).
-		Update("status", status).Error
+	return checkpoint.NewRepository(r.db).MarkAnalyticsProjectorCheckpointStatus(ctx, eventID, status)
 }
 
 func (r *StatisticsRepository) UpsertAnalyticsPendingEvent(ctx context.Context, eventID, eventType, payload string, nextAttemptAt time.Time, lastError string) error {

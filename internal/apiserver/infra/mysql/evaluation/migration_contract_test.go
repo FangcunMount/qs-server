@@ -55,21 +55,24 @@ func TestAssessmentOutcomeV2MigrationBackfillsInterpretedRows(t *testing.T) {
 	}
 }
 
-func TestEvaluationRunMigrationDefinesRunTableAndAssessmentPointer(t *testing.T) {
+func TestRuntimeCheckpointMigrationMergesLegacyTables(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000038_add_evaluation_run.up.sql")
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000040_merge_runtime_checkpoint.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(data)
 	for _, token := range []string{
-		"CREATE TABLE IF NOT EXISTS `evaluation_run`",
-		"`run_id`",
+		"CREATE TABLE IF NOT EXISTS `runtime_checkpoint`",
+		"`scope`",
+		"`resource_id`",
 		"`attempt_no`",
-		"`retryable`",
-		"`current_run_id`",
-		"idx_assessment_current_run_id",
+		"INSERT INTO `runtime_checkpoint`",
+		"FROM `evaluation_run`",
+		"FROM `analytics_projector_checkpoint`",
+		"DROP TABLE IF EXISTS `analytics_projector_checkpoint`",
+		"DROP TABLE IF EXISTS `evaluation_run`",
 	} {
 		if !strings.Contains(text, token) {
 			t.Fatalf("migration does not contain %q", token)

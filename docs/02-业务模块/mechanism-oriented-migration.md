@@ -605,3 +605,15 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R113 | 新增 `application/evaluation/consistency`：`Scan` 检测 report 已出站但 MySQL status 未 interpreted、计分产物已落库但 status 仍 submitted；`RepairInterpretedFinalization` 幂等重放 reporting 末步（`ApplyOutcome` + assessment Save）；`evaluation_run` 与 `analytics_projector_checkpoint` 仍未物理合并 |
+
+## Round 114：四机制 Audience / ReportProfile 生产注册（R114）
+
+| 轮次 | 内容 |
+|------|------|
+| R114 | `policy.ReportProfile` 常量与 `ReportProfileForDecisionKind`；`ReportRoutingContextFromOutcome` 按 decision 填充 profile（v1 audience 仍空）；`ExpandAudienceProfileBuilders` 为 scoring/norming/task_performance/typology 注册 participant/clinician/admin/profile 键；clinician 经 `VisibilityPolicy` 过滤 `model_extra`；生产 `buildReportBuilderRegistry` 物化后展开 |
+
+## Round 115：CheckpointSeam 物理合表（R115）
+
+| 轮次 | 内容 |
+|------|------|
+| R115 | migration `000040` 创建 `runtime_checkpoint` 并 backfill `evaluation_run` / `analytics_projector_checkpoint` 后 drop 旧表；`infra/mysql/checkpoint` 实现 `evaluationrun.Repository` + `CheckpointSeam` + analytics projector 幂等；statistics journey 与 evaluation execute/runquery 改读新表；cleanup 脚本同步 |

@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -32,6 +33,7 @@ func MechanismReportBuilderKeyFromRuntimeDescriptorKey(
 		AlgorithmFamily: key.AlgorithmFamily,
 		DecisionKind:    decision,
 		ReportType:      reportType,
+		ReportProfile:   policy.ReportProfileForDecisionKind(decision),
 	}, true
 }
 

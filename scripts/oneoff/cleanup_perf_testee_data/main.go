@@ -565,13 +565,13 @@ func loadEventIDCollation(ctx context.Context, conn *sql.Conn) (string, error) {
 	var collation sql.NullString
 	if err := conn.QueryRowContext(ctx, `
 SELECT COALESCE(
+  MAX(CASE WHEN table_name = 'runtime_checkpoint' THEN collation_name END),
   MAX(CASE WHEN table_name = 'analytics_pending_event' THEN collation_name END),
-  MAX(CASE WHEN table_name = 'analytics_projector_checkpoint' THEN collation_name END),
   MAX(CASE WHEN table_name = 'domain_event_outbox' THEN collation_name END)
 )
 FROM information_schema.columns
 WHERE table_schema = DATABASE()
-  AND table_name IN ('analytics_pending_event', 'analytics_projector_checkpoint', 'domain_event_outbox')
+  AND table_name IN ('analytics_pending_event', 'runtime_checkpoint', 'domain_event_outbox')
   AND column_name = 'event_id'`).Scan(&collation); err != nil {
 		return "", fmt.Errorf("load event_id collation: %w", err)
 	}
@@ -1068,7 +1068,7 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 		{"assessment_episode", `SELECT COUNT(*) FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"analytics_pending_event", `SELECT COUNT(*) FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
-		{"analytics_projector_checkpoint", `SELECT COUNT(*) FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		{"runtime_checkpoint", `SELECT COUNT(*) FROM runtime_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.resource_id WHERE c.scope = 'analytics_projector'`},
 	}
 	legacyItems, err := legacyStatisticsCountItems(ctx, conn)
 	if err != nil {
@@ -1123,7 +1123,7 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 		{"assessment_episode", `SELECT ae.* FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"analytics_pending_event", `SELECT p.* FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
-		{"analytics_projector_checkpoint", `SELECT c.* FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		{"runtime_checkpoint", `SELECT c.* FROM runtime_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.resource_id WHERE c.scope = 'analytics_projector'`},
 	}
 	legacyItems, err := legacyStatisticsBackupItems(ctx, conn)
 	if err != nil {
@@ -1279,7 +1279,7 @@ func mysqlDeleteItems(ctx context.Context, conn *sql.Conn) ([]mysqlDeleteItem, e
 		log.Print("optional mysql table statistics_accumulated does not exist; skip legacy statistics_accumulated delete")
 	}
 	items = append(items,
-		mysqlDeleteItem{"analytics_projector_checkpoint", `DELETE c FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		mysqlDeleteItem{"runtime_checkpoint", `DELETE c FROM runtime_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.resource_id WHERE c.scope = 'analytics_projector'`},
 		mysqlDeleteItem{"analytics_pending_event", `DELETE p FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
 		mysqlDeleteItem{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		mysqlDeleteItem{"behavior_footprint", `DELETE bf FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
@@ -1457,20 +1457,22 @@ LIMIT ?`,
 FROM statistics_accumulated a
 JOIN tmp_cleanup_batch_ids b ON b.id = a.id`,
 		}, true
-	case "analytics_projector_checkpoint":
+	case "runtime_checkpoint":
 		return mysqlChunkedDeleteSpec{
 			name:             name,
 			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_event_ids LIKE tmp_cleanup_event_ids`,
 			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_event_ids`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_event_ids (event_id)
-SELECT c.event_id
-FROM analytics_projector_checkpoint c
-JOIN tmp_cleanup_event_ids x ON x.event_id = c.event_id
-ORDER BY c.event_id
+SELECT c.resource_id
+FROM runtime_checkpoint c
+JOIN tmp_cleanup_event_ids x ON x.event_id = c.resource_id
+WHERE c.scope = 'analytics_projector'
+ORDER BY c.resource_id
 LIMIT ?`,
 			deleteBatch: `DELETE c
-FROM analytics_projector_checkpoint c
-JOIN tmp_cleanup_batch_event_ids b ON b.event_id = c.event_id`,
+FROM runtime_checkpoint c
+JOIN tmp_cleanup_batch_event_ids b ON b.event_id = c.resource_id
+WHERE c.scope = 'analytics_projector'`,
 		}, true
 	case "analytics_pending_event":
 		return mysqlChunkedDeleteSpec{

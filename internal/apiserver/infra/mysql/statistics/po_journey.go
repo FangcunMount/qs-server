@@ -158,23 +158,6 @@ func assessmentEpisodeFromDomain(e *domainStatistics.AssessmentEpisode) *Assessm
 	}
 }
 
-const (
-	AnalyticsProjectorCheckpointStatusProcessing = "processing"
-	AnalyticsProjectorCheckpointStatusCompleted  = "completed"
-	AnalyticsProjectorCheckpointStatusPending    = "pending"
-)
-
-type AnalyticsProjectorCheckpointPO struct {
-	EventID   string         `gorm:"column:event_id;size:128;primaryKey"`
-	EventType string         `gorm:"column:event_type;size:128;not null"`
-	Status    string         `gorm:"column:status;size:32;not null;index"`
-	CreatedAt time.Time      `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
-}
-
-func (AnalyticsProjectorCheckpointPO) TableName() string { return "analytics_projector_checkpoint" }
-
 type AnalyticsPendingEventPO struct {
 	EventID       string         `gorm:"column:event_id;size:128;primaryKey"`
 	EventType     string         `gorm:"column:event_type;size:128;not null;index"`

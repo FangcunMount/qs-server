@@ -23,8 +23,7 @@ type CheckpointRecord struct {
 	ErrorMessage string
 }
 
-// CheckpointSeam documents the convergence target between evaluation_run and statistics projector checkpoints.
-// Table merge is deferred; callers should treat this as the contract for future unification.
+// CheckpointSeam is the unified persistence contract for evaluation runs and analytics projector checkpoints.
 type CheckpointSeam interface {
 	Begin(scope CheckpointScope, resourceID string, attemptNo int) (bool, error)
 	Complete(scope CheckpointScope, resourceID string, attemptNo int, status string, retryable bool, errCode, errMsg string) error

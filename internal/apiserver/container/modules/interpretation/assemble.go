@@ -144,7 +144,8 @@ func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegi
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}
-	registry, err := interpretationreporting.NewReportBuilderRegistry(builders...)
+	expanded := interpretationreporting.ExpandAudienceProfileBuilders(builders...)
+	registry, err := interpretationreporting.NewReportBuilderRegistry(expanded...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report builder registry: %v", err)
 	}
