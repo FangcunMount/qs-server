@@ -45,8 +45,12 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if !ok || scaleSnapshot == nil {
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
-	return e.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
+	outcome, err := e.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
 		Assessment: input.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(input.Input, scaleSnapshot),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return NormalizeOutcome(outcome), nil
 }
