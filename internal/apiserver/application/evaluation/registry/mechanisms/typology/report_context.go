@@ -2,6 +2,7 @@ package typology
 
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -11,9 +12,6 @@ func resolveReportBuildContext(
 	runner algorithmRunner,
 	outcome evaloutcome.Outcome,
 ) (modeltypology.ReportSpec, modeltypology.OutcomeMappingSpec, modelcatalog.DecisionKind) {
-	var spec modeltypology.ReportSpec
-	mapping := modeltypology.OutcomeMappingSpec{}
-	decisionKind := modelcatalog.DecisionKind("")
 	if outcome.Input != nil {
 		if payload, ok := port.TypologyPayload(outcome.Input); ok && payload != nil {
 			if runtimeSpec, err := payload.ToRuntimeSpec(); err == nil {
@@ -29,10 +27,9 @@ func resolveReportBuildContext(
 		algorithm = legacyAlgorithmFromOutcome(outcome)
 	}
 	if algorithm != "" {
-		spec = ReportSpecForAlgorithm(algorithm)
-		mapping = OutcomeMappingForAlgorithm(algorithm)
+		return typologylegacy.ReportBuildContextFromAlgorithm(algorithm)
 	}
-	return spec, mapping, decisionKind
+	return modeltypology.ReportSpec{}, modeltypology.OutcomeMappingSpec{}, ""
 }
 
 func legacyAlgorithmFromOutcome(outcome evaloutcome.Outcome) modelcatalog.Algorithm {

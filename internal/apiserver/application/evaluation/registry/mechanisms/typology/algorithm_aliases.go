@@ -2,7 +2,6 @@ package typology
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 var defaultAlgorithmAliases = []modelcatalog.Algorithm{
@@ -30,14 +29,4 @@ func CategoryLabelFor(algorithm modelcatalog.Algorithm) string {
 	default:
 		return "MBTI"
 	}
-}
-
-// ReportSpecForAlgorithm derives report spec from legacy algorithm identifiers.
-func ReportSpecForAlgorithm(algorithm modelcatalog.Algorithm) modeltypology.ReportSpec {
-	return modeltypology.LegacyReportSpecFromAlgorithm(algorithm)
-}
-
-// OutcomeMappingForAlgorithm derives outcome mapping from legacy algorithm identifiers.
-func OutcomeMappingForAlgorithm(algorithm modelcatalog.Algorithm) modeltypology.OutcomeMappingSpec {
-	return modeltypology.LegacyOutcomeMappingFromAlgorithm(algorithm)
 }

@@ -3,6 +3,7 @@ package typology
 import (
 	"testing"
 
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
@@ -18,12 +19,18 @@ func TestPersonalityTypeTemplateForSpecCharacterization(t *testing.T) {
 	}{
 		{
 			name: "mbti via template_id",
-			spec: ReportSpecForAlgorithm(modelcatalog.AlgorithmMBTI),
+			spec: func() modeltypology.ReportSpec {
+				s, _, _ := typologylegacy.ReportBuildContextFromAlgorithm(modelcatalog.AlgorithmMBTI)
+				return s
+			}(),
 			want: "mbti",
 		},
 		{
 			name: "sbti via template_id",
-			spec: ReportSpecForAlgorithm(modelcatalog.AlgorithmSBTI),
+			spec: func() modeltypology.ReportSpec {
+				s, _, _ := typologylegacy.ReportBuildContextFromAlgorithm(modelcatalog.AlgorithmSBTI)
+				return s
+			}(),
 			want: "sbti",
 		},
 	}
@@ -39,7 +46,8 @@ func TestPersonalityTypeTemplateForSpecCharacterization(t *testing.T) {
 	}
 
 	legacyMBTI := reporttypology.MBTIPersonalityTypeTemplate()
-	derivedMBTI := personalityTypeTemplateForSpec(ReportSpecForAlgorithm(modelcatalog.AlgorithmMBTI))
+	mbtiSpec, _, _ := typologylegacy.ReportBuildContextFromAlgorithm(modelcatalog.AlgorithmMBTI)
+	derivedMBTI := personalityTypeTemplateForSpec(mbtiSpec)
 	if derivedMBTI.Kind != legacyMBTI.Kind || derivedMBTI.DefaultModelCode != legacyMBTI.DefaultModelCode {
 		t.Fatalf("derived MBTI template drifted from legacy fixture")
 	}
@@ -48,8 +56,8 @@ func TestPersonalityTypeTemplateForSpecCharacterization(t *testing.T) {
 func TestTraitProfileTemplateForSpecCharacterization(t *testing.T) {
 	t.Parallel()
 
-	spec := ReportSpecForAlgorithm(modelcatalog.AlgorithmBigFive)
-	tmpl := traitProfileTemplateForSpec(spec)
+	bigFiveSpec, _, _ := typologylegacy.ReportBuildContextFromAlgorithm(modelcatalog.AlgorithmBigFive)
+	tmpl := traitProfileTemplateForSpec(bigFiveSpec)
 	if tmpl.Kind != "bigfive" {
 		t.Fatalf("template kind = %q, want bigfive", tmpl.Kind)
 	}

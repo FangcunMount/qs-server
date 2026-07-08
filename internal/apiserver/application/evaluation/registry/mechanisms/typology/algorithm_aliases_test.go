@@ -3,6 +3,7 @@ package typology
 import (
 	"testing"
 
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
@@ -24,7 +25,7 @@ func TestCategoryLabelForLegacyAlgorithms(t *testing.T) {
 }
 
 func TestReportSpecForAlgorithmUsesLegacyDerivation(t *testing.T) {
-	spec := ReportSpecForAlgorithm(modelcatalog.AlgorithmBigFive)
+	spec, _, _ := typologylegacy.ReportBuildContextFromAlgorithm(modelcatalog.AlgorithmBigFive)
 	if spec.AdapterKey != modeltypology.ReportAdapterTraitProfile {
 		t.Fatalf("adapter = %s, want trait_profile", spec.AdapterKey)
 	}
