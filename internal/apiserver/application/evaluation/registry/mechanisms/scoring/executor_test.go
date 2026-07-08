@@ -9,8 +9,7 @@ import (
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -126,7 +125,7 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 
 func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	validator := &stubValidator{}
-	handler := domainfactor_scoring.NewHandler(stubScoringRegistry{})
+	handler := calcscoring.NewEvaluator(stubScoringRegistry{})
 	executor := NewExecutorWithDeps(validator, handler)
 
 	a, _ := assessment.NewAssessment(

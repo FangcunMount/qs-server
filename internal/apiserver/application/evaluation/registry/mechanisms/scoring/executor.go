@@ -8,7 +8,6 @@ import (
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -16,7 +15,7 @@ import (
 // Executor 运行因子计分 评估s。
 type Executor struct {
 	validator InputValidator
-	handler   *domainfactor_scoring.Handler
+	evaluator *calcscoring.Evaluator
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
@@ -25,21 +24,21 @@ var _ evaluationexecute.Evaluator = (*Executor)(nil)
 func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return NewExecutorWithDeps(
 		DefaultInputValidator{},
-		domainfactor_scoring.NewHandler(scoringRegistry{scorer: scorer}),
+		calcscoring.NewEvaluator(scoringRegistry{scorer: scorer}),
 	)
 }
 
 // NewExecutorWithDeps 创建executor 使用 replaceable dependencies (tests)。
-func NewExecutorWithDeps(validator InputValidator, handler *domainfactor_scoring.Handler) *Executor {
+func NewExecutorWithDeps(validator InputValidator, evaluator *calcscoring.Evaluator) *Executor {
 	if validator == nil {
 		validator = DefaultInputValidator{}
 	}
-	if handler == nil {
-		handler = domainfactor_scoring.NewDefaultHandler()
+	if evaluator == nil {
+		evaluator = calcscoring.NewDefaultEvaluator()
 	}
 	return &Executor{
 		validator: validator,
-		handler:   handler,
+		evaluator: evaluator,
 	}
 }
 
@@ -56,7 +55,7 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 }
 
 func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
-	if e == nil || e.handler == nil {
+	if e == nil || e.evaluator == nil {
 		return nil, fmt.Errorf("factor_scoring evaluation executor is not configured")
 	}
 	executionInput := ExecutionInput{
@@ -66,7 +65,7 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if err := e.validator.Validate(executionInput); err != nil {
 		return nil, err
 	}
-	result, err := e.handler.Score(ctx, evaluateInputFromSnapshot(input.Input))
+	result, err := e.evaluator.Score(ctx, calcInputFromSnapshot(input.Input))
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +78,7 @@ type scoringRegistry struct {
 
 func (r scoringRegistry) ScoreFactor(ctx context.Context, factor calcscoring.Factor, values []float64) (float64, error) {
 	if r.scorer == nil {
-		return domainfactor_scoring.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+		return calcscoring.DefaultStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, factor.Code, values, factor.ScoringStrategy, nil)
 }

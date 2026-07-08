@@ -1,13 +1,13 @@
 package calculationadapter
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
 )
 
 // AssessmentOutcomeFromScaleInterpretation maps scale scoring output to a canonical assessment outcome.
 func AssessmentOutcomeFromScaleInterpretation(
-	result *domainfactor_scoring.ScaleInterpretationResult,
+	result *scoring.Result,
 	modelRef assessment.EvaluationModelRef,
 ) *assessment.AssessmentOutcome {
 	if result == nil {
@@ -42,7 +42,7 @@ func AssessmentOutcomeFromScaleInterpretation(
 	return outcome
 }
 
-func factorScoreResultsFromInterpretation(result *domainfactor_scoring.ScaleInterpretationResult) []assessment.FactorScoreResult {
+func factorScoreResultsFromInterpretation(result *scoring.Result) []assessment.FactorScoreResult {
 	factorScores := make([]assessment.FactorScoreResult, 0, len(result.FactorScores))
 	for _, fs := range result.FactorScores {
 		factorScores = append(factorScores, assessment.NewFactorScoreResult(
