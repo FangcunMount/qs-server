@@ -91,8 +91,8 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetBehavioralRatingByRef: %v", err)
 	}
-	if got.Brief2 == nil || got.Brief2.FormVariant != "parent" {
-		t.Fatalf("brief2 profile = %#v", got.Brief2)
+	if got.Norming == nil || got.Norming.Variant != "parent" {
+		t.Fatalf("norming profile = %#v", got.Norming)
 	}
 }
 

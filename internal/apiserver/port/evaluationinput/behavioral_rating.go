@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 )
 
 const EvaluationModelKindBehavioralRating EvaluationModelKind = "behavioral_rating"
@@ -24,7 +24,7 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot) *Mo
 	}
 	version := snapshot.Version
 	algorithm := string(modelcatalog.AlgorithmBehavioralRatingDefault)
-	if snapshot.Brief2 != nil {
+	if snapshot.Norming != nil {
 		algorithm = string(modelcatalog.AlgorithmBrief2)
 	}
 	return &ModelSnapshot{

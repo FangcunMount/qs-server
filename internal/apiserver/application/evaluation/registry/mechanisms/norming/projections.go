@@ -5,7 +5,7 @@ import (
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/projection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 )
 
 // ApplyFactorProjections 补充原始 scale 结果 使用 复合 rollup 和 常模 投影。

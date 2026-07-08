@@ -6,7 +6,7 @@ import (
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -20,7 +20,7 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 		}},
 	}
 	snapshot := &behavioralsnapshot.Snapshot{
-		Brief2: &behavioralsnapshot.Brief2Profile{
+		Norming: &behavioralsnapshot.NormingProfile{
 			NormTables: &calcnorm.NormTables{
 				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",

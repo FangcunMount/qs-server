@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -27,17 +27,17 @@ func enrichNormCalcResult(
 	snapshot *behavioralsnapshot.Snapshot,
 	subject calcnorm.Subject,
 ) *calculation.Result {
-	if calcResult == nil || snapshot == nil || snapshot.Brief2 == nil {
+	if calcResult == nil || snapshot == nil || snapshot.Norming == nil {
 		return calcResult
 	}
-	tables := snapshot.Brief2.NormTablesOrNil()
+	tables := snapshot.Norming.NormTablesOrNil()
 	if tables == nil {
 		return calcResult
 	}
 	return calcnorm.Projection{
 		Tables:               tables,
 		Subject:              subject,
-		PrimaryDimensionCode: snapshot.Brief2.PrimaryDimensionCode,
+		PrimaryDimensionCode: snapshot.Norming.PrimaryDimensionCode,
 	}.Apply(calcResult)
 }
 

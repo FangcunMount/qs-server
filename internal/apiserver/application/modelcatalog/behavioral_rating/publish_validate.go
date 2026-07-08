@@ -2,8 +2,8 @@ package behavioral_rating
 
 import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 )
 
 func validatePublishedScoreNodes(snapshot *domain.PublishedModelSnapshot) error {
