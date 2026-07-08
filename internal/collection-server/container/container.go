@@ -46,12 +46,12 @@ type Container struct {
 	IAMModule *IAMModule
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
-	answerSheetClient      *grpcclient.AnswerSheetClient
-	questionnaireClient    *grpcclient.QuestionnaireClient
-	evaluationClient       *grpcclient.EvaluationClient
-	actorClient            *grpcclient.ActorClient
-	scaleClient            *grpcclient.ScaleClient
-	personalityModelClient *grpcclient.PersonalityModelClient
+	answerSheetClient   *grpcclient.AnswerSheetClient
+	questionnaireClient *grpcclient.QuestionnaireClient
+	evaluationClient    *grpcclient.EvaluationClient
+	actorClient         *grpcclient.ActorClient
+	scaleClient         *grpcclient.ScaleClient
+	typologyModelClient *grpcclient.TypologyModelClient
 
 	// 应用层服务
 	submissionService                 *answersheet.SubmissionService
@@ -59,7 +59,7 @@ type Container struct {
 	evaluationQueryService            *evaluation.QueryService
 	waitReportService                 *reportwait.Service
 	scaleQueryService                 *scale.QueryService
-	personalityModelQueryService      *typologymodel.QueryService
+	typologyModelQueryService         *typologymodel.QueryService
 	personalityAssessmentQueryService *typologyassessment.QueryService
 	personalitySessionService         *personalitysession.Service
 	testeeService                     *testee.Service
@@ -71,15 +71,15 @@ type Container struct {
 	l1PeekRegistry                    *catalogpeek.Registry
 
 	// 接口层处理器
-	answerSheetHandler                  *handler.AnswerSheetHandler
-	questionnaireHandler                *handler.QuestionnaireHandler
-	evaluationHandler                   *handler.EvaluationHandler
-	scaleHandler                        *handler.ScaleHandler
-	personalityModelHandler             *handler.PersonalityModelHandler
-	personalityAssessmentHandler        *handler.PersonalityAssessmentHandler
-	personalityAssessmentSessionHandler *handler.PersonalityAssessmentSessionHandler
-	testeeHandler                       *handler.TesteeHandler
-	healthHandler                       *handler.HealthHandler
+	answerSheetHandler               *handler.AnswerSheetHandler
+	questionnaireHandler             *handler.QuestionnaireHandler
+	evaluationHandler                *handler.EvaluationHandler
+	scaleHandler                     *handler.ScaleHandler
+	typologyModelHandler             *handler.TypologyModelHandler
+	typologyAssessmentHandler        *handler.TypologyAssessmentHandler
+	typologyAssessmentSessionHandler *handler.TypologyAssessmentSessionHandler
+	testeeHandler                    *handler.TesteeHandler
+	healthHandler                    *handler.HealthHandler
 
 	queryConcurrencyGate      *concurrency.Gate
 	catalogConcurrencyGate    *concurrency.Gate
@@ -90,12 +90,12 @@ type Container struct {
 // ClientBundle is the collection-server runtime client graph produced by the
 // gRPC integration stage and consumed by the container composition root.
 type ClientBundle struct {
-	AnswerSheet      *grpcclient.AnswerSheetClient
-	Questionnaire    *grpcclient.QuestionnaireClient
-	Evaluation       *grpcclient.EvaluationClient
-	Actor            *grpcclient.ActorClient
-	Scale            *grpcclient.ScaleClient
-	PersonalityModel *grpcclient.PersonalityModelClient
+	AnswerSheet   *grpcclient.AnswerSheetClient
+	Questionnaire *grpcclient.QuestionnaireClient
+	Evaluation    *grpcclient.EvaluationClient
+	Actor         *grpcclient.ActorClient
+	Scale         *grpcclient.ScaleClient
+	TypologyModel *grpcclient.TypologyModelClient
 }
 
 // NewContainer 创建新的容器
@@ -157,8 +157,8 @@ func (c *Container) Initialize() error {
 	// 2. 初始化接口层
 	c.initHandlers()
 
-	if c.scaleClient != nil && c.personalityModelClient != nil {
-		catalogcache.WarmCatalogOnStartup(c.scaleQueryService, c.personalityModelQueryService)
+	if c.scaleClient != nil && c.typologyModelClient != nil {
+		catalogcache.WarmCatalogOnStartup(c.scaleQueryService, c.typologyModelQueryService)
 	}
 
 	c.initialized = true
@@ -179,7 +179,7 @@ func (c *Container) initApplicationServices() {
 	catalogRuntime := c.buildCatalogRuntime()
 	c.questionnaireQueryService = catalogRuntime.questionnaire
 	c.scaleQueryService = catalogRuntime.scale
-	c.personalityModelQueryService = catalogRuntime.personality
+	c.typologyModelQueryService = catalogRuntime.personality
 
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
@@ -195,7 +195,7 @@ func (c *Container) initApplicationServices() {
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
 		c.waitReportService,
 	)
-	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
+	c.personalitySessionService = personalitysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
 	c.reportEventsHandler = c.buildReportEventsHandler()
 
@@ -216,9 +216,9 @@ func (c *Container) initHandlers() {
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService, c.waitReportService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
-	c.personalityModelHandler = handler.NewPersonalityModelHandler(c.personalityModelQueryService)
-	c.personalityAssessmentHandler = handler.NewPersonalityAssessmentHandler(c.personalityAssessmentQueryService, c.waitReportService)
-	c.personalityAssessmentSessionHandler = handler.NewPersonalityAssessmentSessionHandler(c.personalitySessionService)
+	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
+	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.personalityAssessmentQueryService, c.waitReportService)
+	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.personalitySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 
@@ -275,19 +275,19 @@ func (c *Container) ScaleHandler() *handler.ScaleHandler {
 	return c.scaleHandler
 }
 
-// PersonalityModelHandler 获取人格测评模型处理器
-func (c *Container) PersonalityModelHandler() *handler.PersonalityModelHandler {
-	return c.personalityModelHandler
+// TypologyModelHandler 获取人格测评模型处理器
+func (c *Container) TypologyModelHandler() *handler.TypologyModelHandler {
+	return c.typologyModelHandler
 }
 
-// PersonalityAssessmentSessionHandler 获取人格测评会话处理器
-func (c *Container) PersonalityAssessmentSessionHandler() *handler.PersonalityAssessmentSessionHandler {
-	return c.personalityAssessmentSessionHandler
+// TypologyAssessmentSessionHandler 获取人格测评会话处理器
+func (c *Container) TypologyAssessmentSessionHandler() *handler.TypologyAssessmentSessionHandler {
+	return c.typologyAssessmentSessionHandler
 }
 
-// PersonalityAssessmentHandler 获取人格测评处理器
-func (c *Container) PersonalityAssessmentHandler() *handler.PersonalityAssessmentHandler {
-	return c.personalityAssessmentHandler
+// TypologyAssessmentHandler 获取人格测评处理器
+func (c *Container) TypologyAssessmentHandler() *handler.TypologyAssessmentHandler {
+	return c.typologyAssessmentHandler
 }
 
 // RateLimitOptions 获取限流配置
@@ -335,11 +335,11 @@ func (c *Container) ScaleQueryService() *scale.QueryService {
 	return c.scaleQueryService
 }
 
-func (c *Container) PersonalityModelQueryService() *typologymodel.QueryService {
+func (c *Container) TypologyModelQueryService() *typologymodel.QueryService {
 	if c == nil {
 		return nil
 	}
-	return c.personalityModelQueryService
+	return c.typologyModelQueryService
 }
 
 func (c *Container) QuestionnaireQueryService() *questionnaire.QueryService {
@@ -444,7 +444,7 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.evaluationClient = bundle.Evaluation
 	c.actorClient = bundle.Actor
 	c.scaleClient = bundle.Scale
-	c.personalityModelClient = bundle.PersonalityModel
+	c.typologyModelClient = bundle.TypologyModel
 }
 
 // ActorClient 获取 Actor 客户端

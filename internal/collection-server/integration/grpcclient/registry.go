@@ -29,12 +29,12 @@ func NewRegistry(manager *grpcclient.Manager) *GRPCClientRegistry {
 func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 	log.Info("🔧 Building collection gRPC client bundle...")
 	bundle := container.ClientBundle{
-		AnswerSheet:      r.answerSheetClient(),
-		Questionnaire:    r.questionnaireClient(),
-		Evaluation:       r.evaluationClient(),
-		Actor:            r.actorClient(),
-		Scale:            r.scaleClient(),
-		PersonalityModel: r.personalityModelClient(),
+		AnswerSheet:   r.answerSheetClient(),
+		Questionnaire: r.questionnaireClient(),
+		Evaluation:    r.evaluationClient(),
+		Actor:         r.actorClient(),
+		Scale:         r.scaleClient(),
+		TypologyModel: r.typologyModelClient(),
 	}
 	log.Info("✅ Collection gRPC client bundle built")
 	return bundle
@@ -90,13 +90,13 @@ func (r *GRPCClientRegistry) scaleClient() *grpcclient.ScaleClient {
 	return client
 }
 
-func (r *GRPCClientRegistry) personalityModelClient() *grpcclient.PersonalityModelClient {
-	client := r.manager.PersonalityModelClient()
+func (r *GRPCClientRegistry) typologyModelClient() *grpcclient.TypologyModelClient {
+	client := r.manager.TypologyModelClient()
 	if client == nil {
-		log.Warn("Personality model client is not initialized, skipping registration")
+		log.Warn("Typology model client is not initialized, skipping registration")
 		return nil
 	}
-	log.Info("   📊 Personality model client added to bundle")
+	log.Info("   📊 Typology model client added to bundle")
 	return client
 }
 

@@ -9,10 +9,10 @@ import (
 )
 
 type fakeModelReader struct {
-	model *typologymodel.PersonalityModelResponse
+	model *typologymodel.TypologyModelResponse
 }
 
-func (f *fakeModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
+func (f *fakeModelReader) Get(context.Context, string) (*typologymodel.TypologyModelResponse, error) {
 	return f.model, nil
 }
 
@@ -26,7 +26,7 @@ func (f *fakeQuestionnaireReader) Get(context.Context, string, string) (*questio
 
 func TestServiceStartReturnsBoundQuestionnaire(t *testing.T) {
 	svc := NewService(
-		&fakeModelReader{model: &typologymodel.PersonalityModelResponse{
+		&fakeModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 "MBTI_OEJTS",
 			Version:              "1.0.0",
 			Title:                "MBTI",

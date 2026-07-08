@@ -3,17 +3,17 @@ package grpcclient
 import (
 	"context"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/personalitymodel"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/typologymodel"
 )
 
-type PersonalityModelOutput struct {
-	Summary        PersonalityModelSummaryOutput
+type TypologyModelOutput struct {
+	Summary        TypologyModelSummaryOutput
 	DimensionOrder []string
-	Dimensions     []PersonalityDimensionOutput
-	Outcomes       []PersonalityOutcomeSummaryOutput
+	Dimensions     []TypologyDimensionOutput
+	Outcomes       []TypologyOutcomeSummaryOutput
 }
 
-type PersonalityModelSummaryOutput struct {
+type TypologyModelSummaryOutput struct {
 	Code                 string
 	Version              string
 	Title                string
@@ -31,49 +31,49 @@ type PersonalityModelSummaryOutput struct {
 	DecisionKind         string
 }
 
-type PersonalityDimensionOutput struct {
+type TypologyDimensionOutput struct {
 	Code      string
 	Name      string
 	LeftPole  string
 	RightPole string
 }
 
-type PersonalityOutcomeSummaryOutput struct {
+type TypologyOutcomeSummaryOutput struct {
 	Code     string
 	Name     string
 	OneLiner string
 	ImageURL string
 }
 
-type ListPersonalityModelsOutput struct {
-	Models     []PersonalityModelSummaryOutput
+type ListTypologyModelsOutput struct {
+	Models     []TypologyModelSummaryOutput
 	Total      int64
 	Page       int32
 	PageSize   int32
 	TotalPages int32
 }
 
-type PersonalityModelCategoriesOutput struct {
+type TypologyModelCategoriesOutput struct {
 	Categories []CategoryOutput
 }
 
-type PersonalityModelClient struct {
+type TypologyModelClient struct {
 	client     *Client
-	grpcClient pb.PersonalityModelServiceClient
+	grpcClient pb.TypologyModelServiceClient
 }
 
-func NewPersonalityModelClient(client *Client) *PersonalityModelClient {
-	return &PersonalityModelClient{
+func NewTypologyModelClient(client *Client) *TypologyModelClient {
+	return &TypologyModelClient{
 		client:     client,
-		grpcClient: pb.NewPersonalityModelServiceClient(client.Conn()),
+		grpcClient: pb.NewTypologyModelServiceClient(client.Conn()),
 	}
 }
 
-func (c *PersonalityModelClient) GetPersonalityModel(ctx context.Context, code string) (*PersonalityModelOutput, error) {
+func (c *TypologyModelClient) GetTypologyModel(ctx context.Context, code string) (*TypologyModelOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.GetPersonalityModel(ctx, &pb.GetPersonalityModelRequest{Code: code})
+	resp, err := c.grpcClient.GetTypologyModel(ctx, &pb.GetTypologyModelRequest{Code: code})
 	if err != nil {
 		return nil, err
 	}
@@ -81,14 +81,14 @@ func (c *PersonalityModelClient) GetPersonalityModel(ctx context.Context, code s
 	if model == nil {
 		return nil, nil
 	}
-	return convertPersonalityModel(model), nil
+	return convertTypologyModel(model), nil
 }
 
-func (c *PersonalityModelClient) ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListPersonalityModelsOutput, error) {
+func (c *TypologyModelClient) ListTypologyModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListTypologyModelsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.ListPersonalityModels(ctx, &pb.ListPersonalityModelsRequest{
+	resp, err := c.grpcClient.ListTypologyModels(ctx, &pb.ListTypologyModelsRequest{
 		Page:      page,
 		PageSize:  pageSize,
 		Algorithm: algorithm,
@@ -96,11 +96,11 @@ func (c *PersonalityModelClient) ListPersonalityModels(ctx context.Context, page
 	if err != nil {
 		return nil, err
 	}
-	models := make([]PersonalityModelSummaryOutput, 0, len(resp.GetModels()))
+	models := make([]TypologyModelSummaryOutput, 0, len(resp.GetModels()))
 	for _, model := range resp.GetModels() {
-		models = append(models, convertPersonalityModelSummary(model))
+		models = append(models, convertTypologyModelSummary(model))
 	}
-	return &ListPersonalityModelsOutput{
+	return &ListTypologyModelsOutput{
 		Models:     models,
 		Total:      resp.GetTotal(),
 		Page:       resp.GetPage(),
@@ -109,11 +109,11 @@ func (c *PersonalityModelClient) ListPersonalityModels(ctx context.Context, page
 	}, nil
 }
 
-func (c *PersonalityModelClient) GetPersonalityModelCategories(ctx context.Context) (*PersonalityModelCategoriesOutput, error) {
+func (c *TypologyModelClient) GetTypologyModelCategories(ctx context.Context) (*TypologyModelCategoriesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.GetPersonalityModelCategories(ctx, &pb.GetPersonalityModelCategoriesRequest{})
+	resp, err := c.grpcClient.GetTypologyModelCategories(ctx, &pb.GetTypologyModelCategoriesRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -124,44 +124,44 @@ func (c *PersonalityModelClient) GetPersonalityModelCategories(ctx context.Conte
 			Label: item.GetLabel(),
 		})
 	}
-	return &PersonalityModelCategoriesOutput{Categories: categories}, nil
+	return &TypologyModelCategoriesOutput{Categories: categories}, nil
 }
 
-func convertPersonalityModel(model *pb.PersonalityModel) *PersonalityModelOutput {
+func convertTypologyModel(model *pb.TypologyModel) *TypologyModelOutput {
 	if model == nil {
 		return nil
 	}
-	dimensions := make([]PersonalityDimensionOutput, 0, len(model.GetDimensions()))
+	dimensions := make([]TypologyDimensionOutput, 0, len(model.GetDimensions()))
 	for _, dim := range model.GetDimensions() {
-		dimensions = append(dimensions, PersonalityDimensionOutput{
+		dimensions = append(dimensions, TypologyDimensionOutput{
 			Code:      dim.GetCode(),
 			Name:      dim.GetName(),
 			LeftPole:  dim.GetLeftPole(),
 			RightPole: dim.GetRightPole(),
 		})
 	}
-	outcomes := make([]PersonalityOutcomeSummaryOutput, 0, len(model.GetOutcomes()))
+	outcomes := make([]TypologyOutcomeSummaryOutput, 0, len(model.GetOutcomes()))
 	for _, outcome := range model.GetOutcomes() {
-		outcomes = append(outcomes, PersonalityOutcomeSummaryOutput{
+		outcomes = append(outcomes, TypologyOutcomeSummaryOutput{
 			Code:     outcome.GetCode(),
 			Name:     outcome.GetName(),
 			OneLiner: outcome.GetOneLiner(),
 			ImageURL: outcome.GetImageUrl(),
 		})
 	}
-	return &PersonalityModelOutput{
-		Summary:        convertPersonalityModelSummary(model.GetSummary()),
+	return &TypologyModelOutput{
+		Summary:        convertTypologyModelSummary(model.GetSummary()),
 		DimensionOrder: append([]string(nil), model.GetDimensionOrder()...),
 		Dimensions:     dimensions,
 		Outcomes:       outcomes,
 	}
 }
 
-func convertPersonalityModelSummary(summary *pb.PersonalityModelSummary) PersonalityModelSummaryOutput {
+func convertTypologyModelSummary(summary *pb.TypologyModelSummary) TypologyModelSummaryOutput {
 	if summary == nil {
-		return PersonalityModelSummaryOutput{}
+		return TypologyModelSummaryOutput{}
 	}
-	return PersonalityModelSummaryOutput{
+	return TypologyModelSummaryOutput{
 		Code:                 summary.GetCode(),
 		Version:              summary.GetVersion(),
 		Title:                summary.GetTitle(),

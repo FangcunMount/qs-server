@@ -153,8 +153,8 @@ EvaluatorKey
 需要特别注意：
 
 ```text
-scale/personalitymodel 是 modelcatalog 的 legacy register name；
-application/scale 和 application/personalitymodel 是旧能力路径；
+scale/typologymodel 是 modelcatalog 的 legacy register name（R108 后 `personalitymodel` 注册名已改为 `typologymodel`）；
+application/scale 与 collection `application/typologymodel` 等为能力路径；
 它们不再表示文档层的独立核心模块。
 ```
 
@@ -419,7 +419,7 @@ modelcatalog
 report
 statistics
 application/scale
-application/personalitymodel
+application/modelcatalog/typology/consumer
 ```
 
 如果马上把它们改成：
@@ -510,7 +510,7 @@ statistic
 - `internal/apiserver/domain/modelcatalog/scale`
 - `internal/apiserver/application/modelcatalog`
 - `internal/apiserver/application/scale`
-- `internal/apiserver/application/personalitymodel`
+- `internal/apiserver/application/modelcatalog/typology/consumer`
 - `internal/apiserver/port/modelcatalog`
 
 ### Evaluation

@@ -10896,6 +10896,9 @@ const docTemplate = `{
                 "finished_at": {
                     "type": "string"
                 },
+                "input_snapshot_ref": {
+                    "type": "string"
+                },
                 "retryable": {
                     "type": "boolean"
                 },
@@ -11136,10 +11139,16 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
                     "type": "string"
                 },
                 "sub_kind": {
@@ -11607,6 +11616,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "finished_at": {
+                    "type": "string"
+                },
+                "input_snapshot_ref": {
                     "type": "string"
                 },
                 "org_id": {

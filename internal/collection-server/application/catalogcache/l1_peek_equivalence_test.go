@@ -28,7 +28,7 @@ func TestL1PeekEquivalencePersonalityDetailSmoke(t *testing.T) {
 
 	cache := typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 8})
 	svc := typologymodel.NewQueryService(nil, cache, false)
-	cache.SetDetail("p", &typologymodel.PersonalityModelResponse{Code: "p"})
+	cache.SetDetail("p", &typologymodel.TypologyModelResponse{Code: "p"})
 	if !svc.HasCachedDetail("p") {
 		t.Fatal("expected personality peek equivalence")
 	}

@@ -7319,6 +7319,8 @@ components:
           type: string
         finished_at:
           type: string
+        input_snapshot_ref:
+          type: string
         retryable:
           type: boolean
         run_id:
@@ -7483,9 +7485,13 @@ components:
       properties:
         algorithm:
           type: string
+        algorithm_family:
+          type: string
         code:
           type: string
         kind:
+          type: string
+        product_channel:
           type: string
         sub_kind:
           type: string
@@ -7808,6 +7814,8 @@ components:
         error_message:
           type: string
         finished_at:
+          type: string
+        input_snapshot_ref:
           type: string
         org_id:
           type: integer

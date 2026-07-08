@@ -212,13 +212,13 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportGRPCDeps()
 		deps.Scale = exports.Scale
-		deps.PersonalityModel = exports.PersonalityModel
+		deps.TypologyModel = exports.TypologyModel
 	} else {
 		if c.ScaleModule != nil {
 			deps.Scale = c.ScaleModule.ExportGRPCDeps()
 		}
-		if c.PersonalityModelModule != nil {
-			deps.PersonalityModel = c.PersonalityModelModule.ExportGRPCDeps()
+		if c.TypologyModelModule != nil {
+			deps.TypologyModel = c.TypologyModelModule.ExportGRPCDeps()
 		}
 	}
 	if c.PlanModule != nil {

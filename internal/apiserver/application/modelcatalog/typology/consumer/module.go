@@ -31,23 +31,4 @@ type (
 	TypologyModelResult            = shared.TypologyModelResult
 	TypologyModelCategoryResult    = shared.TypologyModelCategoryResult
 	TypologyModelCategoriesResult  = shared.TypologyModelCategoriesResult
-
-	// Deprecated: use TypologyModelQueryService.
-	PersonalityModelQueryService = TypologyModelQueryService
-	// Deprecated: use ListTypologyModelsDTO.
-	ListPersonalityModelsDTO = ListTypologyModelsDTO
-	// Deprecated: use TypologyModelSummaryResult.
-	PersonalityModelSummaryResult = TypologyModelSummaryResult
-	// Deprecated: use TypologyModelSummaryListResult.
-	PersonalityModelSummaryListResult = TypologyModelSummaryListResult
-	// Deprecated: use TypologyDimensionResult.
-	PersonalityDimensionResult = TypologyDimensionResult
-	// Deprecated: use TypologyOutcomeSummaryResult.
-	PersonalityOutcomeSummaryResult = TypologyOutcomeSummaryResult
-	// Deprecated: use TypologyModelResult.
-	PersonalityModelResult = TypologyModelResult
-	// Deprecated: use TypologyModelCategoryResult.
-	PersonalityModelCategoryResult = TypologyModelCategoryResult
-	// Deprecated: use TypologyModelCategoriesResult.
-	PersonalityModelCategoriesResult = TypologyModelCategoriesResult
 )

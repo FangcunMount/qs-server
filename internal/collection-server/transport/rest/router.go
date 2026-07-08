@@ -105,12 +105,12 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	// 量表相关路由
 	r.registerScaleRoutes(api)
 
-	// 人格测评模型相关路由
-	r.registerPersonalityModelRoutes(api)
+	// 类型学模型相关路由
+	r.registerTypologyModelRoutes(api)
 
-	// 人格测评相关路由
-	r.registerPersonalityAssessmentRoutes(api)
-	r.registerPersonalityAssessmentSessionRoutes(api)
+	// 类型学测评相关路由
+	r.registerTypologyAssessmentRoutes(api)
+	r.registerTypologyAssessmentSessionRoutes(api)
 
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
@@ -235,8 +235,8 @@ func isPublicScaleReadOnly(c *gin.Context) bool {
 		"/api/v1/scales",
 		"/api/v1/scales/hot",
 		"/api/v1/scales/categories",
-		"/api/v1/personality-models",
-		"/api/v1/personality-models/categories",
+		"/api/v1/typology-models",
+		"/api/v1/typology-models/categories",
 	}
 
 	return slices.Contains(whitelist, strings.TrimRight(c.Request.URL.Path, "/"))
@@ -558,12 +558,12 @@ func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
 	}
 }
 
-// registerPersonalityModelRoutes 注册人格测评模型相关路由
-func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
-	handler := r.container.PersonalityModelHandler()
+// registerTypologyModelRoutes 注册类型学模型相关路由
+func (r *Router) registerTypologyModelRoutes(api *gin.RouterGroup) {
+	handler := r.container.TypologyModelHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
-	models := api.Group("/personality-models")
+	models := api.Group("/typology-models")
 	{
 		models.GET("/categories", r.rateLimitedCatalogHandlers(
 			r.container.RateLimitBackend(),
@@ -598,12 +598,12 @@ func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
 	}
 }
 
-// registerPersonalityAssessmentRoutes 注册人格测评相关路由
-func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
-	handler := r.container.PersonalityAssessmentHandler()
+// registerTypologyAssessmentRoutes 注册类型学测评相关路由
+func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
+	handler := r.container.TypologyAssessmentHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
-	assessments := api.Group("/personality-assessments")
+	assessments := api.Group("/typology-assessments")
 	{
 		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
@@ -660,11 +660,11 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 	}
 }
 
-func (r *Router) registerPersonalityAssessmentSessionRoutes(api *gin.RouterGroup) {
-	handler := r.container.PersonalityAssessmentSessionHandler()
+func (r *Router) registerTypologyAssessmentSessionRoutes(api *gin.RouterGroup) {
+	handler := r.container.TypologyAssessmentSessionHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
-	api.POST("/personality-assessment-sessions", r.rateLimitedSubmitHandlers(
+	api.POST("/typology-assessment-sessions", r.rateLimitedSubmitHandlers(
 		r.container.RateLimitBackend(),
 		"query",
 		rateCfg,

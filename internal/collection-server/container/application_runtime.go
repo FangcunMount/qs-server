@@ -78,7 +78,7 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			catalogL1SingleflightEnabled(c.opts, catalogKindScale),
 		),
 		personality: typologymodel.NewQueryService(
-			grpcbridge.NewPersonalityCatalogReader(c.personalityModelClient),
+			grpcbridge.NewTypologyCatalogReader(c.typologyModelClient),
 			catalogCaches.personality,
 			catalogL1SingleflightEnabled(c.opts, catalogKindPersonality),
 		),

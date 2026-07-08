@@ -9,23 +9,23 @@ import (
 
 type stubPersonalityModelClient struct {
 	getCalls int32
-	getFn    func(ctx context.Context, code string) (*PersonalityModelResponse, error)
+	getFn    func(ctx context.Context, code string) (*TypologyModelResponse, error)
 }
 
-func (s *stubPersonalityModelClient) GetPersonalityModel(ctx context.Context, code string) (*PersonalityModelResponse, error) {
+func (s *stubPersonalityModelClient) GetTypologyModel(ctx context.Context, code string) (*TypologyModelResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
 	if s.getFn != nil {
 		return s.getFn(ctx, code)
 	}
-	return &PersonalityModelResponse{Code: code, Title: "sample"}, nil
+	return &TypologyModelResponse{Code: code, Title: "sample"}, nil
 }
 
-func (s *stubPersonalityModelClient) ListPersonalityModels(context.Context, int32, int32, string) (*ListPersonalityModelsResponse, error) {
-	return &ListPersonalityModelsResponse{}, nil
+func (s *stubPersonalityModelClient) ListTypologyModels(context.Context, int32, int32, string) (*ListTypologyModelsResponse, error) {
+	return &ListTypologyModelsResponse{}, nil
 }
 
-func (s *stubPersonalityModelClient) GetPersonalityModelCategories(context.Context) (*PersonalityModelCategoriesResponse, error) {
-	return &PersonalityModelCategoriesResponse{}, nil
+func (s *stubPersonalityModelClient) GetTypologyModelCategories(context.Context) (*TypologyModelCategoriesResponse, error) {
+	return &TypologyModelCategoriesResponse{}, nil
 }
 
 func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {
@@ -48,15 +48,15 @@ func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {
 
 func TestEvictCatalogOnSignalClearsDetailAndList(t *testing.T) {
 	cache := NewLocalCatalogCache(LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 16})
-	cache.SetDetail("mbti", &PersonalityModelResponse{Code: "mbti"})
-	cache.SetListByRequest(&ListPersonalityModelsRequest{Page: 1, PageSize: 20}, &ListPersonalityModelsResponse{Total: 1})
-	cache.SetCategories(&PersonalityModelCategoriesResponse{})
+	cache.SetDetail("mbti", &TypologyModelResponse{Code: "mbti"})
+	cache.SetListByRequest(&ListTypologyModelsRequest{Page: 1, PageSize: 20}, &ListTypologyModelsResponse{Total: 1})
+	cache.SetCategories(&TypologyModelCategoriesResponse{})
 
 	cache.EvictOnSignal("mbti")
 	if _, ok := cache.GetDetail("mbti"); ok {
 		t.Fatal("expected detail evicted")
 	}
-	if _, ok := cache.GetListByRequest(&ListPersonalityModelsRequest{Page: 1, PageSize: 20}); ok {
+	if _, ok := cache.GetListByRequest(&ListTypologyModelsRequest{Page: 1, PageSize: 20}); ok {
 		t.Fatal("expected list evicted")
 	}
 	if _, ok := cache.GetCategories(); ok {

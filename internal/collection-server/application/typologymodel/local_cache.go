@@ -16,7 +16,7 @@ const (
 
 // LocalCatalogCache 人格模型目录进程内 TTL 缓存。
 type LocalCatalogCache struct {
-	inner *catalogl1.MultiCache[*PersonalityModelResponse, *ListPersonalityModelsResponse, *PersonalityModelCategoriesResponse, struct{}]
+	inner *catalogl1.MultiCache[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]
 }
 
 // LocalCatalogCacheOptions 人格模型目录 L1 配置。
@@ -37,14 +37,14 @@ func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
 			TTLJitterRatio: opts.TTLJitterRatio,
 			OnHit:          opts.OnHit,
 			OnMiss:         opts.OnMiss,
-		}, catalogl1.MultiHooks[*PersonalityModelResponse, *ListPersonalityModelsResponse, *PersonalityModelCategoriesResponse, struct{}]{
+		}, catalogl1.MultiHooks[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]{
 			DetailKey:       detailCacheKey,
-			ListKey:         func(req any) string { return listCacheKey(req.(*ListPersonalityModelsRequest)) },
+			ListKey:         func(req any) string { return listCacheKey(req.(*ListTypologyModelsRequest)) },
 			CategoriesKey:   cacheKeyCategories,
 			ListPrefix:      cacheKeyPrefixList,
-			CloneDetail:     clonePersonalityModelResponse,
-			CloneList:       cloneListPersonalityModelsResponse,
-			CloneCategories: clonePersonalityModelCategoriesResponse,
+			CloneDetail:     cloneTypologyModelResponse,
+			CloneList:       cloneListTypologyModelsResponse,
+			CloneCategories: cloneTypologyModelCategoriesResponse,
 			CloneHot:        nil,
 		}),
 	}
@@ -54,55 +54,55 @@ func detailCacheKey(code string) string {
 	return cacheKeyPrefixDetail + strings.ToLower(strings.TrimSpace(code))
 }
 
-func listCacheKey(req *ListPersonalityModelsRequest) string {
+func listCacheKey(req *ListTypologyModelsRequest) string {
 	if req == nil {
-		req = &ListPersonalityModelsRequest{}
+		req = &ListTypologyModelsRequest{}
 	}
 	return fmt.Sprintf("%sp%d:ps%d:a:%s", cacheKeyPrefixList, req.Page, req.PageSize, strings.ToLower(strings.TrimSpace(req.Algorithm)))
 }
 
-func (c *LocalCatalogCache) GetDetail(code string) (*PersonalityModelResponse, bool) {
+func (c *LocalCatalogCache) GetDetail(code string) (*TypologyModelResponse, bool) {
 	if c == nil || c.inner == nil {
 		return nil, false
 	}
 	return c.inner.GetDetail(code)
 }
 
-func (c *LocalCatalogCache) SetDetail(code string, value *PersonalityModelResponse) {
+func (c *LocalCatalogCache) SetDetail(code string, value *TypologyModelResponse) {
 	if c == nil || c.inner == nil {
 		return
 	}
 	c.inner.SetDetail(code, value)
 }
 
-func (c *LocalCatalogCache) GetListByRequest(req *ListPersonalityModelsRequest) (*ListPersonalityModelsResponse, bool) {
+func (c *LocalCatalogCache) GetListByRequest(req *ListTypologyModelsRequest) (*ListTypologyModelsResponse, bool) {
 	if c == nil || c.inner == nil {
 		return nil, false
 	}
 	if req == nil {
-		req = &ListPersonalityModelsRequest{}
+		req = &ListTypologyModelsRequest{}
 	}
 	return c.inner.GetListByRequest(req)
 }
 
-func (c *LocalCatalogCache) SetListByRequest(req *ListPersonalityModelsRequest, value *ListPersonalityModelsResponse) {
+func (c *LocalCatalogCache) SetListByRequest(req *ListTypologyModelsRequest, value *ListTypologyModelsResponse) {
 	if c == nil || c.inner == nil {
 		return
 	}
 	if req == nil {
-		req = &ListPersonalityModelsRequest{}
+		req = &ListTypologyModelsRequest{}
 	}
 	c.inner.SetListByRequest(req, value)
 }
 
-func (c *LocalCatalogCache) GetCategories() (*PersonalityModelCategoriesResponse, bool) {
+func (c *LocalCatalogCache) GetCategories() (*TypologyModelCategoriesResponse, bool) {
 	if c == nil || c.inner == nil {
 		return nil, false
 	}
 	return c.inner.GetCategories()
 }
 
-func (c *LocalCatalogCache) SetCategories(value *PersonalityModelCategoriesResponse) {
+func (c *LocalCatalogCache) SetCategories(value *TypologyModelCategoriesResponse) {
 	if c == nil || c.inner == nil {
 		return
 	}

@@ -67,13 +67,13 @@ type SessionEndpointsResponse struct {
 }
 
 type StartSessionResponse struct {
-	Model          typologymodel.PersonalityModelSummaryResponse `json:"model"`
-	Questionnaire  questionnaire.QuestionnaireResponse           `json:"questionnaire"`
-	SubmitContract SubmitContractResponse                        `json:"submit_contract"`
-	Endpoints      SessionEndpointsResponse                      `json:"endpoints"`
+	Model          typologymodel.TypologyModelSummaryResponse `json:"model"`
+	Questionnaire  questionnaire.QuestionnaireResponse        `json:"questionnaire"`
+	SubmitContract SubmitContractResponse                     `json:"submit_contract"`
+	Endpoints      SessionEndpointsResponse                   `json:"endpoints"`
 }
 
-func buildSubmitContract(model *typologymodel.PersonalityModelResponse, testeeID uint64) SubmitContractResponse {
+func buildSubmitContract(model *typologymodel.TypologyModelResponse, testeeID uint64) SubmitContractResponse {
 	return SubmitContractResponse{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
@@ -86,7 +86,7 @@ func buildEndpoints(testeeID uint64) SessionEndpointsResponse {
 	return SessionEndpointsResponse{
 		SubmitAnswerSheet:       "/api/v1/answersheets",
 		AssessmentByAnswerSheet: "/api/v1/answersheets/{answersheet_id}/assessment",
-		WaitReport:              fmt.Sprintf("/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id=%s", testeeIDStr),
-		Report:                  fmt.Sprintf("/api/v1/personality-assessments/{assessment_id}/report?testee_id=%s", testeeIDStr),
+		WaitReport:              fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/wait-report?testee_id=%s", testeeIDStr),
+		Report:                  fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/report?testee_id=%s", testeeIDStr),
 	}
 }

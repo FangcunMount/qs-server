@@ -53,17 +53,17 @@ type Container struct {
 	publisherMode  eventruntime.PublishMode
 
 	// 业务模块
-	SurveyModule           *SurveyModule           // Survey 模块（包含问卷和答卷子模块）
-	AssessmentModelModule  *AssessmentModelModule  // 测评解释模型资产（量表 + 人格模型目录）
-	ScaleModule            *ScaleModule            // Scale 能力别名（AssessmentModelModule.Scale）
-	PersonalityModelModule *PersonalityModelModule // legacy alias（AssessmentModelModule.Typology）
-	ActorModule            *ActorModule            // Actor 模块
-	EvaluationModule       *EvaluationModule       // Evaluation 模块（测评、得分、报告）
-	ReportModule           *ReportModule           // Report 模块（报告读模型与 builder registry）
-	PlanModule             *PlanModule             // Plan 模块（测评计划）
-	StatisticsModule       *StatisticsModule       // Statistics 模块（统计）
-	IAMModule              *IAMModule              // IAM 集成模块
-	CodesService           codesapp.CodesService   // CodesService 应用服务（code 申请）
+	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
+	AssessmentModelModule *AssessmentModelModule // 测评解释模型资产（量表 + 人格模型目录）
+	ScaleModule           *ScaleModule           // Scale 能力别名（AssessmentModelModule.Scale）
+	TypologyModelModule   *TypologyModelModule   // Typology 能力别名（AssessmentModelModule.Typology）
+	ActorModule           *ActorModule           // Actor 模块
+	EvaluationModule      *EvaluationModule      // Evaluation 模块（测评、得分、报告）
+	ReportModule          *ReportModule          // Report 模块（报告读模型与 builder registry）
+	PlanModule            *PlanModule            // Plan 模块（测评计划）
+	StatisticsModule      *StatisticsModule      // Statistics 模块（统计）
+	IAMModule             *IAMModule             // IAM 集成模块
+	CodesService          codesapp.CodesService  // CodesService 应用服务（code 申请）
 
 	ruleSetCatalog rulesetport.RuleSetCatalog
 

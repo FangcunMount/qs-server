@@ -44,14 +44,14 @@ func (f *fakePersonalityAssessmentQueryService) WaitReport(context.Context, uint
 func TestPersonalityAssessmentHandlerGetReportRequiresTesteeID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewPersonalityAssessmentHandler(
+	handler := NewTypologyAssessmentHandler(
 		&fakePersonalityAssessmentQueryService{},
 		nil,
 	)
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/personality-assessments/42/report", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/typology-assessments/42/report", nil)
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
 
 	handler.GetReport(c)
@@ -64,7 +64,7 @@ func TestPersonalityAssessmentHandlerGetReportRequiresTesteeID(t *testing.T) {
 func TestPersonalityAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewPersonalityAssessmentHandler(
+	handler := NewTypologyAssessmentHandler(
 		&fakePersonalityAssessmentQueryService{
 			getReport: func(context.Context, uint64, uint64) (*personalityassessment.AssessmentReportResponse, error) {
 				return nil, status.Error(codes.PermissionDenied, "forbidden")
@@ -75,7 +75,7 @@ func TestPersonalityAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/personality-assessments/42/report?testee_id=7", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/typology-assessments/42/report?testee_id=7", nil)
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
 
 	handler.GetReport(c)
@@ -88,7 +88,7 @@ func TestPersonalityAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
 func TestPersonalityAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewPersonalityAssessmentHandler(
+	handler := NewTypologyAssessmentHandler(
 		&fakePersonalityAssessmentQueryService{
 			getReport: func(_ context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error) {
 				if testeeID != 7 || assessmentID != 42 {
@@ -102,7 +102,7 @@ func TestPersonalityAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/personality-assessments/42/report?testee_id=7", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/typology-assessments/42/report?testee_id=7", nil)
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
 
 	handler.GetReport(c)

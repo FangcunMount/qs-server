@@ -382,7 +382,7 @@ func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxQueryConcurrency, "concurrency.max-query-concurrency", c.MaxQueryConcurrency,
 		"Maximum concurrent HTTP handlers for non-catalog read paths (assessment, stats, etc.).")
 	fs.IntVar(&c.MaxCatalogConcurrency, "concurrency.max-catalog-concurrency", c.MaxCatalogConcurrency,
-		"Maximum concurrent HTTP handlers for catalog read paths (scales, personality-models, questionnaire detail).")
+		"Maximum concurrent HTTP handlers for catalog read paths (scales, typology-models, questionnaire detail).")
 	fs.IntVar(&c.MaxSubmitConcurrency, "concurrency.max-submit-concurrency", c.MaxSubmitConcurrency,
 		"Maximum concurrent HTTP handlers for submit/write paths.")
 	fs.IntVar(&c.MaxWaitMs, "concurrency.max-wait-ms", c.MaxWaitMs,

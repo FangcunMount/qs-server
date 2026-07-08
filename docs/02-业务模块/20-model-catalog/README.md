@@ -1,6 +1,6 @@
 # Assessment Model
 
-**本文回答**：Assessment Model 如何作为统一测评模型资产层，吸收旧 `scale/personalitymodel`，为 Evaluation 和报告层提供可发布、可追溯的模型快照。
+**本文回答**：Assessment Model 如何作为统一测评模型资产层，吸收旧 `scale/typologymodel`，为 Evaluation 和报告层提供可发布、可追溯的模型快照。
 
 ---
 
@@ -13,7 +13,7 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 - `AssessmentModelSnapshot`：发布后冻结的模型快照。
 - `ModelBinding`：模型与问卷、入口或解释资产的绑定。
 - `ModelPayload`：医学量表、人格模型、行为能力测评等模型资产 payload。
-- 旧 `scale/personalitymodel` 的兼容注册和资产归并。
+- 旧 `scale/typologymodel` 的兼容注册和资产归并。
 
 ---
 

@@ -13,11 +13,11 @@ import (
 // flowModelReader returns a published MBTI-like model binding.
 type flowModelReader struct{}
 
-func (flowModelReader) Get(_ context.Context, code string) (*typologymodel.PersonalityModelResponse, error) {
+func (flowModelReader) Get(_ context.Context, code string) (*typologymodel.TypologyModelResponse, error) {
 	if code != "MBTI_OEJTS" {
 		return nil, nil
 	}
-	return &typologymodel.PersonalityModelResponse{
+	return &typologymodel.TypologyModelResponse{
 		Code:                 "MBTI_OEJTS",
 		Version:              "1.0.0",
 		Title:                "MBTI OEJTS",

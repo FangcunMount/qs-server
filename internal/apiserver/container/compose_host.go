@@ -189,10 +189,10 @@ func (c *Container) SetSurveyModule(module *surveymod.Module) {
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
 	c.ScaleModule = module.Scoring
-	c.PersonalityModelModule = module.Typology
+	c.TypologyModelModule = module.Typology
 	c.registerModule("modelcatalog", module)
 	c.registerModule("scale", module.Scoring)
-	c.registerModule("personalitymodel", module.Typology)
+	c.registerModule("typologymodel", module.Typology)
 }
 
 func (c *Container) SetActorModule(module *actormod.Module) {

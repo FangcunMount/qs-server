@@ -13,7 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
-	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
+	typologyModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -36,15 +36,15 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey           SurveyDeps
-	Actor            ActorDeps
-	Evaluation       EvaluationDeps
-	Scale            ScaleDeps
-	PersonalityModel PersonalityModelDeps
-	Plan             PlanDeps
-	Statistics       StatisticsDeps
-	IAM              IAMDeps
-	RuleSet          RuleSetDeps
+	Survey        SurveyDeps
+	Actor         ActorDeps
+	Evaluation    EvaluationDeps
+	Scale         ScaleDeps
+	TypologyModel TypologyModelDeps
+	Plan          PlanDeps
+	Statistics    StatisticsDeps
+	IAM           IAMDeps
+	RuleSet       RuleSetDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
@@ -91,8 +91,8 @@ type ScaleDeps struct {
 	CategoryService scaleApp.ScaleCategoryService
 }
 
-type PersonalityModelDeps struct {
-	QueryService personalityModelApp.TypologyModelQueryService
+type TypologyModelDeps struct {
+	QueryService typologyModelApp.TypologyModelQueryService
 }
 
 type PlanDeps struct {
@@ -141,7 +141,7 @@ func (r *Registry) RegisterServices() error {
 	if err := r.registerScaleService(); err != nil {
 		return err
 	}
-	if err := r.registerPersonalityModelService(); err != nil {
+	if err := r.registerTypologyModelService(); err != nil {
 		return err
 	}
 	if err := r.registerInternalService(); err != nil {
@@ -243,17 +243,17 @@ func (r *Registry) registerScaleService() error {
 	return nil
 }
 
-func (r *Registry) registerPersonalityModelService() error {
-	if r.deps.PersonalityModel.QueryService == nil {
-		log.Warn("PersonalityModelModule is not initialized, skipping personality model service registration")
+func (r *Registry) registerTypologyModelService() error {
+	if r.deps.TypologyModel.QueryService == nil {
+		log.Warn("TypologyModelModule is not initialized, skipping typology model service registration")
 		return nil
 	}
 
-	personalityModelService := service.NewPersonalityModelService(
-		r.deps.PersonalityModel.QueryService,
+	typologyModelService := service.NewTypologyModelService(
+		r.deps.TypologyModel.QueryService,
 	)
-	r.server.RegisterService(personalityModelService)
-	log.Info("   📊 Personality model service registered (read-only)")
+	r.server.RegisterService(typologyModelService)
+	log.Info("   📊 Typology model service registered (read-only)")
 	return nil
 }
 

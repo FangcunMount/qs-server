@@ -14,7 +14,7 @@ func TestDescribeExposesAggregateAndLegacyRegisterNames(t *testing.T) {
 	if desc.Name != modules.PackageModelCatalog {
 		t.Fatalf("name = %q, want instrument", desc.Name)
 	}
-	want := []string{string(Name), "scale", "personalitymodel"}
+	want := []string{string(Name), "scale", "typologymodel"}
 	if len(desc.RegisterNames) != len(want) {
 		t.Fatalf("register names = %#v, want %#v", desc.RegisterNames, want)
 	}

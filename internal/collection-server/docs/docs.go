@@ -995,454 +995,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/personality-assessment-sessions": {
-            "post": {
-                "description": "小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "开始人格测评会话",
-                "parameters": [
-                    {
-                        "description": "开始会话请求",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/personalitysession.StartSessionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalitysession.StartSessionResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-assessments": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "查询人格测评列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "算法过滤（legacy，推荐改用 model.code 或 categories）",
-                        "name": "algorithm",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalityassessment.ListAssessmentsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-assessments/{id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "获取人格测评详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "测评ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalityassessment.AssessmentDetailResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-assessments/{id}/report": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "获取人格测评报告",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "测评ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalityassessment.AssessmentReportResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-assessments/{id}/report-status": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "查询人格测评报告状态",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "测评ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalityassessment.AssessmentStatusResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-assessments/{id}/wait-report": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评"
-                ],
-                "summary": "长轮询等待人格测评报告",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "测评ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "超时时间（秒）",
-                        "name": "timeout",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalityassessment.AssessmentStatusResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-models": {
-            "get": {
-                "description": "浏览已发布人格模型目录。单模型详情与题版绑定请用 GET /personality-models/{code} 或推荐入口 POST /personality-assessment-sessions。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评模型"
-                ],
-                "summary": "获取人格测评模型列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）",
-                        "name": "algorithm",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-models/categories": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评模型"
-                ],
-                "summary": "获取人格测评模型分类",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalitymodel.PersonalityModelCategoriesResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/personality-models/{code}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "人格测评模型"
-                ],
-                "summary": "获取人格测评模型详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "模型编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/personalitymodel.PersonalityModelResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/public/info": {
             "get": {
                 "description": "获取服务基本信息",
@@ -2274,6 +1826,454 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessment-sessions": {
+            "post": {
+                "description": "小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "开始类型学测评会话",
+                "parameters": [
+                    {
+                        "description": "开始会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/personalitysession.StartSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalitysession.StartSessionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessments": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "查询类型学测评列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "算法过滤（legacy，推荐改用 model.code 或 categories）",
+                        "name": "algorithm",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologyassessment.ListAssessmentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessments/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "获取类型学测评详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologyassessment.AssessmentDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessments/{id}/report": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "获取类型学测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologyassessment.AssessmentReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessments/{id}/report-status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "查询类型学测评报告状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologyassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-assessments/{id}/wait-report": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学测评"
+                ],
+                "summary": "长轮询等待类型学测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "超时时间（秒）",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologyassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-models": {
+            "get": {
+                "description": "浏览已发布类型学模型目录。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学模型"
+                ],
+                "summary": "获取类型学模型列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）",
+                        "name": "algorithm",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-models/categories": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学模型"
+                ],
+                "summary": "获取类型学模型分类",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologymodel.TypologyModelCategoriesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/typology-models/{code}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "类型学模型"
+                ],
+                "summary": "获取类型学模型详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/typologymodel.TypologyModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -3215,10 +3215,16 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
                     "type": "string"
                 },
                 "sub_kind": {
@@ -3331,29 +3337,6 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse": {
-            "type": "object",
-            "properties": {
-                "models": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/personalitymodel.PersonalityModelSummaryResponse"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
         "github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse": {
             "type": "object",
             "properties": {
@@ -3414,139 +3397,13 @@ const docTemplate = `{
                 }
             }
         },
-        "meta.Birthday": {
-            "type": "object"
-        },
-        "personalityassessment.AssessmentDetailResponse": {
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse": {
             "type": "object",
             "properties": {
-                "answer_sheet_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "failed_at": {
-                    "type": "string"
-                },
-                "failure_reason": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interpreted_at": {
-                    "type": "string"
-                },
-                "level": {
-                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
-                },
-                "org_id": {
-                    "type": "string"
-                },
-                "origin_id": {
-                    "type": "string"
-                },
-                "origin_type": {
-                    "type": "string"
-                },
-                "primary_score": {
-                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "testee_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalityassessment.AssessmentReportResponse": {
-            "type": "object",
-            "properties": {
-                "assessment_id": {
-                    "type": "string"
-                },
-                "conclusion": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "dimensions": {
+                "models": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
-                    }
-                },
-                "level": {
-                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
-                },
-                "model_extra": {
-                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
-                },
-                "primary_score": {
-                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
-                },
-                "suggestions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/evaluation.SuggestionResponse"
-                    }
-                }
-            }
-        },
-        "personalityassessment.AssessmentStatusResponse": {
-            "type": "object",
-            "properties": {
-                "level": {
-                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "model": {
-                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
-                },
-                "next_poll_after_ms": {
-                    "type": "integer"
-                },
-                "reason": {
-                    "type": "string"
-                },
-                "stage": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "integer"
-                }
-            }
-        },
-        "personalityassessment.ListAssessmentsResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
+                        "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
                     }
                 },
                 "page": {
@@ -3563,180 +3420,8 @@ const docTemplate = `{
                 }
             }
         },
-        "personalityassessment.ModelIdentityResponse": {
-            "type": "object",
-            "properties": {
-                "algorithm": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalityassessment.ResultLevelResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "severity": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitymodel.CategoryResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitymodel.PersonalityDimensionResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "left_pole": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "right_pole": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitymodel.PersonalityModelCategoriesResponse": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/personalitymodel.CategoryResponse"
-                    }
-                }
-            }
-        },
-        "personalitymodel.PersonalityModelResponse": {
-            "type": "object",
-            "properties": {
-                "algorithm": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "dimension_order": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "dimensions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/personalitymodel.PersonalityDimensionResponse"
-                    }
-                },
-                "outcomes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/personalitymodel.PersonalityOutcomeResponse"
-                    }
-                },
-                "question_count": {
-                    "type": "integer"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitymodel.PersonalityModelSummaryResponse": {
-            "type": "object",
-            "properties": {
-                "algorithm": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "question_count": {
-                    "type": "integer"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitymodel.PersonalityOutcomeResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "one_liner": {
-                    "type": "string"
-                }
-            }
+        "meta.Birthday": {
+            "type": "object"
         },
         "personalitysession.SessionEndpointsResponse": {
             "type": "object",
@@ -3777,7 +3462,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/personalitysession.SessionEndpointsResponse"
                 },
                 "model": {
-                    "$ref": "#/definitions/personalitymodel.PersonalityModelSummaryResponse"
+                    "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
                 },
                 "questionnaire": {
                     "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
@@ -4492,6 +4177,369 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "typologyassessment.AssessmentDetailResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologyassessment.AssessmentReportResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                }
+            }
+        },
+        "typologyassessment.AssessmentStatusResponse": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "$ref": "#/definitions/typologyassessment.ResultLevelResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "model": {
+                    "$ref": "#/definitions/typologyassessment.ModelIdentityResponse"
+                },
+                "next_poll_after_ms": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "typologyassessment.ListAssessmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "typologyassessment.ModelIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologyassessment.ResultLevelResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologymodel.TypologyCategoryResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologymodel.TypologyDimensionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "left_pole": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "right_pole": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologymodel.TypologyModelCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/typologymodel.TypologyCategoryResponse"
+                    }
+                }
+            }
+        },
+        "typologymodel.TypologyModelResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "decision_kind": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimension_order": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/typologymodel.TypologyDimensionResponse"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/typologymodel.TypologyOutcomeResponse"
+                    }
+                },
+                "payload_format": {
+                    "type": "string"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologymodel.TypologyModelSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "decision_kind": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "payload_format": {
+                    "type": "string"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologymodel.TypologyOutcomeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "one_liner": {
+                    "type": "string"
                 }
             }
         }

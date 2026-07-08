@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package typologymodel;
+
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/typologymodel";
+
+// TypologyModelService exposes C-side typology model catalog reads.
+service TypologyModelService {
+  rpc GetTypologyModel(GetTypologyModelRequest) returns (GetTypologyModelResponse);
+  rpc ListTypologyModels(ListTypologyModelsRequest) returns (ListTypologyModelsResponse);
+  rpc GetTypologyModelCategories(GetTypologyModelCategoriesRequest) returns (GetTypologyModelCategoriesResponse);
+}
+
+message TypologyModelSummary {
+  string code = 1;
+  string version = 2;
+  string title = 3;
+  string algorithm = 4;
+  string description = 5;
+  string questionnaire_code = 6;
+  string questionnaire_version = 7;
+  string status = 8;
+  int32 question_count = 9;
+  string kind = 10;
+  string sub_kind = 11;
+  string product_channel = 12;
+  string algorithm_family = 13;
+  string payload_format = 14;
+  string decision_kind = 15;
+}
+
+message TypologyDimension {
+  string code = 1;
+  string name = 2;
+  string left_pole = 3;
+  string right_pole = 4;
+}
+
+message TypologyOutcomeSummary {
+  string code = 1;
+  string name = 2;
+  string one_liner = 3;
+  string image_url = 4;
+}
+
+message TypologyModel {
+  TypologyModelSummary summary = 1;
+  repeated string dimension_order = 2;
+  repeated TypologyDimension dimensions = 3;
+  repeated TypologyOutcomeSummary outcomes = 4;
+}
+
+message TypologyModelCategory {
+  string value = 1;
+  string label = 2;
+}
+
+message GetTypologyModelRequest {
+  string code = 1;
+}
+
+message GetTypologyModelResponse {
+  TypologyModel model = 1;
+}
+
+message ListTypologyModelsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string algorithm = 3;
+}
+
+message ListTypologyModelsResponse {
+  repeated TypologyModelSummary models = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  int32 total_pages = 5;
+}
+
+message GetTypologyModelCategoriesRequest {}
+
+message GetTypologyModelCategoriesResponse {
+  repeated TypologyModelCategory categories = 1;
+}

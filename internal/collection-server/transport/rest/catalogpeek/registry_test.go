@@ -21,7 +21,7 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 	scaleSvc := scale.NewQueryService(nil, scaleCache, false)
 
 	personalityCache := typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 16})
-	personalityCache.SetDetail("PM1", &typologymodel.PersonalityModelResponse{Code: "PM1"})
+	personalityCache.SetDetail("PM1", &typologymodel.TypologyModelResponse{Code: "PM1"})
 	personalitySvc := typologymodel.NewQueryService(nil, personalityCache, false)
 
 	questionnaireCache := questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{TTL: time.Minute, MaxEntries: 16})
@@ -35,7 +35,7 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 		var got bool
 		engine := gin.New()
 		engine.GET("/api/v1/scales/:code", func(c *gin.Context) { got = registry.Peek(c) })
-		engine.GET("/api/v1/personality-models/:code", func(c *gin.Context) { got = registry.Peek(c) })
+		engine.GET("/api/v1/typology-models/:code", func(c *gin.Context) { got = registry.Peek(c) })
 		engine.GET("/api/v1/questionnaires/:code", func(c *gin.Context) { got = registry.Peek(c) })
 		engine.POST("/api/v1/scales/:code", func(c *gin.Context) { got = registry.Peek(c) })
 		recorder := httptest.NewRecorder()
@@ -51,7 +51,7 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 	}{
 		{name: "scale_detail_hit", method: http.MethodGet, path: "/api/v1/scales/ABC", want: true},
 		{name: "scale_detail_miss", method: http.MethodGet, path: "/api/v1/scales/missing", want: false},
-		{name: "personality_detail_hit", method: http.MethodGet, path: "/api/v1/personality-models/PM1", want: true},
+		{name: "personality_detail_hit", method: http.MethodGet, path: "/api/v1/typology-models/PM1", want: true},
 		{name: "questionnaire_detail_hit", method: http.MethodGet, path: "/api/v1/questionnaires/Q1?version=v1", want: true},
 		{name: "questionnaire_detail_version_miss", method: http.MethodGet, path: "/api/v1/questionnaires/Q1?version=other", want: false},
 		{name: "non_get", method: http.MethodPost, path: "/api/v1/scales/ABC", want: false},

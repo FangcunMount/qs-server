@@ -8,17 +8,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type personalityModelClient = CatalogReader
+type typologyModelClient = CatalogReader
 
 // QueryService is the BFF layer for personality model catalog reads.
 type QueryService struct {
-	client          personalityModelClient
+	client          typologyModelClient
 	cache           CatalogCache
 	coalescer       loadguard.Coalescer
 	useSingleflight bool
 }
 
-func NewQueryService(client personalityModelClient, cache CatalogCache, useSingleflight bool) *QueryService {
+func NewQueryService(client typologyModelClient, cache CatalogCache, useSingleflight bool) *QueryService {
 	svc := &QueryService{
 		client:          client,
 		cache:           cache,
@@ -40,12 +40,12 @@ func (s *QueryService) HasCachedDetail(code string) bool {
 }
 
 // HasCachedList 进程内 L1 是否已有人格模型列表。
-func (s *QueryService) HasCachedList(req *ListPersonalityModelsRequest) bool {
+func (s *QueryService) HasCachedList(req *ListTypologyModelsRequest) bool {
 	if s == nil || s.cache == nil {
 		return false
 	}
 	if req == nil {
-		req = &ListPersonalityModelsRequest{}
+		req = &ListTypologyModelsRequest{}
 	}
 	s.normalizeListRequest(req)
 	_, ok := s.cache.GetListByRequest(req)
@@ -61,21 +61,21 @@ func (s *QueryService) HasCachedCategories() bool {
 	return ok
 }
 
-func (s *QueryService) Get(ctx context.Context, code string) (*PersonalityModelResponse, error) {
+func (s *QueryService) Get(ctx context.Context, code string) (*TypologyModelResponse, error) {
 	return s.readThroughDetail(
 		detailCacheKey(code),
-		func() (*PersonalityModelResponse, bool) {
+		func() (*TypologyModelResponse, bool) {
 			if s.cache == nil {
 				return nil, false
 			}
 			return s.cache.GetDetail(code)
 		},
-		func(resp *PersonalityModelResponse) { s.cache.SetDetail(code, resp) },
-		func() (*PersonalityModelResponse, error) {
+		func(resp *TypologyModelResponse) { s.cache.SetDetail(code, resp) },
+		func() (*TypologyModelResponse, error) {
 			log.Infof("Getting personality model: code=%s", code)
-			result, err := s.client.GetPersonalityModel(ctx, code)
+			result, err := s.client.GetTypologyModel(ctx, code)
 			if err != nil {
-				logPersonalityGRPCError("Failed to get personality model via gRPC", err)
+				logTypologyGRPCError("Failed to get personality model via gRPC", err)
 				return nil, err
 			}
 			return result, nil
@@ -83,25 +83,25 @@ func (s *QueryService) Get(ctx context.Context, code string) (*PersonalityModelR
 	)
 }
 
-func (s *QueryService) List(ctx context.Context, req *ListPersonalityModelsRequest) (*ListPersonalityModelsResponse, error) {
+func (s *QueryService) List(ctx context.Context, req *ListTypologyModelsRequest) (*ListTypologyModelsResponse, error) {
 	if req == nil {
-		req = &ListPersonalityModelsRequest{}
+		req = &ListTypologyModelsRequest{}
 	}
 	s.normalizeListRequest(req)
 
 	return s.readThroughList(
 		listCacheKey(req),
-		func() (*ListPersonalityModelsResponse, bool) {
+		func() (*ListTypologyModelsResponse, bool) {
 			if s.cache == nil {
 				return nil, false
 			}
 			return s.cache.GetListByRequest(req)
 		},
-		func(resp *ListPersonalityModelsResponse) { s.cache.SetListByRequest(req, resp) },
-		func() (*ListPersonalityModelsResponse, error) {
-			result, err := s.client.ListPersonalityModels(ctx, req.Page, req.PageSize, req.Algorithm)
+		func(resp *ListTypologyModelsResponse) { s.cache.SetListByRequest(req, resp) },
+		func() (*ListTypologyModelsResponse, error) {
+			result, err := s.client.ListTypologyModels(ctx, req.Page, req.PageSize, req.Algorithm)
 			if err != nil {
-				logPersonalityGRPCError("Failed to list personality models via gRPC", err)
+				logTypologyGRPCError("Failed to list personality models via gRPC", err)
 				return nil, err
 			}
 			return result, nil
@@ -109,20 +109,20 @@ func (s *QueryService) List(ctx context.Context, req *ListPersonalityModelsReque
 	)
 }
 
-func (s *QueryService) GetCategories(ctx context.Context) (*PersonalityModelCategoriesResponse, error) {
+func (s *QueryService) GetCategories(ctx context.Context) (*TypologyModelCategoriesResponse, error) {
 	return s.readThroughCategories(
 		cacheKeyCategories,
-		func() (*PersonalityModelCategoriesResponse, bool) {
+		func() (*TypologyModelCategoriesResponse, bool) {
 			if s.cache == nil {
 				return nil, false
 			}
 			return s.cache.GetCategories()
 		},
-		func(resp *PersonalityModelCategoriesResponse) { s.cache.SetCategories(resp) },
-		func() (*PersonalityModelCategoriesResponse, error) {
-			result, err := s.client.GetPersonalityModelCategories(ctx)
+		func(resp *TypologyModelCategoriesResponse) { s.cache.SetCategories(resp) },
+		func() (*TypologyModelCategoriesResponse, error) {
+			result, err := s.client.GetTypologyModelCategories(ctx)
 			if err != nil {
-				logPersonalityGRPCError("Failed to get personality model categories via gRPC", err)
+				logTypologyGRPCError("Failed to get personality model categories via gRPC", err)
 				return nil, err
 			}
 			return result, nil
@@ -130,7 +130,7 @@ func (s *QueryService) GetCategories(ctx context.Context) (*PersonalityModelCate
 	)
 }
 
-func (s *QueryService) normalizeListRequest(req *ListPersonalityModelsRequest) {
+func (s *QueryService) normalizeListRequest(req *ListTypologyModelsRequest) {
 	if req.Page <= 0 {
 		req.Page = 1
 	}
@@ -142,7 +142,7 @@ func (s *QueryService) normalizeListRequest(req *ListPersonalityModelsRequest) {
 	}
 }
 
-func logPersonalityGRPCError(message string, err error) {
+func logTypologyGRPCError(message string, err error) {
 	if cancelerr.Is(err) {
 		log.Debugf("%s: %v", message, err)
 		return

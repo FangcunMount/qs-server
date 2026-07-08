@@ -21,16 +21,27 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/answersheets/{id}/assessment", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
-	assertOpenAPIOperation(t, spec, "/personality-assessment-sessions", "post")
+	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
 	assertOpenAPIOperation(t, spec, "/scales/hot", "get")
 	assertOpenAPIOperation(t, spec, "/scales/categories", "get")
-	assertOpenAPIOperation(t, spec, "/personality-models", "get")
-	assertOpenAPIOperation(t, spec, "/personality-models/categories", "get")
-	assertOpenAPIOperation(t, spec, "/personality-assessments", "get")
-	assertOpenAPIOperation(t, spec, "/personality-assessments/{id}/report", "get")
-	assertOpenAPIOperation(t, spec, "/personality-assessments/{id}/wait-report", "get")
+	assertOpenAPIOperation(t, spec, "/typology-models", "get")
+	assertOpenAPIOperation(t, spec, "/typology-models/categories", "get")
+	assertOpenAPIOperation(t, spec, "/typology-assessments", "get")
+	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/report", "get")
+	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}/care-context", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
+}
+
+func TestCollectionOpenAPIHasNoLegacyPersonalityPaths(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	for path := range spec.Paths {
+		if strings.Contains(path, "/personality-") {
+			t.Fatalf("legacy personality path still in OpenAPI: %s", path)
+		}
+	}
 }
 
 func TestCollectionPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
@@ -91,6 +102,27 @@ func loadOpenAPISpec(t *testing.T, path string) openAPISpec {
 		t.Fatalf("%s has no OpenAPI paths", path)
 	}
 	return spec
+}
+
+func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	components, ok := root["components"].(map[string]any)
+	if !ok {
+		t.Fatal("missing components")
+	}
+	schemas, ok := components["schemas"].(map[string]any)
+	if !ok {
+		t.Fatal("missing components.schemas")
+	}
+	return schemas
 }
 
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {

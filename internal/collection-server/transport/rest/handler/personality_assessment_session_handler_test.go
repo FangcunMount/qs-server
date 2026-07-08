@@ -17,8 +17,8 @@ import (
 func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&sessionModelReader{model: &typologymodel.PersonalityModelResponse{
+	handler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+		&sessionModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",
 			QuestionnaireVersion: "1.0.0",
@@ -40,7 +40,7 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/personality-assessment-sessions", bytes.NewReader(body))
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/typology-assessment-sessions", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.Start(c)
@@ -53,8 +53,8 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&sessionModelReader{model: &typologymodel.PersonalityModelResponse{
+	handler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+		&sessionModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",
 			QuestionnaireVersion: "1.0.0",
@@ -70,7 +70,7 @@ func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testin
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/personality-assessment-sessions", bytes.NewReader(body))
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/typology-assessment-sessions", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.Start(c)
@@ -81,10 +81,10 @@ func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testin
 }
 
 type sessionModelReader struct {
-	model *typologymodel.PersonalityModelResponse
+	model *typologymodel.TypologyModelResponse
 }
 
-func (r *sessionModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
+func (r *sessionModelReader) Get(context.Context, string) (*typologymodel.TypologyModelResponse, error) {
 	return r.model, nil
 }
 

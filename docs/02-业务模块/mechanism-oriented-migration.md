@@ -543,12 +543,18 @@ type Algorithm = identity.Algorithm
 | R91 | `container/modules/modelcatalog` 装配机制化：`assemble_{typology,norming,taskperformance}`；`Module.{Typology,Norming,TaskPerformance}`；守卫禁回退 assemble 文件名 |
 | R92 | `publishing` 快照/载荷解码机制化：`typology_payload`/`snapshot_{typology,norming,taskperformance}`；`TypologyPayloadAndRuntimeSpecFromModel`；守卫禁回退 publishing 文件名 |
 
-过渡态说明（R92 后 domain/application/container 内部均已机制化；对外 API 字符串与 gRPC `personalitymodel` 注册名保持不变）：
+过渡态说明（R108 后对外 REST/gRPC 已收敛 typology；领域 `KindPersonality` 数据值与缓存信号名仍保留 personality 字样）：
 
 ## Round 106–107：运行审计与 API 身份补全（R107）
 
 | Round | 动作 |
 |-------|------|
 | R106 | modelcatalog 机制包结构收官（见 `docs/系统设计文档.md` §19） |
-| R107 | `EvaluationRun` 补齐 `trace_id` / `input_snapshot_ref`；evaluation 与 personality catalog 的 `ModelIdentity` additive 暴露 `product_channel` / `algorithm_family`；report routing 已支持 Algorithm/ProductChannel key 精确命中与 broad fallback 测试；Audience/ReportProfile 仍未入选择键 |
+| R107 | `EvaluationRun` 补齐 `trace_id` / `input_snapshot_ref`；evaluation 与 typology catalog 的 `ModelIdentity` 暴露 `product_channel` / `algorithm_family`；report routing 已支持 Algorithm/ProductChannel key 精确命中与 broad fallback 测试；Audience/ReportProfile 仍未入选择键 |
+
+## Round 108：旧接口与兼容层下线（R108）
+
+| 轮次 | 内容 |
+|------|------|
+| R108 | breaking 下线 `/api/v1/personality-*` REST、`personalitymodel` gRPC、application `Personality*` DTO/deprecated alias；唯一公开面为 `/api/v1/typology-*` + `typologymodel` gRPC；OpenAPI drift 字段已重生成修复；`KindPersonality` 数据值与 `PersonalityModel*` 缓存信号名本轮保留 |
 

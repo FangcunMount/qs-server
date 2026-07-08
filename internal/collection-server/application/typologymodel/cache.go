@@ -2,12 +2,12 @@ package typologymodel
 
 // CatalogCache 人格模型目录 REST DTO 进程内 L1 缓存。
 type CatalogCache interface {
-	GetDetail(code string) (*PersonalityModelResponse, bool)
-	SetDetail(code string, value *PersonalityModelResponse)
-	GetListByRequest(req *ListPersonalityModelsRequest) (*ListPersonalityModelsResponse, bool)
-	SetListByRequest(req *ListPersonalityModelsRequest, value *ListPersonalityModelsResponse)
-	GetCategories() (*PersonalityModelCategoriesResponse, bool)
-	SetCategories(value *PersonalityModelCategoriesResponse)
+	GetDetail(code string) (*TypologyModelResponse, bool)
+	SetDetail(code string, value *TypologyModelResponse)
+	GetListByRequest(req *ListTypologyModelsRequest) (*ListTypologyModelsResponse, bool)
+	SetListByRequest(req *ListTypologyModelsRequest, value *ListTypologyModelsResponse)
+	GetCategories() (*TypologyModelCategoriesResponse, bool)
+	SetCategories(value *TypologyModelCategoriesResponse)
 	EvictOnSignal(code string)
 	Stats() (hits, misses uint64)
 }

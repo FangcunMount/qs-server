@@ -60,20 +60,20 @@ func RegisterCatalogL1(
 		},
 	})
 	registry.Register(Entry{
-		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/personality-models/:code") },
+		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/typology-models/:code") },
 		HasCached: func(c *gin.Context) bool {
 			return personalitySvc != nil && personalitySvc.HasCachedDetail(c.Param("code"))
 		},
 	})
 	registry.Register(Entry{
 		RouteMatch: func(route string) bool {
-			return route == "/api/v1/personality-models" || strings.HasSuffix(route, "/personality-models")
+			return route == "/api/v1/typology-models" || strings.HasSuffix(route, "/typology-models")
 		},
 		HasCached: func(c *gin.Context) bool {
 			if personalitySvc == nil {
 				return false
 			}
-			var req typologymodel.ListPersonalityModelsRequest
+			var req typologymodel.ListTypologyModelsRequest
 			if err := c.ShouldBindQuery(&req); err != nil {
 				return false
 			}
@@ -81,7 +81,7 @@ func RegisterCatalogL1(
 		},
 	})
 	registry.Register(Entry{
-		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/personality-models/categories") },
+		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/typology-models/categories") },
 		HasCached: func(c *gin.Context) bool {
 			return personalitySvc != nil && personalitySvc.HasCachedCategories()
 		},

@@ -52,12 +52,12 @@ type Manager struct {
 	clients map[string]interface{}
 
 	// 已注册的客户端
-	answerSheetClient      *AnswerSheetClient
-	questionnaireClient    *QuestionnaireClient
-	evaluationClient       *EvaluationClient
-	actorClient            *ActorClient
-	scaleClient            *ScaleClient
-	personalityModelClient *PersonalityModelClient
+	answerSheetClient   *AnswerSheetClient
+	questionnaireClient *QuestionnaireClient
+	evaluationClient    *EvaluationClient
+	actorClient         *ActorClient
+	scaleClient         *ScaleClient
+	typologyModelClient *TypologyModelClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -259,8 +259,8 @@ func (m *Manager) RegisterClients() error {
 	m.clients["scale"] = m.scaleClient
 	log.Info("   📊 Scale client registered")
 
-	m.personalityModelClient = NewPersonalityModelClient(baseClient)
-	m.clients["personalityModel"] = m.personalityModelClient
+	m.typologyModelClient = NewTypologyModelClient(baseClient)
+	m.clients["typologyModel"] = m.typologyModelClient
 	log.Info("   📊 Personality model client registered")
 
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
@@ -292,9 +292,9 @@ func (m *Manager) ScaleClient() *ScaleClient {
 	return m.scaleClient
 }
 
-// PersonalityModelClient 获取人格测评模型客户端
-func (m *Manager) PersonalityModelClient() *PersonalityModelClient {
-	return m.personalityModelClient
+// TypologyModelClient 获取人格测评模型客户端
+func (m *Manager) TypologyModelClient() *TypologyModelClient {
+	return m.typologyModelClient
 }
 
 // GetClient 根据名称获取客户端

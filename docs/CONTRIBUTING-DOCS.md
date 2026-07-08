@@ -52,7 +52,7 @@ plan
 statistics
 ```
 
-`scale/personalitymodel` 是 `modelcatalog` 的兼容注册名或旧能力路径，不再作为独立核心模块维护。
+`scale/typologymodel` 是 `modelcatalog` 的兼容注册名或旧能力路径，不再作为独立核心模块维护。
 
 `70-statistics` 使用复数目录名，和当前代码包 `statistics` 保持一致。
 

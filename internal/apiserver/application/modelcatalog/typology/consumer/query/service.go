@@ -16,9 +16,6 @@ type TypologyModelQueryService interface {
 	GetCategories(ctx context.Context) (*shared.TypologyModelCategoriesResult, error)
 }
 
-// PersonalityModelQueryService is a deprecated alias for TypologyModelQueryService.
-type PersonalityModelQueryService = TypologyModelQueryService
-
 type queryService struct {
 	lister          port.PublishedModelLister
 	algorithmLister port.PublishedAlgorithmLister

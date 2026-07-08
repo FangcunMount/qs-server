@@ -313,12 +313,12 @@ func TestAssessmentModelLegacyRegisterNamesCoverScaleAndPersonalityModel(t *test
 	legacy := map[string]struct{}{}
 	for _, step := range modules.LegacyInitializeSequence {
 		for _, name := range step.RegisterNames {
-			if name == "scale" || name == "personalitymodel" {
+			if name == "scale" || name == "typologymodel" {
 				legacy[name] = struct{}{}
 			}
 		}
 	}
-	for _, name := range []string{"scale", "personalitymodel"} {
+	for _, name := range []string{"scale", "typologymodel"} {
 		if _, ok := legacy[name]; !ok {
 			t.Fatalf("legacy initialize sequence no longer registers %q; assessment-model merge may be complete or registry is stale", name)
 		}

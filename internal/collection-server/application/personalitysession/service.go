@@ -8,7 +8,7 @@ import (
 )
 
 type personalityModelReader interface {
-	Get(ctx context.Context, code string) (*typologymodel.PersonalityModelResponse, error)
+	Get(ctx context.Context, code string) (*typologymodel.TypologyModelResponse, error)
 }
 
 type questionnaireReader interface {
@@ -46,7 +46,7 @@ func (s *Service) Start(ctx context.Context, req *StartSessionRequest) (*StartSe
 	if q == nil {
 		return nil, nil
 	}
-	summary := typologymodel.PersonalityModelSummaryResponse{
+	summary := typologymodel.TypologyModelSummaryResponse{
 		Code:                 model.Code,
 		Version:              model.Version,
 		Title:                model.Title,

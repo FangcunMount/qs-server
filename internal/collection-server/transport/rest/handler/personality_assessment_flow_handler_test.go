@@ -28,8 +28,8 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 		questionnaireVersion        = "1.0.0"
 	)
 
-	sessionHandler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&httpFlowModelReader{model: &typologymodel.PersonalityModelResponse{
+	sessionHandler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+		&httpFlowModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 modelCode,
 			Version:              questionnaireVersion,
 			QuestionnaireCode:    questionnaireCode,
@@ -49,7 +49,7 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 		ModelCode: modelCode,
 		TesteeID:  testeeID,
 	})
-	sessionCtx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/personality-assessment-sessions", bytes.NewReader(sessionBody))
+	sessionCtx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/typology-assessment-sessions", bytes.NewReader(sessionBody))
 	sessionCtx.Request.Header.Set("Content-Type", "application/json")
 	sessionHandler.Start(sessionCtx)
 	if sessionRecorder.Code != http.StatusOK {
@@ -66,13 +66,13 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 		t.Fatalf("submit contract = %#v", sessionResp.Data.SubmitContract)
 	}
 
-	assessmentHandler := NewPersonalityAssessmentHandler(&httpFlowAssessmentQueryService{
+	assessmentHandler := NewTypologyAssessmentHandler(&httpFlowAssessmentQueryService{
 		report: &personalityassessment.AssessmentReportResponse{AssessmentID: "8001"},
 	}, nil)
 
 	reportRecorder := httptest.NewRecorder()
 	reportCtx, _ := gin.CreateTestContext(reportRecorder)
-	reportCtx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/personality-assessments/8001/report?testee_id=1001", nil)
+	reportCtx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/typology-assessments/8001/report?testee_id=1001", nil)
 	reportCtx.Params = gin.Params{{Key: "id", Value: "8001"}}
 	assessmentHandler.GetReport(reportCtx)
 	if reportRecorder.Code != http.StatusOK {
@@ -84,10 +84,10 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 }
 
 type httpFlowModelReader struct {
-	model *typologymodel.PersonalityModelResponse
+	model *typologymodel.TypologyModelResponse
 }
 
-func (r *httpFlowModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
+func (r *httpFlowModelReader) Get(context.Context, string) (*typologymodel.TypologyModelResponse, error) {
 	return r.model, nil
 }
 

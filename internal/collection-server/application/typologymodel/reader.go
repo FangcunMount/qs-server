@@ -2,9 +2,9 @@ package typologymodel
 
 import "context"
 
-// CatalogReader 人格模型目录读端口（application-owned DTO）。
+// CatalogReader 类型学模型目录读端口（application-owned DTO）。
 type CatalogReader interface {
-	GetPersonalityModel(ctx context.Context, code string) (*PersonalityModelResponse, error)
-	ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListPersonalityModelsResponse, error)
-	GetPersonalityModelCategories(ctx context.Context) (*PersonalityModelCategoriesResponse, error)
+	GetTypologyModel(ctx context.Context, code string) (*TypologyModelResponse, error)
+	ListTypologyModels(ctx context.Context, page, pageSize int32, algorithm string) (*ListTypologyModelsResponse, error)
+	GetTypologyModelCategories(ctx context.Context) (*TypologyModelCategoriesResponse, error)
 }

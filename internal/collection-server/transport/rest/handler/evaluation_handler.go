@@ -70,7 +70,7 @@ func NewEvaluationHandler(
 }
 
 // GetLegacyMyAssessment 获取我的测评详情（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/personality-assessments。
+// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/typology-assessments。
 // @Summary 获取我的测评详情
 // @Description 根据测评ID获取测评详情
 // @Tags 测评
@@ -111,7 +111,7 @@ func (h *EvaluationHandler) GetLegacyMyAssessment(c *gin.Context) {
 }
 
 // GetLegacyMyAssessmentList 获取我的测评列表（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/personality-assessments。
+// Deprecated: 新接入请使用 outcome 投影（/api/v2/assessments）或 /api/v1/typology-assessments。
 // @Summary 获取我的测评列表
 // @Description 分页获取当前用户的测评列表
 // @Tags 测评
@@ -184,7 +184,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 }
 
 // GetLegacyAssessmentReport 获取测评报告（deprecated 量表投影）。
-// Deprecated: 新接入请使用 outcome 报告（/api/v2/assessments/{id}/report）或 personality-assessments 专用路由。
+// Deprecated: 新接入请使用 outcome 报告（/api/v2/assessments/{id}/report）或 typology-assessments 专用路由。
 // @Summary 获取测评报告
 // @Description 获取测评的解读报告。响应字段说明：
 // @Description - dimensions（维度列表）：只包含 is_show = true 的因子维度，每个维度包含 factor_code（因子编码）、factor_name（因子名称）、raw_score（原始分）、max_score（最大分，可选）、risk_level（风险等级）、description（解读描述）、suggestion（维度建议，字符串）字段
@@ -451,7 +451,7 @@ func isGRPCNotFound(err error) bool {
 }
 
 // GetMyAssessment 获取测评详情（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/personality-assessments。
+// Deprecated: 请优先使用 /api/v1/typology-assessments。
 // @Summary 获取测评详情
 // @Description 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
 // @Tags 测评
@@ -478,7 +478,7 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 }
 
 // ListMyAssessments 查询测评列表（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/personality-assessments。
+// Deprecated: 请优先使用 /api/v1/typology-assessments。
 // @Summary 查询测评列表
 // @Description 分页查询测评列表，响应使用 model/primary_score/level 投影
 // @Tags 测评
@@ -500,7 +500,7 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 }
 
 // GetAssessmentReport 获取测评报告（outcome 投影，/api/v2）。
-// Deprecated: 请优先使用 /api/v1/personality-assessments/{id}/report。
+// Deprecated: 请优先使用 /api/v1/typology-assessments/{id}/report。
 // @Summary 获取测评报告
 // @Description 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
 // @Tags 测评

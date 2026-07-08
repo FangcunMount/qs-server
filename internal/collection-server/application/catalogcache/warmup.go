@@ -70,7 +70,7 @@ func WarmCatalogOnStartupWithPlan(
 		}
 		if personalitySvc != nil {
 			if plan.PersonalityList {
-				if _, err := personalitySvc.List(ctx, &typologymodel.ListPersonalityModelsRequest{
+				if _, err := personalitySvc.List(ctx, &typologymodel.ListTypologyModelsRequest{
 					Page: 1, PageSize: 20,
 				}); err != nil {
 					log.Warnf("catalog warmup: personality list: %v", err)

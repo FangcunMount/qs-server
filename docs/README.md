@@ -19,7 +19,7 @@
 | 当前业务模块 | 4 个核心模块：`survey / model-catalog / evaluation / report`；3 个支撑模块：`actor / plan / statistics` |
 | 代码映射 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
 | 执行主线 | Survey 提供答卷事实，Assessment Model 提供发布模型资产，Evaluation 执行测评并产出结果，Interpretation Model / Report 输出最终解释报告 |
-| 兼容说明 | `scale/personalitymodel` 是 `modelcatalog` 的旧注册名或具体模型资产入口，不再作为独立核心模块 |
+| 兼容说明 | `scale/typologymodel` 是 `modelcatalog` 的旧注册名或具体模型资产入口，不再作为独立核心模块 |
 
 ---
 
