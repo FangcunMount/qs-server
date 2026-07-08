@@ -1,23 +1,23 @@
 package legacy
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 // LegacyKindMapping 解析deprecated flat 类型 到 v2 身份 triples。
-func LegacyKindMapping(kind identity.Kind) (identity.Kind, identity.SubKind, identity.Algorithm, bool) {
+func LegacyKindMapping(kind binding.Kind) (binding.Kind, binding.SubKind, binding.Algorithm, bool) {
 	mappedKind, subKind, algorithm, ok := KindMapping(string(kind))
 	if !ok {
 		return "", "", "", false
 	}
-	return identity.Kind(mappedKind), identity.SubKind(subKind), identity.Algorithm(algorithm), true
+	return binding.Kind(mappedKind), binding.SubKind(subKind), binding.Algorithm(algorithm), true
 }
 
 // ModelDefinitionFromLegacy 构建v2 definition 从 v1 envelope definition。
-func ModelDefinitionFromLegacy(def Definition, decision identity.DecisionKind) catalog.ModelDefinition {
+func ModelDefinitionFromLegacy(def Definition, decision binding.DecisionKind) publishing.ModelDefinition {
 	if kind, subKind, algorithm, ok := LegacyKindMapping(def.Kind); ok {
-		return catalog.ModelDefinition{
+		return publishing.ModelDefinition{
 			Kind:      kind,
 			SubKind:   subKind,
 			Algorithm: algorithm,
@@ -27,7 +27,7 @@ func ModelDefinitionFromLegacy(def Definition, decision identity.DecisionKind) c
 			Status:    def.Status,
 		}
 	}
-	return catalog.ModelDefinition{
+	return publishing.ModelDefinition{
 		Kind:    def.Kind,
 		Code:    def.Code,
 		Version: def.Version,
@@ -37,19 +37,19 @@ func ModelDefinitionFromLegacy(def Definition, decision identity.DecisionKind) c
 }
 
 // PublishedFromLegacy 转换v1 快照 envelope 到 v2。
-func PublishedFromLegacy(snapshot *Snapshot) *catalog.PublishedModelSnapshot {
+func PublishedFromLegacy(snapshot *Snapshot) *publishing.PublishedModelSnapshot {
 	if snapshot == nil {
 		return nil
 	}
-	source := catalog.SourceRef(nil)
+	source := publishing.SourceRef(nil)
 	if snapshot.Source != nil {
-		source = catalog.SourceRef(snapshot.Source)
+		source = publishing.SourceRef(snapshot.Source)
 	}
-	return &catalog.PublishedModelSnapshot{
-		SchemaVersion: catalog.SchemaVersionV2,
+	return &publishing.PublishedModelSnapshot{
+		SchemaVersion: publishing.SchemaVersionV2,
 		Model:         ModelDefinitionFromLegacy(snapshot.Definition, snapshot.DecisionKind),
 		Binding:       snapshot.Binding,
-		Decision:      catalog.DecisionSpec{Kind: snapshot.DecisionKind},
+		Decision:      publishing.DecisionSpec{Kind: snapshot.DecisionKind},
 		Source:        source,
 		PayloadFormat: snapshot.PayloadFormat,
 		Payload:       snapshot.Payload,
@@ -57,7 +57,7 @@ func PublishedFromLegacy(snapshot *Snapshot) *catalog.PublishedModelSnapshot {
 }
 
 // LegacyFromPublished 转换v2 快照 到 v1 envelope 用于 迁移 读取器。
-func LegacyFromPublished(snapshot *catalog.PublishedModelSnapshot) *Snapshot {
+func LegacyFromPublished(snapshot *publishing.PublishedModelSnapshot) *Snapshot {
 	if snapshot == nil {
 		return nil
 	}

@@ -1,22 +1,22 @@
 package legacy
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 // RuleSetKind 是kept 作为 兼容性 name while callers migrate 到 类型。
-type RuleSetKind = identity.Kind
+type RuleSetKind = binding.Kind
 
 const (
-	RuleSetKindScale = identity.KindScale
+	RuleSetKindScale = binding.KindScale
 	RuleSetKindMBTI  = RuleSetKind(KindMBTIMigration)
 	RuleSetKindSBTI  = RuleSetKind(KindSBTIMigration)
 )
 
 // Definition 是kept 作为 兼容性 name while callers migrate 到 ModelDefinition。
 type Definition struct {
-	Kind    identity.Kind
+	Kind    binding.Kind
 	Code    string
 	Version string
 	Title   string
@@ -31,8 +31,8 @@ type Snapshot struct {
 	SchemaVersion string
 	PayloadFormat string
 	Definition    Definition
-	Binding       catalog.QuestionnaireBinding
-	DecisionKind  identity.DecisionKind
+	Binding       publishing.QuestionnaireBinding
+	DecisionKind  binding.DecisionKind
 	Source        map[string]any
 	Payload       []byte
 }
@@ -40,4 +40,4 @@ type Snapshot struct {
 // RuleSetSnapshot 是kept 作为 兼容性 name while callers migrate 到 快照。
 type RuleSetSnapshot = Snapshot
 
-const RuleSetSchemaVersionV1 = catalog.SchemaVersionV1
+const RuleSetSchemaVersionV1 = publishing.SchemaVersionV1

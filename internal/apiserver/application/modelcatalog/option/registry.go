@@ -1,10 +1,9 @@
 package option
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/capability"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 // CatalogOperations 记录lifecycle 守卫 用于 一个API 类型。
@@ -17,27 +16,27 @@ type CatalogOperations struct {
 	PreviewSupported          bool
 	QRCodeSupported           bool
 	RuntimeExecutable         bool
-	ExecutionPath             routing.ExecutionPath
+	ExecutionPath             publishing.ExecutionPath
 }
 
 // Allows 报告是否 操作 是 permitted 用于 这个API 类型。
-func (o CatalogOperations) Allows(op capability.CatalogOperation) bool {
+func (o CatalogOperations) Allows(op binding.CatalogOperation) bool {
 	switch op {
-	case capability.CatalogOpCreate:
+	case binding.CatalogOpCreate:
 		return o.CreateSupported
-	case capability.CatalogOpList:
+	case binding.CatalogOpList:
 		return o.ListSupported
-	case capability.CatalogOpUpdateBasicInfo, capability.CatalogOpDelete:
+	case binding.CatalogOpUpdateBasicInfo, binding.CatalogOpDelete:
 		return o.CreateSupported
-	case capability.CatalogOpPublish, capability.CatalogOpUnpublish, capability.CatalogOpArchive:
+	case binding.CatalogOpPublish, binding.CatalogOpUnpublish, binding.CatalogOpArchive:
 		return o.PublishSupported
-	case capability.CatalogOpBindQuestionnaire:
+	case binding.CatalogOpBindQuestionnaire:
 		return o.BindQuestionnaire
-	case capability.CatalogOpUpdateDefinition:
+	case binding.CatalogOpUpdateDefinition:
 		return o.DefinitionUpdateSupported
-	case capability.CatalogOpPreview:
+	case binding.CatalogOpPreview:
 		return o.PreviewSupported
-	case capability.CatalogOpQRCode:
+	case binding.CatalogOpQRCode:
 		return o.QRCodeSupported
 	default:
 		return false
@@ -46,8 +45,8 @@ func (o CatalogOperations) Allows(op capability.CatalogOperation) bool {
 
 // RegisteredOption 是应用层注册表条目 用于 一个目录 API 类型。
 type RegisteredOption struct {
-	Kind           identity.Kind
-	Role           capability.CapabilityRole
+	Kind           binding.Kind
+	Role           binding.CapabilityRole
 	APIKind        string
 	DisplayName    string
 	OptionsEnabled bool
@@ -98,7 +97,7 @@ func (r *Registry) ByAPIKind(apiKind string) (RegisteredOption, bool) {
 }
 
 // Allows 报告是否 API 类型 supports 操作。
-func (r *Registry) Allows(apiKind string, op capability.CatalogOperation) bool {
+func (r *Registry) Allows(apiKind string, op binding.CatalogOperation) bool {
 	entry, ok := r.ByAPIKind(apiKind)
 	if !ok {
 		return false
@@ -107,7 +106,7 @@ func (r *Registry) Allows(apiKind string, op capability.CatalogOperation) bool {
 }
 
 // ByKind 解析一个注册表条目 按 规范模型家族类型。
-func (r *Registry) ByKind(kind identity.Kind) (RegisteredOption, bool) {
+func (r *Registry) ByKind(kind binding.Kind) (RegisteredOption, bool) {
 	if r == nil {
 		return RegisteredOption{}, false
 	}
@@ -126,7 +125,7 @@ func (r *Registry) PresentationOptions() []ModelCatalogOption {
 	}
 	out := make([]ModelCatalogOption, 0, len(r.ordered))
 	for _, entry := range r.ordered {
-		if entry.Role == capability.CapabilityRoleProductChannel {
+		if entry.Role == binding.CapabilityRoleProductChannel {
 			continue
 		}
 		out = append(out, entry.catalogOption())
@@ -157,11 +156,11 @@ func (o RegisteredOption) catalogOption() ModelCatalogOption {
 
 // IsProductChannel 报告是否 API 类型 是 产品聚合槽位。
 func (o RegisteredOption) IsProductChannel() bool {
-	return o.Role == capability.CapabilityRoleProductChannel
+	return o.Role == binding.CapabilityRoleProductChannel
 }
 
 // ProductChannelKind 返回领域类型 when entry 是 产品通道。
-func (o RegisteredOption) ProductChannelKind() identity.Kind {
+func (o RegisteredOption) ProductChannelKind() binding.Kind {
 	if o.IsProductChannel() {
 		return o.Kind
 	}
@@ -170,8 +169,8 @@ func (o RegisteredOption) ProductChannelKind() identity.Kind {
 
 var defaultRegisteredOptions = []RegisteredOption{
 	{
-		Kind:           identity.KindPersonality,
-		Role:           capability.CapabilityRoleModelFamily,
+		Kind:           binding.KindPersonality,
+		Role:           binding.CapabilityRoleModelFamily,
 		APIKind:        "personality",
 		DisplayName:    "人格测评",
 		OptionsEnabled: true,
@@ -184,13 +183,13 @@ var defaultRegisteredOptions = []RegisteredOption{
 			PreviewSupported:          true,
 			QRCodeSupported:           true,
 			RuntimeExecutable:         true,
-			ExecutionPath:             routing.ExecutionPathTypologyDescriptor,
+			ExecutionPath:             publishing.ExecutionPathTypologyDescriptor,
 		},
 	},
 	{
-		Kind:           identity.KindBehavioralRating,
-		Role:           capability.CapabilityRoleModelFamily,
-		APIKind:        string(identity.KindBehavioralRating),
+		Kind:           binding.KindBehavioralRating,
+		Role:           binding.CapabilityRoleModelFamily,
+		APIKind:        string(binding.KindBehavioralRating),
 		DisplayName:    "行为评分",
 		OptionsEnabled: true,
 		Operations: CatalogOperations{
@@ -201,23 +200,23 @@ var defaultRegisteredOptions = []RegisteredOption{
 			DefinitionUpdateSupported: true,
 			QRCodeSupported:           true,
 			RuntimeExecutable:         true,
-			ExecutionPath:             routing.ExecutionPathBehavioralRatingDescriptor,
+			ExecutionPath:             publishing.ExecutionPathBehavioralRatingDescriptor,
 		},
 	},
 	{
-		Kind:           identity.KindScale,
-		Role:           capability.CapabilityRoleModelFamily,
+		Kind:           binding.KindScale,
+		Role:           binding.CapabilityRoleModelFamily,
 		APIKind:        "medical_scale",
 		DisplayName:    "医学量表",
 		OptionsEnabled: true,
 		Operations: CatalogOperations{
 			RuntimeExecutable: true,
-			ExecutionPath:     routing.ExecutionPathScaleDescriptor,
+			ExecutionPath:     publishing.ExecutionPathScaleDescriptor,
 		},
 	},
 	{
-		Kind:           identity.KindCognitive,
-		Role:           capability.CapabilityRoleModelFamily,
+		Kind:           binding.KindCognitive,
+		Role:           binding.CapabilityRoleModelFamily,
 		APIKind:        "cognitive",
 		DisplayName:    "认知测评",
 		OptionsEnabled: true,
@@ -229,21 +228,21 @@ var defaultRegisteredOptions = []RegisteredOption{
 			DefinitionUpdateSupported: true,
 			QRCodeSupported:           true,
 			RuntimeExecutable:         true,
-			ExecutionPath:             routing.ExecutionPathCognitiveDescriptor,
+			ExecutionPath:             publishing.ExecutionPathCognitiveDescriptor,
 		},
 	},
 	{
-		Kind:        identity.KindCustom,
-		Role:        capability.CapabilityRoleModelFamily,
+		Kind:        binding.KindCustom,
+		Role:        binding.CapabilityRoleModelFamily,
 		APIKind:     "custom",
 		DisplayName: "自定义测评",
 		Operations: CatalogOperations{
-			ExecutionPath: routing.ExecutionPathNone,
+			ExecutionPath: publishing.ExecutionPathNone,
 		},
 	},
 	{
-		Kind:        identity.Kind(legacy.APIKindBehaviorAbility),
-		Role:        capability.CapabilityRoleProductChannel,
+		Kind:        binding.Kind(legacy.APIKindBehaviorAbility),
+		Role:        binding.CapabilityRoleProductChannel,
 		APIKind:     legacy.APIKindBehaviorAbility,
 		DisplayName: "行为能力",
 		Operations: CatalogOperations{

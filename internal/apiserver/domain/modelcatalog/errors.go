@@ -3,16 +3,16 @@ package modelcatalog
 import (
 	stderrors "errors"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 var (
 	ErrNotFound         = stderrors.New("assessment model not found")
 	ErrVersionRequired  = stderrors.New("assessment model version is required")
 	ErrAmbiguousVersion = stderrors.New("multiple published assessment models matched")
-	ErrInvalidArgument  = identity.ErrInvalidArgument
-	ErrInvalidState     = catalog.ErrInvalidState
+	ErrInvalidArgument  = binding.ErrInvalidArgument
+	ErrInvalidState     = publishing.ErrInvalidState
 )
 
 func IsNotFound(err error) bool {

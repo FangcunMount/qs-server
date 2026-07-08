@@ -3,25 +3,25 @@ package legacy
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func TestBehaviorAbilityChannelFamilies(t *testing.T) {
 	t.Parallel()
 
 	families := BehaviorAbilityChannelModelFamilies()
-	if len(families) != 2 || families[0] != identity.KindBehavioralRating || families[1] != identity.KindCognitive {
+	if len(families) != 2 || families[0] != binding.KindBehavioralRating || families[1] != binding.KindCognitive {
 		t.Fatalf("families = %#v", families)
 	}
 	if !IsBehaviorAbilityProductChannelAPIKind(APIKindBehaviorAbility) {
 		t.Fatal("behavior_ability must be a product channel api kind")
 	}
-	for _, kind := range []identity.Kind{identity.KindBehavioralRating, identity.KindCognitive} {
+	for _, kind := range []binding.Kind{binding.KindBehavioralRating, binding.KindCognitive} {
 		if !IsBehaviorAbilityChannelFamily(kind) {
 			t.Fatalf("%q must belong to behavior_ability channel", kind)
 		}
 	}
-	if IsBehaviorAbilityChannelFamily(identity.KindPersonality) {
+	if IsBehaviorAbilityChannelFamily(binding.KindPersonality) {
 		t.Fatal("personality must not belong to behavior_ability channel")
 	}
 }
@@ -29,8 +29,8 @@ func TestBehaviorAbilityChannelFamilies(t *testing.T) {
 func TestResolveBehaviorAbilityChannelFamily(t *testing.T) {
 	t.Parallel()
 
-	kind, ok := ResolveBehaviorAbilityChannelFamily(string(identity.KindBehavioralRating))
-	if !ok || kind != identity.KindBehavioralRating {
+	kind, ok := ResolveBehaviorAbilityChannelFamily(string(binding.KindBehavioralRating))
+	if !ok || kind != binding.KindBehavioralRating {
 		t.Fatalf("resolve behavioral_rating = %q, %v", kind, ok)
 	}
 	if _, ok := ResolveBehaviorAbilityChannelFamily("personality"); ok {

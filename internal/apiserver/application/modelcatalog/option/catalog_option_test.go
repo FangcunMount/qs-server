@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func TestDefaultOptionsExposePresentationFields(t *testing.T) {
@@ -16,7 +16,7 @@ func TestDefaultOptionsExposePresentationFields(t *testing.T) {
 	}
 	found := false
 	for _, item := range opts {
-		if item.Kind == identity.KindPersonality {
+		if item.Kind == binding.KindPersonality {
 			found = true
 			if item.APIKind != "personality" || item.DisplayName == "" {
 				t.Fatalf("option = %#v", item)

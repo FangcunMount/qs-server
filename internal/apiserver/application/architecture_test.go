@@ -116,7 +116,7 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                          "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -363,7 +363,7 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 	}
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "catalog/read-model snapshot adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                       "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                         "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
@@ -418,16 +418,16 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                         "application error mapping/use cases",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                               "infrastructure adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                           "transport adapters",
-		"github.com/FangcunMount/component-base/pkg/logger":                                         "application/infra observability",
-		"github.com/FangcunMount/component-base/pkg/errors":                                         "domain-native errors",
-		"github.com/FangcunMount/component-base/pkg/code":                                           "domain-native errors",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                                       "application API error mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                           "application error mapping/use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                                 "infrastructure adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                             "transport adapters",
+		"github.com/FangcunMount/component-base/pkg/logger":                                           "application/infra observability",
+		"github.com/FangcunMount/component-base/pkg/errors":                                           "domain-native errors",
+		"github.com/FangcunMount/component-base/pkg/code":                                             "domain-native errors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                                         "application API error mapping",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluation-local snapshots/value objects",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":         "report-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                          "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":           "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if isEvaluationRootPackageGoFile(root, path) {

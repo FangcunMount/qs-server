@@ -1,12 +1,12 @@
 package option
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // ModelCatalogOption 是application-facing 目录展示契约。
 type ModelCatalogOption struct {
-	Kind             identity.Kind
+	Kind             binding.Kind
 	APIKind          string
 	DisplayName      string
 	OptionsEnabled   bool
@@ -20,7 +20,7 @@ func DefaultOptions() []ModelCatalogOption {
 }
 
 // ByKind 解析展示选项 用于 模型家族 类型。
-func ByKind(kind identity.Kind) (ModelCatalogOption, bool) {
+func ByKind(kind binding.Kind) (ModelCatalogOption, bool) {
 	entry, ok := DefaultRegistry().ByKind(kind)
 	if !ok {
 		return ModelCatalogOption{}, false

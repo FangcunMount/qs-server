@@ -103,10 +103,6 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 		"cognitive":         {},
 		"behavioral_rating": {},
 		"personality":       {},
-		"identity":          {},
-		"routing":           {},
-		"catalog":           {},
-		"capability":        {},
 		"task_performance":  {},
 	}
 	entries, err := os.ReadDir(root)

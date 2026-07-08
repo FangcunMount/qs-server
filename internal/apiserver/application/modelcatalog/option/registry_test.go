@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/capability"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
@@ -16,7 +15,7 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 	reg := option.NewRegistry()
 	cases := []struct {
 		apiKind        string
-		kind           identity.Kind
+		kind           binding.Kind
 		displayName    string
 		optionsEnabled bool
 		create         bool
@@ -27,7 +26,7 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 	}{
 		{
 			apiKind:        "personality",
-			kind:           identity.KindPersonality,
+			kind:           binding.KindPersonality,
 			displayName:    "人格测评",
 			optionsEnabled: true,
 			create:         true,
@@ -38,7 +37,7 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		},
 		{
 			apiKind:        "behavioral_rating",
-			kind:           identity.KindBehavioralRating,
+			kind:           binding.KindBehavioralRating,
 			displayName:    "行为评分",
 			optionsEnabled: true,
 			create:         true,
@@ -48,13 +47,13 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		},
 		{
 			apiKind:        "medical_scale",
-			kind:           identity.KindScale,
+			kind:           binding.KindScale,
 			displayName:    "医学量表",
 			optionsEnabled: true,
 		},
 		{
 			apiKind:        "cognitive",
-			kind:           identity.KindCognitive,
+			kind:           binding.KindCognitive,
 			displayName:    "认知测评",
 			optionsEnabled: true,
 			create:         true,
@@ -64,7 +63,7 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		},
 		{
 			apiKind:     "custom",
-			kind:        identity.KindCustom,
+			kind:        binding.KindCustom,
 			displayName: "自定义测评",
 		},
 	}
@@ -76,19 +75,19 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		if entry.Kind != tc.kind || entry.DisplayName != tc.displayName || entry.OptionsEnabled != tc.optionsEnabled {
 			t.Fatalf("entry(%q) = %#v", tc.apiKind, entry)
 		}
-		if reg.Allows(tc.apiKind, capability.CatalogOpCreate) != tc.create {
+		if reg.Allows(tc.apiKind, binding.CatalogOpCreate) != tc.create {
 			t.Fatalf("create(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, capability.CatalogOpList) != tc.list {
+		if reg.Allows(tc.apiKind, binding.CatalogOpList) != tc.list {
 			t.Fatalf("list(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, capability.CatalogOpPublish) != tc.publish {
+		if reg.Allows(tc.apiKind, binding.CatalogOpPublish) != tc.publish {
 			t.Fatalf("publish(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, capability.CatalogOpPreview) != tc.preview {
+		if reg.Allows(tc.apiKind, binding.CatalogOpPreview) != tc.preview {
 			t.Fatalf("preview(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, capability.CatalogOpQRCode) != tc.qrcode {
+		if reg.Allows(tc.apiKind, binding.CatalogOpQRCode) != tc.qrcode {
 			t.Fatalf("qrcode(%q) mismatch", tc.apiKind)
 		}
 	}

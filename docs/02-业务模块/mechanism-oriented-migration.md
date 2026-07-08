@@ -537,11 +537,12 @@ type Algorithm = identity.Algorithm
 | Round | 动作 |
 |-------|------|
 | R87 | 剩余调用方改引 `scoring/definition`；删除 `modelcatalog/scale/` 整树；顶层守卫禁 `scale/` |
+| R88 | `identity/routing/catalog/capability` 调用方改引 `binding/publishing`；删除四过渡包 |
 
-过渡态说明（R87 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
+过渡态说明（R88 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
 
 ```text
-modelcatalog/{identity,routing,catalog,capability,cognitive,behavioral_rating,personality,task_performance}
+modelcatalog/{cognitive,behavioral_rating,personality,task_performance}
 application/modelcatalog/{personality,behavioral_rating,cognitive}/  # 用例子包，非顶层 service 命名
 ```
 

@@ -1,6 +1,6 @@
 package legacy
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 
 // IsBehaviorAbilityProductChannelAPIKind 报告是否 api类型 是 behavior-ability 产品通道。
 func IsBehaviorAbilityProductChannelAPIKind(apiKind string) bool {
@@ -8,14 +8,14 @@ func IsBehaviorAbilityProductChannelAPIKind(apiKind string) bool {
 }
 
 // BehaviorAbilityChannelModelFamilies 返回可执行 模型家族 aggregated 按 channel。
-func BehaviorAbilityChannelModelFamilies() []identity.Kind {
-	return []identity.Kind{identity.KindBehavioralRating, identity.KindCognitive}
+func BehaviorAbilityChannelModelFamilies() []binding.Kind {
+	return []binding.Kind{binding.KindBehavioralRating, binding.KindCognitive}
 }
 
 // IsBehaviorAbilityChannelFamily 报告是否 类型 是 listed under behavior-ability channel。
-func IsBehaviorAbilityChannelFamily(kind identity.Kind) bool {
+func IsBehaviorAbilityChannelFamily(kind binding.Kind) bool {
 	switch kind {
-	case identity.KindBehavioralRating, identity.KindCognitive:
+	case binding.KindBehavioralRating, binding.KindCognitive:
 		return true
 	default:
 		return false
@@ -23,10 +23,10 @@ func IsBehaviorAbilityChannelFamily(kind identity.Kind) bool {
 }
 
 // ResolveBehaviorAbilityChannelFamily 映射可选 channel filter 到 模型家族 类型。
-func ResolveBehaviorAbilityChannelFamily(filter string) (identity.Kind, bool) {
-	switch identity.Kind(filter) {
-	case identity.KindBehavioralRating, identity.KindCognitive:
-		return identity.Kind(filter), true
+func ResolveBehaviorAbilityChannelFamily(filter string) (binding.Kind, bool) {
+	switch binding.Kind(filter) {
+	case binding.KindBehavioralRating, binding.KindCognitive:
+		return binding.Kind(filter), true
 	case "":
 		return "", false
 	default:

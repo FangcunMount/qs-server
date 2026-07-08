@@ -1,4 +1,4 @@
-package routing_test
+package binding_test
 
 import (
 	"os"
