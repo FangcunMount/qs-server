@@ -49,7 +49,7 @@ func normalizeDefinitionPayloadForAPI(model *domain.AssessmentModel) []byte {
 	if len(raw) == 0 {
 		return raw
 	}
-	payload, runtime, err := publishing.PersonalityPayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
 	if err != nil || runtime == nil {
 		return raw
 	}

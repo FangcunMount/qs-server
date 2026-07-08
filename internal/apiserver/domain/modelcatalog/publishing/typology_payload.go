@@ -7,14 +7,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-// PersonalityRuntimeSpecFromModel decodes draft model definition into runtime execution spec.
-func PersonalityRuntimeSpecFromModel(model *AssessmentModel) (*typology.RuntimeSpec, error) {
-	_, runtime, err := PersonalityPayloadAndRuntimeSpecFromModel(model)
+// TypologyRuntimeSpecFromModel decodes draft model definition into runtime execution spec.
+func TypologyRuntimeSpecFromModel(model *AssessmentModel) (*typology.RuntimeSpec, error) {
+	_, runtime, err := TypologyPayloadAndRuntimeSpecFromModel(model)
 	return runtime, err
 }
 
-// PersonalityPayloadAndRuntimeSpecFromModel decodes draft definition and preserves payload-level metadata.
-func PersonalityPayloadAndRuntimeSpecFromModel(model *AssessmentModel) (*typology.Payload, *typology.RuntimeSpec, error) {
+// TypologyPayloadAndRuntimeSpecFromModel decodes draft definition and preserves payload-level metadata.
+func TypologyPayloadAndRuntimeSpecFromModel(model *AssessmentModel) (*typology.Payload, *typology.RuntimeSpec, error) {
 	if model == nil {
 		return nil, nil, fmt.Errorf("assessment model is nil")
 	}
@@ -31,7 +31,7 @@ func PersonalityPayloadAndRuntimeSpecFromModel(model *AssessmentModel) (*typolog
 	}
 	var runtime typology.RuntimeSpec
 	if err := json.Unmarshal(model.Definition.Data, &runtime); err != nil {
-		return nil, nil, fmt.Errorf("decode personality runtime spec: %w", err)
+		return nil, nil, fmt.Errorf("decode typology runtime spec: %w", err)
 	}
 	wrapped := &typology.Payload{
 		Algorithm: model.Algorithm,

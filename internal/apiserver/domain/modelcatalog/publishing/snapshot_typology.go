@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-func buildPersonalityPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, error) {
+func buildTypologyPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, error) {
 	if model.Kind != binding.KindPersonality {
 		return nil, fmt.Errorf("model kind %s is not personality", model.Kind)
 	}
@@ -18,11 +18,11 @@ func buildPersonalityPublishedSnapshot(model *AssessmentModel) (*PublishedModelS
 	if model.Definition.IsEmpty() {
 		return nil, fmt.Errorf("personality model definition is empty")
 	}
-	payload, runtime, err := PersonalityPayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := TypologyPayloadAndRuntimeSpecFromModel(model)
 	if err != nil {
 		return nil, err
 	}
-	preparePersonalityPublishedPayload(payload, model, runtime)
+	prepareTypologyPublishedPayload(payload, model, runtime)
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("marshal typology payload: %w", err)
@@ -51,7 +51,7 @@ func buildPersonalityPublishedSnapshot(model *AssessmentModel) (*PublishedModelS
 	}, nil
 }
 
-func preparePersonalityPublishedPayload(payload *typology.Payload, model *AssessmentModel, runtime *typology.RuntimeSpec) {
+func prepareTypologyPublishedPayload(payload *typology.Payload, model *AssessmentModel, runtime *typology.RuntimeSpec) {
 	payload.Code = model.Code
 	payload.Version = modelVersionString(model)
 	payload.Title = model.Title

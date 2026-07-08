@@ -541,6 +541,7 @@ type Algorithm = identity.Algorithm
 | R89 | `personality publish` 迁入 `publishing.SnapshotBuilder`；`typology` 去 `modelcatalog` 根依赖；删 `cognitive/behavioral_rating/task_performance` domain 包 |
 | R90 | `application/modelcatalog/{personality,behavioral_rating,cognitive}` → `{typology,norming,taskperformance}`；删 `personality/seed`；seed 调用方直引 `legacy`；守卫禁回退目录 |
 | R91 | `container/modules/modelcatalog` 装配机制化：`assemble_{typology,norming,taskperformance}`；`Module.{Typology,Norming,TaskPerformance}`；守卫禁回退 assemble 文件名 |
+| R92 | `publishing` 快照/载荷解码机制化：`typology_payload`/`snapshot_{typology,norming,taskperformance}`；`TypologyPayloadAndRuntimeSpecFromModel`；守卫禁回退 publishing 文件名 |
 
-过渡态说明（R91 后 container 内部已机制化；对外仍保留 `PersonalityModelModule` / `personalitymodel` 注册名作为兼容别名）：
+过渡态说明（R92 后 domain/application/container 内部均已机制化；对外 API 字符串与 gRPC `personalitymodel` 注册名保持不变）：
 

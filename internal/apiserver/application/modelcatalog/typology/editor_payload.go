@@ -129,7 +129,7 @@ func decodeDefinitionPayload(data []byte, algorithm domain.Algorithm) (*modeltyp
 		Algorithm:  algorithm,
 		Definition: domain.DefinitionPayload{Data: data},
 	}
-	decoded, runtime, err := publishing.PersonalityPayloadAndRuntimeSpecFromModel(model)
+	decoded, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
 	if err != nil {
 		return nil, err
 	}

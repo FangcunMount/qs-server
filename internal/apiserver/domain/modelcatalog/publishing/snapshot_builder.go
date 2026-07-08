@@ -2,6 +2,7 @@ package publishing
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
@@ -13,12 +14,16 @@ func BuildPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnapshot, er
 	}
 	switch model.Kind {
 	case binding.KindPersonality:
-		return buildPersonalityPublishedSnapshot(model)
+		return buildTypologyPublishedSnapshot(model)
 	case binding.KindBehavioralRating:
-		return buildBehavioralRatingPublishedSnapshot(model)
+		return buildNormingPublishedSnapshot(model)
 	case binding.KindCognitive:
-		return buildCognitivePublishedSnapshot(model)
+		return buildTaskPerformancePublishedSnapshot(model)
 	default:
 		return nil, fmt.Errorf("unsupported model kind %s for publishing snapshot builder", model.Kind)
 	}
+}
+
+func modelVersionString(model *AssessmentModel) string {
+	return "v" + strconv.FormatInt(model.Version, 10)
 }

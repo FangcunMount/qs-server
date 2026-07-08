@@ -43,7 +43,7 @@ func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modelt
 	if issues := validateDefinitionPayloadForSave(model.Definition.Format, model.Definition.Data); len(issues) > 0 {
 		return nil, validationContext, issues
 	}
-	payload, runtime, err := publishing.PersonalityPayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
 	if err != nil {
 		return nil, validationContext, []ValidationIssue{{
 			Field: "definition.payload", Message: err.Error(),
