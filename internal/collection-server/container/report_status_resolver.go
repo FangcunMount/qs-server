@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 )
 
 type medicalKindReader struct {
@@ -45,8 +45,8 @@ func (m medicalKindReader) CurrentStatus(ctx context.Context, testeeID, assessme
 
 type personalityKindReader struct {
 	personality interface {
-		Get(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentDetailResponse, error)
-		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentStatusResponse, error)
+		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
+		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	}
 }
 
@@ -93,8 +93,8 @@ func newReportStatusResolver(
 		GetStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentStatusResponse, error)
 	},
 	personality interface {
-		Get(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentDetailResponse, error)
-		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentStatusResponse, error)
+		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
+		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	},
 ) *reportstatus.Resolver {
 	return reportstatus.NewResolver(map[string]reportstatus.KindReader{

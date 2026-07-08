@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 type StartSessionRequest struct {
@@ -67,13 +67,13 @@ type SessionEndpointsResponse struct {
 }
 
 type StartSessionResponse struct {
-	Model          personalitymodel.PersonalityModelSummaryResponse `json:"model"`
-	Questionnaire  questionnaire.QuestionnaireResponse              `json:"questionnaire"`
-	SubmitContract SubmitContractResponse                           `json:"submit_contract"`
-	Endpoints      SessionEndpointsResponse                         `json:"endpoints"`
+	Model          typologymodel.PersonalityModelSummaryResponse `json:"model"`
+	Questionnaire  questionnaire.QuestionnaireResponse           `json:"questionnaire"`
+	SubmitContract SubmitContractResponse                        `json:"submit_contract"`
+	Endpoints      SessionEndpointsResponse                      `json:"endpoints"`
 }
 
-func buildSubmitContract(model *personalitymodel.PersonalityModelResponse, testeeID uint64) SubmitContractResponse {
+func buildSubmitContract(model *typologymodel.PersonalityModelResponse, testeeID uint64) SubmitContractResponse {
 	return SubmitContractResponse{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,

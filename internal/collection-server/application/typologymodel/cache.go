@@ -1,4 +1,4 @@
-package personalitymodel
+package typologymodel
 
 // CatalogCache 人格模型目录 REST DTO 进程内 L1 缓存。
 type CatalogCache interface {

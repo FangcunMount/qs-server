@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 const warmupTimeout = 30 * time.Second
@@ -32,14 +32,14 @@ func DefaultCatalogWarmupPlan() CatalogWarmupPlan {
 // WarmCatalogOnStartup 预热压测高频 catalog 路径，减少开跑 L1 miss 尖刺。
 func WarmCatalogOnStartup(
 	scaleSvc *scale.QueryService,
-	personalitySvc *personalitymodel.QueryService,
+	personalitySvc *typologymodel.QueryService,
 ) {
 	WarmCatalogOnStartupWithPlan(scaleSvc, personalitySvc, DefaultCatalogWarmupPlan())
 }
 
 func WarmCatalogOnStartupWithPlan(
 	scaleSvc *scale.QueryService,
-	personalitySvc *personalitymodel.QueryService,
+	personalitySvc *typologymodel.QueryService,
 	plan CatalogWarmupPlan,
 ) {
 	if scaleSvc == nil && personalitySvc == nil {
@@ -70,7 +70,7 @@ func WarmCatalogOnStartupWithPlan(
 		}
 		if personalitySvc != nil {
 			if plan.PersonalityList {
-				if _, err := personalitySvc.List(ctx, &personalitymodel.ListPersonalityModelsRequest{
+				if _, err := personalitySvc.List(ctx, &typologymodel.ListPersonalityModelsRequest{
 					Page: 1, PageSize: 20,
 				}); err != nil {
 					log.Warnf("catalog warmup: personality list: %v", err)

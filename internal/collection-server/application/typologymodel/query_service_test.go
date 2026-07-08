@@ -1,4 +1,4 @@
-package personalitymodel
+package typologymodel
 
 import (
 	"context"

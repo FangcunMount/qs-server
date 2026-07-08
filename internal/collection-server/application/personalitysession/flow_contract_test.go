@@ -6,18 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 // flowModelReader returns a published MBTI-like model binding.
 type flowModelReader struct{}
 
-func (flowModelReader) Get(_ context.Context, code string) (*personalitymodel.PersonalityModelResponse, error) {
+func (flowModelReader) Get(_ context.Context, code string) (*typologymodel.PersonalityModelResponse, error) {
 	if code != "MBTI_OEJTS" {
 		return nil, nil
 	}
-	return &personalitymodel.PersonalityModelResponse{
+	return &typologymodel.PersonalityModelResponse{
 		Code:                 "MBTI_OEJTS",
 		Version:              "1.0.0",
 		Title:                "MBTI OEJTS",

@@ -1,4 +1,4 @@
-package personalityassessment
+package typologyassessment
 
 import evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 

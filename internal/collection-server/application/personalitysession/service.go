@@ -3,12 +3,12 @@ package personalitysession
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 type personalityModelReader interface {
-	Get(ctx context.Context, code string) (*personalitymodel.PersonalityModelResponse, error)
+	Get(ctx context.Context, code string) (*typologymodel.PersonalityModelResponse, error)
 }
 
 type questionnaireReader interface {
@@ -46,7 +46,7 @@ func (s *Service) Start(ctx context.Context, req *StartSessionRequest) (*StartSe
 	if q == nil {
 		return nil, nil
 	}
-	summary := personalitymodel.PersonalityModelSummaryResponse{
+	summary := typologymodel.PersonalityModelSummaryResponse{
 		Code:                 model.Code,
 		Version:              model.Version,
 		Title:                model.Title,

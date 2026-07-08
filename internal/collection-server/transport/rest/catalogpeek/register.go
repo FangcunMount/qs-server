@@ -3,9 +3,9 @@ package catalogpeek
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,7 +13,7 @@ import (
 func RegisterCatalogL1(
 	registry *Registry,
 	scaleSvc *scale.QueryService,
-	personalitySvc *personalitymodel.QueryService,
+	personalitySvc *typologymodel.QueryService,
 	questionnaireSvc *questionnaire.QueryService,
 ) {
 	if registry == nil {
@@ -73,7 +73,7 @@ func RegisterCatalogL1(
 			if personalitySvc == nil {
 				return false
 			}
-			var req personalitymodel.ListPersonalityModelsRequest
+			var req typologymodel.ListPersonalityModelsRequest
 			if err := c.ShouldBindQuery(&req); err != nil {
 				return false
 			}

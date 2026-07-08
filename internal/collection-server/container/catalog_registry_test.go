@@ -3,9 +3,9 @@ package container
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 )
 
@@ -42,7 +42,7 @@ func TestCatalogL1CacheEnabledBuildsTypedCaches(t *testing.T) {
 	if _, ok := newCatalogL1Cache(opts, catalogKindScale).(*scale.LocalCatalogCache); !ok {
 		t.Fatal("scale cache type mismatch")
 	}
-	if _, ok := newCatalogL1Cache(opts, catalogKindPersonality).(*personalitymodel.LocalCatalogCache); !ok {
+	if _, ok := newCatalogL1Cache(opts, catalogKindPersonality).(*typologymodel.LocalCatalogCache); !ok {
 		t.Fatal("personality cache type mismatch")
 	}
 }

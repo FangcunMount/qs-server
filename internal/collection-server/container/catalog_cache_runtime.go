@@ -8,9 +8,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -20,7 +20,7 @@ import (
 type catalogCaches struct {
 	questionnaire questionnaire.PublishedDetailCache
 	scale         scale.CatalogCache
-	personality   personalitymodel.CatalogCache
+	personality   typologymodel.CatalogCache
 }
 
 func (c *Container) initCatalogCaches() catalogCaches {
@@ -34,7 +34,7 @@ func (c *Container) initCatalogCaches() catalogCaches {
 		c.startCatalogSignalWatcher(catalogKindScale, cache)
 	}
 	if cache := newCatalogL1Cache(c.opts, catalogKindPersonality); cache != nil {
-		caches.personality = cache.(personalitymodel.CatalogCache)
+		caches.personality = cache.(typologymodel.CatalogCache)
 		c.startCatalogSignalWatcher(catalogKindPersonality, cache)
 	}
 	return caches
@@ -110,10 +110,10 @@ func (c *Container) startCatalogSignalWatcher(kind catalogKind, cache any) {
 	case catalogKindPersonality:
 		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
 			cachesignal.NewPersonalityModelSignaler,
-			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.PersonalityModelCacheChangedSignal], target personalitymodel.CatalogCache) {
-				personalitymodel.StartCacheSignalWatcher(ctx, signaler, target)
+			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.PersonalityModelCacheChangedSignal], target typologymodel.CatalogCache) {
+				typologymodel.StartCacheSignalWatcher(ctx, signaler, target)
 			},
-			func(v any) personalitymodel.CatalogCache { return v.(personalitymodel.CatalogCache) },
+			func(v any) typologymodel.CatalogCache { return v.(typologymodel.CatalogCache) },
 		)
 	}
 }

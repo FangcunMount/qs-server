@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,7 +29,7 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 	)
 
 	sessionHandler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&httpFlowModelReader{model: &personalitymodel.PersonalityModelResponse{
+		&httpFlowModelReader{model: &typologymodel.PersonalityModelResponse{
 			Code:                 modelCode,
 			Version:              questionnaireVersion,
 			QuestionnaireCode:    questionnaireCode,
@@ -84,10 +84,10 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 }
 
 type httpFlowModelReader struct {
-	model *personalitymodel.PersonalityModelResponse
+	model *typologymodel.PersonalityModelResponse
 }
 
-func (r *httpFlowModelReader) Get(context.Context, string) (*personalitymodel.PersonalityModelResponse, error) {
+func (r *httpFlowModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
 	return r.model, nil
 }
 

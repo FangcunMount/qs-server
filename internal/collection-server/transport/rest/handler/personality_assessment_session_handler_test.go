@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,7 +18,7 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&sessionModelReader{model: &personalitymodel.PersonalityModelResponse{
+		&sessionModelReader{model: &typologymodel.PersonalityModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",
 			QuestionnaireVersion: "1.0.0",
@@ -54,7 +54,7 @@ func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testin
 	gin.SetMode(gin.TestMode)
 
 	handler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
-		&sessionModelReader{model: &personalitymodel.PersonalityModelResponse{
+		&sessionModelReader{model: &typologymodel.PersonalityModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",
 			QuestionnaireVersion: "1.0.0",
@@ -81,10 +81,10 @@ func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testin
 }
 
 type sessionModelReader struct {
-	model *personalitymodel.PersonalityModelResponse
+	model *typologymodel.PersonalityModelResponse
 }
 
-func (r *sessionModelReader) Get(context.Context, string) (*personalitymodel.PersonalityModelResponse, error) {
+func (r *sessionModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
 	return r.model, nil
 }
 

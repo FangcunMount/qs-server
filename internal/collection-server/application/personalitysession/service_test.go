@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 type fakeModelReader struct {
-	model *personalitymodel.PersonalityModelResponse
+	model *typologymodel.PersonalityModelResponse
 }
 
-func (f *fakeModelReader) Get(context.Context, string) (*personalitymodel.PersonalityModelResponse, error) {
+func (f *fakeModelReader) Get(context.Context, string) (*typologymodel.PersonalityModelResponse, error) {
 	return f.model, nil
 }
 
@@ -26,7 +26,7 @@ func (f *fakeQuestionnaireReader) Get(context.Context, string, string) (*questio
 
 func TestServiceStartReturnsBoundQuestionnaire(t *testing.T) {
 	svc := NewService(
-		&fakeModelReader{model: &personalitymodel.PersonalityModelResponse{
+		&fakeModelReader{model: &typologymodel.PersonalityModelResponse{
 			Code:                 "MBTI_OEJTS",
 			Version:              "1.0.0",
 			Title:                "MBTI",

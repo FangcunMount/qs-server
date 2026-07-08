@@ -3,7 +3,7 @@ package grpcbridge
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
 // PersonalityCatalogReader 将 infra gRPC 输出转换为 application DTO。
@@ -15,7 +15,7 @@ func NewPersonalityCatalogReader(inner PersonalityModelReader) *PersonalityCatal
 	return &PersonalityCatalogReader{inner: inner}
 }
 
-func (r *PersonalityCatalogReader) GetPersonalityModel(ctx context.Context, code string) (*personalitymodel.PersonalityModelResponse, error) {
+func (r *PersonalityCatalogReader) GetPersonalityModel(ctx context.Context, code string) (*typologymodel.PersonalityModelResponse, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -25,7 +25,7 @@ func (r *PersonalityCatalogReader) GetPersonalityModel(ctx context.Context, code
 	)
 }
 
-func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*personalitymodel.ListPersonalityModelsResponse, error) {
+func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*typologymodel.ListPersonalityModelsResponse, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -37,7 +37,7 @@ func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, pa
 	)
 }
 
-func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Context) (*personalitymodel.PersonalityModelCategoriesResponse, error) {
+func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Context) (*typologymodel.PersonalityModelCategoriesResponse, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -47,12 +47,12 @@ func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Con
 	)
 }
 
-func toListPersonalityModelsResponse(out *ListPersonalityModelsOutput) *personalitymodel.ListPersonalityModelsResponse {
-	models := make([]personalitymodel.PersonalityModelSummaryResponse, 0, len(out.Models))
+func toListPersonalityModelsResponse(out *ListPersonalityModelsOutput) *typologymodel.ListPersonalityModelsResponse {
+	models := make([]typologymodel.PersonalityModelSummaryResponse, 0, len(out.Models))
 	for _, model := range out.Models {
 		models = append(models, toPersonalitySummary(model))
 	}
-	return &personalitymodel.ListPersonalityModelsResponse{
+	return &typologymodel.ListPersonalityModelsResponse{
 		Models:     models,
 		Total:      out.Total,
 		Page:       out.Page,
@@ -61,16 +61,16 @@ func toListPersonalityModelsResponse(out *ListPersonalityModelsOutput) *personal
 	}
 }
 
-func toPersonalityModelCategoriesResponse(out *PersonalityModelCategoriesOutput) *personalitymodel.PersonalityModelCategoriesResponse {
-	categories := make([]personalitymodel.CategoryResponse, 0, len(out.Categories))
+func toPersonalityModelCategoriesResponse(out *PersonalityModelCategoriesOutput) *typologymodel.PersonalityModelCategoriesResponse {
+	categories := make([]typologymodel.CategoryResponse, 0, len(out.Categories))
 	for _, item := range out.Categories {
-		categories = append(categories, personalitymodel.CategoryResponse{Value: item.Value, Label: item.Label})
+		categories = append(categories, typologymodel.CategoryResponse{Value: item.Value, Label: item.Label})
 	}
-	return &personalitymodel.PersonalityModelCategoriesResponse{Categories: categories}
+	return &typologymodel.PersonalityModelCategoriesResponse{Categories: categories}
 }
 
-func toPersonalitySummary(model PersonalityModelSummaryOutput) personalitymodel.PersonalityModelSummaryResponse {
-	return personalitymodel.PersonalityModelSummaryResponse{
+func toPersonalitySummary(model PersonalityModelSummaryOutput) typologymodel.PersonalityModelSummaryResponse {
+	return typologymodel.PersonalityModelSummaryResponse{
 		Code:                 model.Code,
 		Version:              model.Version,
 		Title:                model.Title,
@@ -83,19 +83,19 @@ func toPersonalitySummary(model PersonalityModelSummaryOutput) personalitymodel.
 	}
 }
 
-func toPersonalityModelResponse(model *PersonalityModelOutput) *personalitymodel.PersonalityModelResponse {
-	dimensions := make([]personalitymodel.PersonalityDimensionResponse, 0, len(model.Dimensions))
+func toPersonalityModelResponse(model *PersonalityModelOutput) *typologymodel.PersonalityModelResponse {
+	dimensions := make([]typologymodel.PersonalityDimensionResponse, 0, len(model.Dimensions))
 	for _, dim := range model.Dimensions {
-		dimensions = append(dimensions, personalitymodel.PersonalityDimensionResponse{
+		dimensions = append(dimensions, typologymodel.PersonalityDimensionResponse{
 			Code:      dim.Code,
 			Name:      dim.Name,
 			LeftPole:  dim.LeftPole,
 			RightPole: dim.RightPole,
 		})
 	}
-	outcomes := make([]personalitymodel.PersonalityOutcomeResponse, 0, len(model.Outcomes))
+	outcomes := make([]typologymodel.PersonalityOutcomeResponse, 0, len(model.Outcomes))
 	for _, outcome := range model.Outcomes {
-		outcomes = append(outcomes, personalitymodel.PersonalityOutcomeResponse{
+		outcomes = append(outcomes, typologymodel.PersonalityOutcomeResponse{
 			Code:     outcome.Code,
 			Name:     outcome.Name,
 			OneLiner: outcome.OneLiner,
@@ -103,7 +103,7 @@ func toPersonalityModelResponse(model *PersonalityModelOutput) *personalitymodel
 		})
 	}
 	summary := toPersonalitySummary(model.Summary)
-	return &personalitymodel.PersonalityModelResponse{
+	return &typologymodel.PersonalityModelResponse{
 		Code:                 summary.Code,
 		Version:              summary.Version,
 		Title:                summary.Title,

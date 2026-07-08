@@ -1,4 +1,4 @@
-package personalitymodel
+package typologymodel
 
 import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"

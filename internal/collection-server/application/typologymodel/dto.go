@@ -1,4 +1,4 @@
-package personalitymodel
+package typologymodel
 
 type PersonalityModelResponse struct {
 	Code                 string                         `json:"code"`

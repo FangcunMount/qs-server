@@ -1,4 +1,4 @@
-package personalityassessment
+package typologyassessment
 
 import (
 	"context"

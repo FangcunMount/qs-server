@@ -1,9 +1,9 @@
 package container
 
 import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 )
 
@@ -51,7 +51,7 @@ var catalogSpecs = map[catalogKind]catalogSpec{
 		watcherLabel: "personality model cache signal watcher",
 		config:       personalityCatalogCfg,
 		build: func(o localCacheOptions) any {
-			return personalitymodel.NewLocalCatalogCache(personalitymodel.LocalCatalogCacheOptions{
+			return typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{
 				TTL: o.TTL, MaxEntries: o.MaxEntries, TTLJitterRatio: o.TTLJitterRatio,
 				OnHit: o.OnHit, OnMiss: o.OnMiss,
 			})

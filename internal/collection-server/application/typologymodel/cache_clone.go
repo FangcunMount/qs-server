@@ -1,4 +1,4 @@
-package personalitymodel
+package typologymodel
 
 func clonePersonalityModelResponse(src *PersonalityModelResponse) *PersonalityModelResponse {
 	if src == nil {

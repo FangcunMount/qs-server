@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
+	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

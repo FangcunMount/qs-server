@@ -8,14 +8,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
@@ -59,8 +59,8 @@ type Container struct {
 	evaluationQueryService            *evaluation.QueryService
 	waitReportService                 *reportwait.Service
 	scaleQueryService                 *scale.QueryService
-	personalityModelQueryService      *personalitymodel.QueryService
-	personalityAssessmentQueryService *personalityassessment.QueryService
+	personalityModelQueryService      *typologymodel.QueryService
+	personalityAssessmentQueryService *typologyassessment.QueryService
 	personalitySessionService         *personalitysession.Service
 	testeeService                     *testee.Service
 	reportStatusReporter              *reportstatus.Reporter
@@ -191,7 +191,7 @@ func (c *Container) initApplicationServices() {
 	c.waitReportService = reportRuntime.waitReport
 	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
-	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(
+	c.personalityAssessmentQueryService = typologyassessment.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
 		c.waitReportService,
 	)
@@ -335,7 +335,7 @@ func (c *Container) ScaleQueryService() *scale.QueryService {
 	return c.scaleQueryService
 }
 
-func (c *Container) PersonalityModelQueryService() *personalitymodel.QueryService {
+func (c *Container) PersonalityModelQueryService() *typologymodel.QueryService {
 	if c == nil {
 		return nil
 	}

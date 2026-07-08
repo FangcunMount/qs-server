@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/gin-gonic/gin"
 )
@@ -20,9 +20,9 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 	scaleCache.SetDetail("ABC", &scale.ScaleResponse{Code: "ABC"})
 	scaleSvc := scale.NewQueryService(nil, scaleCache, false)
 
-	personalityCache := personalitymodel.NewLocalCatalogCache(personalitymodel.LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 16})
-	personalityCache.SetDetail("PM1", &personalitymodel.PersonalityModelResponse{Code: "PM1"})
-	personalitySvc := personalitymodel.NewQueryService(nil, personalityCache, false)
+	personalityCache := typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 16})
+	personalityCache.SetDetail("PM1", &typologymodel.PersonalityModelResponse{Code: "PM1"})
+	personalitySvc := typologymodel.NewQueryService(nil, personalityCache, false)
 
 	questionnaireCache := questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{TTL: time.Minute, MaxEntries: 16})
 	questionnaireCache.Set("Q1", "v1", &questionnaire.QuestionnaireResponse{Code: "Q1", Version: "v1"})
