@@ -8,7 +8,7 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
@@ -40,7 +40,7 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	if issues := validatePreviewAnswers(input.Answers, questionnaire); len(issues) > 0 {
 		return nil, validationFailed(issues)
 	}
-	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	snapshot, err := publishing.BuildPublishedSnapshot(model)
 	if err != nil {
 		return nil, err
 	}

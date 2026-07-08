@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -52,7 +53,7 @@ func (c RuleSetTypologyCatalog) FindTypologyModelByQuestionnaire(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-	return modeltypology.DecodeFromSnapshot(snapshot)
+	return legacy.DecodeTypologyFromSnapshot(snapshot)
 }
 
 func (c RuleSetTypologyCatalog) decodePublishedRef(ctx context.Context, ref rulesetport.Ref) (*modeltypology.Payload, error) {
@@ -60,7 +61,7 @@ func (c RuleSetTypologyCatalog) decodePublishedRef(ctx context.Context, ref rule
 	if err != nil {
 		return nil, err
 	}
-	return modeltypology.DecodeFromSnapshot(snapshot)
+	return legacy.DecodeTypologyFromSnapshot(snapshot)
 }
 
 func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {

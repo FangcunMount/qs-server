@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -77,7 +78,7 @@ func decodePublishedTypologyModel(snapshot *domain.PublishedModelSnapshot) (*mod
 		return nil, domain.ErrNotFound
 	}
 	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		payload, err := modeltypology.DecodeFromSnapshot(domain.LegacyFromPublished(snapshot))
+		payload, err := legacy.DecodeTypologyFromSnapshot(domain.LegacyFromPublished(snapshot))
 		if err != nil {
 			return nil, err
 		}

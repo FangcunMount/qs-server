@@ -100,10 +100,7 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 		"binding", "publishing", "legacy",
 	}
 	transitional := map[string]struct{}{
-		"cognitive":         {},
-		"behavioral_rating": {},
-		"personality":       {},
-		"task_performance":  {},
+		"personality": {},
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {

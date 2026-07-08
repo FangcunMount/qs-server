@@ -1,15 +1,20 @@
-package typology_test
+package legacy_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 )
 
-func TestDecodeFromSnapshotTypologyV2(t *testing.T) {
-	payload := &typology.Payload{
+func TestDecodeTypologyFromSnapshotTypologyV2(t *testing.T) {
+	payload := struct {
+		Code      string
+		Version   string
+		Algorithm domain.Algorithm
+		Status    string
+	}{
 		Code:      "BIGFIVE_V1",
 		Version:   "1.0.0",
 		Algorithm: domain.AlgorithmBigFive,
@@ -29,16 +34,16 @@ func TestDecodeFromSnapshotTypologyV2(t *testing.T) {
 		Payload:       payloadBytes,
 	}
 
-	got, err := typology.DecodeFromSnapshot(snapshot)
+	got, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
-		t.Fatalf("DecodeFromSnapshot: %v", err)
+		t.Fatalf("DecodeTypologyFromSnapshot: %v", err)
 	}
 	if got.Algorithm != domain.AlgorithmBigFive {
 		t.Fatalf("Algorithm = %s, want bigfive", got.Algorithm)
 	}
 }
 
-func TestDecodeFromSnapshotRejectsLegacyFlatFormat(t *testing.T) {
+func TestDecodeTypologyFromSnapshotRejectsLegacyFlatFormat(t *testing.T) {
 	snapshot := &domain.Snapshot{
 		Definition: domain.Definition{
 			Kind:    domain.RuleSetKindMBTI,
@@ -48,7 +53,7 @@ func TestDecodeFromSnapshotRejectsLegacyFlatFormat(t *testing.T) {
 		PayloadFormat: domain.PayloadFormatMBTIV1,
 		Payload:       []byte(`{"code":"MBTI_TEST"}`),
 	}
-	if _, err := typology.DecodeFromSnapshot(snapshot); err == nil {
+	if _, err := legacy.DecodeTypologyFromSnapshot(snapshot); err == nil {
 		t.Fatal("expected error for legacy flat mbti payload format")
 	}
 }

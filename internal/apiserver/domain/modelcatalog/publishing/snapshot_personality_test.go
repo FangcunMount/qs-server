@@ -1,11 +1,11 @@
-package personality_test
+package publishing_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -41,7 +41,7 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
-	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	snapshot, err := publishing.BuildPublishedSnapshot(model)
 	if err != nil {
 		t.Fatalf("BuildPublishedSnapshot: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
-	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	snapshot, err := publishing.BuildPublishedSnapshot(model)
 	if err != nil {
 		t.Fatalf("BuildPublishedSnapshot: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestBuildPublishedSnapshotUsesExplicitRuntimeDecisionKind(t *testing.T) {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
-	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	snapshot, err := publishing.BuildPublishedSnapshot(model)
 	if err != nil {
 		t.Fatalf("BuildPublishedSnapshot: %v", err)
 	}

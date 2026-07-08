@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func TestToRuntimeSpecPrefersExplicitRuntimeOverAlgorithmDerivation(t *testing.T) {
 	payload := &Payload{
 		Code:           "CUSTOM_V1",
 		Version:        "1.0.0",
-		Algorithm:      modelcatalog.AlgorithmMBTI,
+		Algorithm:      binding.AlgorithmMBTI,
 		DimensionOrder: []string{"EI"},
 		Dimensions: map[string]Dimension{
 			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"},
 		},
 		Runtime: &RuntimeSpec{
 			Decision: PersonalityDecisionSpec{
-				Kind: modelcatalog.DecisionKindTraitProfile,
+				Kind: binding.DecisionKindTraitProfile,
 			},
 			OutcomeMapping: OutcomeMappingSpec{
 				DetailKind: OutcomeDetailTraitProfile,
@@ -34,7 +34,7 @@ func TestToRuntimeSpecPrefersExplicitRuntimeOverAlgorithmDerivation(t *testing.T
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindTraitProfile {
+	if spec.Decision.Kind != binding.DecisionKindTraitProfile {
 		t.Fatalf("Decision.Kind = %s, want trait_profile", spec.Decision.Kind)
 	}
 	if spec.OutcomeMapping.DetailKind != OutcomeDetailTraitProfile {
@@ -53,7 +53,7 @@ func TestToRuntimeSpecWithoutAlgorithmWhenRuntimeExplicit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindPoleComposition {
+	if spec.Decision.Kind != binding.DecisionKindPoleComposition {
 		t.Fatalf("Decision.Kind = %s", spec.Decision.Kind)
 	}
 	if spec.OutcomeMapping.DetailKind != OutcomeDetailPersonalityType {
@@ -150,7 +150,7 @@ func explicitPoleCompositionPayload() *Payload {
 				},
 			},
 			Decision: PersonalityDecisionSpec{
-				Kind: modelcatalog.DecisionKindPoleComposition,
+				Kind: binding.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: OutcomeMappingSpec{
 				DetailKind: OutcomeDetailPersonalityType,

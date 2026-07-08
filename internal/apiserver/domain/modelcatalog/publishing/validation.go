@@ -5,38 +5,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// ValidationLevel 划分校验问题 severity。
-type ValidationLevel string
-
-const (
-	ValidationLevelError   ValidationLevel = "error"
-	ValidationLevelWarning ValidationLevel = "warning"
+type (
+	ValidationLevel         = binding.ValidationLevel
+	DomainValidationIssue   = binding.DomainValidationIssue
+	DomainValidationResult  = binding.DomainValidationResult
 )
 
-// DomainValidationIssue 是structured 校验发现 at 领域层。
-type DomainValidationIssue struct {
-	Field   string
-	Message string
-	Code    string
-	Level   ValidationLevel
-}
-
-// DomainValidationResult 聚合 领域校验发现s。
-type DomainValidationResult struct {
-	Issues []DomainValidationIssue
-}
-
-func (r DomainValidationResult) Passed() bool {
-	if len(r.Issues) == 0 {
-		return true
-	}
-	for _, issue := range r.Issues {
-		if issue.Level == "" || issue.Level == ValidationLevelError {
-			return false
-		}
-	}
-	return true
-}
+const (
+	ValidationLevelError   = binding.ValidationLevelError
+	ValidationLevelWarning = binding.ValidationLevelWarning
+)
 
 // ValidateBasic 检查required draft 字段 在之前 publish。
 func (m *AssessmentModel) ValidateBasic() DomainValidationResult {

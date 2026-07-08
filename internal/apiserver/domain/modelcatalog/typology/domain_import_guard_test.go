@@ -25,6 +25,9 @@ func TestTypologyDoesNotDependOnOuterLayers(t *testing.T) {
 		}
 		for _, imp := range parsed.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
+			if path == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog" {
+				t.Fatalf("domain/modelcatalog/typology must not import modelcatalog root facade in %s", file)
+			}
 			if strings.Contains(path, "/internal/apiserver/application/") ||
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/") {

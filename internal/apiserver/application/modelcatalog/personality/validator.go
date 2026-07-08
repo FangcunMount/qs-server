@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -43,7 +43,7 @@ func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modelt
 	if issues := validateDefinitionPayloadForSave(model.Definition.Format, model.Definition.Data); len(issues) > 0 {
 		return nil, validationContext, issues
 	}
-	payload, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := publishing.PersonalityPayloadAndRuntimeSpecFromModel(model)
 	if err != nil {
 		return nil, validationContext, []ValidationIssue{{
 			Field: "definition.payload", Message: err.Error(),

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // FromSBTI 转换旧版 SBTI 载荷 到 unified 类型学 form。
@@ -74,13 +74,13 @@ func FromSBTI(model *SBTILegacyModel) *Payload {
 			ImageBaseURL:  model.Source.ImageBaseURL,
 			NonCommercial: model.Source.NonCommercial,
 		},
-		Algorithm:        modelcatalog.AlgorithmSBTI,
+		Algorithm:        binding.AlgorithmSBTI,
 		DimensionOrder:   append([]string(nil), model.DimensionOrder...),
 		Dimensions:       dimensions,
 		QuestionMappings: mappings,
 		Outcomes:         outcomes,
 		MatchingSpec: MatchingSpec{
-			Kind:                        modelcatalog.DecisionKindNearestPattern,
+			Kind:                        binding.DecisionKindNearestPattern,
 			FallbackSimilarityThreshold: model.FallbackSimilarityThreshold,
 		},
 		SpecialTriggers: triggers,
@@ -110,7 +110,7 @@ func ToSBTI(payload *Payload) (*SBTILegacyModel, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")
 	}
-	if payload.Algorithm != modelcatalog.AlgorithmSBTI {
+	if payload.Algorithm != binding.AlgorithmSBTI {
 		return nil, fmt.Errorf("typology algorithm %s is not sbti", payload.Algorithm)
 	}
 	dimensions := make(map[string]SBTILegacyDimension, len(payload.Dimensions))

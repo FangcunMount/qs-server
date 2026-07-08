@@ -1,17 +1,17 @@
 package typology
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 
 // LegacyOutcomeMappingFromAlgorithm 推导结果 mapping 从 旧版 算法 identifier。
-func LegacyOutcomeMappingFromAlgorithm(algorithm modelcatalog.Algorithm) OutcomeMappingSpec {
+func LegacyOutcomeMappingFromAlgorithm(algorithm binding.Algorithm) OutcomeMappingSpec {
 	switch algorithm {
-	case modelcatalog.AlgorithmBigFive:
+	case binding.AlgorithmBigFive:
 		return OutcomeMappingSpec{
 			DetailKind:       OutcomeDetailTraitProfile,
 			DetailAdapterKey: DetailAdapterTraitProfile,
 			Algorithm:        algorithm,
 		}
-	case modelcatalog.AlgorithmSBTI:
+	case binding.AlgorithmSBTI:
 		return OutcomeMappingSpec{
 			DetailKind:       OutcomeDetailPersonalityType,
 			DetailAdapterKey: DetailAdapterPersonalityType,
@@ -35,15 +35,15 @@ func LegacyReportSpecFromPayload(p *Payload) ReportSpec {
 }
 
 // LegacyReportSpecFromAlgorithm 推导report spec 从 旧版 算法 identifier。
-func LegacyReportSpecFromAlgorithm(algorithm modelcatalog.Algorithm) ReportSpec {
+func LegacyReportSpecFromAlgorithm(algorithm binding.Algorithm) ReportSpec {
 	switch algorithm {
-	case modelcatalog.AlgorithmBigFive:
+	case binding.AlgorithmBigFive:
 		return ReportSpec{
 			Kind:          ReportKindTraitProfile,
 			AdapterKey:    ReportAdapterTraitProfile,
 			CategoryLabel: "Big Five",
 		}
-	case modelcatalog.AlgorithmSBTI:
+	case binding.AlgorithmSBTI:
 		return ReportSpec{
 			Kind:          ReportKindPersonalityType,
 			AdapterKey:    ReportAdapterPersonalityType,

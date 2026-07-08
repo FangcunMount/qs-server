@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // QuestionnaireSnapshot 是minimal 问卷 结构 needed 到 有效ate 运行时规格。
@@ -20,18 +20,18 @@ type QuestionSnapshot struct {
 }
 
 // ValidateRuntimeSpecForPublish performs strong 校验 gate 用于之前 发布。
-func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []modelcatalog.DomainValidationIssue {
+func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []binding.DomainValidationIssue {
 	return ValidateRuntimeSpecForPublishWithContext(spec, questionnaire, RuntimeSpecValidationContext{})
 }
 
 // RuntimeSpecValidationContext 携带载荷-等级 元数据 needed 按 publish 校验。
 type RuntimeSpecValidationContext struct {
-	Algorithm modelcatalog.Algorithm
+	Algorithm binding.Algorithm
 	Outcomes  []Outcome
 }
 
 // ValidateRuntimeSpecForPublishWithContext performs strong 校验 gate 用于之前 发布。
-func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []modelcatalog.DomainValidationIssue {
+func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []binding.DomainValidationIssue {
 	validator := runtimeSpecValidator{
 		questions: map[string]map[string]struct{}{},
 		algorithm: validationContext.Algorithm,
@@ -53,9 +53,9 @@ func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire Q
 
 type runtimeSpecValidator struct {
 	questions map[string]map[string]struct{}
-	algorithm modelcatalog.Algorithm
+	algorithm binding.Algorithm
 	outcomes  map[string]Outcome
-	issues    []modelcatalog.DomainValidationIssue
+	issues    []binding.DomainValidationIssue
 }
 
 func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
@@ -202,7 +202,7 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 	}
 }
 
-func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec, decisionKind modelcatalog.DecisionKind) {
+func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec, decisionKind binding.DecisionKind) {
 	if mapping.DetailKind == "" {
 		v.add("outcome_mapping.detail_kind", "outcome_mapping.detail_kind.required", "outcome mapping detail_kind 不能为空")
 	} else if !isSupportedOutcomeDetailKind(mapping.DetailKind) {
@@ -267,7 +267,7 @@ func (v *runtimeSpecValidator) validateSpecialRuleQuestionRefs(rule SpecialRuleS
 	}
 }
 
-func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping OutcomeMappingSpec, decisionKind modelcatalog.DecisionKind) {
+func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping OutcomeMappingSpec, decisionKind binding.DecisionKind) {
 	if report.Kind == "" {
 		v.add("report.kind", "report.kind.required", "report kind 不能为空")
 	}
@@ -307,19 +307,19 @@ func (v *runtimeSpecValidator) validateOutcomeCode(field, issueCode, outcomeCode
 }
 
 func (v *runtimeSpecValidator) add(field, code, message string) {
-	v.issues = append(v.issues, modelcatalog.DomainValidationIssue{
+	v.issues = append(v.issues, binding.DomainValidationIssue{
 		Field:   field,
 		Code:    code,
 		Message: message,
-		Level:   modelcatalog.ValidationLevelError,
+		Level:   binding.ValidationLevelError,
 	})
 }
 
-func isSupportedDecisionKind(kind modelcatalog.DecisionKind) bool {
+func isSupportedDecisionKind(kind binding.DecisionKind) bool {
 	switch kind {
-	case modelcatalog.DecisionKindPoleComposition,
-		modelcatalog.DecisionKindNearestPattern,
-		modelcatalog.DecisionKindTraitProfile:
+	case binding.DecisionKindPoleComposition,
+		binding.DecisionKindNearestPattern,
+		binding.DecisionKindTraitProfile:
 		return true
 	default:
 		return false
@@ -388,28 +388,28 @@ func isLegacyReportAdapter(adapter ReportAdapterKey) bool {
 	}
 }
 
-func isDetailAdapterCompatible(algorithm modelcatalog.Algorithm, adapter DetailAdapterKey) bool {
-	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
+func isDetailAdapterCompatible(algorithm binding.Algorithm, adapter DetailAdapterKey) bool {
+	if algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology {
 		return true
 	}
 	switch algorithm {
-	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI:
+	case binding.AlgorithmMBTI, binding.AlgorithmSBTI:
 		return adapter == DetailAdapterPersonalityType
-	case modelcatalog.AlgorithmBigFive:
+	case binding.AlgorithmBigFive:
 		return adapter == DetailAdapterTraitProfile
 	default:
 		return true
 	}
 }
 
-func isReportAdapterCompatible(algorithm modelcatalog.Algorithm, adapter ReportAdapterKey) bool {
-	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
+func isReportAdapterCompatible(algorithm binding.Algorithm, adapter ReportAdapterKey) bool {
+	if algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology {
 		return true
 	}
 	switch algorithm {
-	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI:
+	case binding.AlgorithmMBTI, binding.AlgorithmSBTI:
 		return adapter == ReportAdapterPersonalityType
-	case modelcatalog.AlgorithmBigFive:
+	case binding.AlgorithmBigFive:
 		return adapter == ReportAdapterTraitProfile
 	default:
 		return true

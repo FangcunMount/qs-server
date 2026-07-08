@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -38,7 +39,7 @@ func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Paylo
 }
 
 func SummaryFromSnapshotOnly(snapshot *domain.Snapshot) (PersonalityModelSummaryResult, error) {
-	payload, err := modeltypology.DecodeFromSnapshot(snapshot)
+	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
 		return PersonalityModelSummaryResult{}, err
 	}
@@ -63,7 +64,7 @@ func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (Persona
 }
 
 func DetailFromSnapshot(snapshot *domain.Snapshot) (*PersonalityModelResult, error) {
-	payload, err := modeltypology.DecodeFromSnapshot(snapshot)
+	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func payloadFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*modelt
 		return nil, domain.ErrNotFound
 	}
 	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		return modeltypology.DecodeFromSnapshot(domain.LegacyFromPublished(snapshot))
+		return legacy.DecodeTypologyFromSnapshot(domain.LegacyFromPublished(snapshot))
 	}
 	var payload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {

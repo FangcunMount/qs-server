@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -35,7 +36,7 @@ func TestSummaryFromSnapshotTypologyPayload(t *testing.T) {
 		},
 		Payload: payload,
 	}
-	decoded, err := modeltypology.DecodeFromSnapshot(snapshot)
+	decoded, err := legacy.DecodeTypologyFromSnapshot(snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}

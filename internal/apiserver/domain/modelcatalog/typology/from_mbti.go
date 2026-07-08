@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // FromMBTI 转换旧版 MBTI 载荷 到 unified 类型学 form。
@@ -58,13 +58,13 @@ func FromMBTI(model *MBTILegacyModel) *Payload {
 			Attribution:   model.Source.Attribution,
 			NonCommercial: model.Source.NonCommercial,
 		},
-		Algorithm:        modelcatalog.AlgorithmMBTI,
+		Algorithm:        binding.AlgorithmMBTI,
 		DimensionOrder:   append([]string(nil), model.DimensionOrder...),
 		Dimensions:       dimensions,
 		QuestionMappings: mappings,
 		Outcomes:         outcomes,
 		MatchingSpec: MatchingSpec{
-			Kind: modelcatalog.DecisionKindPoleComposition,
+			Kind: binding.DecisionKindPoleComposition,
 		},
 	}
 }
@@ -74,7 +74,7 @@ func ToMBTI(payload *Payload) (*MBTILegacyModel, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")
 	}
-	if payload.Algorithm != modelcatalog.AlgorithmMBTI {
+	if payload.Algorithm != binding.AlgorithmMBTI {
 		return nil, fmt.Errorf("typology algorithm %s is not mbti", payload.Algorithm)
 	}
 	dimensions := make(map[string]MBTILegacyDimension, len(payload.Dimensions))

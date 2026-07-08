@@ -1,6 +1,6 @@
 package typology
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 
 // RuntimeSpec 是配置-driven execution 视图 of 类型学载荷。
 type RuntimeSpec struct {
@@ -83,7 +83,7 @@ func (fg FactorGraphSpec) DecisionFactorOrder() []string {
 
 // PersonalityDecisionSpec 描述如何画像 向量转成 结果。
 type PersonalityDecisionSpec struct {
-	Kind                        modelcatalog.DecisionKind `json:"kind"`
+	Kind                        binding.DecisionKind `json:"kind"`
 	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
 	FallbackCode                string                    `json:"fallback_code,omitempty"`
 	LevelRule                   *LevelRuleSpec            `json:"level_rule,omitempty"`
@@ -172,7 +172,7 @@ const (
 type OutcomeMappingSpec struct {
 	DetailKind       OutcomeDetailKind      `json:"detail_kind"`
 	DetailAdapterKey DetailAdapterKey       `json:"detail_adapter_key,omitempty"`
-	Algorithm        modelcatalog.Algorithm `json:"algorithm,omitempty"`
+	Algorithm        binding.Algorithm `json:"algorithm,omitempty"`
 }
 
 // DetailAdapterKey 选择明细组装器 实现。
@@ -187,7 +187,7 @@ const (
 )
 
 // ResolvedDetailAdapterKey 返回配置化 adapter 键, deriving 从 旧版 字段 when needed。
-func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind modelcatalog.DecisionKind) DetailAdapterKey {
+func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind binding.DecisionKind) DetailAdapterKey {
 	if m.DetailAdapterKey != "" {
 		return m.DetailAdapterKey
 	}
@@ -227,7 +227,7 @@ const (
 
 // ResolvedAdapterKey 返回配置化 报告适配器 从 显式 键 或 通用 report 类型。
 // Legacy model-特定 报告适配器 必须 be set on Adapter键 在 旧版 derivation。
-func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ modelcatalog.DecisionKind) ReportAdapterKey {
+func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ binding.DecisionKind) ReportAdapterKey {
 	if r.AdapterKey != "" {
 		return r.AdapterKey
 	}

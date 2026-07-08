@@ -3,7 +3,7 @@ package typology
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func TestToRuntimeSpecFromMBTIPayload(t *testing.T) {
@@ -23,7 +23,7 @@ func TestToRuntimeSpecFromMBTIPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindPoleComposition {
+	if spec.Decision.Kind != binding.DecisionKindPoleComposition {
 		t.Fatalf("Decision.Kind = %s", spec.Decision.Kind)
 	}
 	if spec.OutcomeMapping.DetailKind != OutcomeDetailPersonalityType {
@@ -64,7 +64,7 @@ func TestToRuntimeSpecFromSBTIPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindNearestPattern {
+	if spec.Decision.Kind != binding.DecisionKindNearestPattern {
 		t.Fatalf("Decision.Kind = %s", spec.Decision.Kind)
 	}
 	if spec.Decision.FallbackCode != "HHHH" {
@@ -105,19 +105,19 @@ func TestToRuntimeSpecFromBigFivePayload(t *testing.T) {
 	payload := &Payload{
 		Code:           "BIGFIVE_V1",
 		Version:        "1.0.0",
-		Algorithm:      modelcatalog.AlgorithmBigFive,
+		Algorithm:      binding.AlgorithmBigFive,
 		DimensionOrder: []string{"O"},
 		Dimensions: map[string]Dimension{
 			"O": {Code: "O", Name: "Openness"},
 		},
-		MatchingSpec: MatchingSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+		MatchingSpec: MatchingSpec{Kind: binding.DecisionKindTraitProfile},
 	}
 
 	spec, err := payload.ToRuntimeSpec()
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindTraitProfile {
+	if spec.Decision.Kind != binding.DecisionKindTraitProfile {
 		t.Fatalf("Decision.Kind = %s", spec.Decision.Kind)
 	}
 	if spec.OutcomeMapping.DetailKind != OutcomeDetailTraitProfile {

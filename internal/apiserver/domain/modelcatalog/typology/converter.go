@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // ToRuntimeSpec 返回执行规格 用于 类型学载荷。
@@ -287,13 +287,13 @@ func decisionSpecFromPayload(p *Payload) PersonalityDecisionSpec {
 		FallbackSimilarityThreshold: p.MatchingSpec.FallbackSimilarityThreshold,
 	}
 	switch p.MatchingSpec.Kind {
-	case modelcatalog.DecisionKindNearestPattern:
+	case binding.DecisionKindNearestPattern:
 		spec.FallbackCode = fallbackCodeFromOutcomes(p.Outcomes)
 		spec.LevelRule = &LevelRuleSpec{LowMax: 3, HighMin: 5}
-	case "", modelcatalog.DecisionKindPoleComposition:
-		spec.Kind = modelcatalog.DecisionKindPoleComposition
-	case modelcatalog.DecisionKindTraitProfile:
-		spec.Kind = modelcatalog.DecisionKindTraitProfile
+	case "", binding.DecisionKindPoleComposition:
+		spec.Kind = binding.DecisionKindPoleComposition
+	case binding.DecisionKindTraitProfile:
+		spec.Kind = binding.DecisionKindTraitProfile
 	}
 	return spec
 }
@@ -336,7 +336,7 @@ func specialRulesFromPayload(p *Payload) []SpecialRuleSpec {
 			OptionValues:  optionValues,
 		})
 	}
-	if p.MatchingSpec.Kind == modelcatalog.DecisionKindNearestPattern &&
+	if p.MatchingSpec.Kind == binding.DecisionKindNearestPattern &&
 		p.MatchingSpec.FallbackSimilarityThreshold > 0 {
 		fallbackCode := fallbackCodeFromOutcomes(p.Outcomes)
 		if fallbackCode != "" {

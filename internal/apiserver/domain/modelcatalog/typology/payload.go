@@ -3,7 +3,7 @@ package typology
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // Payload 是unified personality 类型学 model 载荷。
@@ -15,7 +15,7 @@ type Payload struct {
 	QuestionnaireVersion string                 `json:"questionnaire_version"`
 	Status               string                 `json:"status"`
 	Source               Source                 `json:"source"`
-	Algorithm            modelcatalog.Algorithm `json:"algorithm"`
+	Algorithm            binding.Algorithm `json:"algorithm"`
 	DimensionOrder       []string               `json:"dimension_order"`
 	Dimensions           map[string]Dimension   `json:"dimensions"`
 	QuestionMappings     []QuestionMapping      `json:"question_mappings"`
@@ -113,7 +113,7 @@ type Rarity struct {
 }
 
 type MatchingSpec struct {
-	Kind                        modelcatalog.DecisionKind `json:"kind"`
+	Kind                        binding.DecisionKind `json:"kind"`
 	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cognitivedomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -222,7 +222,7 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err := model.MarkPublished(now); err != nil {
 		return nil, mapDomainError(err)
 	}
-	snapshot, err := cognitivedomain.BuildPublishedSnapshot(model)
+	snapshot, err := publishing.BuildPublishedSnapshot(model)
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
