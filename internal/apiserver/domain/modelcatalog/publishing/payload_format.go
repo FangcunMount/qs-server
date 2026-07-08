@@ -129,3 +129,35 @@ func DraftPayloadFormatForModel(kind binding.Kind, algorithm binding.Algorithm) 
 		return ""
 	}
 }
+
+// LegacyDecodeOnlyPayloadFormats lists payload formats that may exist in historical data
+// but must not be used for new draft/publish input.
+func LegacyDecodeOnlyPayloadFormats() []string {
+	return []string{
+		PayloadFormatScaleV1,
+		PayloadFormatMBTIV1,
+		PayloadFormatSBTIV1,
+		PayloadFormatScaleV1Legacy,
+		PayloadFormatMBTIV1Legacy,
+		PayloadFormatSBTIV1Legacy,
+		PayloadFormatBehavioralRatingBrief2V1,
+		PayloadFormatCognitiveSPMV1,
+	}
+}
+
+func IsLegacyDecodeOnlyPayloadFormat(format string) bool {
+	for _, legacy := range LegacyDecodeOnlyPayloadFormats() {
+		if format == legacy {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidatePublishPayloadFormat rejects legacy-decode-only formats for new publishes.
+func ValidatePublishPayloadFormat(format string) error {
+	if IsLegacyDecodeOnlyPayloadFormat(format) {
+		return fmt.Errorf("payload format %q is legacy-decode-only and cannot be published", format)
+	}
+	return nil
+}

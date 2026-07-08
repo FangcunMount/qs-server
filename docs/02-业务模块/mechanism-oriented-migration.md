@@ -653,3 +653,12 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R121 | 删除 collection `/api/v2/assessments*` outcome 兼容路由、swagger 注解与 OpenAPI 输出；删除 evaluation gRPC `GetMyAssessmentByAnswerSheetID` RPC / message / service 实现并重生成 proto；保留 `ResolveAssessmentByAnswerSheetID + GetMyAssessment` 组合路径和内部 answer-sheet lookup 能力；新增 REST/OpenAPI/proto contract guard |
+
+## Round 122–125：ModelCatalog 运行态与 Legacy ACL 终局（R122–R125）
+
+| 轮次 | 内容 |
+|------|------|
+| R122 | 新增 `NewRuntimePublishedCatalog`；`DualStore` 重命名为 `PublishedStore`；删除 `LayeredCatalog`、静态 fallback 与 `RecordLegacyFallback` metric；`EnsureRuleSetCatalog` 改走 v2-only 读路径；架构守卫禁止生产引用 `NewDefaultStaticCatalog` |
+| R123 | 删除 `RuleSet*` port alias、`LegacyRegisterNames`、`ScaleReportInput`/`BuildScaleReport`/`AssessmentOutcomeFromScaleInterpretation`；container 仅注册 `modelcatalog`；`Scoring`/`Typology` ModuleInfo 改为 `modelcatalog.scoring`/`modelcatalog.typology` |
+| R124 | `evaluation.proto` Assessment outcome 三消息删除 `scale_code/scale_name/total_score/risk_level` 并 `reserved`；删除 `fillLegacy*` 双写；新增 proto/OpenAPI contract guard |
+| R125 | 新增 `audit_published_model_payload_formats` dry-run 审计；发布链路拒绝 legacy-decode-only format；typology 读路径与 mongo/cache/store 原生 v2；删除生产路径 `domain/modelcatalog/legacy` import（保留 `export.go` re-export 与 oneoff） |

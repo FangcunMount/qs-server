@@ -62,6 +62,5 @@ func (r *InvalidatingPublishedModelRepository) invalidate(ctx context.Context, s
 	if r == nil || r.cache == nil || snapshot == nil {
 		return
 	}
-	legacy := catalogdomain.LegacyFromPublished(snapshot)
-	r.cache.invalidateSnapshot(ctx, legacy)
+	r.cache.invalidatePublishedSnapshot(ctx, snapshot)
 }

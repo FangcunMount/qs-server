@@ -4,20 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// ScaleRuleSetPublisher 将已发布量表同步到 evaluation_rule_sets。
-// Deprecated: legacy ACL over v2 publishing; prefer publishing.BuildScoringPublishedSnapshotFromScale.
-type ScaleRuleSetPublisher struct {
-	writer rulesetport.PublishedRuleSetWriter
+type publishedModelWriter interface {
+	UpsertPublishedModel(ctx context.Context, snapshot *publishing.PublishedModelSnapshot) error
 }
 
-func NewScaleRuleSetPublisher(writer rulesetport.PublishedRuleSetWriter) *ScaleRuleSetPublisher {
+// ScaleRuleSetPublisher syncs published scales into published_assessment_models.
+type ScaleRuleSetPublisher struct {
+	writer rulesetport.PublishedWriter
+}
+
+func NewScaleRuleSetPublisher(writer rulesetport.PublishedWriter) *ScaleRuleSetPublisher {
 	return &ScaleRuleSetPublisher{writer: writer}
 }
 
@@ -37,5 +39,8 @@ func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale
 	if err != nil {
 		return err
 	}
-	return p.writer.UpsertPublished(ctx, legacy.LegacyFromPublished(published))
+	if writer, ok := p.writer.(publishedModelWriter); ok {
+		return writer.UpsertPublishedModel(ctx, published)
+	}
+	return fmt.Errorf("published model writer is not configured")
 }

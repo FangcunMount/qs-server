@@ -32,7 +32,7 @@ type publishedModelInner interface {
 	port.PublishedAlgorithmLister
 }
 
-// CachedPublishedModelStore decorates DualStore with Redis read-through cache on submit hot paths.
+// CachedPublishedModelStore decorates PublishedStore with Redis read-through cache on submit hot paths.
 type CachedPublishedModelStore struct {
 	inner             publishedModelInner
 	keys              *keyspace.Builder
@@ -174,11 +174,10 @@ func (c *CachedPublishedModelStore) GetPublishedByRef(ctx context.Context, ref p
 }
 
 func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := c.GetPublishedByRef(ctx, ref)
-	if err != nil {
-		return nil, err
+	if c == nil || c.inner == nil {
+		return nil, domain.ErrNotFound
 	}
-	return domain.PublishedFromLegacy(snapshot), nil
+	return c.inner.GetPublishedModelByRef(ctx, ref)
 }
 
 func (c *CachedPublishedModelStore) FindPublishedByQuestionnaire(
@@ -204,14 +203,10 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
 ) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := c.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil {
-		return nil, err
+	if c == nil || c.inner == nil {
+		return nil, domain.ErrNotFound
 	}
-	if snapshot == nil {
-		return nil, nil
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
+	return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
 func (c *CachedPublishedModelStore) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
@@ -235,30 +230,7 @@ func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	if !c.store.available() {
-		return c.inner.FindPublishedModelByCode(ctx, kind, code)
-	}
-	cacheKey := c.modelByCodeCacheKey(kind, code)
-	snapshot, err := c.readThrough(ctx, cacheKey, func(ctx context.Context) (*domain.Snapshot, error) {
-		published, loadErr := c.inner.FindPublishedModelByCode(ctx, kind, code)
-		if loadErr != nil {
-			if domain.IsNotFound(loadErr) {
-				return nil, nil
-			}
-			return nil, loadErr
-		}
-		if published == nil {
-			return nil, nil
-		}
-		return domain.LegacyFromPublished(published), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if snapshot == nil {
-		return nil, nil
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
+	return c.inner.FindPublishedModelByCode(ctx, kind, code)
 }
 
 func (c *CachedPublishedModelStore) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
@@ -400,6 +372,33 @@ func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
 
 func canonicalPublishedModelRef(ref port.Ref) port.Ref {
 	return ref
+}
+
+func (c *CachedPublishedModelStore) invalidatePublishedSnapshot(ctx context.Context, snapshot *domain.PublishedModelSnapshot) {
+	if !c.store.available() || snapshot == nil {
+		return
+	}
+	keys := []string{
+		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, snapshot.Binding.QuestionnaireVersion),
+		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, ""),
+		c.refCacheKey(aminfra.RefFromPublished(snapshot)),
+		c.modelByCodeCacheKey(snapshot.Model.Kind, snapshot.Model.Code),
+		c.algorithmsCatalogCacheKey(),
+	}
+	for _, key := range keys {
+		if err := c.store.Delete(ctx, key); err != nil {
+			logger.L(ctx).Warnw("failed to invalidate published model cache",
+				"key", key,
+				"error", err,
+			)
+		}
+	}
+	if c.catalogAlgorithms != nil {
+		if err := c.catalogAlgorithms.Delete(ctx, c.algorithmsCatalogCacheKey()); err != nil {
+			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)
+		}
+	}
+	c.invalidateCatalogListCaches(ctx)
 }
 
 func (c *CachedPublishedModelStore) invalidateSnapshot(ctx context.Context, snapshot *domain.Snapshot) {

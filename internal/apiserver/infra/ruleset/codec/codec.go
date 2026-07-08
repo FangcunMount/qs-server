@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
@@ -110,11 +109,6 @@ func decodeTypologyPayload(payload []byte) (*typology.Payload, error) {
 		return nil, fmt.Errorf("decode typology payload: %w", err)
 	}
 	return &model, nil
-}
-
-// DecodeTypologyFromSnapshot decodes a published snapshot into a typology payload.
-func DecodeTypologyFromSnapshot(snapshot *domain.Snapshot) (*typology.Payload, error) {
-	return legacy.DecodeTypologyFromSnapshot(snapshot)
 }
 
 func resolvePayloadFormat(snapshot *domain.RuleSetSnapshot, kind domain.Kind, defaultFormat string) (string, error) {

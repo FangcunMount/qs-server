@@ -2,10 +2,10 @@ package shared
 
 import (
 	"encoding/json"
+	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
@@ -41,14 +41,6 @@ func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Paylo
 	return result
 }
 
-func SummaryFromSnapshotOnly(snapshot *domain.Snapshot) (TypologyModelSummaryResult, error) {
-	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
-	if err != nil {
-		return TypologyModelSummaryResult{}, err
-	}
-	return SummaryFromSnapshot(snapshot, payload), nil
-}
-
 func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (TypologyModelSummaryResult, error) {
 	payload, err := payloadFromPublishedModel(snapshot)
 	if err != nil {
@@ -65,22 +57,6 @@ func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (Typolog
 	applyPayloadSummary(&result, payload)
 	applyPublishedModelRouting(&result, snapshot)
 	return result, nil
-}
-
-func DetailFromSnapshot(snapshot *domain.Snapshot) (*TypologyModelResult, error) {
-	payload, err := legacy.DecodeTypologyFromSnapshot(snapshot)
-	if err != nil {
-		return nil, err
-	}
-	summary := SummaryFromSnapshot(snapshot, payload)
-	dimensions, order := dimensionsFromPayload(payload)
-	outcomes := outcomesFromPayload(payload)
-	return &TypologyModelResult{
-		TypologyModelSummaryResult: summary,
-		DimensionOrder:             order,
-		Dimensions:                 dimensions,
-		Outcomes:                   outcomes,
-	}, nil
 }
 
 func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*TypologyModelResult, error) {
@@ -105,8 +81,8 @@ func payloadFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*modelt
 	if snapshot == nil {
 		return nil, domain.ErrNotFound
 	}
-	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		return legacy.DecodeTypologyFromSnapshot(domain.LegacyFromPublished(snapshot))
+	if snapshot.PayloadFormat != publishing.PayloadFormatPersonalityTypologyV1 {
+		return nil, fmt.Errorf("unsupported typology payload format %q", snapshot.PayloadFormat)
 	}
 	var payload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {

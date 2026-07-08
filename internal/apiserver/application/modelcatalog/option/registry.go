@@ -1,8 +1,8 @@
 package option
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
@@ -225,9 +225,9 @@ var defaultRegisteredOptions = []RegisteredOption{
 		apiKind: "custom", displayName: "自定义测评",
 	}),
 	{
-		Kind:        binding.Kind(legacy.APIKindBehaviorAbility),
+		Kind:        binding.Kind(modelcatalog.APIKindBehaviorAbility),
 		Role:        binding.CapabilityRoleProductChannel,
-		APIKind:     legacy.APIKindBehaviorAbility,
+		APIKind:     modelcatalog.APIKindBehaviorAbility,
 		DisplayName: "行为能力",
 		Operations: CatalogOperations{
 			ListSupported:   false,

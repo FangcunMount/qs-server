@@ -36,37 +36,25 @@ func (a *PublishedModelRepoAdapter) FindLatestPublishedByModelCode(ctx context.C
 	if a == nil || a.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	legacy, err := a.inner.FindLatestPublishedByModelCode(ctx, kind, code)
-	if err != nil {
-		return nil, err
-	}
-	return domain.PublishedFromLegacy(legacy), nil
+	return a.inner.FindLatestPublishedModelByModelCode(ctx, kind, code)
 }
 
 func (a *PublishedModelRepoAdapter) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error) {
 	if a == nil || a.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	legacy, err := a.inner.FindPublishedByModelCodeVersion(ctx, kind, code, version)
+	published, err := a.inner.GetPublishedModelByRef(ctx, port.Ref{Kind: kind, Code: code, Version: version})
 	if err != nil {
 		return nil, err
 	}
-	return domain.PublishedFromLegacy(legacy), nil
+	return published, nil
 }
 
 func (a *PublishedModelRepoAdapter) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
 	if a == nil || a.inner == nil {
 		return nil, 0, domain.ErrNotFound
 	}
-	legacy, total, err := a.inner.ListPublished(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*domain.PublishedModelSnapshot, 0, len(legacy))
-	for _, item := range legacy {
-		out = append(out, domain.PublishedFromLegacy(item))
-	}
-	return out, total, nil
+	return a.inner.ListPublishedModels(ctx, filter)
 }
 
 func (a *PublishedModelRepoAdapter) DeletePublished(ctx context.Context, kind domain.Kind, code string) error {

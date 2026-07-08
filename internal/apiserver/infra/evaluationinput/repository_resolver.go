@@ -32,7 +32,7 @@ func NewRepositoryResolver(
 	scaleRepo ScaleSnapshotRepository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
-	modelCatalog rulesetport.RuleSetCatalog,
+	modelCatalog rulesetport.Catalog,
 	descs []evaldomain.ModelDescriptor,
 ) (*RepositoryResolver, error) {
 	if len(descs) == 0 {
@@ -53,7 +53,7 @@ func NewRepositoryResolver(
 		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader)
 		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader)
 	} else {
-		typologyCatalog = NewRuleSetTypologyCatalog(modelCatalog)
+		return nil, fmt.Errorf("ruleset catalog must implement PublishedModelReader")
 	}
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)

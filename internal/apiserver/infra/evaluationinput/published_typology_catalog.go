@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -68,11 +67,7 @@ func decodePublishedTypologyModel(snapshot *domain.PublishedModelSnapshot) (*mod
 		return nil, domain.ErrNotFound
 	}
 	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		payload, err := legacy.DecodeTypologyFromSnapshot(domain.LegacyFromPublished(snapshot))
-		if err != nil {
-			return nil, err
-		}
-		return ensurePublishedTypologyPayload(payload)
+		return nil, fmt.Errorf("unsupported typology payload format %q", snapshot.PayloadFormat)
 	}
 	var payload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
@@ -87,6 +82,58 @@ func ensurePublishedTypologyPayload(payload *modeltypology.Payload) (*modeltypol
 	}
 	if !payload.IsPublished() {
 		return nil, fmt.Errorf("typology model is not published: %s", payload.Code)
+	}
+	return payload, nil
+}
+
+func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {
+	if ref.Algorithm != "" {
+		return domain.Algorithm(ref.Algorithm)
+	}
+	return ""
+}
+
+func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
+	if algorithm != "" {
+		return []rulesetport.Ref{{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: algorithm,
+			Code:      ref.Code,
+			Version:   ref.Version,
+		}}
+	}
+	refs := make([]rulesetport.Ref, 0, 3)
+	if ref.SubKind != "" {
+		refs = append(refs, rulesetport.Ref{
+			Kind:    domain.KindPersonality,
+			SubKind: domain.SubKind(ref.SubKind),
+			Code:    ref.Code,
+			Version: ref.Version,
+		})
+	}
+	refs = append(refs,
+		rulesetport.Ref{
+			Kind:    domain.KindPersonality,
+			Code:    ref.Code,
+			Version: ref.Version,
+		},
+		rulesetport.Ref{
+			Kind:    domain.KindPersonality,
+			SubKind: domain.SubKindTypology,
+			Code:    ref.Code,
+			Version: ref.Version,
+		},
+	)
+	return refs
+}
+
+func assertTypologyAlgorithm(payload *modeltypology.Payload, algorithm domain.Algorithm) (*modeltypology.Payload, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("typology payload is nil")
+	}
+	if payload.Algorithm != algorithm {
+		return nil, fmt.Errorf("typology algorithm %s does not match ref %s", payload.Algorithm, algorithm)
 	}
 	return payload, nil
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
@@ -64,16 +65,20 @@ func TestScaleRuleSetPublisherUpsertsPublishedScale(t *testing.T) {
 	if writer.last == nil {
 		t.Fatal("expected upsert")
 	}
-	if writer.last.Definition.Kind != domain.RuleSetKindScale {
-		t.Fatalf("kind = %s", writer.last.Definition.Kind)
+	if writer.last.Model.Kind != domain.KindScale {
+		t.Fatalf("kind = %s", writer.last.Model.Kind)
 	}
 }
 
 type stubRuleWriter struct {
-	last *domain.RuleSetSnapshot
+	last *publishing.PublishedModelSnapshot
 }
 
-func (s *stubRuleWriter) UpsertPublished(_ context.Context, snapshot *domain.RuleSetSnapshot) error {
+func (s *stubRuleWriter) UpsertPublished(_ context.Context, _ *domain.Snapshot) error {
+	return nil
+}
+
+func (s *stubRuleWriter) UpsertPublishedModel(_ context.Context, snapshot *publishing.PublishedModelSnapshot) error {
 	s.last = snapshot
 	return nil
 }

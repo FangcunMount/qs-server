@@ -42,6 +42,13 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 	if m.Definition.IsEmpty() {
 		issues = append(issues, DomainValidationIssue{Field: "definition", Message: "definition payload is required", Code: "definition.required", Level: ValidationLevelError})
 	}
+	if m.Definition.Format != "" {
+		if err := ValidatePublishPayloadFormat(m.Definition.Format); err != nil {
+			issues = append(issues, DomainValidationIssue{
+				Field: "definition.format", Message: err.Error(), Code: "definition.format.legacy_decode_only", Level: ValidationLevelError,
+			})
+		}
+	}
 	if m.Kind == binding.KindPersonality {
 		if m.SubKind != binding.SubKindTypology {
 			issues = append(issues, DomainValidationIssue{Field: "sub_kind", Message: "typology models require sub_kind typology", Code: "sub_kind.typology.required", Level: ValidationLevelError})

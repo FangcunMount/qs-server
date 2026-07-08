@@ -118,6 +118,20 @@ func LegacySnapshotFromSBTI(model *modeltypology.SBTILegacyModel) (*domain.Snaps
 	return LegacySnapshotFromPublished(published), nil
 }
 
+func RefFromPublished(snapshot *domain.PublishedModelSnapshot) port.Ref {
+	if snapshot == nil {
+		return port.Ref{}
+	}
+	return port.Ref{
+		Kind:      snapshot.Model.Kind,
+		SubKind:   snapshot.Model.SubKind,
+		Algorithm: snapshot.Model.Algorithm,
+		Code:      snapshot.Model.Code,
+		Version:   snapshot.Model.Version,
+		Title:     snapshot.Model.Title,
+	}
+}
+
 func RefFromSnapshot(snapshot *domain.Snapshot) port.Ref {
 	if snapshot == nil {
 		return port.Ref{}
