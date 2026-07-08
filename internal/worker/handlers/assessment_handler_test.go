@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
+
+func TestEvaluationRunRetryHintReferencesRuntimeCheckpoint(t *testing.T) {
+	if !strings.Contains(evaluationRunRetryHint, "runtime_checkpoint") {
+		t.Fatalf("hint = %q", evaluationRunRetryHint)
+	}
+	if !strings.Contains(evaluationRunRetryHint, "scope=evaluation_run") {
+		t.Fatalf("hint = %q", evaluationRunRetryHint)
+	}
+}
 
 func TestHandleAssessmentSubmittedFailsWhenInternalClientMissing(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(nil, nil)

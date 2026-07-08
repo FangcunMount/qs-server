@@ -14,6 +14,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const evaluationRunRetryHint = "check runtime_checkpoint table (scope=evaluation_run) for latest attempt and retryable flag"
+
 // handleAssessmentSubmitted 处理测评提交事件
 // 业务逻辑：
 // 1. 解析测评提交事件
@@ -90,7 +92,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			deps.Logger.Warn("assessment evaluation returned retryable failure",
 				slog.Int64("assessment_id", data.AssessmentID),
 				slog.String("error", err.Error()),
-				slog.String("evaluation_run_hint", "check runtime_checkpoint table (scope=evaluation_run) for latest attempt and retryable flag"),
+				slog.String("evaluation_run_hint", evaluationRunRetryHint),
 			)
 			return err
 		}
