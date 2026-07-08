@@ -17,9 +17,9 @@ const (
 
 var (
 	ExecutionIdentityScaleDefault            = evalpipeline.ExecutionIdentityScaleDefault
-	ExecutionIdentityMBTI                    = evalpipeline.ExecutionIdentityMBTI
-	ExecutionIdentitySBTI                    = evalpipeline.ExecutionIdentitySBTI
-	ExecutionIdentityBigFive                 = evalpipeline.ExecutionIdentityBigFive
+	ExecutionIdentityMBTI                    = evalpipeline.ExecutionIdentityMBTI    //nolint:staticcheck // legacy compat re-export
+	ExecutionIdentitySBTI                    = evalpipeline.ExecutionIdentitySBTI    //nolint:staticcheck // legacy compat re-export
+	ExecutionIdentityBigFive                 = evalpipeline.ExecutionIdentityBigFive //nolint:staticcheck // legacy compat re-export
 	ExecutionIdentityPersonalityTypology     = evalpipeline.ExecutionIdentityPersonalityTypology
 	ExecutionIdentityBehavioralRatingDefault = evalpipeline.ExecutionIdentityBehavioralRatingDefault
 	ExecutionIdentityCognitiveDefault        = evalpipeline.ExecutionIdentityCognitiveDefault

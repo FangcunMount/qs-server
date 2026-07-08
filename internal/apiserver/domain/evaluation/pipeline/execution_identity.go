@@ -15,9 +15,6 @@ var (
 		SubKind:   modelcatalog.SubKindEmpty,
 		Algorithm: modelcatalog.AlgorithmScaleDefault,
 	}
-	ExecutionIdentityMBTI                = PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI)
-	ExecutionIdentitySBTI                = PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI)
-	ExecutionIdentityBigFive             = PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive)
 	ExecutionIdentityPersonalityTypology = ExecutionIdentity{
 		Kind:      modelcatalog.KindPersonality,
 		SubKind:   modelcatalog.SubKindTypology,
@@ -65,15 +62,6 @@ func (id ExecutionIdentity) IsPersonalityTypologyLegacyIdentity() bool {
 		return true
 	default:
 		return false
-	}
-}
-
-// PersonalityTypologyLegacyIdentities 返回内置 类型学算法 路由身份。
-func PersonalityTypologyLegacyIdentities() []ExecutionIdentity {
-	return []ExecutionIdentity{
-		ExecutionIdentityMBTI,
-		ExecutionIdentitySBTI,
-		ExecutionIdentityBigFive,
 	}
 }
 
