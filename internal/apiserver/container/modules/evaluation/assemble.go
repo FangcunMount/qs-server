@@ -28,7 +28,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -230,13 +229,11 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
-				ScaleScorer: evalruntime.MaterializeFactorScoringPipelineComponents(wiringDeps),
+				ScaleScorer:          evalruntime.MaterializeFactorScoringPipelineComponents(wiringDeps),
+				FactorNorm:           evalruntime.MaterializeFactorNormPipelineComponents(wiringDeps),
+				TaskPerformance:      evalruntime.MaterializeTaskPerformancePipelineComponents(wiringDeps),
+				FactorClassification: evalruntime.MaterializeFactorClassificationPipelineComponents(wiringDeps),
 			})
-			evalruntime.AttachEvaluatorPipelines(
-				normalized.RuntimeDescriptorRegistry,
-				familyEvaluators,
-				modelcatalog.AlgorithmFamilyFactorScoring,
-			)
 		}
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
 		if err != nil {

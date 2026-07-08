@@ -576,6 +576,24 @@ type Algorithm = identity.Algorithm
 |------|------|
 | R111 | `registry/mechanisms/scoring/pipeline_components.go` 实现原生 `InputAssembler/Calculator/OutcomeAssembler`；`runtime.AttachNativePipelines` 仅对 `AlgorithmFamilyFactorScoring` 装配；`AttachEvaluatorPipelines` 跳过已原生化 family；`scoring.Executor` 与 `pipeline_bridge` 保留供 fallback/characterization；norming/task_performance/typology 仍 evaluator-backed |
 
+## Round 111b：factor_norm / task_performance 原生 RuntimeDescriptor triple（R111b）
+
+| 轮次 | 内容 |
+|------|------|
+| R111b | `norming/pipeline_components.go` 与 `task_performance/pipeline_components.go` 实现原生 triple（Calculator 克隆 scale payload 后委托 `scoring.Executor`，OutcomeAssembler 分别做 `ApplyFactorProjections` / `NormalizeOutcome`）；`AttachNativePipelines` 扩展装配两 family；`AttachEvaluatorPipelines` 同步 skip；Executor 与 bridge 保留；仅 `factor_classification`（typology）仍 evaluator-backed |
+
+## Round 111c：factor_classification（typology）原生 RuntimeDescriptor triple（R111c）
+
+| 轮次 | 内容 |
+|------|------|
+| R111c | `typology/pipeline_components.go` 实现原生 triple（Calculator 经 configured `runnerForIdentity` 调用 `algorithmRunner.buildOutcome`，OutcomeAssembler pass-through）；`AttachNativePipelines` 装配 `AlgorithmFamilyFactorClassification`；四条机制均已原生化，仅 `pipeline_bridge` 与 legacy Executor 保留供 fallback |
+
+## Round 111d：删除 evaluator-backed bridge（R111d）
+
+| 轮次 | 内容 |
+|------|------|
+| R111d | 删除 `execute/pipeline_bridge.go`（`EvaluatorPipelineComponents` / `evaluatorCalculator`）与 `runtime/pipeline_attach.go`（`AttachEvaluatorPipelines`）；上下文辅助迁至 `execute/descriptor_pipeline_context.go`；生产仅 `AttachNativePipelines` 装配；family `Executor` 仍保留供无 snapshot 的 evaluator registry fallback |
+
 ## Round 112：报告 Audience / ReportProfile 路由入键（R112）
 
 | 轮次 | 内容 |

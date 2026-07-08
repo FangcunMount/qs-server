@@ -1,14 +1,20 @@
 package runtime
 
 import (
+	mechanismnorming "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	mechanismscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
+	mechanismtask "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance"
+	mechanismtypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// NativePipelineDeps 分组 factor_scoring 原生 descriptor pipeline 依赖。
+// NativePipelineDeps 分组已原生化的 RuntimeDescriptor pipeline 依赖。
 type NativePipelineDeps struct {
-	ScaleScorer mechanismscoring.PipelineComponents
+	ScaleScorer          mechanismscoring.PipelineComponents
+	FactorNorm           mechanismnorming.PipelineComponents
+	TaskPerformance      mechanismtask.PipelineComponents
+	FactorClassification mechanismtypology.PipelineComponents
 }
 
 // AttachNativePipelines wires native descriptor pipeline triple for supported algorithm families.
@@ -17,6 +23,9 @@ func AttachNativePipelines(registry *evalpipeline.RuntimeDescriptorRegistry, dep
 		return
 	}
 	attachFactorScoringNativePipeline(registry, deps)
+	attachFactorNormNativePipeline(registry, deps)
+	attachTaskPerformanceNativePipeline(registry, deps)
+	attachFactorClassificationNativePipeline(registry, deps)
 }
 
 func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
@@ -32,4 +41,49 @@ func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorR
 	desc.Calculator = components.Calculator
 	desc.OutcomeAssembler = components.OutcomeAssembler
 	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorScoring, desc)
+}
+
+func attachFactorNormNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyFactorNorm)
+	if !ok {
+		return
+	}
+	components := deps.FactorNorm
+	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
+		components = mechanismnorming.NewPipelineComponents(nil)
+	}
+	desc.InputAssembler = components.InputAssembler
+	desc.Calculator = components.Calculator
+	desc.OutcomeAssembler = components.OutcomeAssembler
+	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorNorm, desc)
+}
+
+func attachTaskPerformanceNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyTaskPerformance)
+	if !ok {
+		return
+	}
+	components := deps.TaskPerformance
+	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
+		components = mechanismtask.NewPipelineComponents(nil)
+	}
+	desc.InputAssembler = components.InputAssembler
+	desc.Calculator = components.Calculator
+	desc.OutcomeAssembler = components.OutcomeAssembler
+	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyTaskPerformance, desc)
+}
+
+func attachFactorClassificationNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyFactorClassification)
+	if !ok {
+		return
+	}
+	components := deps.FactorClassification
+	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
+		components = mechanismtypology.NewPipelineComponents(mechanismtypology.ModuleRegistry{})
+	}
+	desc.InputAssembler = components.InputAssembler
+	desc.Calculator = components.Calculator
+	desc.OutcomeAssembler = components.OutcomeAssembler
+	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorClassification, desc)
 }
