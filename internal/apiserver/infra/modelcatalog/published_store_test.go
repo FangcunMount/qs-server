@@ -8,7 +8,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-type dualStoreV2Stub struct {
+type publishedStoreV2Stub struct {
 	latestCalled bool
 	latest       *domain.Snapshot
 	latestErr    error
@@ -16,36 +16,67 @@ type dualStoreV2Stub struct {
 	total        int64
 }
 
-func (s *dualStoreV2Stub) UpsertPublished(context.Context, *domain.Snapshot) error {
+func (s *publishedStoreV2Stub) UpsertPublished(context.Context, *domain.Snapshot) error {
 	return nil
 }
 
-func (s *dualStoreV2Stub) GetPublishedByRef(context.Context, port.Ref) (*domain.Snapshot, error) {
+func (s *publishedStoreV2Stub) UpsertPublishedModel(context.Context, *domain.PublishedModelSnapshot) error {
+	return nil
+}
+
+func (s *publishedStoreV2Stub) GetPublishedModelByRef(context.Context, port.Ref) (*domain.PublishedModelSnapshot, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (s *dualStoreV2Stub) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.Snapshot, error) {
+func (s *publishedStoreV2Stub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (s *dualStoreV2Stub) FindLatestPublishedByModelCode(context.Context, domain.Kind, string) (*domain.Snapshot, error) {
+func (s *publishedStoreV2Stub) FindLatestPublishedModelByModelCode(context.Context, domain.Kind, string) (*domain.PublishedModelSnapshot, error) {
+	s.latestCalled = true
+	if s.latest != nil {
+		return domain.PublishedFromLegacy(s.latest), s.latestErr
+	}
+	return nil, s.latestErr
+}
+
+func (s *publishedStoreV2Stub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+	out := make([]*domain.PublishedModelSnapshot, 0, len(s.list))
+	for _, snapshot := range s.list {
+		if snapshot == nil {
+			continue
+		}
+		out = append(out, domain.PublishedFromLegacy(snapshot))
+	}
+	return out, s.total, nil
+}
+
+func (s *publishedStoreV2Stub) GetPublishedByRef(context.Context, port.Ref) (*domain.Snapshot, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (s *publishedStoreV2Stub) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.Snapshot, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (s *publishedStoreV2Stub) FindLatestPublishedByModelCode(context.Context, domain.Kind, string) (*domain.Snapshot, error) {
 	s.latestCalled = true
 	return s.latest, s.latestErr
 }
 
-func (s *dualStoreV2Stub) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
+func (s *publishedStoreV2Stub) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
 	return s.list, s.total, nil
 }
 
-func (s *dualStoreV2Stub) ListPublishedAlgorithms(context.Context) ([]domain.Algorithm, error) {
+func (s *publishedStoreV2Stub) ListPublishedAlgorithms(context.Context) ([]domain.Algorithm, error) {
 	return nil, nil
 }
 
-func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
-	v2 := &dualStoreV2Stub{latest: &domain.Snapshot{
+func TestPublishedStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
+	v2 := &publishedStoreV2Stub{latest: &domain.Snapshot{
 		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
 	}}
-	store := &DualStore{v2: v2}
+	store := &PublishedStore{v2: v2}
 
 	got, err := store.FindPublishedByModelCode(context.Background(), domain.KindPersonality, "personality_demo")
 	if err != nil {
@@ -59,8 +90,8 @@ func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
 	}
 }
 
-func TestDualStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
-	v2 := &dualStoreV2Stub{
+func TestPublishedStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
+	v2 := &publishedStoreV2Stub{
 		latest: &domain.Snapshot{
 			Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
 		},
@@ -69,7 +100,7 @@ func TestDualStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 		}},
 		total: 1,
 	}
-	store := &DualStore{v2: v2}
+	store := &PublishedStore{v2: v2}
 
 	byCode, err := store.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "personality_demo")
 	if err != nil {
@@ -90,8 +121,8 @@ func TestDualStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 	}
 }
 
-func TestDualStoreReturnsNotFoundWhenV2Misses(t *testing.T) {
-	store := &DualStore{v2: &dualStoreV2Stub{}}
+func TestPublishedStoreReturnsNotFoundWhenV2Misses(t *testing.T) {
+	store := &PublishedStore{v2: &publishedStoreV2Stub{}}
 	_, err := store.GetPublishedByRef(context.Background(), port.Ref{
 		Kind: domain.KindPersonality, Code: "missing", Version: "1.0.0",
 	})

@@ -115,7 +115,7 @@ func buildTypologyDeps(
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
 	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
-	dualStore := modelcatalog.NewDualStore(v2Repo)
+	dualStore := modelcatalog.NewPublishedStore(v2Repo)
 	publishedLister := port.PublishedModelLister(dualStore)
 	algorithmLister := port.PublishedAlgorithmLister(dualStore)
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {

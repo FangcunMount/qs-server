@@ -1,0 +1,106 @@
+package ruleset
+
+import (
+	"context"
+	"fmt"
+
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+type runtimePublishedStore interface {
+	port.PublishedReader
+	port.PublishedModelReader
+}
+
+// RuntimePublishedCatalog reads only published_assessment_models v2 at runtime.
+type RuntimePublishedCatalog struct {
+	store runtimePublishedStore
+}
+
+var (
+	_ port.Catalog              = (*RuntimePublishedCatalog)(nil)
+	_ port.PublishedModelReader = (*RuntimePublishedCatalog)(nil)
+)
+
+// NewRuntimePublishedCatalog builds the production runtime catalog backed by v2 published snapshots.
+func NewRuntimePublishedCatalog(
+	db *mongo.Database,
+	mongoOpts mongoBase.BaseRepositoryOptions,
+	cacheCfg PublishedModelCacheConfig,
+) (port.Catalog, error) {
+	if db == nil {
+		return nil, fmt.Errorf("mongo database is nil")
+	}
+	v2 := mongomodelcatalog.NewRepository(db, mongoOpts)
+	store := aminfra.NewPublishedStore(v2)
+	var publishedStore runtimePublishedStore = store
+	if cacheCfg.enabled() {
+		publishedStore = cache.NewCachedPublishedModelStore(store, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
+	}
+	return &RuntimePublishedCatalog{store: publishedStore}, nil
+}
+
+// NewRuntimePublishedCatalogWithStore wires a runtime catalog for tests.
+func NewRuntimePublishedCatalogWithStore(store runtimePublishedStore) *RuntimePublishedCatalog {
+	return &RuntimePublishedCatalog{store: store}
+}
+
+func (c *RuntimePublishedCatalog) ResolveByQuestionnaire(
+	ctx context.Context,
+	questionnaireCode, questionnaireVersion string,
+) (port.Ref, bool, error) {
+	if c == nil || c.store == nil {
+		return port.Ref{}, false, nil
+	}
+	snapshot, err := c.store.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return port.Ref{}, false, nil
+		}
+		return port.Ref{}, false, err
+	}
+	return aminfra.RefFromSnapshot(snapshot), true, nil
+}
+
+func (c *RuntimePublishedCatalog) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
+	}
+	return c.store.GetPublishedByRef(ctx, ref)
+}
+
+func (c *RuntimePublishedCatalog) FindPublishedByQuestionnaire(
+	ctx context.Context,
+	questionnaireCode, questionnaireVersion string,
+) (*domain.Snapshot, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	return c.store.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}
+
+func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	return c.store.GetPublishedModelByRef(ctx, ref)
+}
+
+func (c *RuntimePublishedCatalog) FindPublishedModelByQuestionnaire(
+	ctx context.Context,
+	questionnaireCode, questionnaireVersion string,
+) (*domain.PublishedModelSnapshot, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	return c.store.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}

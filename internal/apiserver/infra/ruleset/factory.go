@@ -3,13 +3,7 @@ package ruleset
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/mongo"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
-	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -28,34 +22,12 @@ func (c PublishedModelCacheConfig) enabled() bool {
 	return c.Redis != nil && c.Builder != nil
 }
 
-// NewDefaultStaticCatalog 从内置 SBTI/MBTI 与可选量表 repo 回退构建静态规则目录。
-func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.RuleSetCatalog, error) {
+// NewDefaultStaticCatalog 从内置 SBTI/MBTI 与可选量表 repo 构建静态规则目录。
+// 仅供 oneoff seed/backfill 与测试使用，生产 composition root 禁止引用。
+func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.Catalog, error) {
 	ruleSets, err := DefaultEmbeddedRuleSets(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	return NewStaticCompositeCatalog(ruleSets, scaleSource), nil
-}
-
-// NewCatalog 优先读 published_assessment_models，未命中时回退 evaluation_rule_sets / 静态 seed。
-func NewCatalog(
-	db *mongo.Database,
-	scaleSource ScaleBindingSource,
-	mongoOpts mongoBase.BaseRepositoryOptions,
-	cacheCfg PublishedModelCacheConfig,
-) (port.RuleSetCatalog, error) {
-	static, err := NewDefaultStaticCatalog(scaleSource)
-	if err != nil {
-		return nil, err
-	}
-	if db == nil {
-		return static, nil
-	}
-	v2 := mongomodelcatalog.NewRepository(db, mongoOpts)
-	dual := aminfra.NewDualStore(v2)
-	var store publishedStore = dual
-	if cacheCfg.enabled() {
-		store = cache.NewCachedPublishedModelStore(dual, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
-	}
-	return NewLayeredCatalog(store, static), nil
 }

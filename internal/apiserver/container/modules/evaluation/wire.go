@@ -52,7 +52,7 @@ type WireInput struct {
 	OpsHandle                                   *cacheplane.Handle
 	ReportStatusConfig                          reportstatus.Config
 	ScaleInfra                                  *surveymod.ScaleInfra
-	RuleSetCatalog                              rulesetport.RuleSetCatalog
+	RuleSetCatalog                              rulesetport.Catalog
 	StaticRedisClient                           redis.UniversalClient
 	StaticCacheBuilder                          *keyspace.Builder
 	PublishedModelPolicy                        cachepolicy.CachePolicy
@@ -65,11 +65,11 @@ type WireInput struct {
 // WireResult carries evaluation module and shared catalog side effects.
 type WireResult struct {
 	Module         *Module
-	RuleSetCatalog rulesetport.RuleSetCatalog
+	RuleSetCatalog rulesetport.Catalog
 }
 
 // EnsureRuleSetCatalog builds the shared ruleset catalog used by evaluation and gRPC export.
-func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.RuleSetCatalog, error) {
+func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.Catalog, error) {
 	if in.Existing != nil {
 		return in.Existing, nil
 	}
@@ -77,11 +77,7 @@ func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.RuleSetCatalog, e
 		return nil, fmt.Errorf("mongo database is nil")
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
-	var scaleSource rulesetInfra.ScaleBindingSource
-	if in.ScaleInfra != nil && in.ScaleInfra.ScaleRepo != nil {
-		scaleSource = evaluationinputInfra.NewRepositoryScaleBindingSource(in.ScaleInfra.ScaleRepo)
-	}
-	return rulesetInfra.NewCatalog(in.MongoDB, scaleSource, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
+	return rulesetInfra.NewRuntimePublishedCatalog(in.MongoDB, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
 		Redis:    in.StaticRedisClient,
 		Builder:  in.StaticCacheBuilder,
 		Policy:   in.PublishedModelPolicy,
@@ -94,7 +90,7 @@ type RuleSetCatalogInput struct {
 	MongoDB              *mongo.Database
 	MongoLimiter         backpressure.Acquirer
 	ScaleInfra           *surveymod.ScaleInfra
-	Existing             rulesetport.RuleSetCatalog
+	Existing             rulesetport.Catalog
 	StaticRedisClient    redis.UniversalClient
 	StaticCacheBuilder   *keyspace.Builder
 	PublishedModelPolicy cachepolicy.CachePolicy

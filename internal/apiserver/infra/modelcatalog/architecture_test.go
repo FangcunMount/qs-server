@@ -52,6 +52,109 @@ func TestRuntimeReadPathsDoNotImportMongoRuleSetRepository(t *testing.T) {
 	}
 }
 
+func TestProductionCodeDoesNotReferenceLayeredCatalogFallback(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := []string{
+		"NewLayeredCatalog",
+		"LayeredCatalog",
+		"CatalogStoreLayeredStatic",
+		"qs_modelcatalog_legacy_fallback_hits_total",
+		"RecordLegacyFallback",
+		"ruleset.NewCatalog",
+		"rulesetInfra.NewCatalog",
+	}
+	allowPrefixes := []string{
+		"scripts/",
+		"internal/apiserver/infra/ruleset/static_composite_catalog",
+		"internal/apiserver/infra/ruleset/factory.go",
+	}
+
+	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		for _, prefix := range allowPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s must not reference retired fallback token %s", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProductionCodeDoesNotReferenceDefaultStaticCatalog(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	token := "NewDefaultStaticCatalog"
+	allowPrefixes := []string{
+		"scripts/",
+		"internal/apiserver/infra/ruleset/",
+	}
+
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "vendor" || entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if strings.HasSuffix(rel, "_test.go") {
+			return nil
+		}
+		for _, prefix := range allowPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		if strings.HasPrefix(rel, "internal/apiserver/container/") {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s must not reference %s; production uses NewRuntimePublishedCatalog only", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
