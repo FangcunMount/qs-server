@@ -662,3 +662,13 @@ type Algorithm = identity.Algorithm
 | R123 | 删除 `RuleSet*` port alias、`LegacyRegisterNames`、`ScaleReportInput`/`BuildScaleReport`/`AssessmentOutcomeFromScaleInterpretation`；container 仅注册 `modelcatalog`；`Scoring`/`Typology` ModuleInfo 改为 `modelcatalog.scoring`/`modelcatalog.typology` |
 | R124 | `evaluation.proto` Assessment outcome 三消息删除 `scale_code/scale_name/total_score/risk_level` 并 `reserved`；删除 `fillLegacy*` 双写；新增 proto/OpenAPI contract guard |
 | R125 | 新增 `audit_published_model_payload_formats` dry-run 审计；发布链路拒绝 legacy-decode-only format；typology 读路径与 mongo/cache/store 原生 v2；删除生产路径 `domain/modelcatalog/legacy` import（保留 `export.go` re-export 与 oneoff） |
+
+## Round 126–129：ModelCatalog v2 读路径与 Legacy 退场（R126–R129）
+
+| 轮次 | 要点 |
+|------|------|
+| R126 | `Catalog` 改嵌 `PublishedModelReader`；新增 `DecodeScaleFromPublished`；运行态消费者（runtime_catalog/binding_resolver/PublishedScaleCatalog/questionnaire gRPC）切 v2；`StaticCompositeCatalog` 实现 v2 读；架构守卫禁止运行态 v1 读 |
+| R127 | `EnsurePublishedModelCatalog`/`PublishedScaleCatalog`/`ScalePublisher` canonical 命名；`BackfillFromLegacy` 移入 `scripts/oneoff/backfill_published_assessment_models`；`infra/mongo/ruleset` 降 oneoff-only |
+| R128 | 数据工程：`audit_published_model_payload_formats` dry-run 门禁（需 Mongo 环境）；非零则 oneoff backfill 至 legacy format 归零 |
+| R129 | 删除 mongo v1 读路径/`ToLegacySnapshot`/`PublishedReader` port；静态 seed 原生 v2；收紧 legacy ACL（生产仅 `export.go` + `scripts/`） |
+| R128b | `KindTypology`/`ProductChannelTypology` 为 canonical；`personality` 作 API/Mongo 双读别名；`audit/migrate_personality_kind_values` oneoff；物理删除 `domain/modelcatalog/legacy`，v1 信封迁至 `infra/ruleset/v1envelope`，种子常量迁至 `infra/ruleset/seedfixtures` |
