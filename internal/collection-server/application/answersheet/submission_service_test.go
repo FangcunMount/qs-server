@@ -103,7 +103,7 @@ func TestNewSubmissionServiceAlwaysInitializesQueue(t *testing.T) {
 		Enabled:     false,
 		QueueSize:   8,
 		WorkerCount: 1,
-	}, nil)
+	}, nil, nil)
 
 	if service.queue == nil {
 		t.Fatal("expected submit queue to be initialized even when enabled=false")

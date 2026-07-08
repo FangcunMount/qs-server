@@ -45,6 +45,23 @@ func TestCollectionOpenAPICoversK6PerfPaths(t *testing.T) {
 	}
 }
 
+func TestCollectionOpenAPISubmitStatusHasAssessmentID(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
+	schema, ok := schemas["answersheet.SubmitStatusResponse"].(map[string]any)
+	if !ok {
+		t.Fatal("missing answersheet.SubmitStatusResponse schema")
+	}
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("SubmitStatusResponse has no properties")
+	}
+	if _, ok := props["assessment_id"]; !ok {
+		t.Fatal("SubmitStatusResponse missing assessment_id")
+	}
+}
+
 func TestCollectionOpenAPIHasNoK6RemovedLegacyPaths(t *testing.T) {
 	t.Parallel()
 

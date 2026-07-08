@@ -26,7 +26,7 @@ func (f *fakeAnswerSheetSubmissionService) SubmitQueued(ctx context.Context, req
 	return f.submitQueued(ctx, requestID, writerID, req)
 }
 
-func (f *fakeAnswerSheetSubmissionService) GetSubmitStatus(string) (*answersheet.SubmitStatusResponse, bool) {
+func (f *fakeAnswerSheetSubmissionService) GetSubmitStatus(context.Context, string) (*answersheet.SubmitStatusResponse, bool) {
 	panic("unexpected GetSubmitStatus call")
 }
 

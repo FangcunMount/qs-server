@@ -15,6 +15,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// SubmitAssessmentResolver resolves assessment_id after answer sheet persistence (internal gRPC).
+type SubmitAssessmentResolver interface {
+	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
+}
+
 // IdempotencyGuard protects cross-instance submit idempotency for the same request key.
 type IdempotencyGuard interface {
 	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *locklease.Lease, acquired bool, err error)
@@ -41,8 +46,9 @@ type SubmissionService struct {
 	profileAccess      *ProfileAccessResolver
 	answerConverter    AnswerConverter
 	committer          *SubmissionCommitter
-	queue              *SubmitQueue
-	submitGuard        IdempotencyGuard
+	queue                *SubmitQueue
+	submitGuard          IdempotencyGuard
+	assessmentResolver   SubmitAssessmentResolver
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -53,16 +59,18 @@ func NewSubmissionService(
 	profileLinkService profileLinkChecker,
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard IdempotencyGuard,
+	assessmentResolver SubmitAssessmentResolver,
 ) *SubmissionService {
 	service := &SubmissionService{
-		answerSheetWriter:  answerSheetWriter,
-		answerSheetReader:  answerSheetReader,
-		actorClient:        actorClient,
-		profileLinkService: profileLinkService,
-		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
-		answerConverter:    AnswerConverter{},
-		committer:          NewSubmissionCommitter(answerSheetWriter),
-		submitGuard:        submitGuard,
+		answerSheetWriter:    answerSheetWriter,
+		answerSheetReader:    answerSheetReader,
+		actorClient:          actorClient,
+		profileLinkService:   profileLinkService,
+		profileAccess:        NewProfileAccessResolver(actorClient, profileLinkService),
+		answerConverter:      AnswerConverter{},
+		committer:            NewSubmissionCommitter(answerSheetWriter),
+		submitGuard:          submitGuard,
+		assessmentResolver:   assessmentResolver,
 	}
 
 	if queueOptions == nil {
@@ -132,8 +140,8 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 	return resp, nil
 }
 
-// GetSubmitStatus 获取提交状态
-func (s *SubmissionService) GetSubmitStatus(requestID string) (*SubmitStatusResponse, bool) {
+// GetSubmitStatus 获取提交状态；done 后若测评已创建则附带 assessment_id。
+func (s *SubmissionService) GetSubmitStatus(ctx context.Context, requestID string) (*SubmitStatusResponse, bool) {
 	if s.queue == nil {
 		return nil, false
 	}
@@ -142,7 +150,26 @@ func (s *SubmissionService) GetSubmitStatus(requestID string) (*SubmitStatusResp
 	if !ok {
 		return nil, false
 	}
+	s.enrichAssessmentID(ctx, &status)
 	return &status, true
+}
+
+func (s *SubmissionService) enrichAssessmentID(ctx context.Context, status *SubmitStatusResponse) {
+	if status == nil || status.Status != SubmitStatusDone || status.AnswerSheetID == "" || status.AssessmentID != "" {
+		return
+	}
+	if s.assessmentResolver == nil {
+		return
+	}
+	answerSheetID, err := strconv.ParseUint(status.AnswerSheetID, 10, 64)
+	if err != nil || answerSheetID == 0 {
+		return
+	}
+	_, assessmentID, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+	if err != nil || assessmentID == 0 {
+		return
+	}
+	status.AssessmentID = strconv.FormatUint(assessmentID, 10)
 }
 
 func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {

@@ -87,7 +87,9 @@ type SubmitAcceptedResponse struct {
 type SubmitStatusResponse struct {
 	Status        string `json:"status"`
 	AnswerSheetID string `json:"answersheet_id,omitempty"`
-	UpdatedAt     int64  `json:"updated_at"`
+	// AssessmentID 在 status=done 且异步测评已落库后出现；未就绪时省略，客户端可继续轮询 submit-status。
+	AssessmentID string `json:"assessment_id,omitempty"`
+	UpdatedAt    int64  `json:"updated_at"`
 }
 
 // GetAnswerSheetRequest 获取答卷请求

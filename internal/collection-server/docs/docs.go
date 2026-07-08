@@ -97,7 +97,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "根据 request_id 查询提交处理状态",
+                "description": "根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带 assessment_id（人格/医学通用），未就绪可继续轮询。",
                 "produces": [
                     "application/json"
                 ],
@@ -2143,6 +2143,10 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "answersheet_id": {
+                    "type": "string"
+                },
+                "assessment_id": {
+                    "description": "AssessmentID 在 status=done 且异步测评已落库后出现；未就绪时省略，客户端可继续轮询 submit-status。",
                     "type": "string"
                 },
                 "status": {

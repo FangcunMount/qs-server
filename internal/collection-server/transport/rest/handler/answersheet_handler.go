@@ -17,7 +17,7 @@ import (
 
 type answerSheetSubmissionService interface {
 	SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) error
-	GetSubmitStatus(requestID string) (*answersheet.SubmitStatusResponse, bool)
+	GetSubmitStatus(ctx context.Context, requestID string) (*answersheet.SubmitStatusResponse, bool)
 	Get(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error)
 }
 
@@ -135,7 +135,7 @@ func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
 
 // SubmitStatus 查询提交状态
 // @Summary 查询提交状态
-// @Description 根据 request_id 查询提交处理状态
+// @Description 根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带 assessment_id（人格/医学通用），未就绪可继续轮询。
 // @Tags 答卷
 // @Produce json
 // @Param request_id query string true "请求ID"
@@ -153,7 +153,7 @@ func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
 		return
 	}
 
-	status, ok := h.submissionService.GetSubmitStatus(requestID)
+	status, ok := h.submissionService.GetSubmitStatus(c.Request.Context(), requestID)
 	if !ok {
 		h.NotFoundResponse(c, "submit status not found", nil)
 		return

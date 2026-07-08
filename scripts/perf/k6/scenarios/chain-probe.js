@@ -57,13 +57,13 @@ export function runAsyncChainProbe(ctx, modelType) {
     return;
   }
 
-  const answerSheetID = waitSubmitDone(requestID);
-  if (!answerSheetID) {
+  const submitResult = waitSubmitDone(requestID);
+  if (!submitResult || !submitResult.answerSheetID) {
     chainProbeFailed.add(1, { reason: 'submit_status_timeout', model_type: modelType });
     return;
   }
 
-  const assessmentID = waitAssessmentID(answerSheetID, payload.testee_id, modelType);
+  const assessmentID = submitResult.assessmentID || waitAssessmentID(submitResult.answerSheetID, payload.testee_id, modelType);
   if (!assessmentID) {
     chainProbeFailed.add(1, { reason: 'assessment_lookup_failed', model_type: modelType });
     return;
@@ -125,15 +125,18 @@ export function waitSubmitDone(requestID) {
     if (res.status === 200) {
       const data = responseData(res);
       if (data.status === 'done' && data.answersheet_id) {
-        return data.answersheet_id;
+        return {
+          answerSheetID: data.answersheet_id,
+          assessmentID: data.assessment_id || '',
+        };
       }
       if (data.status === 'failed') {
-        return '';
+        return null;
       }
     }
     sleep(CHAIN_PROBE_POLL_SECONDS);
   }
-  return '';
+  return null;
 }
 
 export function findAssessmentIDByAnswerSheet(data, answerSheetID) {
