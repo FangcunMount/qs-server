@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestDomainScaleRootDoesNotImportApplicationInfraOrEvaluationPipeline(t *testing.T) {
+func TestDomainScoringDefinitionDoesNotImportApplicationInfraOrEvaluationPipeline(t *testing.T) {
 	matches, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatalf("Glob returned error: %v", err)
@@ -27,7 +27,7 @@ func TestDomainScaleRootDoesNotImportApplicationInfraOrEvaluationPipeline(t *tes
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/evaluationinput") ||
 				strings.Contains(path, "/application/evaluation/execute") {
-				t.Fatalf("domain/modelcatalog/scale/definition must not import %s in %s", path, file)
+				t.Fatalf("domain/modelcatalog/scoring/definition must not import %s in %s", path, file)
 			}
 		}
 	}

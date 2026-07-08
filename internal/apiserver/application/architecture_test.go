@@ -179,11 +179,11 @@ func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
 	})
 }
 
-func TestScaleDomainDoesNotModelMBTIAsCategory(t *testing.T) {
+func TestScoringDefinitionDoesNotModelMBTIAsCategory(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale", "definition", "types.go")
+	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scoring", "definition", "types.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
