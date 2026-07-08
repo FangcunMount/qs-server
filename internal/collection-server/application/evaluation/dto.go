@@ -30,19 +30,19 @@ type ResultLevelResponse struct {
 
 // AssessmentSummaryResponse 测评摘要响应（含 model/primary_score/level）。
 type AssessmentSummaryResponse struct {
-	ID                   string                `json:"id"`
-	QuestionnaireCode    string                `json:"questionnaire_code"`
-	QuestionnaireVersion string                `json:"questionnaire_version"`
+	ID                   string `json:"id"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
 	// 关联答卷 ID；提交后可用其与 answersheet_id 匹配取得 assessment_id（R121 后推荐方式）。
-	AnswerSheetID string `json:"answer_sheet_id,omitempty"`
-	Model                ModelIdentityResponse `json:"model"`
-	PrimaryScore         *ScoreValueResponse   `json:"primary_score,omitempty"`
-	Level                *ResultLevelResponse  `json:"level,omitempty"`
-	OriginType           string                `json:"origin_type"`
-	Status               string                `json:"status"`
-	CreatedAt            string                `json:"created_at"`
-	SubmittedAt          string                `json:"submitted_at,omitempty"`
-	InterpretedAt        string                `json:"interpreted_at,omitempty"`
+	AnswerSheetID string                `json:"answer_sheet_id,omitempty"`
+	Model         ModelIdentityResponse `json:"model"`
+	PrimaryScore  *ScoreValueResponse   `json:"primary_score,omitempty"`
+	Level         *ResultLevelResponse  `json:"level,omitempty"`
+	OriginType    string                `json:"origin_type"`
+	Status        string                `json:"status"`
+	CreatedAt     string                `json:"created_at"`
+	SubmittedAt   string                `json:"submitted_at,omitempty"`
+	InterpretedAt string                `json:"interpreted_at,omitempty"`
 }
 
 // AssessmentDetailResponse 测评详情响应（含 model/primary_score/level）。

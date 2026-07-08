@@ -94,11 +94,11 @@ type ApplyCodesDTO struct {
 }
 
 type ModelSummary struct {
-	Code                 string   `json:"code"`
+	Code string `json:"code"`
 	// 模型族；R128b canonical 为 typology，读兼容 personality。
-	Kind                 string   `json:"kind" example:"typology" enums:"typology,personality"`
-	SubKind              string   `json:"sub_kind,omitempty" example:"typology"`
-	Algorithm            string   `json:"algorithm,omitempty"`
+	Kind      string `json:"kind" example:"typology" enums:"typology,personality"`
+	SubKind   string `json:"sub_kind,omitempty" example:"typology"`
+	Algorithm string `json:"algorithm,omitempty"`
 	// 产品通道；R128b canonical 为 typology，读兼容 personality。
 	ProductChannel       string   `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
 	AlgorithmFamily      string   `json:"algorithm_family,omitempty"`

@@ -1,27 +1,27 @@
 package typologymodel
 
 type TypologyModelResponse struct {
-	Code                 string                      `json:"code"`
-	Version              string                      `json:"version"`
-	Title                string                      `json:"title"`
-	Algorithm            string                      `json:"algorithm"`
-	Description          string                      `json:"description"`
-	QuestionnaireCode    string                      `json:"questionnaire_code"`
-	QuestionnaireVersion string                      `json:"questionnaire_version"`
-	Status               string                      `json:"status"`
-	QuestionCount        int32                       `json:"question_count"`
+	Code                 string `json:"code"`
+	Version              string `json:"version"`
+	Title                string `json:"title"`
+	Algorithm            string `json:"algorithm"`
+	Description          string `json:"description"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	Status               string `json:"status"`
+	QuestionCount        int32  `json:"question_count"`
 	// 模型族；R128b canonical 为 typology，读兼容 personality。
 	Kind string `json:"kind,omitempty" example:"typology" enums:"typology,personality"`
 	// 子机制，人格测评固定 typology。
 	SubKind string `json:"sub_kind,omitempty" example:"typology"`
 	// 产品通道；R128b canonical 为 typology，读兼容 personality。
-	ProductChannel string `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
-	AlgorithmFamily      string                      `json:"algorithm_family,omitempty"`
-	PayloadFormat        string                      `json:"payload_format,omitempty"`
-	DecisionKind         string                      `json:"decision_kind,omitempty"`
-	DimensionOrder       []string                    `json:"dimension_order,omitempty"`
-	Dimensions           []TypologyDimensionResponse `json:"dimensions,omitempty"`
-	Outcomes             []TypologyOutcomeResponse   `json:"outcomes,omitempty"`
+	ProductChannel  string                      `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
+	AlgorithmFamily string                      `json:"algorithm_family,omitempty"`
+	PayloadFormat   string                      `json:"payload_format,omitempty"`
+	DecisionKind    string                      `json:"decision_kind,omitempty"`
+	DimensionOrder  []string                    `json:"dimension_order,omitempty"`
+	Dimensions      []TypologyDimensionResponse `json:"dimensions,omitempty"`
+	Outcomes        []TypologyOutcomeResponse   `json:"outcomes,omitempty"`
 }
 
 type TypologyDimensionResponse struct {
@@ -53,10 +53,10 @@ type TypologyModelSummaryResponse struct {
 	// 子机制，人格测评固定 typology。
 	SubKind string `json:"sub_kind,omitempty" example:"typology"`
 	// 产品通道；R128b canonical 为 typology，读兼容 personality。
-	ProductChannel string `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
-	AlgorithmFamily      string `json:"algorithm_family,omitempty"`
-	PayloadFormat        string `json:"payload_format,omitempty"`
-	DecisionKind         string `json:"decision_kind,omitempty"`
+	ProductChannel  string `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
+	AlgorithmFamily string `json:"algorithm_family,omitempty"`
+	PayloadFormat   string `json:"payload_format,omitempty"`
+	DecisionKind    string `json:"decision_kind,omitempty"`
 }
 
 type ListTypologyModelsRequest struct {
