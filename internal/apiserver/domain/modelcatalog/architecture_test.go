@@ -54,8 +54,8 @@ func TestModelCatalogExportOnlyImportsSubpackages(t *testing.T) {
 			t.Fatalf("export.go imports %q; root facade may only import modelcatalog subpackages", path)
 		}
 		sub := strings.TrimPrefix(path, modulePrefix)
-		if sub == "" || strings.Contains(sub, "/") && !isAllowedSubpackageRoot(sub) {
-			t.Fatalf("export.go imports %q; allowed subpackages are identity, routing, capability, catalog, legacy, scoring, typology, taskperformance, binding, publishing", path)
+		if sub == "" || strings.Contains(sub, "/") && !isAllowedExportSubpackageRoot(sub) {
+			t.Fatalf("export.go imports %q; allowed subpackages are factor, scoring, norming, typology, taskperformance, binding, publishing, legacy", path)
 		}
 	}
 }
@@ -78,14 +78,13 @@ func TestModelCatalogExportHasNoNonAliasBusinessLogic(t *testing.T) {
 	}
 }
 
-func isAllowedSubpackageRoot(sub string) bool {
+func isAllowedExportSubpackageRoot(sub string) bool {
 	if idx := strings.Index(sub, "/"); idx >= 0 {
 		sub = sub[:idx]
 	}
 	switch sub {
-	case "identity", "routing", "capability", "catalog", "legacy",
-		"scoring", "typology", "taskperformance", "binding", "publishing",
-		"factor", "norming":
+	case "factor", "scoring", "norming", "typology", "taskperformance",
+		"binding", "publishing", "legacy":
 		return true
 	default:
 		return false
@@ -134,6 +133,38 @@ func TestModelCatalogScalePackageOnlyCompatSeams(t *testing.T) {
 			}
 		}
 	}
+	assertScaleCompatReexportsScoring(t, scaleRoot)
+}
+
+func assertScaleCompatReexportsScoring(t *testing.T, scaleRoot string) {
+	t.Helper()
+
+	const scoringPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/"
+	err := filepath.WalkDir(scaleRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, "compat.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		if len(parsed.Imports) == 0 {
+			t.Fatalf("%s must re-export from scoring canonical home", path)
+		}
+		for _, imp := range parsed.Imports {
+			importPath := strings.Trim(imp.Path.Value, `"`)
+			if !strings.HasPrefix(importPath, scoringPrefix) {
+				t.Fatalf("%s imports %q; scale compat seams may only re-export scoring packages", path, importPath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestModelCatalogTopLevelPackages(t *testing.T) {
@@ -177,7 +208,7 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 			}
 		}
 		if !allowed {
-			t.Fatalf("unexpected top-level package %q; canonical homes are %v (transitional: identity/routing/catalog/capability + family compat seams)", name, required)
+			t.Fatalf("unexpected top-level package %q; canonical homes are %v (transitional compat seams only)", name, required)
 		}
 	}
 	for _, req := range required {

@@ -518,9 +518,24 @@ type Algorithm = identity.Algorithm
 | R76 | `identity/routing/catalog/capability` 经 `binding/publishing/export.go` 收敛；`task_performance` → `taskperformance` |
 | R77 | modelcatalog 顶层包守卫 + 本文档 R61–R77 表；`系统设计文档` §19/§20.7 标注演进态 |
 
-过渡态说明（R77 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
+## Round 78–86：modelcatalog 机制化收官（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R78 | `identity`/`capability`/`QuestionnaireBinding` 实体迁入 `binding`；旧包降 compat re-export |
+| R79 | `routing`/`catalog` 聚合迁入 `publishing`；根 `export.go` 仅引 binding/publishing/legacy |
+| R80 | family `publish` 下沉 `publishing.SnapshotBuilder`；norming 校验/metadata 机制化 |
+| R81 | `scoring/definition` seam re-export `scale/definition` 全部符号 + 契约测试 |
+| R82 | infra/application/container/ruleset 分批改 import 至 `scoring/definition`（BSON 不变） |
+| R83 | 物理迁移 `scale/definition` → `scoring/definition`；`scale/` 仅留 compat seam |
+| R84 | `application/modelcatalog` service/bridge/gateway 去模型族命名；架构守卫禁回退文件名 |
+| R85 | §20.5 `primary_dimension_code` 配置化；§20.6 `DecisionKind` 去 algorithm 推断 |
+| R86 | 终局守卫收口（顶层八包 + scale compat）+ 文档 §19/§20.7 转正 + 本文档 R78–R86 表 |
+
+过渡态说明（R86 后仍保留、仅 compat/实现下沉，禁止新增业务逻辑）：
 
 ```text
-modelcatalog/{cognitive,behavioral_rating,scale,personality,identity,routing,catalog,capability,task_performance}
+modelcatalog/{identity,routing,catalog,capability,cognitive,behavioral_rating,scale,personality,task_performance}
+application/modelcatalog/{personality,behavioral_rating,cognitive}/  # 用例子包，非顶层 service 命名
 ```
 
