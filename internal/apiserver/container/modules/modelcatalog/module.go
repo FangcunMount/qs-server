@@ -8,7 +8,7 @@ const Name = modules.PackageModelCatalog
 var RegisterNames = []string{string(Name), "scale", "typologymodel"}
 
 // LegacyRegisterNames are legacy registerModule keys kept for GetLoadedModules compatibility
-// after scale and personality catalog merged under modelcatalog.
+// after scale and typology catalog merged under modelcatalog.
 var LegacyRegisterNames = []string{"scale", "typologymodel"}
 
 // Descriptor identifies the model-catalog module in container composition.

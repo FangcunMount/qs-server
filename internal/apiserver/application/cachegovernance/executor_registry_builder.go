@@ -38,15 +38,15 @@ func (ExecutorRegistryBuilder) Build(deps Dependencies) *WarmupRegistry {
 		}
 		return deps.WarmScaleList(ctx)
 	})
-	registry.Register(cachetarget.WarmupKindStaticPersonalityModel, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if deps.WarmPublishedPersonalityModel == nil {
+	registry.Register(cachetarget.WarmupKindStaticTypologyModel, func(ctx context.Context, target cachetarget.WarmupTarget) error {
+		if deps.WarmPublishedTypologyModel == nil {
 			return nil
 		}
-		code, ok := cachetarget.ParseStaticPersonalityModelScope(target.Scope)
+		code, ok := cachetarget.ParseStaticTypologyModelScope(target.Scope)
 		if !ok {
-			return fmt.Errorf("invalid static personality model warmup scope: %s", target.Scope)
+			return fmt.Errorf("invalid static typology model warmup scope: %s", target.Scope)
 		}
-		return deps.WarmPublishedPersonalityModel(ctx, code)
+		return deps.WarmPublishedTypologyModel(ctx, code)
 	})
 	registry.Register(cachetarget.WarmupKindQueryStatsOverview, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if deps.WarmStatsOverview == nil {

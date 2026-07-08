@@ -31,7 +31,7 @@ type Options struct {
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
 	QuestionnaireCache      *QuestionnaireCacheOptions              `json:"questionnaire_cache" mapstructure:"questionnaire_cache"`
 	ScaleCache              *ScaleCacheOptions                      `json:"scale_cache" mapstructure:"scale_cache"`
-	PersonalityCache        *PersonalityCacheOptions                `json:"personality_cache" mapstructure:"personality_cache"`
+	TypologyCache           *TypologyCacheOptions                   `json:"typology_cache" mapstructure:"typology_cache"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
@@ -240,7 +240,7 @@ func NewOptions() *Options {
 		SubmitQueue:        NewSubmitQueueOptions(),
 		QuestionnaireCache: NewQuestionnaireCacheOptions(),
 		ScaleCache:         NewScaleCacheOptions(),
-		PersonalityCache:   NewPersonalityCacheOptions(),
+		TypologyCache:      NewTypologyCacheOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -354,7 +354,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
 	o.QuestionnaireCache.AddFlags(fss.FlagSet("questionnaire_cache"))
 	o.ScaleCache.AddFlags(fss.FlagSet("scale_cache"))
-	o.PersonalityCache.AddFlags(fss.FlagSet("personality_cache"))
+	o.TypologyCache.AddFlags(fss.FlagSet("typology_cache"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -481,7 +481,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
 	errs = append(errs, validateQuestionnaireCacheOptions(o.QuestionnaireCache)...)
 	errs = append(errs, validateScaleCacheOptions(o.ScaleCache)...)
-	errs = append(errs, validatePersonalityCacheOptions(o.PersonalityCache)...)
+	errs = append(errs, validateTypologyCacheOptions(o.TypologyCache)...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)

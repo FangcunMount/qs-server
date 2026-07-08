@@ -52,6 +52,55 @@ func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 	}
 }
 
+func TestTypologyCacheNamingDoesNotUsePersonalityModelProductionIdentifiers(t *testing.T) {
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"PersonalityModelCacheChangedSignal",
+		"NotifyPersonalityModelCacheChanged",
+		"NewPersonalityModelSignaler",
+		"PersonalityModelSignaler",
+		"WarmupKindStaticPersonalityModel",
+		"NewStaticPersonalityModelWarmupTarget",
+		"ParseStaticPersonalityModelScope",
+		"WarmPublishedPersonalityModel",
+		"HandlePersonalityModelPublished",
+		"static.personality_model",
+		"personality_model_cache_changed",
+	}
+
+	for _, relRoot := range []string{"internal", "api/rest"} {
+		err := filepath.WalkDir(filepath.Join(root, filepath.FromSlash(relRoot)), func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			ext := filepath.Ext(path)
+			if ext != ".go" && ext != ".yaml" && ext != ".json" {
+				return nil
+			}
+			if strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbiddenTokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains legacy typology cache identifier %q", mustRel(t, root, path), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", relRoot, err)
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	wd, err := os.Getwd()

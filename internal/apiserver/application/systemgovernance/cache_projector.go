@@ -331,7 +331,7 @@ func DefaultCacheWarmupKinds() []CacheWarmupKind {
 		cachetarget.WarmupKindStaticScale,
 		cachetarget.WarmupKindStaticQuestionnaire,
 		cachetarget.WarmupKindStaticScaleList,
-		cachetarget.WarmupKindStaticPersonalityModel,
+		cachetarget.WarmupKindStaticTypologyModel,
 		cachetarget.WarmupKindQueryStatsOverview,
 		cachetarget.WarmupKindQueryStatsSystem,
 		cachetarget.WarmupKindQueryStatsQuestionnaire,
@@ -357,8 +357,8 @@ func cacheWarmupScopeExample(kind cachetarget.WarmupKind) string {
 		return "questionnaire:Q-001"
 	case cachetarget.WarmupKindStaticScaleList:
 		return "published"
-	case cachetarget.WarmupKindStaticPersonalityModel:
-		return "personality_model:M-001"
+	case cachetarget.WarmupKindStaticTypologyModel:
+		return "typology_model:M-001"
 	case cachetarget.WarmupKindQueryStatsOverview:
 		return "org:1:preset:30d"
 	case cachetarget.WarmupKindQueryStatsSystem:

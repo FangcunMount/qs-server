@@ -543,7 +543,7 @@ type Algorithm = identity.Algorithm
 | R91 | `container/modules/modelcatalog` 装配机制化：`assemble_{typology,norming,taskperformance}`；`Module.{Typology,Norming,TaskPerformance}`；守卫禁回退 assemble 文件名 |
 | R92 | `publishing` 快照/载荷解码机制化：`typology_payload`/`snapshot_{typology,norming,taskperformance}`；`TypologyPayloadAndRuntimeSpecFromModel`；守卫禁回退 publishing 文件名 |
 
-过渡态说明（R108 后对外 REST/gRPC 已收敛 typology；领域 `KindPersonality` 数据值与缓存信号名仍保留 personality 字样）：
+过渡态说明（R109 后对外 REST/gRPC 与 collection 内部 session/cache/warmup 命名已收敛 typology；领域 `KindPersonality`、`ProductChannelPersonality`、`PayloadFormatPersonalityTypologyV1` 等历史数据值仍保留 personality 字样）：
 
 ## Round 106–107：运行审计与 API 身份补全（R107）
 
@@ -556,5 +556,10 @@ type Algorithm = identity.Algorithm
 
 | 轮次 | 内容 |
 |------|------|
-| R108 | breaking 下线 `/api/v1/personality-*` REST、`personalitymodel` gRPC、application `Personality*` DTO/deprecated alias；唯一公开面为 `/api/v1/typology-*` + `typologymodel` gRPC；OpenAPI drift 字段已重生成修复；`KindPersonality` 数据值与 `PersonalityModel*` 缓存信号名本轮保留 |
+| R108 | breaking 下线 `/api/v1/personality-*` REST、`personalitymodel` gRPC、application `Personality*` DTO/deprecated alias；唯一公开面为 `/api/v1/typology-*` + `typologymodel` gRPC；OpenAPI drift 字段已重生成修复；`KindPersonality` 数据值与 `PersonalityModel*` 缓存信号名在 R108 当轮仍保留 |
 
+## Round 109：内部旧命名闭环（R109）
+
+| 轮次 | 内容 |
+|------|------|
+| R109 | `collection-server/application/personalitysession` 迁移为 `typologysession`；OpenAPI schema 不再导出 `personalitysession.*`；collection container 字段、cache signal、governance warmup、L1 cache 配置从 `PersonalityModel*` / `personality_model_cache_changed` / `static.personality_model` / `personality_cache` 收敛为 typology 命名；新增架构/契约测试防止旧命名回流 |

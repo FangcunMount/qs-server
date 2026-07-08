@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
@@ -16,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
@@ -54,21 +54,21 @@ type Container struct {
 	typologyModelClient *grpcclient.TypologyModelClient
 
 	// 应用层服务
-	submissionService                 *answersheet.SubmissionService
-	questionnaireQueryService         *questionnaire.QueryService
-	evaluationQueryService            *evaluation.QueryService
-	waitReportService                 *reportwait.Service
-	scaleQueryService                 *scale.QueryService
-	typologyModelQueryService         *typologymodel.QueryService
-	personalityAssessmentQueryService *typologyassessment.QueryService
-	personalitySessionService         *personalitysession.Service
-	testeeService                     *testee.Service
-	reportStatusReporter              *reportstatus.Reporter
-	reportNotifier                    reportnotify.Notifier
-	waitWatcherCancel                 context.CancelFunc
-	reportEventsHandler               *ws.ReportEventsHandler
-	catalogCacheWatcherCancels        []context.CancelFunc
-	l1PeekRegistry                    *catalogpeek.Registry
+	submissionService              *answersheet.SubmissionService
+	questionnaireQueryService      *questionnaire.QueryService
+	evaluationQueryService         *evaluation.QueryService
+	waitReportService              *reportwait.Service
+	scaleQueryService              *scale.QueryService
+	typologyModelQueryService      *typologymodel.QueryService
+	typologyAssessmentQueryService *typologyassessment.QueryService
+	typologySessionService         *typologysession.Service
+	testeeService                  *testee.Service
+	reportStatusReporter           *reportstatus.Reporter
+	reportNotifier                 reportnotify.Notifier
+	waitWatcherCancel              context.CancelFunc
+	reportEventsHandler            *ws.ReportEventsHandler
+	catalogCacheWatcherCancels     []context.CancelFunc
+	l1PeekRegistry                 *catalogpeek.Registry
 
 	// 接口层处理器
 	answerSheetHandler               *handler.AnswerSheetHandler
@@ -179,7 +179,7 @@ func (c *Container) initApplicationServices() {
 	catalogRuntime := c.buildCatalogRuntime()
 	c.questionnaireQueryService = catalogRuntime.questionnaire
 	c.scaleQueryService = catalogRuntime.scale
-	c.typologyModelQueryService = catalogRuntime.personality
+	c.typologyModelQueryService = catalogRuntime.typology
 
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
@@ -191,11 +191,11 @@ func (c *Container) initApplicationServices() {
 	c.waitReportService = reportRuntime.waitReport
 	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
-	c.personalityAssessmentQueryService = typologyassessment.NewQueryService(
+	c.typologyAssessmentQueryService = typologyassessment.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
 		c.waitReportService,
 	)
-	c.personalitySessionService = personalitysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
+	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
 	c.reportEventsHandler = c.buildReportEventsHandler()
 
@@ -217,8 +217,8 @@ func (c *Container) initHandlers() {
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService, c.waitReportService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
-	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.personalityAssessmentQueryService, c.waitReportService)
-	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.personalitySessionService)
+	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.typologyAssessmentQueryService, c.waitReportService)
+	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.typologySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 

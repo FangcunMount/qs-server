@@ -26,8 +26,8 @@ type ScaleCacheOptions struct {
 	CatalogL1CacheOptions `mapstructure:",squash"`
 }
 
-// PersonalityCacheOptions 人格模型目录 BFF 进程内 L1 缓存。
-type PersonalityCacheOptions struct {
+// TypologyCacheOptions 类型学模型目录 BFF 进程内 L1 缓存。
+type TypologyCacheOptions struct {
 	CatalogL1CacheOptions `mapstructure:",squash"`
 }
 
@@ -52,9 +52,9 @@ func NewScaleCacheOptions() *ScaleCacheOptions {
 	return &ScaleCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
 }
 
-// NewPersonalityCacheOptions 创建默认人格模型目录 L1 缓存配置。
-func NewPersonalityCacheOptions() *PersonalityCacheOptions {
-	return &PersonalityCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
+// NewTypologyCacheOptions 创建默认类型学模型目录 L1 缓存配置。
+func NewTypologyCacheOptions() *TypologyCacheOptions {
+	return &TypologyCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
 }
 
 func (o *CatalogL1CacheOptions) addFlags(fs *pflag.FlagSet, prefix, label string) {
@@ -77,8 +77,8 @@ func (s *ScaleCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	s.addFlags(fs, "scale_cache", "scale catalog reads")
 }
 
-func (p *PersonalityCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	p.addFlags(fs, "personality_cache", "personality model catalog reads")
+func (p *TypologyCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	p.addFlags(fs, "typology_cache", "typology model catalog reads")
 }
 
 func validateCatalogL1CacheOptions(opts *CatalogL1CacheOptions, name string) []error {
@@ -112,9 +112,9 @@ func validateScaleCacheOptions(opts *ScaleCacheOptions) []error {
 	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "scale_cache")
 }
 
-func validatePersonalityCacheOptions(opts *PersonalityCacheOptions) []error {
+func validateTypologyCacheOptions(opts *TypologyCacheOptions) []error {
 	if opts == nil {
 		return nil
 	}
-	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "personality_cache")
+	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "typology_cache")
 }

@@ -14,7 +14,7 @@ import (
 type Notifier struct {
 	questionnaire signaling.Notifier[QuestionnaireCacheChangedSignal]
 	scale         signaling.Notifier[ScaleCacheChangedSignal]
-	personality   signaling.Notifier[PersonalityModelCacheChangedSignal]
+	typology      signaling.Notifier[TypologyModelCacheChangedSignal]
 	service       string
 }
 
@@ -40,13 +40,13 @@ func NewNotifier(opsHandle *cacheplane.Handle, cfg Config) (*Notifier, error) {
 	if err != nil {
 		return nil, err
 	}
-	pSignaler, err := NewPersonalityModelSignaler(standalone, cfg.Signaling)
+	pSignaler, err := NewTypologyModelSignaler(standalone, cfg.Signaling)
 	if err != nil {
 		return nil, err
 	}
 	n.questionnaire = qSignaler
 	n.scale = sSignaler
-	n.personality = pSignaler
+	n.typology = pSignaler
 	return n, nil
 }
 
@@ -70,11 +70,11 @@ func (n *Notifier) ScaleSignaler() *signalredis.Signaler[ScaleCacheChangedSignal
 	return nil
 }
 
-func (n *Notifier) PersonalityModelSignaler() *signalredis.Signaler[PersonalityModelCacheChangedSignal] {
+func (n *Notifier) TypologyModelSignaler() *signalredis.Signaler[TypologyModelCacheChangedSignal] {
 	if n == nil {
 		return nil
 	}
-	if s, ok := n.personality.(*signalredis.Signaler[PersonalityModelCacheChangedSignal]); ok {
+	if s, ok := n.typology.(*signalredis.Signaler[TypologyModelCacheChangedSignal]); ok {
 		return s
 	}
 	return nil
@@ -120,19 +120,19 @@ func (n *Notifier) NotifyScaleCacheChanged(ctx context.Context, code, action str
 	}
 }
 
-func (n *Notifier) NotifyPersonalityModelCacheChanged(ctx context.Context, code, action string) {
-	if n == nil || n.personality == nil || code == "" {
+func (n *Notifier) NotifyTypologyModelCacheChanged(ctx context.Context, code, action string) {
+	if n == nil || n.typology == nil || code == "" {
 		return
 	}
-	signal := PersonalityModelCacheChangedSignal{
+	signal := TypologyModelCacheChangedSignal{
 		Code:       code,
 		Action:     action,
 		OccurredAt: time.Now().UTC(),
 	}
 	IncNotify(signal.SignalName(), n.service)
-	if err := n.personality.Notify(ctx, signal); err != nil {
+	if err := n.typology.Notify(ctx, signal); err != nil {
 		IncNotifyFailed(signal.SignalName(), n.service)
-		logger.L(ctx).Warnw("personality model cache signal notify failed",
+		logger.L(ctx).Warnw("typology model cache signal notify failed",
 			"code", code,
 			"error", err.Error(),
 		)

@@ -626,47 +626,6 @@ definitions:
     type: object
   meta.Birthday:
     type: object
-  personalitysession.SessionEndpointsResponse:
-    properties:
-      assessment_by_answer_sheet:
-        type: string
-      report:
-        type: string
-      submit_answer_sheet:
-        type: string
-      wait_report:
-        type: string
-    type: object
-  personalitysession.StartSessionRequest:
-    properties:
-      model_code:
-        type: string
-      testee_id:
-        type: integer
-    required:
-    - model_code
-    - testee_id
-    type: object
-  personalitysession.StartSessionResponse:
-    properties:
-      endpoints:
-        $ref: '#/definitions/personalitysession.SessionEndpointsResponse'
-      model:
-        $ref: '#/definitions/typologymodel.TypologyModelSummaryResponse'
-      questionnaire:
-        $ref: '#/definitions/questionnaire.QuestionnaireResponse'
-      submit_contract:
-        $ref: '#/definitions/personalitysession.SubmitContractResponse'
-    type: object
-  personalitysession.SubmitContractResponse:
-    properties:
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      testee_id:
-        type: string
-    type: object
   questionnaire.CalculationRuleResponse:
     properties:
       formula_type:
@@ -1365,6 +1324,47 @@ definitions:
       name:
         type: string
       one_liner:
+        type: string
+    type: object
+  typologysession.SessionEndpointsResponse:
+    properties:
+      assessment_by_answer_sheet:
+        type: string
+      report:
+        type: string
+      submit_answer_sheet:
+        type: string
+      wait_report:
+        type: string
+    type: object
+  typologysession.StartSessionRequest:
+    properties:
+      model_code:
+        type: string
+      testee_id:
+        type: integer
+    required:
+    - model_code
+    - testee_id
+    type: object
+  typologysession.StartSessionResponse:
+    properties:
+      endpoints:
+        $ref: '#/definitions/typologysession.SessionEndpointsResponse'
+      model:
+        $ref: '#/definitions/typologymodel.TypologyModelSummaryResponse'
+      questionnaire:
+        $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+      submit_contract:
+        $ref: '#/definitions/typologysession.SubmitContractResponse'
+    type: object
+  typologysession.SubmitContractResponse:
+    properties:
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      testee_id:
         type: string
     type: object
 info:
@@ -2522,7 +2522,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/personalitysession.StartSessionRequest'
+          $ref: '#/definitions/typologysession.StartSessionRequest'
       produces:
       - application/json
       responses:
@@ -2533,7 +2533,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/personalitysession.StartSessionResponse'
+                  $ref: '#/definitions/typologysession.StartSessionResponse'
               type: object
         "400":
           description: Bad Request

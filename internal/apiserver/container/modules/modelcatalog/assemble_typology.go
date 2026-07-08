@@ -27,10 +27,10 @@ type TypologyDeps struct {
 	CacheSignalNotifier      appTypologyModel.CacheSignalNotifier
 }
 
-// NewTypology assembles the personality-model catalog capability.
+// NewTypology assembles the typology-model catalog capability.
 func NewTypology(deps TypologyDeps) (*Typology, error) {
 	if deps.PublishedLister == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "personality model published lister is required")
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "typology model published lister is required")
 	}
 	var queryService appTypologyCatalog.TypologyModelQueryService
 	if deps.PublishedAlgorithmLister != nil {
@@ -60,7 +60,7 @@ func (m *Typology) Cleanup() error { return nil }
 // CheckHealth verifies module health.
 func (m *Typology) CheckHealth() error { return nil }
 
-// ModuleInfo returns legacy personality-model module metadata.
+// ModuleInfo returns typology-model module metadata.
 func (m *Typology) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{Name: "typologymodel", Version: "1.0.0"}
 }

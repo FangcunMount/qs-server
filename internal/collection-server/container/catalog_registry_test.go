@@ -15,7 +15,7 @@ func TestCatalogL1CacheDisabledReturnsNil(t *testing.T) {
 	opts := options.NewOptions()
 	opts.QuestionnaireCache.Enabled = false
 	opts.ScaleCache.Enabled = false
-	opts.PersonalityCache.Enabled = false
+	opts.TypologyCache.Enabled = false
 
 	if got := newCatalogL1Cache(opts, catalogKindQuestionnaire); got != nil {
 		t.Fatalf("questionnaire cache = %T, want nil", got)
@@ -23,8 +23,8 @@ func TestCatalogL1CacheDisabledReturnsNil(t *testing.T) {
 	if got := newCatalogL1Cache(opts, catalogKindScale); got != nil {
 		t.Fatalf("scale cache = %T, want nil", got)
 	}
-	if got := newCatalogL1Cache(opts, catalogKindPersonality); got != nil {
-		t.Fatalf("personality cache = %T, want nil", got)
+	if got := newCatalogL1Cache(opts, catalogKindTypology); got != nil {
+		t.Fatalf("typology cache = %T, want nil", got)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestCatalogL1CacheEnabledBuildsTypedCaches(t *testing.T) {
 	opts := options.NewOptions()
 	opts.QuestionnaireCache.Enabled = true
 	opts.ScaleCache.Enabled = true
-	opts.PersonalityCache.Enabled = true
+	opts.TypologyCache.Enabled = true
 
 	if _, ok := newCatalogL1Cache(opts, catalogKindQuestionnaire).(*questionnaire.LocalCache); !ok {
 		t.Fatal("questionnaire cache type mismatch")
@@ -42,8 +42,8 @@ func TestCatalogL1CacheEnabledBuildsTypedCaches(t *testing.T) {
 	if _, ok := newCatalogL1Cache(opts, catalogKindScale).(*scale.LocalCatalogCache); !ok {
 		t.Fatal("scale cache type mismatch")
 	}
-	if _, ok := newCatalogL1Cache(opts, catalogKindPersonality).(*typologymodel.LocalCatalogCache); !ok {
-		t.Fatal("personality cache type mismatch")
+	if _, ok := newCatalogL1Cache(opts, catalogKindTypology).(*typologymodel.LocalCatalogCache); !ok {
+		t.Fatal("typology cache type mismatch")
 	}
 }
 

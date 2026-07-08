@@ -146,7 +146,7 @@ scale_cache:
   singleflight: true
   signal_evict_enabled: true
 
-personality_cache:
+typology_cache:
   enabled: false
   ttl_seconds: 180
   max_entries: 256

@@ -31,7 +31,7 @@ type submitRuntime struct {
 type catalogRuntime struct {
 	questionnaire *questionnaire.QueryService
 	scale         *scale.QueryService
-	personality   *typologymodel.QueryService
+	typology      *typologymodel.QueryService
 }
 
 type reportRuntime struct {
@@ -77,14 +77,14 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			catalogCaches.scale,
 			catalogL1SingleflightEnabled(c.opts, catalogKindScale),
 		),
-		personality: typologymodel.NewQueryService(
+		typology: typologymodel.NewQueryService(
 			grpcbridge.NewTypologyCatalogReader(c.typologyModelClient),
-			catalogCaches.personality,
-			catalogL1SingleflightEnabled(c.opts, catalogKindPersonality),
+			catalogCaches.typology,
+			catalogL1SingleflightEnabled(c.opts, catalogKindTypology),
 		),
 	}
 	c.l1PeekRegistry = catalogpeek.NewRegistry()
-	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.scale, rt.personality, rt.questionnaire)
+	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.scale, rt.typology, rt.questionnaire)
 	return rt
 }
 
@@ -149,7 +149,7 @@ func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 		Events: reportevents.NewService(newReportStatusResolver(
 			c.evaluationQueryService,
 			c.waitReportService,
-			c.personalityAssessmentQueryService,
+			c.typologyAssessmentQueryService,
 		)),
 		Options:      c.opts.ReportEvents,
 		RateLimit:    c.RateLimitBackend(),

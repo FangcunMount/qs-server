@@ -13,7 +13,7 @@ type catalogKind int
 const (
 	catalogKindQuestionnaire catalogKind = iota
 	catalogKindScale
-	catalogKindPersonality
+	catalogKindTypology
 )
 
 type catalogSpec struct {
@@ -46,10 +46,10 @@ var catalogSpecs = map[catalogKind]catalogSpec{
 			})
 		},
 	},
-	catalogKindPersonality: {
-		kind:         "personality",
-		watcherLabel: "personality model cache signal watcher",
-		config:       personalityCatalogCfg,
+	catalogKindTypology: {
+		kind:         "typology",
+		watcherLabel: "typology model cache signal watcher",
+		config:       typologyCatalogCfg,
 		build: func(o localCacheOptions) any {
 			return typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{
 				TTL: o.TTL, MaxEntries: o.MaxEntries, TTLJitterRatio: o.TTLJitterRatio,
@@ -100,9 +100,9 @@ func scaleCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
 	return &opts.ScaleCache.CatalogL1CacheOptions
 }
 
-func personalityCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.PersonalityCache == nil {
+func typologyCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
+	if opts == nil || opts.TypologyCache == nil {
 		return nil
 	}
-	return &opts.PersonalityCache.CatalogL1CacheOptions
+	return &opts.TypologyCache.CatalogL1CacheOptions
 }

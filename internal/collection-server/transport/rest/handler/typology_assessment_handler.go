@@ -81,7 +81,7 @@ func (h *TypologyAssessmentHandler) Get(c *gin.Context) {
 	}
 	result, err := h.queryService.Get(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		if typologyassessment.IsNotPersonalityAssessment(err) {
+		if typologyassessment.IsNotTypologyAssessment(err) {
 			h.NotFoundResponse(c, "typology assessment not found", err)
 			return
 		}
@@ -117,7 +117,7 @@ func (h *TypologyAssessmentHandler) GetReport(c *gin.Context) {
 	}
 	result, err := h.queryService.GetReport(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		if typologyassessment.IsNotPersonalityAssessment(err) {
+		if typologyassessment.IsNotTypologyAssessment(err) {
 			h.NotFoundResponse(c, "typology assessment report not found", err)
 			return
 		}

@@ -1,4 +1,4 @@
-package personalitysession
+package typologysession
 
 import (
 	"encoding/json"

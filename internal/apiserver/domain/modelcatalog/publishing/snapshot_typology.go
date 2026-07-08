@@ -13,10 +13,10 @@ func buildTypologyPublishedSnapshot(model *AssessmentModel) (*PublishedModelSnap
 		return nil, fmt.Errorf("model kind %s is not personality", model.Kind)
 	}
 	if model.SubKind != binding.SubKindTypology {
-		return nil, fmt.Errorf("personality model sub_kind %s is not typology", model.SubKind)
+		return nil, fmt.Errorf("typology model sub_kind %s is not typology", model.SubKind)
 	}
 	if model.Definition.IsEmpty() {
-		return nil, fmt.Errorf("personality model definition is empty")
+		return nil, fmt.Errorf("typology model definition is empty")
 	}
 	payload, runtime, err := TypologyPayloadAndRuntimeSpecFromModel(model)
 	if err != nil {

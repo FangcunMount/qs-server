@@ -1851,7 +1851,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/personalitysession.StartSessionRequest"
+                            "$ref": "#/definitions/typologysession.StartSessionRequest"
                         }
                     }
                 ],
@@ -1867,7 +1867,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/personalitysession.StartSessionResponse"
+                                            "$ref": "#/definitions/typologysession.StartSessionResponse"
                                         }
                                     }
                                 }
@@ -3423,69 +3423,6 @@ const docTemplate = `{
         "meta.Birthday": {
             "type": "object"
         },
-        "personalitysession.SessionEndpointsResponse": {
-            "type": "object",
-            "properties": {
-                "assessment_by_answer_sheet": {
-                    "type": "string"
-                },
-                "report": {
-                    "type": "string"
-                },
-                "submit_answer_sheet": {
-                    "type": "string"
-                },
-                "wait_report": {
-                    "type": "string"
-                }
-            }
-        },
-        "personalitysession.StartSessionRequest": {
-            "type": "object",
-            "required": [
-                "model_code",
-                "testee_id"
-            ],
-            "properties": {
-                "model_code": {
-                    "type": "string"
-                },
-                "testee_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "personalitysession.StartSessionResponse": {
-            "type": "object",
-            "properties": {
-                "endpoints": {
-                    "$ref": "#/definitions/personalitysession.SessionEndpointsResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
-                },
-                "questionnaire": {
-                    "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
-                },
-                "submit_contract": {
-                    "$ref": "#/definitions/personalitysession.SubmitContractResponse"
-                }
-            }
-        },
-        "personalitysession.SubmitContractResponse": {
-            "type": "object",
-            "properties": {
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "testee_id": {
-                    "type": "string"
-                }
-            }
-        },
         "questionnaire.CalculationRuleResponse": {
             "type": "object",
             "properties": {
@@ -4539,6 +4476,69 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "one_liner": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologysession.SessionEndpointsResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_by_answer_sheet": {
+                    "type": "string"
+                },
+                "report": {
+                    "type": "string"
+                },
+                "submit_answer_sheet": {
+                    "type": "string"
+                },
+                "wait_report": {
+                    "type": "string"
+                }
+            }
+        },
+        "typologysession.StartSessionRequest": {
+            "type": "object",
+            "required": [
+                "model_code",
+                "testee_id"
+            ],
+            "properties": {
+                "model_code": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "typologysession.StartSessionResponse": {
+            "type": "object",
+            "properties": {
+                "endpoints": {
+                    "$ref": "#/definitions/typologysession.SessionEndpointsResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
+                },
+                "questionnaire": {
+                    "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
+                },
+                "submit_contract": {
+                    "$ref": "#/definitions/typologysession.SubmitContractResponse"
+                }
+            }
+        },
+        "typologysession.SubmitContractResponse": {
+            "type": "object",
+            "properties": {
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "testee_id": {
                     "type": "string"
                 }
             }

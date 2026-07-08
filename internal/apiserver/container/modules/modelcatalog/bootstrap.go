@@ -31,7 +31,7 @@ func (p SurveyBootstrapPorts) ApplySurveyPorts(deps *ScoringDeps) {
 	}
 }
 
-// Bootstrap assembles scoring + personality catalog capabilities.
+// Bootstrap assembles scoring + typology catalog capabilities.
 func Bootstrap(in BootstrapInput) (*Module, error) {
 	scoringDeps := in.Scoring
 	in.Survey.ApplySurveyPorts(&scoringDeps)

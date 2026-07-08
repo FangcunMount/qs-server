@@ -10,7 +10,7 @@ import (
 
 type typologyModelClient = CatalogReader
 
-// QueryService is the BFF layer for personality model catalog reads.
+// QueryService is the BFF layer for typology model catalog reads.
 type QueryService struct {
 	client          typologyModelClient
 	cache           CatalogCache
@@ -72,10 +72,10 @@ func (s *QueryService) Get(ctx context.Context, code string) (*TypologyModelResp
 		},
 		func(resp *TypologyModelResponse) { s.cache.SetDetail(code, resp) },
 		func() (*TypologyModelResponse, error) {
-			log.Infof("Getting personality model: code=%s", code)
+			log.Infof("Getting typology model: code=%s", code)
 			result, err := s.client.GetTypologyModel(ctx, code)
 			if err != nil {
-				logTypologyGRPCError("Failed to get personality model via gRPC", err)
+				logTypologyGRPCError("Failed to get typology model via gRPC", err)
 				return nil, err
 			}
 			return result, nil
@@ -101,7 +101,7 @@ func (s *QueryService) List(ctx context.Context, req *ListTypologyModelsRequest)
 		func() (*ListTypologyModelsResponse, error) {
 			result, err := s.client.ListTypologyModels(ctx, req.Page, req.PageSize, req.Algorithm)
 			if err != nil {
-				logTypologyGRPCError("Failed to list personality models via gRPC", err)
+				logTypologyGRPCError("Failed to list typology models via gRPC", err)
 				return nil, err
 			}
 			return result, nil
@@ -122,7 +122,7 @@ func (s *QueryService) GetCategories(ctx context.Context) (*TypologyModelCategor
 		func() (*TypologyModelCategoriesResponse, error) {
 			result, err := s.client.GetTypologyModelCategories(ctx)
 			if err != nil {
-				logTypologyGRPCError("Failed to get personality model categories via gRPC", err)
+				logTypologyGRPCError("Failed to get typology model categories via gRPC", err)
 				return nil, err
 			}
 			return result, nil

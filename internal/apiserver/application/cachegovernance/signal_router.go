@@ -40,12 +40,12 @@ func (c *coordinator) HandleQuestionnairePublished(ctx context.Context, code, _ 
 	return err
 }
 
-func (c *coordinator) HandlePersonalityModelPublished(ctx context.Context, code string) error {
+func (c *coordinator) HandleTypologyModelPublished(ctx context.Context, code string) error {
 	if c == nil || !c.cfg.Enable || strings.TrimSpace(code) == "" {
 		return nil
 	}
 	_, err := c.executeTargets(ctx, "publish", []cachetarget.WarmupTarget{
-		cachetarget.NewStaticPersonalityModelWarmupTarget(code),
+		cachetarget.NewStaticTypologyModelWarmupTarget(code),
 	})
 	return err
 }

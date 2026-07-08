@@ -14,12 +14,12 @@ const (
 	cacheKeyPrefixList   = "personality:list:"
 )
 
-// LocalCatalogCache 人格模型目录进程内 TTL 缓存。
+// LocalCatalogCache 类型学模型目录进程内 TTL 缓存。
 type LocalCatalogCache struct {
 	inner *catalogl1.MultiCache[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]
 }
 
-// LocalCatalogCacheOptions 人格模型目录 L1 配置。
+// LocalCatalogCacheOptions 类型学模型目录 L1 配置。
 type LocalCatalogCacheOptions struct {
 	TTL            time.Duration
 	MaxEntries     int
@@ -28,7 +28,7 @@ type LocalCatalogCacheOptions struct {
 	OnMiss         func()
 }
 
-// NewLocalCatalogCache 创建人格模型目录 L1 缓存。
+// NewLocalCatalogCache 创建类型学模型目录 L1 缓存。
 func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
 	return &LocalCatalogCache{
 		inner: catalogl1.NewMultiCache(catalogl1.Options{

@@ -98,8 +98,8 @@ func TestCollectionApplicationDoesNotAddPersonalityTopLevelPackages(t *testing.T
 			continue
 		}
 		name := entry.Name()
-		if strings.HasPrefix(name, "personality") && name != "personalitysession" {
-			t.Fatalf("forbidden top-level package %q; use typologymodel/typologyassessment internally", name)
+		if strings.HasPrefix(name, "personality") {
+			t.Fatalf("forbidden top-level package %q; use typology packages internally", name)
 		}
 	}
 }

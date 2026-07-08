@@ -147,8 +147,8 @@ scale_cache:                        # 量表目录 L1 缓存配置
   singleflight: true                # 启用 singleflight 避免重复请求
   signal_evict_enabled: true        # 启用信号驱逐
 
-personality_cache:                  # 人格模型目录 L1 缓存配置
-  enabled: true                     # 启用人格模型目录 L1 缓存
+typology_cache:                   # 类型学模型目录 L1 缓存配置
+  enabled: true                    # 启用类型学模型目录 L1 缓存
   ttl_seconds: 180
   ttl_jitter_ratio: 0.2
   max_entries: 256

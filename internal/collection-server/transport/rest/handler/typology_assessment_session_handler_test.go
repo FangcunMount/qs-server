@@ -8,16 +8,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
 	"github.com/gin-gonic/gin"
 )
 
-func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
+func TestTypologyAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+	handler := NewTypologyAssessmentSessionHandler(typologysession.NewService(
 		&sessionModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",
@@ -30,7 +30,7 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 		}},
 	))
 
-	body, err := json.Marshal(personalitysession.StartSessionRequest{
+	body, err := json.Marshal(typologysession.StartSessionRequest{
 		ModelCode: "MBTI_OEJTS",
 		TesteeID:  7,
 	})
@@ -50,10 +50,10 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 	}
 }
 
-func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testing.T) {
+func TestTypologyAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+	handler := NewTypologyAssessmentSessionHandler(typologysession.NewService(
 		&sessionModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 "MBTI_OEJTS",
 			QuestionnaireCode:    "MBTI_OEJTS",

@@ -1,16 +1,16 @@
 package handler
 
 import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
 	"github.com/gin-gonic/gin"
 )
 
 type TypologyAssessmentSessionHandler struct {
 	*BaseHandler
-	service *personalitysession.Service
+	service *typologysession.Service
 }
 
-func NewTypologyAssessmentSessionHandler(service *personalitysession.Service) *TypologyAssessmentSessionHandler {
+func NewTypologyAssessmentSessionHandler(service *typologysession.Service) *TypologyAssessmentSessionHandler {
 	return &TypologyAssessmentSessionHandler{
 		BaseHandler: NewBaseHandler(),
 		service:     service,
@@ -23,14 +23,14 @@ func NewTypologyAssessmentSessionHandler(service *personalitysession.Service) *T
 // @Tags 类型学测评
 // @Accept json
 // @Produce json
-// @Param body body personalitysession.StartSessionRequest true "开始会话请求"
-// @Success 200 {object} core.Response{data=personalitysession.StartSessionResponse}
+// @Param body body typologysession.StartSessionRequest true "开始会话请求"
+// @Success 200 {object} core.Response{data=typologysession.StartSessionResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/typology-assessment-sessions [post]
 func (h *TypologyAssessmentSessionHandler) Start(c *gin.Context) {
-	var req personalitysession.StartSessionRequest
+	var req typologysession.StartSessionRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}

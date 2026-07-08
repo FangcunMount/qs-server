@@ -43,18 +43,18 @@ func (m medicalKindReader) CurrentStatus(ctx context.Context, testeeID, assessme
 	return reportstatus.MedicalView(status), nil
 }
 
-type personalityKindReader struct {
-	personality interface {
+type typologyKindReader struct {
+	typology interface {
 		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
 		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	}
 }
 
-func (p personalityKindReader) Authorize(ctx context.Context, testeeID, assessmentID uint64) error {
-	if p.personality == nil {
-		return fmt.Errorf("personality query service is not configured")
+func (p typologyKindReader) Authorize(ctx context.Context, testeeID, assessmentID uint64) error {
+	if p.typology == nil {
+		return fmt.Errorf("typology query service is not configured")
 	}
-	result, err := p.personality.Get(ctx, testeeID, assessmentID)
+	result, err := p.typology.Get(ctx, testeeID, assessmentID)
 	if err != nil {
 		return err
 	}
@@ -64,11 +64,11 @@ func (p personalityKindReader) Authorize(ctx context.Context, testeeID, assessme
 	return nil
 }
 
-func (p personalityKindReader) CurrentStatus(ctx context.Context, testeeID, assessmentID uint64) (*reportstatus.View, error) {
-	if p.personality == nil {
-		return nil, fmt.Errorf("personality query service is not configured")
+func (p typologyKindReader) CurrentStatus(ctx context.Context, testeeID, assessmentID uint64) (*reportstatus.View, error) {
+	if p.typology == nil {
+		return nil, fmt.Errorf("typology query service is not configured")
 	}
-	status, err := p.personality.GetReportStatus(ctx, testeeID, assessmentID)
+	status, err := p.typology.GetReportStatus(ctx, testeeID, assessmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func newReportStatusResolver(
 	waitReport interface {
 		GetStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentStatusResponse, error)
 	},
-	personality interface {
+	typology interface {
 		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
 		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	},
@@ -102,6 +102,6 @@ func newReportStatusResolver(
 			medical:    medical,
 			waitReport: waitReport,
 		},
-		reportstatus.KindPersonality: personalityKindReader{personality: personality},
+		reportstatus.KindPersonality: typologyKindReader{typology: typology},
 	})
 }

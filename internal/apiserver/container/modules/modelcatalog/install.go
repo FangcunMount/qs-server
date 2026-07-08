@@ -41,6 +41,6 @@ func InstallFrom(host InstallHost) error {
 		return err
 	}
 	host.SetAssessmentModelModule(module)
-	host.Printf("📦 Assessment model module initialized (scale + personality catalog)\n")
+	host.Printf("📦 Assessment model module initialized (scale + typology catalog)\n")
 	return nil
 }

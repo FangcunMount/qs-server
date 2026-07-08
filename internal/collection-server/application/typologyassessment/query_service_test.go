@@ -57,7 +57,7 @@ func (f *fakeStatusCache) SetIfHigherPriority(context.Context, *reportstatus.Sna
 	return nil
 }
 
-func TestQueryServiceGetRejectsNonPersonalityModel(t *testing.T) {
+func TestQueryServiceGetRejectsNonTypologyModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewQueryService(&fakeEvaluationReader{
@@ -66,7 +66,7 @@ func TestQueryServiceGetRejectsNonPersonalityModel(t *testing.T) {
 		},
 	}, nil)
 	_, err := svc.Get(context.Background(), 1, 2)
-	if !IsNotPersonalityAssessment(err) {
+	if !IsNotTypologyAssessment(err) {
 		t.Fatalf("expected personality guard error, got %v", err)
 	}
 }

@@ -18,7 +18,7 @@ type Coordinator interface {
 	WarmStartup(ctx context.Context) error
 	HandleScalePublished(ctx context.Context, code string) error
 	HandleQuestionnairePublished(ctx context.Context, code, version string) error
-	HandlePersonalityModelPublished(ctx context.Context, code string) error
+	HandleTypologyModelPublished(ctx context.Context, code string) error
 	HandleStatisticsSync(ctx context.Context, orgID int64) error
 	HandleRepairComplete(ctx context.Context, req RepairCompleteRequest) error
 	HandleManualWarmup(ctx context.Context, req ManualWarmupRequest) (*ManualWarmupResult, error)
@@ -79,7 +79,7 @@ type Dependencies struct {
 	WarmScale                       func(context.Context, string) error
 	WarmQuestionnaire               func(context.Context, string) error
 	WarmScaleList                   func(context.Context) error
-	WarmPublishedPersonalityModel   func(context.Context, string) error
+	WarmPublishedTypologyModel      func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
 	WarmStatsSystem                 func(context.Context, int64) error
 	WarmStatsQuestionnaire          func(context.Context, int64, string) error

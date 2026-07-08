@@ -120,7 +120,7 @@ func TestPersonalityDefinitionValidation(t *testing.T) {
 	}
 	result := model.ValidateForPublish()
 	if result.Passed() {
-		t.Fatal("ValidateForPublish() should fail for incomplete personality model")
+		t.Fatal("ValidateForPublish() should fail for incomplete typology model")
 	}
 }
 

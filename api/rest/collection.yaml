@@ -1336,7 +1336,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/personalitysession.StartSessionRequest'
+              $ref: '#/components/schemas/typologysession.StartSessionRequest'
       responses:
         '200':
           description: OK
@@ -1348,7 +1348,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/personalitysession.StartSessionResponse'
+                      $ref: '#/components/schemas/typologysession.StartSessionResponse'
         '400':
           description: Bad Request
           content:
@@ -2370,47 +2370,6 @@ components:
           type: integer
     meta.Birthday:
       type: object
-    personalitysession.SessionEndpointsResponse:
-      type: object
-      properties:
-        assessment_by_answer_sheet:
-          type: string
-        report:
-          type: string
-        submit_answer_sheet:
-          type: string
-        wait_report:
-          type: string
-    personalitysession.StartSessionRequest:
-      type: object
-      required:
-      - model_code
-      - testee_id
-      properties:
-        model_code:
-          type: string
-        testee_id:
-          type: integer
-    personalitysession.StartSessionResponse:
-      type: object
-      properties:
-        endpoints:
-          $ref: '#/components/schemas/personalitysession.SessionEndpointsResponse'
-        model:
-          $ref: '#/components/schemas/typologymodel.TypologyModelSummaryResponse'
-        questionnaire:
-          $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
-        submit_contract:
-          $ref: '#/components/schemas/personalitysession.SubmitContractResponse'
-    personalitysession.SubmitContractResponse:
-      type: object
-      properties:
-        questionnaire_code:
-          type: string
-        questionnaire_version:
-          type: string
-        testee_id:
-          type: string
     questionnaire.CalculationRuleResponse:
       type: object
       properties:
@@ -3110,6 +3069,47 @@ components:
         name:
           type: string
         one_liner:
+          type: string
+    typologysession.SessionEndpointsResponse:
+      type: object
+      properties:
+        assessment_by_answer_sheet:
+          type: string
+        report:
+          type: string
+        submit_answer_sheet:
+          type: string
+        wait_report:
+          type: string
+    typologysession.StartSessionRequest:
+      type: object
+      required:
+      - model_code
+      - testee_id
+      properties:
+        model_code:
+          type: string
+        testee_id:
+          type: integer
+    typologysession.StartSessionResponse:
+      type: object
+      properties:
+        endpoints:
+          $ref: '#/components/schemas/typologysession.SessionEndpointsResponse'
+        model:
+          $ref: '#/components/schemas/typologymodel.TypologyModelSummaryResponse'
+        questionnaire:
+          $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
+        submit_contract:
+          $ref: '#/components/schemas/typologysession.SubmitContractResponse'
+    typologysession.SubmitContractResponse:
+      type: object
+      properties:
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        testee_id:
           type: string
   securitySchemes:
     BearerAuth:

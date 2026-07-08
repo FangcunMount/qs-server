@@ -14,38 +14,38 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type fakePersonalityAssessmentQueryService struct {
+type fakeTypologyAssessmentQueryService struct {
 	getReport func(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error)
 }
 
-func (f *fakePersonalityAssessmentQueryService) List(context.Context, uint64, *personalityassessment.ListAssessmentsRequest) (*personalityassessment.ListAssessmentsResponse, error) {
+func (f *fakeTypologyAssessmentQueryService) List(context.Context, uint64, *personalityassessment.ListAssessmentsRequest) (*personalityassessment.ListAssessmentsResponse, error) {
 	panic("unexpected List call")
 }
 
-func (f *fakePersonalityAssessmentQueryService) Get(context.Context, uint64, uint64) (*personalityassessment.AssessmentDetailResponse, error) {
+func (f *fakeTypologyAssessmentQueryService) Get(context.Context, uint64, uint64) (*personalityassessment.AssessmentDetailResponse, error) {
 	panic("unexpected Get call")
 }
 
-func (f *fakePersonalityAssessmentQueryService) GetReport(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error) {
+func (f *fakeTypologyAssessmentQueryService) GetReport(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error) {
 	if f.getReport == nil {
 		panic("unexpected GetReport call")
 	}
 	return f.getReport(ctx, testeeID, assessmentID)
 }
 
-func (f *fakePersonalityAssessmentQueryService) GetReportStatus(context.Context, uint64, uint64) (*personalityassessment.AssessmentStatusResponse, error) {
+func (f *fakeTypologyAssessmentQueryService) GetReportStatus(context.Context, uint64, uint64) (*personalityassessment.AssessmentStatusResponse, error) {
 	panic("unexpected GetReportStatus call")
 }
 
-func (f *fakePersonalityAssessmentQueryService) WaitReport(context.Context, uint64, uint64, time.Duration) (*personalityassessment.AssessmentStatusResponse, error) {
+func (f *fakeTypologyAssessmentQueryService) WaitReport(context.Context, uint64, uint64, time.Duration) (*personalityassessment.AssessmentStatusResponse, error) {
 	panic("unexpected WaitReport call")
 }
 
-func TestPersonalityAssessmentHandlerGetReportRequiresTesteeID(t *testing.T) {
+func TestTypologyAssessmentHandlerGetReportRequiresTesteeID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewTypologyAssessmentHandler(
-		&fakePersonalityAssessmentQueryService{},
+		&fakeTypologyAssessmentQueryService{},
 		nil,
 	)
 
@@ -61,11 +61,11 @@ func TestPersonalityAssessmentHandlerGetReportRequiresTesteeID(t *testing.T) {
 	}
 }
 
-func TestPersonalityAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
+func TestTypologyAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewTypologyAssessmentHandler(
-		&fakePersonalityAssessmentQueryService{
+		&fakeTypologyAssessmentQueryService{
 			getReport: func(context.Context, uint64, uint64) (*personalityassessment.AssessmentReportResponse, error) {
 				return nil, status.Error(codes.PermissionDenied, "forbidden")
 			},
@@ -85,11 +85,11 @@ func TestPersonalityAssessmentHandlerGetReportRejectsWrongTestee(t *testing.T) {
 	}
 }
 
-func TestPersonalityAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
+func TestTypologyAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewTypologyAssessmentHandler(
-		&fakePersonalityAssessmentQueryService{
+		&fakeTypologyAssessmentQueryService{
 			getReport: func(_ context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error) {
 				if testeeID != 7 || assessmentID != 42 {
 					t.Fatalf("unexpected ids: testee=%d assessment=%d", testeeID, assessmentID)

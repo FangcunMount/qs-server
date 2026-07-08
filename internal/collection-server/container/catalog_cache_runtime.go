@@ -20,7 +20,7 @@ import (
 type catalogCaches struct {
 	questionnaire questionnaire.PublishedDetailCache
 	scale         scale.CatalogCache
-	personality   typologymodel.CatalogCache
+	typology      typologymodel.CatalogCache
 }
 
 func (c *Container) initCatalogCaches() catalogCaches {
@@ -33,9 +33,9 @@ func (c *Container) initCatalogCaches() catalogCaches {
 		caches.scale = cache.(scale.CatalogCache)
 		c.startCatalogSignalWatcher(catalogKindScale, cache)
 	}
-	if cache := newCatalogL1Cache(c.opts, catalogKindPersonality); cache != nil {
-		caches.personality = cache.(typologymodel.CatalogCache)
-		c.startCatalogSignalWatcher(catalogKindPersonality, cache)
+	if cache := newCatalogL1Cache(c.opts, catalogKindTypology); cache != nil {
+		caches.typology = cache.(typologymodel.CatalogCache)
+		c.startCatalogSignalWatcher(catalogKindTypology, cache)
 	}
 	return caches
 }
@@ -107,10 +107,10 @@ func (c *Container) startCatalogSignalWatcher(kind catalogKind, cache any) {
 			},
 			func(v any) scale.CatalogCache { return v.(scale.CatalogCache) },
 		)
-	case catalogKindPersonality:
+	case catalogKindTypology:
 		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
-			cachesignal.NewPersonalityModelSignaler,
-			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.PersonalityModelCacheChangedSignal], target typologymodel.CatalogCache) {
+			cachesignal.NewTypologyModelSignaler,
+			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.TypologyModelCacheChangedSignal], target typologymodel.CatalogCache) {
 				typologymodel.StartCacheSignalWatcher(ctx, signaler, target)
 			},
 			func(v any) typologymodel.CatalogCache { return v.(typologymodel.CatalogCache) },

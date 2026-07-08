@@ -25,7 +25,7 @@ func (f *fakeManualWarmupCoordinator) WarmStartup(context.Context) error { retur
 
 func (f *fakeManualWarmupCoordinator) HandleScalePublished(context.Context, string) error { return nil }
 
-func (f *fakeManualWarmupCoordinator) HandlePersonalityModelPublished(context.Context, string) error {
+func (f *fakeManualWarmupCoordinator) HandleTypologyModelPublished(context.Context, string) error {
 	return nil
 }
 

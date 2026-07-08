@@ -15,7 +15,7 @@ import (
 
 const personalityModelKind = "personality"
 
-var errNotPersonalityAssessment = errors.New("assessment is not a personality evaluation")
+var errNotTypologyAssessment = errors.New("assessment is not a personality evaluation")
 
 type QueryService struct {
 	evaluationClient evaluationapp.BFFReader
@@ -33,7 +33,7 @@ func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAsses
 	page, pageSize := evaluationapp.NormalizeListPage(req.Page, req.PageSize, evaluationapp.AssessmentListPageDefault)
 	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", personalityModelKind, req.Algorithm, "", "", page, pageSize)
 	if err != nil {
-		logPersonalityAssessmentError("list personality assessments failed", err)
+		logTypologyAssessmentError("list typology assessments failed", err)
 		return nil, err
 	}
 	return result, nil
@@ -42,13 +42,13 @@ func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAsses
 func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
 	result, err := s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
-		logPersonalityAssessmentError("get personality assessment failed", err)
+		logTypologyAssessmentError("get typology assessment failed", err)
 		return nil, err
 	}
 	if result == nil {
 		return nil, nil
 	}
-	if err := ensurePersonalityModel(result.Model); err != nil {
+	if err := ensureTypologyModel(result.Model); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -57,13 +57,13 @@ func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (
 func (s *QueryService) GetReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
 	result, err := s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
 	if err != nil {
-		logPersonalityAssessmentError("get personality assessment report failed", err)
+		logTypologyAssessmentError("get typology assessment report failed", err)
 		return nil, err
 	}
 	if result == nil {
 		return nil, nil
 	}
-	if err := ensurePersonalityModel(result.Model); err != nil {
+	if err := ensureTypologyModel(result.Model); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -115,14 +115,14 @@ func (s *QueryService) toPublicStatusResponse(
 	return resp
 }
 
-func ensurePersonalityModel(model evaluationapp.ModelIdentityResponse) error {
+func ensureTypologyModel(model evaluationapp.ModelIdentityResponse) error {
 	if model.Kind != personalityModelKind {
-		return errNotPersonalityAssessment
+		return errNotTypologyAssessment
 	}
 	return nil
 }
 
-func logPersonalityAssessmentError(message string, err error) {
+func logTypologyAssessmentError(message string, err error) {
 	if cancelerr.Is(err) {
 		log.Debugf("%s: %v", message, err)
 		return
@@ -130,6 +130,6 @@ func logPersonalityAssessmentError(message string, err error) {
 	log.Errorf("%s: %v", message, err)
 }
 
-func IsNotPersonalityAssessment(err error) bool {
-	return errors.Is(err, errNotPersonalityAssessment)
+func IsNotTypologyAssessment(err error) bool {
+	return errors.Is(err, errNotTypologyAssessment)
 }

@@ -9,7 +9,7 @@ import (
 )
 
 // V1 contract: Mongo report mapper preserves scale summary, factor dimensions,
-// suggestions, and personality model extra across round trip.
+// suggestions, and typology model extra across round trip.
 func TestV1MongoReportMapperPreservesScaleAndPersonalityFields(t *testing.T) {
 	mapper := mongoevaluation.NewReportMapper()
 	createdAt := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)

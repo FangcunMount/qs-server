@@ -82,7 +82,7 @@ func (f *fakeStatisticsWarmupCoordinator) HandleScalePublished(context.Context, 
 	return nil
 }
 
-func (f *fakeStatisticsWarmupCoordinator) HandlePersonalityModelPublished(context.Context, string) error {
+func (f *fakeStatisticsWarmupCoordinator) HandleTypologyModelPublished(context.Context, string) error {
 	return nil
 }
 

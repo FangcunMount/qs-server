@@ -256,7 +256,7 @@ func TestGetQRCodeDispatchesByKind(t *testing.T) {
 		RawQRCodeGenerator: &personalityQRCodeGeneratorStub{},
 	})
 
-	t.Run("personality model", func(t *testing.T) {
+	t.Run("typology model", func(t *testing.T) {
 		got, err := svc.GetQRCode(context.Background(), "personality_demo")
 		if err != nil {
 			t.Fatalf("GetQRCode() error = %v", err)

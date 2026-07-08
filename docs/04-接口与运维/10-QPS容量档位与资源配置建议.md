@@ -42,7 +42,7 @@
 | collection submit_queue | queue_size **2800**，worker_count **56** | 提交削峰 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
-| collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
+| collection typology_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/cache/01-缓存模块整体架构.md)。
 | collection concurrency | query **460** + submit **96**（catalog Try 503） | 4C/8G；280 档 169×503 后上调读池 |

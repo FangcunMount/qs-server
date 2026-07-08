@@ -44,6 +44,17 @@ func TestCollectionOpenAPIHasNoLegacyPersonalityPaths(t *testing.T) {
 	}
 }
 
+func TestCollectionOpenAPIHasNoLegacyPersonalitySessionSchemas(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
+	for name := range schemas {
+		if strings.Contains(name, "personalitysession.") {
+			t.Fatalf("legacy personality session schema still in OpenAPI: %s", name)
+		}
+	}
+}
+
 func TestCollectionPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

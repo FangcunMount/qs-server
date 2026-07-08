@@ -1,4 +1,4 @@
-package personalitysession
+package typologysession
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func (f *flowAssessmentReader) GetReport(_ context.Context, testeeID, assessment
 	return true, nil
 }
 
-func TestMiniProgramPersonalityAssessmentFlowContract(t *testing.T) {
+func TestMiniProgramTypologyAssessmentFlowContract(t *testing.T) {
 	const testeeID uint64 = 1001
 	const answerSheetID uint64 = 9001
 	const assessmentID uint64 = 8001
@@ -131,7 +131,7 @@ func TestMiniProgramPersonalityAssessmentFlowContract(t *testing.T) {
 	}
 }
 
-func TestMiniProgramPersonalityAssessmentFlowRejectsUnknownModel(t *testing.T) {
+func TestMiniProgramTypologyAssessmentFlowRejectsUnknownModel(t *testing.T) {
 	sessionSvc := NewService(flowModelReader{}, flowQuestionnaireReader{})
 	session, err := sessionSvc.Start(context.Background(), &StartSessionRequest{
 		ModelCode: "UNKNOWN_MODEL",

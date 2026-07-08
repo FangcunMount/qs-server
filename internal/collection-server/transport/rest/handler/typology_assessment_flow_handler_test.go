@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
 	"github.com/gin-gonic/gin"
 )
 
-func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
+func TestMiniProgramTypologyAssessmentHTTPFlowContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	const (
@@ -28,7 +28,7 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 		questionnaireVersion        = "1.0.0"
 	)
 
-	sessionHandler := NewTypologyAssessmentSessionHandler(personalitysession.NewService(
+	sessionHandler := NewTypologyAssessmentSessionHandler(typologysession.NewService(
 		&httpFlowModelReader{model: &typologymodel.TypologyModelResponse{
 			Code:                 modelCode,
 			Version:              questionnaireVersion,
@@ -45,7 +45,7 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 
 	sessionRecorder := httptest.NewRecorder()
 	sessionCtx, _ := gin.CreateTestContext(sessionRecorder)
-	sessionBody, _ := json.Marshal(personalitysession.StartSessionRequest{
+	sessionBody, _ := json.Marshal(typologysession.StartSessionRequest{
 		ModelCode: modelCode,
 		TesteeID:  testeeID,
 	})
@@ -57,7 +57,7 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 	}
 
 	var sessionResp struct {
-		Data personalitysession.StartSessionResponse `json:"data"`
+		Data typologysession.StartSessionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(sessionRecorder.Body.Bytes(), &sessionResp); err != nil {
 		t.Fatalf("unmarshal session response: %v", err)

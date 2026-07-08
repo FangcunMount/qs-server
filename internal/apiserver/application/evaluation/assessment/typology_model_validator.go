@@ -27,7 +27,7 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 		return nil
 	}
 	if modelRef.Version() == "" {
-		return fmt.Errorf("%w: personality model version is required", evalassessment.ErrEvaluationModelNotPublished)
+		return fmt.Errorf("%w: typology model version is required", evalassessment.ErrEvaluationModelNotPublished)
 	}
 	snapshot, err := v.reader.GetPublishedModelByRef(ctx, port.Ref{
 		Kind:      domainmodel.KindPersonality,
@@ -40,7 +40,7 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 		if domainmodel.IsNotFound(err) {
 			return fmt.Errorf("%w: %s@%s", evalassessment.ErrEvaluationModelNotPublished, modelRef.Code(), modelRef.Version())
 		}
-		return fmt.Errorf("failed to validate personality model: %w", err)
+		return fmt.Errorf("failed to validate typology model: %w", err)
 	}
 	if snapshot == nil {
 		return fmt.Errorf("%w: %s@%s", evalassessment.ErrEvaluationModelNotPublished, modelRef.Code(), modelRef.Version())

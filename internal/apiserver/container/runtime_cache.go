@@ -137,7 +137,7 @@ func (c *Container) StartCacheSignalWatcher(ctx context.Context) {
 		c.WarmupCoordinator(),
 		notifier.QuestionnaireSignaler(),
 		notifier.ScaleSignaler(),
-		notifier.PersonalityModelSignaler(),
+		notifier.TypologyModelSignaler(),
 	)
 }
 
@@ -178,7 +178,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		WarmScale:                       warmScale,
 		WarmQuestionnaire:               warmQuestionnaire,
 		WarmScaleList:                   warmScaleList,
-		WarmPublishedPersonalityModel:   a.warmPublishedPersonalityModel,
+		WarmPublishedTypologyModel:      a.warmPublishedTypologyModel,
 		WarmStatsOverview:               warmStatsOverview,
 		WarmStatsSystem:                 warmStatsSystem,
 		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
@@ -284,7 +284,7 @@ func (a cacheGovernanceAdapter) warmScaleListTarget(ctx context.Context) error {
 	return infra.ScaleListCache.Rebuild(ctx)
 }
 
-func (a cacheGovernanceAdapter) warmPublishedPersonalityModel(ctx context.Context, code string) error {
+func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, code string) error {
 	c := a.container
 	if c == nil || c.AssessmentModelModule == nil || c.AssessmentModelModule.Typology == nil {
 		return nil

@@ -18,7 +18,7 @@ import (
 
 // CacheSignalNotifier 缓存失效信令发布端口（best-effort，非领域事件）。
 type CacheSignalNotifier interface {
-	NotifyPersonalityModelCacheChanged(ctx context.Context, code, action string)
+	NotifyTypologyModelCacheChanged(ctx context.Context, code, action string)
 }
 
 type Service interface {
@@ -330,7 +330,7 @@ func (s *service) notifyCacheChanged(ctx context.Context, code, action string) {
 	if s.deps.CacheSignalNotifier == nil || code == "" {
 		return
 	}
-	s.deps.CacheSignalNotifier.NotifyPersonalityModelCacheChanged(ctx, code, action)
+	s.deps.CacheSignalNotifier.NotifyTypologyModelCacheChanged(ctx, code, action)
 }
 
 func (s *service) validateModelForPublish(ctx context.Context, model *domain.AssessmentModel) []ValidationIssue {

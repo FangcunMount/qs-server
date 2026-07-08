@@ -1,4 +1,4 @@
-package personalitysession
+package typologysession
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 )
 
-type personalityModelReader interface {
+type typologyModelReader interface {
 	Get(ctx context.Context, code string) (*typologymodel.TypologyModelResponse, error)
 }
 
@@ -15,13 +15,13 @@ type questionnaireReader interface {
 	Get(ctx context.Context, code, version string) (*questionnaire.QuestionnaireResponse, error)
 }
 
-// Service aggregates the stable mini-program entry for starting a personality assessment.
+// Service aggregates the stable mini-program entry for starting a typology assessment.
 type Service struct {
-	models        personalityModelReader
+	models        typologyModelReader
 	questionnaire questionnaireReader
 }
 
-func NewService(models personalityModelReader, questionnaire questionnaireReader) *Service {
+func NewService(models typologyModelReader, questionnaire questionnaireReader) *Service {
 	return &Service{
 		models:        models,
 		questionnaire: questionnaire,

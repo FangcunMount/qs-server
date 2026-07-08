@@ -18,7 +18,7 @@ type Deps struct {
 	Norming         NormingDeps
 }
 
-// New assembles scoring and personality catalog capabilities.
+// New assembles scoring and typology catalog capabilities.
 func New(deps Deps) (*Module, error) {
 	scoring, err := NewScoring(deps.Scoring)
 	if err != nil {
@@ -101,6 +101,6 @@ func (m *Module) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
 		Name:        string(Name),
 		Version:     "1.0.0",
-		Description: "测评解释模型资产模块（量表 + 人格模型目录）",
+		Description: "测评解释模型资产模块（量表 + 类型学模型目录）",
 	}
 }

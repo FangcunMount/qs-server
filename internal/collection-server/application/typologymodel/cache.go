@@ -1,6 +1,6 @@
 package typologymodel
 
-// CatalogCache 人格模型目录 REST DTO 进程内 L1 缓存。
+// CatalogCache 类型学模型目录 REST DTO 进程内 L1 缓存。
 type CatalogCache interface {
 	GetDetail(code string) (*TypologyModelResponse, bool)
 	SetDetail(code string, value *TypologyModelResponse)

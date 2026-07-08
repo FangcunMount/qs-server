@@ -54,7 +54,7 @@ type Container struct {
 
 	// 业务模块
 	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
-	AssessmentModelModule *AssessmentModelModule // 测评解释模型资产（量表 + 人格模型目录）
+	AssessmentModelModule *AssessmentModelModule // 测评解释模型资产（量表 + 类型学模型目录）
 	ScaleModule           *ScaleModule           // Scale 能力别名（AssessmentModelModule.Scale）
 	TypologyModelModule   *TypologyModelModule   // Typology 能力别名（AssessmentModelModule.Typology）
 	ActorModule           *ActorModule           // Actor 模块
@@ -182,7 +182,7 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
-	// 初始化 Assessment model 模块（scale + personality catalog）
+	// 初始化 Assessment model 模块（scale + typology catalog）
 	if err := c.initModelCatalogModule(); err != nil {
 		return fmt.Errorf("failed to initialize assessment model module: %w", err)
 	}

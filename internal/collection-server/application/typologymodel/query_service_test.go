@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-type stubPersonalityModelClient struct {
+type stubTypologyModelClient struct {
 	getCalls int32
 	getFn    func(ctx context.Context, code string) (*TypologyModelResponse, error)
 }
 
-func (s *stubPersonalityModelClient) GetTypologyModel(ctx context.Context, code string) (*TypologyModelResponse, error) {
+func (s *stubTypologyModelClient) GetTypologyModel(ctx context.Context, code string) (*TypologyModelResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
 	if s.getFn != nil {
 		return s.getFn(ctx, code)
@@ -20,16 +20,16 @@ func (s *stubPersonalityModelClient) GetTypologyModel(ctx context.Context, code 
 	return &TypologyModelResponse{Code: code, Title: "sample"}, nil
 }
 
-func (s *stubPersonalityModelClient) ListTypologyModels(context.Context, int32, int32, string) (*ListTypologyModelsResponse, error) {
+func (s *stubTypologyModelClient) ListTypologyModels(context.Context, int32, int32, string) (*ListTypologyModelsResponse, error) {
 	return &ListTypologyModelsResponse{}, nil
 }
 
-func (s *stubPersonalityModelClient) GetTypologyModelCategories(context.Context) (*TypologyModelCategoriesResponse, error) {
+func (s *stubTypologyModelClient) GetTypologyModelCategories(context.Context) (*TypologyModelCategoriesResponse, error) {
 	return &TypologyModelCategoriesResponse{}, nil
 }
 
 func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {
-	client := &stubPersonalityModelClient{}
+	client := &stubTypologyModelClient{}
 	cache := NewLocalCatalogCache(LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 8})
 	service := NewQueryService(client, cache, true)
 
