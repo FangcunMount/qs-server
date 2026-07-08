@@ -83,3 +83,23 @@ func mustRel(t *testing.T, root, path string) string {
 	}
 	return rel
 }
+
+func TestCollectionApplicationDoesNotAddPersonalityTopLevelPackages(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	appRoot := filepath.Join(root, "internal", "collection-server", "application")
+	entries, err := os.ReadDir(appRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, "personality") && name != "personalitysession" {
+			t.Fatalf("forbidden top-level package %q; use typologymodel/typologyassessment internally", name)
+		}
+	}
+}

@@ -232,3 +232,111 @@ func TestMechanismProductionCodeDoesNotImportDomainMBTIPatternSymbols(t *testing
 		t.Fatal(err)
 	}
 }
+
+func TestEvaluationAndPipelineDoNotRouteByBehaviorAbilityProductChannel(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoots := []string{
+		filepath.Join(root, "internal/apiserver/domain/evaluation/pipeline"),
+		filepath.Join(root, "internal/apiserver/application/evaluation/execute"),
+		filepath.Join(root, "internal/apiserver/application/evaluation/runtime"),
+		filepath.Join(root, "internal/apiserver/application/evaluation/registry"),
+	}
+	forbidden := []string{"behavior_ability", "BehaviorAbility", "APIKindBehaviorAbility", "IsBehaviorAbility"}
+	for _, scanRoot := range scanRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				if entry.Name() == "legacy" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbidden {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s references %q; behavior_ability is taxonomy-only and must not drive execution routing",
+						filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestMechanismProductionCodeDoesNotCallReportSpecForAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	typologyRoot := filepath.Join(root, "internal/apiserver/application/evaluation/registry/mechanisms/typology")
+	err := filepath.WalkDir(typologyRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "legacy" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "ReportSpecForAlgorithm") {
+			t.Fatalf("%s calls ReportSpecForAlgorithm; use payload runtime or typology/legacy adapter",
+				filepath.ToSlash(mustRel(t, root, path)))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestModelCatalogContainerDoesNotReintroduceAssembleScale(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	modelCatalogRoot := filepath.Join(root, "internal/apiserver/container/modules/modelcatalog")
+	forbidden := []string{"assemble_scale", "behavior/scale"}
+	err := filepath.WalkDir(modelCatalogRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s references forbidden scale legacy path %q; use assemble_scoring",
+					filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
