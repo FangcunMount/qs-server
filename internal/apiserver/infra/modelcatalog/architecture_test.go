@@ -13,9 +13,8 @@ func TestRuntimeReadPathsDoNotImportMongoRuleSetRepository(t *testing.T) {
 	root := repoRoot(t)
 	modulePrefix := "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	allowlist := map[string]struct{}{
-		"internal/apiserver/infra/mongo/ruleset":                  {},
-		"internal/apiserver/infra/mongo/modelcatalog/backfill.go": {},
-		"internal/apiserver/infra/mongo/modelcatalog":             {},
+		"internal/apiserver/infra/mongo/ruleset":      {},
+		"internal/apiserver/infra/mongo/modelcatalog": {},
 	}
 
 	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
@@ -152,6 +151,64 @@ func TestProductionCodeDoesNotReferenceDefaultStaticCatalog(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRuntimePathsDoNotCallLegacyPublishedReaderMethods(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := []string{
+		".GetPublishedByRef(",
+		".FindPublishedByQuestionnaire(",
+	}
+	scanRoots := []string{
+		"internal/apiserver/infra/ruleset",
+		"internal/apiserver/infra/evaluationinput",
+		"internal/apiserver/transport/grpc/service",
+	}
+	allowPrefixes := []string{
+		"internal/apiserver/infra/ruleset/static_composite_catalog",
+		"internal/apiserver/infra/ruleset/runtime_catalog_test.go",
+		"internal/apiserver/infra/ruleset/runtime_catalog_v2_test.go",
+	}
+
+	for _, scanRoot := range scanRoots {
+		scanRoot := scanRoot
+		t.Run(scanRoot, func(t *testing.T) {
+			t.Parallel()
+			err := filepath.WalkDir(filepath.Join(root, scanRoot), func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() {
+					return nil
+				}
+				if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+					return nil
+				}
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				for _, prefix := range allowPrefixes {
+					if strings.HasPrefix(rel, prefix) {
+						return nil
+					}
+				}
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				text := string(data)
+				for _, token := range forbidden {
+					if strings.Contains(text, token) {
+						t.Fatalf("%s must not call legacy v1 reader %s; use PublishedModelReader", rel, token)
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

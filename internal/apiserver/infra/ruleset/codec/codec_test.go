@@ -2,6 +2,7 @@ package codec
 
 import (
 	"encoding/json"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -23,11 +24,11 @@ func TestSBTICodecRoundTrip(t *testing.T) {
 	if format != domain.PayloadFormatPersonalityTypologyV1 {
 		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatPersonalityTypologyV1)
 	}
-	snapshot := &domain.RuleSetSnapshot{
-		SchemaVersion: domain.RuleSetSchemaVersionV1,
+	snapshot := &v1envelope.V1Snapshot{
+		SchemaVersion: v1envelope.RuleSetSchemaVersionV1,
 		PayloadFormat: format,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.RuleSetKindSBTI,
+		Definition: v1envelope.V1Definition{
+			Kind: v1envelope.RuleSetKindSBTI,
 			Code: model.Code,
 		},
 		Payload: payload,
@@ -55,11 +56,11 @@ func TestMBTICodecRoundTrip(t *testing.T) {
 	if format != domain.PayloadFormatPersonalityTypologyV1 {
 		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatPersonalityTypologyV1)
 	}
-	snapshot := &domain.RuleSetSnapshot{
-		SchemaVersion: domain.RuleSetSchemaVersionV1,
+	snapshot := &v1envelope.V1Snapshot{
+		SchemaVersion: v1envelope.RuleSetSchemaVersionV1,
 		PayloadFormat: format,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.RuleSetKindMBTI,
+		Definition: v1envelope.V1Definition{
+			Kind: v1envelope.RuleSetKindMBTI,
 			Code: model.Code,
 		},
 		Payload: payload,
@@ -84,10 +85,10 @@ func TestDecodeRejectsLegacyFlatPayloadFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	snapshot := &domain.RuleSetSnapshot{
+	snapshot := &v1envelope.V1Snapshot{
 		PayloadFormat: domain.PayloadFormatMBTIV1Legacy,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.RuleSetKindMBTI,
+		Definition: v1envelope.V1Definition{
+			Kind: v1envelope.RuleSetKindMBTI,
 			Code: model.Code,
 		},
 		Payload: payload,
@@ -113,11 +114,11 @@ func TestScaleCodecRoundTrip(t *testing.T) {
 	if format != domain.PayloadFormatAssessmentScaleV1 {
 		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatAssessmentScaleV1)
 	}
-	snapshot := &domain.RuleSetSnapshot{
-		SchemaVersion: domain.RuleSetSchemaVersionV1,
+	snapshot := &v1envelope.V1Snapshot{
+		SchemaVersion: v1envelope.RuleSetSchemaVersionV1,
 		PayloadFormat: format,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.RuleSetKindScale,
+		Definition: v1envelope.V1Definition{
+			Kind: v1envelope.RuleSetKindScale,
 			Code: model.Code,
 		},
 		Payload: payload,
@@ -132,10 +133,10 @@ func TestScaleCodecRoundTrip(t *testing.T) {
 }
 
 func TestDecodeRejectsInvalidPayload(t *testing.T) {
-	snapshot := &domain.RuleSetSnapshot{
+	snapshot := &v1envelope.V1Snapshot{
 		PayloadFormat: domain.PayloadFormatMBTIV1,
-		Definition: domain.RuleSetDefinition{
-			Kind: domain.RuleSetKindMBTI,
+		Definition: v1envelope.V1Definition{
+			Kind: v1envelope.RuleSetKindMBTI,
 		},
 		Payload: []byte(`not-json`),
 	}

@@ -2,6 +2,7 @@ package codec
 
 import (
 	"encoding/json"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -56,9 +57,9 @@ func TestDecodeRejectsLegacyRulesetPayloadFormats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	_, err = DecodeMBTI(&domain.RuleSetSnapshot{
+	_, err = DecodeMBTI(&v1envelope.V1Snapshot{
 		PayloadFormat: domain.PayloadFormatMBTIV1Legacy,
-		Definition:    domain.RuleSetDefinition{Kind: domain.RuleSetKindMBTI, Code: model.Code},
+		Definition:    v1envelope.V1Definition{Kind: v1envelope.RuleSetKindMBTI, Code: model.Code},
 		Payload:       payload,
 	})
 	if err == nil {
@@ -80,10 +81,10 @@ func TestTypologyEncodeDecodeRoundTripThroughLegacyDecoder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeSBTI: %v", err)
 	}
-	got, err := DecodeSBTI(&domain.RuleSetSnapshot{
-		SchemaVersion: domain.RuleSetSchemaVersionV1,
+	got, err := DecodeSBTI(&v1envelope.V1Snapshot{
+		SchemaVersion: v1envelope.RuleSetSchemaVersionV1,
 		PayloadFormat: format,
-		Definition:    domain.RuleSetDefinition{Kind: domain.RuleSetKindSBTI, Code: legacy.Code},
+		Definition:    v1envelope.V1Definition{Kind: v1envelope.RuleSetKindSBTI, Code: legacy.Code},
 		Payload:       payload,
 	})
 	if err != nil {

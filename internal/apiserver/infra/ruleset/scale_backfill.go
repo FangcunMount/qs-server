@@ -6,11 +6,12 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 )
 
-// PublishedScaleRuleSetSnapshots 从 Mongo 已发布量表快照构建规则集（backfill 用）。
-func PublishedScaleRuleSetSnapshots(ctx context.Context, repo *mongoScale.Repository) ([]*domain.RuleSetSnapshot, error) {
+// PublishedScaleSnapshots builds v2 published snapshots from active Mongo scale rows (oneoff seed).
+func PublishedScaleSnapshots(ctx context.Context, repo *mongoScale.Repository) ([]*domain.PublishedModelSnapshot, error) {
 	if repo == nil {
 		return nil, nil
 	}
@@ -18,9 +19,17 @@ func PublishedScaleRuleSetSnapshots(ctx context.Context, repo *mongoScale.Reposi
 	if err != nil {
 		return nil, err
 	}
-	snapshots := make([]*domain.RuleSetSnapshot, 0, len(scales))
+	return ScaleSnapshotsFromMedicalScales(scales)
+}
+
+// ScaleSnapshotsFromMedicalScales converts published medical scales to v2 snapshots.
+func ScaleSnapshotsFromMedicalScales(scales []*scaledefinition.MedicalScale) ([]*domain.PublishedModelSnapshot, error) {
+	snapshots := make([]*domain.PublishedModelSnapshot, 0, len(scales))
 	for _, scale := range scales {
-		snapshot, err := ScaleRuleSetSnapshot(evaluationinputInfra.MedicalScaleToSnapshot(scale))
+		if scale == nil {
+			continue
+		}
+		snapshot, err := aminfra.BuildScalePublishedSnapshot(evaluationinputInfra.MedicalScaleToSnapshot(scale))
 		if err != nil {
 			return nil, err
 		}
@@ -29,18 +38,7 @@ func PublishedScaleRuleSetSnapshots(ctx context.Context, repo *mongoScale.Reposi
 	return snapshots, nil
 }
 
-// ScaleRuleSetSnapshotsFromMedicalScales 将领域量表列表转为规则集快照。
-func ScaleRuleSetSnapshotsFromMedicalScales(scales []*scaledefinition.MedicalScale) ([]*domain.RuleSetSnapshot, error) {
-	snapshots := make([]*domain.RuleSetSnapshot, 0, len(scales))
-	for _, scale := range scales {
-		if scale == nil {
-			continue
-		}
-		snapshot, err := ScaleRuleSetSnapshot(evaluationinputInfra.MedicalScaleToSnapshot(scale))
-		if err != nil {
-			return nil, err
-		}
-		snapshots = append(snapshots, snapshot)
-	}
-	return snapshots, nil
+// PublishedScaleRuleSetSnapshots is deprecated; use PublishedScaleSnapshots.
+func PublishedScaleRuleSetSnapshots(ctx context.Context, repo *mongoScale.Repository) ([]*domain.PublishedModelSnapshot, error) {
+	return PublishedScaleSnapshots(ctx, repo)
 }

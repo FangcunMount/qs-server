@@ -5,6 +5,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -21,21 +22,21 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 	if published.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
 		t.Fatalf("format = %s", published.PayloadFormat)
 	}
-	if published.Model.Kind != domain.KindPersonality || published.Model.Algorithm != domain.AlgorithmMBTI {
+	if published.Model.Kind != domain.KindTypology || published.Model.Algorithm != domain.AlgorithmMBTI {
 		t.Fatalf("model = %#v", published.Model)
 	}
-	legacy := LegacySnapshotFromPublished(published)
-	if legacy.Definition.Kind != domain.KindPersonality || legacy.Definition.Code != "MBTI_OEJTS" {
+	legacy := v1envelope.V1FromPublished(published)
+	if legacy.Definition.Kind != domain.KindTypology || legacy.Definition.Code != "MBTI_OEJTS" {
 		t.Fatalf("legacy kind = %s code = %s", legacy.Definition.Kind, legacy.Definition.Code)
 	}
 }
 
-func TestRefFromSnapshotPreservesPersonalityTypologyIdentity(t *testing.T) {
-	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+func TestRefFromPublishedPreservesPersonalityTypologyIdentity(t *testing.T) {
+	published := &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Model: domain.ModelDefinition{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: domain.AlgorithmPersonalityTypology,
 			Code:      "ENNEAGRAM_45",
@@ -44,19 +45,19 @@ func TestRefFromSnapshotPreservesPersonalityTypologyIdentity(t *testing.T) {
 			Status:    "published",
 		},
 		Payload: []byte(`{"algorithm":"personality_typology","code":"ENNEAGRAM_45","version":"1.0.0","status":"published"}`),
-	})
-	ref := RefFromSnapshot(legacy)
-	if ref.Kind != domain.KindPersonality || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmPersonalityTypology {
-		t.Fatalf("ref = %#v, want personality/typology/personality_typology", ref)
+	}
+	ref := RefFromPublished(published)
+	if ref.Kind != domain.KindTypology || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmPersonalityTypology {
+		t.Fatalf("ref = %#v, want typology/typology/personality_typology", ref)
 	}
 }
 
-func TestRefMatchesSnapshotSupportsLegacyAndV2Refs(t *testing.T) {
-	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+func TestRefMatchesPublishedSupportsLegacyAndV2Refs(t *testing.T) {
+	published := &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Model: domain.ModelDefinition{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: domain.AlgorithmMBTI,
 			Code:      "MBTI_OEJTS",
@@ -65,25 +66,25 @@ func TestRefMatchesSnapshotSupportsLegacyAndV2Refs(t *testing.T) {
 			Status:    "published",
 		},
 		Payload: []byte(`{"algorithm":"mbti","code":"MBTI_OEJTS","version":"2.0.1","status":"published"}`),
-	})
+	}
 	v2Ref := port.Ref{
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
 		Code:      "MBTI_OEJTS",
 		Version:   "2.0.1",
 	}
-	if !RefMatchesSnapshot(v2Ref, legacy) {
-		t.Fatal("expected v2 ref to match legacy snapshot")
+	if !RefMatchesPublished(v2Ref, published) {
+		t.Fatal("expected v2 ref to match published snapshot")
 	}
 }
 
-func TestRefFromSnapshotPreservesBigFiveIdentity(t *testing.T) {
-	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+func TestRefFromPublishedPreservesBigFiveIdentity(t *testing.T) {
+	published := &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
 		Model: domain.ModelDefinition{
-			Kind:      domain.KindPersonality,
+			Kind:      domain.KindTypology,
 			SubKind:   domain.SubKindTypology,
 			Algorithm: domain.AlgorithmBigFive,
 			Code:      "BIG5_IPIP_50",
@@ -92,9 +93,9 @@ func TestRefFromSnapshotPreservesBigFiveIdentity(t *testing.T) {
 			Status:    "published",
 		},
 		Payload: []byte(`{"algorithm":"bigfive","code":"BIG5_IPIP_50","version":"1.0.0","status":"published"}`),
-	})
-	ref := RefFromSnapshot(legacy)
-	if ref.Kind != domain.KindPersonality || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmBigFive {
-		t.Fatalf("ref = %#v, want personality/typology/bigfive", ref)
+	}
+	ref := RefFromPublished(published)
+	if ref.Kind != domain.KindTypology || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmBigFive {
+		t.Fatalf("ref = %#v, want typology/typology/bigfive", ref)
 	}
 }

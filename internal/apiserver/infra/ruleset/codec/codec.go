@@ -7,6 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	rulesetv1 "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 )
 
 func EncodeSBTI(model *typology.SBTILegacyModel) ([]byte, string, error) {
@@ -39,7 +40,7 @@ func EncodeScale(model *scalesnapshot.ScaleSnapshot) ([]byte, string, error) {
 	return payload, domain.PayloadFormatAssessmentScaleV1, nil
 }
 
-func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*typology.SBTILegacyModel, error) {
+func DecodeSBTI(snapshot *rulesetv1.V1Snapshot) (*typology.SBTILegacyModel, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -57,7 +58,7 @@ func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*typology.SBTILegacyModel, er
 	return typology.ToSBTI(payload)
 }
 
-func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*typology.MBTILegacyModel, error) {
+func DecodeMBTI(snapshot *rulesetv1.V1Snapshot) (*typology.MBTILegacyModel, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -75,7 +76,7 @@ func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*typology.MBTILegacyModel, er
 	return typology.ToMBTI(payload)
 }
 
-func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot, error) {
+func DecodeScale(snapshot *rulesetv1.V1Snapshot) (*scalesnapshot.ScaleSnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -111,7 +112,7 @@ func decodeTypologyPayload(payload []byte) (*typology.Payload, error) {
 	return &model, nil
 }
 
-func resolvePayloadFormat(snapshot *domain.RuleSetSnapshot, kind domain.Kind, defaultFormat string) (string, error) {
+func resolvePayloadFormat(snapshot *rulesetv1.V1Snapshot, kind domain.Kind, defaultFormat string) (string, error) {
 	if snapshot.PayloadFormat != "" {
 		return snapshot.PayloadFormat, nil
 	}

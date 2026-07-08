@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 )
 
 func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
@@ -18,8 +18,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		cataloglegacy.SBTIQuestionnaireCode,
-		cataloglegacy.SBTIModelVersion,
+		seedfixtures.SBTIQuestionnaireCode,
+		seedfixtures.SBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -27,7 +27,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Kind != domain.KindPersonality ||
+	if binding.Ref.Kind != domain.KindTypology ||
 		binding.Ref.SubKind != domain.SubKindTypology ||
 		binding.Ref.Algorithm != domain.AlgorithmSBTI {
 		t.Fatalf("ref = %#v, want personality/typology/sbti", binding.Ref)
@@ -46,8 +46,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		cataloglegacy.MBTIQuestionnaireCode,
-		cataloglegacy.MBTIModelVersion,
+		seedfixtures.MBTIQuestionnaireCode,
+		seedfixtures.MBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -55,7 +55,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Code != cataloglegacy.MBTIModelCode {
+	if binding.Ref.Code != seedfixtures.MBTIModelCode {
 		t.Fatalf("code = %s", binding.Ref.Code)
 	}
 }
@@ -80,7 +80,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingScale(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Kind != domain.RuleSetKindScale {
+	if binding.Ref.Kind != domain.KindScale {
 		t.Fatalf("kind = %s, want scale", binding.Ref.Kind)
 	}
 	if binding.MedicalScaleID == nil || *binding.MedicalScaleID != 42 {

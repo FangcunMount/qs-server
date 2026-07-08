@@ -5,43 +5,27 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
+	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type runtimeStubStore struct {
-	byQuestionnaire *domain.Snapshot
-	byRef           *domain.Snapshot
+	byQuestionnaire *domain.PublishedModelSnapshot
+	byRef           *domain.PublishedModelSnapshot
 }
 
-func (s runtimeStubStore) GetPublishedByRef(_ context.Context, ref port.Ref) (*domain.Snapshot, error) {
+func (s runtimeStubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
 	if s.byRef != nil {
 		return s.byRef, nil
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (s runtimeStubStore) FindPublishedByQuestionnaire(_ context.Context, _, _ string) (*domain.Snapshot, error) {
+func (s runtimeStubStore) FindPublishedModelByQuestionnaire(_ context.Context, _, _ string) (*domain.PublishedModelSnapshot, error) {
 	if s.byQuestionnaire != nil {
 		return s.byQuestionnaire, nil
 	}
 	return nil, domain.ErrNotFound
-}
-
-func (s runtimeStubStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := s.GetPublishedByRef(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
-}
-
-func (s runtimeStubStore) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := s.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil {
-		return nil, err
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
 }
 
 func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.T) {
@@ -51,7 +35,7 @@ func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.
 	}
 	catalog := NewRuntimePublishedCatalogWithStore(runtimeStubStore{})
 
-	ref, ok, err := catalog.ResolveByQuestionnaire(context.Background(), cataloglegacy.SBTIQuestionnaireCode, cataloglegacy.SBTIModelVersion)
+	ref, ok, err := catalog.ResolveByQuestionnaire(context.Background(), seedfixtures.SBTIQuestionnaireCode, seedfixtures.SBTIModelVersion)
 	if err != nil {
 		t.Fatalf("ResolveByQuestionnaire: %v", err)
 	}
@@ -59,7 +43,7 @@ func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.
 		t.Fatalf("expected miss without static fallback, got ref=%#v", ref)
 	}
 
-	staticRef, staticOK, err := static.ResolveByQuestionnaire(context.Background(), cataloglegacy.SBTIQuestionnaireCode, cataloglegacy.SBTIModelVersion)
+	staticRef, staticOK, err := static.ResolveByQuestionnaire(context.Background(), seedfixtures.SBTIQuestionnaireCode, seedfixtures.SBTIModelVersion)
 	if err != nil {
 		t.Fatalf("static ResolveByQuestionnaire: %v", err)
 	}
@@ -70,16 +54,16 @@ func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.
 		t.Fatal("static catalog ref should be populated")
 	}
 
-	_, err = catalog.GetPublishedByRef(context.Background(), staticRef)
+	_, err = catalog.GetPublishedModelByRef(context.Background(), staticRef)
 	if err == nil || !domain.IsNotFound(err) {
-		t.Fatalf("GetPublishedByRef() err = %v, want not found", err)
+		t.Fatalf("GetPublishedModelByRef() err = %v, want not found", err)
 	}
 }
 
 func TestRuntimePublishedCatalogPrefersV2Snapshot(t *testing.T) {
-	mongoSnapshot := &domain.Snapshot{
-		Definition: domain.Definition{
-			Kind:    domain.KindPersonality,
+	mongoSnapshot := &domain.PublishedModelSnapshot{
+		Model: domain.ModelDefinition{
+			Kind:    domain.KindTypology,
 			Code:    "personality_demo",
 			Version: "9.9.9",
 			Title:   "from mongo",

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cataloglegacy "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -24,28 +24,28 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 	}{
 		{
 			name:    "sbti",
-			code:    cataloglegacy.SBTIQuestionnaireCode,
-			version: cataloglegacy.SBTIModelVersion,
+			code:    seedfixtures.SBTIQuestionnaireCode,
+			version: seedfixtures.SBTIModelVersion,
 			want: port.Ref{
-				Kind:      domain.KindPersonality,
+				Kind:      domain.KindTypology,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmSBTI,
-				Code:      cataloglegacy.SBTIModelCode,
-				Version:   cataloglegacy.SBTIModelVersion,
-				Title:     cataloglegacy.SBTIModelTitle,
+				Code:      seedfixtures.SBTIModelCode,
+				Version:   seedfixtures.SBTIModelVersion,
+				Title:     seedfixtures.SBTIModelTitle,
 			},
 		},
 		{
 			name:    "mbti",
-			code:    cataloglegacy.MBTIQuestionnaireCode,
-			version: cataloglegacy.MBTIModelVersion,
+			code:    seedfixtures.MBTIQuestionnaireCode,
+			version: seedfixtures.MBTIModelVersion,
 			want: port.Ref{
-				Kind:      domain.KindPersonality,
+				Kind:      domain.KindTypology,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmMBTI,
-				Code:      cataloglegacy.MBTIModelCode,
-				Version:   cataloglegacy.MBTIModelVersion,
-				Title:     cataloglegacy.MBTIModelTitle,
+				Code:      seedfixtures.MBTIModelCode,
+				Version:   seedfixtures.MBTIModelVersion,
+				Title:     seedfixtures.MBTIModelTitle,
 			},
 		},
 	}
@@ -66,27 +66,27 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 	}
 }
 
-func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
+func TestStaticCompositeCatalogGetPublishedModelByRef(t *testing.T) {
 	catalog, err := NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
 
 	ref := port.Ref{
-		Kind:      domain.KindPersonality,
+		Kind:      domain.KindTypology,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,
-		Code:      cataloglegacy.MBTIModelCode,
-		Version:   cataloglegacy.MBTIModelVersion,
+		Code:      seedfixtures.MBTIModelCode,
+		Version:   seedfixtures.MBTIModelVersion,
 	}
-	snapshot, err := catalog.GetPublishedByRef(t.Context(), ref)
+	snapshot, err := catalog.GetPublishedModelByRef(t.Context(), ref)
 	if err != nil {
-		t.Fatalf("GetPublishedByRef: %v", err)
+		t.Fatalf("GetPublishedModelByRef: %v", err)
 	}
-	if snapshot.DecisionKind != domain.DecisionKindPoleComposition {
-		t.Fatalf("DecisionKind = %s, want %s", snapshot.DecisionKind, domain.DecisionKindPoleComposition)
+	if snapshot.Decision.Kind != domain.DecisionKindPoleComposition {
+		t.Fatalf("DecisionKind = %s, want %s", snapshot.Decision.Kind, domain.DecisionKindPoleComposition)
 	}
-	if snapshot.Binding.QuestionnaireCode != cataloglegacy.MBTIQuestionnaireCode {
+	if snapshot.Binding.QuestionnaireCode != seedfixtures.MBTIQuestionnaireCode {
 		t.Fatalf("binding code = %s", snapshot.Binding.QuestionnaireCode)
 	}
 	if len(snapshot.Payload) == 0 {
@@ -149,16 +149,16 @@ func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
 	if !ok {
 		t.Fatal("expected scale binding")
 	}
-	if ref.Kind != domain.RuleSetKindScale || ref.Code != "SCL-001" || ref.Version != "1.0.0" {
+	if ref.Kind != domain.KindScale || ref.Code != "SCL-001" || ref.Version != "1.0.0" {
 		t.Fatalf("ref = %#v", ref)
 	}
 
-	snapshot, err := catalog.GetPublishedByRef(t.Context(), ref)
+	snapshot, err := catalog.GetPublishedModelByRef(t.Context(), ref)
 	if err != nil {
-		t.Fatalf("GetPublishedByRef: %v", err)
+		t.Fatalf("GetPublishedModelByRef: %v", err)
 	}
-	if snapshot.DecisionKind != domain.DecisionKindScoreRange {
-		t.Fatalf("decision = %s", snapshot.DecisionKind)
+	if snapshot.Decision.Kind != domain.DecisionKindScoreRange {
+		t.Fatalf("decision = %s", snapshot.Decision.Kind)
 	}
 }
 

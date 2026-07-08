@@ -40,14 +40,14 @@ func (r *CatalogBindingResolver) ResolveAssessmentBinding(
 	if err != nil || !ok || ref.IsEmpty() {
 		return port.AssessmentBinding{}, ok, err
 	}
-	if ref.Kind != domain.RuleSetKindScale {
+	if ref.Kind != domain.KindScale {
 		return port.AssessmentBinding{Ref: ref}, true, nil
 	}
-	snapshot, err := r.catalog.GetPublishedByRef(ctx, ref)
+	snapshot, err := r.catalog.GetPublishedModelByRef(ctx, ref)
 	if err != nil {
 		return port.AssessmentBinding{}, false, err
 	}
-	scale, err := aminfrac.DecodeScaleFromRuleSetSnapshot(snapshot)
+	scale, err := aminfrac.DecodeScaleFromPublished(snapshot)
 	if err != nil {
 		return port.AssessmentBinding{}, false, err
 	}

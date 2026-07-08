@@ -16,19 +16,17 @@ type publishedModelStoreStub struct {
 	findByQuestionnaireCalls int
 	getByRefCalls            int
 	findByCodeCalls          int
-	findByModelCodeCalls     int
-	findByQuestionnaire      *domain.Snapshot
-	getByRef                 *domain.Snapshot
+	findByQuestionnaire      *domain.PublishedModelSnapshot
+	getByRef                 *domain.PublishedModelSnapshot
 	findByCode               *domain.PublishedModelSnapshot
-	findByModelCode          *domain.Snapshot
 	upsertErr                error
 }
 
-func (s *publishedModelStoreStub) UpsertPublished(context.Context, *domain.Snapshot) error {
+func (s *publishedModelStoreStub) UpsertPublishedModel(context.Context, *domain.PublishedModelSnapshot) error {
 	return s.upsertErr
 }
 
-func (s *publishedModelStoreStub) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error) {
+func (s *publishedModelStoreStub) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
 	s.getByRefCalls++
 	if s.getByRef != nil {
 		return s.getByRef, nil
@@ -36,34 +34,10 @@ func (s *publishedModelStoreStub) GetPublishedByRef(ctx context.Context, ref por
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error) {
+func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
 	s.findByQuestionnaireCalls++
 	if s.findByQuestionnaire != nil {
 		return s.findByQuestionnaire, nil
-	}
-	return nil, domain.ErrNotFound
-}
-
-func (s *publishedModelStoreStub) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := s.GetPublishedByRef(ctx, ref)
-	if err != nil || snapshot == nil {
-		return nil, err
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
-}
-
-func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
-	snapshot, err := s.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil || snapshot == nil {
-		return nil, err
-	}
-	return domain.PublishedFromLegacy(snapshot), nil
-}
-
-func (s *publishedModelStoreStub) FindPublishedByModelCode(_ context.Context, _ domain.Kind, _ string) (*domain.Snapshot, error) {
-	s.findByModelCodeCalls++
-	if s.findByModelCode != nil {
-		return s.findByModelCode, nil
 	}
 	return nil, domain.ErrNotFound
 }
@@ -76,10 +50,6 @@ func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, doma
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
-	return nil, 0, nil
-}
-
 func (s *publishedModelStoreStub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
 	return nil, 0, nil
 }
@@ -88,7 +58,7 @@ func (s *publishedModelStoreStub) ListPublishedAlgorithms(context.Context) ([]do
 	return nil, nil
 }
 
-func TestCachedPublishedModelStoreFindPublishedByQuestionnaireCachesHit(t *testing.T) {
+func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToInner(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() {
@@ -96,8 +66,8 @@ func TestCachedPublishedModelStoreFindPublishedByQuestionnaireCachesHit(t *testi
 		mr.Close()
 	})
 
-	snapshot := &domain.Snapshot{
-		Definition: domain.Definition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
+	snapshot := &domain.PublishedModelSnapshot{
+		Model: domain.ModelDefinition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    "q-001",
 			QuestionnaireVersion: "1.0.0",
@@ -112,33 +82,30 @@ func TestCachedPublishedModelStoreFindPublishedByQuestionnaireCachesHit(t *testi
 		nil,
 	)
 
-	got, err := cached.FindPublishedByQuestionnaire(context.Background(), "q-001", "1.0.0")
+	got, err := cached.FindPublishedModelByQuestionnaire(context.Background(), "q-001", "1.0.0")
 	if err != nil {
-		t.Fatalf("first FindPublishedByQuestionnaire() error = %v", err)
+		t.Fatalf("first FindPublishedModelByQuestionnaire() error = %v", err)
 	}
-	if got == nil || got.Definition.Code != "scale-001" {
-		t.Fatalf("first FindPublishedByQuestionnaire() = %#v", got)
+	if got == nil || got.Model.Code != "scale-001" {
+		t.Fatalf("first FindPublishedModelByQuestionnaire() = %#v", got)
 	}
 	if inner.findByQuestionnaireCalls != 1 {
 		t.Fatalf("source calls after first read = %d, want 1", inner.findByQuestionnaireCalls)
 	}
-	waitFor(t, func() bool {
-		return hasRedisKey(t, client, cached.questionnaireCacheKey("q-001", "1.0.0"))
-	})
 
-	got, err = cached.FindPublishedByQuestionnaire(context.Background(), "q-001", "1.0.0")
+	got, err = cached.FindPublishedModelByQuestionnaire(context.Background(), "q-001", "1.0.0")
 	if err != nil {
-		t.Fatalf("second FindPublishedByQuestionnaire() error = %v", err)
+		t.Fatalf("second FindPublishedModelByQuestionnaire() error = %v", err)
 	}
-	if got == nil || got.Definition.Code != "scale-001" {
-		t.Fatalf("second FindPublishedByQuestionnaire() = %#v", got)
+	if got == nil || got.Model.Code != "scale-001" {
+		t.Fatalf("second FindPublishedModelByQuestionnaire() = %#v", got)
 	}
-	if inner.findByQuestionnaireCalls != 1 {
-		t.Fatalf("source calls after cache hit = %d, want 1", inner.findByQuestionnaireCalls)
+	if inner.findByQuestionnaireCalls != 2 {
+		t.Fatalf("source calls after second read = %d, want 2", inner.findByQuestionnaireCalls)
 	}
 }
 
-func TestCachedPublishedModelStoreUpsertPublishedInvalidatesCache(t *testing.T) {
+func TestCachedPublishedModelStoreUpsertPublishedModelDelegatesToInner(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() {
@@ -146,14 +113,14 @@ func TestCachedPublishedModelStoreUpsertPublishedInvalidatesCache(t *testing.T) 
 		mr.Close()
 	})
 
-	snapshot := &domain.Snapshot{
-		Definition: domain.Definition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
+	snapshot := &domain.PublishedModelSnapshot{
+		Model: domain.ModelDefinition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    "q-001",
 			QuestionnaireVersion: "1.0.0",
 		},
 	}
-	inner := &publishedModelStoreStub{findByQuestionnaire: snapshot}
+	inner := &publishedModelStoreStub{}
 	cached := NewCachedPublishedModelStore(
 		inner,
 		client,
@@ -161,20 +128,9 @@ func TestCachedPublishedModelStoreUpsertPublishedInvalidatesCache(t *testing.T) 
 		cachepolicy.CachePolicy{},
 		nil,
 	)
-	cacheKey := cached.questionnaireCacheKey("q-001", "1.0.0")
 
-	if _, err := cached.FindPublishedByQuestionnaire(context.Background(), "q-001", "1.0.0"); err != nil {
-		t.Fatalf("warm cache error = %v", err)
-	}
-	waitFor(t, func() bool {
-		return hasRedisKey(t, client, cacheKey)
-	})
-
-	if err := cached.UpsertPublished(context.Background(), snapshot); err != nil {
-		t.Fatalf("UpsertPublished() error = %v", err)
-	}
-	if hasRedisKey(t, client, cacheKey) {
-		t.Fatal("cache key should be deleted after upsert invalidation")
+	if err := cached.UpsertPublishedModel(context.Background(), snapshot); err != nil {
+		t.Fatalf("UpsertPublishedModel() error = %v", err)
 	}
 }
 
@@ -187,7 +143,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	})
 
 	published := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindPersonality, Code: "mbti", Version: "1.0.0"},
+		Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0"},
 	}
 	inner := &publishedModelStoreStub{findByCode: published}
 	cached := NewCachedPublishedModelStore(
@@ -198,7 +154,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 		nil,
 	)
 
-	got, err := cached.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "mbti")
+	got, err := cached.FindPublishedModelByCode(context.Background(), domain.KindTypology, "mbti")
 	if err != nil {
 		t.Fatalf("first FindPublishedModelByCode() error = %v", err)
 	}
@@ -206,7 +162,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 		t.Fatalf("first FindPublishedModelByCode() = %#v", got)
 	}
 
-	got, err = cached.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "mbti")
+	got, err = cached.FindPublishedModelByCode(context.Background(), domain.KindTypology, "mbti")
 	if err != nil {
 		t.Fatalf("second FindPublishedModelByCode() error = %v", err)
 	}
@@ -226,45 +182,10 @@ func TestCachedPublishedModelStoreInvalidatePublishedSnapshotClearsModelByCodeCa
 		mr.Close()
 	})
 
-	snapshot := &domain.Snapshot{
-		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "mbti", Version: "1.0.0"},
+	snapshot := &domain.PublishedModelSnapshot{
+		Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0"},
 	}
-	inner := &publishedModelStoreStub{findByModelCode: snapshot}
-	cached := NewCachedPublishedModelStore(
-		inner,
-		client,
-		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{},
-		nil,
-	)
-	cacheKey := cached.modelByCodeCacheKey(domain.KindPersonality, "mbti")
-
-	if _, err := cached.FindPublishedByModelCode(context.Background(), domain.KindPersonality, "mbti"); err != nil {
-		t.Fatalf("warm cache error = %v", err)
-	}
-	waitFor(t, func() bool {
-		return hasRedisKey(t, client, cacheKey)
-	})
-
-	published := domain.PublishedFromLegacy(snapshot)
-	cached.invalidatePublishedSnapshot(context.Background(), published)
-	if hasRedisKey(t, client, cacheKey) {
-		t.Fatal("model-by-code cache key should be deleted after published snapshot invalidation")
-	}
-}
-
-func TestCachedPublishedModelStoreFindPublishedByModelCodeCachesHit(t *testing.T) {
-	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	t.Cleanup(func() {
-		_ = client.Close()
-		mr.Close()
-	})
-
-	snapshot := &domain.Snapshot{
-		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "mbti", Version: "1.0.0"},
-	}
-	inner := &publishedModelStoreStub{findByModelCode: snapshot}
+	inner := &publishedModelStoreStub{findByCode: snapshot}
 	cached := NewCachedPublishedModelStore(
 		inner,
 		client,
@@ -273,28 +194,8 @@ func TestCachedPublishedModelStoreFindPublishedByModelCodeCachesHit(t *testing.T
 		nil,
 	)
 
-	got, err := cached.FindPublishedByModelCode(context.Background(), domain.KindPersonality, "mbti")
-	if err != nil {
-		t.Fatalf("first FindPublishedByModelCode() error = %v", err)
+	if _, err := cached.FindPublishedModelByCode(context.Background(), domain.KindTypology, "mbti"); err != nil {
+		t.Fatalf("FindPublishedModelByCode error = %v", err)
 	}
-	if got == nil || got.Definition.Code != "mbti" {
-		t.Fatalf("first FindPublishedByModelCode() = %#v", got)
-	}
-	if inner.findByModelCodeCalls != 1 {
-		t.Fatalf("source calls after first read = %d, want 1", inner.findByModelCodeCalls)
-	}
-	waitFor(t, func() bool {
-		return hasRedisKey(t, client, cached.modelByCodeCacheKey(domain.KindPersonality, "mbti"))
-	})
-
-	got, err = cached.FindPublishedByModelCode(context.Background(), domain.KindPersonality, "mbti")
-	if err != nil {
-		t.Fatalf("second FindPublishedByModelCode() error = %v", err)
-	}
-	if got == nil || got.Definition.Code != "mbti" {
-		t.Fatalf("second FindPublishedByModelCode() = %#v", got)
-	}
-	if inner.findByModelCodeCalls != 1 {
-		t.Fatalf("source calls after cache hit = %d, want 1", inner.findByModelCodeCalls)
-	}
+	cached.invalidatePublishedSnapshot(context.Background(), snapshot)
 }

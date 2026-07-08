@@ -30,16 +30,9 @@ type ListPublishedFilter struct {
 	PageSize  int
 }
 
-// PublishedReader 读取已发布测评模型快照。
-type PublishedReader interface {
-	GetPublishedByRef(ctx context.Context, ref Ref) (*domain.Snapshot, error)
-	FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error)
-}
-
-// PublishedLister lists published models for C-side catalogs.
-type PublishedLister interface {
-	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error)
-	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.Snapshot, int64, error)
+// PublishedWriter writes v2 published assessment models (seed / admin paths).
+type PublishedWriter interface {
+	UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error
 }
 
 // PublishedModelReader reads v2 published assessment model snapshots for runtime execution.
@@ -62,18 +55,13 @@ type PublishedAlgorithmLister interface {
 	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
 }
 
-// PublishedWriter 写入已发布测评模型（seed / 管理链路使用）。
-type PublishedWriter interface {
-	UpsertPublished(ctx context.Context, snapshot *domain.Snapshot) error
-}
-
 // QuestionnaireResolver 根据问卷版本解析测评模型引用。
 type QuestionnaireResolver interface {
 	ResolveByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (Ref, bool, error)
 }
 
-// Catalog 测评模型资产读侧统一端口（静态 seed / Mongo 实现均可）。
+// Catalog is the runtime read port for published assessment models.
 type Catalog interface {
-	PublishedReader
+	PublishedModelReader
 	QuestionnaireResolver
 }

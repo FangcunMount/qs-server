@@ -10,20 +10,15 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-type publishedModelWriter interface {
-	UpsertPublishedModel(ctx context.Context, snapshot *publishing.PublishedModelSnapshot) error
-}
-
-// ScaleRuleSetPublisher syncs published scales into published_assessment_models.
-type ScaleRuleSetPublisher struct {
+type ScalePublisher struct {
 	writer rulesetport.PublishedWriter
 }
 
-func NewScaleRuleSetPublisher(writer rulesetport.PublishedWriter) *ScaleRuleSetPublisher {
-	return &ScaleRuleSetPublisher{writer: writer}
+func NewScalePublisher(writer rulesetport.PublishedWriter) *ScalePublisher {
+	return &ScalePublisher{writer: writer}
 }
 
-func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error {
+func (p *ScalePublisher) PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error {
 	if scale == nil {
 		return fmt.Errorf("scale is nil")
 	}
@@ -39,8 +34,5 @@ func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale
 	if err != nil {
 		return err
 	}
-	if writer, ok := p.writer.(publishedModelWriter); ok {
-		return writer.UpsertPublishedModel(ctx, published)
-	}
-	return fmt.Errorf("published model writer is not configured")
+	return p.writer.UpsertPublishedModel(ctx, published)
 }

@@ -24,8 +24,6 @@ const (
 
 // publishedModelInner is the delegate for non-cached published-model persistence.
 type publishedModelInner interface {
-	port.PublishedReader
-	port.PublishedLister
 	port.PublishedModelReader
 	port.PublishedModelLister
 	port.PublishedWriter
@@ -38,7 +36,6 @@ type CachedPublishedModelStore struct {
 	keys              *keyspace.Builder
 	policy            cachepolicy.CachePolicy
 	observer          *observability.ComponentObserver
-	store             *ObjectCacheStore[domain.Snapshot]
 	catalogList       *ObjectCacheStore[publishedModelCatalogListPage]
 	catalogAlgorithms *ObjectCacheStore[publishedModelCatalogAlgorithms]
 }
@@ -71,14 +68,6 @@ func NewCachedPublishedModelStore(
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[domain.Snapshot]{
-			Cache:       redisCache,
-			PolicyKey:   cachepolicy.PolicyPublishedModel,
-			Policy:      policy,
-			TTL:         ttl,
-			NegativeTTL: negativeTTL,
-			Codec:       newPublishedModelCacheEntryCodec(),
-		}),
 		catalogList: NewObjectCacheStore(ObjectCacheStoreOptions[publishedModelCatalogListPage]{
 			Cache:       redisCache,
 			PolicyKey:   cachepolicy.PolicyPublishedModel,
@@ -95,21 +84,6 @@ func NewCachedPublishedModelStore(
 			NegativeTTL: negativeTTL,
 			Codec:       newPublishedModelCatalogAlgorithmsCodec(),
 		}),
-	}
-}
-
-func newPublishedModelCacheEntryCodec() CacheEntryCodec[domain.Snapshot] {
-	return CacheEntryCodec[domain.Snapshot]{
-		EncodeFunc: func(snapshot *domain.Snapshot) ([]byte, error) {
-			return json.Marshal(snapshot)
-		},
-		DecodeFunc: func(data []byte) (*domain.Snapshot, error) {
-			var snapshot domain.Snapshot
-			if err := json.Unmarshal(data, &snapshot); err != nil {
-				return nil, err
-			}
-			return &snapshot, nil
-		},
 	}
 }
 
@@ -143,34 +117,12 @@ func newPublishedModelCatalogAlgorithmsCodec() CacheEntryCodec[publishedModelCat
 	}
 }
 
-func (c *CachedPublishedModelStore) UpsertPublished(ctx context.Context, snapshot *domain.Snapshot) error {
-	if err := c.inner.UpsertPublished(ctx, snapshot); err != nil {
+func (c *CachedPublishedModelStore) UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
+	if err := c.inner.UpsertPublishedModel(ctx, snapshot); err != nil {
 		return err
 	}
-	c.invalidateSnapshot(ctx, snapshot)
+	c.invalidatePublishedSnapshot(ctx, snapshot)
 	return nil
-}
-
-func (c *CachedPublishedModelStore) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error) {
-	if ref.Version == "" {
-		return nil, domain.ErrVersionRequired
-	}
-	cacheKey := c.refCacheKey(ref)
-	snapshot, err := c.readThrough(ctx, cacheKey, func(ctx context.Context) (*domain.Snapshot, error) {
-		snapshot, err := c.inner.GetPublishedByRef(ctx, ref)
-		if domain.IsNotFound(err) {
-			return nil, nil
-		}
-		return snapshot, err
-	})
-	if err != nil {
-		return nil, err
-	}
-	if snapshot == nil {
-		return nil, domain.ErrNotFound
-	}
-	c.warmQuestionnaireAlias(ctx, snapshot)
-	return snapshot, nil
 }
 
 func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
@@ -178,25 +130,6 @@ func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, 
 		return nil, domain.ErrNotFound
 	}
 	return c.inner.GetPublishedModelByRef(ctx, ref)
-}
-
-func (c *CachedPublishedModelStore) FindPublishedByQuestionnaire(
-	ctx context.Context,
-	questionnaireCode, questionnaireVersion string,
-) (*domain.Snapshot, error) {
-	cacheKey := c.questionnaireCacheKey(questionnaireCode, questionnaireVersion)
-	snapshot, err := c.readThrough(ctx, cacheKey, func(ctx context.Context) (*domain.Snapshot, error) {
-		snapshot, err := c.inner.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
-		if domain.IsNotFound(err) {
-			return nil, nil
-		}
-		return snapshot, err
-	})
-	if err != nil || snapshot == nil {
-		return snapshot, err
-	}
-	c.warmRefAlias(ctx, snapshot)
-	return snapshot, nil
 }
 
 func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
@@ -209,32 +142,11 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 	return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
-func (c *CachedPublishedModelStore) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
-	if c == nil || c.inner == nil {
-		return nil, domain.ErrNotFound
-	}
-	if !c.store.available() {
-		return c.inner.FindPublishedByModelCode(ctx, kind, code)
-	}
-	cacheKey := c.modelByCodeCacheKey(kind, code)
-	return c.readThrough(ctx, cacheKey, func(ctx context.Context) (*domain.Snapshot, error) {
-		snapshot, err := c.inner.FindPublishedByModelCode(ctx, kind, code)
-		if domain.IsNotFound(err) {
-			return nil, nil
-		}
-		return snapshot, err
-	})
-}
-
 func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
 	return c.inner.FindPublishedModelByCode(ctx, kind, code)
-}
-
-func (c *CachedPublishedModelStore) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
-	return c.inner.ListPublished(ctx, filter)
 }
 
 func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
@@ -303,39 +215,6 @@ func (c *CachedPublishedModelStore) ListPublishedAlgorithms(ctx context.Context)
 	return payload.Algorithms, nil
 }
 
-func (c *CachedPublishedModelStore) readThrough(
-	ctx context.Context,
-	cacheKey string,
-	load func(context.Context) (*domain.Snapshot, error),
-) (*domain.Snapshot, error) {
-	return ReadThroughObject(ctx, ObjectReadThroughOptions[domain.Snapshot]{
-		PolicyKey:        cachepolicy.PolicyPublishedModel,
-		CacheKey:         cacheKey,
-		Policy:           c.policy,
-		Observer:         c.observer,
-		Store:            c.store,
-		Load:             load,
-		CacheNegative:    c.policy.NegativeEnabled(false),
-		AsyncSetCached:   true,
-		AsyncSetNegative: true,
-	})
-}
-
-func (c *CachedPublishedModelStore) questionnaireCacheKey(questionnaireCode, questionnaireVersion string) string {
-	return c.keys.BuildPublishedAssessmentModelByQuestionnaireKey(
-		strings.ToLower(questionnaireCode),
-		strings.ToLower(questionnaireVersion),
-	)
-}
-
-func (c *CachedPublishedModelStore) modelByCodeCacheKey(kind domain.Kind, code string) string {
-	return c.refCacheKey(port.Ref{
-		Kind:    kind,
-		Code:    strings.ToLower(strings.TrimSpace(code)),
-		Version: "latest",
-	})
-}
-
 func (c *CachedPublishedModelStore) listCatalogCacheKey(filter port.ListPublishedFilter) string {
 	return c.refCacheKey(port.Ref{
 		Kind:      filter.Kind,
@@ -353,14 +232,13 @@ func (c *CachedPublishedModelStore) listCatalogCacheKey(filter port.ListPublishe
 
 func (c *CachedPublishedModelStore) algorithmsCatalogCacheKey() string {
 	return c.refCacheKey(port.Ref{
-		Kind:    domain.KindPersonality,
+		Kind:    domain.KindTypology,
 		Code:    "catalog-algorithms",
 		Version: "all",
 	})
 }
 
 func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
-	ref = canonicalPublishedModelRef(ref)
 	return c.keys.BuildPublishedAssessmentModelByRefKey(
 		string(ref.Kind),
 		string(ref.SubKind),
@@ -370,56 +248,11 @@ func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
 	)
 }
 
-func canonicalPublishedModelRef(ref port.Ref) port.Ref {
-	return ref
-}
-
 func (c *CachedPublishedModelStore) invalidatePublishedSnapshot(ctx context.Context, snapshot *domain.PublishedModelSnapshot) {
-	if !c.store.available() || snapshot == nil {
+	if snapshot == nil {
 		return
 	}
-	keys := []string{
-		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, snapshot.Binding.QuestionnaireVersion),
-		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, ""),
-		c.refCacheKey(aminfra.RefFromPublished(snapshot)),
-		c.modelByCodeCacheKey(snapshot.Model.Kind, snapshot.Model.Code),
-		c.algorithmsCatalogCacheKey(),
-	}
-	for _, key := range keys {
-		if err := c.store.Delete(ctx, key); err != nil {
-			logger.L(ctx).Warnw("failed to invalidate published model cache",
-				"key", key,
-				"error", err,
-			)
-		}
-	}
-	if c.catalogAlgorithms != nil {
-		if err := c.catalogAlgorithms.Delete(ctx, c.algorithmsCatalogCacheKey()); err != nil {
-			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)
-		}
-	}
-	c.invalidateCatalogListCaches(ctx)
-}
-
-func (c *CachedPublishedModelStore) invalidateSnapshot(ctx context.Context, snapshot *domain.Snapshot) {
-	if !c.store.available() || snapshot == nil {
-		return
-	}
-	keys := []string{
-		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, snapshot.Binding.QuestionnaireVersion),
-		c.questionnaireCacheKey(snapshot.Binding.QuestionnaireCode, ""),
-		c.refCacheKey(aminfra.RefFromSnapshot(snapshot)),
-		c.modelByCodeCacheKey(snapshot.Definition.Kind, snapshot.Definition.Code),
-		c.algorithmsCatalogCacheKey(),
-	}
-	for _, key := range keys {
-		if err := c.store.Delete(ctx, key); err != nil {
-			logger.L(ctx).Warnw("failed to invalidate published model cache",
-				"key", key,
-				"error", err,
-			)
-		}
-	}
+	_ = aminfra.RefFromPublished(snapshot)
 	if c.catalogAlgorithms != nil {
 		if err := c.catalogAlgorithms.Delete(ctx, c.algorithmsCatalogCacheKey()); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)
@@ -447,44 +280,7 @@ func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Cont
 	}
 }
 
-func (c *CachedPublishedModelStore) warmRefAlias(ctx context.Context, snapshot *domain.Snapshot) {
-	if snapshot == nil || !c.store.available() {
-		return
-	}
-	if err := c.store.Set(ctx, c.refCacheKey(aminfra.RefFromSnapshot(snapshot)), snapshot); err != nil {
-		logger.L(ctx).Warnw("failed to warm published model ref cache alias", "error", err)
-	}
-}
-
-func (c *CachedPublishedModelStore) warmQuestionnaireAlias(ctx context.Context, snapshot *domain.Snapshot) {
-	if snapshot == nil || !c.store.available() {
-		return
-	}
-	code := snapshot.Binding.QuestionnaireCode
-	if code == "" {
-		return
-	}
-	version := snapshot.Binding.QuestionnaireVersion
-	if err := c.store.Set(ctx, c.questionnaireCacheKey(code, version), snapshot); err != nil {
-		logger.L(ctx).Warnw("failed to warm published model questionnaire cache alias",
-			"questionnaire_code", code,
-			"questionnaire_version", version,
-			"error", err,
-		)
-	}
-	if version != "" {
-		if err := c.store.Set(ctx, c.questionnaireCacheKey(code, ""), snapshot); err != nil {
-			logger.L(ctx).Warnw("failed to warm published model questionnaire cache alias without version",
-				"questionnaire_code", code,
-				"error", err,
-			)
-		}
-	}
-}
-
 var (
-	_ port.PublishedReader          = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedLister          = (*CachedPublishedModelStore)(nil)
 	_ port.PublishedModelReader     = (*CachedPublishedModelStore)(nil)
 	_ port.PublishedModelLister     = (*CachedPublishedModelStore)(nil)
 	_ port.PublishedWriter          = (*CachedPublishedModelStore)(nil)

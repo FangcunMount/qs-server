@@ -38,16 +38,16 @@ func DecodeBehavioralRatingFromPublished(snapshot *domain.PublishedModelSnapshot
 	return payload, nil
 }
 
-// DecodeScaleFromRuleSetSnapshot is the single infra entry for scale ruleset snapshot decode.
-func DecodeScaleFromRuleSetSnapshot(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot, error) {
+// DecodeScaleFromPublished decodes a v2 published scale snapshot.
+func DecodeScaleFromPublished(snapshot *domain.PublishedModelSnapshot) (*scalesnapshot.ScaleSnapshot, error) {
 	if snapshot == nil {
-		return nil, fmt.Errorf("ruleset snapshot is nil")
+		return nil, fmt.Errorf("published model snapshot is nil")
+	}
+	if snapshot.Model.Kind != domain.KindScale {
+		return nil, fmt.Errorf("published model kind = %q, want scale", snapshot.Model.Kind)
 	}
 	format := snapshot.PayloadFormat
 	if format == "" {
-		if snapshot.Definition.Kind != "" && snapshot.Definition.Kind != domain.KindScale {
-			return nil, fmt.Errorf("ruleset kind %s does not match decoder scale", snapshot.Definition.Kind)
-		}
 		format = domain.PayloadFormatAssessmentScaleV1
 	}
 	if !domain.IsScalePayloadFormat(format) {

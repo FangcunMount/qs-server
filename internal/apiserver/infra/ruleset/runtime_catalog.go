@@ -14,7 +14,6 @@ import (
 )
 
 type runtimePublishedStore interface {
-	port.PublishedReader
 	port.PublishedModelReader
 }
 
@@ -58,39 +57,22 @@ func (c *RuntimePublishedCatalog) ResolveByQuestionnaire(
 	if c == nil || c.store == nil {
 		return port.Ref{}, false, nil
 	}
-	snapshot, err := c.store.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	snapshot, err := c.store.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil {
 		if domain.IsNotFound(err) {
 			return port.Ref{}, false, nil
 		}
 		return port.Ref{}, false, err
 	}
-	return aminfra.RefFromSnapshot(snapshot), true, nil
-}
-
-func (c *RuntimePublishedCatalog) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error) {
-	if c == nil || c.store == nil {
-		return nil, domain.ErrNotFound
-	}
-	if ref.Version == "" {
-		return nil, domain.ErrVersionRequired
-	}
-	return c.store.GetPublishedByRef(ctx, ref)
-}
-
-func (c *RuntimePublishedCatalog) FindPublishedByQuestionnaire(
-	ctx context.Context,
-	questionnaireCode, questionnaireVersion string,
-) (*domain.Snapshot, error) {
-	if c == nil || c.store == nil {
-		return nil, domain.ErrNotFound
-	}
-	return c.store.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	return aminfra.RefFromPublished(snapshot), true, nil
 }
 
 func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
 	if c == nil || c.store == nil {
 		return nil, domain.ErrNotFound
+	}
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
 	}
 	return c.store.GetPublishedModelByRef(ctx, ref)
 }

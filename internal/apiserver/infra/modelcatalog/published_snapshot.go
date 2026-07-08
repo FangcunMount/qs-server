@@ -1,11 +1,13 @@
 package modelcatalog
 
 import (
+	"encoding/json"
+	"fmt"
+
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -14,7 +16,7 @@ func BuildScalePublishedSnapshot(model *scalesnapshot.ScaleSnapshot) (*domain.Pu
 }
 
 func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.PublishedModelSnapshot, error) {
-	payload, format, err := codec.EncodeTypology(modeltypology.FromMBTI(model))
+	payload, format, err := encodeTypologyPayload(modeltypology.FromMBTI(model))
 	if err != nil {
 		return nil, err
 	}
@@ -26,8 +28,8 @@ func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.P
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: format,
 		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelPersonality,
-			Kind:           domain.KindPersonality,
+			ProductChannel: domain.ProductChannelTypology,
+			Kind:           domain.KindTypology,
 			SubKind:        domain.SubKindTypology,
 			Algorithm:      domain.AlgorithmMBTI,
 			Code:           model.Code,
@@ -52,7 +54,7 @@ func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.P
 }
 
 func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.PublishedModelSnapshot, error) {
-	payload, format, err := codec.EncodeTypology(modeltypology.FromSBTI(model))
+	payload, format, err := encodeTypologyPayload(modeltypology.FromSBTI(model))
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +67,8 @@ func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.P
 		PayloadFormat: format,
 		Payload:       payload,
 		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelPersonality,
-			Kind:           domain.KindPersonality,
+			ProductChannel: domain.ProductChannelTypology,
+			Kind:           domain.KindTypology,
 			SubKind:        domain.SubKindTypology,
 			Algorithm:      domain.AlgorithmSBTI,
 			Code:           model.Code,
@@ -90,34 +92,6 @@ func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.P
 	}, nil
 }
 
-func LegacySnapshotFromPublished(snapshot *domain.PublishedModelSnapshot) *domain.Snapshot {
-	return domain.LegacyFromPublished(snapshot)
-}
-
-func LegacySnapshotFromScale(model *scalesnapshot.ScaleSnapshot) (*domain.Snapshot, error) {
-	published, err := BuildScalePublishedSnapshot(model)
-	if err != nil {
-		return nil, err
-	}
-	return LegacySnapshotFromPublished(published), nil
-}
-
-func LegacySnapshotFromMBTI(model *modeltypology.MBTILegacyModel) (*domain.Snapshot, error) {
-	published, err := BuildMBTIPublishedSnapshot(model)
-	if err != nil {
-		return nil, err
-	}
-	return LegacySnapshotFromPublished(published), nil
-}
-
-func LegacySnapshotFromSBTI(model *modeltypology.SBTILegacyModel) (*domain.Snapshot, error) {
-	published, err := BuildSBTIPublishedSnapshot(model)
-	if err != nil {
-		return nil, err
-	}
-	return LegacySnapshotFromPublished(published), nil
-}
-
 func RefFromPublished(snapshot *domain.PublishedModelSnapshot) port.Ref {
 	if snapshot == nil {
 		return port.Ref{}
@@ -132,42 +106,25 @@ func RefFromPublished(snapshot *domain.PublishedModelSnapshot) port.Ref {
 	}
 }
 
-func RefFromSnapshot(snapshot *domain.Snapshot) port.Ref {
-	if snapshot == nil {
-		return port.Ref{}
-	}
-	ref := port.Ref{
-		Kind:    snapshot.Definition.Kind,
-		Code:    snapshot.Definition.Code,
-		Version: snapshot.Definition.Version,
-		Title:   snapshot.Definition.Title,
-	}
-	if domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat) {
-		algorithm, err := domain.AlgorithmFromTypologyPayload(snapshot.Payload)
-		if err == nil {
-			ref.Kind = domain.KindPersonality
-			ref.SubKind = domain.SubKindTypology
-			ref.Algorithm = algorithm
-		}
-	}
-	return ref
-}
-
-func canonicalRef(ref port.Ref) port.Ref {
-	return ref
-}
-
-// RefMatchesSnapshot reports whether ref points at the given legacy snapshot envelope.
-func RefMatchesSnapshot(ref port.Ref, snapshot *domain.Snapshot) bool {
+func RefMatchesPublished(ref port.Ref, snapshot *domain.PublishedModelSnapshot) bool {
 	if snapshot == nil || ref.Code == "" || ref.Version == "" {
 		return false
 	}
-	if snapshot.Definition.Code != ref.Code || snapshot.Definition.Version != ref.Version {
-		return false
+	got := RefFromPublished(snapshot)
+	return ref.Kind == got.Kind &&
+		ref.SubKind == got.SubKind &&
+		ref.Algorithm == got.Algorithm &&
+		ref.Code == got.Code &&
+		ref.Version == got.Version
+}
+
+func encodeTypologyPayload(model *modeltypology.Payload) ([]byte, string, error) {
+	if model == nil {
+		return nil, "", fmt.Errorf("typology model is nil")
 	}
-	want := canonicalRef(ref)
-	got := RefFromSnapshot(snapshot)
-	return want.Kind == got.Kind &&
-		want.SubKind == got.SubKind &&
-		want.Algorithm == got.Algorithm
+	payload, err := json.Marshal(model)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal typology payload: %w", err)
+	}
+	return payload, domain.PayloadFormatPersonalityTypologyV1, nil
 }
