@@ -128,6 +128,32 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 	}
 }
 
+func TestModelCatalogExportReExportsMechanismRoots(t *testing.T) {
+	t.Parallel()
+
+	root := modelCatalogRoot(t)
+	exportPath := filepath.Join(root, "export.go")
+	data, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	required := []string{
+		"FactorSnapshot",
+		"TypologyPayload",
+		"ScaleSnapshot",
+		"BuildPublishedSnapshot",
+		"BuildScoringPublishedSnapshotFromScale",
+		"RuntimeSpec",
+		"ReportSpec",
+	}
+	for _, symbol := range required {
+		if !strings.Contains(text, symbol) {
+			t.Fatalf("export.go missing mechanism re-export %q", symbol)
+		}
+	}
+}
+
 func modelCatalogRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

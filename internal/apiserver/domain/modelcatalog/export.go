@@ -6,8 +6,11 @@ package modelcatalog
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	factorpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	legacypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	typologypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 type (
@@ -30,6 +33,29 @@ type (
 	DecisionSpec           = publishing.DecisionSpec
 	SourceRef              = publishing.SourceRef
 	PublishedModelSnapshot = publishing.PublishedModelSnapshot
+
+	// Mechanism re-exports (factor).
+	FactorSnapshot              = factorpkg.FactorSnapshot
+	DefinitionBody              = factorpkg.DefinitionBody
+	FactorRole                  = factorpkg.FactorRole
+	ScoringStrategy             = factorpkg.ScoringStrategy
+	ScoringParams               = factorpkg.ScoringParams
+	ChildrenPolicy              = factorpkg.ChildrenPolicy
+	ChildrenAggregationStrategy = factorpkg.ChildrenAggregationStrategy
+	InterpretRule               = factorpkg.InterpretRule
+	HierarchyIssue              = factorpkg.HierarchyIssue
+
+	// Mechanism re-exports (typology).
+	TypologyPayload = typologypkg.Payload
+	RuntimeSpec     = typologypkg.RuntimeSpec
+	ReportSpec      = typologypkg.ReportSpec
+	FactorGraphSpec = typologypkg.FactorGraphSpec
+	FactorSpec      = typologypkg.FactorSpec
+
+	// Mechanism re-exports (scoring snapshot).
+	ScaleSnapshot         = scoringsnapshot.ScaleSnapshot
+	ScaleFactorSnapshot   = scoringsnapshot.FactorSnapshot
+	InterpretRuleSnapshot = scoringsnapshot.InterpretRuleSnapshot
 
 	AssessmentModel         = publishing.AssessmentModel
 	NewAssessmentModelInput = publishing.NewAssessmentModelInput
@@ -175,4 +201,12 @@ var (
 
 	NewAssessmentModel = publishing.NewAssessmentModel
 	ParseModelStatus   = publishing.ParseModelStatus
+
+	BuildPublishedSnapshot                 = publishing.BuildPublishedSnapshot
+	BuildScoringPublishedSnapshotFromScale = publishing.BuildScoringPublishedSnapshotFromScale
+	ParseDefinitionBodyJSON                = factorpkg.ParseDefinitionBodyJSON
+	FactorsFromDefinitionBodyJSON          = factorpkg.FactorsFromDefinitionBodyJSON
+	ValidateDefinitionBodyForPublish       = factorpkg.ValidateDefinitionBodyForPublish
+	ValidateDefinitionBodyJSONForPublish   = factorpkg.ValidateDefinitionBodyJSONForPublish
+	ParsePublishedScalePayload             = scoringsnapshot.ParsePublishedPayload
 )

@@ -42,7 +42,8 @@
 //   - factor|scoring|norming|typology|taskperformance/: 机制载荷与快照
 //   - legacy/: v1 信封、迁移适配器、behavior_ability 产品通道
 //
-// 深 import 机制子包（factor/typology 等）用于机制专用逻辑；跨机制身份/发布读根包别名即可。
+// 深 import 机制子包（factor/typology 等）用于机制专用逻辑；跨机制常用读路径类型经 export.go 薄 re-export。
+// 新增机制专用逻辑仍优先落在子包；仅将跨包高频叶子类型提升到根包别名。
 // application 展示选项见 application/modelcatalog/option.ModelCatalogOption（与 domain ModelFamilyCapability 分离）。
 //
 // # 子包（机制八包，已与磁盘对齐）
