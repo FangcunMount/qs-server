@@ -3,11 +3,11 @@ package configured_test
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
@@ -16,7 +16,7 @@ func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
-	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -41,11 +41,11 @@ func TestEvaluatorCompositeFactorMatchesFlatTraitProfileScores(t *testing.T) {
 		t.Fatalf("flat Score: %v", err)
 	}
 
-	explicitDetail, err := evaluationtypology.TraitProfileDetailFromPayload(explicitResult.Detail)
+	explicitDetail, err := outcometypology.TraitProfileDetailFromPayload(explicitResult.Detail)
 	if err != nil {
 		t.Fatalf("explicit detail: %v", err)
 	}
-	flatDetail, err := evaluationtypology.TraitProfileDetailFromPayload(flatResult.Detail)
+	flatDetail, err := outcometypology.TraitProfileDetailFromPayload(flatResult.Detail)
 	if err != nil {
 		t.Fatalf("flat detail: %v", err)
 	}
@@ -203,15 +203,15 @@ func flatTraitPayload() *modeltypology.Payload {
 	}
 }
 
-func compositePoleSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func compositePoleSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Score: 3},
 		{QuestionCode: "Q2", Score: 3},
 	}}
 }
 
-func compositeTraitSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func compositeTraitSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "O1", Score: 4},
 		{QuestionCode: "O2", Score: 2},
 		{QuestionCode: "C1", Score: 5},

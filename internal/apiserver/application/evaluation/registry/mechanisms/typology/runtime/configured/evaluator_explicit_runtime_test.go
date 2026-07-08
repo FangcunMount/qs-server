@@ -3,10 +3,10 @@ package configured_test
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
@@ -17,7 +17,7 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
-	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestEvaluatorAppliesGenericFallbackSpecialRule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
-	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -97,8 +97,8 @@ func explicitPoleCompositionPayload() *modeltypology.Payload {
 	}
 }
 
-func explicitPoleCompositionSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func explicitPoleCompositionSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q_EI", Score: 1},
 		{QuestionCode: "Q_SN", Score: 5},
 		{QuestionCode: "Q_TF", Score: 1},
@@ -169,8 +169,8 @@ func explicitNearestPatternPayload() *modeltypology.Payload {
 	}
 }
 
-func explicitNearestPatternLowSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func explicitNearestPatternLowSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "Q1", Value: "A"},
 		{QuestionCode: "Q2", Value: "C"},
 	}}

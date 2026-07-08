@@ -6,9 +6,9 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -50,7 +50,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := outcome.Detail.Payload.(evaluationtypology.PersonalityTypeDetail)
+	detail, ok := outcome.Detail.Payload.(outcometypology.PersonalityTypeDetail)
 	if !ok {
 		t.Fatalf("detail type = %T, want PersonalityTypeDetail", outcome.Detail.Payload)
 	}

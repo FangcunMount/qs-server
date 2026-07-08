@@ -2,10 +2,10 @@ package configured
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 )
 
-func classificationAnswers(sheet *evaluationinput.AnswerSheet) []classification.Answer {
+func classificationAnswers(sheet *evalinput.AnswerSheet) []classification.Answer {
 	if sheet == nil {
 		return nil
 	}
@@ -20,7 +20,7 @@ func classificationAnswers(sheet *evaluationinput.AnswerSheet) []classification.
 	return answers
 }
 
-func classificationAnswerSheet(sheet *evaluationinput.AnswerSheet) *classification.AnswerSheet {
+func classificationAnswerSheet(sheet *evalinput.AnswerSheet) *classification.AnswerSheet {
 	if sheet == nil {
 		return nil
 	}

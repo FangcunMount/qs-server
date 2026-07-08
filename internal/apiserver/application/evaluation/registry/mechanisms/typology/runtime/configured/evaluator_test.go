@@ -3,11 +3,11 @@ package configured_test
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestConfiguredEvaluatorMatchesBigFiveTraitProfile(t *testing.T) {
@@ -19,7 +19,7 @@ func TestConfiguredEvaluatorMatchesBigFiveTraitProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configured Score: %v", err)
 	}
-	gotGeneric, err := evaluationtypology.TraitProfileDetailFromPayload(got.Detail)
+	gotGeneric, err := outcometypology.TraitProfileDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
@@ -48,8 +48,8 @@ func bigFivePayload() *modeltypology.Payload {
 	}
 }
 
-func bigFiveSheet() *evaluationinput.AnswerSheet {
-	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+func bigFiveSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{Answers: []evalinput.Answer{
 		{QuestionCode: "O1", Score: 4},
 		{QuestionCode: "O2", Score: 2},
 		{QuestionCode: "C1", Score: 5},

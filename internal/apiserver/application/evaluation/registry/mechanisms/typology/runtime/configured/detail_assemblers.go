@@ -3,8 +3,8 @@ package configured
 import (
 	"fmt"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -29,7 +29,7 @@ func assemblePersonalityTypeDetail(input DetailInput) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return evaluationtypology.PersonalityTypeDetail{
+	return outcometypology.PersonalityTypeDetail{
 		TypeCode:       outcome.Code,
 		TypeName:       outcome.Name,
 		OneLiner:       outcome.OneLiner,
@@ -52,7 +52,7 @@ func assemblePersonalityTypeDetail(input DetailInput) (any, error) {
 }
 
 func assembleTraitProfileDetail(input DetailInput) (any, error) {
-	traits := make([]evaluationtypology.TraitProfileFactorResult, 0, len(input.Spec.FactorGraph.DecisionFactorOrder()))
+	traits := make([]outcometypology.TraitProfileFactorResult, 0, len(input.Spec.FactorGraph.DecisionFactorOrder()))
 	for _, dimCode := range input.Spec.FactorGraph.DecisionFactorOrder() {
 		meta, ok := dimensionMetaForFactor(input.Spec.FactorGraph, dimCode)
 		if !ok {
@@ -66,37 +66,37 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 			}
 			raw = score.Raw
 		}
-		traits = append(traits, evaluationtypology.TraitProfileFactorResult{
+		traits = append(traits, outcometypology.TraitProfileFactorResult{
 			Code:     meta.Code,
 			Name:     meta.Name,
 			RawScore: raw,
 		})
 	}
-	return evaluationtypology.TraitProfileDetail{
+	return outcometypology.TraitProfileDetail{
 		Traits: traits,
 		Source: input.Payload.Source,
 	}, nil
 }
 
 // AssemblePersonalityTypeDetail 暴露机制中性人格类型明细组装，供 legacy adapter 使用。
-func AssemblePersonalityTypeDetail(input DetailInput) (evaluationtypology.PersonalityTypeDetail, error) {
+func AssemblePersonalityTypeDetail(input DetailInput) (outcometypology.PersonalityTypeDetail, error) {
 	generic, err := assemblePersonalityTypeDetail(input)
 	if err != nil {
-		return evaluationtypology.PersonalityTypeDetail{}, err
+		return outcometypology.PersonalityTypeDetail{}, err
 	}
-	return generic.(evaluationtypology.PersonalityTypeDetail), nil
+	return generic.(outcometypology.PersonalityTypeDetail), nil
 }
 
 // AssembleTraitProfileDetail 暴露机制中性特质画像明细组装，供 legacy adapter 使用。
-func AssembleTraitProfileDetail(input DetailInput) (evaluationtypology.TraitProfileDetail, error) {
+func AssembleTraitProfileDetail(input DetailInput) (outcometypology.TraitProfileDetail, error) {
 	generic, err := assembleTraitProfileDetail(input)
 	if err != nil {
-		return evaluationtypology.TraitProfileDetail{}, err
+		return outcometypology.TraitProfileDetail{}, err
 	}
-	return generic.(evaluationtypology.TraitProfileDetail), nil
+	return generic.(outcometypology.TraitProfileDetail), nil
 }
 
-func buildPersonalityDimensions(input DetailInput) ([]evaluationtypology.PersonalityDimensionResult, error) {
+func buildPersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {
 	if input.Decision.Kind == calcclassification.DecisionKindPoleComposition || len(input.Decision.Poles) > 0 {
 		return buildPolePersonalityDimensions(input)
 	}
@@ -107,11 +107,11 @@ func buildPersonalityDimensions(input DetailInput) ([]evaluationtypology.Persona
 	return nil, nil
 }
 
-func buildPolePersonalityDimensions(input DetailInput) ([]evaluationtypology.PersonalityDimensionResult, error) {
+func buildPolePersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {
 	if len(input.Vector.Scores) == 0 {
 		return nil, nil
 	}
-	dimensions := make([]evaluationtypology.PersonalityDimensionResult, 0, len(input.Decision.Poles))
+	dimensions := make([]outcometypology.PersonalityDimensionResult, 0, len(input.Decision.Poles))
 	for _, pole := range input.Decision.Poles {
 		score, ok := input.Vector.Scores[pole.FactorID]
 		if !ok {
@@ -122,7 +122,7 @@ func buildPolePersonalityDimensions(input DetailInput) ([]evaluationtypology.Per
 			return nil, fmt.Errorf("pole metadata for factor %s is not defined", pole.FactorID)
 		}
 		preference, strength := calcclassification.ResolvePole(pole, score.Raw)
-		dimensions = append(dimensions, evaluationtypology.PersonalityDimensionResult{
+		dimensions = append(dimensions, outcometypology.PersonalityDimensionResult{
 			Code:       meta.Code,
 			Name:       meta.Name,
 			Model:      meta.Model,
@@ -136,7 +136,7 @@ func buildPolePersonalityDimensions(input DetailInput) ([]evaluationtypology.Per
 	return dimensions, nil
 }
 
-func buildPatternPersonalityDimensions(input DetailInput) ([]evaluationtypology.PersonalityDimensionResult, error) {
+func buildPatternPersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {
 	if len(input.Vector.Scores) == 0 {
 		return nil, nil
 	}
@@ -146,7 +146,7 @@ func buildPatternPersonalityDimensions(input DetailInput) ([]evaluationtypology.
 			order = append(order, calcclassification.FactorID(factorID))
 		}
 	}
-	dimensions := make([]evaluationtypology.PersonalityDimensionResult, 0, len(order))
+	dimensions := make([]outcometypology.PersonalityDimensionResult, 0, len(order))
 	for _, factorID := range order {
 		meta, ok := dimensionMetaForFactor(input.Spec.FactorGraph, string(factorID))
 		if !ok {
@@ -156,7 +156,7 @@ func buildPatternPersonalityDimensions(input DetailInput) ([]evaluationtypology.
 		if !ok {
 			return nil, fmt.Errorf("missing factor score for %s", factorID)
 		}
-		dimensions = append(dimensions, evaluationtypology.PersonalityDimensionResult{
+		dimensions = append(dimensions, outcometypology.PersonalityDimensionResult{
 			Code:     meta.Code,
 			Name:     meta.Name,
 			Model:    meta.Model,

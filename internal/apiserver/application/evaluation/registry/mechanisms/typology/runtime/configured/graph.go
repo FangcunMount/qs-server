@@ -6,7 +6,7 @@ import (
 
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func buildGraphAndDecision(payload *modeltypology.Payload, spec *modeltypology.RuntimeSpec) (calcclassification.FactorGraph, calcclassification.DecisionSpec, error) {

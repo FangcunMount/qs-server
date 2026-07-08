@@ -3,11 +3,11 @@ package configured
 import (
 	"fmt"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	calcspecialrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // Evaluator 计算类型学载荷 通过 配置化运行时 pipeline。
@@ -30,16 +30,16 @@ func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 }
 
 // Score 评估类型学载荷 和 returns 计分结果。
-func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.AnswerSheet) (evaluationtypology.ScoringResult, error) {
+func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.AnswerSheet) (outcometypology.ScoringResult, error) {
 	if payload == nil {
-		return evaluationtypology.ScoringResult{}, fmt.Errorf("typology payload is required")
+		return outcometypology.ScoringResult{}, fmt.Errorf("typology payload is required")
 	}
 	if sheet == nil {
-		return evaluationtypology.ScoringResult{}, fmt.Errorf("answer sheet is required")
+		return outcometypology.ScoringResult{}, fmt.Errorf("answer sheet is required")
 	}
 	spec, err := payload.ToRuntimeSpec()
 	if err != nil {
-		return evaluationtypology.ScoringResult{}, err
+		return outcometypology.ScoringResult{}, err
 	}
 	adapterKey := spec.OutcomeMapping.ResolvedDetailAdapterKey(spec.Decision.Kind)
 
@@ -48,7 +48,7 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 			Code:       match.OutcomeCode,
 			Similarity: 1,
 			Trigger:    match.Trigger,
-		}, &evaluationtypology.ScoringSpecialMatch{
+		}, &outcometypology.ScoringSpecialMatch{
 			OutcomeCode: match.OutcomeCode,
 			Trigger:     match.Trigger,
 			SkipScoring: match.SkipScoring,
@@ -57,26 +57,26 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 
 	graph, decision, err := buildGraphAndDecision(payload, spec)
 	if err != nil {
-		return evaluationtypology.ScoringResult{}, err
+		return outcometypology.ScoringResult{}, err
 	}
 	vector, err := calcclassification.ScoreGraph(graph, classificationAnswerSheet(sheet))
 	if err != nil {
-		return evaluationtypology.ScoringResult{}, err
+		return outcometypology.ScoringResult{}, err
 	}
 	candidate, err := calcclassification.SelectOutcome(vector, decision)
 	if err != nil {
-		return evaluationtypology.ScoringResult{}, err
+		return outcometypology.ScoringResult{}, err
 	}
 
 	selected := SelectedOutcome{
 		Code:       candidate.Code,
 		Similarity: candidate.MatchScore,
 	}
-	var specialMatch *evaluationtypology.ScoringSpecialMatch
+	var specialMatch *outcometypology.ScoringSpecialMatch
 	if match, ok := e.rules.ApplyAfterDecision(spec.SpecialRules, spec.Decision, payload, candidate.MatchScore); ok {
 		selected.Code = match.OutcomeCode
 		selected.Trigger = match.Trigger
-		specialMatch = &evaluationtypology.ScoringSpecialMatch{
+		specialMatch = &outcometypology.ScoringSpecialMatch{
 			OutcomeCode: match.OutcomeCode,
 			Trigger:     match.Trigger,
 		}
@@ -92,9 +92,9 @@ func (e Evaluator) assembleResult(
 	decision calcclassification.DecisionSpec,
 	candidate calcclassification.OutcomeCandidate,
 	selected SelectedOutcome,
-	specialMatch *evaluationtypology.ScoringSpecialMatch,
+	specialMatch *outcometypology.ScoringSpecialMatch,
 	adapterKey modeltypology.DetailAdapterKey,
-) (evaluationtypology.ScoringResult, error) {
+) (outcometypology.ScoringResult, error) {
 	detail, err := e.details.Assemble(DetailInput{
 		Payload:   payload,
 		Spec:      spec,
@@ -105,13 +105,13 @@ func (e Evaluator) assembleResult(
 		Adapter:   adapterKey,
 	})
 	if err != nil {
-		return evaluationtypology.ScoringResult{}, err
+		return outcometypology.ScoringResult{}, err
 	}
-	return evaluationtypology.ScoringResult{
+	return outcometypology.ScoringResult{
 		Runtime:         spec,
 		Vector:          vector,
 		Candidate:       candidate,
-		SelectedOutcome: evaluationtypology.SelectedOutcome{Code: selected.Code, Similarity: selected.Similarity, Trigger: selected.Trigger},
+		SelectedOutcome: outcometypology.SelectedOutcome{Code: selected.Code, Similarity: selected.Similarity, Trigger: selected.Trigger},
 		SpecialMatch:    specialMatch,
 		Detail:          detail,
 	}, nil

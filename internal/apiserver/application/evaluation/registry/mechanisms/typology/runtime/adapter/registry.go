@@ -3,10 +3,10 @@ package adapter
 import (
 	"fmt"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // ModelAdapter 计算类型学载荷 通过 人格画像流水线。
@@ -14,8 +14,8 @@ type ModelAdapter interface {
 	Algorithm() modelcatalog.Algorithm
 	Score(
 		payload *modeltypology.Payload,
-		sheet *evaluationinput.AnswerSheet,
-	) (evaluationtypology.ScoringResult, error)
+		sheet *evalinput.AnswerSheet,
+	) (outcometypology.ScoringResult, error)
 }
 
 // Registry 解析人格模型适配器 按 算法。

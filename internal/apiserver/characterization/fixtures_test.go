@@ -3,18 +3,18 @@ package characterization_test
 import (
 	"testing"
 
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
-	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
-	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -164,9 +164,9 @@ func mbtiINTJModel() *modeltypology.MBTILegacyModel {
 	}
 }
 
-func mbtiINTJAnswerSheet() *evaluationinputdomain.AnswerSheet {
-	return &evaluationinputdomain.AnswerSheet{
-		Answers: []evaluationinputdomain.Answer{
+func mbtiINTJAnswerSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{
+		Answers: []evalinput.Answer{
 			{QuestionCode: "Q_EI", Score: 1},
 			{QuestionCode: "Q_SN", Score: 5},
 			{QuestionCode: "Q_TF", Score: 1},
@@ -242,9 +242,9 @@ func sbtiCharacterizationModel() *modeltypology.SBTILegacyModel {
 	}
 }
 
-func sbtiHighAnswerSheet() *evaluationinputdomain.AnswerSheet {
-	return &evaluationinputdomain.AnswerSheet{
-		Answers: []evaluationinputdomain.Answer{
+func sbtiHighAnswerSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{
+		Answers: []evalinput.Answer{
 			{QuestionCode: "Q1", Value: "C"},
 			{QuestionCode: "Q2", Value: "C"},
 			{QuestionCode: "Q3", Value: "C"},
@@ -341,8 +341,8 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 				},
 			},
 		},
-		Brief2: &behavioralsnapshot.Brief2Profile{
-			FormVariant:      "parent",
+		Norming: &behavioralsnapshot.NormingProfile{
+			Variant:          "parent",
 			NormTableVersion: "2024",
 			NormTables: &calcnorm.NormTables{
 				Factors: []calcnorm.FactorNormTable{{
@@ -400,21 +400,21 @@ func draftBehavioralRatingAssessment(t *testing.T) *assessment.Assessment {
 }
 
 func cognitiveInputSnapshot() *evaluationinput.InputSnapshot {
-	snapshot := &cognitivesnapshot.Snapshot{
+	snapshot := &taskperfsnapshot.Snapshot{
 		Code:                 "COG-001",
 		Version:              "1.0.0",
 		Title:                "认知测评",
 		QuestionnaireCode:    "Q-001",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Factors: []cognitivesnapshot.FactorSnapshot{
+		Factors: []taskperfsnapshot.FactorSnapshot{
 			{
 				Code:            "total",
 				Title:           "总分",
 				IsTotalScore:    true,
 				QuestionCodes:   []string{"q1", "q2"},
 				ScoringStrategy: "sum",
-				InterpretRules: []cognitivesnapshot.InterpretRuleSnapshot{
+				InterpretRules: []taskperfsnapshot.InterpretRuleSnapshot{
 					{MinScore: 0, MaxScore: 10, Conclusion: "low", Level: "low", Suggestion: "keep"},
 				},
 			},
@@ -538,9 +538,9 @@ func bigFiveCharacterizationModel() *modeltypology.Payload {
 	}
 }
 
-func bigFiveAnswerSheet() *evaluationinputdomain.AnswerSheet {
-	return &evaluationinputdomain.AnswerSheet{
-		Answers: []evaluationinputdomain.Answer{
+func bigFiveAnswerSheet() *evalinput.AnswerSheet {
+	return &evalinput.AnswerSheet{
+		Answers: []evalinput.Answer{
 			{QuestionCode: "O1", Score: 4},
 			{QuestionCode: "O2", Score: 2},
 			{QuestionCode: "C1", Score: 5},
@@ -715,18 +715,18 @@ func submittedCustomRuntimeAssessment(t *testing.T) *assessment.Assessment {
 	return a
 }
 
-func requirePersonalityTypeDetail(t *testing.T, payload any) evaluationtypology.PersonalityTypeDetail {
+func requirePersonalityTypeDetail(t *testing.T, payload any) outcometypology.PersonalityTypeDetail {
 	t.Helper()
-	detail, ok := payload.(evaluationtypology.PersonalityTypeDetail)
+	detail, ok := payload.(outcometypology.PersonalityTypeDetail)
 	if !ok {
 		t.Fatalf("payload type = %T, want PersonalityTypeDetail", payload)
 	}
 	return detail
 }
 
-func requireTraitProfileDetail(t *testing.T, payload any) evaluationtypology.TraitProfileDetail {
+func requireTraitProfileDetail(t *testing.T, payload any) outcometypology.TraitProfileDetail {
 	t.Helper()
-	detail, ok := payload.(evaluationtypology.TraitProfileDetail)
+	detail, ok := payload.(outcometypology.TraitProfileDetail)
 	if !ok {
 		t.Fatalf("payload type = %T, want TraitProfileDetail", payload)
 	}
@@ -736,7 +736,7 @@ func requireTraitProfileDetail(t *testing.T, payload any) evaluationtypology.Tra
 func scoreBigFiveCharacterization(
 	t *testing.T,
 	payload *modeltypology.Payload,
-	sheet *evaluationinputdomain.AnswerSheet,
+	sheet *evalinput.AnswerSheet,
 ) (legacy.BigFiveResultDetail, error) {
 	t.Helper()
 	evaluator := configured.NewEvaluator()
@@ -744,7 +744,7 @@ func scoreBigFiveCharacterization(
 	if err != nil {
 		return legacy.BigFiveResultDetail{}, err
 	}
-	generic, err := evaluationtypology.TraitProfileDetailFromPayload(result.Detail)
+	generic, err := outcometypology.TraitProfileDetailFromPayload(result.Detail)
 	if err != nil {
 		return legacy.BigFiveResultDetail{}, err
 	}

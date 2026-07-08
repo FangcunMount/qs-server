@@ -3,11 +3,11 @@ package configured
 import (
 	"fmt"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 // Adapter implements ModelAdapter 通过 配置化人格评估器。
@@ -45,13 +45,13 @@ func NewRuntimeAdapterWithEvaluator(evaluator personalityconfigured.Evaluator) A
 
 func (a Adapter) Score(
 	payload *modeltypology.Payload,
-	sheet *evaluationinput.AnswerSheet,
-) (evaluationtypology.ScoringResult, error) {
+	sheet *evalinput.AnswerSheet,
+) (outcometypology.ScoringResult, error) {
 	if payload == nil {
-		return evaluationtypology.ScoringResult{}, fmt.Errorf("typology payload is required")
+		return outcometypology.ScoringResult{}, fmt.Errorf("typology payload is required")
 	}
 	if a.algorithm != "" && payload.Algorithm != a.algorithm {
-		return evaluationtypology.ScoringResult{}, fmt.Errorf(
+		return outcometypology.ScoringResult{}, fmt.Errorf(
 			"typology algorithm %s does not match adapter %s",
 			payload.Algorithm,
 			a.algorithm,

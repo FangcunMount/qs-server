@@ -1,7 +1,7 @@
 package typology
 
 import (
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 )
 
 // PersonalityRuntimeOptions 配置injectable adapter 注册表 用于 类型学 execution。

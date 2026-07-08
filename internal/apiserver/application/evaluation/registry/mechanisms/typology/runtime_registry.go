@@ -3,9 +3,9 @@ package typology
 import (
 	"fmt"
 
+	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/adapter/configured"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/adapter/configured"
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/typology/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
