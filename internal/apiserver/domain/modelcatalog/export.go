@@ -23,7 +23,7 @@ type (
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
 	CapabilityRole        = binding.CapabilityRole
-	CatalogOperation = binding.CatalogOperation
+	CatalogOperation      = binding.CatalogOperation
 
 	QuestionnaireBinding   = binding.QuestionnaireBinding
 	ModelDefinition        = publishing.ModelDefinition

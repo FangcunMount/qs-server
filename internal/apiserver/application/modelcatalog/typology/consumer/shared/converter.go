@@ -73,9 +73,9 @@ func DetailFromSnapshot(snapshot *domain.Snapshot) (*TypologyModelResult, error)
 	outcomes := outcomesFromPayload(payload)
 	return &TypologyModelResult{
 		TypologyModelSummaryResult: summary,
-		DimensionOrder:                order,
-		Dimensions:                    dimensions,
-		Outcomes:                      outcomes,
+		DimensionOrder:             order,
+		Dimensions:                 dimensions,
+		Outcomes:                   outcomes,
 	}, nil
 }
 
@@ -91,9 +91,9 @@ func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*Typolog
 	dimensions, order := dimensionsFromPayload(payload)
 	return &TypologyModelResult{
 		TypologyModelSummaryResult: summary,
-		DimensionOrder:                order,
-		Dimensions:                    dimensions,
-		Outcomes:                      outcomesFromPayload(payload),
+		DimensionOrder:             order,
+		Dimensions:                 dimensions,
+		Outcomes:                   outcomesFromPayload(payload),
 	}, nil
 }
 

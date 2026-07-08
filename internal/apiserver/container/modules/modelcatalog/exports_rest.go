@@ -3,8 +3,8 @@ package modelcatalog
 import (
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
+	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	assessmentModelAppTypology "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	typologyModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
