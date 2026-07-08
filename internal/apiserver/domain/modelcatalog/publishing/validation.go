@@ -1,8 +1,8 @@
 package publishing
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
 // ValidationLevel 划分校验问题 severity。
