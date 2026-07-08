@@ -98,7 +98,7 @@ func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) 
 	}
 }
 
-func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
+func TestAssessmentModelModuleRegistersAggregateOnly(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
@@ -112,11 +112,11 @@ func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 		t.Fatalf("legacy field aliases not wired to assessment model module")
 	}
 	got := c.GetLoadedModules()
-	if len(got) != 3 {
-		t.Fatalf("GetLoadedModules() = %v, want 3 entries", got)
+	if len(got) != 1 {
+		t.Fatalf("GetLoadedModules() = %v, want 1 entry", got)
 	}
-	if got[0] != "modelcatalog" || got[1] != "scale" || got[2] != "typologymodel" {
-		t.Fatalf("GetLoadedModules() = %v, want [modelcatalog scale typologymodel]", got)
+	if got[0] != "modelcatalog" {
+		t.Fatalf("GetLoadedModules() = %v, want [modelcatalog]", got)
 	}
 }
 

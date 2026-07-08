@@ -65,15 +65,15 @@ func (b FactorScoringReportBuilder) Build(ctx context.Context, outcome evaloutco
 		return nil, evalerrors.ModuleNotConfigured("factor_scoring report builder is not configured")
 	}
 	_ = ctx
-	rpt, err := reportscore.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))
+	rpt, err := reportscore.BuildFactorScoringReport(b.composer, factorScoringReportInputFromOutcome(outcome))
 	if err != nil {
 		return nil, err
 	}
 	return AttachReportOutcomeSummary(outcome, rpt), nil
 }
 
-func scaleReportInputFromOutcome(outcome evaloutcome.Outcome) reportscore.ScaleReportInput {
-	input := reportscore.ScaleReportInput{}
+func factorScoringReportInputFromOutcome(outcome evaloutcome.Outcome) reportscore.FactorScoringReportInput {
+	input := reportscore.FactorScoringReportInput{}
 	if outcome.Assessment != nil {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
 	}

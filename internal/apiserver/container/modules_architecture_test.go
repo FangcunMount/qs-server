@@ -307,20 +307,17 @@ func collectRegisterModuleNames(body ast.Node) []string {
 	return names
 }
 
-func TestAssessmentModelLegacyRegisterNamesCoverScaleAndPersonalityModel(t *testing.T) {
+func TestAssessmentModelDoesNotRegisterLegacyModuleNames(t *testing.T) {
 	t.Parallel()
 
-	legacy := map[string]struct{}{}
 	for _, step := range modules.LegacyInitializeSequence {
+		if step.InitMethod != "initModelCatalogModule" {
+			continue
+		}
 		for _, name := range step.RegisterNames {
 			if name == "scale" || name == "typologymodel" {
-				legacy[name] = struct{}{}
+				t.Fatalf("initModelCatalogModule must not register legacy name %q", name)
 			}
-		}
-	}
-	for _, name := range []string{"scale", "typologymodel"} {
-		if _, ok := legacy[name]; !ok {
-			t.Fatalf("legacy initialize sequence no longer registers %q; assessment-model merge may be complete or registry is stale", name)
 		}
 	}
 }

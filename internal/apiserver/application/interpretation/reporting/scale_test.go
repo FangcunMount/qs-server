@@ -10,7 +10,7 @@ import (
 func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 	t.Parallel()
 
-	input := scaleReportInputFromOutcome(evaloutcome.Outcome{
+	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
 		Execution: &assessment.AssessmentOutcome{
 			Primary: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 10},
 			Level:   &assessment.OutcomeResultLevel{Code: string(assessment.RiskLevelMedium)},
@@ -45,7 +45,7 @@ func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 func TestScaleReportInputUsesLegacyFactorScoresWithoutHierarchy(t *testing.T) {
 	t.Parallel()
 
-	input := scaleReportInputFromOutcome(evaloutcome.Outcome{
+	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
 		Execution: &assessment.AssessmentOutcome{
 			Dimensions: []assessment.DimensionResult{
 				{Code: "total", Name: "总分", Score: &assessment.OutcomeScoreValue{Value: 5}},

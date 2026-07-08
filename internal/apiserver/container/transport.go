@@ -240,7 +240,7 @@ func (c *Container) exportGRPCAuthzSnapshotLoader() *iaminfra.AuthzSnapshotLoade
 	return c.IAMModule.AuthzSnapshotLoader()
 }
 
-func (c *Container) exportGRPCRuleSetCatalog() rulesetport.RuleSetCatalog {
+func (c *Container) exportGRPCRuleSetCatalog() rulesetport.Catalog {
 	if c == nil {
 		return nil
 	}

@@ -10,21 +10,21 @@ import (
 
 // CatalogBindingResolver 从统一规则目录解析建测评绑定。
 type CatalogBindingResolver struct {
-	catalog port.RuleSetCatalog
+	catalog port.Catalog
 }
 
 var _ port.AssessmentBindingResolver = (*CatalogBindingResolver)(nil)
 
-func NewAssessmentBindingResolver(catalog port.RuleSetCatalog) *CatalogBindingResolver {
+func NewAssessmentBindingResolver(catalog port.Catalog) *CatalogBindingResolver {
 	return &CatalogBindingResolver{catalog: catalog}
 }
 
 func (r *CatalogBindingResolver) ResolveByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
-) (port.RuleSetRef, bool, error) {
+) (port.Ref, bool, error) {
 	if r == nil || r.catalog == nil {
-		return port.RuleSetRef{}, false, nil
+		return port.Ref{}, false, nil
 	}
 	return r.catalog.ResolveByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
@@ -41,7 +41,7 @@ func (r *CatalogBindingResolver) ResolveAssessmentBinding(
 		return port.AssessmentBinding{}, ok, err
 	}
 	if ref.Kind != domain.RuleSetKindScale {
-		return port.RuleSetAssessmentBinding(ref), true, nil
+		return port.AssessmentBinding{Ref: ref}, true, nil
 	}
 	snapshot, err := r.catalog.GetPublishedByRef(ctx, ref)
 	if err != nil {

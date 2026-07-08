@@ -62,5 +62,5 @@ func (m *Typology) CheckHealth() error { return nil }
 
 // ModuleInfo returns typology-model module metadata.
 func (m *Typology) ModuleInfo() modules.ModuleInfo {
-	return modules.ModuleInfo{Name: "typologymodel", Version: "1.0.0"}
+	return modules.ModuleInfo{Name: "modelcatalog.typology", Version: "1.0.0"}
 }

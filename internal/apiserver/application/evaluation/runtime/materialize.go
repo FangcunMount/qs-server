@@ -53,7 +53,7 @@ func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFam
 	session := wiringSession{typologyExecutor: &sharedConfigured}
 	out := make(map[modelcatalog.AlgorithmFamily]execute.Evaluator, len(defaultPathMaterializations()))
 	for _, spec := range defaultPathMaterializations() {
-		desc := evaldomain.ModelDescriptor{Kind: modelKindForExecutionPath(spec.path)}
+		desc := defaultDescriptorForExecutionPath(spec.path)
 		evaluator, err := spec.evaluator(desc, deps, session)
 		if err != nil {
 			return nil, err
@@ -61,6 +61,15 @@ func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFam
 		out[spec.family] = evaluator
 	}
 	return out, nil
+}
+
+func defaultDescriptorForExecutionPath(path modelcatalog.ExecutionPath) evaldomain.ModelDescriptor {
+	switch path {
+	case modelcatalog.ExecutionPathTypologyDescriptor:
+		return factorclassification.ConfiguredTypologyDescriptor()
+	default:
+		return evaldomain.ModelDescriptor{Kind: modelKindForExecutionPath(path)}
+	}
 }
 
 func modelKindForExecutionPath(path modelcatalog.ExecutionPath) evaldomain.ModelKind {

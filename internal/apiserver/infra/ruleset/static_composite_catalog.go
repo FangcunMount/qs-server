@@ -15,7 +15,7 @@ type StaticCompositeCatalog struct {
 	scale    ScaleBindingSource
 }
 
-var _ port.RuleSetCatalog = (*StaticCompositeCatalog)(nil)
+var _ port.Catalog = (*StaticCompositeCatalog)(nil)
 
 func NewStaticCompositeCatalog(ruleSets []*domain.RuleSetSnapshot, scale ScaleBindingSource) *StaticCompositeCatalog {
 	copied := make([]*domain.RuleSetSnapshot, 0, len(ruleSets))
@@ -35,9 +35,9 @@ func NewStaticCompositeCatalog(ruleSets []*domain.RuleSetSnapshot, scale ScaleBi
 func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
-) (port.RuleSetRef, bool, error) {
+) (port.Ref, bool, error) {
 	if c == nil {
-		return port.RuleSetRef{}, false, nil
+		return port.Ref{}, false, nil
 	}
 	if snapshot := c.findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion); snapshot != nil {
 		return RuleSetRefFromSnapshot(snapshot), true, nil
@@ -46,18 +46,18 @@ func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
 		model, err := c.scale.FindScaleByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 		if err != nil {
 			if domain.IsNotFound(err) {
-				return port.RuleSetRef{}, false, nil
+				return port.Ref{}, false, nil
 			}
-			return port.RuleSetRef{}, false, err
+			return port.Ref{}, false, err
 		}
 		if model != nil {
 			return scaleRuleSetRef(model), true, nil
 		}
 	}
-	return port.RuleSetRef{}, false, nil
+	return port.Ref{}, false, nil
 }
 
-func (c *StaticCompositeCatalog) GetPublishedByRef(ctx context.Context, ref port.RuleSetRef) (*domain.RuleSetSnapshot, error) {
+func (c *StaticCompositeCatalog) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.RuleSetSnapshot, error) {
 	if c == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -106,7 +106,7 @@ func (c *StaticCompositeCatalog) findRuleSetByQuestionnaire(questionnaireCode, q
 	return nil
 }
 
-func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.RuleSetRef) *domain.RuleSetSnapshot {
+func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.Ref) *domain.RuleSetSnapshot {
 	for _, snapshot := range c.ruleSets {
 		if snapshot == nil {
 			continue
@@ -118,11 +118,11 @@ func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.RuleSetRef) *domain.R
 	return nil
 }
 
-func scaleRuleSetRef(model *scalesnapshot.ScaleSnapshot) port.RuleSetRef {
+func scaleRuleSetRef(model *scalesnapshot.ScaleSnapshot) port.Ref {
 	if model == nil {
-		return port.RuleSetRef{}
+		return port.Ref{}
 	}
-	return port.RuleSetRef{
+	return port.Ref{
 		Kind:    domain.RuleSetKindScale,
 		Code:    model.Code,
 		Version: model.ScaleVersion,

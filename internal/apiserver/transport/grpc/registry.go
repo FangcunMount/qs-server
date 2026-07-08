@@ -105,7 +105,7 @@ type StatisticsDeps struct {
 }
 
 type RuleSetDeps struct {
-	RuleSetCatalog rulesetport.RuleSetCatalog
+	RuleSetCatalog rulesetport.Catalog
 }
 
 type IAMDeps struct {

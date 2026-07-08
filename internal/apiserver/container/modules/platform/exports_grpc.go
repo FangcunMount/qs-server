@@ -14,7 +14,7 @@ type GRPCIntegrationDeps struct {
 	QRCodeService                      grpctransport.SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 	AuthzSnapshotLoader                *iaminfra.AuthzSnapshotLoader
-	RuleSetCatalog                     rulesetport.RuleSetCatalog
+	RuleSetCatalog                     rulesetport.Catalog
 }
 
 // ExportGRPCIntegrationDeps maps platform integration ports to gRPC transport fields.

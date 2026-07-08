@@ -21,6 +21,6 @@ func ScaleRuleSetSnapshot(model *scalesnapshot.ScaleSnapshot) (*domain.RuleSetSn
 	return aminfra.LegacySnapshotFromScale(model)
 }
 
-func RuleSetRefFromSnapshot(snapshot *domain.RuleSetSnapshot) port.RuleSetRef {
+func RuleSetRefFromSnapshot(snapshot *domain.RuleSetSnapshot) port.Ref {
 	return aminfra.RefFromSnapshot(snapshot)
 }

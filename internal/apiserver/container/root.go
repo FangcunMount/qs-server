@@ -65,7 +65,7 @@ type Container struct {
 	IAMModule             *IAMModule             // IAM 集成模块
 	CodesService          codesapp.CodesService  // CodesService 应用服务（code 申请）
 
-	ruleSetCatalog rulesetport.RuleSetCatalog
+	ruleSetCatalog rulesetport.Catalog
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
 	surveyScaleInfra *surveymod.ScaleInfra

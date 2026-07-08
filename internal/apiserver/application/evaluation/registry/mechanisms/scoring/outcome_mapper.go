@@ -14,7 +14,7 @@ func ToAssessmentOutcome(
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,
 ) *assessment.AssessmentOutcome {
-	return calculationadapter.AssessmentOutcomeFromScaleInterpretation(result, scaleModelRef(a, snapshot))
+	return calculationadapter.AssessmentOutcomeFromScoringInterpretation(result, scaleModelRef(a, snapshot))
 }
 
 func scaleModelRef(a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot) assessment.EvaluationModelRef {

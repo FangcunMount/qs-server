@@ -20,13 +20,13 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 		name    string
 		code    string
 		version string
-		want    port.RuleSetRef
+		want    port.Ref
 	}{
 		{
 			name:    "sbti",
 			code:    cataloglegacy.SBTIQuestionnaireCode,
 			version: cataloglegacy.SBTIModelVersion,
-			want: port.RuleSetRef{
+			want: port.Ref{
 				Kind:      domain.KindPersonality,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmSBTI,
@@ -39,7 +39,7 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 			name:    "mbti",
 			code:    cataloglegacy.MBTIQuestionnaireCode,
 			version: cataloglegacy.MBTIModelVersion,
-			want: port.RuleSetRef{
+			want: port.Ref{
 				Kind:      domain.KindPersonality,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmMBTI,
@@ -72,7 +72,7 @@ func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
 
-	ref := port.RuleSetRef{
+	ref := port.Ref{
 		Kind:      domain.KindPersonality,
 		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmMBTI,

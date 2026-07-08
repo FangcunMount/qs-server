@@ -7,14 +7,14 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
-func TestDescribeExposesAggregateAndLegacyRegisterNames(t *testing.T) {
+func TestDescribeExposesAggregateRegisterName(t *testing.T) {
 	t.Parallel()
 
 	desc := Describe()
 	if desc.Name != modules.PackageModelCatalog {
-		t.Fatalf("name = %q, want instrument", desc.Name)
+		t.Fatalf("name = %q, want modelcatalog", desc.Name)
 	}
-	want := []string{string(Name), "scale", "typologymodel"}
+	want := []string{string(Name)}
 	if len(desc.RegisterNames) != len(want) {
 		t.Fatalf("register names = %#v, want %#v", desc.RegisterNames, want)
 	}

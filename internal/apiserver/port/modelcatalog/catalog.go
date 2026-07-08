@@ -20,9 +20,6 @@ func (r Ref) IsEmpty() bool {
 	return r.Kind == "" && r.Code == ""
 }
 
-// RuleSetRef is kept as a compatibility name while callers migrate to Ref.
-type RuleSetRef = Ref
-
 // ListPublishedFilter narrows published-model list queries for C-side catalogs.
 type ListPublishedFilter struct {
 	Kind      domain.Kind
@@ -65,30 +62,18 @@ type PublishedAlgorithmLister interface {
 	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
 }
 
-// PublishedRuleSetReader is kept as a compatibility name while callers migrate to PublishedReader.
-type PublishedRuleSetReader = PublishedReader
-
 // PublishedWriter 写入已发布测评模型（seed / 管理链路使用）。
 type PublishedWriter interface {
 	UpsertPublished(ctx context.Context, snapshot *domain.Snapshot) error
 }
-
-// PublishedRuleSetWriter is kept as a compatibility name while callers migrate to PublishedWriter.
-type PublishedRuleSetWriter = PublishedWriter
 
 // QuestionnaireResolver 根据问卷版本解析测评模型引用。
 type QuestionnaireResolver interface {
 	ResolveByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (Ref, bool, error)
 }
 
-// QuestionnaireRuleSetResolver is kept as a compatibility name while callers migrate to QuestionnaireResolver.
-type QuestionnaireRuleSetResolver = QuestionnaireResolver
-
 // Catalog 测评模型资产读侧统一端口（静态 seed / Mongo 实现均可）。
 type Catalog interface {
 	PublishedReader
 	QuestionnaireResolver
 }
-
-// RuleSetCatalog is kept as a compatibility name while callers migrate to Catalog.
-type RuleSetCatalog = Catalog

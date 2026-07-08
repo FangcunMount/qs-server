@@ -15,7 +15,7 @@ type stubScaleRuleReader struct {
 	snapshot *domain.RuleSetSnapshot
 }
 
-func (s stubScaleRuleReader) GetPublishedByRef(context.Context, rulesetport.RuleSetRef) (*domain.RuleSetSnapshot, error) {
+func (s stubScaleRuleReader) GetPublishedByRef(context.Context, rulesetport.Ref) (*domain.RuleSetSnapshot, error) {
 	if s.snapshot == nil {
 		return nil, domain.ErrNotFound
 	}

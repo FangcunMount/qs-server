@@ -43,11 +43,11 @@ func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, v
 
 // RuleSetScaleCatalog 优先从统一规则目录解码 scale payload，未命中时回退量表 repo。
 type RuleSetScaleCatalog struct {
-	reader   rulesetport.PublishedRuleSetReader
+	reader   rulesetport.PublishedReader
 	fallback port.ScaleModelCatalog
 }
 
-func NewRuleSetScaleCatalog(reader rulesetport.PublishedRuleSetReader, fallback port.ScaleModelCatalog) RuleSetScaleCatalog {
+func NewRuleSetScaleCatalog(reader rulesetport.PublishedReader, fallback port.ScaleModelCatalog) RuleSetScaleCatalog {
 	return RuleSetScaleCatalog{reader: reader, fallback: fallback}
 }
 
@@ -60,7 +60,7 @@ func (c RuleSetScaleCatalog) GetScale(ctx context.Context, code string) (*scales
 
 func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	if ref.Version != "" && c.reader != nil {
-		snapshot, err := c.reader.GetPublishedByRef(ctx, rulesetport.RuleSetRef{
+		snapshot, err := c.reader.GetPublishedByRef(ctx, rulesetport.Ref{
 			Kind:    domain.RuleSetKindScale,
 			Code:    ref.Code,
 			Version: ref.Version,

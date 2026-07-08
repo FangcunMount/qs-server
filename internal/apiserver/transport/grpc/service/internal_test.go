@@ -38,7 +38,7 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -174,8 +174,8 @@ type failingBindingResolver struct {
 	err error
 }
 
-func (f failingBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.RuleSetRef, bool, error) {
-	return rulesetport.RuleSetRef{}, false, f.err
+func (f failingBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.Ref, bool, error) {
+	return rulesetport.Ref{}, false, f.err
 }
 
 func (f failingBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
@@ -192,7 +192,7 @@ func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -212,14 +212,14 @@ type stubScaleBindingResolver struct {
 	ok      bool
 }
 
-func (s stubScaleBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.RuleSetRef, bool, error) {
+func (s stubScaleBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.Ref, bool, error) {
 	if !s.ok && s.binding.Ref.IsEmpty() {
-		return rulesetport.RuleSetRef{}, false, nil
+		return rulesetport.Ref{}, false, nil
 	}
 	if s.ok || !s.binding.Ref.IsEmpty() {
 		return s.binding.Ref, true, nil
 	}
-	return rulesetport.RuleSetRef{}, false, nil
+	return rulesetport.Ref{}, false, nil
 }
 
 func (s stubScaleBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
@@ -260,7 +260,7 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
 		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
+			rulesetport.Ref{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})

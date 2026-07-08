@@ -15,9 +15,6 @@ type FactorScoringReportInput struct {
 	FactorScores []FactorReportScore
 }
 
-// ScaleReportInput is a deprecated alias for FactorScoringReportInput.
-type ScaleReportInput = FactorScoringReportInput
-
 // BuildFactorScoringReport assembles factor-scoring mechanism reports.
 // When factor conclusion/suggestion is empty, interpretation rules generate them;
 // overall conclusion/suggestion falls back to the total-score factor when unset.
@@ -50,9 +47,6 @@ func BuildFactorScoringReport(composer report.ReportBuilder, input FactorScoring
 		FactorScores: factorScores,
 	})
 }
-
-// BuildScaleReport is a deprecated alias for BuildFactorScoringReport.
-var BuildScaleReport = BuildFactorScoringReport
 
 func BuildReport(composer report.ReportBuilder, input ReportInput) (*report.InterpretReport, error) {
 	if composer == nil {

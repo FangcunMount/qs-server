@@ -56,8 +56,7 @@ func TestTypologyCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
 		"mongoruleset",
 		"evaluation_rule_sets",
 		"UpsertPublished",
-		"DualStore",
-		"NewLayeredCatalog",
+		"NewPublishedStore",
 		"KindMBTIMigration",
 		"KindSBTIMigration",
 	}

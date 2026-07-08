@@ -79,6 +79,3 @@ func assessmentDimensionResultsFromFactorScores(scores []assessment.FactorScoreR
 	}
 	return results
 }
-
-// AssessmentOutcomeFromScaleInterpretation is a deprecated alias for AssessmentOutcomeFromScoringInterpretation.
-var AssessmentOutcomeFromScaleInterpretation = AssessmentOutcomeFromScoringInterpretation

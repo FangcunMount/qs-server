@@ -30,11 +30,6 @@ func ScaleAssessmentBinding(ref Ref, scaleID uint64, code, title, version string
 		ScaleVersion:     &version,
 	}
 }
-
-func RuleSetAssessmentBinding(ref Ref) AssessmentBinding {
-	return AssessmentBinding{Ref: ref}
-}
-
 func (b AssessmentBinding) ModelKind() domain.Kind {
 	return b.Ref.Kind
 }

@@ -146,11 +146,11 @@ func (c *Container) DefaultEvaluationCatalog() (compose.EvaluationCatalog, error
 	return ammod.ExportEvaluationCatalog()
 }
 
-func (c *Container) RuleSetCatalog() rulesetport.RuleSetCatalog {
+func (c *Container) RuleSetCatalog() rulesetport.Catalog {
 	return c.ruleSetCatalog
 }
 
-func (c *Container) SetRuleSetCatalog(catalog rulesetport.RuleSetCatalog) {
+func (c *Container) SetRuleSetCatalog(catalog rulesetport.Catalog) {
 	c.ruleSetCatalog = catalog
 }
 
@@ -191,8 +191,6 @@ func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.ScaleModule = module.Scoring
 	c.TypologyModelModule = module.Typology
 	c.registerModule("modelcatalog", module)
-	c.registerModule("scale", module.Scoring)
-	c.registerModule("typologymodel", module.Typology)
 }
 
 func (c *Container) SetActorModule(module *actormod.Module) {
@@ -301,7 +299,7 @@ func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
 	return infra, nil
 }
 
-func (c *Container) ensureRuleSetCatalog() (rulesetport.RuleSetCatalog, error) {
+func (c *Container) ensureRuleSetCatalog() (rulesetport.Catalog, error) {
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}

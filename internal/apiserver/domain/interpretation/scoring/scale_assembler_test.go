@@ -8,10 +8,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 )
 
-func TestBuildScaleReportAssemblesInterpretReport(t *testing.T) {
+func TestBuildFactorScoringReportAssemblesInterpretReport(t *testing.T) {
 	totalMax := 27.0
 	sleepMax := 3.0
-	got, err := scoring.BuildScaleReport(builder.NewDefaultInterpretReportBuilder(nil), scoring.ScaleReportInput{
+	got, err := scoring.BuildFactorScoringReport(builder.NewDefaultInterpretReportBuilder(nil), scoring.FactorScoringReportInput{
 		AssessmentID: report.ID(9001),
 		Scale: &scoring.ReportModel{
 			Code:  "PHQ9",
@@ -44,7 +44,7 @@ func TestBuildScaleReportAssemblesInterpretReport(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("BuildScaleReport: %v", err)
+		t.Fatalf("BuildFactorScoringReport: %v", err)
 	}
 	if got.ModelName() != "抑郁筛查" {
 		t.Fatalf("ModelName = %q", got.ModelName())

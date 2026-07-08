@@ -120,10 +120,10 @@ func (m *Scoring) CheckHealth() error {
 	return nil
 }
 
-// ModuleInfo returns legacy scale module metadata.
+// ModuleInfo returns scoring capability metadata under modelcatalog.
 func (m *Scoring) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
-		Name:        "scale",
+		Name:        "modelcatalog.scoring",
 		Version:     "2.0.0",
 		Description: "量表管理模块（重构版）",
 	}

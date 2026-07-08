@@ -18,8 +18,8 @@ type Repository struct {
 }
 
 var (
-	_ port.PublishedRuleSetReader = (*Repository)(nil)
-	_ port.PublishedRuleSetWriter = (*Repository)(nil)
+	_ port.PublishedReader = (*Repository)(nil)
+	_ port.PublishedWriter = (*Repository)(nil)
 )
 
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
@@ -79,7 +79,7 @@ func (r *Repository) UpsertPublished(ctx context.Context, snapshot *domain.RuleS
 	return err
 }
 
-func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.RuleSetRef) (*domain.RuleSetSnapshot, error) {
+func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.RuleSetSnapshot, error) {
 	if ref.Version == "" {
 		return nil, domain.ErrVersionRequired
 	}
