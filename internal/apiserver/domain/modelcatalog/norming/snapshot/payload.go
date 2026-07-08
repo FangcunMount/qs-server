@@ -7,7 +7,7 @@ import (
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 )
 
 // Snapshot 是published behavioral_rating 执行载荷 (默认.v1 或 brief2.v1)。
@@ -19,12 +19,12 @@ type Snapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
-	Brief2               *Brief2Profile
+	Norming              *NormingProfile
 }
 
-// Brief2Profile 携带BRIEF-2 特定 配置 beyond score_range 计分。
-type Brief2Profile struct {
-	FormVariant          string
+// NormingProfile 携带常模化配置 beyond score_range 计分（机制中性，解析自 brief2 等扩展）。
+type NormingProfile struct {
+	Variant              string
 	NormTableVersion     string
 	IndexCodes           []string
 	ValidityCodes        []string
@@ -32,8 +32,8 @@ type Brief2Profile struct {
 	NormTables           *calcnorm.NormTables
 }
 
-// NormTablesOrNil 返回parsed 常模表 when Brief-2 常模 配置 是 存在。
-func (p *Brief2Profile) NormTablesOrNil() *calcnorm.NormTables {
+// NormTablesOrNil 返回 parsed 常模表 when 常模配置存在。
+func (p *NormingProfile) NormTablesOrNil() *calcnorm.NormTables {
 	if p == nil {
 		return nil
 	}
@@ -140,8 +140,8 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	}
 	out.Factors = factors
 	if body.Brief2 != nil {
-		out.Brief2 = &Brief2Profile{
-			FormVariant:          body.Brief2.FormVariant,
+		out.Norming = &NormingProfile{
+			Variant:              body.Brief2.FormVariant,
 			NormTableVersion:     body.Brief2.NormTableVersion,
 			IndexCodes:           append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:        append([]string(nil), body.Brief2.ValidityCodes...),
@@ -229,11 +229,11 @@ func (s *Snapshot) IsPublished() bool {
 }
 
 // ToScaleSnapshot 投影behavioral_rating 因子 为 scale execution 结构。
-func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
+func (s *Snapshot) ToScaleSnapshot() *scoringsnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	return scalesnapshot.BuildFromModelFactors(
+	return scoringsnapshot.BuildFromModelFactors(
 		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
 	)
 }

@@ -3,8 +3,8 @@ package snapshot_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 )
 
 func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
@@ -65,8 +65,8 @@ func TestParseBrief2PayloadPreservesProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	if got.Brief2 == nil || got.Brief2.FormVariant != "teacher" || got.Brief2.NormTableVersion != "2024" {
-		t.Fatalf("brief2 profile = %#v", got.Brief2)
+	if got.Norming == nil || got.Norming.Variant != "teacher" || got.Norming.NormTableVersion != "2024" {
+		t.Fatalf("norming profile = %#v", got.Norming)
 	}
 	if got.ToScaleSnapshot() == nil || len(got.ToScaleSnapshot().Factors) != 1 {
 		t.Fatal("expected scale projection to remain available")
@@ -164,7 +164,7 @@ func TestParseBrief2PayloadNormTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	tables := got.Brief2.NormTablesOrNil()
+	tables := got.Norming.NormTablesOrNil()
 	if tables == nil || len(tables.Factors) != 1 || tables.Factors[0].FactorCode != "gec" {
 		t.Fatalf("norm factors = %#v", tables)
 	}
