@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/task_performance"
+	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 )
 
-// Snapshot 是published cognitive 执行载荷 (默认.v1 或 spm.v1)。
+// Snapshot 是published cognitive 执行载荷 (default.v1 或 spm.v1)。
 type Snapshot struct {
 	Code                 string
 	Version              string
@@ -18,14 +18,6 @@ type Snapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
-	SPM                  *SPMProfile
-}
-
-// SPMProfile 携带SPM-特定 配置 beyond score_range 计分。
-type SPMProfile struct {
-	TimeLimitSeconds int
-	ItemSetCodes     []string
-	NormTableVersion string
 }
 
 type (
@@ -78,13 +70,6 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 		})
 	}
 	out.Factors = factors
-	if body.SPM != nil {
-		out.SPM = &SPMProfile{
-			TimeLimitSeconds: body.SPM.TimeLimitSeconds,
-			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
-			NormTableVersion: body.SPM.NormTableVersion,
-		}
-	}
 	return out, nil
 }
 
@@ -93,11 +78,11 @@ func (s *Snapshot) IsPublished() bool {
 }
 
 // ToScaleSnapshot 投影cognitive 因子 为 scale execution 结构。
-func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
+func (s *Snapshot) ToScaleSnapshot() *scoringsnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	return scalesnapshot.BuildFromModelFactors(
+	return scoringsnapshot.BuildFromModelFactors(
 		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
 	)
 }

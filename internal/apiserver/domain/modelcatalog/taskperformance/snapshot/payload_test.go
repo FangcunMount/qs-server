@@ -3,7 +3,8 @@ package snapshot_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 )
 
 func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
@@ -44,11 +45,14 @@ func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
 	}
 }
 
-func TestParseSPMPayloadPreservesProfile(t *testing.T) {
+func TestParseSPMPayloadAppliesTaskPerformanceMetadata(t *testing.T) {
 	t.Parallel()
 
 	raw := []byte(`{
-		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum"}],
+		"dimensions": [
+			{"code": "A", "title": "A", "question_codes": ["q1"], "scoring_strategy": "sum"},
+			{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}
+		],
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"spm": {
 			"time_limit_seconds": 900,
@@ -63,7 +67,16 @@ func TestParseSPMPayloadPreservesProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	if got.SPM == nil || got.SPM.TimeLimitSeconds != 900 || len(got.SPM.ItemSetCodes) != 5 {
-		t.Fatalf("spm profile = %#v", got.SPM)
+	if len(got.Factors) != 2 {
+		t.Fatalf("len(Factors) = %d, want 2", len(got.Factors))
+	}
+	if got.Factors[0].Code != "A" || got.Factors[0].Role != factor.FactorRoleTaskSet {
+		t.Fatalf("task-set factor = %#v", got.Factors[0])
+	}
+	if got.Factors[0].Norm == nil || got.Factors[0].Norm.NormTableVersion != "2024" {
+		t.Fatalf("task-set norm = %#v", got.Factors[0].Norm)
+	}
+	if got.Factors[1].Norm == nil || got.Factors[1].Norm.NormTableVersion != "2024" {
+		t.Fatalf("total norm = %#v", got.Factors[1].Norm)
 	}
 }

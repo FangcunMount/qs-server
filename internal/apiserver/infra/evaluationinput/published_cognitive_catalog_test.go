@@ -64,7 +64,7 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 	t.Parallel()
 
 	raw := []byte(`{
-		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum"}],
+		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"spm": {"time_limit_seconds": 900, "item_set_codes": ["A", "B"], "norm_table_version": "2024"}
 	}`)
@@ -91,8 +91,8 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCognitiveByRef: %v", err)
 	}
-	if got.SPM == nil || got.SPM.TimeLimitSeconds != 900 {
-		t.Fatalf("spm profile = %#v", got.SPM)
+	if got.Factors[0].Norm == nil || got.Factors[0].Norm.NormTableVersion != "2024" {
+		t.Fatalf("total factor norm = %#v", got.Factors[0].Norm)
 	}
 }
 
