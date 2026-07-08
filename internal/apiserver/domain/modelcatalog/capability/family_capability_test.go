@@ -6,15 +6,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-func TestFamilyCapabilityByKindSeparatesDomainGuards(t *testing.T) {
-	t.Parallel()
-
-	family, ok := FamilyCapabilityByKind(identity.KindPersonality)
-	if !ok || !family.CreateSupported || !family.RuntimeExecutable {
-		t.Fatalf("personality family capability = %#v, %v", family, ok)
-	}
-}
-
 func TestCatalogOptionByKindSeparatesPresentation(t *testing.T) {
 	t.Parallel()
 

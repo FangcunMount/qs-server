@@ -1,10 +1,10 @@
-package routing
+package publishing
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 const (
@@ -67,11 +67,11 @@ func IsPersonalityTypologyPayloadFormat(format string) bool {
 }
 
 type typologyAlgorithmEnvelope struct {
-	Algorithm identity.Algorithm `json:"algorithm"`
+	Algorithm binding.Algorithm `json:"algorithm"`
 }
 
 // AlgorithmFromTypologyPayload reads 算法 身份 从 v2 类型学载荷。
-func AlgorithmFromTypologyPayload(payload []byte) (identity.Algorithm, error) {
+func AlgorithmFromTypologyPayload(payload []byte) (binding.Algorithm, error) {
 	var envelope typologyAlgorithmEnvelope
 	if err := json.Unmarshal(payload, &envelope); err != nil {
 		return "", fmt.Errorf("decode typology payload algorithm: %w", err)
@@ -84,13 +84,13 @@ func AlgorithmFromTypologyPayload(payload []byte) (identity.Algorithm, error) {
 
 // PayloadFormatForBehavioralRating returns the family draft/publish format (norming mechanism).
 // Algorithm is ignored; legacy brief2.v1 remains decodable via IsBehavioralRatingPayloadFormat.
-func PayloadFormatForBehavioralRating(_ identity.Algorithm) string {
+func PayloadFormatForBehavioralRating(_ binding.Algorithm) string {
 	return PayloadFormatBehavioralRatingDefaultV1
 }
 
 // PayloadFormatForCognitive returns the family draft/publish format (task_performance mechanism).
 // Algorithm is ignored; legacy spm.v1 remains decodable via IsCognitivePayloadFormat.
-func PayloadFormatForCognitive(_ identity.Algorithm) string {
+func PayloadFormatForCognitive(_ binding.Algorithm) string {
 	return PayloadFormatCognitiveDefaultV1
 }
 
@@ -115,11 +115,11 @@ func IsCognitivePayloadFormat(format string) bool {
 }
 
 // DraftPayloadFormatForModel 返回draft/publish 载荷格式 用于 模型家族 和 算法。
-func DraftPayloadFormatForModel(kind identity.Kind, algorithm identity.Algorithm) string {
+func DraftPayloadFormatForModel(kind binding.Kind, algorithm binding.Algorithm) string {
 	switch kind {
-	case identity.KindBehavioralRating:
+	case binding.KindBehavioralRating:
 		return PayloadFormatForBehavioralRating(algorithm)
-	case identity.KindCognitive:
+	case binding.KindCognitive:
 		return PayloadFormatForCognitive(algorithm)
 	default:
 		return ""

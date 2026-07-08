@@ -1,7 +1,7 @@
-package routing
+package publishing
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // AlgorithmFamily 分组执行语义 用于 运行时, 载荷, 和 reporting。
@@ -40,53 +40,53 @@ func (f AlgorithmFamily) IsValid() bool {
 }
 
 // AlgorithmFamilyFromDecisionKind 映射published 判定策略 到 its 执行家族。
-func AlgorithmFamilyFromDecisionKind(decision identity.DecisionKind) (AlgorithmFamily, bool) {
+func AlgorithmFamilyFromDecisionKind(decision binding.DecisionKind) (AlgorithmFamily, bool) {
 	switch decision {
-	case identity.DecisionKindScoreRange, identity.DecisionKind("score_range_interpretation"):
+	case binding.DecisionKindScoreRange, binding.DecisionKind("score_range_interpretation"):
 		return AlgorithmFamilyFactorScoring, true
-	case identity.DecisionKindPoleComposition, identity.DecisionKindTraitProfile, identity.DecisionKindNearestPattern:
+	case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern:
 		return AlgorithmFamilyFactorClassification, true
-	case identity.DecisionKindNormLookup:
+	case binding.DecisionKindNormLookup:
 		return AlgorithmFamilyFactorNorm, true
-	case identity.DecisionKindAbilityLevel:
+	case binding.DecisionKindAbilityLevel:
 		return AlgorithmFamilyTaskPerformance, true
 	default:
 		return "", false
 	}
 }
 
-// DecisionKindForIdentity mirrors publish-builder decision selection for non-typology draft identity.
+// DecisionKindForIdentity mirrors publish-builder decision selection for non-typology draft binding.
 // Personality typology requires explicit decision.kind in payload; no algorithm fallback.
-func DecisionKindForIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (identity.DecisionKind, bool) {
+func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) (binding.DecisionKind, bool) {
 	switch kind {
-	case identity.KindScale:
-		return identity.DecisionKindScoreRange, true
-	case identity.KindPersonality:
-		if subKind != identity.SubKindTypology {
+	case binding.KindScale:
+		return binding.DecisionKindScoreRange, true
+	case binding.KindPersonality:
+		if subKind != binding.SubKindTypology {
 			return "", false
 		}
 		return "", false
-	case identity.KindBehavioralRating:
+	case binding.KindBehavioralRating:
 		algo := algorithm
 		if algo == "" {
-			algo = identity.AlgorithmBrief2
+			algo = binding.AlgorithmBrief2
 		}
-		if algo == identity.AlgorithmBrief2 {
-			return identity.DecisionKindNormLookup, true
+		if algo == binding.AlgorithmBrief2 {
+			return binding.DecisionKindNormLookup, true
 		}
-		return identity.DecisionKindScoreRange, true
-	case identity.KindCognitive:
-		return identity.DecisionKindScoreRange, true
-	case identity.KindCustom:
+		return binding.DecisionKindScoreRange, true
+	case binding.KindCognitive:
+		return binding.DecisionKindScoreRange, true
+	case binding.KindCustom:
 		return "", false
 	default:
 		return "", false
 	}
 }
 
-// AlgorithmFamilyFromIdentity 推导执行家族 from draft model identity.
-func AlgorithmFamilyFromIdentity(kind identity.Kind, subKind identity.SubKind, algorithm identity.Algorithm) (AlgorithmFamily, bool) {
-	if kind == identity.KindPersonality && subKind == identity.SubKindTypology {
+// AlgorithmFamilyFromIdentity 推导执行家族 from draft model binding.
+func AlgorithmFamilyFromIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) (AlgorithmFamily, bool) {
+	if kind == binding.KindPersonality && subKind == binding.SubKindTypology {
 		return AlgorithmFamilyFactorClassification, true
 	}
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)

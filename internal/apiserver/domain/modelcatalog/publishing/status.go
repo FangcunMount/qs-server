@@ -1,4 +1,4 @@
-package catalog
+package publishing
 
 // ModelStatus 是lifecycle 状态 of draft assessment model。
 type ModelStatus string

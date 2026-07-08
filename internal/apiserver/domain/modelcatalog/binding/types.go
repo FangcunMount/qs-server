@@ -1,4 +1,4 @@
-package identity
+package binding
 
 // Kind 是规范 assessment 模型家族。
 type Kind string

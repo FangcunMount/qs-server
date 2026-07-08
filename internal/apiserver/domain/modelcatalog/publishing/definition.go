@@ -1,4 +1,4 @@
-package catalog
+package publishing
 
 // DefinitionPayload 是persisted draft definition envelope。
 type DefinitionPayload struct {

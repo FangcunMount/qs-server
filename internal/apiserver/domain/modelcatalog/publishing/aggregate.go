@@ -1,20 +1,20 @@
-package catalog
+package publishing
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // AssessmentModel 是draft-model aggregate 用于 backend 配置。
 type AssessmentModel struct {
 	ID             string
 	Code           string
-	Kind           identity.Kind
-	SubKind        identity.SubKind
-	Algorithm      identity.Algorithm
-	ProductChannel identity.ProductChannel
+	Kind           binding.Kind
+	SubKind        binding.SubKind
+	Algorithm      binding.Algorithm
+	ProductChannel binding.ProductChannel
 	Title          string
 	Description    string
 	Category       string
@@ -32,10 +32,10 @@ type AssessmentModel struct {
 // NewAssessmentModelInput 携带字段 required 到 create draft model。
 type NewAssessmentModelInput struct {
 	Code           string
-	Kind           identity.Kind
-	SubKind        identity.SubKind
-	Algorithm      identity.Algorithm
-	ProductChannel identity.ProductChannel
+	Kind           binding.Kind
+	SubKind        binding.SubKind
+	Algorithm      binding.Algorithm
+	ProductChannel binding.ProductChannel
 	Title          string
 	Description    string
 	Category       string
@@ -54,7 +54,7 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
 	}
-	productChannel, err := identity.CompleteProductChannel(input.Kind, input.ProductChannel)
+	productChannel, err := binding.CompleteProductChannel(input.Kind, input.ProductChannel)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (m *AssessmentModel) touch(now time.Time) {
 }
 
 // UpdateBasicInfo updates editable 元数据 on draft model。
-func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind identity.SubKind, algorithm identity.Algorithm, productChannel identity.ProductChannel, category string, tags []string, now time.Time) error {
+func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags []string, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind ide
 		m.Algorithm = algorithm
 	}
 	if productChannel != "" {
-		resolved, err := identity.CompleteProductChannel(m.Kind, productChannel)
+		resolved, err := binding.CompleteProductChannel(m.Kind, productChannel)
 		if err != nil {
 			return err
 		}

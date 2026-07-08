@@ -18,7 +18,7 @@ type (
 
 	KindCapability   = binding.KindCapability
 	CapabilityRole   = binding.CapabilityRole
-	CatalogOperation = publishing.CatalogOperation
+	CatalogOperation = binding.CatalogOperation
 
 	QuestionnaireBinding   = binding.QuestionnaireBinding
 	ModelDefinition        = publishing.ModelDefinition
@@ -67,7 +67,7 @@ const (
 	DecisionKindNearestPattern                        = binding.DecisionKindNearestPattern
 	DecisionKindNormLookup                            = binding.DecisionKindNormLookup
 	DecisionKindAbilityLevel                          = binding.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation DecisionKind = publishing.DecisionKindScoreRangeInterpretation
+	DecisionKindScoreRangeInterpretation DecisionKind = binding.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
 
 	ProductChannelMedicalScale    = binding.ProductChannelMedicalScale
 	ProductChannelPersonality     = binding.ProductChannelPersonality
@@ -93,8 +93,8 @@ const (
 	PayloadFormatCognitiveDefaultV1        = publishing.PayloadFormatCognitiveDefaultV1
 	PayloadFormatCognitiveSPMV1            = publishing.PayloadFormatCognitiveSPMV1
 	PayloadFormatScaleV1                   = publishing.PayloadFormatScaleV1
-	PayloadFormatMBTIV1                    = publishing.PayloadFormatMBTIV1
-	PayloadFormatSBTIV1                    = publishing.PayloadFormatSBTIV1
+	PayloadFormatMBTIV1                    = publishing.PayloadFormatMBTIV1 //nolint:staticcheck // legacy decode data value
+	PayloadFormatSBTIV1                    = publishing.PayloadFormatSBTIV1 //nolint:staticcheck // legacy decode data value
 	PayloadFormatScaleV1Legacy             = publishing.PayloadFormatScaleV1Legacy
 	PayloadFormatMBTIV1Legacy              = publishing.PayloadFormatMBTIV1Legacy
 	PayloadFormatSBTIV1Legacy              = publishing.PayloadFormatSBTIV1Legacy
@@ -102,17 +102,17 @@ const (
 	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
 	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
 
-	CatalogOpCreate            = publishing.CatalogOpCreate
-	CatalogOpList              = publishing.CatalogOpList
-	CatalogOpUpdateBasicInfo   = publishing.CatalogOpUpdateBasicInfo
-	CatalogOpDelete            = publishing.CatalogOpDelete
-	CatalogOpPublish           = publishing.CatalogOpPublish
-	CatalogOpUnpublish         = publishing.CatalogOpUnpublish
-	CatalogOpArchive           = publishing.CatalogOpArchive
-	CatalogOpBindQuestionnaire = publishing.CatalogOpBindQuestionnaire
-	CatalogOpUpdateDefinition  = publishing.CatalogOpUpdateDefinition
-	CatalogOpPreview           = publishing.CatalogOpPreview
-	CatalogOpQRCode            = publishing.CatalogOpQRCode
+	CatalogOpCreate            = binding.CatalogOpCreate
+	CatalogOpList              = binding.CatalogOpList
+	CatalogOpUpdateBasicInfo   = binding.CatalogOpUpdateBasicInfo
+	CatalogOpDelete            = binding.CatalogOpDelete
+	CatalogOpPublish           = binding.CatalogOpPublish
+	CatalogOpUnpublish         = binding.CatalogOpUnpublish
+	CatalogOpArchive           = binding.CatalogOpArchive
+	CatalogOpBindQuestionnaire = binding.CatalogOpBindQuestionnaire
+	CatalogOpUpdateDefinition  = binding.CatalogOpUpdateDefinition
+	CatalogOpPreview           = binding.CatalogOpPreview
+	CatalogOpQRCode            = binding.CatalogOpQRCode
 
 	SchemaVersionV1        = publishing.SchemaVersionV1
 	SchemaVersionV2        = publishing.SchemaVersionV2

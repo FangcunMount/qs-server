@@ -1,9 +1,8 @@
-package catalog
+package publishing
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // ValidationLevel 划分校验问题 severity。
@@ -65,14 +64,14 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 	if m.Definition.IsEmpty() {
 		issues = append(issues, DomainValidationIssue{Field: "definition", Message: "definition payload is required", Code: "definition.required", Level: ValidationLevelError})
 	}
-	if m.Kind == identity.KindPersonality {
-		if m.SubKind != identity.SubKindTypology {
+	if m.Kind == binding.KindPersonality {
+		if m.SubKind != binding.SubKindTypology {
 			issues = append(issues, DomainValidationIssue{Field: "sub_kind", Message: "personality models require sub_kind typology", Code: "sub_kind.typology.required", Level: ValidationLevelError})
 		}
 		if m.Algorithm == "" {
 			issues = append(issues, DomainValidationIssue{Field: "algorithm", Message: "algorithm is required", Code: "algorithm.required", Level: ValidationLevelError})
 		}
-		if m.Definition.Format != "" && m.Definition.Format != routing.PayloadFormatPersonalityTypologyV1 {
+		if m.Definition.Format != "" && m.Definition.Format != PayloadFormatPersonalityTypologyV1 {
 			issues = append(issues, DomainValidationIssue{Field: "definition.format", Message: "unsupported personality payload format", Code: "definition.format.unsupported", Level: ValidationLevelError})
 		}
 	}
@@ -93,9 +92,9 @@ func (m *AssessmentModel) ValidateForPublish() DomainValidationResult {
 	return result
 }
 
-func usesSharedFactorDefinitionBody(kind identity.Kind) bool {
+func usesSharedFactorDefinitionBody(kind binding.Kind) bool {
 	switch kind {
-	case identity.KindBehavioralRating, identity.KindCognitive:
+	case binding.KindBehavioralRating, binding.KindCognitive:
 		return true
 	default:
 		return false

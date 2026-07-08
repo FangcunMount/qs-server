@@ -1,4 +1,4 @@
-package capability
+package binding
 
 // CapabilityRole separates product-facing taxonomy from executable model families.
 type CapabilityRole string

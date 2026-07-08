@@ -1,13 +1,8 @@
-package capability
-
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/routing"
-)
+package binding
 
 // ModelFamilyCapability 记录领域 execution 和 lifecycle 守卫 用于 模型家族。
 type ModelFamilyCapability struct {
-	Kind                      identity.Kind
+	Kind                      Kind
 	Role                      CapabilityRole
 	CreateSupported           bool
 	ListSupported             bool
@@ -15,8 +10,11 @@ type ModelFamilyCapability struct {
 	BindQuestionnaire         bool
 	DefinitionUpdateSupported bool
 	RuntimeExecutable         bool
-	ExecutionPath             routing.ExecutionPath
+	ExecutionPath             ExecutionPath
 }
+
+// KindCapability is the mechanism-oriented alias for model-family capability guards.
+type KindCapability = ModelFamilyCapability
 
 func (c ModelFamilyCapability) CanExecute() bool {
 	return c.RuntimeExecutable
@@ -32,7 +30,7 @@ func (c ModelFamilyCapability) AllowsNewDraft() bool {
 
 var defaultFamilyCapabilities = []ModelFamilyCapability{
 	{
-		Kind:                      identity.KindPersonality,
+		Kind:                      KindPersonality,
 		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
@@ -40,10 +38,10 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 		BindQuestionnaire:         true,
 		DefinitionUpdateSupported: true,
 		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathTypologyDescriptor,
+		ExecutionPath:             ExecutionPathTypologyDescriptor,
 	},
 	{
-		Kind:                      identity.KindBehavioralRating,
+		Kind:                      KindBehavioralRating,
 		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
@@ -51,17 +49,17 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 		BindQuestionnaire:         true,
 		DefinitionUpdateSupported: true,
 		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathBehavioralRatingDescriptor,
+		ExecutionPath:             ExecutionPathBehavioralRatingDescriptor,
 	},
 	{
-		Kind:              identity.KindScale,
+		Kind:              KindScale,
 		Role:              CapabilityRoleModelFamily,
 		ListSupported:     false,
 		RuntimeExecutable: true,
-		ExecutionPath:     routing.ExecutionPathScaleDescriptor,
+		ExecutionPath:     ExecutionPathScaleDescriptor,
 	},
 	{
-		Kind:                      identity.KindCognitive,
+		Kind:                      KindCognitive,
 		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
@@ -69,17 +67,17 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 		BindQuestionnaire:         true,
 		DefinitionUpdateSupported: true,
 		RuntimeExecutable:         true,
-		ExecutionPath:             routing.ExecutionPathCognitiveDescriptor,
+		ExecutionPath:             ExecutionPathCognitiveDescriptor,
 	},
 	{
-		Kind:          identity.KindCustom,
+		Kind:          KindCustom,
 		Role:          CapabilityRoleModelFamily,
-		ExecutionPath: routing.ExecutionPathNone,
+		ExecutionPath: ExecutionPathNone,
 	},
 }
 
 // FamilyCapabilityByKind resolves model-family capability guards.
-func FamilyCapabilityByKind(kind identity.Kind) (ModelFamilyCapability, bool) {
+func FamilyCapabilityByKind(kind Kind) (ModelFamilyCapability, bool) {
 	for _, cap := range defaultFamilyCapabilities {
 		if cap.Kind == kind {
 			return cap, true
@@ -89,8 +87,8 @@ func FamilyCapabilityByKind(kind identity.Kind) (ModelFamilyCapability, bool) {
 }
 
 // RuntimeExecutableKinds returns domain types that have direct evaluation descriptors.
-func RuntimeExecutableKinds() []identity.Kind {
-	out := make([]identity.Kind, 0)
+func RuntimeExecutableKinds() []Kind {
+	out := make([]Kind, 0)
 	for _, cap := range defaultFamilyCapabilities {
 		if cap.RuntimeExecutable {
 			out = append(out, cap.Kind)

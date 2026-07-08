@@ -1,6 +1,6 @@
-package catalog
+package publishing
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 
 const (
 	SchemaVersionV1 = "1"
@@ -8,17 +8,14 @@ const (
 )
 
 // QuestionnaireBinding binds 已发布模型 到 问卷版本。
-type QuestionnaireBinding struct {
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-}
+type QuestionnaireBinding = binding.QuestionnaireBinding
 
 // ModelDefinition 是规范 published-model 元数据。
 type ModelDefinition struct {
-	ProductChannel identity.ProductChannel
-	Kind           identity.Kind
-	SubKind        identity.SubKind
-	Algorithm      identity.Algorithm
+	ProductChannel binding.ProductChannel
+	Kind           binding.Kind
+	SubKind        binding.SubKind
+	Algorithm      binding.Algorithm
 	Code           string
 	Version        string
 	Title          string
@@ -27,7 +24,7 @@ type ModelDefinition struct {
 
 // DecisionSpec 记录结果 判定策略 用于 已发布模型。
 type DecisionSpec struct {
-	Kind identity.DecisionKind
+	Kind binding.DecisionKind
 }
 
 // SourceRef 携带可选 provenance 元数据 用于 已发布快照。

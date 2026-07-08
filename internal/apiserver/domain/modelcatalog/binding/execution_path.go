@@ -1,4 +1,4 @@
-package routing
+package binding
 
 // ExecutionPath 命名如何 模型家族 是 materialized 为 评估执行time 注册表。
 type ExecutionPath string

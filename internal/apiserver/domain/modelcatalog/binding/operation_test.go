@@ -1,15 +1,11 @@
-package capability
+package binding
 
-import (
-	"testing"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-)
+import "testing"
 
 func TestModelFamilyCapabilityAllowsOperations(t *testing.T) {
 	t.Parallel()
 
-	personality, ok := FamilyCapabilityByKind(identity.KindPersonality)
+	personality, ok := FamilyCapabilityByKind(KindPersonality)
 	if !ok {
 		t.Fatal("missing personality capability")
 	}
@@ -24,9 +20,9 @@ func TestModelFamilyCapabilityAllowsOperations(t *testing.T) {
 			t.Fatalf("personality should allow %s", op)
 		}
 	}
-	for _, kind := range []identity.Kind{
-		identity.KindScale,
-		identity.KindCustom,
+	for _, kind := range []Kind{
+		KindScale,
+		KindCustom,
 	} {
 		cap, ok := FamilyCapabilityByKind(kind)
 		if !ok {
