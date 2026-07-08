@@ -46,11 +46,10 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 	if err := outcome.Assessment.ApplyScoringOutcome(outcome.Execution); err != nil {
 		return evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
 	}
-	if err := w.assessmentRepo.Save(ctx, outcome.Assessment); err != nil {
-		l.Errorw("Failed to save evaluated assessment",
-			"assessment_id", outcome.Assessment.ID().Uint64(),
-			"error", err)
-		return evalerrors.Database(err, "保存计分结果失败")
+	if w.snapshotStore != nil {
+		if err := w.snapshotStore.Save(ctx, outcome.Assessment.ID().Uint64(), outcome.Execution); err != nil {
+			return evalerrors.Database(err, "保存计分快照失败")
+		}
 	}
 	if w.scoreProjectors != nil {
 		mechanismKey, ok := interpretationreporting.MechanismReportBuilderKeyFromOutcome(outcome)
@@ -68,10 +67,11 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 			}
 		}
 	}
-	if w.snapshotStore != nil {
-		if err := w.snapshotStore.Save(ctx, outcome.Assessment.ID().Uint64(), outcome.Execution); err != nil {
-			return evalerrors.Database(err, "保存计分快照失败")
-		}
+	if err := w.assessmentRepo.Save(ctx, outcome.Assessment); err != nil {
+		l.Errorw("Failed to save evaluated assessment",
+			"assessment_id", outcome.Assessment.ID().Uint64(),
+			"error", err)
+		return evalerrors.Database(err, "保存计分结果失败")
 	}
 	return nil
 }

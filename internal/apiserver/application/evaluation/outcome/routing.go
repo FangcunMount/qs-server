@@ -33,12 +33,13 @@ func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcata
 	payloadFormat := modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
 	return modelcatalog.PublishedModelSnapshot{
 		Model: modelcatalog.ModelDefinition{
-			Kind:      kind,
-			SubKind:   subKind,
-			Algorithm: algorithm,
-			Code:      model.Code,
-			Version:   model.Version,
-			Title:     model.Title,
+			ProductChannel: modelcatalog.DefaultProductChannelFor(kind),
+			Kind:           kind,
+			SubKind:        subKind,
+			Algorithm:      algorithm,
+			Code:           model.Code,
+			Version:        model.Version,
+			Title:          model.Title,
 		},
 		Decision:      decision,
 		PayloadFormat: payloadFormat,

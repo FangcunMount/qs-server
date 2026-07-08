@@ -64,48 +64,27 @@ func DefaultRegistry() *Registry {
 	return defaultRegistry
 }
 
-var defaultRegistry = NewRegistryFromDomain()
+var defaultRegistry = NewRegistry()
 
-// NewRegistryFromDomain 物化选项 从 领域 目录默认值 在启动时一次性。
-func NewRegistryFromDomain() *Registry {
-	presentation := capability.DefaultCatalogOptions()
-	optionsByKind := make(map[identity.Kind]capability.CatalogOption, len(presentation))
-	for _, item := range presentation {
-		optionsByKind[item.Kind] = item
-	}
-	ordered := make([]RegisteredOption, 0, len(capability.DefaultFamilyCapabilities()))
+// NewRegistry 物化应用层目录选项注册表。
+func NewRegistry() *Registry {
+	ordered := make([]RegisteredOption, len(defaultRegisteredOptions))
+	copy(ordered, defaultRegisteredOptions)
 	byAPIKind := make(map[string]RegisteredOption, len(ordered))
-	for _, family := range capability.DefaultFamilyCapabilities() {
-		presentation, ok := optionsByKind[family.Kind]
-		if !ok {
+	for _, entry := range ordered {
+		if entry.APIKind == "" {
 			continue
 		}
-		apiKind := presentation.APIKind
-		if apiKind == "" {
-			continue
-		}
-		entry := RegisteredOption{
-			Kind:           family.Kind,
-			Role:           family.Role,
-			APIKind:        apiKind,
-			DisplayName:    presentation.DisplayName,
-			OptionsEnabled: presentation.OptionsEnabled,
-			Operations: CatalogOperations{
-				CreateSupported:           family.CreateSupported,
-				ListSupported:             family.ListSupported,
-				PublishSupported:          family.PublishSupported,
-				BindQuestionnaire:         family.BindQuestionnaire,
-				DefinitionUpdateSupported: family.DefinitionUpdateSupported,
-				PreviewSupported:          presentation.PreviewSupported,
-				QRCodeSupported:           presentation.QRCodeSupported,
-				RuntimeExecutable:         family.RuntimeExecutable,
-				ExecutionPath:             family.ExecutionPath,
-			},
-		}
-		ordered = append(ordered, entry)
-		byAPIKind[apiKind] = entry
+		byAPIKind[entry.APIKind] = entry
 	}
 	return &Registry{byAPIKind: byAPIKind, ordered: ordered}
+}
+
+// NewRegistryFromDomain 保留旧测试/调用方名称。
+//
+// Deprecated: 使用 NewRegistry；目录展示元数据由 application/option 拥有。
+func NewRegistryFromDomain() *Registry {
+	return NewRegistry()
 }
 
 // ByAPIKind 解析一个注册表条目。
@@ -140,25 +119,29 @@ func (r *Registry) ByKind(kind identity.Kind) (RegisteredOption, bool) {
 }
 
 // PresentationOptions 返回API-facing 目录选项 用于 模型家族。
-func (r *Registry) PresentationOptions() []capability.CatalogOption {
+func (r *Registry) PresentationOptions() []ModelCatalogOption {
 	if r == nil {
 		return nil
 	}
-	out := make([]capability.CatalogOption, 0, len(r.ordered))
+	out := make([]ModelCatalogOption, 0, len(r.ordered))
 	for _, entry := range r.ordered {
 		if entry.Role == capability.CapabilityRoleProductChannel {
 			continue
 		}
-		out = append(out, capability.CatalogOption{
-			Kind:             entry.Kind,
-			APIKind:          entry.APIKind,
-			DisplayName:      entry.DisplayName,
-			OptionsEnabled:   entry.OptionsEnabled,
-			PreviewSupported: entry.Operations.PreviewSupported,
-			QRCodeSupported:  entry.Operations.QRCodeSupported,
-		})
+		out = append(out, entry.catalogOption())
 	}
 	return out
+}
+
+func (o RegisteredOption) catalogOption() ModelCatalogOption {
+	return ModelCatalogOption{
+		Kind:             o.Kind,
+		APIKind:          o.APIKind,
+		DisplayName:      o.DisplayName,
+		OptionsEnabled:   o.OptionsEnabled,
+		PreviewSupported: o.Operations.PreviewSupported,
+		QRCodeSupported:  o.Operations.QRCodeSupported,
+	}
 }
 
 // IsProductChannel 报告是否 API 类型 是 产品聚合槽位。
@@ -172,4 +155,79 @@ func (o RegisteredOption) ProductChannelKind() identity.Kind {
 		return o.Kind
 	}
 	return ""
+}
+
+var defaultRegisteredOptions = []RegisteredOption{
+	{
+		Kind:           identity.KindPersonality,
+		Role:           capability.CapabilityRoleModelFamily,
+		APIKind:        "personality",
+		DisplayName:    "人格测评",
+		OptionsEnabled: true,
+		Operations: CatalogOperations{
+			CreateSupported:           true,
+			ListSupported:             true,
+			PublishSupported:          true,
+			BindQuestionnaire:         true,
+			DefinitionUpdateSupported: true,
+			PreviewSupported:          true,
+			QRCodeSupported:           true,
+			RuntimeExecutable:         true,
+			ExecutionPath:             routing.ExecutionPathTypologyDescriptor,
+		},
+	},
+	{
+		Kind:           identity.KindBehavioralRating,
+		Role:           capability.CapabilityRoleModelFamily,
+		APIKind:        string(identity.KindBehavioralRating),
+		DisplayName:    "行为评分",
+		OptionsEnabled: true,
+		Operations: CatalogOperations{
+			CreateSupported:           true,
+			ListSupported:             true,
+			PublishSupported:          true,
+			BindQuestionnaire:         true,
+			DefinitionUpdateSupported: true,
+			QRCodeSupported:           true,
+			RuntimeExecutable:         true,
+			ExecutionPath:             routing.ExecutionPathBehavioralRatingDescriptor,
+		},
+	},
+	{
+		Kind:           identity.KindScale,
+		Role:           capability.CapabilityRoleModelFamily,
+		APIKind:        "medical_scale",
+		DisplayName:    "医学量表",
+		OptionsEnabled: true,
+		Operations: CatalogOperations{
+			RuntimeExecutable: true,
+			ExecutionPath:     routing.ExecutionPathScaleDescriptor,
+		},
+	},
+	{
+		Kind:           identity.KindCognitive,
+		Role:           capability.CapabilityRoleModelFamily,
+		APIKind:        "cognitive",
+		DisplayName:    "认知测评",
+		OptionsEnabled: true,
+		Operations: CatalogOperations{
+			CreateSupported:           true,
+			ListSupported:             true,
+			PublishSupported:          true,
+			BindQuestionnaire:         true,
+			DefinitionUpdateSupported: true,
+			QRCodeSupported:           true,
+			RuntimeExecutable:         true,
+			ExecutionPath:             routing.ExecutionPathCognitiveDescriptor,
+		},
+	},
+	{
+		Kind:        identity.KindCustom,
+		Role:        capability.CapabilityRoleModelFamily,
+		APIKind:     "custom",
+		DisplayName: "自定义测评",
+		Operations: CatalogOperations{
+			ExecutionPath: routing.ExecutionPathNone,
+		},
+	},
 }

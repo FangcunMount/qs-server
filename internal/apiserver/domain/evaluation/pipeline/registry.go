@@ -25,13 +25,14 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 		return fmt.Errorf("invalid algorithm family: %s", desc.AlgorithmFamily)
 	}
 	key := desc.Key
+	explicitKey := !key.IsZero()
 	if key.AlgorithmFamily == "" {
 		key.AlgorithmFamily = desc.AlgorithmFamily
 	}
-	if key.PayloadFormat == "" {
+	if !explicitKey && key.PayloadFormat == "" {
 		key.PayloadFormat = desc.PayloadFormat
 	}
-	if key.DecisionKind == "" {
+	if !explicitKey && key.DecisionKind == "" {
 		key.DecisionKind = desc.DecisionKind
 	}
 	if _, exists := r.byKey[key]; exists {
@@ -70,11 +71,6 @@ func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.Algo
 	familyKey := RuntimeDescriptorKey{AlgorithmFamily: family}
 	if desc, ok := r.byKey[familyKey]; ok {
 		return desc, true
-	}
-	for key, desc := range r.byKey {
-		if key.AlgorithmFamily == family {
-			return desc, true
-		}
 	}
 	return RuntimeDescriptor{}, false
 }

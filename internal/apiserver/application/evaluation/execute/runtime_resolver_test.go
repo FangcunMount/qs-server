@@ -97,3 +97,25 @@ func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
 		t.Fatalf("key=%s", resolved.ExecutionIdentity)
 	}
 }
+
+func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(t *testing.T) {
+	t.Parallel()
+
+	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewRuntimeResolver(evalpipeline.NewRuntimeDescriptorRegistry(), evaluatorRegistry, nil)
+
+	input := &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:      evaluationinput.EvaluationModelKindScale,
+			Algorithm: "scale_default",
+			Code:      "PHQ9",
+		},
+	}
+	_, _, err = resolver.Execute(context.Background(), nil, input)
+	if err == nil {
+		t.Fatal("Execute error = nil, want descriptor resolve error when registry is configured")
+	}
+}

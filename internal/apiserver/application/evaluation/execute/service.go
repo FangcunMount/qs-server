@@ -189,7 +189,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 	evaluationRun.Start(time.Now())
 	a.SetCurrentRunID(evaluationRun.RunID)
-	s.persistEvaluationRunState(ctx, a, evaluationRun)
+	if err := s.persistEvaluationRunState(ctx, a, evaluationRun); err != nil {
+		return err
+	}
 	if s.reportStatus != nil {
 		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
 		s.reportStatus.SetProcessing(ctx, assessmentID, answerSheetID, "scoring")
@@ -199,6 +201,10 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
 		s.failureFinalizer().MarkAsFailed(ctx, a, inputResolveFailureReason(err))
+		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()})
+		if persistErr := s.persistEvaluationRunState(ctx, a, evaluationRun); persistErr != nil {
+			return persistErr
+		}
 		return err
 	}
 
@@ -206,6 +212,10 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if s.runtimeResolver == nil {
 		err := evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured")
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()})
+		if persistErr := s.persistEvaluationRunState(ctx, a, evaluationRun); persistErr != nil {
+			return persistErr
+		}
 		return err
 	}
 
@@ -222,7 +232,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		)
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+resolveErr.Error())
 		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()})
-		s.persistEvaluationRunState(ctx, a, evaluationRun)
+		if persistErr := s.persistEvaluationRunState(ctx, a, evaluationRun); persistErr != nil {
+			return persistErr
+		}
 		return resolveErr
 	}
 
@@ -250,7 +262,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		)
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true})
-		s.persistEvaluationRunState(ctx, a, evaluationRun)
+		if persistErr := s.persistEvaluationRunState(ctx, a, evaluationRun); persistErr != nil {
+			return persistErr
+		}
 		return err
 	}
 
@@ -270,11 +284,17 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"error", err.Error(),
 		)
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error(), Retryable: true})
+		if persistErr := s.persistEvaluationRunState(ctx, a, evaluationRun); persistErr != nil {
+			return persistErr
+		}
 		return err
 	}
 
 	evaluationRun.Succeed(time.Now())
-	s.persistEvaluationRunState(ctx, a, evaluationRun)
+	if err := s.persistEvaluationRunState(ctx, a, evaluationRun); err != nil {
+		return err
+	}
 	l.Infow("评估执行完成",
 		"action", "evaluate",
 		"resource", "assessment",

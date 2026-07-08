@@ -128,3 +128,58 @@ func TestRuntimeDescriptorRegistryResolvesByFamilyFallback(t *testing.T) {
 		t.Fatalf("family=%s", got.AlgorithmFamily)
 	}
 }
+
+func TestRuntimeDescriptorRegistryKeepsExplicitFamilyKeyWhenDescriptorHasDecisionMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRuntimeDescriptorRegistry()
+	desc := RuntimeDescriptor{
+		Key:             RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+		ExecutionPath:   modelcatalog.ExecutionPathTypologyDescriptor,
+	}
+	if err := registry.Register(desc); err != nil {
+		t.Fatal(err)
+	}
+	got, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
+		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindNearestPattern},
+		PayloadFormat: "assessmentmodel.personality.nearest-pattern.v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ExecutionPath != modelcatalog.ExecutionPathTypologyDescriptor {
+		t.Fatalf("path=%s", got.ExecutionPath)
+	}
+	if !registry.HasAlgorithmFamily(modelcatalog.AlgorithmFamilyFactorClassification) {
+		t.Fatal("expected explicit family key to be discoverable")
+	}
+}
+
+func TestRuntimeDescriptorRegistryRequiresExplicitFamilyFallback(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRuntimeDescriptorRegistry()
+	desc := RuntimeDescriptor{
+		Key: RuntimeDescriptorKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			PayloadFormat:   modelcatalog.PayloadFormatPersonalityTypologyV1,
+		},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		ExecutionPath:   modelcatalog.ExecutionPathTypologyDescriptor,
+	}
+	if err := registry.Register(desc); err != nil {
+		t.Fatal(err)
+	}
+	_, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
+		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+		PayloadFormat: "assessmentmodel.personality.trait-profile.v2",
+	})
+	if err == nil {
+		t.Fatal("Resolve error = nil, want unsupported descriptor without explicit family fallback")
+	}
+	if registry.HasAlgorithmFamily(modelcatalog.AlgorithmFamilyFactorClassification) {
+		t.Fatal("HasAlgorithmFamily returned true for a format-specific descriptor; want explicit family key only")
+	}
+}

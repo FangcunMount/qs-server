@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -43,6 +44,11 @@ type Evaluator interface {
 // EvaluatorRegistry 评估模型评估器注册表。
 type EvaluatorRegistry interface {
 	Resolve(key evaluation.ExecutionIdentity) (Evaluator, error)
+}
+
+// DescriptorExecutor 执行 RuntimeDescriptor 已解析后的评估路径。
+type DescriptorExecutor interface {
+	Execute(ctx context.Context, descriptor evalpipeline.RuntimeDescriptor, input ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
 // ExecutionInput 执行输入

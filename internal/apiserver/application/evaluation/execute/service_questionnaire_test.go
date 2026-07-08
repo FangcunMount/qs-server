@@ -22,6 +22,7 @@ type fakeAssessmentRepo struct {
 	assessment         *domainAssessment.Assessment
 	saveCalls          int
 	saveCtxHadTxMarker bool
+	saveErr            error
 }
 
 type engineTxCtxMarker struct{}
@@ -52,7 +53,7 @@ func (r *fakeAssessmentRepo) Save(ctx context.Context, assessment *domainAssessm
 	r.saveCtxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
 	r.assessment = assessment
 	r.saveCalls++
-	return nil
+	return r.saveErr
 }
 
 func (r *fakeAssessmentRepo) FindByID(_ context.Context, _ domainAssessment.ID) (*domainAssessment.Assessment, error) {

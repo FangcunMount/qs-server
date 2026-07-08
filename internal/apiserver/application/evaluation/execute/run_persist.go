@@ -29,15 +29,19 @@ func (s *service) persistEvaluationRun(ctx context.Context, run evalrun.Evaluati
 	return s.runRepo.Save(ctx, run)
 }
 
-func (s *service) persistEvaluationRunState(ctx context.Context, a *assessment.Assessment, run evalrun.EvaluationRun) {
-	if err := s.persistEvaluationRun(ctx, run); err != nil && a != nil {
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估运行记录保存失败: "+err.Error())
-		return
+func (s *service) persistEvaluationRunState(ctx context.Context, a *assessment.Assessment, run evalrun.EvaluationRun) error {
+	if err := s.persistEvaluationRun(ctx, run); err != nil {
+		if a != nil {
+			s.failureFinalizer().MarkAsFailed(ctx, a, "评估运行记录保存失败: "+err.Error())
+		}
+		return fmt.Errorf("persist evaluation run: %w", err)
 	}
-	if a == nil || s.runRepo == nil || s.assessmentRepo == nil || a.CurrentRunID() == "" {
-		return
+	if s == nil || a == nil || s.runRepo == nil || s.assessmentRepo == nil || a.CurrentRunID() == "" {
+		return nil
 	}
 	if err := s.assessmentRepo.Save(ctx, a); err != nil {
 		s.failureFinalizer().MarkAsFailed(ctx, a, "当前运行ID保存失败: "+err.Error())
+		return fmt.Errorf("persist current evaluation run id: %w", err)
 	}
+	return nil
 }

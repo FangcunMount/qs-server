@@ -100,6 +100,43 @@ func TestMechanismReportBuilderKeyFromOutcomeUsesInputSnapshot(t *testing.T) {
 	}
 }
 
+func TestReportRoutingContextFromOutcomeCarriesAlgorithmAndProductChannel(t *testing.T) {
+	t.Parallel()
+
+	outcome := evaloutcome.Outcome{
+		Input: &evaluationinput.InputSnapshot{
+			Model: &evaluationinput.ModelSnapshot{
+				Kind:      evaluationinput.EvaluationModelKindScale,
+				Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+				Code:      "PHQ9",
+			},
+		},
+	}
+	ctx, ok := ReportRoutingContextFromOutcome(outcome)
+	if !ok {
+		t.Fatal("ReportRoutingContextFromOutcome returned false")
+	}
+	if ctx.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
+		t.Fatalf("family=%s", ctx.AlgorithmFamily)
+	}
+	if ctx.DecisionKind != modelcatalog.DecisionKindScoreRange {
+		t.Fatalf("decision=%s", ctx.DecisionKind)
+	}
+	if ctx.Algorithm != modelcatalog.AlgorithmScaleDefault {
+		t.Fatalf("algorithm=%s", ctx.Algorithm)
+	}
+	if ctx.ProductChannel != modelcatalog.ProductChannelMedicalScale {
+		t.Fatalf("product channel=%s", ctx.ProductChannel)
+	}
+	key, ok := ctx.MechanismKey()
+	if !ok {
+		t.Fatal("MechanismKey returned false")
+	}
+	if key.ReportType != domainReport.ReportTypeStandard {
+		t.Fatalf("report type=%s", key.ReportType)
+	}
+}
+
 func TestMechanismReportBuilderKeyFromOutcomeUsesBehavioralRatingExecutionFamily(t *testing.T) {
 	t.Parallel()
 

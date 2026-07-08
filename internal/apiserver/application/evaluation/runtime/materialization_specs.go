@@ -125,7 +125,6 @@ func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.Ru
 		descs = append(descs, evalpipeline.RuntimeDescriptor{
 			Key: evalpipeline.RuntimeDescriptorKey{
 				AlgorithmFamily: spec.family,
-				DecisionKind:    decisionKind,
 			},
 			AlgorithmFamily: spec.family,
 			DecisionKind:    decisionKind,

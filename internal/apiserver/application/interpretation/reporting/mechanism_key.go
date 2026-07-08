@@ -72,17 +72,11 @@ func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIden
 
 // MechanismReportBuilderKeyFromOutcome 推导机制 路由 键 从 scored 结果。
 func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (MechanismReportBuilderKey, bool) {
-	reportType := resolveReportType(outcome)
-	if !outcome.RuntimeDescriptorKey.IsZero() {
-		return MechanismReportBuilderKeyFromRuntimeDescriptorKey(outcome.RuntimeDescriptorKey, reportType)
+	ctx, ok := ReportRoutingContextFromOutcome(outcome)
+	if !ok {
+		return MechanismReportBuilderKey{}, false
 	}
-	if snapshot, ok := evaloutcome.PublishedSnapshotFromInput(outcome.Input); ok {
-		routingKey, err := evalpipeline.ExecutionRoutingFromSnapshot(snapshot)
-		if err == nil {
-			return MechanismReportBuilderKeyFromRuntimeDescriptorKey(routingKey, reportType)
-		}
-	}
-	return MechanismReportBuilderKey{}, false
+	return ctx.MechanismKey()
 }
 
 func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
