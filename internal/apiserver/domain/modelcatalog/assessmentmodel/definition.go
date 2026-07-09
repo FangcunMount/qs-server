@@ -1,6 +1,6 @@
 package assessmentmodel
 
-// DefinitionPayload 是 persisted draft definition envelope.
+// DefinitionPayload 是评估模型的定义
 type DefinitionPayload struct {
 	Format string
 	Data   []byte

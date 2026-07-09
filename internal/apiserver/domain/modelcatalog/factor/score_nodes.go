@@ -7,12 +7,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-// CalculationScoreNodesFromSnapshots translates catalog factor snapshots to calculation score nodes.
-func CalculationScoreNodesFromSnapshots(factors []FactorSnapshot) []calculation.ScoreNode {
+// CalculationScoreNodesFromFactors translates catalog Factors to calculation score nodes.
+func CalculationScoreNodesFromFactors(factors []Factor) []calculation.ScoreNode {
 	if len(factors) == 0 {
 		return nil
 	}
-	inferred := InferParentCodesFromChildrenPolicy(factors)
+	inferred := InferParentCodesFromFactorChildrenPolicy(factors)
 	nodes := make([]calculation.ScoreNode, 0, len(inferred))
 	for _, f := range inferred {
 		role := f.ResolvedRole()
@@ -40,9 +40,14 @@ func CalculationScoreNodesFromSnapshots(factors []FactorSnapshot) []calculation.
 	return nodes
 }
 
-// ValidateCalculationScoreNodes validates the score graph derived from catalog factors.
-func ValidateCalculationScoreNodes(factors []FactorSnapshot) error {
-	nodes := CalculationScoreNodesFromSnapshots(factors)
+// CalculationScoreNodesFromSnapshots translates catalog factor snapshots to calculation score nodes.
+func CalculationScoreNodesFromSnapshots(factors []FactorSnapshot) []calculation.ScoreNode {
+	return CalculationScoreNodesFromFactors(FactorsFromSnapshots(factors))
+}
+
+// ValidateCalculationScoreNodesFromFactors validates the score graph derived from catalog factors.
+func ValidateCalculationScoreNodesFromFactors(factors []Factor) error {
+	nodes := CalculationScoreNodesFromFactors(factors)
 	issues := calculation.ValidateScoreNodes(nodes)
 	if len(issues) == 0 {
 		return nil
@@ -52,6 +57,11 @@ func ValidateCalculationScoreNodes(factors []FactorSnapshot) error {
 		msgs = append(msgs, issue.Message)
 	}
 	return fmt.Errorf("invalid score node graph: %s", strings.Join(msgs, "; "))
+}
+
+// ValidateCalculationScoreNodes validates the score graph derived from catalog factor snapshots.
+func ValidateCalculationScoreNodes(factors []FactorSnapshot) error {
+	return ValidateCalculationScoreNodesFromFactors(FactorsFromSnapshots(factors))
 }
 
 func calculationDimensionKindForRole(role FactorRole) calculation.DimensionKind {

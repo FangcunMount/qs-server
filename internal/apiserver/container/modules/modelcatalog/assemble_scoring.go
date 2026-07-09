@@ -14,6 +14,7 @@ import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -47,6 +48,9 @@ type ScoringDeps struct {
 	HotsetRecorder         cachetarget.HotsetRecorder
 	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
 	ScalePublisher         scoringLifecycle.ScalePublisher
+	ModelRepo              modelcatalogport.ModelRepository
+	PublishedRepo          modelcatalogport.PublishedModelRepository
+	PublishedReader        modelcatalogport.PublishedModelReader
 }
 
 // NewScoring assembles the scoring capability.
@@ -67,21 +71,38 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 		scoringApp.WithQuestionnairePublisher(newScoringQuestionnairePublisher(normalized.QuestionnairePublisher)),
 		scoringApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
 		scoringApp.WithScalePublisher(normalized.ScalePublisher),
+		scoringApp.WithAssessmentSnapshotPublisher(newScaleAssessmentSnapshotPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
 	)
 	module.FactorService = scoringApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
-	module.QueryService = scoringApp.NewQueryServiceWithHotListCache(
+	module.QueryService = scoringApp.NewQueryServiceWithModelCatalogSources(
 		normalized.Repo,
 		normalized.Reader,
 		normalized.IdentityService,
 		normalized.ListCache,
 		normalized.HotListCache,
 		normalized.HotsetRecorder,
+		queryModelCatalogSources(normalized),
 		hotRankReader,
 	)
 	module.CategoryService = scoringApp.NewCategoryService()
 
 	return module, nil
+}
+
+func queryModelCatalogSources(deps ScoringDeps) scoringApp.ModelCatalogSources {
+	return scoringApp.ModelCatalogSources{
+		ModelRepo:       deps.ModelRepo,
+		PublishedRepo:   deps.PublishedRepo,
+		PublishedReader: deps.PublishedReader,
+	}
+}
+
+func newScaleAssessmentSnapshotPublisher(modelRepo modelcatalogport.ModelRepository, publishedRepo modelcatalogport.PublishedModelRepository) scoringLifecycle.AssessmentSnapshotPublisher {
+	if publishedRepo == nil {
+		return nil
+	}
+	return scoringApp.NewAssessmentSnapshotPublisher(modelRepo, publishedRepo)
 }
 
 func newScoringQuestionnairePublisher(service quesApp.QuestionnaireLifecycleService) scoringApp.QuestionnairePublisherFunc {

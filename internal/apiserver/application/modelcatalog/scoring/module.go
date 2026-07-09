@@ -5,12 +5,14 @@ import (
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -45,6 +47,16 @@ func WithScalePublisher(publisher lifecycle.ScalePublisher) lifecycle.ServiceOpt
 	return lifecycle.WithScalePublisher(publisher)
 }
 
+// WithAssessmentSnapshotPublisher injects the AssessmentModel snapshot publish bridge for scale publish.
+func WithAssessmentSnapshotPublisher(publisher lifecycle.AssessmentSnapshotPublisher) lifecycle.ServiceOption {
+	return lifecycle.WithAssessmentSnapshotPublisher(publisher)
+}
+
+// NewAssessmentSnapshotPublisher creates the scale legacy-to-AssessmentModel publish bridge.
+func NewAssessmentSnapshotPublisher(modelRepo modelcatalogport.ModelRepository, publishedRepo modelcatalogport.PublishedModelRepository) lifecycle.AssessmentSnapshotPublisher {
+	return legacyadapter.NewAssessmentSnapshotPublisher(modelRepo, publishedRepo)
+}
+
 // QuestionnairePublisherFunc 适配函数 到 scale lifecycle's。
 // 问卷 发布 port。
 type QuestionnairePublisherFunc func(ctx context.Context, code string) (string, error)
@@ -75,6 +87,19 @@ func NewQueryServiceWithHotListCache(
 	hotRankReaders ...hotrank.ReadModel,
 ) ScaleQueryService {
 	return query.NewQueryServiceWithHotListCache(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
+}
+
+func NewQueryServiceWithModelCatalogSources(
+	repo scaledefinition.Repository,
+	reader scalereadmodel.ScaleReader,
+	identitySvc iambridge.IdentityResolver,
+	listCache scalelistcache.PublishedListCache,
+	hotListCache scalelistcache.HotListCache,
+	hotset cachetarget.HotsetRecorder,
+	sources query.ModelCatalogSources,
+	hotRankReaders ...hotrank.ReadModel,
+) ScaleQueryService {
+	return query.NewQueryServiceWithModelCatalogSources(repo, reader, identitySvc, listCache, hotListCache, hotset, sources, hotRankReaders...)
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。

@@ -33,6 +33,7 @@ type lifecycleService struct {
 	listCache               scalelistcache.PublishedListCache
 	cacheSignalNotifier     CacheSignalNotifier
 	interpretationPublisher ScalePublisher
+	assessmentPublisher     AssessmentSnapshotPublisher
 }
 
 type lifecycleRepository interface {
@@ -49,6 +50,11 @@ type lifecycleRepository interface {
 // ScalePublisher syncs published scales into published_assessment_models.
 type ScalePublisher interface {
 	PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error
+}
+
+// AssessmentSnapshotPublisher syncs published scales through the AssessmentModel snapshot path.
+type AssessmentSnapshotPublisher interface {
+	PublishAssessmentSnapshot(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
 // QuestionnairePublisher 是nar行 port 供 scale 发布 到。
@@ -79,6 +85,13 @@ func WithCacheSignalNotifier(notifier CacheSignalNotifier) ServiceOption {
 func WithScalePublisher(publisher ScalePublisher) ServiceOption {
 	return func(s *lifecycleService) {
 		s.interpretationPublisher = publisher
+	}
+}
+
+// WithAssessmentSnapshotPublisher injects the v2 AssessmentModel publication bridge for scale publish.
+func WithAssessmentSnapshotPublisher(publisher AssessmentSnapshotPublisher) ServiceOption {
+	return func(s *lifecycleService) {
+		s.assessmentPublisher = publisher
 	}
 }
 
@@ -252,6 +265,9 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, code, action 
 }
 
 func (s *lifecycleService) syncInterpretationRules(ctx context.Context, m *scaledefinition.MedicalScale) error {
+	if s != nil && s.assessmentPublisher != nil {
+		return s.assessmentPublisher.PublishAssessmentSnapshot(ctx, m)
+	}
 	if s == nil || s.interpretationPublisher == nil {
 		return nil
 	}

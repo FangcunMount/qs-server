@@ -1,6 +1,7 @@
 package factor
 
-// FactorSnapshot 是规范 published-model 维度 definition。
+// FactorSnapshot 是兼容 read/published DTO，不是 Factor 核心领域模型。
+// 新领域逻辑优先使用 Factor；runtime、legacy payload adapter 可继续使用该快照形态。
 type FactorSnapshot struct {
 	Code            string
 	Title           string
@@ -21,10 +22,19 @@ type FactorSnapshot struct {
 
 // ResolvedRole 返回显式 角色 或 derives 一个from 旧版 flags。
 func (f FactorSnapshot) ResolvedRole() FactorRole {
-	if f.Role != "" {
-		return f.Role
+	return resolveRole(f.Role, f.IsTotalScore)
+}
+
+// Factor materializes the domain Factor represented by this compatibility snapshot.
+func (f FactorSnapshot) Factor() Factor {
+	return FactorFromSnapshot(f)
+}
+
+func resolveRole(role FactorRole, isTotalScore bool) FactorRole {
+	if role != "" {
+		return role
 	}
-	if f.IsTotalScore {
+	if isTotalScore {
 		return FactorRoleTotal
 	}
 	return FactorRoleDimension

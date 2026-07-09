@@ -43,22 +43,31 @@ func (r FactorRole) Resolved() FactorRole {
 	return r
 }
 
-// IndexByCode 构建lookup 映射 用于 层级 校验 和 tree 物化。
-func IndexByCode(factors []FactorSnapshot) map[string]FactorSnapshot {
-	index := make(map[string]FactorSnapshot, len(factors))
+// IndexByFactorCode 构建领域 Factor lookup 映射，用于层级校验和 tree 物化。
+func IndexByFactorCode(factors []Factor) map[string]Factor {
+	index := make(map[string]Factor, len(factors))
 	for _, factor := range factors {
 		index[factor.Code] = factor
 	}
 	return index
 }
 
-// InferParentCodesFromChildrenPolicy fills 空 Parent编码 从 index 子节点策略 edges,。
+// IndexByCode 构建兼容 snapshot lookup 映射。
+func IndexByCode(factors []FactorSnapshot) map[string]FactorSnapshot {
+	index := make(map[string]FactorSnapshot, len(factors))
+	for code, factor := range IndexByFactorCode(FactorsFromSnapshots(factors)) {
+		index[code] = factor.Snapshot()
+	}
+	return index
+}
+
+// InferParentCodesFromFactorChildrenPolicy fills 空 Parent编码 从 index 子节点策略 edges,
 // then derives 层级 等级。
-func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapshot {
+func InferParentCodesFromFactorChildrenPolicy(factors []Factor) []Factor {
 	if len(factors) == 0 {
 		return nil
 	}
-	out := make([]FactorSnapshot, len(factors))
+	out := make([]Factor, len(factors))
 	copy(out, factors)
 	for _, parent := range out {
 		if parent.ChildrenPolicy == nil {
@@ -73,16 +82,21 @@ func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapsh
 			}
 		}
 	}
-	return DeriveLevels(out)
+	return DeriveFactorLevels(out)
 }
 
-// DeriveLevels fills 等级 从 Parent编码 when 缺失. Returns copy 使用 派生 等级。
-func DeriveLevels(factors []FactorSnapshot) []FactorSnapshot {
+// InferParentCodesFromChildrenPolicy 是兼容 snapshot wrapper。
+func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapshot {
+	return SnapshotsFromFactors(InferParentCodesFromFactorChildrenPolicy(FactorsFromSnapshots(factors)))
+}
+
+// DeriveFactorLevels fills 等级 从 Parent编码 when 缺失. Returns copy 使用 派生 等级。
+func DeriveFactorLevels(factors []Factor) []Factor {
 	if len(factors) == 0 {
 		return nil
 	}
-	byCode := IndexByCode(factors)
-	derived := make([]FactorSnapshot, len(factors))
+	byCode := IndexByFactorCode(factors)
+	derived := make([]Factor, len(factors))
 	copy(derived, factors)
 
 	memo := make(map[string]int, len(factors))
@@ -111,4 +125,9 @@ func DeriveLevels(factors []FactorSnapshot) []FactorSnapshot {
 		derived[i].Level = walk(derived[i].Code)
 	}
 	return derived
+}
+
+// DeriveLevels 是兼容 snapshot wrapper。
+func DeriveLevels(factors []FactorSnapshot) []FactorSnapshot {
+	return SnapshotsFromFactors(DeriveFactorLevels(FactorsFromSnapshots(factors)))
 }

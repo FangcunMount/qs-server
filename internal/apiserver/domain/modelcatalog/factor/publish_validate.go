@@ -11,8 +11,8 @@ func ValidateDefinitionBodyForPublish(body DefinitionBody) []HierarchyIssue {
 			Message: "dimensions 不能为空",
 		}}
 	}
-	factors := DeriveLevels(ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules))
-	issues := ValidateFactorHierarchy(factors)
+	factors := DeriveFactorLevels(ParseFactorsFromDefinitionBodyAsFactors(body.Dimensions, body.InterpretRules))
+	issues := ValidateFactors(factors)
 	issues = append(issues, validateInterpretRuleRefs(body.InterpretRules, factors)...)
 	issues = append(issues, validateNormRefs(factors)...)
 	return issues
@@ -27,11 +27,11 @@ func ValidateDefinitionBodyJSONForPublish(payload []byte) ([]HierarchyIssue, err
 	return ValidateDefinitionBodyForPublish(body), nil
 }
 
-func validateInterpretRuleRefs(rules []InterpretRule, factors []FactorSnapshot) []HierarchyIssue {
+func validateInterpretRuleRefs(rules []InterpretRule, factors []Factor) []HierarchyIssue {
 	if len(rules) == 0 {
 		return nil
 	}
-	byCode := IndexByCode(factors)
+	byCode := IndexByFactorCode(factors)
 	issues := make([]HierarchyIssue, 0, len(rules))
 	for _, rule := range rules {
 		field := "interpret_rules"
@@ -57,8 +57,8 @@ func validateInterpretRuleRefs(rules []InterpretRule, factors []FactorSnapshot) 
 	return issues
 }
 
-func validateNormRefs(factors []FactorSnapshot) []HierarchyIssue {
-	byCode := IndexByCode(factors)
+func validateNormRefs(factors []Factor) []HierarchyIssue {
+	byCode := IndexByFactorCode(factors)
 	issues := make([]HierarchyIssue, 0)
 	for _, factor := range factors {
 		if factor.Norm == nil {

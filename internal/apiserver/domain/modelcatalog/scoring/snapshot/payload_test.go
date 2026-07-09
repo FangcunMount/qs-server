@@ -32,3 +32,38 @@ func TestFactorSnapshotCanonicalRoundTrip(t *testing.T) {
 		t.Fatalf("round trip = %#v", got)
 	}
 }
+
+func TestFactorSnapshotDomainCanonicalRoundTripPreservesExecutionShape(t *testing.T) {
+	t.Parallel()
+
+	maxScore := 10.0
+	original := FactorSnapshot{
+		Code:            "f1",
+		Title:           "维度一",
+		IsTotalScore:    true,
+		QuestionCodes:   []string{"q1", "q2"},
+		ScoringStrategy: "cnt",
+		ScoringParams: ScoringParamsSnapshot{
+			CntOptionContents: []string{"yes", "no"},
+		},
+		MaxScore: &maxScore,
+		InterpretRules: []InterpretRuleSnapshot{{
+			Min: 0, Max: 5, RiskLevel: "low", Conclusion: "低", Suggestion: "观察",
+		}},
+	}
+
+	canonical := original.Canonical()
+	domainFactor := canonical.Factor()
+	got := FactorFromDomainFactor(domainFactor)
+
+	if got.Code != original.Code ||
+		got.Title != original.Title ||
+		!got.IsTotalScore ||
+		got.QuestionCodes[0] != "q1" ||
+		got.ScoringStrategy != original.ScoringStrategy ||
+		got.ScoringParams.CntOptionContents[1] != "no" ||
+		*got.MaxScore != maxScore ||
+		got.InterpretRules[0].RiskLevel != "low" {
+		t.Fatalf("domain canonical round trip = %#v, want execution shape %#v", got, original)
+	}
+}

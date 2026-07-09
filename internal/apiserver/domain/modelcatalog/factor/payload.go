@@ -35,7 +35,8 @@ type InterpretRule struct {
 	Ranges        []ScoreRangeRule `json:"ranges"`
 }
 
-// ParseFactorsFromDefinitionBody 物化规范 因子 从 共享 载荷 parts。
+// ParseFactorsFromDefinitionBody 从共享 payload parts 物化兼容 FactorSnapshot DTO。
+// 新领域逻辑优先使用 ParseFactorsFromDefinitionBodyAsFactors。
 func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []FactorSnapshot {
 	rulesByDimension := make(map[string][]ScoreRangeRule, len(interpretRules))
 	for _, rule := range interpretRules {
@@ -64,6 +65,11 @@ func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules [
 		})
 	}
 	return factors
+}
+
+// ParseFactorsFromDefinitionBodyAsFactors 从共享 payload parts 物化领域 Factor。
+func ParseFactorsFromDefinitionBodyAsFactors(dimensions []DimensionRule, interpretRules []InterpretRule) []Factor {
+	return FactorsFromSnapshots(ParseFactorsFromDefinitionBody(dimensions, interpretRules))
 }
 
 func childrenPolicyFromPayload(payload *ChildrenPolicyPayload) *ChildrenPolicy {

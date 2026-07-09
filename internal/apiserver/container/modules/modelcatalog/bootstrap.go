@@ -35,6 +35,15 @@ func (p SurveyBootstrapPorts) ApplySurveyPorts(deps *ScoringDeps) {
 func Bootstrap(in BootstrapInput) (*Module, error) {
 	scoringDeps := in.Scoring
 	in.Survey.ApplySurveyPorts(&scoringDeps)
+	if scoringDeps.ModelRepo == nil {
+		scoringDeps.ModelRepo = in.Typology.ModelRepo
+	}
+	if scoringDeps.PublishedRepo == nil {
+		scoringDeps.PublishedRepo = in.Typology.PublishedRepo
+	}
+	if scoringDeps.PublishedReader == nil {
+		scoringDeps.PublishedReader = in.Typology.PublishedReader
+	}
 	return New(Deps{
 		Scoring:  scoringDeps,
 		Typology: in.Typology,

@@ -9,25 +9,39 @@ import (
 
 // AssessmentModel 是后台可编辑测评模型配置聚合。
 type AssessmentModel struct {
-	ID             string
-	Code           string
-	Kind           binding.Kind
-	SubKind        binding.SubKind
-	Algorithm      binding.Algorithm
-	ProductChannel binding.ProductChannel
-	Title          string
-	Description    string
+	// 唯一标识
+	ID   string
+	Code string
+	// 类型
+	Kind    binding.Kind
+	SubKind binding.SubKind
+	// 算法
+	Algorithm binding.Algorithm
+
+	// 标题
+	Title       string
+	Description string
+	// 分类
 	Category       string
+	ProductChannel binding.ProductChannel
 	Tags           []string
-	Status         Status
-	Binding        binding.QuestionnaireBinding
-	Definition     DefinitionPayload
+
+	// 状态
+	Status Status
+	// 绑定问卷
+	Binding binding.QuestionnaireBinding
+	// 定义
+	Definition DefinitionPayload
+	// 版本
 	// Version is the persisted compatibility field for the draft configuration
 	// revision. Business versioning is anchored by QuestionnaireBinding.Version.
 	// New domain code should call Revision() when it means config revision.
-	Version     int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	Version int64
+	// 创建时间
+	CreatedAt time.Time
+	// 更新时间
+	UpdatedAt time.Time
+	// 发布时间
 	PublishedAt *time.Time
 	ArchivedAt  *time.Time
 }

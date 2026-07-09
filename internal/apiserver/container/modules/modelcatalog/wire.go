@@ -117,15 +117,18 @@ func buildTypologyDeps(
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
 	dualStore := modelcatalog.NewPublishedStore(v2Repo)
 	publishedLister := port.PublishedModelLister(dualStore)
+	publishedReader := port.PublishedModelReader(dualStore)
 	algorithmLister := port.PublishedAlgorithmLister(dualStore)
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
 		cached := cache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
 		publishedLister = cached
+		publishedReader = cached
 		algorithmLister = cached
 		publishedRepo = cache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
 	return TypologyDeps{
 		PublishedLister:          publishedLister,
+		PublishedReader:          publishedReader,
 		PublishedAlgorithmLister: algorithmLister,
 		ModelRepo:                draftRepo,
 		PublishedRepo:            publishedRepo,

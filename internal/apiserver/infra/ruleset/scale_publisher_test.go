@@ -2,8 +2,12 @@ package ruleset
 
 import (
 	"context"
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
@@ -60,6 +64,56 @@ func TestScalePublisherUpsertsPublishedScale(t *testing.T) {
 	}
 	if writer.last.Kind != domain.KindScale {
 		t.Fatalf("kind = %s", writer.last.Kind)
+	}
+}
+
+func TestScalePublisherMatchesAssessmentModelPublishedSnapshot(t *testing.T) {
+	writer := &stubRuleWriter{}
+	publisher := NewScalePublisher(writer)
+	maxScore := 10.0
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("total"),
+		"Total",
+		scaledefinition.WithIsTotalScore(true),
+		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategySum),
+		scaledefinition.WithMaxScore(&maxScore),
+		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
+			scaledefinition.NewInterpretationRule(
+				scaledefinition.NewScoreRange(0, 10),
+				scaledefinition.RiskLevelNone,
+				"none",
+				"keep",
+			),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewFactor: %v", err)
+	}
+	scale, err := scaledefinition.NewMedicalScale(
+		meta.NewCode("SCL-002"),
+		"Demo",
+		scaledefinition.WithQuestionnaire(meta.NewCode("QNR-002"), "1.0.0"),
+		scaledefinition.WithScaleVersion("1.0.0"),
+		scaledefinition.WithStatus(scaledefinition.StatusPublished),
+		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
+	)
+	if err != nil {
+		t.Fatalf("NewMedicalScale: %v", err)
+	}
+	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("AssessmentModelFromMedicalScale: %v", err)
+	}
+	want, err := publishedmodel.BuildAssessmentSnapshot(model)
+	if err != nil {
+		t.Fatalf("BuildAssessmentSnapshot: %v", err)
+	}
+
+	if err := publisher.PublishPublishedScale(t.Context(), scale); err != nil {
+		t.Fatalf("PublishPublishedScale: %v", err)
+	}
+	if !reflect.DeepEqual(writer.last, want) {
+		t.Fatalf("published snapshot mismatch\n got: %#v\nwant: %#v", writer.last, want)
 	}
 }
 

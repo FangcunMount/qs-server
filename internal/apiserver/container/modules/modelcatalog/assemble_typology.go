@@ -20,6 +20,7 @@ type Typology struct {
 // TypologyDeps defines explicit construction dependencies.
 type TypologyDeps struct {
 	PublishedLister          port.PublishedModelLister
+	PublishedReader          port.PublishedModelReader
 	PublishedAlgorithmLister port.PublishedAlgorithmLister
 	ModelRepo                port.ModelRepository
 	PublishedRepo            port.PublishedModelRepository

@@ -24,7 +24,21 @@ func buildScoring(model *domain.AssessmentModel) (*port.AssessmentSnapshot, erro
 	if algorithm == "" {
 		algorithm = domain.AlgorithmScaleDefault
 	}
-	return recordFromModel(model, domain.KindScale, domain.SubKindEmpty, algorithm, domain.PayloadFormatAssessmentScaleV1, domain.DecisionKindScoreRange, encoded), nil
+	record := recordFromModel(model, domain.KindScale, domain.SubKindEmpty, algorithm, domain.PayloadFormatAssessmentScaleV1, domain.DecisionKindScoreRange, encoded)
+	if version := scaleVersionFromPayload(encoded); version != "" {
+		record.Version = version
+	}
+	return record, nil
+}
+
+func scaleVersionFromPayload(payload []byte) string {
+	var snapshot struct {
+		ScaleVersion string
+	}
+	if err := json.Unmarshal(payload, &snapshot); err != nil {
+		return ""
+	}
+	return snapshot.ScaleVersion
 }
 
 // BuildAssessmentSnapshotFromScale materializes an execution snapshot from a

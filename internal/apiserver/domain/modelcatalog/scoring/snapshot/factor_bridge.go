@@ -35,7 +35,7 @@ func ScoreRangeFromInterpretRule(rule InterpretRuleSnapshot) factor.ScoreRangeRu
 	}
 }
 
-// FactorFromCanonical 投影一个规范 因子 为 scale execution 结构。
+// FactorFromCanonical projects a canonical snapshot into the scale execution shape.
 func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	rules := make([]InterpretRuleSnapshot, 0, len(f.InterpretRules))
 	for _, rule := range f.InterpretRules {
@@ -55,6 +55,11 @@ func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 		MaxScore:        f.MaxScore,
 		InterpretRules:  rules,
 	}
+}
+
+// FactorFromDomainFactor projects a domain Factor into the scale execution shape.
+func FactorFromDomainFactor(f factor.Factor) FactorSnapshot {
+	return FactorFromCanonical(f.Snapshot())
 }
 
 // Canonical 适配scale execution 因子 为 规范 目录 form。

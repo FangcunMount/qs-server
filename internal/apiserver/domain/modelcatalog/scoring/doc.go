@@ -1,2 +1,2 @@
-// Package scoring is the mechanism-oriented home for scale/scoring snapshots (§19).
+// Package scoring 是 评估模型定义的评分机制
 package scoring

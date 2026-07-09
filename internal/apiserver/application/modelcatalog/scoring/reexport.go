@@ -4,6 +4,7 @@ package scale
 import (
 	applifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	appports "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
+	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/query"
 	appshared "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 )
 
@@ -17,6 +18,7 @@ type (
 	AssessmentScaleContextResolver = appports.AssessmentScaleContextResolver
 	ScaleQRCodeGenerator           = appports.ScaleQRCodeGenerator
 	ScaleQRCodeQueryService        = appports.ScaleQRCodeQueryService
+	ModelCatalogSources            = appquery.ModelCatalogSources
 )
 
 // QuestionnaireBindingSyncer 问卷发布后同步量表绑定版本（实现位于 lifecycle 子包）。

@@ -9,13 +9,13 @@ type HierarchyIssue struct {
 	Message string
 }
 
-// ValidateFactorHierarchy 检查multi-等级 因子 invariants 用于 flat 因子 list。
+// ValidateFactors 检查multi-等级 因子 invariants 用于 flat 因子 list。
 // Models 不使用 Parent编码 pass 使用 zero issues。
-func ValidateFactorHierarchy(factors []FactorSnapshot) []HierarchyIssue {
+func ValidateFactors(factors []Factor) []HierarchyIssue {
 	if len(factors) == 0 {
 		return nil
 	}
-	byCode := IndexByCode(factors)
+	byCode := IndexByFactorCode(factors)
 	issues := make([]HierarchyIssue, 0)
 
 	seenCodes := make(map[string]struct{}, len(factors))
@@ -108,7 +108,12 @@ func ValidateFactorHierarchy(factors []FactorSnapshot) []HierarchyIssue {
 	return issues
 }
 
-func validateChildrenPolicy(prefix string, policy *ChildrenPolicy, byCode map[string]FactorSnapshot) []HierarchyIssue {
+// ValidateFactorHierarchy 是兼容 snapshot wrapper。
+func ValidateFactorHierarchy(factors []FactorSnapshot) []HierarchyIssue {
+	return ValidateFactors(FactorsFromSnapshots(factors))
+}
+
+func validateChildrenPolicy(prefix string, policy *ChildrenPolicy, byCode map[string]Factor) []HierarchyIssue {
 	if policy == nil {
 		return nil
 	}
@@ -142,7 +147,7 @@ func validateChildrenPolicy(prefix string, policy *ChildrenPolicy, byCode map[st
 	return issues
 }
 
-func hasCycle(byCode map[string]FactorSnapshot, start string) bool {
+func hasCycle(byCode map[string]Factor, start string) bool {
 	visited := make(map[string]struct{})
 	current := start
 	for {
