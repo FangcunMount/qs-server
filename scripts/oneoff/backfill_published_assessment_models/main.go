@@ -74,7 +74,7 @@ func backfillFromLegacy(ctx context.Context, legacy *mongoruleset.Repository, ta
 			continue
 		}
 		if err := target.UpsertPublishedModel(ctx, published); err != nil {
-			return written, fmt.Errorf("upsert %s@%s: %w", published.Model.Code, published.Model.Version, err)
+			return written, fmt.Errorf("upsert %s@%s: %w", published.Code, published.Version, err)
 		}
 		written++
 	}

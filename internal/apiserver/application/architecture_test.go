@@ -397,7 +397,7 @@ func TestModelCatalogLegacyImportsStayInRetirementBoundaries(t *testing.T) {
 		"internal/apiserver/infra/cache/",
 		"internal/apiserver/infra/cachequery/",
 		"internal/apiserver/infra/evaluationinput/",
-		"internal/apiserver/infra/mongo/scale/",
+		"internal/apiserver/infra/mongo/modelcatalog/",
 		"internal/apiserver/infra/ruleset/",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {

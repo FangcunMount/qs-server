@@ -248,6 +248,36 @@ func ScaleResultFromPublishedModel(snapshot *port.PublishedModel) (*shared.Scale
 	return ScaleResultFromSnapshot(model, scaleSnapshot), nil
 }
 
+// MedicalScaleFromPublishedModel materializes a legacy medical-scale aggregate from a published snapshot.
+func MedicalScaleFromPublishedModel(snapshot *port.PublishedModel) (*scaledefinition.MedicalScale, error) {
+	if snapshot == nil {
+		return nil, fmt.Errorf("published scale snapshot is nil")
+	}
+	model := &domain.AssessmentModel{
+		Code:           snapshot.Code,
+		Kind:           domain.KindScale,
+		Algorithm:      snapshot.Algorithm,
+		ProductChannel: snapshot.ProductChannel,
+		Title:          snapshot.Title,
+		Description:    snapshot.Description,
+		Category:       snapshot.Category,
+		Stages:         append([]string(nil), snapshot.Stages...),
+		ApplicableAges: append([]string(nil), snapshot.ApplicableAges...),
+		Reporters:      append([]string(nil), snapshot.Reporters...),
+		Tags:           append([]string(nil), snapshot.Tags...),
+		Status:         domain.ModelStatus(snapshot.Status),
+		Binding: domain.QuestionnaireBinding{
+			QuestionnaireCode:    snapshot.QuestionnaireCode,
+			QuestionnaireVersion: snapshot.QuestionnaireVersion,
+		},
+		Definition: domain.DefinitionPayload{
+			Format: snapshot.PayloadFormat,
+			Data:   append([]byte(nil), snapshot.Payload...),
+		},
+	}
+	return MedicalScaleFromAssessmentModel(model)
+}
+
 func factorResultFromSnapshot(snapshot scalesnapshot.FactorSnapshot) shared.FactorResult {
 	result := shared.FactorResult{
 		Code:            snapshot.Code,

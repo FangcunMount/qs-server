@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestPublishUsesPublicationPublisherWhenAssessmentModelStoreConfigured(t *testing.T) {
@@ -21,21 +22,12 @@ func TestPublishUsesPublicationPublisherWhenAssessmentModelStoreConfigured(t *te
 	}
 	model.Code = "SCL-001"
 
-	legacyRepo := &scalePublishRepoStub{scale: legacyScale}
 	modelRepo := &publishAssessmentModelRepoStub{model: model}
 	publishedRepo := &publishPublishedModelRepoStub{}
-	snapshotPublisher := &assessmentSnapshotPublisherStub{}
-	legacyPublisher := &interpretationPublisherStub{}
-	svc := NewService(
-		legacyRepo,
+	svc := newAuthoringLifecycleService(
 		publishedQuestionnaireCatalogForScalePublish(),
-		event.NewNopEventPublisher(),
-		nil,
-		WithScalePublisher(legacyPublisher),
-		WithAssessmentSnapshotPublisher(snapshotPublisher),
-		WithAssessmentModelRepository(modelRepo),
-		WithPublishedModelRepository(publishedRepo),
-		WithPublicationPublisher(assessmentstore.NewPublicationPublisher(modelRepo, publishedRepo)),
+		modelRepo,
+		publishedRepo,
 	)
 
 	got, err := svc.Publish(ctx, "SCL-001")
@@ -45,20 +37,11 @@ func TestPublishUsesPublicationPublisherWhenAssessmentModelStoreConfigured(t *te
 	if got == nil || got.Status != "published" {
 		t.Fatalf("result = %#v, want published scale", got)
 	}
-	if len(legacyRepo.calls) != 0 {
-		t.Fatalf("legacy repo calls = %v, want none", legacyRepo.calls)
-	}
 	if modelRepo.updateCount < 1 {
 		t.Fatalf("model repo updates = %d, want at least 1", modelRepo.updateCount)
 	}
 	if len(publishedRepo.calls) != 2 || publishedRepo.calls[0] != "delete" || publishedRepo.calls[1] != "save" {
 		t.Fatalf("published repo calls = %v, want delete+save", publishedRepo.calls)
-	}
-	if snapshotPublisher.calls != 0 {
-		t.Fatalf("assessment snapshot publish calls = %d, want 0", snapshotPublisher.calls)
-	}
-	if legacyPublisher.calls != 0 {
-		t.Fatalf("legacy interpretation sync calls = %d, want 0", legacyPublisher.calls)
 	}
 	if model.Status != domain.ModelStatusPublished {
 		t.Fatalf("model status = %s, want published", model.Status)
@@ -73,7 +56,9 @@ type publishAssessmentModelRepoStub struct {
 	updateCount int
 }
 
-func (r *publishAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error { return nil }
+func (r *publishAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error {
+	return nil
+}
 
 func (r *publishAssessmentModelRepoStub) Update(_ context.Context, model *domain.AssessmentModel) error {
 	r.updateCount++
@@ -86,6 +71,10 @@ func (r *publishAssessmentModelRepoStub) FindByCode(_ context.Context, code stri
 		return nil, domain.ErrNotFound
 	}
 	return r.model, nil
+}
+
+func (r *publishAssessmentModelRepoStub) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
 }
 
 func (r *publishAssessmentModelRepoStub) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {
@@ -128,3 +117,42 @@ func (r *publishPublishedModelRepoStub) DeletePublished(_ context.Context, _ dom
 
 var _ modelcatalogport.ModelRepository = (*publishAssessmentModelRepoStub)(nil)
 var _ modelcatalogport.PublishedModelRepository = (*publishPublishedModelRepoStub)(nil)
+
+func newPublishableScaleForTest(t *testing.T) *scaledefinition.MedicalScale {
+	t.Helper()
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("total"),
+		"总分",
+		scaledefinition.WithIsTotalScore(true),
+		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
+		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategySum),
+		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
+			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewFactor: %v", err)
+	}
+	scale, err := scaledefinition.NewMedicalScale(
+		meta.NewCode("SCL-001"),
+		"Demo",
+		scaledefinition.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
+		scaledefinition.WithScaleVersion("1.0.0"),
+		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
+	)
+	if err != nil {
+		t.Fatalf("NewMedicalScale: %v", err)
+	}
+	return scale
+}
+
+func publishedQuestionnaireCatalogForScalePublish() *questionnaireCatalogBindingStub {
+	return &questionnaireCatalogBindingStub{
+		byCode: map[string]*questionnairecatalog.Item{
+			"QNR-001": {Code: "QNR-001", Version: "1.0.0", Status: "published", Type: "MedicalScale"},
+		},
+		byVersion: map[string]*questionnairecatalog.Item{
+			"QNR-001:1.0.0": {Code: "QNR-001", Version: "1.0.0", Status: "published", Type: "MedicalScale"},
+		},
+	}
+}

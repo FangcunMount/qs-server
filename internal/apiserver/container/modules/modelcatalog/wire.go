@@ -67,16 +67,10 @@ func buildScoringDeps(in WireInput) ScoringDeps {
 		CacheSignalNotifier: in.CacheSignalNotifier,
 	}
 	if infra := in.ScaleInfra; infra != nil {
-		deps.Repo = infra.ScaleRepo
 		deps.Reader = infra.ScaleReader
 		deps.ListCache = infra.ScaleListCache
 		deps.HotListCache = infra.ScaleHotListCache
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
-	}
-	if in.MongoDB != nil {
-		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
-		v2Repo := mongomodelcatalog.NewRepository(in.MongoDB, mongoOpts)
-		deps.ScalePublisher = rulesetInfra.NewScalePublisher(v2Repo)
 	}
 	return deps
 }

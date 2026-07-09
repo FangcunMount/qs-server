@@ -4,56 +4,12 @@ import (
 	"context"
 	"testing"
 
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
-
-type scaleRepoBindingStub struct {
-	boundByQuestionnaire map[string]*scaledefinition.MedicalScale
-}
-
-func (r *scaleRepoBindingStub) Create(_ context.Context, _ *scaledefinition.MedicalScale) error {
-	return nil
-}
-func (r *scaleRepoBindingStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
-	return nil
-}
-func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-func (r *scaleRepoBindingStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-func (r *scaleRepoBindingStub) FindPublishedByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
-	if scale, ok := r.boundByQuestionnaire[questionnaireCode]; ok {
-		return scale, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-func (r *scaleRepoBindingStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
-}
-func (r *scaleRepoBindingStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
-}
-func (r *scaleRepoBindingStub) Update(_ context.Context, _ *scaledefinition.MedicalScale) error {
-	return nil
-}
-func (r *scaleRepoBindingStub) Remove(_ context.Context, _ string) error { return nil }
-func (r *scaleRepoBindingStub) ExistsByCode(_ context.Context, _ string) (bool, error) {
-	return false, nil
-}
-func (r *scaleRepoBindingStub) SetActivePublishedVersion(context.Context, string, string) error {
-	return nil
-}
-func (r *scaleRepoBindingStub) ClearActivePublishedVersion(context.Context, string) error {
-	return nil
-}
 
 type questionnaireCatalogBindingStub struct {
 	byCode    map[string]*questionnairecatalog.Item
@@ -99,7 +55,7 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsSurveyQuestionnaire(t *t
 	}
 
 	svc := &lifecycleService{
-		repo: &scaleRepoBindingStub{},
+		modelRepo: &authoringModelRepoStub{},
 		questionnaireCatalog: &questionnaireCatalogBindingStub{
 			byCode: map[string]*questionnairecatalog.Item{
 				"Q-SURVEY": questionnaireCatalogItem(q),
@@ -132,11 +88,12 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}
+	otherModel := assessmentModelFromScale(t, otherScale)
 
 	svc := &lifecycleService{
-		repo: &scaleRepoBindingStub{
-			boundByQuestionnaire: map[string]*scaledefinition.MedicalScale{
-				"Q-MS": otherScale,
+		modelRepo: &authoringModelRepoStub{
+			byQuestion: map[string]*domain.AssessmentModel{
+				"Q-MS": otherModel,
 			},
 		},
 		questionnaireCatalog: &questionnaireCatalogBindingStub{
@@ -174,11 +131,12 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}
+	model := assessmentModelFromScale(t, scaleItem)
 
 	svc := &lifecycleService{
-		repo: &scaleRepoBindingStub{
-			boundByQuestionnaire: map[string]*scaledefinition.MedicalScale{
-				"Q-MS": scaleItem,
+		modelRepo: &authoringModelRepoStub{
+			byQuestion: map[string]*domain.AssessmentModel{
+				"Q-MS": model,
 			},
 		},
 		questionnaireCatalog: &questionnaireCatalogBindingStub{

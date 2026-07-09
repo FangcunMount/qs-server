@@ -2,7 +2,6 @@ package survey
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
@@ -11,8 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	answerSheetMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	questionnaireMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	scaleMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
@@ -31,8 +31,8 @@ type ScaleInfra struct {
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo     *answerSheetMongo.Repository
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
-	ScaleRepo           scaledefinition.Repository
 	ScaleReader         scalereadmodel.ScaleReader
+	AssessmentModelRepo modelcatalogport.ModelRepository
 	ScaleListCache      scalelistcache.PublishedListCache
 	ScaleHotListCache   scalelistcache.HotListCache
 }
@@ -45,7 +45,6 @@ type ScaleInfraDeps struct {
 	StaticRedis         redis.UniversalClient
 	StaticBuilder       *keyspace.Builder
 	QuestionnairePolicy cachepolicy.CachePolicy
-	ScalePolicy         cachepolicy.CachePolicy
 	ScaleListPolicy     cachepolicy.CachePolicy
 	Observer            *observability.ComponentObserver
 	IdentityService     *iam.IdentityService
@@ -86,18 +85,8 @@ func EnsureScaleInfra(deps ScaleInfraDeps) (*ScaleInfra, error) {
 	}
 	answerSheetReader := answerSheetMongo.NewAnswerSheetReadModel(answerSheetRepo)
 
-	scaleBaseRepo := scaleMongo.NewRepository(deps.MongoDB, mongoOpts)
-	scaleReader := scaleMongo.NewScaleReadModel(scaleBaseRepo)
-	var scaleRepo scaledefinition.Repository = scaleBaseRepo
-	if deps.StaticRedis != nil {
-		scaleRepo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(
-			scaleBaseRepo,
-			deps.StaticRedis,
-			deps.StaticBuilder,
-			deps.ScalePolicy,
-			deps.Observer,
-		)
-	}
+	assessmentModelRepo := mongomodelcatalog.NewDraftRepository(deps.MongoDB, mongoOpts)
+	scaleReader := mongomodelcatalog.NewScaleReadModel(assessmentModelRepo)
 
 	var scaleListCache scalelistcache.PublishedListCache
 	var scaleHotListCache scalelistcache.HotListCache
@@ -122,8 +111,8 @@ func EnsureScaleInfra(deps ScaleInfraDeps) (*ScaleInfra, error) {
 		QuestionnaireReader: questionnaireReader,
 		AnswerSheetRepo:     answerSheetRepo,
 		AnswerSheetReader:   answerSheetReader,
-		ScaleRepo:           scaleRepo,
 		ScaleReader:         scaleReader,
+		AssessmentModelRepo: assessmentModelRepo,
 		ScaleListCache:      scaleListCache,
 		ScaleHotListCache:   scaleHotListCache,
 	}, nil

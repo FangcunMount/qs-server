@@ -11,10 +11,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
-	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 func main() {
@@ -51,11 +50,11 @@ func run(cfg config) error {
 	}
 	for _, snapshot := range snapshots {
 		fmt.Printf("plan: upsert %s/%s@%s -> questionnaire %s@%s\n",
-			snapshot.Model.Kind,
-			snapshot.Model.Code,
-			snapshot.Model.Version,
-			snapshot.Binding.QuestionnaireCode,
-			snapshot.Binding.QuestionnaireVersion,
+			snapshot.Kind,
+			snapshot.Code,
+			snapshot.Version,
+			snapshot.QuestionnaireCode,
+			snapshot.QuestionnaireVersion,
 		)
 	}
 	if !cfg.apply {
@@ -78,15 +77,15 @@ func run(cfg config) error {
 	repo := mongomodelcatalog.NewRepository(client.Database(cfg.mongoDB))
 	for _, snapshot := range snapshots {
 		if err := repo.UpsertPublishedModel(applyCtx, snapshot); err != nil {
-			return fmt.Errorf("upsert %s@%s: %w", snapshot.Model.Code, snapshot.Model.Version, err)
+			return fmt.Errorf("upsert %s@%s: %w", snapshot.Code, snapshot.Version, err)
 		}
 	}
 	fmt.Printf("seeded %d published assessment model(s) into published_assessment_models\n", len(snapshots))
 	return nil
 }
 
-func collectSnapshots(ctx context.Context, cfg config) ([]*domain.PublishedModelSnapshot, error) {
-	var snapshots []*domain.PublishedModelSnapshot
+func collectSnapshots(ctx context.Context, cfg config) ([]*port.PublishedModel, error) {
+	var snapshots []*port.PublishedModel
 	if !cfg.skipEmbedded {
 		embedded, err := rulesetInfra.DefaultEmbeddedSnapshots(ctx)
 		if err != nil {
@@ -104,7 +103,7 @@ func collectSnapshots(ctx context.Context, cfg config) ([]*domain.PublishedModel
 	return append(snapshots, scaleSnapshots...), nil
 }
 
-func loadPublishedScaleSnapshots(ctx context.Context, cfg config) ([]*domain.PublishedModelSnapshot, error) {
+func loadPublishedScaleSnapshots(ctx context.Context, cfg config) ([]*port.PublishedModel, error) {
 	applyCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
@@ -114,8 +113,8 @@ func loadPublishedScaleSnapshots(ctx context.Context, cfg config) ([]*domain.Pub
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 
-	scaleRepo := mongoScale.NewRepository(client.Database(cfg.mongoDB))
-	return rulesetInfra.PublishedScaleRuleSetSnapshots(ctx, scaleRepo)
+	modelRepo := mongomodelcatalog.NewRepository(client.Database(cfg.mongoDB))
+	return rulesetInfra.PublishedScaleRuleSetSnapshots(ctx, modelRepo)
 }
 
 func envOr(key, fallback string) string {

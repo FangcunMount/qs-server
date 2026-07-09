@@ -91,6 +91,26 @@ func (r *DraftRepository) FindByCode(ctx context.Context, code string) (*domain.
 	return r.mapper.ToDomain(&po), nil
 }
 
+func (r *DraftRepository) FindByQuestionnaireCode(ctx context.Context, kind domain.Kind, questionnaireCode string) (*domain.AssessmentModel, error) {
+	if questionnaireCode == "" {
+		return nil, domain.ErrNotFound
+	}
+	filter := draftFilter(bson.M{
+		"questionnaire_code": questionnaireCode,
+	})
+	if kind != "" {
+		filter["kind"] = string(kind)
+	}
+	var po AssessmentModelPO
+	if err := r.FindOne(ctx, filter, &po); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
+}
+
 func (r *DraftRepository) List(ctx context.Context, filter port.ListFilter) ([]*domain.AssessmentModel, int64, error) {
 	page := filter.Page
 	if page <= 0 {

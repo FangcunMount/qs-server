@@ -11,7 +11,6 @@ import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -36,7 +35,6 @@ type Scoring struct {
 // ScoringDeps defines explicit constructor dependencies for the scoring capability.
 type ScoringDeps struct {
 	EventPublisher         event.EventPublisher
-	Repo                   scaledefinition.Repository
 	Reader                 scalereadmodel.ScaleReader
 	ListCache              scalelistcache.PublishedListCache
 	HotListCache           scalelistcache.HotListCache
@@ -47,7 +45,6 @@ type ScoringDeps struct {
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
 	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
-	ScalePublisher         scoringLifecycle.ScalePublisher
 	ModelRepo              modelcatalogport.ModelRepository
 	PublishedRepo          modelcatalogport.PublishedModelRepository
 	PublishedReader        modelcatalogport.PublishedModelReader
@@ -64,27 +61,22 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 	module.eventPublisher = normalized.EventPublisher
 
 	module.LifecycleService = scoringApp.NewLifecycleService(
-		normalized.Repo,
 		normalized.QuestionnaireCatalog,
 		module.eventPublisher,
 		normalized.ListCache,
 		scoringApp.WithQuestionnairePublisher(newScoringQuestionnairePublisher(normalized.QuestionnairePublisher)),
 		scoringApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
-		scoringApp.WithScalePublisher(normalized.ScalePublisher),
-		scoringApp.WithAssessmentSnapshotPublisher(newScaleAssessmentSnapshotPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
 		scoringApp.WithAssessmentModelRepository(normalized.ModelRepo),
 		scoringApp.WithPublishedModelRepository(normalized.PublishedRepo),
 		scoringApp.WithPublicationPublisher(scoringApp.NewScalePublicationPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
 	)
 	module.FactorService = scoringApp.NewFactorService(
-		normalized.Repo,
+		normalized.ModelRepo,
 		normalized.ListCache,
 		module.eventPublisher,
-		scoringApp.WithFactorAssessmentModelRepository(normalized.ModelRepo),
 	)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
 	module.QueryService = scoringApp.NewQueryServiceWithModelCatalogSources(
-		normalized.Repo,
 		normalized.Reader,
 		normalized.IdentityService,
 		normalized.ListCache,
@@ -106,13 +98,6 @@ func queryModelCatalogSources(deps ScoringDeps) scoringApp.ModelCatalogSources {
 	}
 }
 
-func newScaleAssessmentSnapshotPublisher(modelRepo modelcatalogport.ModelRepository, publishedRepo modelcatalogport.PublishedModelRepository) scoringLifecycle.AssessmentSnapshotPublisher {
-	if publishedRepo == nil {
-		return nil
-	}
-	return scoringApp.NewAssessmentSnapshotPublisher(modelRepo, publishedRepo)
-}
-
 func newScoringQuestionnairePublisher(service quesApp.QuestionnaireLifecycleService) scoringApp.QuestionnairePublisherFunc {
 	if service == nil {
 		return nil
@@ -130,8 +115,11 @@ func newScoringQuestionnairePublisher(service quesApp.QuestionnaireLifecycleServ
 }
 
 func normalizeScoringDeps(deps ScoringDeps) (ScoringDeps, error) {
-	if deps.Repo == nil || deps.Reader == nil {
-		return ScoringDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "scale repository and read model are required")
+	if deps.Reader == nil {
+		return ScoringDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "scale read model is required")
+	}
+	if deps.ModelRepo == nil || deps.PublishedRepo == nil {
+		return ScoringDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment model repositories are required")
 	}
 	if deps.EventPublisher == nil {
 		deps.EventPublisher = event.NewNopEventPublisher()

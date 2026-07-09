@@ -23,6 +23,7 @@ type ModelRepository interface {
 	Create(ctx context.Context, model *domain.AssessmentModel) error
 	Update(ctx context.Context, model *domain.AssessmentModel) error
 	FindByCode(ctx context.Context, code string) (*domain.AssessmentModel, error)
+	FindByQuestionnaireCode(ctx context.Context, kind domain.Kind, questionnaireCode string) (*domain.AssessmentModel, error)
 	List(ctx context.Context, filter ListFilter) ([]*domain.AssessmentModel, int64, error)
 	Delete(ctx context.Context, code string) error
 }

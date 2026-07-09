@@ -8,10 +8,6 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func (s *lifecycleService) usesAssessmentModelStore() bool {
-	return s != nil && s.modelRepo != nil
-}
-
 func (s *lifecycleService) loadAssessmentModel(ctx context.Context, code string) (*domain.AssessmentModel, error) {
 	return assessmentstore.LoadScale(ctx, s.modelRepo, code)
 }

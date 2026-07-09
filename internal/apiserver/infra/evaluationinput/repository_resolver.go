@@ -24,12 +24,9 @@ type RepositoryResolver struct {
 	providers       *ModelInputProviderRegistry
 }
 
-// NewRepositoryResolver builds the current compatibility adapter from Survey/Scale
-// command repositories. New snapshot sources should implement the catalog/read-model
-// ports and be wired through NewResolver instead of adding more repository/domain
-// dependencies outside repository_resolver.go and snapshot_mappers.go.
+// NewRepositoryResolver builds evaluation input resolution from survey repositories
+// and the published assessment model catalog.
 func NewRepositoryResolver(
-	scaleRepo ScaleSnapshotRepository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 	modelCatalog rulesetport.Catalog,
@@ -38,11 +35,10 @@ func NewRepositoryResolver(
 	if len(descs) == 0 {
 		return nil, fmt.Errorf("evaluation model descriptors are required")
 	}
-	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
 	if modelCatalog == nil {
 		return nil, fmt.Errorf("ruleset catalog is required")
 	}
-	interpretationScaleCatalog := NewPublishedScaleCatalog(modelCatalog, scaleCatalog)
+	interpretationScaleCatalog := NewPublishedScaleCatalog(modelCatalog, nil)
 	var (
 		typologyCatalog         port.TypologyModelCatalog
 		behavioralRatingCatalog port.BehavioralRatingModelCatalog

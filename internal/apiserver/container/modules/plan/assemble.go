@@ -11,12 +11,12 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -40,16 +40,16 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the plan module.
 type Deps struct {
-	MySQLDB        *gorm.DB
-	EventPublisher event.EventPublisher
-	ScaleRepo      scaledefinition.Repository
-	RedisClient    redis.UniversalClient
-	CacheBuilder   *keyspace.Builder
-	PlanPolicy     cachepolicy.CachePolicy
-	EntryBaseURL   string
-	Observer       *observability.ComponentObserver
-	MySQLLimiter   backpressure.Acquirer
-	TesteeAccess   actorAccessApp.TesteeAccessService
+	MySQLDB             *gorm.DB
+	EventPublisher      event.EventPublisher
+	AssessmentModelRepo modelcatalogport.ModelRepository
+	RedisClient         redis.UniversalClient
+	CacheBuilder        *keyspace.Builder
+	PlanPolicy          cachepolicy.CachePolicy
+	EntryBaseURL        string
+	Observer            *observability.ComponentObserver
+	MySQLLimiter        backpressure.Acquirer
+	TesteeAccess        actorAccessApp.TesteeAccessService
 }
 
 // New assembles the plan module.
@@ -73,7 +73,7 @@ func New(deps Deps) (*Module, error) {
 
 	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
-	scaleCatalog := planApp.NewRepositoryScaleCatalog(normalized.ScaleRepo)
+	scaleCatalog := planApp.NewAssessmentModelScaleCatalog(normalized.AssessmentModelRepo)
 	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
 	module.FollowUpQueueReader = planReadModel
 

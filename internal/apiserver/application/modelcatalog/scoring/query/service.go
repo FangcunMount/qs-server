@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
@@ -30,7 +31,6 @@ const (
 // 查询Service 量表查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	repo         scaleQueryRepository
 	reader       scalereadmodel.ScaleReader
 	identitySvc  iambridge.IdentityResolver
 	listCache    scalelistcache.PublishedListCache
@@ -48,27 +48,18 @@ type ModelCatalogSources struct {
 	PublishedReader modelcatalogport.PublishedModelReader
 }
 
-type scaleQueryRepository interface {
-	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
-	FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
-	FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
-	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error)
-}
-
 // NewQueryService 创建量表查询服务。
-func NewQueryService(repo scaleQueryRepository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ports.ScaleQueryService {
-	return newQueryService(repo, reader, identitySvc, listCache, nil, hotset, hotRankReaders...)
+func NewQueryService(reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ports.ScaleQueryService {
+	return newQueryService(reader, identitySvc, listCache, nil, hotset, ModelCatalogSources{}, hotRankReaders...)
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
-func NewQueryServiceWithReadModel(repo scaleQueryRepository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ports.ScaleQueryService {
-	return newQueryService(repo, reader, identitySvc, listCache, nil, hotset, hotRankReaders...)
+func NewQueryServiceWithReadModel(reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ports.ScaleQueryService {
+	return newQueryService(reader, identitySvc, listCache, nil, hotset, ModelCatalogSources{}, hotRankReaders...)
 }
 
 // NewQueryServiceWithHotListCache 创建带热门量表列表缓存的查询服务。
 func NewQueryServiceWithHotListCache(
-	repo scaleQueryRepository,
 	reader scalereadmodel.ScaleReader,
 	identitySvc iambridge.IdentityResolver,
 	listCache scalelistcache.PublishedListCache,
@@ -76,11 +67,10 @@ func NewQueryServiceWithHotListCache(
 	hotset cachetarget.HotsetRecorder,
 	hotRankReaders ...hotrank.ReadModel,
 ) ports.ScaleQueryService {
-	return newQueryService(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
+	return newQueryService(reader, identitySvc, listCache, hotListCache, hotset, ModelCatalogSources{}, hotRankReaders...)
 }
 
 func NewQueryServiceWithModelCatalogSources(
-	repo scaleQueryRepository,
 	reader scalereadmodel.ScaleReader,
 	identitySvc iambridge.IdentityResolver,
 	listCache scalelistcache.PublishedListCache,
@@ -89,22 +79,16 @@ func NewQueryServiceWithModelCatalogSources(
 	sources ModelCatalogSources,
 	hotRankReaders ...hotrank.ReadModel,
 ) ports.ScaleQueryService {
-	service := newQueryService(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
-	if query, ok := service.(*queryService); ok {
-		query.modelRepo = sources.ModelRepo
-		query.published = sources.PublishedRepo
-		query.readerV2 = sources.PublishedReader
-	}
-	return service
+	return newQueryService(reader, identitySvc, listCache, hotListCache, hotset, sources, hotRankReaders...)
 }
 
 func newQueryService(
-	repo scaleQueryRepository,
 	reader scalereadmodel.ScaleReader,
 	identitySvc iambridge.IdentityResolver,
 	listCache scalelistcache.PublishedListCache,
 	hotListCache scalelistcache.HotListCache,
 	hotset cachetarget.HotsetRecorder,
+	sources ModelCatalogSources,
 	hotRankReaders ...hotrank.ReadModel,
 ) ports.ScaleQueryService {
 	var hotRank hotrank.ReadModel
@@ -112,55 +96,48 @@ func newQueryService(
 		hotRank = hotRankReaders[0]
 	}
 	return &queryService{
-		repo:         repo,
 		reader:       reader,
 		identitySvc:  identitySvc,
 		listCache:    listCache,
 		hotListCache: hotListCache,
 		hotset:       hotset,
 		hotRank:      hotRank,
+		modelRepo:    sources.ModelRepo,
+		published:    sources.PublishedRepo,
+		readerV2:     sources.PublishedReader,
 	}
 }
 
 // GetByCode 根据编码获取量表
 func (s *queryService) GetByCode(ctx context.Context, code string) (*shared.ScaleResult, error) {
-	// 1. 验证输入参数
 	if code == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
 	}
-
-	// 2. 从仓储获取量表
-	if result, ok, err := s.getScaleResultFromAssessmentModel(ctx, code); err != nil {
-		return nil, err
-	} else if ok {
-		s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
-		return result, nil
-	}
-	// TODO: remove legacy scales fallback after scale query migration completes.
-	m, err := s.repo.FindByCode(ctx, code)
+	result, err := s.getScaleResultFromAssessmentModel(ctx, code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
-
-	return shared.ToScaleResultWithUsers(ctx, m, s.identitySvc), nil
+	return result, nil
 }
 
 // GetByQuestionnaireCode 根据问卷编码获取量表
 func (s *queryService) GetByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*shared.ScaleResult, error) {
-	// 1. 验证输入参数
 	if questionnaireCode == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷编码不能为空")
 	}
-
-	// 2. 从仓储获取量表
-	// TODO: remove legacy scales fallback after scale query migration supports questionnaire-code draft lookup.
-	m, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	if s == nil || s.modelRepo == nil {
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "测评模型仓储未配置")
 	}
-
-	return shared.ToScaleResultWithUsers(ctx, m, s.identitySvc), nil
+	model, err := assessmentstore.FindScaleByQuestionnaireCode(ctx, s.modelRepo, questionnaireCode)
+	if err != nil {
+		return nil, err
+	}
+	result, err := legacyadapter.ScaleResultFromAssessmentModel(model)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "解析量表模型失败")
+	}
+	return result, nil
 }
 
 // List 查询量表摘要列表
@@ -178,53 +155,27 @@ func (s *queryService) List(ctx context.Context, dto shared.ListScalesDTO) (*sha
 
 // GetPublishedByCode 获取已发布的量表
 func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*shared.ScaleResult, error) {
-	// 1. 验证输入参数
 	if code == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
 	}
-
-	// 2. 获取量表
-	if result, ok, err := s.getScaleResultFromPublishedModel(ctx, code); err != nil {
-		return nil, err
-	} else if ok {
-		s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
-		return result, nil
-	}
-	// TODO: remove legacy scales fallback after published scale queries fully read published_assessment_models.
-	m, err := s.repo.FindPublishedByCode(ctx, code)
+	result, err := s.getScaleResultFromPublishedModel(ctx, code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
-
-	return shared.ToScaleResultWithUsers(ctx, m, s.identitySvc), nil
+	return result, nil
 }
 
 // GetFactors 获取量表的因子列表
 func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]shared.FactorResult, error) {
-	// 1. 验证输入参数
 	if scaleCode == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
 	}
-
-	// 2. 从仓储获取量表
-	if result, ok, err := s.getScaleResultFromAssessmentModel(ctx, scaleCode); err != nil {
-		return nil, err
-	} else if ok {
-		return append([]shared.FactorResult(nil), result.Factors...), nil
-	}
-	// TODO: remove legacy scales fallback after factor queries fully read assessment_models.
-	m, err := s.repo.FindByCode(ctx, scaleCode)
+	result, err := s.getScaleResultFromAssessmentModel(ctx, scaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
-
-	snapshots := m.FactorSnapshots()
-	result := make([]shared.FactorResult, 0, len(snapshots))
-	for _, snapshot := range snapshots {
-		result = append(result, shared.ToFactorResult(snapshot))
-	}
-	return result, nil
+	return append([]shared.FactorResult(nil), result.Factors...), nil
 }
 
 // ResolveAssessmentScaleContext 按问卷编码和版本解析创建测评所需的量表上下文。
@@ -239,78 +190,59 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 			return result, nil
 		}
 	}
-	if s.repo == nil {
+	if s.readerV2 == nil {
 		return &shared.AssessmentScaleContextResult{}, nil
 	}
-	var (
-		medicalScale *scaledefinition.MedicalScale
-		err          error
-	)
-	if questionnaireVersion != "" {
-		// TODO: remove legacy scales fallback after questionnaire-version context fully reads published_assessment_models.
-		medicalScale, err = s.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
-	} else {
-		// TODO: remove legacy scales fallback after questionnaire-code context has an assessment_models lookup.
-		medicalScale, err = s.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
-	}
+	snapshot, err := s.readerV2.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil {
-		if scaledefinition.IsNotFound(err) {
+		if domain.IsNotFound(err) || stderrors.Is(err, domain.ErrAmbiguousVersion) {
 			return &shared.AssessmentScaleContextResult{}, nil
 		}
-		return nil, err
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取已发布测评模型失败")
 	}
-	if medicalScale == nil {
+	if snapshot == nil || snapshot.Kind != domain.KindScale {
 		return &shared.AssessmentScaleContextResult{}, nil
 	}
-	scaleID := medicalScale.GetID().Uint64()
-	scaleCode := medicalScale.GetCode().Value()
-	scaleName := medicalScale.GetTitle()
-	scaleVersion := medicalScale.GetScaleVersion()
-	return &shared.AssessmentScaleContextResult{
-		MedicalScaleID:   &scaleID,
-		MedicalScaleCode: &scaleCode,
-		MedicalScaleName: &scaleName,
-		ScaleVersion:     &scaleVersion,
-	}, nil
+	return publishedScaleContext(snapshot), nil
 }
 
-func (s *queryService) getScaleResultFromAssessmentModel(ctx context.Context, code string) (*shared.ScaleResult, bool, error) {
+func (s *queryService) getScaleResultFromAssessmentModel(ctx context.Context, code string) (*shared.ScaleResult, error) {
 	if s == nil || s.modelRepo == nil {
-		return nil, false, nil
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "测评模型仓储未配置")
 	}
 	model, err := s.modelRepo.FindByCode(ctx, code)
 	if err != nil {
 		if domain.IsNotFound(err) {
-			return nil, false, nil
+			return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 		}
-		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "获取测评模型失败")
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取测评模型失败")
 	}
 	if model == nil || model.Kind != domain.KindScale {
-		return nil, false, nil
+		return nil, errors.WithCode(errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 	result, err := legacyadapter.ScaleResultFromAssessmentModel(model)
 	if err != nil {
-		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "解析量表模型失败")
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "解析量表模型失败")
 	}
-	return result, true, nil
+	return result, nil
 }
 
-func (s *queryService) getScaleResultFromPublishedModel(ctx context.Context, code string) (*shared.ScaleResult, bool, error) {
+func (s *queryService) getScaleResultFromPublishedModel(ctx context.Context, code string) (*shared.ScaleResult, error) {
 	if s == nil || s.published == nil {
-		return nil, false, nil
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "已发布测评模型仓储未配置")
 	}
 	snapshot, err := s.published.FindLatestPublishedByModelCode(ctx, domain.KindScale, code)
 	if err != nil {
 		if domain.IsNotFound(err) {
-			return nil, false, nil
+			return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 		}
-		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "获取已发布测评模型失败")
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取已发布测评模型失败")
 	}
 	result, err := legacyadapter.ScaleResultFromPublishedModel(snapshot)
 	if err != nil {
-		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "解析已发布量表模型失败")
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "解析已发布量表模型失败")
 	}
-	return result, true, nil
+	return result, nil
 }
 
 func (s *queryService) assessmentScaleContextFromPublishedModel(ctx context.Context, questionnaireCode, questionnaireVersion string) (*shared.AssessmentScaleContextResult, bool, error) {
@@ -327,6 +259,10 @@ func (s *queryService) assessmentScaleContextFromPublishedModel(ctx context.Cont
 	if snapshot == nil || snapshot.Kind != domain.KindScale {
 		return nil, false, nil
 	}
+	return publishedScaleContext(snapshot), true, nil
+}
+
+func publishedScaleContext(snapshot *modelcatalogport.PublishedModel) *shared.AssessmentScaleContextResult {
 	scaleVersion := snapshot.Version
 	if result, err := legacyadapter.ScaleResultFromPublishedModel(snapshot); err == nil && result != nil && result.ScaleVersion != "" {
 		scaleVersion = result.ScaleVersion
@@ -337,7 +273,7 @@ func (s *queryService) assessmentScaleContextFromPublishedModel(ctx context.Cont
 		MedicalScaleCode: &scaleCode,
 		MedicalScaleName: &scaleName,
 		ScaleVersion:     &scaleVersion,
-	}, true, nil
+	}
 }
 
 func (s *queryService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {

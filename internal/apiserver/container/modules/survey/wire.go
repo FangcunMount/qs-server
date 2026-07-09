@@ -48,7 +48,7 @@ func Wire(in WireInput) (*Module, error) {
 		OpsHandle:                         in.OpsHandle,
 	}
 	if infra := in.ScaleInfra; infra != nil {
-		bootstrap.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.ScaleRepo)
+		bootstrap.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.AssessmentModelRepo)
 		bootstrap.QuestionnaireRepo = infra.QuestionnaireRepo
 		bootstrap.QuestionnaireReader = infra.QuestionnaireReader
 		bootstrap.AnswerSheetRepo = infra.AnswerSheetRepo

@@ -19,17 +19,10 @@ import (
 
 func TestUpdateBasicInfoUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
 	ctx := context.Background()
-	scaleRepo := &basicInfoScaleRepoStub{}
 	modelRepo := &basicInfoAssessmentModelRepoStub{
 		model: newDraftScaleAssessmentModel(t),
 	}
-	svc := NewService(
-		scaleRepo,
-		nil,
-		nil,
-		nil,
-		WithAssessmentModelRepository(modelRepo),
-	)
+	svc := newAuthoringLifecycleService(nil, modelRepo, nil)
 
 	got, err := svc.UpdateBasicInfo(ctx, shared.UpdateScaleBasicInfoDTO{
 		Code:           "SCL_BASIC",
@@ -43,9 +36,6 @@ func TestUpdateBasicInfoUsesAssessmentModelRepositoryWhenConfigured(t *testing.T
 	})
 	if err != nil {
 		t.Fatalf("UpdateBasicInfo() error = %v", err)
-	}
-	if scaleRepo.updateCount != 0 {
-		t.Fatalf("legacy scale repo Update calls = %d, want 0", scaleRepo.updateCount)
 	}
 	if modelRepo.updateCount != 1 {
 		t.Fatalf("model repo Update calls = %d, want 1", modelRepo.updateCount)
@@ -66,17 +56,10 @@ func TestUpdateBasicInfoUsesAssessmentModelRepositoryWhenConfigured(t *testing.T
 
 func TestUpdateQuestionnaireUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
 	ctx := context.Background()
-	scaleRepo := &basicInfoScaleRepoStub{}
 	modelRepo := &basicInfoAssessmentModelRepoStub{
 		model: newDraftScaleAssessmentModel(t),
 	}
-	svc := NewService(
-		scaleRepo,
-		&medicalScaleQuestionnaireCatalogStub{},
-		nil,
-		nil,
-		WithAssessmentModelRepository(modelRepo),
-	)
+	svc := newAuthoringLifecycleService(&medicalScaleQuestionnaireCatalogStub{}, modelRepo, nil)
 
 	got, err := svc.UpdateQuestionnaire(ctx, shared.UpdateScaleQuestionnaireDTO{
 		Code:                 "SCL_BASIC",
@@ -85,9 +68,6 @@ func TestUpdateQuestionnaireUsesAssessmentModelRepositoryWhenConfigured(t *testi
 	})
 	if err != nil {
 		t.Fatalf("UpdateQuestionnaire() error = %v", err)
-	}
-	if scaleRepo.updateCount != 0 {
-		t.Fatalf("legacy scale repo Update calls = %d, want 0", scaleRepo.updateCount)
 	}
 	if modelRepo.updateCount != 1 {
 		t.Fatalf("model repo Update calls = %d, want 1", modelRepo.updateCount)
@@ -115,13 +95,7 @@ func TestUpdateBasicInfoForksPublishedAssessmentModelDraft(t *testing.T) {
 	publishedAt := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 	model.PublishedAt = &publishedAt
 	modelRepo := &basicInfoAssessmentModelRepoStub{model: model}
-	svc := NewService(
-		&basicInfoScaleRepoStub{},
-		nil,
-		nil,
-		nil,
-		WithAssessmentModelRepository(modelRepo),
-	)
+	svc := newAuthoringLifecycleService(nil, modelRepo, nil)
 
 	if _, err := svc.UpdateBasicInfo(ctx, shared.UpdateScaleBasicInfoDTO{
 		Code:  "SCL_BASIC",
@@ -160,41 +134,14 @@ func newDraftScaleAssessmentModel(t *testing.T) *domain.AssessmentModel {
 	return model
 }
 
-type basicInfoScaleRepoStub struct {
-	updateCount int
-}
-
-func (r *basicInfoScaleRepoStub) Create(context.Context, *scaledefinition.MedicalScale) error { return nil }
-
-func (r *basicInfoScaleRepoStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
-	return nil
-}
-
-func (r *basicInfoScaleRepoStub) FindByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *basicInfoScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *basicInfoScaleRepoStub) Update(context.Context, *scaledefinition.MedicalScale) error {
-	r.updateCount++
-	return nil
-}
-
-func (r *basicInfoScaleRepoStub) SetActivePublishedVersion(context.Context, string, string) error { return nil }
-
-func (r *basicInfoScaleRepoStub) ClearActivePublishedVersion(context.Context, string) error { return nil }
-
-func (r *basicInfoScaleRepoStub) Remove(context.Context, string) error { return nil }
-
 type basicInfoAssessmentModelRepoStub struct {
 	model       *domain.AssessmentModel
 	updateCount int
 }
 
-func (r *basicInfoAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error { return nil }
+func (r *basicInfoAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error {
+	return nil
+}
 
 func (r *basicInfoAssessmentModelRepoStub) Update(_ context.Context, model *domain.AssessmentModel) error {
 	r.updateCount++
@@ -207,6 +154,13 @@ func (r *basicInfoAssessmentModelRepoStub) FindByCode(_ context.Context, code st
 		return nil, domain.ErrNotFound
 	}
 	return r.model, nil
+}
+
+func (r *basicInfoAssessmentModelRepoStub) FindByQuestionnaireCode(_ context.Context, kind domain.Kind, questionnaireCode string) (*domain.AssessmentModel, error) {
+	if r.model != nil && r.model.Binding.QuestionnaireCode == questionnaireCode && (kind == "" || r.model.Kind == kind) {
+		return r.model, nil
+	}
+	return nil, domain.ErrNotFound
 }
 
 func (r *basicInfoAssessmentModelRepoStub) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {

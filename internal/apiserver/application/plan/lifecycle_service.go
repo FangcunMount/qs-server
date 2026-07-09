@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -23,14 +22,14 @@ type lifecycleService struct {
 	transitionWorkflow *planTransitionWorkflow
 }
 
-// NewLifecycleService 创建计划生命周期服务
+// NewLifecycleService 创建计划生命周期服务。
 func NewLifecycleService(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
-	scaleRepo scaledefinition.Repository,
+	scaleCatalog ScaleCatalog,
 	eventPublisher event.EventPublisher,
 ) PlanLifecycleService {
-	return NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, newRepositoryScaleCatalog(scaleRepo), eventPublisher)
+	return NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, scaleCatalog, eventPublisher)
 }
 
 // NewLifecycleServiceWithScaleCatalog 创建使用 scale catalog 防腐接口的计划生命周期服务。

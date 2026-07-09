@@ -2,20 +2,21 @@ package lifecycle
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context, scaleCode string, m *scaledefinition.MedicalScale) error {
-	if m.GetQuestionnaireCode().IsEmpty() {
+func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context, scaleCode string, model *domain.AssessmentModel) error {
+	if model == nil || model.Binding.QuestionnaireCode == "" {
 		return nil
 	}
 
-	questionnaireCode := m.GetQuestionnaireCode().String()
-	if err := s.resolveQuestionnaireBinding().validate(ctx, questionnaireCode, m.GetQuestionnaireVersion(), scaleCode); err != nil {
+	questionnaireCode := model.Binding.QuestionnaireCode
+	if err := s.resolveQuestionnaireBinding().validate(ctx, questionnaireCode, model.Binding.QuestionnaireVersion, scaleCode); err != nil {
 		return err
 	}
 	if s.questionnaireCatalog == nil {
@@ -35,7 +36,7 @@ func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取已发布关联问卷失败")
 	}
 
-	targetVersion := m.GetQuestionnaireVersion()
+	targetVersion := model.Binding.QuestionnaireVersion
 	if shouldPublishQuestionnaire(head.Status, head.Version, publishedVersion(published)) {
 		if s.questionnairePublisher == nil {
 			return errors.WithCode(errorCode.ErrModuleInitializationFailed, "量表发布缺少问卷发布服务")
@@ -54,13 +55,13 @@ func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context
 	if targetVersion == "" {
 		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联问卷版本不存在")
 	}
-	if m.GetQuestionnaireVersion() == targetVersion {
+	if model.Binding.QuestionnaireVersion == targetVersion {
 		return nil
 	}
-	if err := s.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), targetVersion); err != nil {
-		return errors.WrapC(err, errorCode.ErrInvalidArgument, "更新量表问卷版本失败")
-	}
-	return nil
+	return model.BindQuestionnaire(domain.QuestionnaireBinding{
+		QuestionnaireCode:    questionnaireCode,
+		QuestionnaireVersion: targetVersion,
+	}, time.Now().UTC())
 }
 
 func shouldPublishQuestionnaire(headStatus, headVersion, activePublishedVersion string) bool {

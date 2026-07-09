@@ -324,6 +324,10 @@ func (r *memoryAssessmentModelRepo) FindByCode(_ context.Context, code string) (
 	return model, nil
 }
 
+func (r *memoryAssessmentModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
+}
+
 func (r *memoryAssessmentModelRepo) List(context.Context, port.ListFilter) ([]*domain.AssessmentModel, int64, error) {
 	return nil, 0, nil
 }

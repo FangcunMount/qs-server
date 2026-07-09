@@ -10,9 +10,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -28,7 +30,7 @@ var initCacheSingleflight sync.Once
 // ensureCacheSingleflightCoordinator 确保 cache singleflight coordinator 初始化
 func ensureCacheSingleflightCoordinator() {
 	initCacheSingleflight.Do(func() {
-		scaleCache.SetDefaultSingleflightCoordinator(scaleCache.NewSingleflightCoordinator())
+		cacheinfra.SetDefaultSingleflightCoordinator(cacheinfra.NewSingleflightCoordinator())
 	})
 }
 
@@ -242,25 +244,29 @@ func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Cont
 
 func (a cacheGovernanceAdapter) lookupScaleQuestionnaireCode(ctx context.Context, code string) (string, error) {
 	infra := a.containerSurveyScaleInfra()
-	if infra == nil || infra.ScaleRepo == nil {
+	if infra == nil || infra.AssessmentModelRepo == nil {
 		return "", nil
 	}
-	item, err := infra.ScaleRepo.FindByCode(ctx, code)
-	if err != nil || item == nil {
+	model, err := infra.AssessmentModelRepo.FindByCode(ctx, code)
+	if err != nil || model == nil {
 		return "", err
 	}
-	return item.GetQuestionnaireCode().String(), nil
+	return model.Binding.QuestionnaireCode, nil
 }
 
 func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code string) error {
-	infra := a.containerSurveyScaleInfra()
-	if infra == nil || infra.ScaleRepo == nil || strings.TrimSpace(code) == "" {
+	if a.container == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if cachedRepo, ok := infra.ScaleRepo.(*scaleCache.CachedScaleRepository); ok {
-		return cachedRepo.WarmupCache(ctx, []string{code})
+	catalog, err := a.container.ensurePublishedModelCatalog()
+	if err != nil {
+		return err
 	}
-	_, err := infra.ScaleRepo.FindByCode(ctx, code)
+	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
+	if !ok || lister == nil {
+		return nil
+	}
+	_, err = lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
 	return err
 }
 
@@ -269,7 +275,7 @@ func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context
 	if infra == nil || infra.QuestionnaireRepo == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if cachedRepo, ok := infra.QuestionnaireRepo.(*scaleCache.CachedQuestionnaireRepository); ok {
+	if cachedRepo, ok := infra.QuestionnaireRepo.(*cacheinfra.CachedQuestionnaireRepository); ok {
 		return cachedRepo.WarmupCache(ctx, []string{code})
 	}
 	_, err := infra.QuestionnaireRepo.FindBaseByCode(ctx, code)

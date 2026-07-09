@@ -9,15 +9,11 @@ import (
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
-
-func (s *lifecycleService) usesAssessmentModelPublishStore() bool {
-	return s != nil && s.modelRepo != nil && s.publishedRepo != nil && s.publisher.ModelRepo != nil && s.publisher.Repo != nil
-}
 
 func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code string) (*shared.ScaleResult, error) {
 	model, err := assessmentstore.LoadScale(ctx, s.modelRepo, code)
@@ -27,21 +23,16 @@ func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code stri
 	if model.IsPublished() {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已发布，不能重复发布")
 	}
-
-	scale, err := legacyadapter.MedicalScaleFromAssessmentModel(model)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
-	}
-	if err := s.ensureBoundQuestionnairePublished(ctx, code, scale); err != nil {
+	if err := s.ensureBoundQuestionnairePublished(ctx, code, model); err != nil {
 		return nil, err
 	}
-	if err := legacyadapter.SyncAssessmentModelFromMedicalScale(model, scale, time.Now().UTC()); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
-	}
-	if err := s.lifecycle.Publish(ctx, scale); err != nil {
+	if err := assessmentstore.ValidateScaleForPublish(model); err != nil {
 		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "发布量表失败")
 	}
-	if err := legacyadapter.SyncAssessmentModelFromMedicalScale(model, scale, time.Now().UTC()); err != nil {
+	if err := assessmentstore.SyncScaleMetadataInModel(model); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
+	}
+	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusPublished.String()); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
 	}
 
@@ -54,7 +45,7 @@ func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code stri
 		return nil, s.mapPublicationError(err)
 	}
 
-	s.publishEvents(ctx, scale)
+	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionPublished)
 	s.refreshListCache(ctx)
 	return assessmentstore.ScaleResult(model)
 }
@@ -64,17 +55,18 @@ func (s *lifecycleService) unpublishAssessmentModel(ctx context.Context, code st
 	if err != nil {
 		return nil, err
 	}
-
-	scale, err := legacyadapter.MedicalScaleFromAssessmentModel(model)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
+	if model.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能下架")
 	}
-	if err := s.lifecycle.Unpublish(ctx, scale); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
+	if !model.IsPublished() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表未发布，不能下架")
 	}
 
 	now := time.Now().UTC()
-	if err := legacyadapter.SyncAssessmentModelFromMedicalScale(model, scale, now); err != nil {
+	if err := model.MarkUnpublished(now); err != nil {
+		return nil, shared.WrapAssessmentModelError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
+	}
+	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusDraft.String()); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
 	if err := s.publishedRepo.DeletePublished(ctx, domain.KindScale, code); err != nil {
@@ -84,7 +76,7 @@ func (s *lifecycleService) unpublishAssessmentModel(ctx context.Context, code st
 		return nil, err
 	}
 
-	s.publishEvents(ctx, scale)
+	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionUnpublished)
 	s.refreshListCache(ctx)
 	s.notifyCacheChanged(ctx, code, "unpublish")
 	return assessmentstore.ScaleResult(model)
@@ -95,18 +87,16 @@ func (s *lifecycleService) archiveAssessmentModel(ctx context.Context, code stri
 	if err != nil {
 		return nil, err
 	}
+	if model.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档")
+	}
 
 	wasPublished := model.IsPublished()
-	scale, err := legacyadapter.MedicalScaleFromAssessmentModel(model)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
-	}
-	if err := s.lifecycle.Archive(ctx, scale); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
-	}
-
 	now := time.Now().UTC()
-	if err := legacyadapter.SyncAssessmentModelFromMedicalScale(model, scale, now); err != nil {
+	if err := model.MarkArchived(now); err != nil {
+		return nil, shared.WrapAssessmentModelError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
+	}
+	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusArchived.String()); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
 	if wasPublished {
@@ -118,7 +108,7 @@ func (s *lifecycleService) archiveAssessmentModel(ctx context.Context, code stri
 		return nil, err
 	}
 
-	s.publishEvents(ctx, scale)
+	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionArchived)
 	s.refreshListCache(ctx)
 	if wasPublished {
 		s.notifyCacheChanged(ctx, code, "archive")

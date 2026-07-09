@@ -56,6 +56,19 @@ func (r *memoryModelRepo) FindByCode(_ context.Context, code string) (*domain.As
 	return cloneAssessmentModel(model), nil
 }
 
+func (r *memoryModelRepo) FindByQuestionnaireCode(_ context.Context, kind domain.Kind, questionnaireCode string) (*domain.AssessmentModel, error) {
+	for _, model := range r.models {
+		if model == nil || model.Binding.QuestionnaireCode != questionnaireCode {
+			continue
+		}
+		if kind != "" && model.Kind != kind {
+			continue
+		}
+		return cloneAssessmentModel(model), nil
+	}
+	return nil, domain.ErrNotFound
+}
+
 func (r *memoryModelRepo) List(_ context.Context, _ port.ListFilter) ([]*domain.AssessmentModel, int64, error) {
 	items := make([]*domain.AssessmentModel, 0, len(r.models))
 	for _, model := range r.models {

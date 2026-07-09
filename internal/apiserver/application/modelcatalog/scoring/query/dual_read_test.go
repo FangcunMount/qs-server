@@ -15,15 +15,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestGetByCodeReadsAssessmentModelBeforeLegacyScales(t *testing.T) {
+func TestGetByCodeReadsAssessmentModel(t *testing.T) {
 	t.Parallel()
 
 	model := newScaleAssessmentModelForQueryTest(t, "SCL_V2")
-	repo := &dualReadScaleRepo{byCode: map[string]*scaledefinition.MedicalScale{
-		"SCL_V2": newLegacyScaleForQueryTest(t, "SCL_LEGACY"),
-	}}
 	modelRepo := &dualReadModelRepo{models: map[string]*domain.AssessmentModel{model.Code: model}}
-	service := newDualReadQueryService(repo, ModelCatalogSources{ModelRepo: modelRepo})
+	service := newDualReadQueryService(ModelCatalogSources{ModelRepo: modelRepo})
 
 	got, err := service.GetByCode(context.Background(), "SCL_V2")
 	if err != nil {
@@ -32,44 +29,32 @@ func TestGetByCodeReadsAssessmentModelBeforeLegacyScales(t *testing.T) {
 	if got.Code != "SCL_V2" {
 		t.Fatalf("code = %q, want SCL_V2", got.Code)
 	}
-	if repo.findByCodeCalls != 0 {
-		t.Fatalf("legacy FindByCode calls = %d, want 0", repo.findByCodeCalls)
-	}
 }
 
-func TestGetByCodeFallsBackToLegacyScalesWhenAssessmentModelMissing(t *testing.T) {
+func TestGetByCodeReturnsNotFoundWhenAssessmentModelMissing(t *testing.T) {
 	t.Parallel()
 
-	repo := &dualReadScaleRepo{byCode: map[string]*scaledefinition.MedicalScale{
-		"SCL_LEGACY": newLegacyScaleForQueryTest(t, "SCL_LEGACY"),
-	}}
-	service := newDualReadQueryService(repo, ModelCatalogSources{ModelRepo: &dualReadModelRepo{}})
+	service := newDualReadQueryService(ModelCatalogSources{ModelRepo: &dualReadModelRepo{}})
 
-	got, err := service.GetByCode(context.Background(), "SCL_LEGACY")
-	if err != nil {
-		t.Fatalf("GetByCode: %v", err)
-	}
-	if got.Code != "SCL_LEGACY" || repo.findByCodeCalls != 1 {
-		t.Fatalf("result=%#v legacy calls=%d, want legacy fallback", got, repo.findByCodeCalls)
+	_, err := service.GetByCode(context.Background(), "SCL_LEGACY")
+	if err == nil {
+		t.Fatal("GetByCode() error = nil, want not found")
 	}
 }
 
-func TestGetPublishedByCodeReadsPublishedModelBeforeLegacyScales(t *testing.T) {
+func TestGetPublishedByCodeReadsPublishedModel(t *testing.T) {
 	t.Parallel()
 
 	snapshot := newPublishedScaleSnapshotForQueryTest(t, "SCL_PUB")
-	repo := &dualReadScaleRepo{publishedByCode: map[string]*scaledefinition.MedicalScale{
-		"SCL_PUB": newLegacyScaleForQueryTest(t, "SCL_LEGACY"),
-	}}
 	publishedRepo := &dualReadPublishedRepo{byCode: map[string]*port.PublishedModel{snapshot.Code: snapshot}}
-	service := newDualReadQueryService(repo, ModelCatalogSources{PublishedRepo: publishedRepo})
+	service := newDualReadQueryService(ModelCatalogSources{PublishedRepo: publishedRepo})
 
 	got, err := service.GetPublishedByCode(context.Background(), "SCL_PUB")
 	if err != nil {
 		t.Fatalf("GetPublishedByCode: %v", err)
 	}
-	if got.Code != "SCL_PUB" || repo.findPublishedByCodeCalls != 0 {
-		t.Fatalf("result=%#v legacy published calls=%d, want v2 published", got, repo.findPublishedByCodeCalls)
+	if got.Code != "SCL_PUB" {
+		t.Fatalf("result=%#v, want v2 published", got)
 	}
 }
 
@@ -77,13 +62,10 @@ func TestResolveAssessmentScaleContextReadsPublishedModelByQuestionnaireVersion(
 	t.Parallel()
 
 	snapshot := newPublishedScaleSnapshotForQueryTest(t, "SCL_CTX")
-	repo := &dualReadScaleRepo{byQuestionnaireRef: map[string]*scaledefinition.MedicalScale{
-		"Q-SCL_CTX:1.0.0": newLegacyScaleForQueryTest(t, "SCL_LEGACY"),
-	}}
 	publishedRepo := &dualReadPublishedRepo{byQuestionnaire: map[string]*port.PublishedModel{
 		"Q-SCL_CTX:1.0.0": snapshot,
 	}}
-	service := newDualReadQueryService(repo, ModelCatalogSources{PublishedReader: publishedRepo})
+	service := newDualReadQueryService(ModelCatalogSources{PublishedReader: publishedRepo})
 
 	got, err := service.ResolveAssessmentScaleContext(context.Background(), "Q-SCL_CTX", "1.0.0")
 	if err != nil {
@@ -93,13 +75,27 @@ func TestResolveAssessmentScaleContextReadsPublishedModelByQuestionnaireVersion(
 		got.ScaleVersion == nil || *got.ScaleVersion != "1.0.0" {
 		t.Fatalf("context = %#v, want v2 published scale context", got)
 	}
-	if repo.findByQuestionnaireRefCalls != 0 {
-		t.Fatalf("legacy questionnaire ref calls = %d, want 0", repo.findByQuestionnaireRefCalls)
-	}
 }
 
-func newDualReadQueryService(repo *dualReadScaleRepo, sources ModelCatalogSources) *queryService {
-	return NewQueryServiceWithModelCatalogSources(repo, repo, nil, nil, nil, nil, sources).(*queryService)
+func newDualReadQueryService(sources ModelCatalogSources) *queryService {
+	return NewQueryServiceWithModelCatalogSources(
+		emptyScaleReader{},
+		nil,
+		nil,
+		nil,
+		nil,
+		sources,
+	).(*queryService)
+}
+
+type emptyScaleReader struct{}
+
+func (emptyScaleReader) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
+	return nil, nil
+}
+
+func (emptyScaleReader) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
+	return 0, nil
 }
 
 func newScaleAssessmentModelForQueryTest(t *testing.T, code string) *domain.AssessmentModel {
@@ -151,63 +147,6 @@ func newLegacyScaleForQueryTest(t *testing.T, code string) *scaledefinition.Medi
 	return scale
 }
 
-type dualReadScaleRepo struct {
-	byCode                      map[string]*scaledefinition.MedicalScale
-	publishedByCode             map[string]*scaledefinition.MedicalScale
-	byQuestionnaireCode         map[string]*scaledefinition.MedicalScale
-	publishedByQuestionnaire    map[string]*scaledefinition.MedicalScale
-	byQuestionnaireRef          map[string]*scaledefinition.MedicalScale
-	findByCodeCalls             int
-	findPublishedByCodeCalls    int
-	findByQuestionnaireRefCalls int
-}
-
-func (r *dualReadScaleRepo) FindByCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	r.findByCodeCalls++
-	if item, ok := r.byCode[code]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *dualReadScaleRepo) FindPublishedByCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	r.findPublishedByCodeCalls++
-	if item, ok := r.publishedByCode[code]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *dualReadScaleRepo) FindByQuestionnaireCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	if item, ok := r.byQuestionnaireCode[code]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *dualReadScaleRepo) FindPublishedByQuestionnaireCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	if item, ok := r.publishedByQuestionnaire[code]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *dualReadScaleRepo) FindByQuestionnaireRef(_ context.Context, code, version string) (*scaledefinition.MedicalScale, error) {
-	r.findByQuestionnaireRefCalls++
-	if item, ok := r.byQuestionnaireRef[code+":"+version]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *dualReadScaleRepo) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
-	return nil, nil
-}
-
-func (r *dualReadScaleRepo) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
-	return 0, nil
-}
-
 type dualReadModelRepo struct {
 	models map[string]*domain.AssessmentModel
 }
@@ -219,6 +158,10 @@ func (r *dualReadModelRepo) FindByCode(_ context.Context, code string) (*domain.
 	if item, ok := r.models[code]; ok {
 		return item, nil
 	}
+	return nil, domain.ErrNotFound
+}
+
+func (r *dualReadModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
 	return nil, domain.ErrNotFound
 }
 

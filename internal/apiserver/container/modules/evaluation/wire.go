@@ -89,7 +89,6 @@ func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Cat
 type PublishedModelCatalogInput struct {
 	MongoDB              *mongo.Database
 	MongoLimiter         backpressure.Acquirer
-	ScaleInfra           *surveymod.ScaleInfra
 	Existing             rulesetport.Catalog
 	StaticRedisClient    redis.UniversalClient
 	StaticCacheBuilder   *keyspace.Builder
@@ -116,7 +115,6 @@ func Wire(in WireInput) (WireResult, error) {
 			catalog, err = EnsurePublishedModelCatalog(PublishedModelCatalogInput{
 				MongoDB:              in.MongoDB,
 				MongoLimiter:         in.MongoLimiter,
-				ScaleInfra:           infra,
 				StaticRedisClient:    in.StaticRedisClient,
 				StaticCacheBuilder:   in.StaticCacheBuilder,
 				PublishedModelPolicy: in.PublishedModelPolicy,
@@ -127,7 +125,6 @@ func Wire(in WireInput) (WireResult, error) {
 			}
 		}
 		resolver, err := evaluationinputInfra.NewRepositoryResolver(
-			infra.ScaleRepo,
 			infra.AnswerSheetRepo,
 			infra.QuestionnaireRepo,
 			catalog,

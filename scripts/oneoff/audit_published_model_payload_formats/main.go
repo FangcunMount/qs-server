@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/payloadformat"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 )
 
@@ -37,7 +37,7 @@ func main() {
 	db := client.Database(*mongoDB)
 	repo := mongomodelcatalog.NewRepository(db)
 
-	formats := publishing.LegacyDecodeOnlyPayloadFormats()
+	formats := payloadformat.LegacyDecodeOnlyPayloadFormats()
 	total := int64(0)
 	for _, format := range formats {
 		count, err := repo.Collection().CountDocuments(ctx, bson.M{

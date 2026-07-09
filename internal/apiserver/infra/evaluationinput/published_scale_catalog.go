@@ -5,43 +5,13 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	aminfrac "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// RepositoryScaleBindingSource 从量表 command repo 提供 scale 规则绑定回退。
-type RepositoryScaleBindingSource struct {
-	repo ScaleSnapshotRepository
-}
-
-func NewRepositoryScaleBindingSource(repo ScaleSnapshotRepository) RepositoryScaleBindingSource {
-	return RepositoryScaleBindingSource{repo: repo}
-}
-
-func (s RepositoryScaleBindingSource) FindScaleByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scalesnapshot.ScaleSnapshot, error) {
-	if s.repo == nil {
-		return nil, scaledefinition.ErrNotFound
-	}
-	medicalScale, err := s.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil {
-		return nil, err
-	}
-	return MedicalScaleToSnapshot(medicalScale), nil
-}
-
-func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, version string) (*scalesnapshot.ScaleSnapshot, error) {
-	catalog := NewRepositoryScaleSnapshotCatalog(s.repo)
-	return catalog.GetScaleByRef(ctx, port.ModelRef{
-		Kind:    port.EvaluationModelKindScale,
-		Code:    code,
-		Version: version,
-	})
-}
-
-// PublishedScaleCatalog prefers published scale snapshots from the model catalog, then falls back to the scale repo.
+// PublishedScaleCatalog reads published scale snapshots from the assessment model catalog.
 type PublishedScaleCatalog struct {
 	reader   rulesetport.PublishedModelReader
 	fallback port.ScaleModelCatalog

@@ -12,6 +12,27 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
+// FindScaleByQuestionnaireCode loads a draft medical-scale AssessmentModel by questionnaire code.
+func FindScaleByQuestionnaireCode(ctx context.Context, repo modelcatalogport.ModelRepository, questionnaireCode string) (*domain.AssessmentModel, error) {
+	if questionnaireCode == "" {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷编码不能为空")
+	}
+	if repo == nil {
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "测评模型仓储未配置")
+	}
+	model, err := repo.FindByQuestionnaireCode(ctx, domain.KindScale, questionnaireCode)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		}
+		return nil, err
+	}
+	if model == nil || model.Kind != domain.KindScale {
+		return nil, errors.WithCode(errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+	return model, nil
+}
+
 // LoadScale loads a draft medical-scale AssessmentModel by code.
 func LoadScale(ctx context.Context, repo modelcatalogport.ModelRepository, code string) (*domain.AssessmentModel, error) {
 	if code == "" {

@@ -7,9 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -29,7 +33,7 @@ func TestScaleQueryServiceListPublishedUsesCachePort(t *testing.T) {
 			}},
 		},
 	}
-	service := NewQueryService(repo, repo, nil, cache, nil)
+	service := NewQueryService(repo, nil, cache, nil)
 
 	got, err := service.ListPublished(context.Background(), shared.ListScalesDTO{Page: 1, PageSize: 10})
 	if err != nil {
@@ -53,7 +57,7 @@ func TestScaleQueryServiceListPublishedFallsBackWhenCacheMisses(t *testing.T) {
 		},
 	}
 	cache := &publishedScaleListCacheStub{hit: false}
-	service := NewQueryService(repo, repo, nil, cache, nil)
+	service := NewQueryService(repo, nil, cache, nil)
 
 	got, err := service.ListPublished(context.Background(), shared.ListScalesDTO{Page: 1, PageSize: 10})
 	if err != nil {
@@ -70,19 +74,24 @@ func TestScaleQueryServiceListPublishedFallsBackWhenCacheMisses(t *testing.T) {
 func TestScaleLifecycleDeleteIgnoresListCacheRebuildFailure(t *testing.T) {
 	t.Parallel()
 
-	repo := &scaleCacheQueryRepo{
-		byCode: map[string]*scaledefinition.MedicalScale{
-			"SCALE_DRAFT": newScaleCacheQueryScale(t, "SCALE_DRAFT", "Draft Scale", scaledefinition.StatusDraft),
-		},
-	}
+	model := newScaleCacheQueryAssessmentModel(t, "SCALE_DRAFT", "Draft Scale")
+	modelRepo := &scaleCacheDeleteModelRepo{model: model}
+	publishedRepo := &scaleCacheDeletePublishedRepo{}
 	cache := &publishedScaleListCacheStub{rebuildErr: stderrors.New("cache unavailable")}
-	service := lifecycle.NewService(repo, nil, nil, cache)
+	service := lifecycle.NewService(
+		nil,
+		nil,
+		cache,
+		lifecycle.WithAssessmentModelRepository(modelRepo),
+		lifecycle.WithPublishedModelRepository(publishedRepo),
+		lifecycle.WithPublicationPublisher(assessmentstore.NewPublicationPublisher(modelRepo, publishedRepo)),
+	)
 
 	if err := service.Delete(context.Background(), "SCALE_DRAFT"); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	if repo.removeCalls.Load() != 1 {
-		t.Fatalf("Remove calls = %d, want 1", repo.removeCalls.Load())
+	if modelRepo.deleteCalls.Load() != 1 {
+		t.Fatalf("Delete calls = %d, want 1", modelRepo.deleteCalls.Load())
 	}
 	if cache.rebuildCalls.Load() != 1 {
 		t.Fatalf("Rebuild calls = %d, want 1", cache.rebuildCalls.Load())
@@ -223,3 +232,68 @@ func newScaleCacheQueryScale(t *testing.T, code, title string, status scaledefin
 	}
 	return scale
 }
+
+func newScaleCacheQueryAssessmentModel(t *testing.T, code, title string) *domain.AssessmentModel {
+	t.Helper()
+	scale := newScaleCacheQueryScale(t, code, title, scaledefinition.StatusDraft)
+	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
+	}
+	model.Code = code
+	return model
+}
+
+type scaleCacheDeleteModelRepo struct {
+	model       *domain.AssessmentModel
+	deleteCalls atomic.Int32
+}
+
+func (r *scaleCacheDeleteModelRepo) Create(context.Context, *domain.AssessmentModel) error {
+	return nil
+}
+func (r *scaleCacheDeleteModelRepo) Update(context.Context, *domain.AssessmentModel) error {
+	return nil
+}
+func (r *scaleCacheDeleteModelRepo) FindByCode(_ context.Context, code string) (*domain.AssessmentModel, error) {
+	if r.model != nil && r.model.Code == code {
+		return r.model, nil
+	}
+	return nil, domain.ErrNotFound
+}
+func (r *scaleCacheDeleteModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (r *scaleCacheDeleteModelRepo) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {
+	return nil, 0, nil
+}
+func (r *scaleCacheDeleteModelRepo) Delete(context.Context, string) error {
+	r.deleteCalls.Add(1)
+	return nil
+}
+
+type scaleCacheDeletePublishedRepo struct{}
+
+func (r *scaleCacheDeletePublishedRepo) Save(context.Context, *modelcatalogport.PublishedModel) error {
+	return nil
+}
+func (r *scaleCacheDeletePublishedRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (r *scaleCacheDeletePublishedRepo) FindLatestPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (r *scaleCacheDeletePublishedRepo) FindPublishedByModelCodeVersion(context.Context, domain.Kind, string, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (r *scaleCacheDeletePublishedRepo) ListPublished(context.Context, modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error) {
+	return nil, 0, nil
+}
+func (r *scaleCacheDeletePublishedRepo) DeletePublished(context.Context, domain.Kind, string) error {
+	return nil
+}
+
+var (
+	_ modelcatalogport.ModelRepository          = (*scaleCacheDeleteModelRepo)(nil)
+	_ modelcatalogport.PublishedModelRepository = (*scaleCacheDeletePublishedRepo)(nil)
+)

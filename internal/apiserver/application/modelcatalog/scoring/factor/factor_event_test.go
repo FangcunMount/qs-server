@@ -3,59 +3,14 @@ package factor
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
-
-type ruleFreezeScaleRepoStub struct {
-	item        *scaledefinition.MedicalScale
-	updateCount int
-}
-
-func (r *ruleFreezeScaleRepoStub) Create(context.Context, *scaledefinition.MedicalScale) error {
-	return nil
-}
-
-func (r *ruleFreezeScaleRepoStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
-	return nil
-}
-
-func (r *ruleFreezeScaleRepoStub) FindByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	if r.item == nil {
-		return nil, scaledefinition.ErrNotFound
-	}
-	return r.item, nil
-}
-
-func (r *ruleFreezeScaleRepoStub) FindByCodeVersion(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByCode(context.Background(), "")
-}
-
-func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	if r.item == nil {
-		return nil, scaledefinition.ErrNotFound
-	}
-	return r.item, nil
-}
-
-func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByQuestionnaireCode(context.Background(), "")
-}
-
-func (r *ruleFreezeScaleRepoStub) Update(_ context.Context, item *scaledefinition.MedicalScale) error {
-	r.updateCount++
-	r.item = item
-	return nil
-}
-
-func (r *ruleFreezeScaleRepoStub) Remove(context.Context, string) error { return nil }
-
-func (r *ruleFreezeScaleRepoStub) ExistsByCode(context.Context, string) (bool, error) {
-	return false, nil
-}
 
 type scaleEventPublisherStub struct {
 	events []event.DomainEvent
@@ -106,12 +61,17 @@ func TestFactorMutationPublishesCollectedDomainEventOnce(t *testing.T) {
 	t.Parallel()
 
 	item := newDraftScaleForEventTest(t)
-	repo := &ruleFreezeScaleRepoStub{item: item}
+	model, err := legacyadapter.AssessmentModelFromMedicalScale(item, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
+	}
+	model.Code = item.GetCode().String()
+	modelRepo := &factorAssessmentModelRepoStub{model: model}
 	publisher := &scaleEventPublisherStub{}
-	factorSvc := NewService(repo, nil, publisher)
+	factorSvc := NewService(modelRepo, nil, publisher)
 
 	if _, err := factorSvc.AddFactor(context.Background(), shared.AddFactorDTO{
-		ScaleCode:     item.GetCode().String(),
+		ScaleCode:     model.Code,
 		Code:          "F2",
 		Title:         "Factor 2",
 		QuestionCodes: []string{"Q2"},

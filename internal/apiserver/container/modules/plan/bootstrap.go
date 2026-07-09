@@ -6,8 +6,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -16,16 +16,16 @@ import (
 
 // BootstrapInput carries container integration inputs for plan module bootstrap.
 type BootstrapInput struct {
-	MySQLDB        *gorm.DB
-	EventPublisher event.EventPublisher
-	ScaleRepo      scaledefinition.Repository
-	RedisClient    redis.UniversalClient
-	CacheBuilder   *keyspace.Builder
-	PlanPolicy     cachepolicy.CachePolicy
-	EntryBaseURL   string
-	Observer       *observability.ComponentObserver
-	MySQLLimiter   backpressure.Acquirer
-	TesteeAccess   actorAccessApp.TesteeAccessService
+	MySQLDB             *gorm.DB
+	EventPublisher      event.EventPublisher
+	AssessmentModelRepo modelcatalogport.ModelRepository
+	RedisClient         redis.UniversalClient
+	CacheBuilder        *keyspace.Builder
+	PlanPolicy          cachepolicy.CachePolicy
+	EntryBaseURL        string
+	Observer            *observability.ComponentObserver
+	MySQLLimiter        backpressure.Acquirer
+	TesteeAccess        actorAccessApp.TesteeAccessService
 }
 
 // Bootstrap assembles the plan module from container integration inputs.

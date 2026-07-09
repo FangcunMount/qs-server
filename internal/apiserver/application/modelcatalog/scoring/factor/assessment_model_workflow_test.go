@@ -17,11 +17,10 @@ import (
 
 func TestAddFactorUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
 	ctx := context.Background()
-	scaleRepo := &ruleFreezeScaleRepoStub{}
 	model := newDraftAssessmentModelForFactorTest(t)
 	modelRepo := &factorAssessmentModelRepoStub{model: model}
 	publisher := &scaleEventPublisherStub{}
-	svc := NewService(scaleRepo, nil, publisher, WithAssessmentModelRepository(modelRepo))
+	svc := NewService(modelRepo, nil, publisher)
 
 	got, err := svc.AddFactor(ctx, shared.AddFactorDTO{
 		ScaleCode:     model.Code,
@@ -31,9 +30,6 @@ func TestAddFactorUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("AddFactor() error = %v", err)
-	}
-	if scaleRepo.updateCount != 0 {
-		t.Fatalf("legacy scale repo Update calls = %d, want 0", scaleRepo.updateCount)
 	}
 	if modelRepo.updateCount < 1 {
 		t.Fatalf("model repo Update calls = %d, want at least 1", modelRepo.updateCount)
@@ -56,7 +52,7 @@ func TestAddFactorForksPublishedAssessmentModelDraft(t *testing.T) {
 	publishedAt := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 	model.PublishedAt = &publishedAt
 	modelRepo := &factorAssessmentModelRepoStub{model: model}
-	svc := NewService(&ruleFreezeScaleRepoStub{}, nil, &scaleEventPublisherStub{}, WithAssessmentModelRepository(modelRepo))
+	svc := NewService(modelRepo, nil, &scaleEventPublisherStub{})
 
 	if _, err := svc.AddFactor(ctx, shared.AddFactorDTO{
 		ScaleCode:     model.Code,
@@ -113,7 +109,9 @@ type factorAssessmentModelRepoStub struct {
 	updateCount int
 }
 
-func (r *factorAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error { return nil }
+func (r *factorAssessmentModelRepoStub) Create(context.Context, *domain.AssessmentModel) error {
+	return nil
+}
 
 func (r *factorAssessmentModelRepoStub) Update(_ context.Context, model *domain.AssessmentModel) error {
 	r.updateCount++
@@ -126,6 +124,10 @@ func (r *factorAssessmentModelRepoStub) FindByCode(_ context.Context, code strin
 		return nil, domain.ErrNotFound
 	}
 	return r.model, nil
+}
+
+func (r *factorAssessmentModelRepoStub) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
 }
 
 func (r *factorAssessmentModelRepoStub) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {

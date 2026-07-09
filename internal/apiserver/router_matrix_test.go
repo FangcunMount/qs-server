@@ -26,7 +26,9 @@ import (
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -320,11 +322,17 @@ func newRouterTestContainer() *container.Container {
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}
+	scaleModelRepo := &routerMatrixModelRepo{}
+	scalePublishedRepo := &routerMatrixPublishedRepo{}
 	scaleModule := &ammod.Scale{
-		LifecycleService: scaleApp.NewLifecycleService(nil, nil, nil, nil),
-		FactorService:    scaleApp.NewFactorService(nil, nil, nil),
-		QueryService:     scaleApp.NewQueryService(nil, nil, nil, nil, nil),
-		CategoryService:  scaleApp.NewCategoryService(),
+		LifecycleService: scaleApp.NewLifecycleService(nil, nil, nil,
+			scaleApp.WithAssessmentModelRepository(scaleModelRepo),
+			scaleApp.WithPublishedModelRepository(scalePublishedRepo),
+			scaleApp.WithPublicationPublisher(scaleApp.NewScalePublicationPublisher(scaleModelRepo, scalePublishedRepo)),
+		),
+		FactorService:   scaleApp.NewFactorService(scaleModelRepo, nil, nil),
+		QueryService:    scaleApp.NewQueryService(nil, nil, nil, nil, nil),
+		CategoryService: scaleApp.NewCategoryService(),
 	}
 	evaluationModule := &evalmod.Module{
 		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
@@ -440,4 +448,40 @@ func normalizeOpenAPIPath(path string) string {
 		}
 	}
 	return strings.Join(parts, "/")
+}
+
+type routerMatrixModelRepo struct{}
+
+func (routerMatrixModelRepo) Create(context.Context, *domain.AssessmentModel) error { return nil }
+func (routerMatrixModelRepo) Update(context.Context, *domain.AssessmentModel) error { return nil }
+func (routerMatrixModelRepo) FindByCode(context.Context, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (routerMatrixModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (routerMatrixModelRepo) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {
+	return nil, 0, nil
+}
+func (routerMatrixModelRepo) Delete(context.Context, string) error { return nil }
+
+type routerMatrixPublishedRepo struct{}
+
+func (routerMatrixPublishedRepo) Save(context.Context, *modelcatalogport.PublishedModel) error {
+	return nil
+}
+func (routerMatrixPublishedRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (routerMatrixPublishedRepo) FindLatestPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (routerMatrixPublishedRepo) FindPublishedByModelCodeVersion(context.Context, domain.Kind, string, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+func (routerMatrixPublishedRepo) ListPublished(context.Context, modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error) {
+	return nil, 0, nil
+}
+func (routerMatrixPublishedRepo) DeletePublished(context.Context, domain.Kind, string) error {
+	return nil
 }

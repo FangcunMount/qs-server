@@ -4,25 +4,25 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 func (s *lifecycleService) resolveQuestionnaireBinding() questionnaireBindingResolver {
 	return questionnaireBindingResolver{
-		repo:                 s.repo,
+		modelRepo:            s.modelRepo,
 		questionnaireCatalog: s.questionnaireCatalog,
 	}
 }
 
 type questionnaireBindingResolver struct {
-	repo                 questionnaireBindingLookup
+	modelRepo            modelBindingLookup
 	questionnaireCatalog questionnairecatalog.Catalog
 }
 
-type questionnaireBindingLookup interface {
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
+type modelBindingLookup interface {
+	FindByQuestionnaireCode(ctx context.Context, kind domain.Kind, questionnaireCode string) (*domain.AssessmentModel, error)
 }
 
 func (r questionnaireBindingResolver) validate(ctx context.Context, questionnaireCode string, questionnaireVersion string, currentScaleCode string) error {
@@ -57,17 +57,17 @@ func (r questionnaireBindingResolver) validate(ctx context.Context, questionnair
 		}
 	}
 
-	boundScale, err := r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	boundModel, err := r.modelRepo.FindByQuestionnaireCode(ctx, domain.KindScale, questionnaireCode)
 	if err != nil {
-		if scaledefinition.IsNotFound(err) {
+		if domain.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询问卷关联量表失败")
 	}
-	if boundScale == nil {
+	if boundModel == nil {
 		return nil
 	}
-	if currentScaleCode != "" && boundScale.GetCode().String() == currentScaleCode {
+	if currentScaleCode != "" && boundModel.Code == currentScaleCode {
 		return nil
 	}
 	return errors.WithCode(errorCode.ErrInvalidArgument, "该问卷已关联其他量表")

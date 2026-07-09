@@ -7,7 +7,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -112,7 +114,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 		if questionnaireCode == "" {
 			continue
 		}
-		item, err := s.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
+		item, err := s.publishedScaleByQuestionnaireCode(ctx, questionnaireCode)
 		if err != nil {
 			logger.L(ctx).Warnw("failed to resolve hot scale by questionnaire code",
 				"questionnaire_code", questionnaireCode,
@@ -156,7 +158,7 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 
 	result := make([]scaledefinition.HotScaleSummary, 0, limit-len(existing))
 	for _, row := range rows {
-		item, err := s.repo.FindPublishedByCode(ctx, row.Code)
+		item, err := s.publishedScaleByCode(ctx, row.Code)
 		if err != nil {
 			logger.L(ctx).Warnw("failed to resolve fallback hot scale",
 				"scale_code", row.Code,
@@ -178,6 +180,28 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 		}
 	}
 	return result, nil
+}
+
+func (s *queryService) publishedScaleByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
+	if s == nil || s.readerV2 == nil {
+		return nil, domain.ErrNotFound
+	}
+	snapshot, err := s.readerV2.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, "")
+	if err != nil {
+		return nil, err
+	}
+	return legacyadapter.MedicalScaleFromPublishedModel(snapshot)
+}
+
+func (s *queryService) publishedScaleByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
+	if s == nil || s.published == nil {
+		return nil, domain.ErrNotFound
+	}
+	snapshot, err := s.published.FindLatestPublishedByModelCode(ctx, domain.KindScale, code)
+	if err != nil {
+		return nil, err
+	}
+	return legacyadapter.MedicalScaleFromPublishedModel(snapshot)
 }
 
 func hotRankCandidateLimit(limit int) int {

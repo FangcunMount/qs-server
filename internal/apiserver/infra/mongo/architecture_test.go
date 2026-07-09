@@ -17,7 +17,6 @@ func TestSurveyScaleMongoCommandReposDoNotExposeReadModelMethods(t *testing.T) {
 	files := []string{
 		"internal/apiserver/infra/mongo/questionnaire/repo.go",
 		"internal/apiserver/infra/mongo/answersheet/repo.go",
-		"internal/apiserver/infra/mongo/scale/repo.go",
 	}
 	forbidden := map[string]struct{}{
 		"FindBaseList":                   {},

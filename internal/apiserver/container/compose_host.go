@@ -287,7 +287,6 @@ func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
 		StaticRedis:         c.CacheClient(cacheplane.FamilyStatic),
 		StaticBuilder:       c.CacheBuilder(cacheplane.FamilyStatic),
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
-		ScalePolicy:         c.CachePolicy(cachepolicy.PolicyScale),
 		ScaleListPolicy:     c.CachePolicy(cachepolicy.PolicyScaleList),
 		Observer:            c.cacheObserver(),
 		IdentityService:     c.resolveIdentityService(),
@@ -309,7 +308,6 @@ func (c *Container) ensurePublishedModelCatalog() (rulesetport.Catalog, error) {
 	catalog, err := evalmod.EnsurePublishedModelCatalog(evalmod.PublishedModelCatalogInput{
 		MongoDB:              c.mongoDB,
 		MongoLimiter:         c.backpressure.Mongo,
-		ScaleInfra:           c.surveyScaleInfra,
 		Existing:             c.publishedModelCatalog,
 		StaticRedisClient:    c.CacheClient(cacheplane.FamilyStatic),
 		StaticCacheBuilder:   c.CacheBuilder(cacheplane.FamilyStatic),

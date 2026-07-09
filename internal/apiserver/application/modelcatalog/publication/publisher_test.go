@@ -121,6 +121,10 @@ func (r *publishedModelRepo) FindByCode(context.Context, string) (*domain.Assess
 	return nil, domain.ErrNotFound
 }
 
+func (r *publishedModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
+	return nil, domain.ErrNotFound
+}
+
 func (r *publishedModelRepo) List(context.Context, port.ListFilter) ([]*domain.AssessmentModel, int64, error) {
 	return nil, 0, nil
 }
