@@ -1,85 +1,51 @@
-# Assessment Model
+# ModelCatalog
 
-**本文回答**：Assessment Model 如何作为统一测评模型资产层，吸收旧 `scale/typologymodel`，为 Evaluation 和报告层提供可发布、可追溯的模型快照。
+**本文回答**：ModelCatalog 模块文档应该从哪里读，哪些是当前模块设计，哪些是规划草案。
 
----
+ModelCatalog 是**测评模型资产目录**。它负责管理“如何解释答卷”的模型配置，并把可变配置发布成可查询、可缓存、可执行的快照。
 
-## 1. 这个模块负责什么
+核心问题：
 
-Assessment Model 负责“用什么模型规则解释答卷”：
-
-- `AssessmentKind`：测评模型类型。
-- `AssessmentModel`：模型资产定义。
-- `AssessmentModelSnapshot`：发布后冻结的模型快照。
-- `ModelBinding`：模型与问卷、入口或解释资产的绑定。
-- `ModelPayload`：医学量表、人格模型、行为能力测评等模型资产 payload。
-- 旧 `scale/typologymodel` 的兼容注册和资产归并。
+```text
+针对某个已发布问卷版本，应该使用哪套测评模型定义来解释答卷？
+```
 
 ---
 
-## 2. 这个模块不负责什么
+## 1. 阅读顺序
 
-- 不保存用户答卷事实。
-- 不执行一次测评状态机。
-- 不生成最终报告实例。
-- 不调度周期任务。
-- 不维护统计读模型。
-
----
-
-## 3. 核心领域模型
-
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `AssessmentModel` | 模型资产聚合 | [02-领域模型.md](./02-领域模型.md) |
-| `AssessmentKind` | 模型分类和执行识别 | [03-测评模型创建链路.md](./03-测评模型创建链路.md) |
-| `AssessmentModelSnapshot` | 发布态冻结快照 | [04-模型发布与快照链路.md](./04-模型发布与快照链路.md) |
-| `ModelBinding` | 模型和问卷 / 解释模型的绑定 | [05-模型绑定与适配机制.md](./05-模型绑定与适配机制.md) |
-| `Factor` | 通用维度构件（快照中的 Factor 列表） | [08-Factor通用构件.md](./08-Factor通用构件.md) |
+| 顺序 | 文档 | 类型 | 回答的问题 |
+| ---- | ---- | ---- | ---------- |
+| 1 | [01-模块设计.md](./01-模块设计.md) | 模块文档 | ModelCatalog 的职责、边界、当前代码分层和上下游 |
+| 2 | [02-领域模型设计.md](./02-领域模型设计.md) | 模块文档 | 当前领域模型和目标模型如何对应 |
+| 3 | [03-关键链路分析.md](./03-关键链路分析.md) | 模块文档 | 创建、绑定、发布、查询、运行解析这些链路如何走 |
+| 4 | [04-存储与契约.md](./04-存储与契约.md) | 模块文档 | Mongo、port、cache、legacy storage 的边界 |
+| 5 | [05-目标设计草案.md](./05-目标设计草案.md) | 设计草案 | 目标模型命名、Definition 四层结构、版本语义 |
+| 6 | [06-重构计划.md](./06-重构计划.md) | 重构计划 | 如何从当前代码迁移到目标模型 |
 
 ---
 
-## 4. 关键业务链路
+## 2. 当前权威来源
 
-| 链路 | 文档 |
-| ---- | ---- |
-| 创建模型资产、配置 Kind 和 Payload | [03-测评模型创建链路.md](./03-测评模型创建链路.md) |
-| 发布版本、生成快照、冻结执行输入 | [04-模型发布与快照链路.md](./04-模型发布与快照链路.md) |
-| 绑定问卷、执行器和解释模型 | [05-模型绑定与适配机制.md](./05-模型绑定与适配机制.md) |
-| 处理模型版本和旧能力兼容 | [06-模型版本与兼容策略.md](./06-模型版本与兼容策略.md) |
-| 新增测评模型 | [07-扩展新测评模型SOP.md](./07-扩展新测评模型SOP.md) |
-| Factor 通用构件与算法族关系 | [08-Factor通用构件.md](./08-Factor通用构件.md) |
+事实优先级：
 
----
+1. 当前源码与运行时行为。
+2. Mongo PO、port interface、REST/gRPC 契约、迁移脚本等机器可读事实。
+3. 本目录下的当前模块文档。
+4. `_archive` 中历史文档，仅作为迁移输入和历史背景。
 
-## 5. 上下游依赖
+旧文档已归档到：
 
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | 管理后台 / 模型配置 | 创建、维护和发布模型资产 |
-| 下游 | `evaluation` | 加载快照并执行测评 |
-| 下游 | `interpretation` | 使用模型身份和解释绑定生成报告 |
+[docs/_archive/2026-07-09-model-catalog-redesign](../../_archive/2026-07-09-model-catalog-redesign/)
+
+归档文档不再作为当前设计权威来源。
 
 ---
 
-## 6. 端到端支持矩阵（以源码为准）
+## 3. 当前模块结论
 
-| Kind / 模型族 | 发布 | Input Provider | Evaluator | Report Builder | 说明 |
-| ------------- | ---- | -------------- | --------- | -------------- | ---- |
-| `scale` | 是 | 是 | 是 | 是 | 医学量表主链路 |
-| `personality/typology`（MBTI/SBTI/BigFive/配置化） | 是 | 是 | 是 | 是 | configured runtime 主路径 |
-| `behavior_ability`（domain: `behavior_ability`） | 是 | 否（scale legacy binding） | 否（scale legacy binding） | 否 | 产品频道：聚合 legacy + `behavioral_rating` + `cognitive` 列表；新模型走后者 |
-| `behavioral_rating` | 是 | 是 | 是 | 是 | 独立 runtime；Brief-2 用 `behavioral_rating.brief2.v1`，legacy 读 `default.v1` |
-| `cognitive` | 是 | 是 | 是 | 是 | 独立 runtime；SPM 用 `cognitive.spm.v1`，legacy 读 `default.v1` |
-| `custom` | 部分（enum） | 否 | 否 | 否 | **Reserved Kind**：仅占位，与 typology `custom_typology`、plan `scheduleType=custom` 无关 |
-
-### Reserved Kind 说明
-
-- `custom`：catalog enum 占位，不可创建/发布/执行；无 payload format 与 runtime descriptor。
-
-legacy `adapter/{mbti,sbti,bigfive}` 仅服务表征测试，非生产执行路径。
-
-代码事实入口：
-
-- [`internal/apiserver/domain/modelcatalog`](../../../internal/apiserver/domain/modelcatalog/)
-- [`internal/apiserver/container/modules/modelcatalog`](../../../internal/apiserver/container/modules/modelcatalog/)
+- 当前代码已经有统一 `AssessmentModel` 草稿聚合和 `PublishedModel` 发布读模型。
+- 当前 domain 仍混合了目标模型、运行 payload、legacy 医学量表聚合和兼容 adapter。
+- 当前运行侧以 `published_assessment_models` 为发布模型读取入口，evaluation 不应读取草稿模型。
+- 当前 `scales` 仍是医学量表 legacy authoring store，不应再作为目标领域模型来源。
+- 目标设计应把 ModelCatalog 写成“模块设计 + 领域模型 + 关键链路”，而不只是模型命名草案。
