@@ -7,30 +7,34 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-// CalculationScoreNodesFromFactors translates catalog Factors to calculation score nodes.
-func CalculationScoreNodesFromFactors(factors []Factor) []calculation.ScoreNode {
+// CalculationScoreNodesFromMeasureParts translates measure-layer parts to calculation score nodes.
+func CalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, scoring []Scoring) []calculation.ScoreNode {
 	if len(factors) == 0 {
 		return nil
 	}
-	inferred := InferParentCodesFromFactorChildrenPolicy(factors)
-	nodes := make([]calculation.ScoreNode, 0, len(inferred))
-	for _, f := range inferred {
+	levels := graph.Levels()
+	scoringByFactor := make(map[string]Scoring, len(scoring))
+	for _, rule := range scoring {
+		scoringByFactor[rule.FactorCode] = rule
+	}
+	nodes := make([]calculation.ScoreNode, 0, len(factors))
+	for _, f := range factors {
 		role := f.ResolvedRole()
 		node := calculation.ScoreNode{
 			Code:       f.Code,
 			Name:       f.Title,
 			Role:       string(role),
 			Kind:       calculationDimensionKindForRole(role),
-			ParentCode: f.ParentCode,
-			Level:      f.Level,
-			SortOrder:  f.SortOrder,
+			ParentCode: graph.ParentCode(f.Code),
+			Level:      levels[f.Code],
+			SortOrder:  graph.SortOrders[f.Code],
 		}
-		if f.ChildrenPolicy != nil {
-			node.Aggregation = aggregationFromChildrenStrategy(f.ChildrenPolicy.Strategy)
-			node.Children = append([]string(nil), f.ChildrenPolicy.Children...)
-			if len(f.ChildrenPolicy.Weights) > 0 {
-				node.Weights = make(map[string]float64, len(f.ChildrenPolicy.Weights))
-				for code, weight := range f.ChildrenPolicy.Weights {
+		if rule, ok := scoringByFactor[f.Code]; ok && scoringHasSourceKind(rule, ScoringSourceFactor) {
+			node.Aggregation = aggregationFromChildrenStrategy(ChildrenAggregationStrategy(rule.Strategy))
+			node.Children = scoringSourceCodes(rule.Sources)
+			if len(rule.Weights) > 0 {
+				node.Weights = make(map[string]float64, len(rule.Weights))
+				for code, weight := range rule.Weights {
 					node.Weights[code] = weight
 				}
 			}
@@ -40,14 +44,18 @@ func CalculationScoreNodesFromFactors(factors []Factor) []calculation.ScoreNode 
 	return nodes
 }
 
-// CalculationScoreNodesFromSnapshots translates catalog factor snapshots to calculation score nodes.
-func CalculationScoreNodesFromSnapshots(factors []FactorSnapshot) []calculation.ScoreNode {
-	return CalculationScoreNodesFromFactors(FactorsFromSnapshots(factors))
+// CalculationScoreNodesFromLegacyFactors translates legacy flat factors to calculation score nodes.
+func CalculationScoreNodesFromLegacyFactors(factors []LegacyFactor) []calculation.ScoreNode {
+	return CalculationScoreNodesFromMeasureParts(
+		SlimFactorsFromLegacy(factors),
+		FactorGraphFromLegacy(factors),
+		ScoringFromLegacy(factors),
+	)
 }
 
-// ValidateCalculationScoreNodesFromFactors validates the score graph derived from catalog factors.
-func ValidateCalculationScoreNodesFromFactors(factors []Factor) error {
-	nodes := CalculationScoreNodesFromFactors(factors)
+// ValidateCalculationScoreNodesFromMeasureParts validates the score graph derived from measure-layer parts.
+func ValidateCalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, scoring []Scoring) error {
+	nodes := CalculationScoreNodesFromMeasureParts(factors, graph, scoring)
 	issues := calculation.ValidateScoreNodes(nodes)
 	if len(issues) == 0 {
 		return nil
@@ -59,9 +67,24 @@ func ValidateCalculationScoreNodesFromFactors(factors []Factor) error {
 	return fmt.Errorf("invalid score node graph: %s", strings.Join(msgs, "; "))
 }
 
-// ValidateCalculationScoreNodes validates the score graph derived from catalog factor snapshots.
-func ValidateCalculationScoreNodes(factors []FactorSnapshot) error {
-	return ValidateCalculationScoreNodesFromFactors(FactorsFromSnapshots(factors))
+// ValidateCalculationScoreNodesFromLegacyFactors validates the score graph derived from legacy flat factors.
+func ValidateCalculationScoreNodesFromLegacyFactors(factors []LegacyFactor) error {
+	return ValidateCalculationScoreNodesFromMeasureParts(
+		SlimFactorsFromLegacy(factors),
+		FactorGraphFromLegacy(factors),
+		ScoringFromLegacy(factors),
+	)
+}
+
+func scoringSourceCodes(sources []ScoringSource) []string {
+	if len(sources) == 0 {
+		return nil
+	}
+	codes := make([]string, 0, len(sources))
+	for _, source := range sources {
+		codes = append(codes, source.Code)
+	}
+	return codes
 }
 
 func calculationDimensionKindForRole(role FactorRole) calculation.DimensionKind {

@@ -18,9 +18,10 @@ type SaveInput struct {
 
 // SaveResult is the normalized draft definition update produced by a handler.
 type SaveResult struct {
-	Payload   domain.DefinitionPayload
-	Algorithm domain.Algorithm
-	SubKind   domain.SubKind
+	Payload      domain.DefinitionPayload
+	DefinitionV2 *domain.Definition
+	Algorithm    domain.Algorithm
+	SubKind      domain.SubKind
 }
 
 // SnapshotBuildResult carries only the family-specific pieces needed to
@@ -32,6 +33,8 @@ type SnapshotBuildResult struct {
 	PayloadFormat string
 	DecisionKind  domain.DecisionKind
 	Payload       []byte
+	// Version optionally overrides the default draft revision version string.
+	Version string
 }
 
 // Handler owns family-specific definition validation and publication shaping.

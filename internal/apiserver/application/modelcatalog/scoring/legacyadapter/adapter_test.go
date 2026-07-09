@@ -30,8 +30,22 @@ func TestAssessmentModelFromMedicalScalePreservesScaleDefinitionPayload(t *testi
 		model.Status != domain.ModelStatusPublished {
 		t.Fatalf("model identity = %#v", model)
 	}
-	if model.Category != "adhd" || !reflect.DeepEqual(model.Tags, []string{"screening", "clinical"}) {
-		t.Fatalf("model metadata category=%q tags=%v", model.Category, model.Tags)
+	if model.Category != "adhd" ||
+		!reflect.DeepEqual(model.Stages, []string{"deep_assessment"}) ||
+		!reflect.DeepEqual(model.ApplicableAges, []string{"school_child"}) ||
+		!reflect.DeepEqual(model.Reporters, []string{"parent"}) ||
+		!reflect.DeepEqual(model.Tags, []string{"screening", "clinical"}) {
+		t.Fatalf("model metadata category=%q stages=%v ages=%v reporters=%v tags=%v",
+			model.Category, model.Stages, model.ApplicableAges, model.Reporters, model.Tags)
+	}
+	if model.DefinitionV2 == nil {
+		t.Fatal("DefinitionV2 is nil")
+	}
+	if len(model.DefinitionV2.Measure.Factors) != 2 {
+		t.Fatalf("measure factors = %#v", model.DefinitionV2.Measure.Factors)
+	}
+	if len(model.DefinitionV2.Conclusions) != 2 {
+		t.Fatalf("conclusions = %#v", model.DefinitionV2.Conclusions)
 	}
 	got, err := ScaleSnapshotFromDefinitionPayload(model.Definition)
 	if err != nil {
@@ -64,6 +78,12 @@ func TestAssessmentModelFromCreateDTOUsesLegacyDTOContract(t *testing.T) {
 	if model.Code != "SCL_DTO" || model.Title != "DTO Scale" || model.Binding.QuestionnaireCode != "Q_DTO" {
 		t.Fatalf("model = %#v", model)
 	}
+	if !reflect.DeepEqual(model.Stages, []string{"deep_assessment"}) ||
+		!reflect.DeepEqual(model.ApplicableAges, []string{"school_child"}) ||
+		!reflect.DeepEqual(model.Reporters, []string{"parent"}) {
+		t.Fatalf("model audience metadata stages=%v ages=%v reporters=%v",
+			model.Stages, model.ApplicableAges, model.Reporters)
+	}
 	snapshot, err := ScaleSnapshotFromDefinitionPayload(model.Definition)
 	if err != nil {
 		t.Fatalf("ScaleSnapshotFromDefinitionPayload: %v", err)
@@ -71,6 +91,30 @@ func TestAssessmentModelFromCreateDTOUsesLegacyDTOContract(t *testing.T) {
 	if snapshot.Code != "SCL_DTO" || snapshot.ScaleVersion != scaledefinition.DefaultScaleVersion ||
 		snapshot.QuestionnaireVersion != "1.0.0" {
 		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestMedicalScaleAssessmentModelRoundTripPreservesFactors(t *testing.T) {
+	t.Parallel()
+
+	original := newLegacyScale(t)
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	model, err := AssessmentModelFromMedicalScale(original, now)
+	if err != nil {
+		t.Fatalf("AssessmentModelFromMedicalScale: %v", err)
+	}
+	scale, err := MedicalScaleFromAssessmentModel(model)
+	if err != nil {
+		t.Fatalf("MedicalScaleFromAssessmentModel: %v", err)
+	}
+	if len(scale.FactorSnapshots()) != len(original.FactorSnapshots()) {
+		t.Fatalf("factor count = %d, want %d", len(scale.FactorSnapshots()), len(original.FactorSnapshots()))
+	}
+	if err := SyncAssessmentModelFromMedicalScale(model, scale, now); err != nil {
+		t.Fatalf("SyncAssessmentModelFromMedicalScale: %v", err)
+	}
+	if len(model.DefinitionV2.Measure.Factors) != 2 {
+		t.Fatalf("synced measure factors = %#v", model.DefinitionV2.Measure.Factors)
 	}
 }
 
@@ -89,6 +133,9 @@ func TestScaleResultFromAssessmentModelProjectsLegacyResponseShape(t *testing.T)
 	}
 	if result.Code != "SCL_LEGACY" || result.ScaleVersion != "1.0.0" ||
 		result.Category != "adhd" || result.Status != "published" ||
+		!reflect.DeepEqual(result.Stages, []string{"deep_assessment"}) ||
+		!reflect.DeepEqual(result.ApplicableAges, []string{"school_child"}) ||
+		!reflect.DeepEqual(result.Reporters, []string{"parent"}) ||
 		!reflect.DeepEqual(result.Tags, []string{"screening", "clinical"}) {
 		t.Fatalf("result = %#v", result)
 	}
@@ -230,6 +277,9 @@ func newLegacyScale(t *testing.T) *scaledefinition.MedicalScale {
 		scaledefinition.WithQuestionnaire(meta.NewCode("Q_LEGACY"), "1.0.0"),
 		scaledefinition.WithStatus(scaledefinition.StatusPublished),
 		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
+		scaledefinition.WithStages([]scaledefinition.Stage{scaledefinition.StageDeepAssessment}),
+		scaledefinition.WithApplicableAges([]scaledefinition.ApplicableAge{scaledefinition.ApplicableAgeSchoolChild}),
+		scaledefinition.WithReporters([]scaledefinition.Reporter{scaledefinition.ReporterParent}),
 		scaledefinition.WithTags([]scaledefinition.Tag{scaledefinition.NewTag("screening"), scaledefinition.NewTag("clinical")}),
 		scaledefinition.WithFactors([]*scaledefinition.Factor{total, cnt}),
 	)

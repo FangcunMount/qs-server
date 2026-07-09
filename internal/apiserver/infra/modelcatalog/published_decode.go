@@ -54,5 +54,31 @@ func DecodeScaleFromPublished(model *port.PublishedModel) (*scalesnapshot.ScaleS
 	if !domain.IsScalePayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported scale payload format: %s", format)
 	}
+	if model.DefinitionV2 != nil {
+		if snapshot := scalesnapshot.ScaleSnapshotFromDefinition(scalesnapshot.ExecutionEnvelope{
+			Code:                 model.Code,
+			ScaleVersion:         model.Version,
+			Title:                model.Title,
+			QuestionnaireCode:    model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion,
+			Status:               model.Status,
+		}, model.DefinitionV2); snapshot != nil {
+			applyScalePublishedPayloadMetadata(snapshot, model.Payload)
+			return snapshot, nil
+		}
+	}
 	return scalesnapshot.ParsePublishedPayload(model.Payload)
+}
+
+func applyScalePublishedPayloadMetadata(snapshot *scalesnapshot.ScaleSnapshot, payload []byte) {
+	if snapshot == nil || len(payload) == 0 {
+		return
+	}
+	legacy, err := scalesnapshot.ParsePublishedPayload(payload)
+	if err != nil || legacy == nil {
+		return
+	}
+	if snapshot.ID == 0 {
+		snapshot.ID = legacy.ID
+	}
 }

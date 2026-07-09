@@ -144,3 +144,45 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 		t.Fatalf("decision kind = %s, want %s", snapshot.DecisionKind, domain.DecisionKindAbilityLevel)
 	}
 }
+
+func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
+	t.Parallel()
+
+	modelRepo := &memoryModelRepo{}
+	svc := taskperformance.NewService(taskperformance.Dependencies{ModelRepo: modelRepo})
+
+	created, err := svc.Create(context.Background(), taskperformance.CreateInput{
+		Code:  "COG-V2",
+		Title: "认知测评",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	payload := []byte(`{
+		"dimensions": [{
+			"code": "total",
+			"title": "总分",
+			"question_codes": ["q1"],
+			"scoring_strategy": "sum",
+			"is_total_score": true
+		}],
+		"spm": {
+			"item_set_codes": ["total"],
+			"norm_table_version": "spm-cn-2026"
+		}
+	}`)
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, taskperformance.DefinitionInput{Payload: payload}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	saved := modelRepo.models[created.Code]
+	if saved.DefinitionV2 == nil {
+		t.Fatal("DefinitionV2 is nil")
+	}
+	if len(saved.DefinitionV2.Measure.Factors) != 1 || saved.DefinitionV2.Measure.Factors[0].Code != "total" {
+		t.Fatalf("measure factors = %#v", saved.DefinitionV2.Measure.Factors)
+	}
+	if len(saved.DefinitionV2.Calibration.NormRefs) != 1 || saved.DefinitionV2.Calibration.NormRefs[0].NormTableVersion != "spm-cn-2026" {
+		t.Fatalf("norm refs = %#v", saved.DefinitionV2.Calibration.NormRefs)
+	}
+}

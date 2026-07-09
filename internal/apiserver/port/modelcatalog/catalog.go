@@ -44,12 +44,19 @@ type AssessmentSnapshot struct {
 	Code                 string
 	Version              string
 	Title                string
+	Description          string
+	Category             string
+	Stages               []string
+	ApplicableAges       []string
+	Reporters            []string
+	Tags                 []string
 	Status               string
 	DecisionKind         domain.DecisionKind
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Source               map[string]any
 	Payload              []byte
+	DefinitionV2         *domain.Definition
 }
 
 // PublishedModel 是 AssessmentSnapshot 的兼容名称。

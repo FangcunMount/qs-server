@@ -25,11 +25,6 @@ func (f FactorSnapshot) ResolvedRole() FactorRole {
 	return resolveRole(f.Role, f.IsTotalScore)
 }
 
-// Factor materializes the domain Factor represented by this compatibility snapshot.
-func (f FactorSnapshot) Factor() Factor {
-	return FactorFromSnapshot(f)
-}
-
 func resolveRole(role FactorRole, isTotalScore bool) FactorRole {
 	if role != "" {
 		return role

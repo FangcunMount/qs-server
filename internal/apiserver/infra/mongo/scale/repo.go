@@ -108,6 +108,28 @@ func (r *Repository) FindPublishedByQuestionnaireCode(ctx context.Context, quest
 	return r.findOne(ctx, publishedQuestionnaireCodeFilter(questionnaireCode))
 }
 
+// ListHeadScales 列出 scales collection 中所有 head 量表（backfill 用）。
+func (r *Repository) ListHeadScales(ctx context.Context) ([]*scaledefinition.MedicalScale, error) {
+	cursor, err := r.Collection().Find(ctx, headScalesFilter())
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	var results []*scaledefinition.MedicalScale
+	for cursor.Next(ctx) {
+		var po ScalePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		results = append(results, r.mapper.ToDomain(ctx, &po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // ListActivePublishedSnapshots 列出所有当前激活的已发布量表快照（backfill 用）。
 func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scaledefinition.MedicalScale, error) {
 	cursor, err := r.Collection().Find(ctx, activePublishedSnapshotsFilter())
@@ -176,6 +198,13 @@ func headRoleCandidates() bson.A {
 func headFilter(code string) bson.M {
 	return bson.M{
 		"code":       code,
+		"deleted_at": nil,
+		"$or":        headRoleCandidates(),
+	}
+}
+
+func headScalesFilter() bson.M {
+	return bson.M{
 		"deleted_at": nil,
 		"$or":        headRoleCandidates(),
 	}

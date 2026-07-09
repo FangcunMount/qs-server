@@ -62,14 +62,14 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 		Title:   title,
 		Status:  status,
 	}
-	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	factors := factor.ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.SPM != nil {
-		factors = taskperf.ApplyNormMetadata(factors, taskperf.MetadataContext{
+		factors = taskperf.ApplyNormMetadataToLegacyFactors(factors, taskperf.MetadataContext{
 			NormTableVersion: body.SPM.NormTableVersion,
 			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
 		})
 	}
-	out.Factors = factors
+	out.Factors = factor.SnapshotsFromLegacyFactors(factors)
 	return out, nil
 }
 
@@ -82,7 +82,12 @@ func (s *Snapshot) ToScaleSnapshot() *scoringsnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	return scoringsnapshot.BuildFromModelFactors(
-		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
-	)
+	return scoringsnapshot.BuildFromCanonicalFactors(scoringsnapshot.ExecutionEnvelope{
+		Code:                 s.Code,
+		ScaleVersion:         s.Version,
+		Title:                s.Title,
+		QuestionnaireCode:    s.QuestionnaireCode,
+		QuestionnaireVersion: s.QuestionnaireVersion,
+		Status:               s.Status,
+	}, s.Factors)
 }

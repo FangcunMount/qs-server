@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -168,6 +169,59 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	}
 	if runtimeSnapshot.Norming == nil || runtimeSnapshot.Norming.Variant != "parent" {
 		t.Fatalf("norming profile = %#v", runtimeSnapshot.Norming)
+	}
+}
+
+func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
+	t.Parallel()
+
+	modelRepo := &memoryModelRepo{}
+	svc := norming.NewService(norming.Dependencies{ModelRepo: modelRepo})
+
+	created, err := svc.Create(context.Background(), norming.CreateInput{
+		Code:  "BR-V2",
+		Title: "BRIEF-2",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	definition := []byte(`{
+		"dimensions": [
+			{"code": "inhibit", "title": "Inhibit", "question_codes": ["q1"], "scoring_strategy": "sum"},
+			{"code": "self_monitor", "title": "Self Monitor", "question_codes": ["q2"], "scoring_strategy": "sum"},
+			{"code": "bri", "title": "BRI"},
+			{"code": "gec", "title": "GEC"}
+		],
+		"brief2": {
+			"norm_table_version": "2024",
+			"index_codes": ["bri", "gec"],
+			"composite_indexes": [
+				{"code": "bri", "strategy": "sum", "children": ["inhibit", "self_monitor"]},
+				{"code": "gec", "strategy": "sum", "children": ["bri"]}
+			],
+			"norms": [{"factor_code": "gec"}]
+		}
+	}`)
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	saved := modelRepo.models[created.Code]
+	if saved.DefinitionV2 == nil {
+		t.Fatal("DefinitionV2 is nil")
+	}
+	roles := map[string]factor.FactorRole{}
+	for _, item := range saved.DefinitionV2.Measure.Factors {
+		roles[item.Code] = item.ResolvedRole()
+	}
+	if roles["bri"] != factor.FactorRoleIndex || roles["gec"] != factor.FactorRoleIndex {
+		t.Fatalf("roles = %#v", roles)
+	}
+	if saved.DefinitionV2.Measure.FactorGraph.ParentCode("inhibit") != "bri" {
+		t.Fatalf("inhibit parent = %q", saved.DefinitionV2.Measure.FactorGraph.ParentCode("inhibit"))
+	}
+	if len(saved.DefinitionV2.Calibration.NormRefs) != 1 || saved.DefinitionV2.Calibration.NormRefs[0].NormTableVersion != "2024" {
+		t.Fatalf("norm refs = %#v", saved.DefinitionV2.Calibration.NormRefs)
 	}
 }
 

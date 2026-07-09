@@ -2,6 +2,18 @@ package factor
 
 // Factor 是 ModelCatalog 的通用测量节点。
 type Factor struct {
+	Code  string
+	Title string
+	Role  FactorRole
+}
+
+// ResolvedRole 返回显式 role，或归一化为空 role 的默认维度角色。
+func (f Factor) ResolvedRole() FactorRole {
+	return f.Role.Resolved()
+}
+
+// LegacyFactor 是历史 flat payload 的 compatibility materialization，不是核心领域模型。
+type LegacyFactor struct {
 	Code            string
 	Title           string
 	Role            FactorRole
@@ -20,12 +32,12 @@ type Factor struct {
 }
 
 // ResolvedRole 返回显式 role，或从旧版 total-score flag 推导 role。
-func (f Factor) ResolvedRole() FactorRole {
+func (f LegacyFactor) ResolvedRole() FactorRole {
 	return resolveRole(f.Role, f.IsTotalScore)
 }
 
-// Snapshot 返回 Factor 的兼容 read/published 快照形态。
-func (f Factor) Snapshot() FactorSnapshot {
+// Snapshot 返回 LegacyFactor 的兼容 read/published 快照形态。
+func (f LegacyFactor) Snapshot() FactorSnapshot {
 	return FactorSnapshot{
 		Code:            f.Code,
 		Title:           f.Title,
@@ -45,15 +57,39 @@ func (f Factor) Snapshot() FactorSnapshot {
 	}
 }
 
-// Scoring 描述一个 Factor 的题目分聚合策略。
+// ScoringSourceKind 标识 Factor 计分输入来源。
+type ScoringSourceKind string
+
+const (
+	ScoringSourceQuestion ScoringSourceKind = "question"
+	ScoringSourceFactor   ScoringSourceKind = "factor"
+)
+
+// ScoringSource 指向一个计分输入，可以是题目或子 Factor。
+type ScoringSource struct {
+	Kind ScoringSourceKind
+	Code string
+}
+
+// Scoring 描述一个 Factor 的分数如何由输入来源聚合得到。
 type Scoring struct {
 	FactorCode string
+	Sources    []ScoringSource
 	Strategy   ScoringStrategy
 	Params     *ScoringParams
+	MaxScore   *float64
+	Weights    map[string]float64
+}
+
+// FactorEdge 描述 FactorGraph 中一条父子边。
+type FactorEdge struct {
+	ParentCode string
+	ChildCode  string
 }
 
 // FactorGraph 描述 Factor 之间的层级和展示顺序。
 type FactorGraph struct {
-	Roots []string
-	Edges map[string][]string
+	Roots      []string
+	Edges      []FactorEdge
+	SortOrders map[string]int
 }

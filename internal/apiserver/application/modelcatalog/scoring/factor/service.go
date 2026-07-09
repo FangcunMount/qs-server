@@ -2,13 +2,17 @@ package factor
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/editable"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -18,6 +22,7 @@ import (
 // 行为者：量表因子编辑者
 type factorService struct {
 	repo           factorRepository
+	modelRepo      modelcatalogport.ModelRepository
 	listCache      scalelistcache.PublishedListCache
 	eventPublisher event.EventPublisher
 }
@@ -28,13 +33,27 @@ type factorRepository interface {
 	Update(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
+// ServiceOption configures factor authoring collaborators.
+type ServiceOption func(*factorService)
+
+// WithAssessmentModelRepository injects the target AssessmentModel draft repository.
+func WithAssessmentModelRepository(repo modelcatalogport.ModelRepository) ServiceOption {
+	return func(s *factorService) {
+		s.modelRepo = repo
+	}
+}
+
 // NewService 创建量表因子编辑应用服务。
-func NewService(repo factorRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ports.ScaleFactorService {
-	return &factorService{
+func NewService(repo factorRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher, opts ...ServiceOption) ports.ScaleFactorService {
+	service := &factorService{
 		repo:           repo,
 		listCache:      listCache,
 		eventPublisher: eventPublisher,
 	}
+	for _, opt := range opts {
+		opt(service)
+	}
+	return service
 }
 
 // AddFactor 添加因子
@@ -49,22 +68,15 @@ func (s *factorService) AddFactor(ctx context.Context, dto shared.AddFactorDTO) 
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子标题不能为空")
 	}
 
-	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
-	if err != nil {
-		return nil, err
-	}
-
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := m.AddFactor(factor); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "添加因子失败")
-	}
-
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, dto.ScaleCode, "添加因子失败", func(scale *scaledefinition.MedicalScale) error {
+		return scale.AddFactor(factor)
+	})
 }
 
 // UpdateFactor 更新因子
@@ -76,22 +88,15 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto shared.UpdateFacto
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
-	if err != nil {
-		return nil, err
-	}
-
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := m.UpdateFactor(factor); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子失败")
-	}
-
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, dto.ScaleCode, "更新因子失败", func(scale *scaledefinition.MedicalScale) error {
+		return scale.UpdateFactor(factor)
+	})
 }
 
 // RemoveFactor 删除因子
@@ -103,16 +108,9 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	m, err := s.loadEditableScale(ctx, scaleCode)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := m.RemoveFactor(scaledefinition.NewFactorCode(factorCode)); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "删除因子失败")
-	}
-
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, scaleCode, "删除因子失败", func(scale *scaledefinition.MedicalScale) error {
+		return scale.RemoveFactor(scaledefinition.NewFactorCode(factorCode))
+	})
 }
 
 // ReplaceFactors 替换所有因子
@@ -122,11 +120,6 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 	}
 	if len(factorDTOs) == 0 {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子列表不能为空")
-	}
-
-	m, err := s.loadEditableScale(ctx, scaleCode)
-	if err != nil {
-		return nil, err
 	}
 
 	factors := make([]*scaledefinition.Factor, 0, len(factorDTOs))
@@ -151,11 +144,9 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, shared.WrapScaleDomainError(scaledefinition.ToError(allValidationErrors), errorCode.ErrInvalidArgument, "验证因子失败")
 	}
 
-	if err := m.ReplaceFactors(factors); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "替换因子失败")
-	}
-
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, scaleCode, "替换因子失败", func(scale *scaledefinition.MedicalScale) error {
+		return scale.ReplaceFactors(factors)
+	})
 }
 
 // UpdateFactorInterpretRules 更新因子解读规则
@@ -167,18 +158,11 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto shar
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
-	if err != nil {
-		return nil, err
-	}
-
 	rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
 
-	if err := m.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules); err != nil {
-		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
-	}
-
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, dto.ScaleCode, "更新解读规则失败", func(scale *scaledefinition.MedicalScale) error {
+		return scale.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules)
+	})
 }
 
 // ReplaceInterpretRules 批量设置所有因子的解读规则
@@ -190,46 +174,94 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子解读规则列表不能为空")
 	}
 
-	m, err := s.loadEditableScale(ctx, scaleCode)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, dto := range dtos {
 		if dto.FactorCode == "" {
 			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 		}
-
-		rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
-
-		if err := m.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules); err != nil {
-			return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
-		}
 	}
 
-	return s.persistFactorMutation(ctx, m)
+	return s.mutateEditableScale(ctx, scaleCode, "更新解读规则失败", func(scale *scaledefinition.MedicalScale) error {
+		for _, dto := range dtos {
+			rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
+			if err := scale.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+type scaleMutation func(scale *scaledefinition.MedicalScale) error
+
+func (s *factorService) usesAssessmentModelStore() bool {
+	return s != nil && s.modelRepo != nil
+}
+
+func (s *factorService) mutateEditableScale(ctx context.Context, scaleCode, failureMessage string, mutate scaleMutation) (*shared.ScaleResult, error) {
+	if s.usesAssessmentModelStore() {
+		return s.mutateEditableAssessmentModel(ctx, scaleCode, failureMessage, mutate)
+	}
+
+	scale, err := s.loadEditableScale(ctx, scaleCode)
+	if err != nil {
+		return nil, err
+	}
+	if err := mutate(scale); err != nil {
+		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "%s", failureMessage)
+	}
+	return s.persistLegacyFactorMutation(ctx, scale)
+}
+
+func (s *factorService) mutateEditableAssessmentModel(ctx context.Context, scaleCode, failureMessage string, mutate scaleMutation) (*shared.ScaleResult, error) {
+	model, err := assessmentstore.LoadScale(ctx, s.modelRepo, scaleCode)
+	if err != nil {
+		return nil, err
+	}
+	if err := assessmentstore.EnsureHeadEditable(ctx, s.modelRepo, model); err != nil {
+		return nil, err
+	}
+
+	scale, err := legacyadapter.MedicalScaleFromAssessmentModel(model)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "%s", failureMessage)
+	}
+	if err := mutate(scale); err != nil {
+		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "%s", failureMessage)
+	}
+
+	now := time.Now().UTC()
+	if err := legacyadapter.SyncAssessmentModelFromMedicalScale(model, scale, now); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "%s", failureMessage)
+	}
+	if err := assessmentstore.SaveScale(ctx, s.modelRepo, model); err != nil {
+		return nil, err
+	}
+
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, scale, nil, nil)
+	s.refreshListCache(ctx)
+	return assessmentstore.ScaleResult(model)
 }
 
 func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string) (*scaledefinition.MedicalScale, error) {
-	m, err := s.repo.FindByCode(ctx, scaleCode)
+	scale, err := s.repo.FindByCode(ctx, scaleCode)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
-	if err := editable.EnsureHeadEditable(ctx, s.repo, m); err != nil {
+	if err := editable.EnsureHeadEditable(ctx, s.repo, scale); err != nil {
 		return nil, err
 	}
-	return m, nil
+	return scale, nil
 }
 
-func (s *factorService) persistFactorMutation(ctx context.Context, m *scaledefinition.MedicalScale) (*shared.ScaleResult, error) {
-	if err := s.repo.Update(ctx, m); err != nil {
+func (s *factorService) persistLegacyFactorMutation(ctx context.Context, scale *scaledefinition.MedicalScale) (*shared.ScaleResult, error) {
+	if err := s.repo.Update(ctx, scale); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, scale, nil, nil)
 	s.refreshListCache(ctx)
 
-	return shared.ToScaleResult(m), nil
+	return shared.ToScaleResult(scale), nil
 }
 
 func (s *factorService) refreshListCache(ctx context.Context) {

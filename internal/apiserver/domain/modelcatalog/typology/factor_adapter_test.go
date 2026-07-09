@@ -34,13 +34,11 @@ func TestCanonicalFactorsFromLegacyMBTIGraph(t *testing.T) {
 	if factors[0].Code != "EI" || factors[0].ResolvedRole() != factor.FactorRoleDimension {
 		t.Fatalf("factor = %#v", factors[0])
 	}
-	if len(factors[0].QuestionCodes) != 1 || factors[0].QuestionCodes[0] != "q1" {
-		t.Fatalf("question codes = %#v", factors[0].QuestionCodes)
-	}
-	if factors[0].Classification == nil ||
-		factors[0].Classification.NegativePole != "I" ||
-		factors[0].Classification.PositivePole != "E" {
-		t.Fatalf("classification = %#v", factors[0].Classification)
+	measure := typology.CanonicalMeasureSpecFromGraph(spec.FactorGraph)
+	if len(measure.Scoring) != 1 ||
+		measure.Scoring[0].Sources[0].Kind != factor.ScoringSourceQuestion ||
+		measure.Scoring[0].Sources[0].Code != "q1" {
+		t.Fatalf("scoring = %#v", measure.Scoring)
 	}
 }
 
@@ -81,8 +79,15 @@ func TestPayloadCanonicalFactorsUsesRuntimeSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CanonicalFactors: %v", err)
 	}
-	if len(factors) != 1 || factors[0].Code != "O" || factors[0].QuestionCodes[0] != "q1" {
+	if len(factors) != 1 || factors[0].Code != "O" {
 		t.Fatalf("factors = %#v", factors)
+	}
+	measure, err := payload.CanonicalMeasureSpec()
+	if err != nil {
+		t.Fatalf("CanonicalMeasureSpec: %v", err)
+	}
+	if len(measure.Scoring) != 1 || measure.Scoring[0].Sources[0].Code != "q1" {
+		t.Fatalf("scoring = %#v", measure.Scoring)
 	}
 }
 

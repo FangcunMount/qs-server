@@ -5,10 +5,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/editable"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -34,6 +36,9 @@ type lifecycleService struct {
 	cacheSignalNotifier     CacheSignalNotifier
 	interpretationPublisher ScalePublisher
 	assessmentPublisher     AssessmentSnapshotPublisher
+	modelRepo               modelcatalogport.ModelRepository
+	publishedRepo           modelcatalogport.PublishedModelRepository
+	publisher               publication.Publisher
 }
 
 type lifecycleRepository interface {
@@ -95,6 +100,27 @@ func WithAssessmentSnapshotPublisher(publisher AssessmentSnapshotPublisher) Serv
 	}
 }
 
+// WithAssessmentModelRepository injects the target AssessmentModel draft repository.
+func WithAssessmentModelRepository(repo modelcatalogport.ModelRepository) ServiceOption {
+	return func(s *lifecycleService) {
+		s.modelRepo = repo
+	}
+}
+
+// WithPublishedModelRepository injects the published AssessmentModel repository.
+func WithPublishedModelRepository(repo modelcatalogport.PublishedModelRepository) ServiceOption {
+	return func(s *lifecycleService) {
+		s.publishedRepo = repo
+	}
+}
+
+// WithPublicationPublisher injects the AssessmentModel publication coordinator.
+func WithPublicationPublisher(publisher publication.Publisher) ServiceOption {
+	return func(s *lifecycleService) {
+		s.publisher = publisher
+	}
+}
+
 // NewService 创建量表生命周期应用服务。
 func NewService(
 	repo lifecycleRepository,
@@ -121,6 +147,9 @@ func NewService(
 func (s *lifecycleService) Publish(ctx context.Context, code string) (*shared.ScaleResult, error) {
 	if code == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
+	}
+	if s.usesAssessmentModelPublishStore() {
+		return s.publishAssessmentModel(ctx, code)
 	}
 
 	m, err := s.getScaleByCode(ctx, code)
@@ -163,6 +192,9 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*shared.
 	if code == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
 	}
+	if s.usesAssessmentModelPublishStore() {
+		return s.unpublishAssessmentModel(ctx, code)
+	}
 
 	m, err := s.getScaleByCode(ctx, code)
 	if err != nil {
@@ -186,6 +218,9 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*shared.
 func (s *lifecycleService) Archive(ctx context.Context, code string) (*shared.ScaleResult, error) {
 	if code == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
+	}
+	if s.usesAssessmentModelPublishStore() {
+		return s.archiveAssessmentModel(ctx, code)
 	}
 
 	m, err := s.getScaleByCode(ctx, code)

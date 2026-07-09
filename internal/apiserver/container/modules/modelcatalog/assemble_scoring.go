@@ -72,8 +72,16 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 		scoringApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
 		scoringApp.WithScalePublisher(normalized.ScalePublisher),
 		scoringApp.WithAssessmentSnapshotPublisher(newScaleAssessmentSnapshotPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
+		scoringApp.WithAssessmentModelRepository(normalized.ModelRepo),
+		scoringApp.WithPublishedModelRepository(normalized.PublishedRepo),
+		scoringApp.WithPublicationPublisher(scoringApp.NewScalePublicationPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
 	)
-	module.FactorService = scoringApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
+	module.FactorService = scoringApp.NewFactorService(
+		normalized.Repo,
+		normalized.ListCache,
+		module.eventPublisher,
+		scoringApp.WithFactorAssessmentModelRepository(normalized.ModelRepo),
+	)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
 	module.QueryService = scoringApp.NewQueryServiceWithModelCatalogSources(
 		normalized.Repo,

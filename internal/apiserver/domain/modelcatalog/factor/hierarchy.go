@@ -1,24 +1,5 @@
 package factor
 
-// HierarchyMeta 携带可选 父节点/ordering 元数据 用于 multi-等级 因子 trees。
-// Level 是usually 派生 从 Parent编码 在 校验; 载荷 may omit it。
-type HierarchyMeta struct {
-	ParentCode string
-	SortOrder  int
-	Level      int
-}
-
-// ScorableRole 报告是否 因子 角色 participates in 计分 pipelines。
-func ScorableRole(role FactorRole) bool {
-	switch role.Resolved() {
-	case FactorRoleDimension, FactorRoleTotal, FactorRoleIndex,
-		FactorRoleValidity, FactorRoleSubtest, FactorRoleTaskSet, FactorRoleAbilityDomain:
-		return true
-	default:
-		return false
-	}
-}
-
 // RequiresChildrenPolicy 报告是否 publish 校验 必须 require 子节点策略。
 func RequiresChildrenPolicy(role FactorRole) bool {
 	return role.Resolved() == FactorRoleIndex
@@ -52,22 +33,22 @@ func IndexByFactorCode(factors []Factor) map[string]Factor {
 	return index
 }
 
-// IndexByCode 构建兼容 snapshot lookup 映射。
-func IndexByCode(factors []FactorSnapshot) map[string]FactorSnapshot {
-	index := make(map[string]FactorSnapshot, len(factors))
-	for code, factor := range IndexByFactorCode(FactorsFromSnapshots(factors)) {
-		index[code] = factor.Snapshot()
+// IndexByLegacyFactorCode 构建 legacy flat factor lookup 映射，用于兼容 DTO 测试和投影。
+func IndexByLegacyFactorCode(factors []LegacyFactor) map[string]LegacyFactor {
+	index := make(map[string]LegacyFactor, len(factors))
+	for _, factor := range factors {
+		index[factor.Code] = factor
 	}
 	return index
 }
 
 // InferParentCodesFromFactorChildrenPolicy fills 空 Parent编码 从 index 子节点策略 edges,
 // then derives 层级 等级。
-func InferParentCodesFromFactorChildrenPolicy(factors []Factor) []Factor {
+func InferParentCodesFromFactorChildrenPolicy(factors []LegacyFactor) []LegacyFactor {
 	if len(factors) == 0 {
 		return nil
 	}
-	out := make([]Factor, len(factors))
+	out := make([]LegacyFactor, len(factors))
 	copy(out, factors)
 	for _, parent := range out {
 		if parent.ChildrenPolicy == nil {
@@ -85,18 +66,13 @@ func InferParentCodesFromFactorChildrenPolicy(factors []Factor) []Factor {
 	return DeriveFactorLevels(out)
 }
 
-// InferParentCodesFromChildrenPolicy 是兼容 snapshot wrapper。
-func InferParentCodesFromChildrenPolicy(factors []FactorSnapshot) []FactorSnapshot {
-	return SnapshotsFromFactors(InferParentCodesFromFactorChildrenPolicy(FactorsFromSnapshots(factors)))
-}
-
 // DeriveFactorLevels fills 等级 从 Parent编码 when 缺失. Returns copy 使用 派生 等级。
-func DeriveFactorLevels(factors []Factor) []Factor {
+func DeriveFactorLevels(factors []LegacyFactor) []LegacyFactor {
 	if len(factors) == 0 {
 		return nil
 	}
-	byCode := IndexByFactorCode(factors)
-	derived := make([]Factor, len(factors))
+	byCode := IndexByLegacyFactorCode(factors)
+	derived := make([]LegacyFactor, len(factors))
 	copy(derived, factors)
 
 	memo := make(map[string]int, len(factors))
@@ -125,9 +101,4 @@ func DeriveFactorLevels(factors []Factor) []Factor {
 		derived[i].Level = walk(derived[i].Code)
 	}
 	return derived
-}
-
-// DeriveLevels 是兼容 snapshot wrapper。
-func DeriveLevels(factors []FactorSnapshot) []FactorSnapshot {
-	return SnapshotsFromFactors(DeriveFactorLevels(FactorsFromSnapshots(factors)))
 }

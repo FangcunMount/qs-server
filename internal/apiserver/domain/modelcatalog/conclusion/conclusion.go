@@ -23,10 +23,20 @@ type Outcome struct {
 
 type RiskConclusion struct {
 	FactorCode string
+	Rules      []ScoreRangeOutcome
 	Outcomes   []Outcome
 }
 
 func (RiskConclusion) conclusionKind() Kind { return KindRisk }
+
+type ScoreRangeOutcome struct {
+	MinScore    float64
+	MaxScore    float64
+	OutcomeCode string
+	Title       string
+	Summary     string
+	Description string
+}
 
 type TypeConclusion struct {
 	FactorCodes []string

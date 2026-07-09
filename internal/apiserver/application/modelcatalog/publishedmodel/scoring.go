@@ -76,6 +76,7 @@ func BuildAssessmentSnapshotFromScale(model *scalesnapshot.ScaleSnapshot) (*port
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Source:               map[string]any{},
 		Payload:              payload,
+		DefinitionV2:         scalesnapshot.DefinitionFromScaleSnapshot(model),
 	}, nil
 }
 

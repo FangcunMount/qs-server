@@ -1,6 +1,7 @@
 package factor_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
@@ -19,9 +20,9 @@ func TestDefinitionBodyJSONRoundTrip(t *testing.T) {
 			Ranges:        []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Level: "low"}},
 		}},
 	}
-	raw, err := factor.MarshalDefinitionBodyJSON(original)
+	raw, err := json.Marshal(original)
 	if err != nil {
-		t.Fatalf("MarshalDefinitionBodyJSON: %v", err)
+		t.Fatalf("json.Marshal: %v", err)
 	}
 	got, err := factor.ParseDefinitionBodyJSON(raw)
 	if err != nil {

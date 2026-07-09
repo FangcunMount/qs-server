@@ -35,20 +35,24 @@ type InterpretRule struct {
 	Ranges        []ScoreRangeRule `json:"ranges"`
 }
 
-// ParseFactorsFromDefinitionBody 从共享 payload parts 物化兼容 FactorSnapshot DTO。
-// 新领域逻辑优先使用 ParseFactorsFromDefinitionBodyAsFactors。
-func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []FactorSnapshot {
+// ParseFactorsFromDefinitionBody 从共享 payload parts 物化瘦领域 Factor。
+func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []Factor {
+	return SlimFactorsFromLegacy(ParseLegacyFactorsFromDefinitionBody(dimensions, interpretRules))
+}
+
+// ParseLegacyFactorsFromDefinitionBody 从共享 payload parts 物化 legacy flat factor。
+func ParseLegacyFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []LegacyFactor {
 	rulesByDimension := make(map[string][]ScoreRangeRule, len(interpretRules))
 	for _, rule := range interpretRules {
-		rulesByDimension[rule.DimensionCode] = append([]ScoreRangeRule(nil), rule.Ranges...)
+		rulesByDimension[rule.DimensionCode] = cloneScoreRangeRules(rule.Ranges)
 	}
-	factors := make([]FactorSnapshot, 0, len(dimensions))
+	factors := make([]LegacyFactor, 0, len(dimensions))
 	for _, dimension := range dimensions {
 		role := FactorRole(dimension.Role)
 		if role != "" && !role.IsValid() {
 			role = ""
 		}
-		factors = append(factors, FactorSnapshot{
+		factors = append(factors, LegacyFactor{
 			Code:            dimension.Code,
 			Title:           dimension.Title,
 			Role:            role,
@@ -56,20 +60,20 @@ func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules [
 			SortOrder:       dimension.SortOrder,
 			Level:           dimension.Level,
 			IsTotalScore:    dimension.IsTotalScore,
-			QuestionCodes:   append([]string(nil), dimension.QuestionCodes...),
+			QuestionCodes:   cloneStrings(dimension.QuestionCodes),
 			ScoringStrategy: dimension.ScoringStrategy,
 			ScoringParams:   scoringParamsFromPayload(dimension.ScoringParams),
-			MaxScore:        dimension.MaxScore,
-			InterpretRules:  rulesByDimension[dimension.Code],
+			MaxScore:        cloneFloat64(dimension.MaxScore),
+			InterpretRules:  cloneScoreRangeRules(rulesByDimension[dimension.Code]),
 			ChildrenPolicy:  childrenPolicyFromPayload(dimension.ChildrenPolicy),
 		})
 	}
 	return factors
 }
 
-// ParseFactorsFromDefinitionBodyAsFactors 从共享 payload parts 物化领域 Factor。
-func ParseFactorsFromDefinitionBodyAsFactors(dimensions []DimensionRule, interpretRules []InterpretRule) []Factor {
-	return FactorsFromSnapshots(ParseFactorsFromDefinitionBody(dimensions, interpretRules))
+// ParseFactorSnapshotsFromDefinitionBody 从共享 payload parts 物化 runtime/published 边界 DTO。
+func ParseFactorSnapshotsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []FactorSnapshot {
+	return SnapshotsFromLegacyFactors(ParseLegacyFactorsFromDefinitionBody(dimensions, interpretRules))
 }
 
 func childrenPolicyFromPayload(payload *ChildrenPolicyPayload) *ChildrenPolicy {
@@ -78,9 +82,20 @@ func childrenPolicyFromPayload(payload *ChildrenPolicyPayload) *ChildrenPolicy {
 	}
 	return &ChildrenPolicy{
 		Strategy: ChildrenAggregationStrategy(payload.Strategy),
-		Children: append([]string(nil), payload.Children...),
-		Weights:  payload.Weights,
+		Children: cloneStrings(payload.Children),
+		Weights:  cloneWeights(payload.Weights),
 	}
+}
+
+func cloneWeights(weights map[string]float64) map[string]float64 {
+	if weights == nil {
+		return nil
+	}
+	out := make(map[string]float64, len(weights))
+	for key, value := range weights {
+		out[key] = value
+	}
+	return out
 }
 
 func scoringParamsFromPayload(payload *ScoringParamsPayload) *ScoringParams {

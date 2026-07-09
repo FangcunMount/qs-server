@@ -17,7 +17,7 @@ func ApplyFactorProjections(
 	if outcome == nil || snapshot == nil {
 		return outcome
 	}
-	nodes := calculationadapter.ScoreNodesFromFactors(snapshot.Factors)
+	nodes := calculationadapter.ScoreNodesFromSnapshots(snapshot.Factors)
 	calcResult := calculationadapter.CalcResultFromOutcome(outcome)
 	calcResult = projection.CompositeProjection{Nodes: nodes}.Apply(calcResult)
 	calcResult = enrichNormCalcResult(calcResult, snapshot, subject)

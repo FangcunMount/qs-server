@@ -80,6 +80,7 @@ type (
 	NormRef           = normpkg.Ref
 	Conclusion        = conclusionpkg.Conclusion
 	Outcome           = conclusionpkg.Outcome
+	ScoreRangeOutcome = conclusionpkg.ScoreRangeOutcome
 	RiskConclusion    = conclusionpkg.RiskConclusion
 	TypeConclusion    = conclusionpkg.TypeConclusion
 	NormConclusion    = conclusionpkg.NormConclusion
@@ -230,7 +231,6 @@ var (
 	ParseModelStatus   = assessmentmodelpkg.ParseStatus
 
 	ParseDefinitionBodyJSON              = factorpkg.ParseDefinitionBodyJSON
-	FactorsFromDefinitionBodyJSON        = factorpkg.FactorsFromDefinitionBodyJSON
 	ValidateDefinitionBodyForPublish     = factorpkg.ValidateDefinitionBodyForPublish
 	ValidateDefinitionBodyJSONForPublish = factorpkg.ValidateDefinitionBodyJSONForPublish
 	ParsePublishedScalePayload           = scoringsnapshot.ParsePublishedPayload

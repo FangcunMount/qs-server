@@ -48,12 +48,19 @@ func recordFromModel(model *domain.AssessmentModel, kind domain.Kind, subKind do
 		Code:                 model.Code,
 		Version:              modelVersionString(model),
 		Title:                model.Title,
+		Description:          model.Description,
+		Category:             model.Category,
+		Stages:               append([]string(nil), model.Stages...),
+		ApplicableAges:       append([]string(nil), model.ApplicableAges...),
+		Reporters:            append([]string(nil), model.Reporters...),
+		Tags:                 append([]string(nil), model.Tags...),
 		Status:               string(domain.ModelStatusPublished),
 		DecisionKind:         decisionKind,
 		QuestionnaireCode:    model.Binding.QuestionnaireCode,
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		Source:               map[string]any{},
 		Payload:              payload,
+		DefinitionV2:         model.DefinitionV2,
 	}
 }
 

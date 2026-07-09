@@ -4,6 +4,8 @@ import (
 	"context"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
@@ -52,6 +54,26 @@ func WithAssessmentSnapshotPublisher(publisher lifecycle.AssessmentSnapshotPubli
 	return lifecycle.WithAssessmentSnapshotPublisher(publisher)
 }
 
+// WithAssessmentModelRepository injects the AssessmentModel draft repository for scale authoring.
+func WithAssessmentModelRepository(repo modelcatalogport.ModelRepository) lifecycle.ServiceOption {
+	return lifecycle.WithAssessmentModelRepository(repo)
+}
+
+// WithPublishedModelRepository injects the published AssessmentModel repository for scale publish flows.
+func WithPublishedModelRepository(repo modelcatalogport.PublishedModelRepository) lifecycle.ServiceOption {
+	return lifecycle.WithPublishedModelRepository(repo)
+}
+
+// WithPublicationPublisher injects the AssessmentModel publication coordinator.
+func WithPublicationPublisher(publisher publication.Publisher) lifecycle.ServiceOption {
+	return lifecycle.WithPublicationPublisher(publisher)
+}
+
+// NewScalePublicationPublisher builds the scale publication coordinator.
+func NewScalePublicationPublisher(modelRepo modelcatalogport.ModelRepository, publishedRepo modelcatalogport.PublishedModelRepository) publication.Publisher {
+	return assessmentstore.NewPublicationPublisher(modelRepo, publishedRepo)
+}
+
 // NewAssessmentSnapshotPublisher creates the scale legacy-to-AssessmentModel publish bridge.
 func NewAssessmentSnapshotPublisher(modelRepo modelcatalogport.ModelRepository, publishedRepo modelcatalogport.PublishedModelRepository) lifecycle.AssessmentSnapshotPublisher {
 	return legacyadapter.NewAssessmentSnapshotPublisher(modelRepo, publishedRepo)
@@ -67,8 +89,13 @@ func (f QuestionnairePublisherFunc) PublishQuestionnaire(ctx context.Context, co
 }
 
 // NewFactorService 创建量表因子编辑应用服务。
-func NewFactorService(repo scaledefinition.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
-	return factor.NewService(repo, listCache, eventPublisher)
+func NewFactorService(repo scaledefinition.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher, opts ...factor.ServiceOption) ScaleFactorService {
+	return factor.NewService(repo, listCache, eventPublisher, opts...)
+}
+
+// WithFactorAssessmentModelRepository injects the AssessmentModel draft repository for scale factor authoring.
+func WithFactorAssessmentModelRepository(repo modelcatalogport.ModelRepository) factor.ServiceOption {
+	return factor.WithAssessmentModelRepository(repo)
 }
 
 // NewQueryService 创建量表查询应用服务。

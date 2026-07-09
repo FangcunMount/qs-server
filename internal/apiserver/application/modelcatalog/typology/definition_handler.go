@@ -42,6 +42,9 @@ func (h DefinitionHandler) PrepareForSave(_ context.Context, model *domain.Asses
 			Data:   storedPayload,
 		},
 	}
+	if definitionV2, err := modeltypology.DefinitionFromPayload(storedPayload, algorithm); err == nil {
+		result.DefinitionV2 = definitionV2
+	}
 	if input.Algorithm != "" {
 		result.Algorithm = domain.Algorithm(input.Algorithm)
 	}

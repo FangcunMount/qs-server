@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -28,6 +29,48 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 	legacy := v1envelope.V1FromPublished(published)
 	if legacy.Definition.Kind != domain.KindTypology || legacy.Definition.Code != "MBTI_OEJTS" {
 		t.Fatalf("legacy kind = %s code = %s", legacy.Definition.Kind, legacy.Definition.Code)
+	}
+}
+
+func TestDecodeScaleFromPublishedPrefersDefinitionV2(t *testing.T) {
+	model := &port.PublishedModel{
+		SchemaVersion:        domain.SchemaVersionV2,
+		PayloadFormat:        domain.PayloadFormatAssessmentScaleV1,
+		Kind:                 domain.KindScale,
+		Code:                 "SCL-V2",
+		Version:              "2.0.0",
+		Title:                "Definition Scale",
+		Status:               "published",
+		QuestionnaireCode:    "QNR-001",
+		QuestionnaireVersion: "1.0.0",
+		Payload:              []byte(`not-json`),
+		DefinitionV2: scalesnapshot.DefinitionFromScaleSnapshot(&scalesnapshot.ScaleSnapshot{
+			Code:         "ignored",
+			ScaleVersion: "ignored",
+			Title:        "ignored",
+			Status:       "published",
+			Factors: []scalesnapshot.FactorSnapshot{{
+				Code:            "total",
+				Title:           "Total",
+				IsTotalScore:    true,
+				QuestionCodes:   []string{"q1"},
+				ScoringStrategy: "sum",
+				InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
+					Min: 0, Max: 10, RiskLevel: "low", Conclusion: "低风险",
+				}},
+			}},
+		}),
+	}
+
+	got, err := DecodeScaleFromPublished(model)
+	if err != nil {
+		t.Fatalf("DecodeScaleFromPublished: %v", err)
+	}
+	if got.Code != "SCL-V2" || got.ScaleVersion != "2.0.0" || got.Factors[0].Title != "Total" {
+		t.Fatalf("decoded scale = %#v", got)
+	}
+	if len(got.Factors[0].InterpretRules) != 1 || got.Factors[0].InterpretRules[0].RiskLevel != "low" {
+		t.Fatalf("interpret rules = %#v", got.Factors[0].InterpretRules)
 	}
 }
 

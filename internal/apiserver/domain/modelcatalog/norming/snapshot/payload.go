@@ -128,17 +128,17 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 		Title:   title,
 		Status:  status,
 	}
-	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	factors := factor.ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.Brief2 != nil {
-		factors = factornorm.ApplyNormMetadata(factors, factornorm.MetadataContext{
+		factors = factornorm.ApplyNormMetadataToLegacyFactors(factors, factornorm.MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
-		factors = factornorm.ApplyCompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
+		factors = factornorm.ApplyCompositeMetadataToLegacyFactors(factors, compositeSpecsFromPayload(body.Brief2))
 	}
-	out.Factors = factors
+	out.Factors = factor.SnapshotsFromLegacyFactors(factors)
 	if body.Brief2 != nil {
 		out.Norming = &NormingProfile{
 			Variant:              body.Brief2.FormVariant,
@@ -228,7 +228,7 @@ func (s *Snapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
 }
 
-func legacyPrimaryDimensionCode(body *brief2Extension, factors []FactorSnapshot) string {
+func legacyPrimaryDimensionCode(body *brief2Extension, factors []factor.LegacyFactor) string {
 	if body == nil {
 		return ""
 	}
@@ -250,7 +250,12 @@ func (s *Snapshot) ToScaleSnapshot() *scoringsnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	return scoringsnapshot.BuildFromModelFactors(
-		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
-	)
+	return scoringsnapshot.BuildFromCanonicalFactors(scoringsnapshot.ExecutionEnvelope{
+		Code:                 s.Code,
+		ScaleVersion:         s.Version,
+		Title:                s.Title,
+		QuestionnaireCode:    s.QuestionnaireCode,
+		QuestionnaireVersion: s.QuestionnaireVersion,
+		Status:               s.Status,
+	}, s.Factors)
 }

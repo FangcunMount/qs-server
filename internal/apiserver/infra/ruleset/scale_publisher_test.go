@@ -112,8 +112,15 @@ func TestScalePublisherMatchesAssessmentModelPublishedSnapshot(t *testing.T) {
 	if err := publisher.PublishPublishedScale(t.Context(), scale); err != nil {
 		t.Fatalf("PublishPublishedScale: %v", err)
 	}
-	if !reflect.DeepEqual(writer.last, want) {
-		t.Fatalf("published snapshot mismatch\n got: %#v\nwant: %#v", writer.last, want)
+	if writer.last.DefinitionV2 == nil {
+		t.Fatal("DefinitionV2 is nil")
+	}
+	gotWithoutDefinitionV2 := *writer.last
+	gotWithoutDefinitionV2.DefinitionV2 = nil
+	wantWithoutDefinitionV2 := *want
+	wantWithoutDefinitionV2.DefinitionV2 = nil
+	if !reflect.DeepEqual(&gotWithoutDefinitionV2, &wantWithoutDefinitionV2) {
+		t.Fatalf("published snapshot mismatch\n got: %#v\nwant: %#v", &gotWithoutDefinitionV2, &wantWithoutDefinitionV2)
 	}
 }
 

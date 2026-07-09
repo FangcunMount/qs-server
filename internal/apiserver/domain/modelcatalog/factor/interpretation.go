@@ -13,8 +13,3 @@ type ScoreRangeRule struct {
 func (r ScoreRangeRule) Matches(score float64) bool {
 	return score >= r.MinScore && score < r.MaxScore
 }
-
-// InterpretationSpec 分组score-range rules 用于 计分 models。
-type InterpretationSpec struct {
-	Ranges []ScoreRangeRule
-}

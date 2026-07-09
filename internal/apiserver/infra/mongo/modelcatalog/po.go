@@ -15,22 +15,30 @@ const statusPublished = "published"
 type PublishedAssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
-	SchemaVersion        string     `bson:"schema_version,omitempty"`
-	PayloadFormat        string     `bson:"payload_format,omitempty"`
-	ModelProductChannel  string     `bson:"model_product_channel,omitempty"`
-	ModelKind            string     `bson:"model_kind"`
-	ModelSubKind         string     `bson:"model_sub_kind,omitempty"`
-	ModelAlgorithm       string     `bson:"model_algorithm,omitempty"`
-	ModelCode            string     `bson:"model_code"`
-	ModelVersion         string     `bson:"model_version"`
-	Title                string     `bson:"title"`
-	Status               string     `bson:"status"`
-	DecisionKind         string     `bson:"decision_kind"`
-	QuestionnaireCode    string     `bson:"questionnaire_code"`
-	QuestionnaireVersion string     `bson:"questionnaire_version"`
-	Source               bson.M     `bson:"source,omitempty"`
-	Payload              []byte     `bson:"payload"`
-	PublishedAt          *time.Time `bson:"published_at,omitempty"`
+	SchemaVersion           string        `bson:"schema_version,omitempty"`
+	PayloadFormat           string        `bson:"payload_format,omitempty"`
+	ModelProductChannel     string        `bson:"model_product_channel,omitempty"`
+	ModelKind               string        `bson:"model_kind"`
+	ModelSubKind            string        `bson:"model_sub_kind,omitempty"`
+	ModelAlgorithm          string        `bson:"model_algorithm,omitempty"`
+	ModelCode               string        `bson:"model_code"`
+	ModelVersion            string        `bson:"model_version"`
+	Title                   string        `bson:"title"`
+	Description             string        `bson:"description,omitempty"`
+	Category                string        `bson:"category,omitempty"`
+	Stages                  []string      `bson:"stages,omitempty"`
+	ApplicableAges          []string      `bson:"applicable_ages,omitempty"`
+	Reporters               []string      `bson:"reporters,omitempty"`
+	Tags                    []string      `bson:"tags,omitempty"`
+	Status                  string        `bson:"status"`
+	DecisionKind            string        `bson:"decision_kind"`
+	QuestionnaireCode       string        `bson:"questionnaire_code"`
+	QuestionnaireVersion    string        `bson:"questionnaire_version"`
+	Source                  bson.M        `bson:"source,omitempty"`
+	Payload                 []byte        `bson:"payload"`
+	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
+	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
+	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
 }
 
 func (PublishedAssessmentModelPO) CollectionName() string {

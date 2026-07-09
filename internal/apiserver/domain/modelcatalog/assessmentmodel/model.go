@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
 
 // AssessmentModel 是后台可编辑测评模型配置聚合。
@@ -24,6 +25,9 @@ type AssessmentModel struct {
 	// 分类
 	Category       string
 	ProductChannel binding.ProductChannel
+	Stages         []string
+	ApplicableAges []string
+	Reporters      []string
 	Tags           []string
 
 	// 状态
@@ -32,6 +36,8 @@ type AssessmentModel struct {
 	Binding binding.QuestionnaireBinding
 	// 定义
 	Definition DefinitionPayload
+	// DefinitionV2 是目标领域定义模型；Definition 保留为 legacy payload 兼容投影。
+	DefinitionV2 *definition.Definition
 	// 版本
 	// Version is the persisted compatibility field for the draft configuration
 	// revision. Business versioning is anchored by QuestionnaireBinding.Version.
@@ -56,6 +62,9 @@ type NewInput struct {
 	Title          string
 	Description    string
 	Category       string
+	Stages         []string
+	ApplicableAges []string
+	Reporters      []string
 	Tags           []string
 	Now            time.Time
 }
@@ -88,6 +97,9 @@ func New(input NewInput) (*AssessmentModel, error) {
 		Title:          input.Title,
 		Description:    input.Description,
 		Category:       input.Category,
+		Stages:         append([]string(nil), input.Stages...),
+		ApplicableAges: append([]string(nil), input.ApplicableAges...),
+		Reporters:      append([]string(nil), input.Reporters...),
 		Tags:           append([]string(nil), input.Tags...),
 		Status:         StatusDraft,
 		Version:        1,
@@ -164,6 +176,19 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind bin
 	return nil
 }
 
+// UpdateAudienceMetadata updates scale-oriented catalog dimensions that are
+// exposed by legacy scale REST contracts and now live on AssessmentModel.
+func (m *AssessmentModel) UpdateAudienceMetadata(stages, applicableAges, reporters []string, now time.Time) error {
+	if err := m.ensureEditable(); err != nil {
+		return err
+	}
+	m.Stages = append([]string(nil), stages...)
+	m.ApplicableAges = append([]string(nil), applicableAges...)
+	m.Reporters = append([]string(nil), reporters...)
+	m.touch(now)
+	return nil
+}
+
 // BindQuestionnaire attaches a questionnaire version to the draft model.
 func (m *AssessmentModel) BindQuestionnaire(binding binding.QuestionnaireBinding, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
@@ -182,6 +207,12 @@ func (m *AssessmentModel) BindQuestionnaire(binding binding.QuestionnaireBinding
 
 // UpdateDefinition replaces the draft definition payload.
 func (m *AssessmentModel) UpdateDefinition(payload DefinitionPayload, now time.Time) error {
+	return m.UpdateDefinitionWithV2(payload, nil, now)
+}
+
+// UpdateDefinitionWithV2 replaces the draft definition payload and optionally stores
+// the target definition model beside the legacy payload.
+func (m *AssessmentModel) UpdateDefinitionWithV2(payload DefinitionPayload, definitionV2 *definition.Definition, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
@@ -189,6 +220,18 @@ func (m *AssessmentModel) UpdateDefinition(payload DefinitionPayload, now time.T
 		return fmt.Errorf("%w: definition payload is required", ErrInvalidArgument)
 	}
 	m.Definition = payload
+	m.DefinitionV2 = definitionV2
+	m.touch(now)
+	return nil
+}
+
+// ForkDraftFromPublished derives a working draft from a published head without
+// changing the active published runtime snapshot.
+func (m *AssessmentModel) ForkDraftFromPublished(now time.Time) error {
+	if m == nil || !m.IsPublished() {
+		return nil
+	}
+	m.Status = StatusDraft
 	m.touch(now)
 	return nil
 }

@@ -77,7 +77,9 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 		return nil, definition.NewValidationError(issues)
 	}
 	now := p.now()
-	if err := model.MarkPublished(now); err != nil {
+	if model.IsPublished() {
+		// Allow callers to pre-mark the draft model after legacy-compatible validation.
+	} else if err := model.MarkPublished(now); err != nil {
 		return nil, err
 	}
 	snapshot, err := p.BuildSnapshot(ctx, model)
@@ -119,6 +121,10 @@ func identityFromModel(model *domain.AssessmentModel) domain.Identity {
 }
 
 func snapshotFromModel(model *domain.AssessmentModel, result definition.SnapshotBuildResult) *port.AssessmentSnapshot {
+	version := modelVersionString(model)
+	if result.Version != "" {
+		version = result.Version
+	}
 	return &port.AssessmentSnapshot{
 		SchemaVersion:        domain.SchemaVersionV2,
 		PayloadFormat:        result.PayloadFormat,
@@ -127,14 +133,21 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 		SubKind:              result.SubKind,
 		Algorithm:            result.Algorithm,
 		Code:                 model.Code,
-		Version:              modelVersionString(model),
+		Version:              version,
 		Title:                model.Title,
+		Description:          model.Description,
+		Category:             model.Category,
+		Stages:               append([]string(nil), model.Stages...),
+		ApplicableAges:       append([]string(nil), model.ApplicableAges...),
+		Reporters:            append([]string(nil), model.Reporters...),
+		Tags:                 append([]string(nil), model.Tags...),
 		Status:               string(domain.ModelStatusPublished),
 		DecisionKind:         result.DecisionKind,
 		QuestionnaireCode:    model.Binding.QuestionnaireCode,
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		Source:               map[string]any{},
 		Payload:              result.Payload,
+		DefinitionV2:         model.DefinitionV2,
 	}
 }
 

@@ -48,7 +48,7 @@ func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	return FactorSnapshot{
 		Code:            f.Code,
 		Title:           f.Title,
-		IsTotalScore:    f.IsTotalScore,
+		IsTotalScore:    f.ResolvedRole() == factor.FactorRoleTotal,
 		QuestionCodes:   append([]string(nil), f.QuestionCodes...),
 		ScoringStrategy: f.ScoringStrategy,
 		ScoringParams:   params,
@@ -57,8 +57,8 @@ func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
 	}
 }
 
-// FactorFromDomainFactor projects a domain Factor into the scale execution shape.
-func FactorFromDomainFactor(f factor.Factor) FactorSnapshot {
+// FactorFromLegacyFactor projects a legacy flat factor into the scale execution shape.
+func FactorFromLegacyFactor(f factor.LegacyFactor) FactorSnapshot {
 	return FactorFromCanonical(f.Snapshot())
 }
 
@@ -105,19 +105,33 @@ func FactorsFromCanonical(factors []factor.FactorSnapshot) []FactorSnapshot {
 	return out
 }
 
-// BuildFromModelFactors 物化scale 快照 从 common 家族 快照 元数据。
-func BuildFromModelFactors(code, version, title, questionnaireCode, questionnaireVersion, status string, factors []factor.FactorSnapshot) *ScaleSnapshot {
-	return BuildFromCanonicalFactors(ExecutionEnvelope{
-		Code:                 code,
-		ScaleVersion:         version,
-		Title:                title,
-		QuestionnaireCode:    questionnaireCode,
-		QuestionnaireVersion: questionnaireVersion,
-		Status:               status,
-	}, factors)
+// FactorsFromLegacy 投影 legacy flat 因子 为 scale execution 因子。
+func FactorsFromLegacy(factors []factor.LegacyFactor) []FactorSnapshot {
+	out := make([]FactorSnapshot, 0, len(factors))
+	for _, item := range factors {
+		out = append(out, FactorFromLegacyFactor(item))
+	}
+	return out
 }
 
-// BuildFromCanonicalFactors 物化scale execution 快照 从 规范 因子。
+// BuildFromLegacyFactors 物化 scale execution 快照 从 legacy flat 因子。
+func BuildFromLegacyFactors(env ExecutionEnvelope, factors []factor.LegacyFactor) *ScaleSnapshot {
+	if env.Code == "" && len(factors) == 0 {
+		return nil
+	}
+	return &ScaleSnapshot{
+		ID:                   env.ID,
+		Code:                 env.Code,
+		ScaleVersion:         env.ScaleVersion,
+		Title:                env.Title,
+		QuestionnaireCode:    env.QuestionnaireCode,
+		QuestionnaireVersion: env.QuestionnaireVersion,
+		Status:               env.Status,
+		Factors:              FactorsFromLegacy(factors),
+	}
+}
+
+// BuildFromCanonicalFactors 物化scale execution 快照 从 snapshot 边界 DTO。
 func BuildFromCanonicalFactors(env ExecutionEnvelope, factors []factor.FactorSnapshot) *ScaleSnapshot {
 	if env.Code == "" && len(factors) == 0 {
 		return nil

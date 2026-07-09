@@ -51,13 +51,13 @@ func TestFactorSnapshotRoundTripPreservesAllFields(t *testing.T) {
 		},
 	}
 
-	domainFactor := factor.FactorFromSnapshot(original)
-	got := domainFactor.Snapshot()
+	legacyFactor := factor.LegacyFactorFromSnapshot(original)
+	got := legacyFactor.Snapshot()
 	if !reflect.DeepEqual(got, original) {
 		t.Fatalf("round trip mismatch\n got: %#v\nwant: %#v", got, original)
 	}
-	if domainFactor.ResolvedRole() != factor.FactorRoleIndex {
-		t.Fatalf("domain role = %s, want %s", domainFactor.ResolvedRole(), factor.FactorRoleIndex)
+	if legacyFactor.ResolvedRole() != factor.FactorRoleIndex {
+		t.Fatalf("legacy role = %s, want %s", legacyFactor.ResolvedRole(), factor.FactorRoleIndex)
 	}
 
 	original.QuestionCodes[0] = "mutated"
@@ -69,7 +69,7 @@ func TestFactorSnapshotRoundTripPreservesAllFields(t *testing.T) {
 	original.ChildrenPolicy.Children[0] = "mutated"
 	original.ChildrenPolicy.Weights["f1"] = 9.9
 
-	afterOriginalMutation := domainFactor.Snapshot()
+	afterOriginalMutation := legacyFactor.Snapshot()
 	if afterOriginalMutation.QuestionCodes[0] != "q1" ||
 		afterOriginalMutation.ScoringParams.CntOptionContents[0] != "yes" ||
 		*afterOriginalMutation.MaxScore != 42 ||
@@ -78,18 +78,18 @@ func TestFactorSnapshotRoundTripPreservesAllFields(t *testing.T) {
 		afterOriginalMutation.Norm.NormTableVersion != "norm-v1" ||
 		afterOriginalMutation.ChildrenPolicy.Children[0] != "f1" ||
 		afterOriginalMutation.ChildrenPolicy.Weights["f1"] != 0.4 {
-		t.Fatalf("Factor shares mutable state with source snapshot: %#v", afterOriginalMutation)
+		t.Fatalf("LegacyFactor shares mutable state with source snapshot: %#v", afterOriginalMutation)
 	}
 
-	snapshot := domainFactor.Snapshot()
-	domainFactor.QuestionCodes[0] = "changed"
-	domainFactor.ScoringParams.CntOptionContents[0] = "changed"
-	*domainFactor.MaxScore = 100
-	domainFactor.InterpretRules[0].Level = "changed"
-	domainFactor.Classification.PositivePole = "changed"
-	domainFactor.Norm.NormTableVersion = "changed"
-	domainFactor.ChildrenPolicy.Children[0] = "changed"
-	domainFactor.ChildrenPolicy.Weights["f1"] = 8.8
+	snapshot := legacyFactor.Snapshot()
+	legacyFactor.QuestionCodes[0] = "changed"
+	legacyFactor.ScoringParams.CntOptionContents[0] = "changed"
+	*legacyFactor.MaxScore = 100
+	legacyFactor.InterpretRules[0].Level = "changed"
+	legacyFactor.Classification.PositivePole = "changed"
+	legacyFactor.Norm.NormTableVersion = "changed"
+	legacyFactor.ChildrenPolicy.Children[0] = "changed"
+	legacyFactor.ChildrenPolicy.Weights["f1"] = 8.8
 
 	if snapshot.QuestionCodes[0] != "q1" ||
 		snapshot.ScoringParams.CntOptionContents[0] != "yes" ||
@@ -99,7 +99,7 @@ func TestFactorSnapshotRoundTripPreservesAllFields(t *testing.T) {
 		snapshot.Norm.NormTableVersion != "norm-v1" ||
 		snapshot.ChildrenPolicy.Children[0] != "f1" ||
 		snapshot.ChildrenPolicy.Weights["f1"] != 0.4 {
-		t.Fatalf("snapshot shares mutable state with Factor: %#v", snapshot)
+		t.Fatalf("snapshot shares mutable state with LegacyFactor: %#v", snapshot)
 	}
 }
 
@@ -116,10 +116,10 @@ func TestDefinitionBodyCanMaterializeDomainFactors(t *testing.T) {
 			Ranges:        []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Level: "low"}},
 		}},
 	}
-	snapshots := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
-	factors := factor.ParseFactorsFromDefinitionBodyAsFactors(body.Dimensions, body.InterpretRules)
-	if got, want := factor.SnapshotsFromFactors(factors), snapshots; !reflect.DeepEqual(got, want) {
-		t.Fatalf("domain materialization mismatch\n got: %#v\nwant: %#v", got, want)
+	factors := factor.ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	snapshots := factor.ParseFactorSnapshotsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	if got, want := factor.SnapshotsFromLegacyFactors(factors), snapshots; !reflect.DeepEqual(got, want) {
+		t.Fatalf("legacy materialization mismatch\n got: %#v\nwant: %#v", got, want)
 	}
 	if len(factors) != 1 || factors[0].ResolvedRole() != factor.FactorRoleTotal {
 		t.Fatalf("factors = %#v", factors)

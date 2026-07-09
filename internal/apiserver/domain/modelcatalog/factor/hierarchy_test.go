@@ -6,10 +6,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-func TestInferParentCodesFromChildrenPolicy(t *testing.T) {
+func TestInferParentCodesFromFactorChildrenPolicy(t *testing.T) {
 	t.Parallel()
 
-	derived := factor.InferParentCodesFromChildrenPolicy([]factor.FactorSnapshot{
+	derived := factor.InferParentCodesFromFactorChildrenPolicy([]factor.LegacyFactor{
 		{Code: "inhibit"},
 		{
 			Code: "bri", Role: factor.FactorRoleIndex,
@@ -26,7 +26,7 @@ func TestInferParentCodesFromChildrenPolicy(t *testing.T) {
 			},
 		},
 	})
-	byCode := factor.IndexByCode(derived)
+	byCode := factor.IndexByLegacyFactorCode(derived)
 	if byCode["bri"].ParentCode != "gec" || byCode["bri"].Level != 2 {
 		t.Fatalf("bri = %#v, want parent gec level 2", byCode["bri"])
 	}

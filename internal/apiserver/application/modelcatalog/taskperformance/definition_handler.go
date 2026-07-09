@@ -7,6 +7,7 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltaskperformance "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 )
 
 // DefinitionHandler owns cognitive task-performance definition validation and publish shaping.
@@ -17,9 +18,13 @@ func (DefinitionHandler) Supports(identity domain.Identity) bool {
 }
 
 func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
-	return appdefinition.SaveResult{
+	result := appdefinition.SaveResult{
 		Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
-	}, nil, nil
+	}
+	if definitionV2, err := modeltaskperformance.DefinitionFromPayload(input.Payload); err == nil {
+		result.DefinitionV2 = definitionV2
+	}
+	return result, nil, nil
 }
 
 func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {

@@ -98,7 +98,7 @@ func TestParseBrief2PayloadAnnotatesCompositeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	byCode := factor.IndexByCode(got.Factors)
+	byCode := factor.IndexByLegacyFactorCode(factor.LegacyFactorsFromSnapshots(got.Factors))
 	if byCode["bri"].ChildrenPolicy == nil || len(byCode["bri"].ChildrenPolicy.Children) != 2 {
 		t.Fatalf("bri policy = %#v", byCode["bri"].ChildrenPolicy)
 	}

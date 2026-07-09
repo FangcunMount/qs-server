@@ -382,6 +382,103 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 	})
 }
 
+func TestModelCatalogLegacyImportsStayInRetirementBoundaries(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	legacyFacadePrefix := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
+	scaleDefinitionPrefix := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
+	allowedScaleDefinitionPrefixes := []string{
+		"internal/apiserver/domain/modelcatalog/legacy/",
+		"internal/apiserver/domain/modelcatalog/scoring/definition/",
+		"internal/apiserver/application/modelcatalog/scoring/",
+		"internal/apiserver/application/plan/",
+		"internal/apiserver/container/",
+		"internal/apiserver/infra/cache/",
+		"internal/apiserver/infra/cachequery/",
+		"internal/apiserver/infra/evaluationinput/",
+		"internal/apiserver/infra/mongo/scale/",
+		"internal/apiserver/infra/ruleset/",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if importPath == legacyFacadePrefix || strings.HasPrefix(importPath, legacyFacadePrefix+"/") {
+			if strings.HasPrefix(rel, "internal/apiserver/domain/modelcatalog/legacy/") {
+				return
+			}
+			t.Fatalf("%s imports %s; legacy modelcatalog facade is delete-after-rg-zero and must not gain production callers", rel, importPath)
+		}
+		if importPath == scaleDefinitionPrefix || strings.HasPrefix(importPath, scaleDefinitionPrefix+"/") {
+			for _, prefix := range allowedScaleDefinitionPrefixes {
+				if strings.HasPrefix(rel, prefix) {
+					return
+				}
+			}
+			t.Fatalf("%s imports %s; scoring/definition is a legacy scale compatibility surface and must stay in the retirement allowlist", rel, importPath)
+		}
+	})
+}
+
+func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedPrefixes := []string{
+		"internal/apiserver/domain/modelcatalog/export.go",
+		"internal/apiserver/domain/modelcatalog/factor/",
+		"internal/apiserver/domain/modelcatalog/definition/",
+		"internal/apiserver/domain/modelcatalog/norming/",
+		"internal/apiserver/domain/modelcatalog/taskperformance/",
+		"internal/apiserver/domain/modelcatalog/scoring/snapshot/",
+		"internal/apiserver/application/modelcatalog/norming/",
+		"internal/apiserver/application/evaluation/calculationadapter/",
+	}
+	forbiddenTokens := []string{
+		"factor.LegacyFactor",
+		"factor.FactorSnapshot",
+		"factor.DefinitionBody",
+		"LegacyFactorFromSnapshot",
+		"LegacyFactorsFromSnapshots",
+		"SnapshotsFromLegacyFactors",
+		"ParseLegacyFactorsFromDefinitionBody",
+		"ParseFactorSnapshotsFromDefinitionBody",
+	}
+	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if filepath.Base(path) == "architecture_test.go" {
+			return nil
+		}
+		for _, prefix := range allowedPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; flat factor compatibility tokens must stay in adapter boundaries", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	t.Parallel()
 

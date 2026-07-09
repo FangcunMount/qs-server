@@ -7,8 +7,7 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	domainnorming "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modelnorming "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 )
 
 // DefinitionHandler owns behavioral-rating definition validation and publish shaping.
@@ -19,9 +18,13 @@ func (DefinitionHandler) Supports(identity domain.Identity) bool {
 }
 
 func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
-	return appdefinition.SaveResult{
+	result := appdefinition.SaveResult{
 		Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
-	}, nil, nil
+	}
+	if definitionV2, err := modelnorming.DefinitionFromPayload(input.Payload); err == nil {
+		result.DefinitionV2 = definitionV2
+	}
+	return result, nil, nil
 }
 
 func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
@@ -50,28 +53,12 @@ func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.A
 	if algorithm == "" {
 		algorithm = domain.AlgorithmBehavioralRatingDefault
 	}
-	var err error
-	encoded, err = domainnorming.RequirePrimaryDimensionCodeForPublish(encoded)
-	if err != nil {
-		return appdefinition.SnapshotBuildResult{}, err
-	}
-	result := appdefinition.SnapshotBuildResult{
+	return appdefinition.SnapshotBuildResult{
 		Kind:          domain.KindBehavioralRating,
 		SubKind:       domain.SubKindEmpty,
 		Algorithm:     algorithm,
 		PayloadFormat: domain.PayloadFormatForBehavioralRating(algorithm),
-		DecisionKind:  domainnorming.DecisionKindFromDefinitionPayload(encoded),
+		DecisionKind:  domain.DecisionKindNormLookup,
 		Payload:       encoded,
-	}
-	if err := validatePublishedScoreNodes(&port.PublishedModel{
-		PayloadFormat: result.PayloadFormat,
-		Code:          model.Code,
-		Version:       fmt.Sprintf("v%d", model.Revision()),
-		Title:         model.Title,
-		Status:        string(domain.ModelStatusPublished),
-		Payload:       result.Payload,
-	}); err != nil {
-		return appdefinition.SnapshotBuildResult{}, err
-	}
-	return result, nil
+	}, nil
 }

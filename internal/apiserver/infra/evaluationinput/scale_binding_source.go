@@ -52,6 +52,21 @@ func NewPublishedScaleCatalog(reader rulesetport.PublishedModelReader, fallback 
 }
 
 func (c PublishedScaleCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
+	if c.reader != nil {
+		if lister, ok := c.reader.(rulesetport.PublishedModelLister); ok {
+			snapshot, err := lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
+			if err == nil {
+				decoded, decodeErr := aminfrac.DecodeScaleFromPublished(snapshot)
+				if decodeErr != nil {
+					return nil, port.NewResolveError(port.FailureKindScaleNotFound, decodeErr, "量表不存在", "加载量表失败")
+				}
+				return decoded, nil
+			}
+			if !domain.IsNotFound(err) {
+				return nil, port.NewResolveError(port.FailureKindScaleNotFound, err, "量表不存在", "加载量表失败")
+			}
+		}
+	}
 	if c.fallback == nil {
 		return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("scale catalog is not configured"), "量表不存在", "加载量表失败")
 	}

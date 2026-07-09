@@ -467,6 +467,41 @@ func TestUpdateDefinitionAllowsIncompleteDraft(t *testing.T) {
 	}
 }
 
+func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	svc := typology.NewService(typology.Dependencies{ModelRepo: modelRepo, PublishedRepo: &memoryPublishedRepo{}})
+
+	created, err := svc.Create(context.Background(), typology.CreateInput{
+		Code: "personality_v2", Algorithm: "mbti", Title: "MBTI",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, typology.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload:       sampleRuntimePayload(),
+	}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	saved := modelRepo.models[created.Code]
+	if saved.DefinitionV2 == nil {
+		t.Fatal("DefinitionV2 is nil")
+	}
+	if len(saved.DefinitionV2.Measure.Factors) != 1 || saved.DefinitionV2.Measure.Factors[0].Code != "EI" {
+		t.Fatalf("measure factors = %#v", saved.DefinitionV2.Measure.Factors)
+	}
+	if len(saved.DefinitionV2.Conclusions) != 1 {
+		t.Fatalf("conclusions = %#v", saved.DefinitionV2.Conclusions)
+	}
+	if _, ok := saved.DefinitionV2.Conclusions[0].(domain.TypeConclusion); !ok {
+		t.Fatalf("conclusion type = %T, want TypeConclusion", saved.DefinitionV2.Conclusions[0])
+	}
+	if len(saved.DefinitionV2.ReportMap.Sections) != 1 || saved.DefinitionV2.ReportMap.Sections[0].Code != "personality_type" {
+		t.Fatalf("report map = %#v", saved.DefinitionV2.ReportMap)
+	}
+}
+
 func TestBindQuestionnaireRequiresPublishedQuestionnaireWithQuestions(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
 	svc := typology.NewService(typology.Dependencies{

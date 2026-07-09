@@ -2,8 +2,10 @@ package lifecycle
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -27,6 +29,23 @@ func (s *lifecycleService) Create(ctx context.Context, dto shared.CreateScaleDTO
 		if err := s.resolveQuestionnaireBinding().validate(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, code.String()); err != nil {
 			return nil, err
 		}
+	}
+	dto.Code = code.String()
+
+	if s.modelRepo != nil {
+		scale, err := legacyadapter.MedicalScaleFromCreateDTO(dto)
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建量表失败")
+		}
+		model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Now().UTC())
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建量表失败")
+		}
+		if err := s.modelRepo.Create(ctx, model); err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
+		}
+		s.refreshListCache(ctx)
+		return shared.ToScaleResult(scale), nil
 	}
 
 	m, err := scaledefinition.NewMedicalScale(

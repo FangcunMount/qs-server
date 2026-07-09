@@ -67,9 +67,9 @@ func TestScaleCanonicalRoundTripPreservesExecutionShape(t *testing.T) {
 func TestBuildFromCanonicalFactorsProjectsInterpretRules(t *testing.T) {
 	t.Parallel()
 
-	scale := scalesnapshot.BuildFromModelFactors(
-		"BA-001", "1.0.0", "demo", "", "", "published",
-		[]factor.FactorSnapshot{{
+	scale := scalesnapshot.BuildFromLegacyFactors(
+		scalesnapshot.ExecutionEnvelope{Code: "BA-001", ScaleVersion: "1.0.0", Title: "demo", Status: "published"},
+		[]factor.LegacyFactor{{
 			Code: "total", ScoringStrategy: "sum",
 			InterpretRules: []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Level: "low"}},
 		}},

@@ -182,7 +182,7 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 		return nil, invalidArgument("%s", err.Error())
 	}
 	now := time.Now().UTC()
-	if err := model.UpdateDefinition(save.Payload, now); err != nil {
+	if err := model.UpdateDefinitionWithV2(save.Payload, save.DefinitionV2, now); err != nil {
 		return nil, mapDomainError(err)
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {

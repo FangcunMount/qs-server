@@ -1,8 +1,8 @@
 package factor
 
-// FactorFromSnapshot materializes the domain Factor from a compatibility snapshot.
-func FactorFromSnapshot(snapshot FactorSnapshot) Factor {
-	return Factor{
+// LegacyFactorFromSnapshot materializes the legacy flat factor from a compatibility snapshot.
+func LegacyFactorFromSnapshot(snapshot FactorSnapshot) LegacyFactor {
+	return LegacyFactor{
 		Code:            snapshot.Code,
 		Title:           snapshot.Title,
 		Role:            snapshot.Role,
@@ -21,20 +21,20 @@ func FactorFromSnapshot(snapshot FactorSnapshot) Factor {
 	}
 }
 
-// FactorsFromSnapshots materializes domain Factors from compatibility snapshots.
-func FactorsFromSnapshots(snapshots []FactorSnapshot) []Factor {
+// LegacyFactorsFromSnapshots materializes legacy flat factors from compatibility snapshots.
+func LegacyFactorsFromSnapshots(snapshots []FactorSnapshot) []LegacyFactor {
 	if snapshots == nil {
 		return nil
 	}
-	out := make([]Factor, 0, len(snapshots))
+	out := make([]LegacyFactor, 0, len(snapshots))
 	for _, snapshot := range snapshots {
-		out = append(out, FactorFromSnapshot(snapshot))
+		out = append(out, LegacyFactorFromSnapshot(snapshot))
 	}
 	return out
 }
 
-// SnapshotsFromFactors returns compatibility snapshots for domain Factors.
-func SnapshotsFromFactors(factors []Factor) []FactorSnapshot {
+// SnapshotsFromLegacyFactors returns compatibility snapshots for legacy flat factors.
+func SnapshotsFromLegacyFactors(factors []LegacyFactor) []FactorSnapshot {
 	if factors == nil {
 		return nil
 	}

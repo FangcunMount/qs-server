@@ -7,10 +7,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 )
 
-func TestApplyCompositeMetadata(t *testing.T) {
+func TestApplyCompositeMetadataToLegacyFactors(t *testing.T) {
 	t.Parallel()
 
-	factors := norming.ApplyCompositeMetadata([]factor.FactorSnapshot{
+	factors := norming.ApplyCompositeMetadataToLegacyFactors([]factor.LegacyFactor{
 		{Code: "inhibit", Title: "Inhibit"},
 		{Code: "self_monitor", Title: "Self Monitor"},
 		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
@@ -20,7 +20,7 @@ func TestApplyCompositeMetadata(t *testing.T) {
 		{Code: "gec", Strategy: factor.ChildrenAggregationSum, Children: []string{"bri"}},
 	})
 
-	byCode := factor.IndexByCode(factors)
+	byCode := factor.IndexByLegacyFactorCode(factors)
 	if byCode["inhibit"].ParentCode != "bri" {
 		t.Fatalf("inhibit parent = %q, want bri", byCode["inhibit"].ParentCode)
 	}
@@ -32,10 +32,28 @@ func TestApplyCompositeMetadata(t *testing.T) {
 	}
 }
 
-func TestApplyNormMetadata(t *testing.T) {
+func TestMeasureSpecWithCompositeMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := norming.ApplyNormMetadata([]factor.FactorSnapshot{
+	measure := norming.MeasureSpecWithCompositeMetadata([]factor.Factor{
+		{Code: "inhibit", Title: "Inhibit"},
+		{Code: "self_monitor", Title: "Self Monitor"},
+		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
+	}, []norming.CompositeIndexSpec{
+		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
+	})
+	if len(measure.FactorGraph.Edges) != 2 {
+		t.Fatalf("edges = %#v", measure.FactorGraph.Edges)
+	}
+	if len(measure.Scoring) != 1 || measure.Scoring[0].Sources[0].Kind != factor.ScoringSourceFactor {
+		t.Fatalf("scoring = %#v", measure.Scoring)
+	}
+}
+
+func TestApplyNormMetadataToLegacyFactors(t *testing.T) {
+	t.Parallel()
+
+	factors := norming.ApplyNormMetadataToLegacyFactors([]factor.LegacyFactor{
 		{Code: "bri"},
 		{Code: "inconsistency"},
 		{Code: "gec"},
@@ -53,5 +71,20 @@ func TestApplyNormMetadata(t *testing.T) {
 	}
 	if factors[2].Norm == nil || factors[2].Norm.NormTableVersion != "2024" {
 		t.Fatalf("gec norm = %#v", factors[2].Norm)
+	}
+}
+
+func TestNormRefsFromMetadata(t *testing.T) {
+	t.Parallel()
+
+	refs := norming.NormRefsFromMetadata(norming.MetadataContext{
+		NormTableVersion: "2024",
+		NormFactorCodes:  []string{"gec", "gec", "bri"},
+	})
+	if len(refs) != 2 {
+		t.Fatalf("refs = %#v", refs)
+	}
+	if refs[0].FactorCode != "gec" || refs[0].NormTableVersion != "2024" {
+		t.Fatalf("first ref = %#v", refs[0])
 	}
 }

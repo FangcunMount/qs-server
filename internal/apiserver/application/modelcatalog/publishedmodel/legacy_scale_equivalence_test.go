@@ -32,8 +32,31 @@ func TestLegacyMedicalScaleAssessmentModelSnapshotEquivalence(t *testing.T) {
 	if got.Version != "1.0.0" {
 		t.Fatalf("snapshot version = %q, want legacy scale version", got.Version)
 	}
-	if !reflect.DeepEqual(got, legacyPublished) {
-		t.Fatalf("assessment snapshot mismatch\n got: %#v\nwant: %#v", got, legacyPublished)
+	if got.DefinitionV2 == nil {
+		t.Fatal("got DefinitionV2 is nil")
+	}
+	if legacyPublished.DefinitionV2 == nil {
+		t.Fatal("legacyPublished DefinitionV2 is nil")
+	}
+	withoutDefinitionV2 := *got
+	withoutDefinitionV2.DefinitionV2 = nil
+	if got.Description != "legacy scale definition" || got.Category != "adhd" ||
+		!reflect.DeepEqual(got.Stages, []string{"deep_assessment"}) ||
+		!reflect.DeepEqual(got.ApplicableAges, []string{"school_child"}) ||
+		!reflect.DeepEqual(got.Reporters, []string{"parent"}) ||
+		!reflect.DeepEqual(got.Tags, []string{"screening"}) {
+		t.Fatalf("scale metadata = %#v", got)
+	}
+	withoutDefinitionV2.Description = ""
+	withoutDefinitionV2.Category = ""
+	withoutDefinitionV2.Stages = nil
+	withoutDefinitionV2.ApplicableAges = nil
+	withoutDefinitionV2.Reporters = nil
+	withoutDefinitionV2.Tags = nil
+	legacyWithoutDefinitionV2 := *legacyPublished
+	legacyWithoutDefinitionV2.DefinitionV2 = nil
+	if !reflect.DeepEqual(&withoutDefinitionV2, &legacyWithoutDefinitionV2) {
+		t.Fatalf("assessment snapshot mismatch\n got: %#v\nwant: %#v", &withoutDefinitionV2, &legacyWithoutDefinitionV2)
 	}
 }
 
