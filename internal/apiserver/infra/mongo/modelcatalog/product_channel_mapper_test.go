@@ -129,4 +129,7 @@ func TestPublishedModelUpsertFilterExcludesProductChannel(t *testing.T) {
 			t.Fatalf("upsert filter must not include model_product_channel: %#v", filter)
 		}
 	}
+	if _, ok := filter["model_sub_kind"]; ok {
+		t.Fatalf("upsert filter must not include empty model_sub_kind: %#v", filter)
+	}
 }

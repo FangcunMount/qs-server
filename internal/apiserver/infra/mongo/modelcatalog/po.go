@@ -87,11 +87,15 @@ func publishedFilter(extra bson.M) bson.M {
 // model_version is intentionally excluded: draft edits bump optimistic version and
 // republication must replace the existing snapshot instead of inserting a new row.
 func publishedModelUpsertFilter(po *PublishedAssessmentModelPO) bson.M {
-	return bson.M{
+	filter := bson.M{
 		"model_kind":      po.ModelKind,
-		"model_sub_kind":  po.ModelSubKind,
 		"model_algorithm": po.ModelAlgorithm,
 		"model_code":      po.ModelCode,
 		"deleted_at":      nil,
 	}
+	// Empty sub_kind must not be written as "" — legacy rows store null/absent.
+	if po.ModelSubKind != "" {
+		filter["model_sub_kind"] = po.ModelSubKind
+	}
+	return filter
 }

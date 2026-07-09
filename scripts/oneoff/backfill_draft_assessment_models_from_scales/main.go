@@ -16,6 +16,7 @@ import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
 
@@ -24,7 +25,8 @@ func main() {
 	mongoDB := flag.String("mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database name")
 	apply := flag.Bool("apply", false, "write backfill rows (default dry-run)")
 	overwrite := flag.Bool("overwrite", false, "update existing assessment_models draft rows")
-	withPublished := flag.Bool("with-published", true, "also upsert active scale snapshots into published_assessment_models")
+	withPublished := flag.Bool("with-published", false, "also upsert active scale snapshots into published_assessment_models")
+	skipExistingPublished := flag.Bool("skip-existing-published", true, "skip published upsert when the same code+version already exists")
 	flag.Parse()
 
 	if *mongoURI == "" {
@@ -45,12 +47,12 @@ func main() {
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
 	publishedRepo := mongomodelcatalog.NewRepository(db)
 
-	plan, err := buildPlan(ctx, scaleRepo, draftRepo, *overwrite, *withPublished)
+	plan, err := buildPlan(ctx, scaleRepo, draftRepo, publishedRepo, *overwrite, *withPublished, *skipExistingPublished)
 	if err != nil {
 		log.Fatalf("build plan: %v", err)
 	}
-	fmt.Printf("plan: create %d draft(s), update %d draft(s), skip %d draft(s), upsert %d published snapshot(s)\n",
-		plan.createCount, plan.updateCount, plan.skipCount, plan.publishedCount)
+	fmt.Printf("plan: create %d draft(s), update %d draft(s), skip %d draft(s), upsert %d published snapshot(s), skip %d published snapshot(s)\n",
+		plan.createCount, plan.updateCount, plan.skipCount, plan.upsertPublishedCount, plan.skipPublishedCount)
 	for _, item := range plan.items {
 		fmt.Printf("  - %s: %s\n", item.code, item.action)
 	}
@@ -82,16 +84,12 @@ func main() {
 	}
 
 	if *withPublished {
-		snapshots, err := rulesetInfra.PublishedScaleSnapshots(ctx, scaleRepo)
-		if err != nil {
-			log.Fatalf("list published scale snapshots: %v", err)
-		}
-		for _, snapshot := range snapshots {
-			if snapshot == nil {
+		for _, item := range plan.publishedItems {
+			if item.skip {
 				continue
 			}
-			if err := publishedRepo.UpsertPublishedModel(ctx, snapshot); err != nil {
-				log.Fatalf("upsert published %s@%s: %v", snapshot.Code, snapshot.Version, err)
+			if err := publishedRepo.UpsertPublishedModel(ctx, item.snapshot); err != nil {
+				log.Fatalf("upsert published %s@%s: %v", item.snapshot.Code, item.snapshot.Version, err)
 			}
 		}
 	}
@@ -105,15 +103,28 @@ type planItem struct {
 }
 
 type backfillPlan struct {
-	scales         []*scaledefinition.MedicalScale
-	items          []planItem
-	createCount    int
-	updateCount    int
-	skipCount      int
-	publishedCount int
+	scales               []*scaledefinition.MedicalScale
+	items                []planItem
+	publishedItems       []publishedPlanItem
+	createCount          int
+	updateCount          int
+	skipCount            int
+	upsertPublishedCount int
+	skipPublishedCount   int
 }
 
-func buildPlan(ctx context.Context, scaleRepo *mongoScale.Repository, draftRepo *mongomodelcatalog.DraftRepository, overwrite, withPublished bool) (*backfillPlan, error) {
+type publishedPlanItem struct {
+	snapshot *port.PublishedModel
+	skip     bool
+}
+
+func buildPlan(
+	ctx context.Context,
+	scaleRepo *mongoScale.Repository,
+	draftRepo *mongomodelcatalog.DraftRepository,
+	publishedRepo *mongomodelcatalog.Repository,
+	overwrite, withPublished, skipExistingPublished bool,
+) (*backfillPlan, error) {
 	scales, err := scaleRepo.ListHeadScales(ctx)
 	if err != nil {
 		return nil, err
@@ -145,7 +156,39 @@ func buildPlan(ctx context.Context, scaleRepo *mongoScale.Repository, draftRepo 
 		if err != nil {
 			return nil, err
 		}
-		plan.publishedCount = len(snapshots)
+		for _, snapshot := range snapshots {
+			if snapshot == nil {
+				continue
+			}
+			item := publishedPlanItem{snapshot: snapshot}
+			if skipExistingPublished {
+				_, err := publishedRepo.GetPublishedModelByRef(ctx, port.Ref{
+					Kind:      domain.KindScale,
+					Code:      snapshot.Code,
+					Version:   snapshot.Version,
+					Algorithm: snapshot.Algorithm,
+				})
+				if err == nil {
+					item.skip = true
+					plan.skipPublishedCount++
+					plan.items = append(plan.items, planItem{
+						code:   snapshot.Code + "@" + snapshot.Version,
+						action: "skip existing published",
+					})
+					plan.publishedItems = append(plan.publishedItems, item)
+					continue
+				}
+				if !domain.IsNotFound(err) {
+					return nil, fmt.Errorf("find published %s@%s: %w", snapshot.Code, snapshot.Version, err)
+				}
+			}
+			plan.upsertPublishedCount++
+			plan.items = append(plan.items, planItem{
+				code:   snapshot.Code + "@" + snapshot.Version,
+				action: "upsert published",
+			})
+			plan.publishedItems = append(plan.publishedItems, item)
+		}
 	}
 	return plan, nil
 }
