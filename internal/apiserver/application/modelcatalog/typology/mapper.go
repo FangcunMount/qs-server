@@ -4,7 +4,7 @@ import (
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
@@ -49,7 +49,7 @@ func normalizeDefinitionPayloadForAPI(model *domain.AssessmentModel) []byte {
 	if len(raw) == 0 {
 		return raw
 	}
-	payload, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := modeltypology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
 	if err != nil || runtime == nil {
 		return raw
 	}

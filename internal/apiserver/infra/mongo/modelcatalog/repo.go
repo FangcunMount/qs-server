@@ -32,15 +32,15 @@ func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) 
 	}
 }
 
-func (r *Repository) UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
-	if snapshot == nil {
+func (r *Repository) UpsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
+	if model == nil {
 		return mongo.ErrNilDocument
 	}
-	return r.upsertPublishedModel(ctx, snapshot)
+	return r.upsertPublishedModel(ctx, model)
 }
 
-func (r *Repository) upsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
-	po := r.mapper.ToPO(snapshot)
+func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
+	po := r.mapper.ToPO(model)
 	now := time.Now()
 	po.Status = statusPublished
 	po.PublishedAt = &now
@@ -76,7 +76,7 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, snapshot *domain.
 	return err
 }
 
-func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if ref.Version == "" {
 		return nil, domain.ErrVersionRequired
 	}
@@ -84,7 +84,7 @@ func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (
 	return r.findOnePublished(ctx, filter)
 }
 
-func (r *Repository) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
+func (r *Repository) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error) {
 	filter := publishedFilter(bson.M{
 		"questionnaire_code": questionnaireCode,
 	})
@@ -94,7 +94,7 @@ func (r *Repository) FindPublishedModelByQuestionnaire(ctx context.Context, ques
 	return r.findOnePublished(ctx, filter)
 }
 
-func (r *Repository) FindLatestPublishedModelByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (r *Repository) FindLatestPublishedModelByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	if code == "" {
 		return nil, domain.ErrNotFound
 	}
@@ -105,7 +105,7 @@ func (r *Repository) FindLatestPublishedModelByModelCode(ctx context.Context, ki
 	return r.findLatestPublished(ctx, filter)
 }
 
-func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	page := filter.Page
 	if page <= 0 {
 		page = 1
@@ -143,18 +143,18 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 
-	snapshots := make([]*domain.PublishedModelSnapshot, 0)
+	models := make([]*port.PublishedModel, 0)
 	for cursor.Next(ctx) {
 		var po PublishedAssessmentModelPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, 0, err
 		}
-		snapshots = append(snapshots, r.mapper.ToPublished(&po))
+		models = append(models, r.mapper.ToPublished(&po))
 	}
 	if err := cursor.Err(); err != nil {
 		return nil, 0, err
 	}
-	return snapshots, total, nil
+	return models, total, nil
 }
 
 func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {
@@ -236,7 +236,7 @@ func (r *Repository) refFilter(ref port.Ref) bson.M {
 	return filter
 }
 
-func (r *Repository) findOnePublished(ctx context.Context, filter bson.M) (*domain.PublishedModelSnapshot, error) {
+func (r *Repository) findOnePublished(ctx context.Context, filter bson.M) (*port.PublishedModel, error) {
 	var po PublishedAssessmentModelPO
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
@@ -248,7 +248,7 @@ func (r *Repository) findOnePublished(ctx context.Context, filter bson.M) (*doma
 	return r.mapper.ToPublished(&po), nil
 }
 
-func (r *Repository) findLatestPublished(ctx context.Context, filter bson.M) (*domain.PublishedModelSnapshot, error) {
+func (r *Repository) findLatestPublished(ctx context.Context, filter bson.M) (*port.PublishedModel, error) {
 	var po PublishedAssessmentModelPO
 	opts := options.FindOne().SetSort(bson.D{
 		{Key: "published_at", Value: -1},

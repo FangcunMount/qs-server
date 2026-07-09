@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 func TestDraftMapperRoundTripProductChannel(t *testing.T) {
@@ -35,26 +36,36 @@ func TestDraftMapperDerivesMissingProductChannel(t *testing.T) {
 		Kind: string(domain.KindCognitive),
 	}
 	got := NewDraftMapper().ToDomain(po)
-	if got.ProductChannel != domain.ProductChannelCognitive {
-		t.Fatalf("derived product channel = %q, want cognitive", got.ProductChannel)
+	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
+		t.Fatalf("derived product channel = %q, want behavior_ability", got.ProductChannel)
+	}
+}
+
+func TestDraftMapperNormalizesLegacyCognitiveProductChannel(t *testing.T) {
+	po := &AssessmentModelPO{
+		Code:           "legacy_cognitive",
+		Kind:           string(domain.KindCognitive),
+		ProductChannel: string(domain.ProductChannelCognitive),
+	}
+	got := NewDraftMapper().ToDomain(po)
+	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
+		t.Fatalf("normalized product channel = %q, want behavior_ability", got.ProductChannel)
 	}
 }
 
 func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
-	original := &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1,
-		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelMedicalScale,
-			Kind:           domain.KindBehavioralRating,
-			Algorithm:      domain.AlgorithmBrief2,
-			Code:           "brief2",
-			Version:        "v1",
-			Title:          "BRIEF-2",
-			Status:         "published",
-		},
-		Decision: domain.DecisionSpec{Kind: domain.DecisionKindNormLookup},
-		Payload:  []byte(`{}`),
+	original := &port.PublishedModel{
+		SchemaVersion:  domain.SchemaVersionV2,
+		PayloadFormat:  domain.PayloadFormatBehavioralRatingBrief2V1,
+		ProductChannel: domain.ProductChannelMedicalScale,
+		Kind:           domain.KindBehavioralRating,
+		Algorithm:      domain.AlgorithmBrief2,
+		Code:           "brief2",
+		Version:        "v1",
+		Title:          "BRIEF-2",
+		Status:         "published",
+		DecisionKind:   domain.DecisionKindNormLookup,
+		Payload:        []byte(`{}`),
 	}
 
 	mapper := NewMapper()
@@ -63,8 +74,8 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 		t.Fatalf("po.ModelProductChannel = %q", po.ModelProductChannel)
 	}
 	got := mapper.ToPublished(po)
-	if got.Model.ProductChannel != domain.ProductChannelMedicalScale {
-		t.Fatalf("round trip product channel = %q", got.Model.ProductChannel)
+	if got.ProductChannel != domain.ProductChannelMedicalScale {
+		t.Fatalf("round trip product channel = %q", got.ProductChannel)
 	}
 }
 
@@ -81,8 +92,26 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 		Payload:        []byte(`{}`),
 	}
 	got := NewMapper().ToPublished(po)
-	if got.Model.ProductChannel != domain.ProductChannelTypology {
-		t.Fatalf("derived product channel = %q, want personality", got.Model.ProductChannel)
+	if got.ProductChannel != domain.ProductChannelTypology {
+		t.Fatalf("derived product channel = %q, want typology", got.ProductChannel)
+	}
+}
+
+func TestPublishedMapperNormalizesLegacyCognitiveProductChannel(t *testing.T) {
+	po := &PublishedAssessmentModelPO{
+		ModelProductChannel: string(domain.ProductChannelCognitive),
+		ModelKind:           string(domain.KindCognitive),
+		ModelAlgorithm:      string(domain.AlgorithmSPM),
+		ModelCode:           "spm",
+		ModelVersion:        "v1",
+		Title:               "SPM",
+		Status:              "published",
+		DecisionKind:        string(domain.DecisionKindAbilityLevel),
+		Payload:             []byte(`{}`),
+	}
+	got := NewMapper().ToPublished(po)
+	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
+		t.Fatalf("normalized product channel = %q, want behavior_ability", got.ProductChannel)
 	}
 }
 

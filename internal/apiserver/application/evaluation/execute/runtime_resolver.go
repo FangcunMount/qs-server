@@ -47,13 +47,13 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	executionIdentity := resolveExecutionIdentity(a, input)
 	resolved := ResolvedExecution{ExecutionIdentity: executionIdentity}
 
-	snapshot, ok := publishedSnapshotFromInput(input)
+	route, ok := modelRouteFromInput(input)
 	if ok && r.descriptors != nil {
-		desc, err := r.descriptors.Resolve(snapshot)
+		desc, err := r.descriptors.Resolve(route)
 		if err != nil {
 			return resolved, err
 		}
-		key, keyErr := evalpipeline.RuntimeDescriptorKeyFromSnapshot(snapshot)
+		key, keyErr := evalpipeline.RuntimeDescriptorKeyFromRoute(route)
 		if keyErr != nil {
 			return ResolvedExecution{}, keyErr
 		}

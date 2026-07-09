@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -28,7 +28,7 @@ func (p *ScalePublisher) PublishPublishedScale(ctx context.Context, scale *scale
 	if scale.GetStatus() != scaledefinition.StatusPublished {
 		return fmt.Errorf("scale %s is not published", scale.GetCode().String())
 	}
-	published, err := publishing.BuildScoringPublishedSnapshotFromScale(
+	published, err := aminfra.BuildScalePublishedSnapshot(
 		evaluationinputInfra.MedicalScaleToSnapshot(scale),
 	)
 	if err != nil {

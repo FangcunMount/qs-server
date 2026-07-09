@@ -27,12 +27,12 @@ type ModelRepository interface {
 	Delete(ctx context.Context, code string) error
 }
 
-// PublishedModelRepository persists published model snapshots for admin publish flows.
+// PublishedModelRepository persists published model runtime records for admin publish flows.
 type PublishedModelRepository interface {
-	Save(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error
-	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
-	FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
-	FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error)
-	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)
+	Save(ctx context.Context, model *PublishedModel) error
+	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
+	FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
+	FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*PublishedModel, error)
+	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*PublishedModel, int64, error)
 	DeletePublished(ctx context.Context, kind domain.Kind, code string) error
 }

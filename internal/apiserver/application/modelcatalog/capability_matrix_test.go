@@ -110,6 +110,92 @@ func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	}
 }
 
+func TestProductModelRuntimeContractMatrix(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name           string
+		apiKind        string
+		productChannel domain.ProductChannel
+		kind           domain.Kind
+		subKind        domain.SubKind
+		algorithm      domain.Algorithm
+		family         domain.AlgorithmFamily
+		executionPath  domain.ExecutionPath
+	}{
+		{
+			name:           "medical_scale",
+			apiKind:        KindMedicalScale,
+			productChannel: domain.ProductChannelMedicalScale,
+			kind:           domain.KindScale,
+			algorithm:      domain.AlgorithmScaleDefault,
+			family:         domain.AlgorithmFamilyFactorScoring,
+			executionPath:  domain.ExecutionPathScaleDescriptor,
+		},
+		{
+			name:           "typology",
+			apiKind:        KindTypology,
+			productChannel: domain.ProductChannelTypology,
+			kind:           domain.KindTypology,
+			subKind:        domain.SubKindTypology,
+			algorithm:      domain.AlgorithmMBTI,
+			family:         domain.AlgorithmFamilyFactorClassification,
+			executionPath:  domain.ExecutionPathTypologyDescriptor,
+		},
+		{
+			name:           "behavioral_rating",
+			apiKind:        KindBehavioralRating,
+			productChannel: domain.ProductChannelBehaviorAbility,
+			kind:           domain.KindBehavioralRating,
+			algorithm:      domain.AlgorithmBrief2,
+			family:         domain.AlgorithmFamilyFactorNorm,
+			executionPath:  domain.ExecutionPathBehavioralRatingDescriptor,
+		},
+		{
+			name:           "cognitive_projection",
+			apiKind:        KindCognitive,
+			productChannel: domain.ProductChannelBehaviorAbility,
+			kind:           domain.KindCognitive,
+			algorithm:      domain.AlgorithmSPM,
+			family:         domain.AlgorithmFamilyTaskPerformance,
+			executionPath:  domain.ExecutionPathCognitiveDescriptor,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			kind, ok := APIKindToDomainKind(tc.apiKind)
+			if !ok {
+				t.Fatalf("APIKindToDomainKind(%q) ok = false", tc.apiKind)
+			}
+			if kind != tc.kind {
+				t.Fatalf("APIKindToDomainKind(%q) = %q, want %q", tc.apiKind, kind, tc.kind)
+			}
+			if got := DomainKindToAPIKind(tc.kind); got != tc.apiKind {
+				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", tc.kind, got, tc.apiKind)
+			}
+			if got := domain.DefaultProductChannelFor(tc.kind); got != tc.productChannel {
+				t.Fatalf("DefaultProductChannelFor(%q) = %q, want %q", tc.kind, got, tc.productChannel)
+			}
+			family, ok := domain.AlgorithmFamilyFromIdentity(tc.kind, tc.subKind, tc.algorithm)
+			if !ok {
+				t.Fatalf("AlgorithmFamilyFromIdentity(%q,%q,%q) ok = false", tc.kind, tc.subKind, tc.algorithm)
+			}
+			if family != tc.family {
+				t.Fatalf("AlgorithmFamilyFromIdentity(%q,%q,%q) = %q, want %q", tc.kind, tc.subKind, tc.algorithm, family, tc.family)
+			}
+			cap, ok := domain.FamilyCapabilityByKind(tc.kind)
+			if !ok {
+				t.Fatalf("FamilyCapabilityByKind(%q) ok = false", tc.kind)
+			}
+			if cap.ExecutionPath != tc.executionPath {
+				t.Fatalf("ExecutionPath = %q, want %q", cap.ExecutionPath, tc.executionPath)
+			}
+		})
+	}
+}
+
 func TestOptionsReflectsCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 

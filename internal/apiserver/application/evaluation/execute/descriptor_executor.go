@@ -19,11 +19,11 @@ func (descriptorDrivenExecutor) Execute(
 	if desc.InputAssembler == nil || desc.Calculator == nil || desc.OutcomeAssembler == nil {
 		return nil, fmt.Errorf("descriptor pipeline is incomplete for family %s", desc.AlgorithmFamily)
 	}
-	snapshot, ok := publishedSnapshotFromInput(input.Input)
+	route, ok := modelRouteFromInput(input.Input)
 	if !ok {
-		return nil, fmt.Errorf("descriptor pipeline requires published model snapshot")
+		return nil, fmt.Errorf("descriptor pipeline requires model route")
 	}
-	calcInput, err := desc.InputAssembler.Assemble(snapshot)
+	calcInput, err := desc.InputAssembler.Assemble(route)
 	if err != nil {
 		return nil, err
 	}

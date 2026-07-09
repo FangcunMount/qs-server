@@ -1,8 +1,8 @@
-// Package modelcatalog 负责已发布测评模型资产。
+// Package modelcatalog 负责测评模型资产目录。
 //
 // # 概览
 //
-// v2 引入 Kind/SubKind/Algorithm 身份、PublishedModelSnapshot，以及统一的人格类型学载荷。
+// v2 引入 Kind/SubKind/Algorithm 身份，以及统一的人格类型学载荷。
 // 迁移期仍保持旧版 ruleset.* 载荷格式可读；新的写入使用 assessmentmodel.* 载荷格式。
 //
 // KindCapability.Role 把产品通道和可执行模型家族分开。
@@ -37,19 +37,27 @@
 //
 // 根包仅保留 doc.go、errors.go、export.go。业务类型通过子包实现，根包 re-export：
 //
-//   - binding/: Kind、SubKind、Algorithm、ModelFamilyCapability（执行/生命周期守卫）
-//   - publishing/: PublishedModelSnapshot、AlgorithmFamily、PayloadFormat
-//   - factor|scoring|norming|typology|taskperformance/: 机制载荷与快照
+//   - identity/: Product、Identity、Family
+//   - assessmentmodel/: AssessmentModel 聚合
+//   - definition/: Definition、MeasureSpec、Calibration、ReportMap
+//   - factor/: Factor 和共享因子图元数据
+//   - norm/: Norm 和 NormRef
+//   - conclusion/: Risk/Type/Norm/Ability Conclusion
+//   - payloadformat/: PayloadFormat、SchemaVersion 和 legacy decode 判定
 //   - legacy/: v1 信封、迁移适配器、behavior_ability 产品通道
+//   - scoring|norming|typology|taskperformance/: 迁移期机制载荷与兼容实现
 //
 // 深 import 机制子包（factor/typology 等）用于机制专用逻辑；跨机制常用读路径类型经 export.go 薄 re-export。
 // 新增机制专用逻辑仍优先落在子包；仅将跨包高频叶子类型提升到根包别名。
 // application 展示选项见 application/modelcatalog/option.ModelCatalogOption（与 domain ModelFamilyCapability 分离）。
 //
-// # 子包（机制八包，已与磁盘对齐）
+// # 子包
 //
-//   - binding/: 身份、产品通道、ModelFamilyCapability
-//   - publishing/: 发布聚合、快照构建、PayloadFormat
+//   - identity/: 产品概念、算法身份和执行家族
+//   - assessmentmodel/: 后台可编辑测评模型配置聚合
+//   - definition/: 测评模型定义主体
+//   - binding/: 基础身份值、产品通道、ExecutionPath、ModelFamilyCapability
+//   - payloadformat/: PayloadFormat、SchemaVersion 和 legacy decode 判定
 //   - factor/: 共享因子图元数据
 //   - scoring/: 因子计分定义与快照
 //   - typology/: 类型学载荷、发布、校验

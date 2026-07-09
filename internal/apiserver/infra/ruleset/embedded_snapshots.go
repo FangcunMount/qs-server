@@ -3,21 +3,21 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // DefaultEmbeddedRuleSets builds v2 published snapshots from embedded SBTI/MBTI seed.
-func DefaultEmbeddedRuleSets(ctx context.Context) ([]*domain.PublishedModelSnapshot, error) {
+func DefaultEmbeddedRuleSets(ctx context.Context) ([]*port.PublishedModel, error) {
 	return defaultEmbeddedSnapshots(ctx)
 }
 
 // DefaultEmbeddedSnapshots builds v2 published snapshots from embedded SBTI/MBTI seed.
-func DefaultEmbeddedSnapshots(ctx context.Context) ([]*domain.PublishedModelSnapshot, error) {
+func DefaultEmbeddedSnapshots(ctx context.Context) ([]*port.PublishedModel, error) {
 	return defaultEmbeddedSnapshots(ctx)
 }
 
-func defaultEmbeddedSnapshots(_ context.Context) ([]*domain.PublishedModelSnapshot, error) {
+func defaultEmbeddedSnapshots(_ context.Context) ([]*port.PublishedModel, error) {
 	sbtiModel, err := LoadDefaultSBTILegacyModel()
 	if err != nil {
 		return nil, err
@@ -34,5 +34,5 @@ func defaultEmbeddedSnapshots(_ context.Context) ([]*domain.PublishedModelSnapsh
 	if err != nil {
 		return nil, err
 	}
-	return []*domain.PublishedModelSnapshot{sbtiSnapshot, mbtiSnapshot}, nil
+	return []*port.PublishedModel{sbtiSnapshot, mbtiSnapshot}, nil
 }

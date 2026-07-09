@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -129,7 +128,7 @@ func decodeDefinitionPayload(data []byte, algorithm domain.Algorithm) (*modeltyp
 		Algorithm:  algorithm,
 		Definition: domain.DefinitionPayload{Data: data},
 	}
-	decoded, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
+	decoded, runtime, err := modeltypology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
 	if err != nil {
 		return nil, err
 	}

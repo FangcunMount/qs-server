@@ -8,6 +8,7 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	rulesetv1 "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 func EncodeSBTI(model *typology.SBTILegacyModel) ([]byte, string, error) {
@@ -90,18 +91,18 @@ func DecodeScale(snapshot *rulesetv1.V1Snapshot) (*scalesnapshot.ScaleSnapshot, 
 	return scalesnapshot.ParsePublishedPayload(snapshot.Payload)
 }
 
-func DecodeTypology(snapshot *domain.PublishedModelSnapshot) (*typology.Payload, error) {
-	if snapshot == nil {
+func DecodeTypology(model *port.PublishedModel) (*typology.Payload, error) {
+	if model == nil {
 		return nil, fmt.Errorf("published model snapshot is nil")
 	}
-	format := snapshot.PayloadFormat
+	format := model.PayloadFormat
 	if format == "" {
 		format = domain.PayloadFormatPersonalityTypologyV1
 	}
 	if !domain.IsPersonalityTypologyPayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported typology payload format: %s", format)
 	}
-	return decodeTypologyPayload(snapshot.Payload)
+	return decodeTypologyPayload(model.Payload)
 }
 
 func decodeTypologyPayload(payload []byte) (*typology.Payload, error) {

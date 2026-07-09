@@ -7,10 +7,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func TestPublishedSnapshotFromInputPreservesExplicitProductChannel(t *testing.T) {
+func TestModelRouteFromInputPreservesRuntimeIdentity(t *testing.T) {
 	t.Parallel()
 
-	snapshot, ok := PublishedSnapshotFromInput(&evaluationinput.InputSnapshot{
+	route, ok := ModelRouteFromInput(&evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:           evaluationinput.EvaluationModelKindBehavioralRating,
 			Algorithm:      string(modelcatalog.AlgorithmBehavioralRatingDefault),
@@ -21,17 +21,17 @@ func TestPublishedSnapshotFromInputPreservesExplicitProductChannel(t *testing.T)
 		},
 	})
 	if !ok {
-		t.Fatal("PublishedSnapshotFromInput returned false")
+		t.Fatal("ModelRouteFromInput returned false")
 	}
-	if snapshot.Model.ProductChannel != modelcatalog.ProductChannel("screening") {
-		t.Fatalf("product channel = %s, want screening", snapshot.Model.ProductChannel)
+	if route.Kind != modelcatalog.KindBehavioralRating || route.Algorithm != modelcatalog.AlgorithmBehavioralRatingDefault {
+		t.Fatalf("route identity = %s/%s", route.Kind, route.Algorithm)
 	}
 }
 
-func TestPublishedSnapshotFromInputDefaultsMissingProductChannel(t *testing.T) {
+func TestModelRouteFromInputPreservesScaleIdentity(t *testing.T) {
 	t.Parallel()
 
-	snapshot, ok := PublishedSnapshotFromInput(&evaluationinput.InputSnapshot{
+	route, ok := ModelRouteFromInput(&evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:      evaluationinput.EvaluationModelKindScale,
 			Algorithm: string(modelcatalog.AlgorithmScaleDefault),
@@ -41,9 +41,9 @@ func TestPublishedSnapshotFromInputDefaultsMissingProductChannel(t *testing.T) {
 		},
 	})
 	if !ok {
-		t.Fatal("PublishedSnapshotFromInput returned false")
+		t.Fatal("ModelRouteFromInput returned false")
 	}
-	if snapshot.Model.ProductChannel != modelcatalog.ProductChannelMedicalScale {
-		t.Fatalf("product channel = %s, want medical_scale", snapshot.Model.ProductChannel)
+	if route.Kind != modelcatalog.KindScale || route.Algorithm != modelcatalog.AlgorithmScaleDefault {
+		t.Fatalf("route identity = %s/%s", route.Kind, route.Algorithm)
 	}
 }

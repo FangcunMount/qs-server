@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -171,8 +172,15 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if err != nil {
 		return nil, err
 	}
+	save, issues, err := s.definitionHandler().PrepareForSave(ctx, model, appdefinition.SaveInput{Payload: input.Payload})
+	if len(issues) > 0 {
+		return nil, invalidArgument("%s", issues[0].Message)
+	}
+	if err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
 	now := time.Now().UTC()
-	if err := model.UpdateDefinition(domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)}, now); err != nil {
+	if err := model.UpdateDefinition(save.Payload, now); err != nil {
 		return nil, mapDomainError(err)
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
@@ -210,31 +218,14 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, err
 	}
-	if model.Definition.IsEmpty() {
-		return nil, invalidArgument("行为评定模型定义不能为空")
-	}
-	if err := publishValidationError(model); err != nil {
-		return nil, err
-	}
-	now := time.Now().UTC()
-	if err := model.MarkPublished(now); err != nil {
-		return nil, mapDomainError(err)
-	}
-	snapshot, err := publishing.BuildPublishedSnapshot(model)
-	if err != nil {
-		return nil, invalidArgument("%s", err.Error())
-	}
-	if err := validatePublishedScoreNodes(snapshot); err != nil {
-		return nil, invalidArgument("%s", err.Error())
-	}
-	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode); err != nil {
-		return nil, err
-	}
-	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
-		return nil, err
-	}
-	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, modelCode)
+	if _, err := s.publisher().Publish(ctx, model, publication.PublishOptions{ReplaceKind: domain.KindBehavioralRating}); err != nil {
+		var validationErr *appdefinition.ValidationError
+		if stderrors.As(err, &validationErr) {
+			return nil, invalidArgument("%s", validationErr.Error())
+		}
+		if stderrors.Is(err, domain.ErrInvalidArgument) || stderrors.Is(err, domain.ErrInvalidState) {
+			return nil, mapDomainError(err)
+		}
 		return nil, err
 	}
 	return summaryFromModel(model), nil
@@ -296,6 +287,18 @@ func (s *service) loadModel(ctx context.Context, modelCode string) (*domain.Asse
 		return nil, errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
 	}
 	return model, nil
+}
+
+func (s *service) definitionHandler() DefinitionHandler {
+	return DefinitionHandler{}
+}
+
+func (s *service) publisher() publication.Publisher {
+	return publication.Publisher{
+		Registry:  appdefinition.NewRegistry(s.definitionHandler()),
+		ModelRepo: s.deps.ModelRepo,
+		Repo:      s.deps.PublishedRepo,
+	}
 }
 
 func unavailable(msg string) error {

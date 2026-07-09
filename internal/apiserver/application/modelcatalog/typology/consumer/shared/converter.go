@@ -5,34 +5,35 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func SummaryFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (TypologyModelSummaryResult, error) {
-	payload, err := payloadFromPublishedModel(snapshot)
+func SummaryFromPublishedModel(model *port.PublishedModel) (TypologyModelSummaryResult, error) {
+	payload, err := payloadFromPublishedModel(model)
 	if err != nil {
 		return TypologyModelSummaryResult{}, err
 	}
 	result := TypologyModelSummaryResult{
-		Code:                 snapshot.Model.Code,
-		Version:              snapshot.Model.Version,
-		Title:                snapshot.Model.Title,
-		Status:               snapshot.Model.Status,
-		QuestionnaireCode:    snapshot.Binding.QuestionnaireCode,
-		QuestionnaireVersion: snapshot.Binding.QuestionnaireVersion,
+		Code:                 model.Code,
+		Version:              model.Version,
+		Title:                model.Title,
+		Status:               model.Status,
+		QuestionnaireCode:    model.QuestionnaireCode,
+		QuestionnaireVersion: model.QuestionnaireVersion,
 	}
 	applyPayloadSummary(&result, payload)
-	applyPublishedModelRouting(&result, snapshot)
+	applyPublishedModelRouting(&result, model)
 	return result, nil
 }
 
-func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*TypologyModelResult, error) {
-	payload, err := payloadFromPublishedModel(snapshot)
+func DetailFromPublishedModel(model *port.PublishedModel) (*TypologyModelResult, error) {
+	payload, err := payloadFromPublishedModel(model)
 	if err != nil {
 		return nil, err
 	}
-	summary, err := SummaryFromPublishedModel(snapshot)
+	summary, err := SummaryFromPublishedModel(model)
 	if err != nil {
 		return nil, err
 	}
@@ -45,15 +46,15 @@ func DetailFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*Typolog
 	}, nil
 }
 
-func payloadFromPublishedModel(snapshot *domain.PublishedModelSnapshot) (*modeltypology.Payload, error) {
-	if snapshot == nil {
+func payloadFromPublishedModel(model *port.PublishedModel) (*modeltypology.Payload, error) {
+	if model == nil {
 		return nil, domain.ErrNotFound
 	}
-	if snapshot.PayloadFormat != publishing.PayloadFormatPersonalityTypologyV1 {
-		return nil, fmt.Errorf("unsupported typology payload format %q", snapshot.PayloadFormat)
+	if model.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
+		return nil, fmt.Errorf("unsupported typology payload format %q", model.PayloadFormat)
 	}
 	var payload modeltypology.Payload
-	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
+	if err := json.Unmarshal(model.Payload, &payload); err != nil {
 		return nil, err
 	}
 	return &payload, nil
@@ -172,18 +173,18 @@ func countPayloadQuestions(payload *modeltypology.Payload) int {
 	return len(seen)
 }
 
-func applyPublishedModelRouting(result *TypologyModelSummaryResult, snapshot *domain.PublishedModelSnapshot) {
-	if result == nil || snapshot == nil {
+func applyPublishedModelRouting(result *TypologyModelSummaryResult, model *port.PublishedModel) {
+	if result == nil || model == nil {
 		return
 	}
-	result.Kind = string(snapshot.Model.Kind)
-	result.SubKind = string(snapshot.Model.SubKind)
-	result.ProductChannel = publishing.ProductChannelForIdentity(snapshot.Model.Kind, string(snapshot.Model.ProductChannel))
-	result.PayloadFormat = snapshot.PayloadFormat
-	result.DecisionKind = string(snapshot.Decision.Kind)
-	result.AlgorithmFamily = publishing.AlgorithmFamilyStringFromIdentity(
-		snapshot.Model.Kind,
-		snapshot.Model.SubKind,
-		snapshot.Model.Algorithm,
+	result.Kind = string(model.Kind)
+	result.SubKind = string(model.SubKind)
+	result.ProductChannel = identitypkg.ProductChannelForIdentity(model.Kind, string(model.ProductChannel))
+	result.PayloadFormat = model.PayloadFormat
+	result.DecisionKind = string(model.DecisionKind)
+	result.AlgorithmFamily = identitypkg.AlgorithmFamilyStringFromIdentity(
+		model.Kind,
+		model.SubKind,
+		model.Algorithm,
 	)
 }

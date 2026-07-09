@@ -2,12 +2,12 @@ package assessment
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
 func EnrichModelIdentityResult(model ModelIdentityResult, explicitProductChannel string) ModelIdentityResult {
 	kind := binding.Kind(model.Kind)
-	model.ProductChannel = publishing.ProductChannelForIdentity(kind, firstNonEmpty(explicitProductChannel, model.ProductChannel))
-	model.AlgorithmFamily = publishing.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(model.SubKind), binding.Algorithm(model.Algorithm))
+	model.ProductChannel = identitypkg.ProductChannelForIdentity(kind, firstNonEmpty(explicitProductChannel, model.ProductChannel))
+	model.AlgorithmFamily = identitypkg.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(model.SubKind), binding.Algorithm(model.Algorithm))
 	return model
 }

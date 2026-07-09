@@ -132,3 +132,28 @@ func TestRuntimeTypologyReadsDoNotUseDraftModelRepository(t *testing.T) {
 		}
 	}
 }
+
+func TestFamilyServicesDoNotBypassPublicationSnapshotBuilder(t *testing.T) {
+	scanRoots := []string{"typology", "norming", "taskperformance"}
+	for _, root := range scanRoots {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(string(content), "/application/modelcatalog/publishedmodel") {
+				t.Fatalf("%s must use publication.Publisher and definition.Handler instead of publishedmodel directly", path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}

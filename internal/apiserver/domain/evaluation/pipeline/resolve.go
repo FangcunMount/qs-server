@@ -16,66 +16,63 @@ const (
 	ModelKindCognitive        ModelKind = "cognitive"
 )
 
-// DecisionKindFromSnapshot 解析判定策略用于运行时路由；仅使用 snapshot 显式 decision.kind。
-func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.DecisionKind, bool) {
-	if snapshot.Decision.Kind != "" {
-		return snapshot.Decision.Kind, true
+// DecisionKindFromRoute 解析判定策略用于运行时路由；仅使用 route 显式 decision.kind。
+func DecisionKindFromRoute(route ModelRoute) (modelcatalog.DecisionKind, bool) {
+	if route.DecisionKind != "" {
+		return route.DecisionKind, true
 	}
 	return "", false
 }
 
-// ExecutionRoutingFromSnapshot 是单一 来源 用于 运行时 和 report 机制 路由。
+// ExecutionRoutingFromRoute 是单一 来源 用于 运行时 和 report 机制 路由。
 // Legacy 建模类型 路由 按 执行路径家族; 判定类型For身份 保持 用于 publish matrices。
-func ExecutionRoutingFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
-	family, ok := ExecutionFamilyFromSnapshot(snapshot)
+func ExecutionRoutingFromRoute(route ModelRoute) (RuntimeDescriptorKey, error) {
+	family, ok := ExecutionFamilyFromRoute(route)
 	if !ok {
-		return RuntimeDescriptorKey{}, fmt.Errorf("unsupported snapshot identity for runtime descriptor: %s/%s", snapshot.Model.Kind, snapshot.Model.Algorithm)
+		return RuntimeDescriptorKey{}, fmt.Errorf("unsupported model route for runtime descriptor: %s/%s", route.Kind, route.Algorithm)
 	}
 	return RuntimeDescriptorKey{
 		AlgorithmFamily: family,
-		DecisionKind:    ExecutionDecisionFromSnapshot(snapshot, family),
-		PayloadFormat:   snapshot.PayloadFormat,
+		DecisionKind:    ExecutionDecisionFromRoute(route, family),
+		PayloadFormat:   route.PayloadFormat,
 	}, nil
 }
 
-// RuntimeDescriptorKeyFromSnapshot 推导机制 路由 键 从 已发布快照。
-func RuntimeDescriptorKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
-	return ExecutionRoutingFromSnapshot(snapshot)
+// RuntimeDescriptorKeyFromRoute 推导机制 路由 键 从 模型路由。
+func RuntimeDescriptorKeyFromRoute(route ModelRoute) (RuntimeDescriptorKey, error) {
+	return ExecutionRoutingFromRoute(route)
 }
 
-// ExecutionFamilyFromSnapshot 解析执行家族 using 类型-主 路由。
-func ExecutionFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
-	if family, ok := executionFamilyFromModelKind(snapshot.Model); ok {
+// ExecutionFamilyFromRoute 解析执行家族 using modelcatalog identity as the primary route.
+func ExecutionFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
+	if family, ok := modelcatalog.AlgorithmFamilyFromIdentity(route.Kind, route.SubKind, route.Algorithm); ok {
 		return family, true
 	}
-	if snapshot.Decision.Kind != "" {
-		return modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind)
+	if family, ok := legacyTypologyFamilyFromRoute(route); ok {
+		return family, true
 	}
-	return modelcatalog.AlgorithmFamilyFromIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
+	if route.DecisionKind != "" {
+		return modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
+	}
+	return modelcatalog.AlgorithmFamilyFromIdentity(route.Kind, route.SubKind, route.Algorithm)
 }
 
-// ExecutionDecisionFromSnapshot 解析判定类型 aligned 使用 执行家族。
-func ExecutionDecisionFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot, family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
-	if snapshot.Decision.Kind != "" {
-		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind); ok && decisionFamily == family {
-			return snapshot.Decision.Kind
+// ExecutionDecisionFromRoute 解析判定类型 aligned 使用 执行家族。
+func ExecutionDecisionFromRoute(route ModelRoute, family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	if route.DecisionKind != "" {
+		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind); ok && decisionFamily == family {
+			return route.DecisionKind
 		}
 	}
 	return defaultDecisionKindForFamily(family)
 }
 
-func executionFamilyFromModelKind(model modelcatalog.ModelDefinition) (modelcatalog.AlgorithmFamily, bool) {
-	switch model.Kind {
-	case modelcatalog.KindScale:
-		return modelcatalog.AlgorithmFamilyFactorScoring, true
+func legacyTypologyFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
+	switch route.Kind {
 	case modelcatalog.KindTypology, modelcatalog.KindPersonality:
-		if model.SubKind == modelcatalog.SubKindTypology || model.SubKind == "" {
+		if route.SubKind == "" {
 			return modelcatalog.AlgorithmFamilyFactorClassification, true
 		}
-	case modelcatalog.KindBehavioralRating:
-		return modelcatalog.AlgorithmFamilyFactorNorm, true
-	case modelcatalog.KindCognitive:
-		return modelcatalog.AlgorithmFamilyTaskPerformance, true
 	}
 	return "", false
 }
@@ -95,9 +92,9 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 	}
 }
 
-// AlgorithmFamilyFromSnapshot 解析执行家族 用于 已发布快照。
-func AlgorithmFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
-	return ExecutionFamilyFromSnapshot(snapshot)
+// AlgorithmFamilyFromRoute 解析执行家族 用于 模型路由。
+func AlgorithmFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
+	return ExecutionFamilyFromRoute(route)
 }
 
 // AlgorithmFamilyFromModelKind 映射旧版 模型类型描述符 到 机制家族。

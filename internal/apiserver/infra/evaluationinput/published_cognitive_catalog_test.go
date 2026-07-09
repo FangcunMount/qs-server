@@ -9,7 +9,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func TestPublishedCognitiveCatalogDecodesPublishedModelSnapshot(t *testing.T) {
+func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 	t.Parallel()
 
 	raw := []byte(`{
@@ -25,22 +25,18 @@ func TestPublishedCognitiveCatalogDecodesPublishedModelSnapshot(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
 		}]
 	}`)
-	reader := stubPublishedCognitiveReader{snapshot: &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatCognitiveDefaultV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindCognitive,
-			Algorithm: domain.AlgorithmSPM,
-			Code:      "COG-001",
-			Version:   "1.0.0",
-			Title:     "认知测评",
-			Status:    "published",
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "Q-001",
-			QuestionnaireVersion: "1.0.0",
-		},
-		Payload: raw,
+	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
+		SchemaVersion:        domain.SchemaVersionV2,
+		PayloadFormat:        domain.PayloadFormatCognitiveDefaultV1,
+		Kind:                 domain.KindCognitive,
+		Algorithm:            domain.AlgorithmSPM,
+		Code:                 "COG-001",
+		Version:              "1.0.0",
+		Title:                "认知测评",
+		Status:               "published",
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+		Payload:              raw,
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
@@ -68,18 +64,16 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"spm": {"time_limit_seconds": 900, "item_set_codes": ["A", "B"], "norm_table_version": "2024"}
 	}`)
-	reader := stubPublishedCognitiveReader{snapshot: &domain.PublishedModelSnapshot{
+	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatCognitiveSPMV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindCognitive,
-			Algorithm: domain.AlgorithmSPM,
-			Code:      "COG-SPM",
-			Version:   "1.0.0",
-			Title:     "SPM",
-			Status:    "published",
-		},
-		Payload: raw,
+		Kind:          domain.KindCognitive,
+		Algorithm:     domain.AlgorithmSPM,
+		Code:          "COG-SPM",
+		Version:       "1.0.0",
+		Title:         "SPM",
+		Status:        "published",
+		Payload:       raw,
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
@@ -97,18 +91,18 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 }
 
 type stubPublishedCognitiveReader struct {
-	snapshot *domain.PublishedModelSnapshot
+	snapshot *rulesetport.PublishedModel
 	err      error
 }
 
-func (s stubPublishedCognitiveReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s stubPublishedCognitiveReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.snapshot, nil
 }
 
-func (s stubPublishedCognitiveReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+func (s stubPublishedCognitiveReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

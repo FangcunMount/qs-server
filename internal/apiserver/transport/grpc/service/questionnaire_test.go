@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,7 +21,7 @@ func TestQuestionnaireServiceGetQuestionnaireByVersion(t *testing.T) {
 		},
 	}
 	svc := NewQuestionnaireService(query, &fakePublishedModelReader{
-		snapshot: &domain.PublishedModelSnapshot{},
+		snapshot: &rulesetport.PublishedModel{},
 	})
 
 	resp, err := svc.GetQuestionnaire(context.Background(), &pb.GetQuestionnaireRequest{
@@ -98,13 +97,13 @@ func (s *fakeQuestionnaireQueryService) ListPublished(context.Context, questionn
 }
 
 type fakePublishedModelReader struct {
-	snapshot *domain.PublishedModelSnapshot
+	snapshot *rulesetport.PublishedModel
 }
 
-func (r *fakePublishedModelReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
+func (r *fakePublishedModelReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
 	return nil, nil
 }
 
-func (r *fakePublishedModelReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+func (r *fakePublishedModelReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
 	return r.snapshot, nil
 }

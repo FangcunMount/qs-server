@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func BuildScalePublishedSnapshot(model *scalesnapshot.ScaleSnapshot) (*domain.PublishedModelSnapshot, error) {
-	return publishing.BuildScoringPublishedSnapshotFromScale(model)
+func BuildScalePublishedSnapshot(model *scalesnapshot.ScaleSnapshot) (*port.PublishedModel, error) {
+	return publishedmodel.BuildAssessmentSnapshotFromScale(model)
 }
 
-func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.PublishedModelSnapshot, error) {
+func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*port.PublishedModel, error) {
 	payload, format, err := encodeTypologyPayload(modeltypology.FromMBTI(model))
 	if err != nil {
 		return nil, err
@@ -24,25 +24,21 @@ func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.P
 	if status == "" {
 		status = "published"
 	}
-	return &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: format,
-		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelTypology,
-			Kind:           domain.KindTypology,
-			SubKind:        domain.SubKindTypology,
-			Algorithm:      domain.AlgorithmMBTI,
-			Code:           model.Code,
-			Version:        model.Version,
-			Title:          model.Title,
-			Status:         status,
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    model.QuestionnaireCode,
-			QuestionnaireVersion: model.QuestionnaireVersion,
-		},
-		Decision: domain.DecisionSpec{Kind: domain.DecisionKindPoleComposition},
-		Source: domain.SourceRef{
+	return &port.PublishedModel{
+		SchemaVersion:        domain.SchemaVersionV2,
+		PayloadFormat:        format,
+		ProductChannel:       domain.ProductChannelTypology,
+		Kind:                 domain.KindTypology,
+		SubKind:              domain.SubKindTypology,
+		Algorithm:            domain.AlgorithmMBTI,
+		Code:                 model.Code,
+		Version:              model.Version,
+		Title:                model.Title,
+		Status:               status,
+		DecisionKind:         domain.DecisionKindPoleComposition,
+		QuestionnaireCode:    model.QuestionnaireCode,
+		QuestionnaireVersion: model.QuestionnaireVersion,
+		Source: map[string]any{
 			"questions_repo": model.Source.QuestionsRepo,
 			"source_site":    model.Source.SourceSite,
 			"license":        model.Source.License,
@@ -53,7 +49,7 @@ func BuildMBTIPublishedSnapshot(model *modeltypology.MBTILegacyModel) (*domain.P
 	}, nil
 }
 
-func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.PublishedModelSnapshot, error) {
+func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*port.PublishedModel, error) {
 	payload, format, err := encodeTypologyPayload(modeltypology.FromSBTI(model))
 	if err != nil {
 		return nil, err
@@ -62,26 +58,22 @@ func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.P
 	if status == "" {
 		status = "published"
 	}
-	return &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: format,
-		Payload:       payload,
-		Model: domain.ModelDefinition{
-			ProductChannel: domain.ProductChannelTypology,
-			Kind:           domain.KindTypology,
-			SubKind:        domain.SubKindTypology,
-			Algorithm:      domain.AlgorithmSBTI,
-			Code:           model.Code,
-			Version:        model.Version,
-			Title:          model.Title,
-			Status:         status,
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    model.QuestionnaireCode,
-			QuestionnaireVersion: model.QuestionnaireVersion,
-		},
-		Decision: domain.DecisionSpec{Kind: domain.DecisionKindNearestPattern},
-		Source: domain.SourceRef{
+	return &port.PublishedModel{
+		SchemaVersion:        domain.SchemaVersionV2,
+		PayloadFormat:        format,
+		Payload:              payload,
+		ProductChannel:       domain.ProductChannelTypology,
+		Kind:                 domain.KindTypology,
+		SubKind:              domain.SubKindTypology,
+		Algorithm:            domain.AlgorithmSBTI,
+		Code:                 model.Code,
+		Version:              model.Version,
+		Title:                model.Title,
+		Status:               status,
+		DecisionKind:         domain.DecisionKindNearestPattern,
+		QuestionnaireCode:    model.QuestionnaireCode,
+		QuestionnaireVersion: model.QuestionnaireVersion,
+		Source: map[string]any{
 			"wiki_repo":      model.Source.WikiRepo,
 			"source_site":    model.Source.SourceSite,
 			"license":        model.Source.License,
@@ -92,25 +84,25 @@ func BuildSBTIPublishedSnapshot(model *modeltypology.SBTILegacyModel) (*domain.P
 	}, nil
 }
 
-func RefFromPublished(snapshot *domain.PublishedModelSnapshot) port.Ref {
-	if snapshot == nil {
+func RefFromPublished(model *port.PublishedModel) port.Ref {
+	if model == nil {
 		return port.Ref{}
 	}
 	return port.Ref{
-		Kind:      snapshot.Model.Kind,
-		SubKind:   snapshot.Model.SubKind,
-		Algorithm: snapshot.Model.Algorithm,
-		Code:      snapshot.Model.Code,
-		Version:   snapshot.Model.Version,
-		Title:     snapshot.Model.Title,
+		Kind:      model.Kind,
+		SubKind:   model.SubKind,
+		Algorithm: model.Algorithm,
+		Code:      model.Code,
+		Version:   model.Version,
+		Title:     model.Title,
 	}
 }
 
-func RefMatchesPublished(ref port.Ref, snapshot *domain.PublishedModelSnapshot) bool {
-	if snapshot == nil || ref.Code == "" || ref.Version == "" {
+func RefMatchesPublished(ref port.Ref, model *port.PublishedModel) bool {
+	if model == nil || ref.Code == "" || ref.Version == "" {
 		return false
 	}
-	got := RefFromPublished(snapshot)
+	got := RefFromPublished(model)
 	return ref.Kind == got.Kind &&
 		ref.SubKind == got.SubKind &&
 		ref.Algorithm == got.Algorithm &&

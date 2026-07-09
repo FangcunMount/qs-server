@@ -22,8 +22,8 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 	if published.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
 		t.Fatalf("format = %s", published.PayloadFormat)
 	}
-	if published.Model.Kind != domain.KindTypology || published.Model.Algorithm != domain.AlgorithmMBTI {
-		t.Fatalf("model = %#v", published.Model)
+	if published.Kind != domain.KindTypology || published.Algorithm != domain.AlgorithmMBTI {
+		t.Fatalf("model = %#v", published)
 	}
 	legacy := v1envelope.V1FromPublished(published)
 	if legacy.Definition.Kind != domain.KindTypology || legacy.Definition.Code != "MBTI_OEJTS" {
@@ -32,19 +32,17 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 }
 
 func TestRefFromPublishedPreservesPersonalityTypologyIdentity(t *testing.T) {
-	published := &domain.PublishedModelSnapshot{
+	published := &port.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: domain.AlgorithmPersonalityTypology,
-			Code:      "ENNEAGRAM_45",
-			Version:   "1.0.0",
-			Title:     "九型人格",
-			Status:    "published",
-		},
-		Payload: []byte(`{"algorithm":"personality_typology","code":"ENNEAGRAM_45","version":"1.0.0","status":"published"}`),
+		Kind:          domain.KindTypology,
+		SubKind:       domain.SubKindTypology,
+		Algorithm:     domain.AlgorithmPersonalityTypology,
+		Code:          "ENNEAGRAM_45",
+		Version:       "1.0.0",
+		Title:         "九型人格",
+		Status:        "published",
+		Payload:       []byte(`{"algorithm":"personality_typology","code":"ENNEAGRAM_45","version":"1.0.0","status":"published"}`),
 	}
 	ref := RefFromPublished(published)
 	if ref.Kind != domain.KindTypology || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmPersonalityTypology {
@@ -53,19 +51,17 @@ func TestRefFromPublishedPreservesPersonalityTypologyIdentity(t *testing.T) {
 }
 
 func TestRefMatchesPublishedSupportsLegacyAndV2Refs(t *testing.T) {
-	published := &domain.PublishedModelSnapshot{
+	published := &port.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: domain.AlgorithmMBTI,
-			Code:      "MBTI_OEJTS",
-			Version:   "2.0.1",
-			Title:     "MBTI",
-			Status:    "published",
-		},
-		Payload: []byte(`{"algorithm":"mbti","code":"MBTI_OEJTS","version":"2.0.1","status":"published"}`),
+		Kind:          domain.KindTypology,
+		SubKind:       domain.SubKindTypology,
+		Algorithm:     domain.AlgorithmMBTI,
+		Code:          "MBTI_OEJTS",
+		Version:       "2.0.1",
+		Title:         "MBTI",
+		Status:        "published",
+		Payload:       []byte(`{"algorithm":"mbti","code":"MBTI_OEJTS","version":"2.0.1","status":"published"}`),
 	}
 	v2Ref := port.Ref{
 		Kind:      domain.KindTypology,
@@ -80,19 +76,17 @@ func TestRefMatchesPublishedSupportsLegacyAndV2Refs(t *testing.T) {
 }
 
 func TestRefFromPublishedPreservesBigFiveIdentity(t *testing.T) {
-	published := &domain.PublishedModelSnapshot{
+	published := &port.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: domain.AlgorithmBigFive,
-			Code:      "BIG5_IPIP_50",
-			Version:   "1.0.0",
-			Title:     "大五人格",
-			Status:    "published",
-		},
-		Payload: []byte(`{"algorithm":"bigfive","code":"BIG5_IPIP_50","version":"1.0.0","status":"published"}`),
+		Kind:          domain.KindTypology,
+		SubKind:       domain.SubKindTypology,
+		Algorithm:     domain.AlgorithmBigFive,
+		Code:          "BIG5_IPIP_50",
+		Version:       "1.0.0",
+		Title:         "大五人格",
+		Status:        "published",
+		Payload:       []byte(`{"algorithm":"bigfive","code":"BIG5_IPIP_50","version":"1.0.0","status":"published"}`),
 	}
 	ref := RefFromPublished(published)
 	if ref.Kind != domain.KindTypology || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmBigFive {

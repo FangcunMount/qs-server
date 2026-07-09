@@ -30,24 +30,53 @@ type ListPublishedFilter struct {
 	PageSize  int
 }
 
-// PublishedWriter writes v2 published assessment models (seed / admin paths).
-type PublishedWriter interface {
-	UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error
+// AssessmentSnapshot 是已发布测评模型的不可变运行快照。
+//
+// 它是查询、缓存、评估执行共享的 read model/value object，不是 domain aggregate。
+// 字段形态直接对应 published_assessment_models 的现有 BSON 契约。
+type AssessmentSnapshot struct {
+	SchemaVersion        string
+	PayloadFormat        string
+	ProductChannel       domain.ProductChannel
+	Kind                 domain.Kind
+	SubKind              domain.SubKind
+	Algorithm            domain.Algorithm
+	Code                 string
+	Version              string
+	Title                string
+	Status               string
+	DecisionKind         domain.DecisionKind
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Source               map[string]any
+	Payload              []byte
 }
 
-// PublishedModelReader reads v2 published assessment model snapshots for runtime execution.
+// PublishedModel 是 AssessmentSnapshot 的兼容名称。
+//
+// Deprecated: use AssessmentSnapshot in new application/runtime code. The old
+// name is retained because REST/gRPC behavior, Mongo fields, and existing
+// repository interfaces still use "published model" terminology.
+type PublishedModel = AssessmentSnapshot
+
+// PublishedWriter writes v2 published assessment models (seed / admin paths).
+type PublishedWriter interface {
+	UpsertPublishedModel(ctx context.Context, model *PublishedModel) error
+}
+
+// PublishedModelReader reads v2 published assessment model records for runtime execution.
 // Callers must treat this as the only read path for C-side and evaluation flows.
 // Draft models in ModelRepository must never be used for execution.
 type PublishedModelReader interface {
-	GetPublishedModelByRef(ctx context.Context, ref Ref) (*domain.PublishedModelSnapshot, error)
-	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error)
+	GetPublishedModelByRef(ctx context.Context, ref Ref) (*PublishedModel, error)
+	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*PublishedModel, error)
 }
 
-// PublishedModelLister lists v2 published assessment model snapshots for C-side catalogs.
-// FindPublishedModelByCode returns the latest published snapshot for a model code.
+// PublishedModelLister lists v2 published assessment model records for C-side catalogs.
+// FindPublishedModelByCode returns the latest published record for a model code.
 type PublishedModelLister interface {
-	FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
-	ListPublishedModels(ctx context.Context, filter ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)
+	FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
+	ListPublishedModels(ctx context.Context, filter ListPublishedFilter) ([]*PublishedModel, int64, error)
 }
 
 // PublishedAlgorithmLister lists distinct published personality typology algorithms.

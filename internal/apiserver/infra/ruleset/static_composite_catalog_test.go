@@ -83,11 +83,11 @@ func TestStaticCompositeCatalogGetPublishedModelByRef(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPublishedModelByRef: %v", err)
 	}
-	if snapshot.Decision.Kind != domain.DecisionKindPoleComposition {
-		t.Fatalf("DecisionKind = %s, want %s", snapshot.Decision.Kind, domain.DecisionKindPoleComposition)
+	if snapshot.DecisionKind != domain.DecisionKindPoleComposition {
+		t.Fatalf("DecisionKind = %s, want %s", snapshot.DecisionKind, domain.DecisionKindPoleComposition)
 	}
-	if snapshot.Binding.QuestionnaireCode != seedfixtures.MBTIQuestionnaireCode {
-		t.Fatalf("binding code = %s", snapshot.Binding.QuestionnaireCode)
+	if snapshot.QuestionnaireCode != seedfixtures.MBTIQuestionnaireCode {
+		t.Fatalf("binding code = %s", snapshot.QuestionnaireCode)
 	}
 	if len(snapshot.Payload) == 0 {
 		t.Fatal("expected payload")
@@ -157,8 +157,8 @@ func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPublishedModelByRef: %v", err)
 	}
-	if snapshot.Decision.Kind != domain.DecisionKindScoreRange {
-		t.Fatalf("decision = %s", snapshot.Decision.Kind)
+	if snapshot.DecisionKind != domain.DecisionKindScoreRange {
+		t.Fatalf("decision = %s", snapshot.DecisionKind)
 	}
 }
 

@@ -42,12 +42,12 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	return nil
 }
 
-// Resolve 选择描述符 用于 已发布模型快照。
-func (r *RuntimeDescriptorRegistry) Resolve(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptor, error) {
+// Resolve 选择描述符 用于 模型路由。
+func (r *RuntimeDescriptorRegistry) Resolve(route ModelRoute) (RuntimeDescriptor, error) {
 	if r == nil {
 		return RuntimeDescriptor{}, fmt.Errorf("runtime descriptor registry is nil")
 	}
-	key, err := RuntimeDescriptorKeyFromSnapshot(snapshot)
+	key, err := RuntimeDescriptorKeyFromRoute(route)
 	if err != nil {
 		return RuntimeDescriptor{}, err
 	}

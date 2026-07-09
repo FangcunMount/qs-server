@@ -12,26 +12,24 @@ import (
 )
 
 type publishedModelReaderStub struct {
-	snapshot *domainmodel.PublishedModelSnapshot
+	snapshot *port.PublishedModel
 	err      error
 }
 
-func (s publishedModelReaderStub) GetPublishedModelByRef(context.Context, port.Ref) (*domainmodel.PublishedModelSnapshot, error) {
+func (s publishedModelReaderStub) GetPublishedModelByRef(context.Context, port.Ref) (*port.PublishedModel, error) {
 	return s.snapshot, s.err
 }
 
-func (s publishedModelReaderStub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domainmodel.PublishedModelSnapshot, error) {
+func (s publishedModelReaderStub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*port.PublishedModel, error) {
 	return nil, domainmodel.ErrNotFound
 }
 
 func TestTypologyEvaluationModelValidatorRequiresPublishedSnapshot(t *testing.T) {
 	validator := NewTypologyEvaluationModelValidator(publishedModelReaderStub{
-		snapshot: &domainmodel.PublishedModelSnapshot{
-			Model: domainmodel.ModelDefinition{Code: "personality_e2e"},
-			Binding: domainmodel.QuestionnaireBinding{
-				QuestionnaireCode:    "Q_FRONTEND_MBTI",
-				QuestionnaireVersion: "1.0.0",
-			},
+		snapshot: &port.PublishedModel{
+			Code:                 "personality_e2e",
+			QuestionnaireCode:    "Q_FRONTEND_MBTI",
+			QuestionnaireVersion: "1.0.0",
 		},
 	})
 	modelRef := evalassessment.NewEvaluationModelRefWithIdentity(
@@ -68,11 +66,9 @@ func TestTypologyEvaluationModelValidatorRejectsMissingPublishedSnapshot(t *test
 
 func TestTypologyEvaluationModelValidatorRejectsQuestionnaireMismatch(t *testing.T) {
 	validator := NewTypologyEvaluationModelValidator(publishedModelReaderStub{
-		snapshot: &domainmodel.PublishedModelSnapshot{
-			Binding: domainmodel.QuestionnaireBinding{
-				QuestionnaireCode:    "Q_OTHER",
-				QuestionnaireVersion: "1.0.0",
-			},
+		snapshot: &port.PublishedModel{
+			QuestionnaireCode:    "Q_OTHER",
+			QuestionnaireVersion: "1.0.0",
 		},
 	})
 	modelRef := evalassessment.NewEvaluationModelRefByCode(

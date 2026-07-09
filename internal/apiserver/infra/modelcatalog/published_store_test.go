@@ -10,30 +10,30 @@ import (
 
 type publishedStoreV2Stub struct {
 	latestCalled bool
-	latest       *domain.PublishedModelSnapshot
+	latest       *port.PublishedModel
 	latestErr    error
-	list         []*domain.PublishedModelSnapshot
+	list         []*port.PublishedModel
 	total        int64
 }
 
-func (s *publishedStoreV2Stub) UpsertPublishedModel(context.Context, *domain.PublishedModelSnapshot) error {
+func (s *publishedStoreV2Stub) UpsertPublishedModel(context.Context, *port.PublishedModel) error {
 	return nil
 }
 
-func (s *publishedStoreV2Stub) GetPublishedModelByRef(context.Context, port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedStoreV2Stub) GetPublishedModelByRef(context.Context, port.Ref) (*port.PublishedModel, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedStoreV2Stub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedStoreV2Stub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*port.PublishedModel, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedStoreV2Stub) FindLatestPublishedModelByModelCode(context.Context, domain.Kind, string) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedStoreV2Stub) FindLatestPublishedModelByModelCode(context.Context, domain.Kind, string) (*port.PublishedModel, error) {
 	s.latestCalled = true
 	return s.latest, s.latestErr
 }
 
-func (s *publishedStoreV2Stub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (s *publishedStoreV2Stub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	return s.list, s.total, nil
 }
 
@@ -42,8 +42,8 @@ func (s *publishedStoreV2Stub) ListPublishedAlgorithms(context.Context) ([]domai
 }
 
 func TestPublishedStoreFindPublishedModelByCodeUsesLatestV2Snapshot(t *testing.T) {
-	v2 := &publishedStoreV2Stub{latest: &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "personality_demo", Version: "v4"},
+	v2 := &publishedStoreV2Stub{latest: &port.PublishedModel{
+		Kind: domain.KindTypology, Code: "personality_demo", Version: "v4",
 	}}
 	store := &PublishedStore{v2: v2}
 
@@ -54,18 +54,18 @@ func TestPublishedStoreFindPublishedModelByCodeUsesLatestV2Snapshot(t *testing.T
 	if !v2.latestCalled {
 		t.Fatal("v2 latest lookup was not called")
 	}
-	if got.Model.Version != "v4" {
-		t.Fatalf("version = %s, want v4", got.Model.Version)
+	if got.Version != "v4" {
+		t.Fatalf("version = %s, want v4", got.Version)
 	}
 }
 
 func TestPublishedStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 	v2 := &publishedStoreV2Stub{
-		latest: &domain.PublishedModelSnapshot{
-			Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "personality_demo", Version: "v4"},
+		latest: &port.PublishedModel{
+			Kind: domain.KindTypology, Code: "personality_demo", Version: "v4",
 		},
-		list: []*domain.PublishedModelSnapshot{{
-			Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "personality_demo", Version: "v4"},
+		list: []*port.PublishedModel{{
+			Kind: domain.KindTypology, Code: "personality_demo", Version: "v4",
 		}},
 		total: 1,
 	}
@@ -75,8 +75,8 @@ func TestPublishedStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindPublishedModelByCode: %v", err)
 	}
-	if byCode.Model.Code != "personality_demo" || byCode.Model.Version != "v4" {
-		t.Fatalf("published model = %#v", byCode.Model)
+	if byCode.Code != "personality_demo" || byCode.Version != "v4" {
+		t.Fatalf("published model = %#v", byCode)
 	}
 	list, total, err := store.ListPublishedModels(context.Background(), port.ListPublishedFilter{Kind: domain.KindTypology})
 	if err != nil {
@@ -85,8 +85,8 @@ func TestPublishedStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
 	if total != 1 || len(list) != 1 {
 		t.Fatalf("list total=%d len=%d, want 1/1", total, len(list))
 	}
-	if list[0].Model.Code != "personality_demo" || list[0].Model.Version != "v4" {
-		t.Fatalf("list model = %#v", list[0].Model)
+	if list[0].Code != "personality_demo" || list[0].Version != "v4" {
+		t.Fatalf("list model = %#v", list[0])
 	}
 }
 

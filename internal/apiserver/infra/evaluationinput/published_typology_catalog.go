@@ -62,15 +62,15 @@ func (c PublishedTypologyCatalog) decodePublishedModelRef(ctx context.Context, r
 	return decodePublishedTypologyModel(snapshot)
 }
 
-func decodePublishedTypologyModel(snapshot *domain.PublishedModelSnapshot) (*modeltypology.Payload, error) {
-	if snapshot == nil {
+func decodePublishedTypologyModel(model *rulesetport.PublishedModel) (*modeltypology.Payload, error) {
+	if model == nil {
 		return nil, domain.ErrNotFound
 	}
-	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		return nil, fmt.Errorf("unsupported typology payload format %q", snapshot.PayloadFormat)
+	if model.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
+		return nil, fmt.Errorf("unsupported typology payload format %q", model.PayloadFormat)
 	}
 	var payload modeltypology.Payload
-	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
+	if err := json.Unmarshal(model.Payload, &payload); err != nil {
 		return nil, err
 	}
 	return ensurePublishedTypologyPayload(&payload)

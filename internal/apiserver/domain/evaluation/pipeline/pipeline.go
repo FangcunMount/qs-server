@@ -3,8 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type descriptorPipeline struct {
@@ -16,28 +14,28 @@ func NewEvaluationPipeline(registry *RuntimeDescriptorRegistry) EvaluationPipeli
 	return &descriptorPipeline{registry: registry}
 }
 
-func (p *descriptorPipeline) Supports(snapshot modelcatalog.PublishedModelSnapshot) bool {
+func (p *descriptorPipeline) Supports(route ModelRoute) bool {
 	if p == nil || p.registry == nil {
 		return false
 	}
-	_, err := p.registry.Resolve(snapshot)
+	_, err := p.registry.Resolve(route)
 	return err == nil
 }
 
-func (p *descriptorPipeline) Execute(ctx context.Context, snapshot modelcatalog.PublishedModelSnapshot) (any, error) {
+func (p *descriptorPipeline) Execute(ctx context.Context, route ModelRoute) (any, error) {
 	if p == nil || p.registry == nil {
 		return nil, fmt.Errorf("evaluation pipeline is not configured")
 	}
-	desc, err := p.registry.Resolve(snapshot)
+	desc, err := p.registry.Resolve(route)
 	if err != nil {
 		return nil, err
 	}
 	if desc.Calculator == nil {
 		return nil, fmt.Errorf("calculator is not configured for %s", desc.Key)
 	}
-	input := CalculationInput{Snapshot: snapshot}
+	input := CalculationInput{Route: route}
 	if desc.InputAssembler != nil {
-		assembled, err := desc.InputAssembler.Assemble(snapshot)
+		assembled, err := desc.InputAssembler.Assemble(route)
 		if err != nil {
 			return nil, err
 		}

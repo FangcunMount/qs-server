@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
 func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIdentity {
@@ -24,8 +24,8 @@ func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIde
 			Code:            outcome.Input.Model.Code,
 			Version:         outcome.Input.Model.Version,
 			Title:           outcome.Input.Model.Title,
-			ProductChannel:  publishing.ProductChannelForIdentity(kind, outcome.Input.Model.ProductChannel),
-			AlgorithmFamily: publishing.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(outcome.Input.Model.SubKind), binding.Algorithm(outcome.Input.Model.Algorithm)),
+			ProductChannel:  identitypkg.ProductChannelForIdentity(kind, outcome.Input.Model.ProductChannel),
+			AlgorithmFamily: identitypkg.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(outcome.Input.Model.SubKind), binding.Algorithm(outcome.Input.Model.Algorithm)),
 		}
 	}
 	return domainreport.ModelIdentity{}
@@ -41,8 +41,8 @@ func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelI
 		Code:            ref.Code().String(),
 		Version:         ref.Version(),
 		Title:           ref.Title(),
-		ProductChannel:  publishing.ProductChannelForIdentity(kind, ""),
-		AlgorithmFamily: publishing.AlgorithmFamilyStringFromIdentity(kind, id.SubKind, id.Algorithm),
+		ProductChannel:  identitypkg.ProductChannelForIdentity(kind, ""),
+		AlgorithmFamily: identitypkg.AlgorithmFamilyStringFromIdentity(kind, id.SubKind, id.Algorithm),
 	}
 }
 

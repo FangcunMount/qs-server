@@ -70,24 +70,24 @@ func (r *memoryModelRepo) Delete(_ context.Context, code string) error {
 }
 
 type memoryPublishedRepo struct {
-	snapshots  map[string]*domain.PublishedModelSnapshot
+	snapshots  map[string]*port.PublishedModel
 	deleteHits int
 	deleteErr  error
 }
 
-func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *domain.PublishedModelSnapshot) error {
+func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *port.PublishedModel) error {
 	if r.snapshots == nil {
-		r.snapshots = map[string]*domain.PublishedModelSnapshot{}
+		r.snapshots = map[string]*port.PublishedModel{}
 	}
-	r.snapshots[snapshot.Model.Code] = snapshot
+	r.snapshots[snapshot.Code] = snapshot
 	return nil
 }
 
-func (r *memoryPublishedRepo) FindPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*port.PublishedModel, error) {
 	return r.FindLatestPublishedByModelCode(context.Background(), domain.KindTypology, code)
 }
 
-func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*port.PublishedModel, error) {
 	snapshot, ok := r.snapshots[code]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -95,15 +95,15 @@ func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, 
 	return snapshot, nil
 }
 
-func (r *memoryPublishedRepo) FindPublishedByModelCodeVersion(_ context.Context, _ domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindPublishedByModelCodeVersion(_ context.Context, _ domain.Kind, code, version string) (*port.PublishedModel, error) {
 	snapshot, ok := r.snapshots[code]
-	if !ok || snapshot.Model.Version != version {
+	if !ok || snapshot.Version != version {
 		return nil, domain.ErrNotFound
 	}
 	return snapshot, nil
 }
 
-func (r *memoryPublishedRepo) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (r *memoryPublishedRepo) ListPublished(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	return nil, 0, nil
 }
 
@@ -221,7 +221,7 @@ func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -284,7 +284,7 @@ func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
 
 func TestCreateAndPublishPersonalityModel(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -326,14 +326,14 @@ func TestCreateAndPublishPersonalityModel(t *testing.T) {
 	}
 	snapshot := publishedRepo.snapshots[created.Code]
 	wantVersion := "v" + strconv.FormatInt(stored.Version, 10)
-	if snapshot.Model.Version != wantVersion {
-		t.Fatalf("snapshot version = %s, want %s", snapshot.Model.Version, wantVersion)
+	if snapshot.Version != wantVersion {
+		t.Fatalf("snapshot version = %s, want %s", snapshot.Version, wantVersion)
 	}
 }
 
 func TestRepublishPersonalityModelAfterDefinitionChange(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -380,8 +380,8 @@ func TestRepublishPersonalityModelAfterDefinitionChange(t *testing.T) {
 	}
 	snapshot := publishedRepo.snapshots[created.Code]
 	wantVersion := "v" + strconv.FormatInt(stored.Version, 10)
-	if snapshot.Model.Version != wantVersion {
-		t.Fatalf("snapshot version = %s, want %s", snapshot.Model.Version, wantVersion)
+	if snapshot.Version != wantVersion {
+		t.Fatalf("snapshot version = %s, want %s", snapshot.Version, wantVersion)
 	}
 }
 
@@ -432,8 +432,8 @@ func TestUnpublishPersonalityModel(t *testing.T) {
 	_ = model.MarkPublished(now)
 
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{model.Code: model}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{
-		model.Code: {Model: domain.ModelDefinition{Code: model.Code}},
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{
+		model.Code: {Code: model.Code},
 	}}
 	svc := typology.NewService(typology.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo})
 
@@ -490,7 +490,7 @@ func TestBindQuestionnaireRequiresPublishedQuestionnaireWithQuestions(t *testing
 
 func TestPublishRequiresQuestionReferencesInBoundQuestionnaire(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	query := questionnaireQueryStub{questionnaire: publishedQuestionnaire()}
 	svc := typology.NewService(typology.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo, QuestionnaireQuery: query})
 
@@ -520,7 +520,7 @@ func TestPublishRequiresQuestionReferencesInBoundQuestionnaire(t *testing.T) {
 
 func TestPublishRequiresSupportedRuntimeAdapters(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -557,7 +557,7 @@ func TestPublishRequiresSupportedRuntimeAdapters(t *testing.T) {
 
 func TestPublishCompensatesWhenDraftUpdateFails(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*port.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -599,7 +599,7 @@ func TestUnpublishDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 	_ = model.MarkPublished(now)
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{model.Code: cloneAssessmentModel(model)}}
 	publishedRepo := &memoryPublishedRepo{
-		snapshots: map[string]*domain.PublishedModelSnapshot{model.Code: {Model: domain.ModelDefinition{Code: model.Code}}},
+		snapshots: map[string]*port.PublishedModel{model.Code: {Code: model.Code}},
 		deleteErr: errors.New("delete failed"),
 	}
 	svc := typology.NewService(typology.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo})
@@ -625,7 +625,7 @@ func TestArchiveDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 	_ = model.MarkPublished(now)
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{model.Code: cloneAssessmentModel(model)}}
 	publishedRepo := &memoryPublishedRepo{
-		snapshots: map[string]*domain.PublishedModelSnapshot{model.Code: {Model: domain.ModelDefinition{Code: model.Code}}},
+		snapshots: map[string]*port.PublishedModel{model.Code: {Code: model.Code}},
 		deleteErr: errors.New("delete failed"),
 	}
 	svc := typology.NewService(typology.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo})

@@ -23,11 +23,11 @@ func NewInvalidatingPublishedModelRepository(
 	return &InvalidatingPublishedModelRepository{inner: inner, cache: cache}
 }
 
-func (r *InvalidatingPublishedModelRepository) Save(ctx context.Context, snapshot *catalogdomain.PublishedModelSnapshot) error {
-	if err := r.inner.Save(ctx, snapshot); err != nil {
+func (r *InvalidatingPublishedModelRepository) Save(ctx context.Context, model *catalogport.PublishedModel) error {
+	if err := r.inner.Save(ctx, model); err != nil {
 		return err
 	}
-	r.invalidate(ctx, snapshot)
+	r.invalidate(ctx, model)
 	return nil
 }
 
@@ -42,25 +42,25 @@ func (r *InvalidatingPublishedModelRepository) DeletePublished(ctx context.Conte
 	return nil
 }
 
-func (r *InvalidatingPublishedModelRepository) FindPublishedByModelCode(ctx context.Context, kind catalogdomain.Kind, code string) (*catalogdomain.PublishedModelSnapshot, error) {
+func (r *InvalidatingPublishedModelRepository) FindPublishedByModelCode(ctx context.Context, kind catalogdomain.Kind, code string) (*catalogport.PublishedModel, error) {
 	return r.inner.FindPublishedByModelCode(ctx, kind, code)
 }
 
-func (r *InvalidatingPublishedModelRepository) FindLatestPublishedByModelCode(ctx context.Context, kind catalogdomain.Kind, code string) (*catalogdomain.PublishedModelSnapshot, error) {
+func (r *InvalidatingPublishedModelRepository) FindLatestPublishedByModelCode(ctx context.Context, kind catalogdomain.Kind, code string) (*catalogport.PublishedModel, error) {
 	return r.inner.FindLatestPublishedByModelCode(ctx, kind, code)
 }
 
-func (r *InvalidatingPublishedModelRepository) FindPublishedByModelCodeVersion(ctx context.Context, kind catalogdomain.Kind, code, version string) (*catalogdomain.PublishedModelSnapshot, error) {
+func (r *InvalidatingPublishedModelRepository) FindPublishedByModelCodeVersion(ctx context.Context, kind catalogdomain.Kind, code, version string) (*catalogport.PublishedModel, error) {
 	return r.inner.FindPublishedByModelCodeVersion(ctx, kind, code, version)
 }
 
-func (r *InvalidatingPublishedModelRepository) ListPublished(ctx context.Context, filter catalogport.ListPublishedFilter) ([]*catalogdomain.PublishedModelSnapshot, int64, error) {
+func (r *InvalidatingPublishedModelRepository) ListPublished(ctx context.Context, filter catalogport.ListPublishedFilter) ([]*catalogport.PublishedModel, int64, error) {
 	return r.inner.ListPublished(ctx, filter)
 }
 
-func (r *InvalidatingPublishedModelRepository) invalidate(ctx context.Context, snapshot *catalogdomain.PublishedModelSnapshot) {
-	if r == nil || r.cache == nil || snapshot == nil {
+func (r *InvalidatingPublishedModelRepository) invalidate(ctx context.Context, model *catalogport.PublishedModel) {
+	if r == nil || r.cache == nil || model == nil {
 		return
 	}
-	r.cache.invalidatePublishedSnapshot(ctx, snapshot)
+	r.cache.invalidatePublishedModel(ctx, model)
 }

@@ -55,7 +55,7 @@ func TestModelCatalogExportOnlyImportsSubpackages(t *testing.T) {
 		}
 		sub := strings.TrimPrefix(path, modulePrefix)
 		if sub == "" || strings.Contains(sub, "/") && !isAllowedExportSubpackageRoot(sub) {
-			t.Fatalf("export.go imports %q; allowed subpackages are factor, scoring, norming, typology, taskperformance, binding, publishing", path)
+			t.Fatalf("export.go imports %q; allowed subpackages are target model packages plus transitional mechanism packages", path)
 		}
 	}
 }
@@ -83,8 +83,8 @@ func isAllowedExportSubpackageRoot(sub string) bool {
 		sub = sub[:idx]
 	}
 	switch sub {
-	case "factor", "scoring", "norming", "typology", "taskperformance",
-		"binding", "publishing":
+	case "identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat", "legacy",
+		"scoring", "norming", "typology", "taskperformance", "binding":
 		return true
 	default:
 		return false
@@ -96,8 +96,8 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 
 	root := modelCatalogRoot(t)
 	required := []string{
-		"factor", "scoring", "norming", "typology", "taskperformance",
-		"binding", "publishing",
+		"identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat", "legacy",
+		"scoring", "norming", "typology", "taskperformance", "binding",
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -128,6 +128,94 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 	}
 }
 
+func TestTargetDomainPackagesDoNotDependOnPublishing(t *testing.T) {
+	t.Parallel()
+
+	root := modelCatalogRoot(t)
+	targetPackages := []string{
+		"assessmentmodel",
+		"binding",
+		"conclusion",
+		"definition",
+		"factor",
+		"identity",
+		"legacy",
+		"norm",
+		"payloadformat",
+	}
+	for _, pkg := range targetPackages {
+		pkg := pkg
+		t.Run(pkg, func(t *testing.T) {
+			t.Parallel()
+
+			pkgRoot := filepath.Join(root, pkg)
+			err := filepath.WalkDir(pkgRoot, func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+					return nil
+				}
+				parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+				if err != nil {
+					return err
+				}
+				for _, imp := range parsed.Imports {
+					importPath := strings.Trim(imp.Path.Value, `"`)
+					if strings.Contains(importPath, "/domain/modelcatalog/publishing") {
+						t.Fatalf("%s must not import publishing compatibility package", path)
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestProductionCodeDoesNotDependOnPublishingFacade(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := filepath.Clean(filepath.Join(modelCatalogRoot(t), "..", "..", "..", ".."))
+	targets := []string{
+		filepath.Join(repoRoot, "internal", "apiserver", "application"),
+		filepath.Join(repoRoot, "internal", "apiserver", "infra"),
+		filepath.Join(repoRoot, "internal", "apiserver", "transport"),
+		filepath.Join(repoRoot, "internal", "collection-server"),
+	}
+	for _, target := range targets {
+		target := target
+		t.Run(filepath.ToSlash(strings.TrimPrefix(target, repoRoot+string(filepath.Separator))), func(t *testing.T) {
+			t.Parallel()
+
+			err := filepath.WalkDir(target, func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+					return nil
+				}
+				parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+				if err != nil {
+					return err
+				}
+				for _, imp := range parsed.Imports {
+					importPath := strings.Trim(imp.Path.Value, `"`)
+					if strings.Contains(importPath, "/domain/modelcatalog/publishing") {
+						t.Fatalf("%s must not import publishing compatibility package", path)
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestModelCatalogExportReExportsMechanismRoots(t *testing.T) {
 	t.Parallel()
 
@@ -139,17 +227,32 @@ func TestModelCatalogExportReExportsMechanismRoots(t *testing.T) {
 	}
 	text := string(data)
 	required := []string{
+		"Product",
+		"Identity",
+		"Definition",
+		"Conclusion",
 		"FactorSnapshot",
 		"TypologyPayload",
 		"ScaleSnapshot",
-		"BuildPublishedSnapshot",
-		"BuildScoringPublishedSnapshotFromScale",
 		"RuntimeSpec",
 		"ReportSpec",
 	}
 	for _, symbol := range required {
 		if !strings.Contains(text, symbol) {
 			t.Fatalf("export.go missing mechanism re-export %q", symbol)
+		}
+	}
+	forbidden := []string{
+		"Published" + "ModelSnapshot",
+		"Model" + "Definition",
+		"Decision" + "Spec",
+		"Source" + "Ref",
+		"Build" + "PublishedSnapshot",
+		"Build" + "ScoringPublishedSnapshotFromScale",
+	}
+	for _, symbol := range forbidden {
+		if strings.Contains(text, symbol) {
+			t.Fatalf("export.go should not re-export runtime published DTO/builder %q", symbol)
 		}
 	}
 }

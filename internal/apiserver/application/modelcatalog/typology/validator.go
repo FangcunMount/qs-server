@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
@@ -43,7 +42,7 @@ func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modelt
 	if issues := validateDefinitionPayloadForSave(model.Definition.Format, model.Definition.Data); len(issues) > 0 {
 		return nil, validationContext, issues
 	}
-	payload, runtime, err := publishing.TypologyPayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := modeltypology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
 	if err != nil {
 		return nil, validationContext, []ValidationIssue{{
 			Field: "definition.payload", Message: err.Error(),

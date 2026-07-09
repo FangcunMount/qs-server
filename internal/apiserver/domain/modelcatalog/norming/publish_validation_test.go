@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 func TestRequirePrimaryDimensionCodeForPublish(t *testing.T) {
@@ -18,7 +18,7 @@ func TestRequirePrimaryDimensionCodeForPublish(t *testing.T) {
 	}
 }
 
-func TestBuildPublishedSnapshotPreservesConfiguredPrimaryDimension(t *testing.T) {
+func TestBuildPublishedModelPreservesConfiguredPrimaryDimension(t *testing.T) {
 	t.Parallel()
 
 	model := &domain.AssessmentModel{
@@ -32,9 +32,9 @@ func TestBuildPublishedSnapshotPreservesConfiguredPrimaryDimension(t *testing.T)
 		},
 	}
 
-	snapshot, err := publishing.BuildPublishedSnapshot(model)
+	snapshot, err := publishedmodel.Build(model)
 	if err != nil {
-		t.Fatalf("BuildPublishedSnapshot: %v", err)
+		t.Fatalf("Build published model: %v", err)
 	}
 	var body struct {
 		Brief2 struct {

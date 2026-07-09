@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -33,8 +32,8 @@ func NewPipelineComponents(registry ModuleRegistry) PipelineComponents {
 
 type typologyInputAssembler struct{}
 
-func (typologyInputAssembler) Assemble(snapshot modelcatalog.PublishedModelSnapshot) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Snapshot: snapshot}, nil
+func (typologyInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
+	return evalpipeline.CalculationInput{Route: route}, nil
 }
 
 type typologyCalculator struct {

@@ -6,7 +6,7 @@ func populateModelSummaryIdentity(summary *ModelSummary, kind domain.Kind, subKi
 	if summary == nil {
 		return
 	}
-	summary.ProductChannel = string(domain.ResolveProductChannel(kind, productChannel))
+	summary.ProductChannel = string(domain.NormalizeProductChannel(domain.ResolveProductChannel(kind, productChannel)))
 	if family, ok := domain.AlgorithmFamilyFromIdentity(kind, subKind, algorithm); ok {
 		summary.AlgorithmFamily = string(family)
 	}
@@ -16,7 +16,7 @@ func populateDefinitionIdentity(dto *DefinitionDTO, kind domain.Kind, subKind do
 	if dto == nil {
 		return
 	}
-	dto.ProductChannel = string(domain.ResolveProductChannel(kind, productChannel))
+	dto.ProductChannel = string(domain.NormalizeProductChannel(domain.ResolveProductChannel(kind, productChannel)))
 	if family, ok := domain.AlgorithmFamilyFromIdentity(kind, subKind, algorithm); ok {
 		dto.AlgorithmFamily = string(family)
 	}
@@ -27,10 +27,8 @@ func productChannelOptions() []Option {
 	options := make([]Option, 0, len(channels))
 	labels := map[domain.ProductChannel]string{
 		domain.ProductChannelMedicalScale:    "医学量表",
-		domain.ProductChannelTypology:        "人格探索",
+		domain.ProductChannelTypology:        "人格测评",
 		domain.ProductChannelBehaviorAbility: "行为能力",
-		domain.ProductChannelCognitive:       "认知能力",
-		domain.ProductChannelCustom:          "自定义",
 	}
 	for _, channel := range channels {
 		label := labels[channel]

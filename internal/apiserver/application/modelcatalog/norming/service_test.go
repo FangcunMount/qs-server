@@ -42,22 +42,22 @@ func (r *memoryModelRepo) List(context.Context, port.ListFilter) ([]*domain.Asse
 func (r *memoryModelRepo) Delete(context.Context, string) error { return nil }
 
 type memoryPublishedRepo struct {
-	snapshots map[string]*domain.PublishedModelSnapshot
+	snapshots map[string]*port.PublishedModel
 }
 
-func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *domain.PublishedModelSnapshot) error {
+func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *port.PublishedModel) error {
 	if r.snapshots == nil {
-		r.snapshots = map[string]*domain.PublishedModelSnapshot{}
+		r.snapshots = map[string]*port.PublishedModel{}
 	}
-	r.snapshots[snapshot.Model.Code] = snapshot
+	r.snapshots[snapshot.Code] = snapshot
 	return nil
 }
 
-func (r *memoryPublishedRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*port.PublishedModel, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, _ domain.Kind, code string) (*port.PublishedModel, error) {
 	snapshot, ok := r.snapshots[code]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -65,11 +65,11 @@ func (r *memoryPublishedRepo) FindLatestPublishedByModelCode(_ context.Context, 
 	return snapshot, nil
 }
 
-func (r *memoryPublishedRepo) FindPublishedByModelCodeVersion(context.Context, domain.Kind, string, string) (*domain.PublishedModelSnapshot, error) {
+func (r *memoryPublishedRepo) FindPublishedByModelCodeVersion(context.Context, domain.Kind, string, string) (*port.PublishedModel, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (r *memoryPublishedRepo) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (r *memoryPublishedRepo) ListPublished(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	return nil, 0, nil
 }
 
@@ -148,8 +148,8 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	if snapshot.PayloadFormat != domain.PayloadFormatBehavioralRatingDefaultV1 {
 		t.Fatalf("payload format = %q, want %q", snapshot.PayloadFormat, domain.PayloadFormatBehavioralRatingDefaultV1)
 	}
-	if snapshot.Model.Kind != domain.KindBehavioralRating || snapshot.Model.Algorithm != domain.AlgorithmBrief2 {
-		t.Fatalf("model identity = %#v", snapshot.Model)
+	if snapshot.Kind != domain.KindBehavioralRating || snapshot.Algorithm != domain.AlgorithmBrief2 {
+		t.Fatalf("model identity = %s/%s", snapshot.Kind, snapshot.Algorithm)
 	}
 	decoded, err := publishedRepo.FindLatestPublishedByModelCode(context.Background(), domain.KindBehavioralRating, created.Code)
 	if err != nil {
@@ -157,10 +157,10 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	}
 	runtimeSnapshot, err := behavioralsnapshot.ParsePublishedPayload(
 		decoded.PayloadFormat,
-		decoded.Model.Code,
-		decoded.Model.Version,
-		decoded.Model.Title,
-		decoded.Model.Status,
+		decoded.Code,
+		decoded.Version,
+		decoded.Title,
+		decoded.Status,
 		decoded.Payload,
 	)
 	if err != nil {

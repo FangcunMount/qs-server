@@ -8,9 +8,9 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 )
 
@@ -40,12 +40,12 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	if issues := validatePreviewAnswers(input.Answers, questionnaire); len(issues) > 0 {
 		return nil, validationFailed(issues)
 	}
-	snapshot, err := publishing.BuildPublishedSnapshot(model)
+	published, err := s.publisher().BuildSnapshot(ctx, model)
 	if err != nil {
 		return nil, err
 	}
 	var typologyPayload modeltypology.Payload
-	if err := json.Unmarshal(snapshot.Payload, &typologyPayload); err != nil {
+	if err := json.Unmarshal(published.Payload, &typologyPayload); err != nil {
 		return nil, invalidArgument("模型定义 payload 格式无效")
 	}
 	if s.deps.ReportPreviewer == nil {
@@ -56,7 +56,7 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 		SubKind:              model.SubKind,
 		Algorithm:            model.Algorithm,
 		Code:                 model.Code,
-		Version:              previewModelVersion(model, snapshot),
+		Version:              previewModelVersion(model, published),
 		Title:                model.Title,
 		QuestionnaireCode:    model.Binding.QuestionnaireCode,
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
@@ -68,11 +68,11 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	return previewReportResult(result), nil
 }
 
-func previewModelVersion(model *domain.AssessmentModel, snapshot *domain.PublishedModelSnapshot) string {
-	if snapshot != nil && snapshot.Model.Version != "" {
-		return snapshot.Model.Version
+func previewModelVersion(model *domain.AssessmentModel, published *portmodelcatalog.PublishedModel) string {
+	if published != nil && published.Version != "" {
+		return published.Version
 	}
-	return fmt.Sprintf("v%d", model.Version)
+	return fmt.Sprintf("v%d", model.Revision())
 }
 
 func (s *service) previewQuestionnaire(ctx context.Context, model *domain.AssessmentModel) (*questionnaireapp.QuestionnaireResult, error) {

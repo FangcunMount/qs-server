@@ -6,6 +6,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 func TestSummaryFromPublishedModelTypologyPayload(t *testing.T) {
@@ -21,23 +22,19 @@ func TestSummaryFromPublishedModelTypologyPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := &domain.PublishedModelSnapshot{
-		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: domain.AlgorithmMBTI,
-			Code:      "MBTI_OEJTS",
-			Version:   "1.0.0",
-			Title:     "MBTI",
-			Status:    "published",
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "MBTI_OEJTS",
-			QuestionnaireVersion: "1.0.0",
-		},
-		Decision: domain.DecisionSpec{Kind: domain.DecisionKindPoleComposition},
-		Payload:  payload,
+	snapshot := &port.PublishedModel{
+		PayloadFormat:        domain.PayloadFormatPersonalityTypologyV1,
+		Kind:                 domain.KindTypology,
+		SubKind:              domain.SubKindTypology,
+		Algorithm:            domain.AlgorithmMBTI,
+		Code:                 "MBTI_OEJTS",
+		Version:              "1.0.0",
+		Title:                "MBTI",
+		Status:               "published",
+		QuestionnaireCode:    "MBTI_OEJTS",
+		QuestionnaireVersion: "1.0.0",
+		DecisionKind:         domain.DecisionKindPoleComposition,
+		Payload:              payload,
 	}
 	summary, err := SummaryFromPublishedModel(snapshot)
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -39,8 +38,8 @@ func NewPipelineComponentsWithScoring(scoring *factorscoring.Executor) PipelineC
 
 type factorNormInputAssembler struct{}
 
-func (factorNormInputAssembler) Assemble(snapshot modelcatalog.PublishedModelSnapshot) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Snapshot: snapshot}, nil
+func (factorNormInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
+	return evalpipeline.CalculationInput{Route: route}, nil
 }
 
 type factorNormCalculator struct {

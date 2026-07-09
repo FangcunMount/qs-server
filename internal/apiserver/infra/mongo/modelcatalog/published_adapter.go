@@ -21,25 +21,25 @@ func NewPublishedModelRepoAdapter(inner *Repository) *PublishedModelRepoAdapter 
 	return &PublishedModelRepoAdapter{inner: inner}
 }
 
-func (a *PublishedModelRepoAdapter) Save(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
+func (a *PublishedModelRepoAdapter) Save(ctx context.Context, model *port.PublishedModel) error {
 	if a == nil || a.inner == nil {
 		return domain.ErrNotFound
 	}
-	return a.inner.UpsertPublishedModel(ctx, snapshot)
+	return a.inner.UpsertPublishedModel(ctx, model)
 }
 
-func (a *PublishedModelRepoAdapter) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (a *PublishedModelRepoAdapter) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	return a.FindLatestPublishedByModelCode(ctx, kind, code)
 }
 
-func (a *PublishedModelRepoAdapter) FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (a *PublishedModelRepoAdapter) FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	if a == nil || a.inner == nil {
 		return nil, domain.ErrNotFound
 	}
 	return a.inner.FindLatestPublishedModelByModelCode(ctx, kind, code)
 }
 
-func (a *PublishedModelRepoAdapter) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error) {
+func (a *PublishedModelRepoAdapter) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*port.PublishedModel, error) {
 	if a == nil || a.inner == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -50,7 +50,7 @@ func (a *PublishedModelRepoAdapter) FindPublishedByModelCodeVersion(ctx context.
 	return published, nil
 }
 
-func (a *PublishedModelRepoAdapter) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (a *PublishedModelRepoAdapter) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	if a == nil || a.inner == nil {
 		return nil, 0, domain.ErrNotFound
 	}

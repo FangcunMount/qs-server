@@ -9,7 +9,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func TestPublishedBehavioralRatingCatalogDecodesPublishedModelSnapshot(t *testing.T) {
+func TestPublishedBehavioralRatingCatalogDecodesPublishedModel(t *testing.T) {
 	t.Parallel()
 
 	raw := []byte(`{
@@ -25,22 +25,18 @@ func TestPublishedBehavioralRatingCatalogDecodesPublishedModelSnapshot(t *testin
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
 		}]
 	}`)
-	reader := stubPublishedBehavioralRatingReader{snapshot: &domain.PublishedModelSnapshot{
-		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindBehavioralRating,
-			Algorithm: domain.AlgorithmBehavioralRatingDefault,
-			Code:      "BR-001",
-			Version:   "1.0.0",
-			Title:     "行为评分",
-			Status:    "published",
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "Q-001",
-			QuestionnaireVersion: "1.0.0",
-		},
-		Payload: raw,
+	reader := stubPublishedBehavioralRatingReader{snapshot: &rulesetport.PublishedModel{
+		SchemaVersion:        domain.SchemaVersionV2,
+		PayloadFormat:        domain.PayloadFormatBehavioralRatingDefaultV1,
+		Kind:                 domain.KindBehavioralRating,
+		Algorithm:            domain.AlgorithmBehavioralRatingDefault,
+		Code:                 "BR-001",
+		Version:              "1.0.0",
+		Title:                "行为评分",
+		Status:               "published",
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+		Payload:              raw,
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
 	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
@@ -68,18 +64,16 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 		"interpret_rules": [{"dimension_code": "gec", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"brief2": {"form_variant": "parent", "norm_table_version": "2024", "index_codes": ["gec"]}
 	}`)
-	reader := stubPublishedBehavioralRatingReader{snapshot: &domain.PublishedModelSnapshot{
+	reader := stubPublishedBehavioralRatingReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1,
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindBehavioralRating,
-			Algorithm: domain.AlgorithmBrief2,
-			Code:      "BR-BRIEF2",
-			Version:   "1.0.0",
-			Title:     "BRIEF-2",
-			Status:    "published",
-		},
-		Payload: raw,
+		Kind:          domain.KindBehavioralRating,
+		Algorithm:     domain.AlgorithmBrief2,
+		Code:          "BR-BRIEF2",
+		Version:       "1.0.0",
+		Title:         "BRIEF-2",
+		Status:        "published",
+		Payload:       raw,
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
 	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
@@ -97,18 +91,18 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 }
 
 type stubPublishedBehavioralRatingReader struct {
-	snapshot *domain.PublishedModelSnapshot
+	snapshot *rulesetport.PublishedModel
 	err      error
 }
 
-func (s stubPublishedBehavioralRatingReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s stubPublishedBehavioralRatingReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.snapshot, nil
 }
 
-func (s stubPublishedBehavioralRatingReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+func (s stubPublishedBehavioralRatingReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

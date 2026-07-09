@@ -29,11 +29,11 @@ func TestExecutionPathForModelKindUsesMechanismFamilies(t *testing.T) {
 	}
 }
 
-func TestRuntimeDescriptorKeyFromSnapshotUsesDecisionKind(t *testing.T) {
+func TestRuntimeDescriptorKeyFromRouteUsesDecisionKind(t *testing.T) {
 	t.Parallel()
 
-	key, err := RuntimeDescriptorKeyFromSnapshot(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindNormLookup},
+	key, err := RuntimeDescriptorKeyFromRoute(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindNormLookup,
 		PayloadFormat: modelcatalog.PayloadFormatBehavioralRatingBrief2V1,
 	})
 	if err != nil {
@@ -50,18 +50,18 @@ func TestRuntimeDescriptorKeyFromSnapshotUsesDecisionKind(t *testing.T) {
 	}
 }
 
-func TestRuntimeDescriptorKeyFromSnapshotDifferentiatesDecisionKindWithinFamily(t *testing.T) {
+func TestRuntimeDescriptorKeyFromRouteDifferentiatesDecisionKindWithinFamily(t *testing.T) {
 	t.Parallel()
 
-	pole, err := RuntimeDescriptorKeyFromSnapshot(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+	pole, err := RuntimeDescriptorKeyFromRoute(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindPoleComposition,
 		PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	trait, err := RuntimeDescriptorKeyFromSnapshot(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+	trait, err := RuntimeDescriptorKeyFromRoute(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindTraitProfile,
 		PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
 	})
 	if err != nil {
@@ -93,8 +93,8 @@ func TestRuntimeDescriptorRegistryResolvesByFormatFallback(t *testing.T) {
 	if err := registry.Register(desc); err != nil {
 		t.Fatal(err)
 	}
-	got, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+	got, err := registry.Resolve(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindTraitProfile,
 		PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
 	})
 	if err != nil {
@@ -117,8 +117,8 @@ func TestRuntimeDescriptorRegistryResolvesByFamilyFallback(t *testing.T) {
 	if err := registry.Register(desc); err != nil {
 		t.Fatal(err)
 	}
-	got, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindScoreRange},
+	got, err := registry.Resolve(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindScoreRange,
 		PayloadFormat: modelcatalog.PayloadFormatAssessmentScaleV1,
 	})
 	if err != nil {
@@ -142,8 +142,8 @@ func TestRuntimeDescriptorRegistryKeepsExplicitFamilyKeyWhenDescriptorHasDecisio
 	if err := registry.Register(desc); err != nil {
 		t.Fatal(err)
 	}
-	got, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindNearestPattern},
+	got, err := registry.Resolve(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindNearestPattern,
 		PayloadFormat: "assessmentmodel.personality.nearest-pattern.v1",
 	})
 	if err != nil {
@@ -172,8 +172,8 @@ func TestRuntimeDescriptorRegistryRequiresExplicitFamilyFallback(t *testing.T) {
 	if err := registry.Register(desc); err != nil {
 		t.Fatal(err)
 	}
-	_, err := registry.Resolve(modelcatalog.PublishedModelSnapshot{
-		Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+	_, err := registry.Resolve(ModelRoute{
+		DecisionKind:  modelcatalog.DecisionKindTraitProfile,
 		PayloadFormat: "assessmentmodel.personality.trait-profile.v2",
 	})
 	if err == nil {

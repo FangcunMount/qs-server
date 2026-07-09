@@ -3,7 +3,6 @@ package option
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 )
 
 // CatalogOperations 记录lifecycle 守卫 用于 一个API 类型。
@@ -16,7 +15,7 @@ type CatalogOperations struct {
 	PreviewSupported          bool
 	QRCodeSupported           bool
 	RuntimeExecutable         bool
-	ExecutionPath             publishing.ExecutionPath
+	ExecutionPath             modelcatalog.ExecutionPath
 }
 
 // Allows 报告是否 操作 是 permitted 用于 这个API 类型。

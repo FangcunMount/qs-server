@@ -8,10 +8,10 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -113,9 +113,9 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 		t.Fatalf("MarkPublished: %v", err)
 	}
 
-	snapshot, err := publishing.BuildPublishedSnapshot(model)
+	snapshot, err := publishedmodel.Build(model)
 	if err != nil {
-		t.Fatalf("BuildPublishedSnapshot: %v", err)
+		t.Fatalf("Build published model: %v", err)
 	}
 	var publishedPayload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &publishedPayload); err != nil {

@@ -22,13 +22,15 @@ type ReportRoutingContext struct {
 // ReportRoutingContextFromOutcome 从评估结果推导报告路由上下文。
 func ReportRoutingContextFromOutcome(outcome evaloutcome.Outcome) (ReportRoutingContext, bool) {
 	ctx := ReportRoutingContext{ReportType: resolveReportType(outcome)}
-	if snapshot, ok := evaloutcome.PublishedSnapshotFromInput(outcome.Input); ok {
-		ctx.Algorithm = snapshot.Model.Algorithm
-		ctx.ProductChannel = snapshot.Model.ProductChannel
-		if ctx.ProductChannel == "" {
-			ctx.ProductChannel = modelcatalog.DefaultProductChannelFor(snapshot.Model.Kind)
+	if route, ok := evaloutcome.ModelRouteFromInput(outcome.Input); ok {
+		ctx.Algorithm = route.Algorithm
+		if outcome.Input != nil && outcome.Input.Model != nil {
+			ctx.ProductChannel = modelcatalog.ProductChannel(outcome.Input.Model.ProductChannel)
 		}
-		if routingKey, err := evalpipeline.ExecutionRoutingFromSnapshot(snapshot); err == nil {
+		if ctx.ProductChannel == "" {
+			ctx.ProductChannel = modelcatalog.DefaultProductChannelFor(route.Kind)
+		}
+		if routingKey, err := evalpipeline.ExecutionRoutingFromRoute(route); err == nil {
 			ctx.AlgorithmFamily = routingKey.AlgorithmFamily
 			ctx.DecisionKind = routingKey.DecisionKind
 		}

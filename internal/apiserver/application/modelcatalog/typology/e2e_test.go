@@ -19,6 +19,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -30,7 +31,7 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 
 	questionnaire := frontendMBTIQuestionnaire()
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
-	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*modelcatalogport.PublishedModel{}}
 	svc := typology.NewService(typology.Dependencies{
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
@@ -112,8 +113,8 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 		t.Fatalf("FindByCode: %v", err)
 	}
 	wantVersion := "v" + strconv.FormatInt(storedModel.Version, 10)
-	if snapshot.Model.Version != wantVersion {
-		t.Fatalf("snapshot version = %s, want %s", snapshot.Model.Version, wantVersion)
+	if snapshot.Version != wantVersion {
+		t.Fatalf("snapshot version = %s, want %s", snapshot.Version, wantVersion)
 	}
 
 	formalOutcome, formalReport, err := executePublishedPersonalityAssessment(
@@ -136,7 +137,7 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 func executePublishedPersonalityAssessment(
 	ctx context.Context,
 	model *domain.AssessmentModel,
-	snapshot *domain.PublishedModelSnapshot,
+	snapshot *modelcatalogport.PublishedModel,
 	questionnaire *questionnaireapp.QuestionnaireResult,
 	answers []typology.PreviewAnswer,
 ) (*assessment.AssessmentOutcome, *domainreport.InterpretReport, error) {
@@ -232,11 +233,11 @@ func publishedExecutionInput(
 
 func publishedSubmittedAssessment(
 	model *domain.AssessmentModel,
-	snapshot *domain.PublishedModelSnapshot,
+	snapshot *modelcatalogport.PublishedModel,
 ) (*assessment.Assessment, error) {
 	version := "v" + strconv.FormatInt(model.Version, 10)
-	if snapshot != nil && snapshot.Model.Version != "" {
-		version = snapshot.Model.Version
+	if snapshot != nil && snapshot.Version != "" {
+		version = snapshot.Version
 	}
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,

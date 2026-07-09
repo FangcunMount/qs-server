@@ -10,18 +10,18 @@ import (
 )
 
 type runtimeStubStore struct {
-	byQuestionnaire *domain.PublishedModelSnapshot
-	byRef           *domain.PublishedModelSnapshot
+	byQuestionnaire *port.PublishedModel
+	byRef           *port.PublishedModel
 }
 
-func (s runtimeStubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s runtimeStubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if s.byRef != nil {
 		return s.byRef, nil
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (s runtimeStubStore) FindPublishedModelByQuestionnaire(_ context.Context, _, _ string) (*domain.PublishedModelSnapshot, error) {
+func (s runtimeStubStore) FindPublishedModelByQuestionnaire(_ context.Context, _, _ string) (*port.PublishedModel, error) {
 	if s.byQuestionnaire != nil {
 		return s.byQuestionnaire, nil
 	}
@@ -61,17 +61,13 @@ func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.
 }
 
 func TestRuntimePublishedCatalogPrefersV2Snapshot(t *testing.T) {
-	mongoSnapshot := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{
-			Kind:    domain.KindTypology,
-			Code:    "personality_demo",
-			Version: "9.9.9",
-			Title:   "from mongo",
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "demo-q",
-			QuestionnaireVersion: "1.0.0",
-		},
+	mongoSnapshot := &port.PublishedModel{
+		Kind:                 domain.KindTypology,
+		Code:                 "personality_demo",
+		Version:              "9.9.9",
+		Title:                "from mongo",
+		QuestionnaireCode:    "demo-q",
+		QuestionnaireVersion: "1.0.0",
 	}
 	catalog := NewRuntimePublishedCatalogWithStore(runtimeStubStore{byQuestionnaire: mongoSnapshot, byRef: mongoSnapshot})
 

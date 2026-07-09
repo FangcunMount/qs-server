@@ -1,13 +1,18 @@
 package modelcatalog
 
 // Root facade: thin aliases over mechanism subpackages. Deep-import factor/scoring/typology
-// when mechanism-specific types are required; use this package for cross-mechanism identity
-// and publishing surfaces.
+// when mechanism-specific types are required; use this package for cross-mechanism identity,
+// payload format, and read-model surfaces.
 
 import (
+	assessmentmodelpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	conclusionpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	definitionpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	factorpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	normpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
+	payloadformatpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/payloadformat"
 	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	typologypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
@@ -18,25 +23,27 @@ type (
 	Algorithm      = binding.Algorithm
 	DecisionKind   = binding.DecisionKind
 	ProductChannel = binding.ProductChannel
+	Product        = identitypkg.Product
+	Identity       = identitypkg.Identity
+	Family         = identitypkg.Family
 
-	AlgorithmFamily = publishing.AlgorithmFamily
-	ExecutionPath   = publishing.ExecutionPath
+	AlgorithmFamily = identitypkg.AlgorithmFamily
+	ExecutionPath   = binding.ExecutionPath
 
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
 	CapabilityRole        = binding.CapabilityRole
 	CatalogOperation      = binding.CatalogOperation
 
-	QuestionnaireBinding   = binding.QuestionnaireBinding
-	ModelDefinition        = publishing.ModelDefinition
-	DecisionSpec           = publishing.DecisionSpec
-	SourceRef              = publishing.SourceRef
-	PublishedModelSnapshot = publishing.PublishedModelSnapshot
+	QuestionnaireBinding = binding.QuestionnaireBinding
 
 	// Mechanism re-exports (factor).
+	Factor                      = factorpkg.Factor
 	FactorSnapshot              = factorpkg.FactorSnapshot
+	FactorGraph                 = factorpkg.FactorGraph
 	DefinitionBody              = factorpkg.DefinitionBody
 	FactorRole                  = factorpkg.FactorRole
+	Scoring                     = factorpkg.Scoring
 	ScoringStrategy             = factorpkg.ScoringStrategy
 	ScoringParams               = factorpkg.ScoringParams
 	ChildrenPolicy              = factorpkg.ChildrenPolicy
@@ -56,13 +63,27 @@ type (
 	ScaleFactorSnapshot   = scoringsnapshot.FactorSnapshot
 	InterpretRuleSnapshot = scoringsnapshot.InterpretRuleSnapshot
 
-	AssessmentModel         = publishing.AssessmentModel
-	NewAssessmentModelInput = publishing.NewAssessmentModelInput
-	DefinitionPayload       = publishing.DefinitionPayload
-	ModelStatus             = publishing.ModelStatus
-	ValidationLevel         = publishing.ValidationLevel
-	DomainValidationIssue   = publishing.DomainValidationIssue
-	DomainValidationResult  = publishing.DomainValidationResult
+	AssessmentModel         = assessmentmodelpkg.AssessmentModel
+	NewAssessmentModelInput = assessmentmodelpkg.NewInput
+	DefinitionPayload       = assessmentmodelpkg.DefinitionPayload
+	ModelStatus             = assessmentmodelpkg.Status
+	ValidationLevel         = assessmentmodelpkg.ValidationLevel
+	DomainValidationIssue   = assessmentmodelpkg.DomainValidationIssue
+	DomainValidationResult  = assessmentmodelpkg.DomainValidationResult
+
+	Definition        = definitionpkg.Definition
+	MeasureSpec       = definitionpkg.MeasureSpec
+	Calibration       = definitionpkg.Calibration
+	ReportMap         = definitionpkg.ReportMap
+	ReportSection     = definitionpkg.ReportSection
+	Norm              = normpkg.Norm
+	NormRef           = normpkg.Ref
+	Conclusion        = conclusionpkg.Conclusion
+	Outcome           = conclusionpkg.Outcome
+	RiskConclusion    = conclusionpkg.RiskConclusion
+	TypeConclusion    = conclusionpkg.TypeConclusion
+	NormConclusion    = conclusionpkg.NormConclusion
+	AbilityConclusion = conclusionpkg.AbilityConclusion
 )
 
 const (
@@ -101,30 +122,39 @@ const (
 	ProductChannelCognitive       = binding.ProductChannelCognitive
 	ProductChannelCustom          = binding.ProductChannelCustom
 
-	AlgorithmFamilyFactorScoring        = publishing.AlgorithmFamilyFactorScoring
-	AlgorithmFamilyFactorClassification = publishing.AlgorithmFamilyFactorClassification
-	AlgorithmFamilyFactorNorm           = publishing.AlgorithmFamilyFactorNorm
-	AlgorithmFamilyTaskPerformance      = publishing.AlgorithmFamilyTaskPerformance
+	ProductMedicalScale    = identitypkg.ProductMedicalScale
+	ProductTypology        = identitypkg.ProductTypology
+	ProductBehaviorAbility = identitypkg.ProductBehaviorAbility
 
-	ExecutionPathNone                       = publishing.ExecutionPathNone
-	ExecutionPathScaleDescriptor            = publishing.ExecutionPathScaleDescriptor
-	ExecutionPathTypologyDescriptor         = publishing.ExecutionPathTypologyDescriptor
-	ExecutionPathBehavioralRatingDescriptor = publishing.ExecutionPathBehavioralRatingDescriptor
-	ExecutionPathCognitiveDescriptor        = publishing.ExecutionPathCognitiveDescriptor
+	FamilyFactorScoring        = identitypkg.FamilyFactorScoring
+	FamilyFactorClassification = identitypkg.FamilyFactorClassification
+	FamilyFactorNorm           = identitypkg.FamilyFactorNorm
+	FamilyTaskPerformance      = identitypkg.FamilyTaskPerformance
 
-	PayloadFormatAssessmentScaleV1         = publishing.PayloadFormatAssessmentScaleV1
-	PayloadFormatPersonalityTypologyV1     = publishing.PayloadFormatPersonalityTypologyV1
-	PayloadFormatTypologyV1                = publishing.PayloadFormatTypologyV1
-	PayloadFormatBehavioralRatingDefaultV1 = publishing.PayloadFormatBehavioralRatingDefaultV1
-	PayloadFormatBehavioralRatingBrief2V1  = publishing.PayloadFormatBehavioralRatingBrief2V1
-	PayloadFormatCognitiveDefaultV1        = publishing.PayloadFormatCognitiveDefaultV1
-	PayloadFormatCognitiveSPMV1            = publishing.PayloadFormatCognitiveSPMV1
-	PayloadFormatScaleV1                   = publishing.PayloadFormatScaleV1
-	PayloadFormatMBTIV1                    = publishing.PayloadFormatMBTIV1 //nolint:staticcheck // legacy decode data value
-	PayloadFormatSBTIV1                    = publishing.PayloadFormatSBTIV1 //nolint:staticcheck // legacy decode data value
-	PayloadFormatScaleV1Legacy             = publishing.PayloadFormatScaleV1Legacy
-	PayloadFormatMBTIV1Legacy              = publishing.PayloadFormatMBTIV1Legacy
-	PayloadFormatSBTIV1Legacy              = publishing.PayloadFormatSBTIV1Legacy
+	AlgorithmFamilyFactorScoring        = identitypkg.AlgorithmFamilyFactorScoring
+	AlgorithmFamilyFactorClassification = identitypkg.AlgorithmFamilyFactorClassification
+	AlgorithmFamilyFactorNorm           = identitypkg.AlgorithmFamilyFactorNorm
+	AlgorithmFamilyTaskPerformance      = identitypkg.AlgorithmFamilyTaskPerformance
+
+	ExecutionPathNone                       = binding.ExecutionPathNone
+	ExecutionPathScaleDescriptor            = binding.ExecutionPathScaleDescriptor
+	ExecutionPathTypologyDescriptor         = binding.ExecutionPathTypologyDescriptor
+	ExecutionPathBehavioralRatingDescriptor = binding.ExecutionPathBehavioralRatingDescriptor
+	ExecutionPathCognitiveDescriptor        = binding.ExecutionPathCognitiveDescriptor
+
+	PayloadFormatAssessmentScaleV1         = payloadformatpkg.PayloadFormatAssessmentScaleV1
+	PayloadFormatPersonalityTypologyV1     = payloadformatpkg.PayloadFormatPersonalityTypologyV1
+	PayloadFormatTypologyV1                = payloadformatpkg.PayloadFormatTypologyV1
+	PayloadFormatBehavioralRatingDefaultV1 = payloadformatpkg.PayloadFormatBehavioralRatingDefaultV1
+	PayloadFormatBehavioralRatingBrief2V1  = payloadformatpkg.PayloadFormatBehavioralRatingBrief2V1
+	PayloadFormatCognitiveDefaultV1        = payloadformatpkg.PayloadFormatCognitiveDefaultV1
+	PayloadFormatCognitiveSPMV1            = payloadformatpkg.PayloadFormatCognitiveSPMV1
+	PayloadFormatScaleV1                   = payloadformatpkg.PayloadFormatScaleV1
+	PayloadFormatMBTIV1                    = payloadformatpkg.PayloadFormatMBTIV1 //nolint:staticcheck // legacy decode data value
+	PayloadFormatSBTIV1                    = payloadformatpkg.PayloadFormatSBTIV1 //nolint:staticcheck // legacy decode data value
+	PayloadFormatScaleV1Legacy             = payloadformatpkg.PayloadFormatScaleV1Legacy
+	PayloadFormatMBTIV1Legacy              = payloadformatpkg.PayloadFormatMBTIV1Legacy
+	PayloadFormatSBTIV1Legacy              = payloadformatpkg.PayloadFormatSBTIV1Legacy
 
 	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
 	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
@@ -141,17 +171,17 @@ const (
 	CatalogOpPreview           = binding.CatalogOpPreview
 	CatalogOpQRCode            = binding.CatalogOpQRCode
 
-	SchemaVersionV1 = publishing.SchemaVersionV1
-	SchemaVersionV2 = publishing.SchemaVersionV2
+	SchemaVersionV1 = payloadformatpkg.SchemaVersionV1
+	SchemaVersionV2 = payloadformatpkg.SchemaVersionV2
 
 	APIKindBehaviorAbility = binding.APIKindBehaviorAbility
 
-	ModelStatusDraft     = publishing.ModelStatusDraft
-	ModelStatusPublished = publishing.ModelStatusPublished
-	ModelStatusArchived  = publishing.ModelStatusArchived
+	ModelStatusDraft     = assessmentmodelpkg.StatusDraft
+	ModelStatusPublished = assessmentmodelpkg.StatusPublished
+	ModelStatusArchived  = assessmentmodelpkg.StatusArchived
 
-	ValidationLevelError   = publishing.ValidationLevelError
-	ValidationLevelWarning = publishing.ValidationLevelWarning
+	ValidationLevelError   = assessmentmodelpkg.ValidationLevelError
+	ValidationLevelWarning = assessmentmodelpkg.ValidationLevelWarning
 )
 
 var (
@@ -172,34 +202,36 @@ var (
 	BehaviorAbilityChannelModelFamilies    = binding.BehaviorAbilityChannelModelFamilies
 	IsBehaviorAbilityChannelFamily         = binding.IsBehaviorAbilityChannelFamily
 	ResolveBehaviorAbilityChannelFamily    = binding.ResolveBehaviorAbilityChannelFamily
+	ProductFromChannel                     = identitypkg.ProductFromChannel
+	NewIdentity                            = identitypkg.New
+	FamilyFromDecisionKind                 = identitypkg.FamilyFromDecisionKind
+	FamilyFromIdentity                     = identitypkg.FamilyFromIdentity
 
-	AlgorithmFamilyFromDecisionKind = publishing.AlgorithmFamilyFromDecisionKind
-	DecisionKindForIdentity         = publishing.DecisionKindForIdentity
-	AlgorithmFamilyFromIdentity     = publishing.AlgorithmFamilyFromIdentity
-	AllAlgorithmFamilies            = publishing.AllAlgorithmFamilies
+	AlgorithmFamilyFromDecisionKind = identitypkg.AlgorithmFamilyFromDecisionKind
+	DecisionKindForIdentity         = identitypkg.DecisionKindForIdentity
+	AlgorithmFamilyFromIdentity     = identitypkg.AlgorithmFamilyFromIdentity
+	AllAlgorithmFamilies            = identitypkg.AllAlgorithmFamilies
 
-	IsScalePayloadFormat               = publishing.IsScalePayloadFormat
-	IsMBTIPayloadFormat                = publishing.IsMBTIPayloadFormat
-	IsSBTIPayloadFormat                = publishing.IsSBTIPayloadFormat
-	IsPersonalityTypologyPayloadFormat = publishing.IsPersonalityTypologyPayloadFormat
-	AlgorithmFromTypologyPayload       = publishing.AlgorithmFromTypologyPayload
-	PayloadFormatForBehavioralRating   = publishing.PayloadFormatForBehavioralRating
-	PayloadFormatForCognitive          = publishing.PayloadFormatForCognitive
-	IsBehavioralRatingPayloadFormat    = publishing.IsBehavioralRatingPayloadFormat
-	IsCognitivePayloadFormat           = publishing.IsCognitivePayloadFormat
-	DraftPayloadFormatForModel         = publishing.DraftPayloadFormatForModel
+	IsScalePayloadFormat               = payloadformatpkg.IsScalePayloadFormat
+	IsMBTIPayloadFormat                = payloadformatpkg.IsMBTIPayloadFormat
+	IsSBTIPayloadFormat                = payloadformatpkg.IsSBTIPayloadFormat
+	IsPersonalityTypologyPayloadFormat = payloadformatpkg.IsPersonalityTypologyPayloadFormat
+	AlgorithmFromTypologyPayload       = payloadformatpkg.AlgorithmFromTypologyPayload
+	PayloadFormatForBehavioralRating   = payloadformatpkg.PayloadFormatForBehavioralRating
+	PayloadFormatForCognitive          = payloadformatpkg.PayloadFormatForCognitive
+	IsBehavioralRatingPayloadFormat    = payloadformatpkg.IsBehavioralRatingPayloadFormat
+	IsCognitivePayloadFormat           = payloadformatpkg.IsCognitivePayloadFormat
+	DraftPayloadFormatForModel         = payloadformatpkg.DraftPayloadFormatForModel
 
 	FamilyCapabilityByKind = binding.FamilyCapabilityByKind
 	RuntimeExecutableKinds = binding.RuntimeExecutableKinds
 
-	NewAssessmentModel = publishing.NewAssessmentModel
-	ParseModelStatus   = publishing.ParseModelStatus
+	NewAssessmentModel = assessmentmodelpkg.New
+	ParseModelStatus   = assessmentmodelpkg.ParseStatus
 
-	BuildPublishedSnapshot                 = publishing.BuildPublishedSnapshot
-	BuildScoringPublishedSnapshotFromScale = publishing.BuildScoringPublishedSnapshotFromScale
-	ParseDefinitionBodyJSON                = factorpkg.ParseDefinitionBodyJSON
-	FactorsFromDefinitionBodyJSON          = factorpkg.FactorsFromDefinitionBodyJSON
-	ValidateDefinitionBodyForPublish       = factorpkg.ValidateDefinitionBodyForPublish
-	ValidateDefinitionBodyJSONForPublish   = factorpkg.ValidateDefinitionBodyJSONForPublish
-	ParsePublishedScalePayload             = scoringsnapshot.ParsePublishedPayload
+	ParseDefinitionBodyJSON              = factorpkg.ParseDefinitionBodyJSON
+	FactorsFromDefinitionBodyJSON        = factorpkg.FactorsFromDefinitionBodyJSON
+	ValidateDefinitionBodyForPublish     = factorpkg.ValidateDefinitionBodyForPublish
+	ValidateDefinitionBodyJSONForPublish = factorpkg.ValidateDefinitionBodyJSONForPublish
+	ParsePublishedScalePayload           = scoringsnapshot.ParsePublishedPayload
 )

@@ -2,7 +2,6 @@ package ruleset
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	v1envelope "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -59,7 +58,7 @@ func (Mapper) ToDomain(po *EvaluationRuleSetPO) *v1envelope.V1Snapshot {
 			Title:   po.Title,
 			Status:  po.Status,
 		},
-		Binding: publishing.QuestionnaireBinding{
+		Binding: binding.QuestionnaireBinding{
 			QuestionnaireCode:    po.QuestionnaireCode,
 			QuestionnaireVersion: po.QuestionnaireVersion,
 		},

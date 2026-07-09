@@ -1,11 +1,12 @@
 package modelcatalog
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// BuildPersonalityPublishedSnapshot delegates to the domain publish builder.
-func BuildPersonalityPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedModelSnapshot, error) {
-	return publishing.BuildPublishedSnapshot(model)
+// BuildPersonalityPublishedSnapshot delegates to the application published-model assembler.
+func BuildPersonalityPublishedSnapshot(model *domain.AssessmentModel) (*port.PublishedModel, error) {
+	return publishedmodel.BuildAssessmentSnapshot(model)
 }

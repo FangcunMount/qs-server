@@ -9,18 +9,18 @@ import (
 )
 
 type runtimeV2StubStore struct {
-	byQuestionnaire *domain.PublishedModelSnapshot
-	byRef           *domain.PublishedModelSnapshot
+	byQuestionnaire *port.PublishedModel
+	byRef           *port.PublishedModel
 }
 
-func (s runtimeV2StubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s runtimeV2StubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if s.byRef != nil {
 		return s.byRef, nil
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (s runtimeV2StubStore) FindPublishedModelByQuestionnaire(_ context.Context, _, _ string) (*domain.PublishedModelSnapshot, error) {
+func (s runtimeV2StubStore) FindPublishedModelByQuestionnaire(_ context.Context, _, _ string) (*port.PublishedModel, error) {
 	if s.byQuestionnaire != nil {
 		return s.byQuestionnaire, nil
 	}
@@ -28,19 +28,15 @@ func (s runtimeV2StubStore) FindPublishedModelByQuestionnaire(_ context.Context,
 }
 
 func TestRuntimePublishedCatalogResolveByQuestionnaireUsesV2Ref(t *testing.T) {
-	published := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: domain.AlgorithmSBTI,
-			Code:      "personality_demo",
-			Version:   "9.9.9",
-			Title:     "from mongo",
-		},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "demo-q",
-			QuestionnaireVersion: "1.0.0",
-		},
+	published := &port.PublishedModel{
+		Kind:                 domain.KindTypology,
+		SubKind:              domain.SubKindTypology,
+		Algorithm:            domain.AlgorithmSBTI,
+		Code:                 "personality_demo",
+		Version:              "9.9.9",
+		Title:                "from mongo",
+		QuestionnaireCode:    "demo-q",
+		QuestionnaireVersion: "1.0.0",
 	}
 	catalog := NewRuntimePublishedCatalogWithStore(runtimeV2StubStore{byQuestionnaire: published})
 

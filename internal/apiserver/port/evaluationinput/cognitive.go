@@ -25,7 +25,7 @@ func NewCognitiveModelSnapshot(snapshot *taskperfsnapshot.Snapshot) *ModelSnapsh
 	return &ModelSnapshot{
 		Kind:           EvaluationModelKindCognitive,
 		Algorithm:      string(modelcatalog.AlgorithmSPM),
-		ProductChannel: string(modelcatalog.ProductChannelCognitive),
+		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
 		Code:           snapshot.Code,
 		Version:        snapshot.Version,
 		Title:          snapshot.Title,

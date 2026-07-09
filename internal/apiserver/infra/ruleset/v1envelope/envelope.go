@@ -2,7 +2,8 @@ package v1envelope
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/payloadformat"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // V1 migration-only flat kinds.
@@ -34,7 +35,7 @@ type V1Snapshot struct {
 	SchemaVersion string
 	PayloadFormat string
 	Definition    V1Definition
-	Binding       publishing.QuestionnaireBinding
+	Binding       binding.QuestionnaireBinding
 	DecisionKind  binding.DecisionKind
 	Source        map[string]any
 	Payload       []byte
@@ -46,30 +47,10 @@ type RuleSetSnapshot = V1Snapshot
 // RuleSetDefinition is a compatibility alias for V1Definition.
 type RuleSetDefinition = V1Definition
 
-const RuleSetSchemaVersionV1 = publishing.SchemaVersionV1
+const RuleSetSchemaVersionV1 = payloadformat.SchemaVersionV1
 
-// PublishedFromV1 converts a v1 snapshot envelope to v2 published model snapshot.
-func PublishedFromV1(snapshot *V1Snapshot) *publishing.PublishedModelSnapshot {
-	if snapshot == nil {
-		return nil
-	}
-	source := publishing.SourceRef(nil)
-	if snapshot.Source != nil {
-		source = publishing.SourceRef(snapshot.Source)
-	}
-	return &publishing.PublishedModelSnapshot{
-		SchemaVersion: publishing.SchemaVersionV2,
-		Model:         modelDefinitionFromV1(snapshot.Definition, snapshot.DecisionKind),
-		Binding:       snapshot.Binding,
-		Decision:      publishing.DecisionSpec{Kind: snapshot.DecisionKind},
-		Source:        source,
-		PayloadFormat: snapshot.PayloadFormat,
-		Payload:       snapshot.Payload,
-	}
-}
-
-// V1FromPublished converts v2 snapshot back to v1 envelope for codec/oneoff tests.
-func V1FromPublished(snapshot *publishing.PublishedModelSnapshot) *V1Snapshot {
+// PublishedFromV1 converts a v1 snapshot envelope to a v2 published model record.
+func PublishedFromV1(snapshot *V1Snapshot) *port.PublishedModel {
 	if snapshot == nil {
 		return nil
 	}
@@ -77,41 +58,58 @@ func V1FromPublished(snapshot *publishing.PublishedModelSnapshot) *V1Snapshot {
 	if snapshot.Source != nil {
 		source = map[string]any(snapshot.Source)
 	}
-	return &V1Snapshot{
-		SchemaVersion: snapshot.SchemaVersion,
-		PayloadFormat: snapshot.PayloadFormat,
-		Definition: V1Definition{
-			Kind:    snapshot.Model.Kind,
-			Code:    snapshot.Model.Code,
-			Version: snapshot.Model.Version,
-			Title:   snapshot.Model.Title,
-			Status:  snapshot.Model.Status,
-		},
-		Binding:      snapshot.Binding,
-		DecisionKind: snapshot.Decision.Kind,
-		Source:       source,
-		Payload:      snapshot.Payload,
+	kind, subKind, algorithm := identityFromV1(snapshot.Definition)
+	return &port.PublishedModel{
+		SchemaVersion:        payloadformat.SchemaVersionV2,
+		ProductChannel:       binding.DefaultProductChannelFor(kind),
+		Kind:                 kind,
+		SubKind:              subKind,
+		Algorithm:            algorithm,
+		Code:                 snapshot.Definition.Code,
+		Version:              snapshot.Definition.Version,
+		Title:                snapshot.Definition.Title,
+		Status:               snapshot.Definition.Status,
+		QuestionnaireCode:    snapshot.Binding.QuestionnaireCode,
+		QuestionnaireVersion: snapshot.Binding.QuestionnaireVersion,
+		DecisionKind:         snapshot.DecisionKind,
+		Source:               source,
+		PayloadFormat:        snapshot.PayloadFormat,
+		Payload:              snapshot.Payload,
 	}
 }
 
-func modelDefinitionFromV1(def V1Definition, decision binding.DecisionKind) publishing.ModelDefinition {
+// V1FromPublished converts v2 published record back to v1 envelope for codec/oneoff tests.
+func V1FromPublished(model *port.PublishedModel) *V1Snapshot {
+	if model == nil {
+		return nil
+	}
+	source := map[string]any(nil)
+	if model.Source != nil {
+		source = map[string]any(model.Source)
+	}
+	return &V1Snapshot{
+		SchemaVersion: model.SchemaVersion,
+		PayloadFormat: model.PayloadFormat,
+		Definition: V1Definition{
+			Kind:    model.Kind,
+			Code:    model.Code,
+			Version: model.Version,
+			Title:   model.Title,
+			Status:  model.Status,
+		},
+		Binding: binding.QuestionnaireBinding{
+			QuestionnaireCode:    model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion,
+		},
+		DecisionKind: model.DecisionKind,
+		Source:       source,
+		Payload:      model.Payload,
+	}
+}
+
+func identityFromV1(def V1Definition) (binding.Kind, binding.SubKind, binding.Algorithm) {
 	if kind, subKind, algorithm, ok := binding.LegacyKindMapping(def.Kind); ok {
-		return publishing.ModelDefinition{
-			Kind:      kind,
-			SubKind:   subKind,
-			Algorithm: algorithm,
-			Code:      def.Code,
-			Version:   def.Version,
-			Title:     def.Title,
-			Status:    def.Status,
-		}
+		return kind, subKind, algorithm
 	}
-	kind := binding.NormalizeKind(def.Kind)
-	return publishing.ModelDefinition{
-		Kind:    kind,
-		Code:    def.Code,
-		Version: def.Version,
-		Title:   def.Title,
-		Status:  def.Status,
-	}
+	return binding.NormalizeKind(def.Kind), "", ""
 }

@@ -11,8 +11,8 @@ func TestDefaultProductChannelFor(t *testing.T) {
 		{KindTypology, ProductChannelTypology},
 		{KindPersonality, ProductChannelTypology},
 		{KindBehavioralRating, ProductChannelBehaviorAbility},
-		{KindCognitive, ProductChannelCognitive},
-		{KindCustom, ProductChannelCustom},
+		{KindCognitive, ProductChannelBehaviorAbility},
+		{KindCustom, ""},
 	}
 	for _, tc := range tests {
 		if got := DefaultProductChannelFor(tc.kind); got != tc.want {
@@ -30,6 +30,14 @@ func TestCompleteProductChannel(t *testing.T) {
 		t.Fatalf("got %q, want medical_scale", got)
 	}
 
+	got, err = CompleteProductChannel(KindCognitive, ProductChannelCognitive)
+	if err != nil {
+		t.Fatalf("CompleteProductChannel legacy cognitive: %v", err)
+	}
+	if got != ProductChannelBehaviorAbility {
+		t.Fatalf("legacy cognitive channel = %q, want behavior_ability", got)
+	}
+
 	if _, err := CompleteProductChannel(KindBehavioralRating, ProductChannel("invalid")); err == nil {
 		t.Fatal("expected invalid product channel error")
 	}
@@ -40,5 +48,22 @@ func TestCompleteProductChannel(t *testing.T) {
 	}
 	if got != ProductChannelBehaviorAbility {
 		t.Fatalf("default channel = %q, want behavior_ability", got)
+	}
+}
+
+func TestAllProductChannelsOnlyReturnsProductConcepts(t *testing.T) {
+	got := AllProductChannels()
+	want := []ProductChannel{
+		ProductChannelMedicalScale,
+		ProductChannelTypology,
+		ProductChannelBehaviorAbility,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("AllProductChannels() = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("AllProductChannels()[%d] = %q, want %q", i, got[i], want[i])
+		}
 	}
 }

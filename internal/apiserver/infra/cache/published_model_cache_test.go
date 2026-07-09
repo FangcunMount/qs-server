@@ -16,17 +16,17 @@ type publishedModelStoreStub struct {
 	findByQuestionnaireCalls int
 	getByRefCalls            int
 	findByCodeCalls          int
-	findByQuestionnaire      *domain.PublishedModelSnapshot
-	getByRef                 *domain.PublishedModelSnapshot
-	findByCode               *domain.PublishedModelSnapshot
+	findByQuestionnaire      *port.PublishedModel
+	getByRef                 *port.PublishedModel
+	findByCode               *port.PublishedModel
 	upsertErr                error
 }
 
-func (s *publishedModelStoreStub) UpsertPublishedModel(context.Context, *domain.PublishedModelSnapshot) error {
+func (s *publishedModelStoreStub) UpsertPublishedModel(context.Context, *port.PublishedModel) error {
 	return s.upsertErr
 }
 
-func (s *publishedModelStoreStub) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedModelStoreStub) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	s.getByRefCalls++
 	if s.getByRef != nil {
 		return s.getByRef, nil
@@ -34,7 +34,7 @@ func (s *publishedModelStoreStub) GetPublishedModelByRef(ctx context.Context, re
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error) {
 	s.findByQuestionnaireCalls++
 	if s.findByQuestionnaire != nil {
 		return s.findByQuestionnaire, nil
@@ -42,7 +42,7 @@ func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, domain.Kind, string) (*domain.PublishedModelSnapshot, error) {
+func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, domain.Kind, string) (*port.PublishedModel, error) {
 	s.findByCodeCalls++
 	if s.findByCode != nil {
 		return s.findByCode, nil
@@ -50,7 +50,7 @@ func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, doma
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (s *publishedModelStoreStub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	return nil, 0, nil
 }
 
@@ -66,12 +66,12 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 		mr.Close()
 	})
 
-	snapshot := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "q-001",
-			QuestionnaireVersion: "1.0.0",
-		},
+	snapshot := &port.PublishedModel{
+		Kind:                 domain.KindScale,
+		Code:                 "scale-001",
+		Version:              "1.0.0",
+		QuestionnaireCode:    "q-001",
+		QuestionnaireVersion: "1.0.0",
 	}
 	inner := &publishedModelStoreStub{findByQuestionnaire: snapshot}
 	cached := NewCachedPublishedModelStore(
@@ -86,7 +86,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 	if err != nil {
 		t.Fatalf("first FindPublishedModelByQuestionnaire() error = %v", err)
 	}
-	if got == nil || got.Model.Code != "scale-001" {
+	if got == nil || got.Code != "scale-001" {
 		t.Fatalf("first FindPublishedModelByQuestionnaire() = %#v", got)
 	}
 	if inner.findByQuestionnaireCalls != 1 {
@@ -97,7 +97,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 	if err != nil {
 		t.Fatalf("second FindPublishedModelByQuestionnaire() error = %v", err)
 	}
-	if got == nil || got.Model.Code != "scale-001" {
+	if got == nil || got.Code != "scale-001" {
 		t.Fatalf("second FindPublishedModelByQuestionnaire() = %#v", got)
 	}
 	if inner.findByQuestionnaireCalls != 2 {
@@ -113,12 +113,12 @@ func TestCachedPublishedModelStoreUpsertPublishedModelDelegatesToInner(t *testin
 		mr.Close()
 	})
 
-	snapshot := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"},
-		Binding: domain.QuestionnaireBinding{
-			QuestionnaireCode:    "q-001",
-			QuestionnaireVersion: "1.0.0",
-		},
+	snapshot := &port.PublishedModel{
+		Kind:                 domain.KindScale,
+		Code:                 "scale-001",
+		Version:              "1.0.0",
+		QuestionnaireCode:    "q-001",
+		QuestionnaireVersion: "1.0.0",
 	}
 	inner := &publishedModelStoreStub{}
 	cached := NewCachedPublishedModelStore(
@@ -142,8 +142,8 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 		mr.Close()
 	})
 
-	published := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0"},
+	published := &port.PublishedModel{
+		Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0",
 	}
 	inner := &publishedModelStoreStub{findByCode: published}
 	cached := NewCachedPublishedModelStore(
@@ -158,7 +158,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	if err != nil {
 		t.Fatalf("first FindPublishedModelByCode() error = %v", err)
 	}
-	if got == nil || got.Model.Code != "mbti" {
+	if got == nil || got.Code != "mbti" {
 		t.Fatalf("first FindPublishedModelByCode() = %#v", got)
 	}
 
@@ -166,7 +166,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	if err != nil {
 		t.Fatalf("second FindPublishedModelByCode() error = %v", err)
 	}
-	if got == nil || got.Model.Code != "mbti" {
+	if got == nil || got.Code != "mbti" {
 		t.Fatalf("second FindPublishedModelByCode() = %#v", got)
 	}
 	if inner.findByCodeCalls != 2 {
@@ -174,7 +174,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	}
 }
 
-func TestCachedPublishedModelStoreInvalidatePublishedSnapshotClearsModelByCodeCache(t *testing.T) {
+func TestCachedPublishedModelStoreInvalidatePublishedModelClearsModelByCodeCache(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() {
@@ -182,8 +182,8 @@ func TestCachedPublishedModelStoreInvalidatePublishedSnapshotClearsModelByCodeCa
 		mr.Close()
 	})
 
-	snapshot := &domain.PublishedModelSnapshot{
-		Model: domain.ModelDefinition{Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0"},
+	snapshot := &port.PublishedModel{
+		Kind: domain.KindTypology, Code: "mbti", Version: "1.0.0",
 	}
 	inner := &publishedModelStoreStub{findByCode: snapshot}
 	cached := NewCachedPublishedModelStore(
@@ -197,5 +197,5 @@ func TestCachedPublishedModelStoreInvalidatePublishedSnapshotClearsModelByCodeCa
 	if _, err := cached.FindPublishedModelByCode(context.Background(), domain.KindTypology, "mbti"); err != nil {
 		t.Fatalf("FindPublishedModelByCode error = %v", err)
 	}
-	cached.invalidatePublishedSnapshot(context.Background(), snapshot)
+	cached.invalidatePublishedModel(context.Background(), snapshot)
 }

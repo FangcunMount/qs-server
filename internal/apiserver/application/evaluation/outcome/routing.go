@@ -1,14 +1,15 @@
 package outcome
 
 import (
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// PublishedSnapshotFromInput 构建路由 快照 从 resolved 评估输入。
-func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcatalog.PublishedModelSnapshot, bool) {
+// ModelRouteFromInput 构建运行时路由 从 resolved 评估输入。
+func ModelRouteFromInput(input *evaluationinput.InputSnapshot) (evalpipeline.ModelRoute, bool) {
 	if input == nil {
-		return modelcatalog.PublishedModelSnapshot{}, false
+		return evalpipeline.ModelRoute{}, false
 	}
 	if input.Model == nil {
 		if scale, ok := evaluationinput.ScalePayload(input); ok {
@@ -16,34 +17,23 @@ func PublishedSnapshotFromInput(input *evaluationinput.InputSnapshot) (modelcata
 		}
 	}
 	if input.Model == nil {
-		return modelcatalog.PublishedModelSnapshot{}, false
+		return evalpipeline.ModelRoute{}, false
 	}
 	model := input.Model
 	kind := modelcatalog.Kind(model.Kind)
 	subKind := modelcatalog.SubKind(model.SubKind)
 	algorithm := modelcatalog.Algorithm(model.Algorithm)
 
-	decision := modelcatalog.DecisionSpec{}
+	var decisionKind modelcatalog.DecisionKind
 	if payload, ok := evaluationinput.TypologyPayload(input); ok && payload.HasExplicitRuntime() && payload.Runtime.Decision.Kind != "" {
-		decision.Kind = payload.Runtime.Decision.Kind
-	}
-
-	productChannel := modelcatalog.ProductChannel(model.ProductChannel)
-	if productChannel == "" {
-		productChannel = modelcatalog.DefaultProductChannelFor(kind)
+		decisionKind = payload.Runtime.Decision.Kind
 	}
 	payloadFormat := modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
-	return modelcatalog.PublishedModelSnapshot{
-		Model: modelcatalog.ModelDefinition{
-			ProductChannel: productChannel,
-			Kind:           kind,
-			SubKind:        subKind,
-			Algorithm:      algorithm,
-			Code:           model.Code,
-			Version:        model.Version,
-			Title:          model.Title,
-		},
-		Decision:      decision,
+	return evalpipeline.ModelRoute{
+		Kind:          kind,
+		SubKind:       subKind,
+		Algorithm:     algorithm,
+		DecisionKind:  decisionKind,
 		PayloadFormat: payloadFormat,
 	}, true
 }

@@ -5,6 +5,8 @@ func NormalizeProductChannel(channel ProductChannel) ProductChannel {
 	switch channel {
 	case ProductChannelPersonality:
 		return ProductChannelTypology
+	case ProductChannelCognitive:
+		return ProductChannelBehaviorAbility
 	default:
 		return channel
 	}
@@ -25,6 +27,9 @@ func ProductChannelQueryValues(channel ProductChannel) []string {
 	normalized := NormalizeProductChannel(channel)
 	if normalized == ProductChannelTypology {
 		return []string{string(ProductChannelTypology), string(ProductChannelPersonality)}
+	}
+	if normalized == ProductChannelBehaviorAbility {
+		return []string{string(ProductChannelBehaviorAbility), string(ProductChannelCognitive)}
 	}
 	if normalized == "" {
 		return nil

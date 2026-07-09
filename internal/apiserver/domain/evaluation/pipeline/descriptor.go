@@ -14,6 +14,15 @@ type RuntimeDescriptorKey struct {
 	PayloadFormat   string
 }
 
+// ModelRoute 是运行时路由需要的最小模型身份。
+type ModelRoute struct {
+	Kind          modelcatalog.Kind
+	SubKind       modelcatalog.SubKind
+	Algorithm     modelcatalog.Algorithm
+	DecisionKind  modelcatalog.DecisionKind
+	PayloadFormat string
+}
+
 func (k RuntimeDescriptorKey) IsZero() bool {
 	return k.AlgorithmFamily == ""
 }
@@ -31,7 +40,7 @@ func (k RuntimeDescriptorKey) String() string {
 
 // CalculationInput 是机制无关 input passed 为 计算器。
 type CalculationInput struct {
-	Snapshot modelcatalog.PublishedModelSnapshot
+	Route ModelRoute
 }
 
 // Calculator 运行计算 stage 用于 已发布模型快照。
@@ -41,7 +50,7 @@ type Calculator interface {
 
 // InputAssembler 适配已发布快照 为 计算输入。
 type InputAssembler interface {
-	Assemble(snapshot modelcatalog.PublishedModelSnapshot) (CalculationInput, error)
+	Assemble(route ModelRoute) (CalculationInput, error)
 }
 
 // OutcomeAssembler 适配计算输出 为 规范 测评结果。
@@ -63,6 +72,6 @@ type RuntimeDescriptor struct {
 
 // EvaluationPipeline 执行一个评估 用于 已发布模型快照。
 type EvaluationPipeline interface {
-	Supports(snapshot modelcatalog.PublishedModelSnapshot) bool
-	Execute(ctx context.Context, snapshot modelcatalog.PublishedModelSnapshot) (any, error)
+	Supports(route ModelRoute) bool
+	Execute(ctx context.Context, route ModelRoute) (any, error)
 }

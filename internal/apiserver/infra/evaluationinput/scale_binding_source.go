@@ -66,7 +66,7 @@ func (c PublishedScaleCatalog) GetScaleByRef(ctx context.Context, ref port.Model
 			Version: ref.Version,
 		})
 		if err == nil {
-			if snapshot.Model.Kind != domain.KindScale {
+			if snapshot.Kind != domain.KindScale {
 				return nil, domain.ErrNotFound
 			}
 			decoded, decodeErr := aminfrac.DecodeScaleFromPublished(snapshot)

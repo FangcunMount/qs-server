@@ -14,11 +14,11 @@ type PublishedStore struct {
 }
 
 type publishedStoreV2Repository interface {
-	UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error
-	GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error)
-	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error)
-	FindLatestPublishedModelByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
-	ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)
+	UpsertPublishedModel(ctx context.Context, model *port.PublishedModel) error
+	GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error)
+	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error)
+	FindLatestPublishedModelByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error)
+	ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error)
 	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
 }
 
@@ -33,35 +33,35 @@ func NewPublishedStore(v2 *mongomodelcatalog.Repository) *PublishedStore {
 	return &PublishedStore{v2: v2}
 }
 
-func (s *PublishedStore) UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
+func (s *PublishedStore) UpsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
 	if s == nil || s.v2 == nil {
 		return domain.ErrNotFound
 	}
-	return s.v2.UpsertPublishedModel(ctx, snapshot)
+	return s.v2.UpsertPublishedModel(ctx, model)
 }
 
-func (s *PublishedStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s *PublishedStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
 	return s.v2.GetPublishedModelByRef(ctx, ref)
 }
 
-func (s *PublishedStore) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
+func (s *PublishedStore) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error) {
 	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
 	return s.v2.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
-func (s *PublishedStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (s *PublishedStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	if s == nil || s.v2 == nil {
 		return nil, domain.ErrNotFound
 	}
 	return s.v2.FindLatestPublishedModelByModelCode(ctx, kind, code)
 }
 
-func (s *PublishedStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (s *PublishedStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	if s == nil || s.v2 == nil {
 		return nil, 0, domain.ErrNotFound
 	}

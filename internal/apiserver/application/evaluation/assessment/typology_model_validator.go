@@ -45,12 +45,12 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 	if snapshot == nil {
 		return fmt.Errorf("%w: %s@%s", evalassessment.ErrEvaluationModelNotPublished, modelRef.Code(), modelRef.Version())
 	}
-	if snapshot.Binding.QuestionnaireCode != "" &&
-		snapshot.Binding.QuestionnaireCode != questionnaireRef.Code().String() {
+	if snapshot.QuestionnaireCode != "" &&
+		snapshot.QuestionnaireCode != questionnaireRef.Code().String() {
 		return evalassessment.ErrEvaluationModelQuestionnaireMismatch
 	}
-	if snapshot.Binding.QuestionnaireVersion != "" &&
-		snapshot.Binding.QuestionnaireVersion != questionnaireRef.Version() {
+	if snapshot.QuestionnaireVersion != "" &&
+		snapshot.QuestionnaireVersion != questionnaireRef.Version() {
 		return evalassessment.ErrEvaluationModelQuestionnaireMismatch
 	}
 	return nil

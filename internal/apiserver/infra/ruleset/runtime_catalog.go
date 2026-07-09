@@ -67,7 +67,7 @@ func (c *RuntimePublishedCatalog) ResolveByQuestionnaire(
 	return aminfra.RefFromPublished(snapshot), true, nil
 }
 
-func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if c == nil || c.store == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -80,7 +80,7 @@ func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, re
 func (c *RuntimePublishedCatalog) FindPublishedModelByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
-) (*domain.PublishedModelSnapshot, error) {
+) (*port.PublishedModel, error) {
 	if c == nil || c.store == nil {
 		return nil, domain.ErrNotFound
 	}

@@ -11,21 +11,21 @@ import (
 )
 
 type StaticCompositeCatalog struct {
-	ruleSets []*domain.PublishedModelSnapshot
+	ruleSets []*port.PublishedModel
 	scale    ScaleBindingSource
 }
 
 var _ port.Catalog = (*StaticCompositeCatalog)(nil)
 
-func NewStaticCompositeCatalog(ruleSets []*domain.PublishedModelSnapshot, scale ScaleBindingSource) *StaticCompositeCatalog {
-	copied := make([]*domain.PublishedModelSnapshot, 0, len(ruleSets))
-	for _, snapshot := range ruleSets {
-		if snapshot == nil {
+func NewStaticCompositeCatalog(ruleSets []*port.PublishedModel, scale ScaleBindingSource) *StaticCompositeCatalog {
+	copied := make([]*port.PublishedModel, 0, len(ruleSets))
+	for _, model := range ruleSets {
+		if model == nil {
 			continue
 		}
-		clone := *snapshot
-		if len(snapshot.Payload) > 0 {
-			clone.Payload = append([]byte(nil), snapshot.Payload...)
+		clone := *model
+		if len(model.Payload) > 0 {
+			clone.Payload = append([]byte(nil), model.Payload...)
 		}
 		copied = append(copied, &clone)
 	}
@@ -57,7 +57,7 @@ func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
 	return port.Ref{}, false, nil
 }
 
-func (c *StaticCompositeCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (c *StaticCompositeCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if c == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -83,7 +83,7 @@ func (c *StaticCompositeCatalog) GetPublishedModelByRef(ctx context.Context, ref
 func (c *StaticCompositeCatalog) FindPublishedModelByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
-) (*domain.PublishedModelSnapshot, error) {
+) (*port.PublishedModel, error) {
 	ref, ok, err := c.ResolveByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil {
 		return nil, err
@@ -94,25 +94,25 @@ func (c *StaticCompositeCatalog) FindPublishedModelByQuestionnaire(
 	return c.GetPublishedModelByRef(ctx, ref)
 }
 
-func (c *StaticCompositeCatalog) findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion string) *domain.PublishedModelSnapshot {
-	for _, snapshot := range c.ruleSets {
-		if snapshot == nil {
+func (c *StaticCompositeCatalog) findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion string) *port.PublishedModel {
+	for _, model := range c.ruleSets {
+		if model == nil {
 			continue
 		}
-		if snapshot.Binding.QuestionnaireCode == questionnaireCode && snapshot.Binding.QuestionnaireVersion == questionnaireVersion {
-			return snapshot
+		if model.QuestionnaireCode == questionnaireCode && model.QuestionnaireVersion == questionnaireVersion {
+			return model
 		}
 	}
 	return nil
 }
 
-func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.Ref) *domain.PublishedModelSnapshot {
-	for _, snapshot := range c.ruleSets {
-		if snapshot == nil {
+func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.Ref) *port.PublishedModel {
+	for _, model := range c.ruleSets {
+		if model == nil {
 			continue
 		}
-		if aminfra.RefMatchesPublished(ref, snapshot) {
-			return snapshot
+		if aminfra.RefMatchesPublished(ref, model) {
+			return model
 		}
 	}
 	return nil

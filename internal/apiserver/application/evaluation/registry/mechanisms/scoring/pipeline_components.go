@@ -8,7 +8,6 @@ import (
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -45,8 +44,8 @@ func NewPipelineComponentsWithDeps(validator InputValidator, evaluator *calcscor
 
 type factorScoringInputAssembler struct{}
 
-func (factorScoringInputAssembler) Assemble(snapshot modelcatalog.PublishedModelSnapshot) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Snapshot: snapshot}, nil
+func (factorScoringInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
+	return evalpipeline.CalculationInput{Route: route}, nil
 }
 
 type factorScoringCalculator struct {

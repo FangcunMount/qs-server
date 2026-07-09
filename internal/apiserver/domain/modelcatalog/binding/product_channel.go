@@ -2,7 +2,7 @@ package binding
 
 import "fmt"
 
-// ProductChannel 划分assessment model 用于 product-facing 分类体系。
+// ProductChannel 划分assessment model 用于 product-facing 产品分类体系。
 type ProductChannel string
 
 const (
@@ -10,7 +10,7 @@ const (
 	ProductChannelTypology        ProductChannel = "typology"
 	ProductChannelPersonality     ProductChannel = "personality" // Deprecated: persisted read-compat; use ProductChannelTypology.
 	ProductChannelBehaviorAbility ProductChannel = "behavior_ability"
-	ProductChannelCognitive       ProductChannel = "cognitive"
+	ProductChannelCognitive       ProductChannel = "cognitive" // Deprecated: persisted read-compat; use ProductChannelBehaviorAbility.
 	ProductChannelScreening       ProductChannel = "screening"
 	ProductChannelFollowup        ProductChannel = "followup"
 	ProductChannelCustom          ProductChannel = "custom"
@@ -22,11 +22,7 @@ func (pc ProductChannel) IsValid() bool {
 	switch NormalizeProductChannel(pc) {
 	case ProductChannelMedicalScale,
 		ProductChannelTypology,
-		ProductChannelBehaviorAbility,
-		ProductChannelCognitive,
-		ProductChannelScreening,
-		ProductChannelFollowup,
-		ProductChannelCustom:
+		ProductChannelBehaviorAbility:
 		return true
 	default:
 		return false
@@ -45,9 +41,7 @@ func DefaultProductChannelFor(kind Kind) ProductChannel {
 	case KindBehavioralRating:
 		return ProductChannelBehaviorAbility
 	case KindCognitive:
-		return ProductChannelCognitive
-	case KindCustom:
-		return ProductChannelCustom
+		return ProductChannelBehaviorAbility
 	default:
 		return ""
 	}
@@ -56,7 +50,7 @@ func DefaultProductChannelFor(kind Kind) ProductChannel {
 // ResolveProductChannel 返回显式 channel when set, otherwise 类型 默认。
 func ResolveProductChannel(kind Kind, channel ProductChannel) ProductChannel {
 	if channel != "" {
-		return channel
+		return NormalizeProductChannel(channel)
 	}
 	return DefaultProductChannelFor(kind)
 }
@@ -73,15 +67,11 @@ func CompleteProductChannel(kind Kind, channel ProductChannel) (ProductChannel, 
 	return resolved, nil
 }
 
-// AllProductChannels 返回supported 产品通道 values 用于 API 选项。
+// AllProductChannels 返回可配置 产品通道 values 用于 API 选项。
 func AllProductChannels() []ProductChannel {
 	return []ProductChannel{
 		ProductChannelMedicalScale,
 		ProductChannelTypology,
 		ProductChannelBehaviorAbility,
-		ProductChannelCognitive,
-		ProductChannelScreening,
-		ProductChannelFollowup,
-		ProductChannelCustom,
 	}
 }

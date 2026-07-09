@@ -25,8 +25,8 @@ func NewOutcomeFromLegacyResult(
 		Input:      input,
 		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result), //nolint:staticcheck // 单一表征边界适配器
 	}
-	if snapshot, ok := PublishedSnapshotFromInput(input); ok {
-		if key, err := evalpipeline.RuntimeDescriptorKeyFromSnapshot(snapshot); err == nil {
+	if route, ok := ModelRouteFromInput(input); ok {
+		if key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(route); err == nil {
 			outcome.RuntimeDescriptorKey = key
 		}
 	}

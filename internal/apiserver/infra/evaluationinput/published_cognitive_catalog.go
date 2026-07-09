@@ -58,29 +58,29 @@ func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
 	}
 }
 
-func decodePublishedCognitiveModel(snapshot *domain.PublishedModelSnapshot) (*taskperfsnapshot.Snapshot, error) {
-	if snapshot == nil {
+func decodePublishedCognitiveModel(model *rulesetport.PublishedModel) (*taskperfsnapshot.Snapshot, error) {
+	if model == nil {
 		return nil, domain.ErrNotFound
 	}
-	if snapshot.Model.Kind != domain.KindCognitive {
-		return nil, fmt.Errorf("published model kind = %q, want cognitive", snapshot.Model.Kind)
+	if model.Kind != domain.KindCognitive {
+		return nil, fmt.Errorf("published model kind = %q, want cognitive", model.Kind)
 	}
-	if !domain.IsCognitivePayloadFormat(snapshot.PayloadFormat) {
-		return nil, fmt.Errorf("unsupported cognitive payload format: %s", snapshot.PayloadFormat)
+	if !domain.IsCognitivePayloadFormat(model.PayloadFormat) {
+		return nil, fmt.Errorf("unsupported cognitive payload format: %s", model.PayloadFormat)
 	}
 	payload, err := taskperfsnapshot.ParsePublishedPayload(
-		snapshot.PayloadFormat,
-		snapshot.Model.Code,
-		snapshot.Model.Version,
-		snapshot.Model.Title,
-		snapshot.Model.Status,
-		snapshot.Payload,
+		model.PayloadFormat,
+		model.Code,
+		model.Version,
+		model.Title,
+		model.Status,
+		model.Payload,
 	)
 	if err != nil {
 		return nil, err
 	}
-	payload.QuestionnaireCode = snapshot.Binding.QuestionnaireCode
-	payload.QuestionnaireVersion = snapshot.Binding.QuestionnaireVersion
+	payload.QuestionnaireCode = model.QuestionnaireCode
+	payload.QuestionnaireVersion = model.QuestionnaireVersion
 	if !payload.IsPublished() {
 		return nil, fmt.Errorf("cognitive model is not published: %s", payload.Code)
 	}

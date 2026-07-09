@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -41,8 +40,8 @@ type CachedPublishedModelStore struct {
 }
 
 type publishedModelCatalogListPage struct {
-	Models []*domain.PublishedModelSnapshot `json:"models"`
-	Total  int64                            `json:"total"`
+	Models []*port.PublishedModel `json:"models"`
+	Total  int64                  `json:"total"`
 }
 
 type publishedModelCatalogAlgorithms struct {
@@ -117,15 +116,15 @@ func newPublishedModelCatalogAlgorithmsCodec() CacheEntryCodec[publishedModelCat
 	}
 }
 
-func (c *CachedPublishedModelStore) UpsertPublishedModel(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error {
-	if err := c.inner.UpsertPublishedModel(ctx, snapshot); err != nil {
+func (c *CachedPublishedModelStore) UpsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
+	if err := c.inner.UpsertPublishedModel(ctx, model); err != nil {
 		return err
 	}
-	c.invalidatePublishedSnapshot(ctx, snapshot)
+	c.invalidatePublishedModel(ctx, model)
 	return nil
 }
 
-func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -135,21 +134,21 @@ func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, 
 func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
-) (*domain.PublishedModelSnapshot, error) {
+) (*port.PublishedModel, error) {
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
 	return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 }
 
-func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
 	return c.inner.FindPublishedModelByCode(ctx, kind, code)
 }
 
-func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
 	if c == nil || c.inner == nil {
 		return nil, 0, domain.ErrNotFound
 	}
@@ -248,11 +247,10 @@ func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
 	)
 }
 
-func (c *CachedPublishedModelStore) invalidatePublishedSnapshot(ctx context.Context, snapshot *domain.PublishedModelSnapshot) {
-	if snapshot == nil {
+func (c *CachedPublishedModelStore) invalidatePublishedModel(ctx context.Context, model *port.PublishedModel) {
+	if model == nil {
 		return
 	}
-	_ = aminfra.RefFromPublished(snapshot)
 	if c.catalogAlgorithms != nil {
 		if err := c.catalogAlgorithms.Delete(ctx, c.algorithmsCatalogCacheKey()); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)

@@ -12,17 +12,17 @@ import (
 )
 
 type stubScalePublishedReader struct {
-	snapshot *domain.PublishedModelSnapshot
+	snapshot *rulesetport.PublishedModel
 }
 
-func (s stubScalePublishedReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
+func (s stubScalePublishedReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
 	if s.snapshot == nil {
 		return nil, domain.ErrNotFound
 	}
 	return s.snapshot, nil
 }
 
-func (s stubScalePublishedReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+func (s stubScalePublishedReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
 	return nil, domain.ErrNotFound
 }
 
@@ -52,17 +52,15 @@ func TestPublishedScaleCatalogPrefersPublishedPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeScale: %v", err)
 	}
-	reader := stubScalePublishedReader{snapshot: &domain.PublishedModelSnapshot{
+	reader := stubScalePublishedReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: format,
-		Model: domain.ModelDefinition{
-			Kind:    domain.KindScale,
-			Code:    fromMongo.Code,
-			Version: fromMongo.ScaleVersion,
-			Title:   fromMongo.Title,
-			Status:  fromMongo.Status,
-		},
-		Payload: payload,
+		Kind:          domain.KindScale,
+		Code:          fromMongo.Code,
+		Version:       fromMongo.ScaleVersion,
+		Title:         fromMongo.Title,
+		Status:        fromMongo.Status,
+		Payload:       payload,
 	}}
 	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",

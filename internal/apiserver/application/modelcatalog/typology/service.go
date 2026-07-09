@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/publishing"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
@@ -201,29 +202,27 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if err != nil {
 		return nil, err
 	}
-	format := input.PayloadFormat
-	if format == "" {
-		format = domain.PayloadFormatPersonalityTypologyV1
+	save, issues, err := s.definitionHandler().PrepareForSave(ctx, model, appdefinition.SaveInput{
+		PayloadFormat: input.PayloadFormat,
+		Payload:       input.Payload,
+		Algorithm:     input.Algorithm,
+		SubKind:       input.SubKind,
+	})
+	if len(issues) > 0 {
+		return nil, validationFailed(domainIssuesToValidation(issues))
 	}
-	if issues := validateDefinitionPayloadForSave(format, input.Payload); len(issues) > 0 {
-		return nil, validationFailed(issues)
-	}
-	storedPayload, err := normalizeDefinitionPayloadForStorage(input.Payload, model.Algorithm)
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
 	now := time.Now().UTC()
-	if err := model.UpdateDefinition(domain.DefinitionPayload{
-		Format: format,
-		Data:   storedPayload,
-	}, now); err != nil {
+	if err := model.UpdateDefinition(save.Payload, now); err != nil {
 		return nil, mapDomainError(err)
 	}
-	if input.Algorithm != "" {
-		model.Algorithm = domain.Algorithm(input.Algorithm)
+	if save.Algorithm != "" {
+		model.Algorithm = save.Algorithm
 	}
-	if input.SubKind != "" {
-		model.SubKind = domain.SubKind(input.SubKind)
+	if save.SubKind != "" {
+		model.SubKind = save.SubKind
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err
@@ -236,7 +235,7 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 	if err != nil {
 		return nil, err
 	}
-	issues := s.validateModelForPublish(ctx, model)
+	issues := domainIssuesToValidation(s.definitionHandler().ValidateForPublish(ctx, model))
 	return NewValidationResult(issues), nil
 }
 
@@ -248,28 +247,19 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, err
 	}
-	if issues := s.validateModelForPublish(ctx, model); len(issues) > 0 {
-		return nil, validationFailed(issues)
-	}
-	now := time.Now().UTC()
-	if err := model.MarkPublished(now); err != nil {
-		return nil, mapDomainError(err)
-	}
-	snapshot, err := publishing.BuildPublishedSnapshot(model)
-	if err != nil {
-		return nil, invalidArgument("%s", err.Error())
-	}
-	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode); err != nil {
+	if _, err := s.publisher().Publish(ctx, model, publication.PublishOptions{
+		ReplaceKind:    domain.KindTypology,
+		AfterPublished: s.notifyCacheChanged,
+	}); err != nil {
+		var validationErr *appdefinition.ValidationError
+		if stderrors.As(err, &validationErr) {
+			return nil, validationFailed(domainIssuesToValidation(validationErr.Issues))
+		}
+		if stderrors.Is(err, domain.ErrInvalidArgument) || stderrors.Is(err, domain.ErrInvalidState) {
+			return nil, mapDomainError(err)
+		}
 		return nil, err
 	}
-	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
-		return nil, err
-	}
-	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindTypology, modelCode)
-		return nil, err
-	}
-	s.notifyCacheChanged(ctx, modelCode, "publish")
 	return summaryFromModel(model), nil
 }
 
@@ -334,14 +324,20 @@ func (s *service) notifyCacheChanged(ctx context.Context, code, action string) {
 }
 
 func (s *service) validateModelForPublish(ctx context.Context, model *domain.AssessmentModel) []ValidationIssue {
-	domainIssues := domainIssuesToValidation(model.ValidateForPublish().Issues)
-	runtime, validationContext, definitionIssues := validateDefinitionPayloadForPublish(model)
-	questionnaire, questionnaireIssues := s.questionnaireSnapshotForPublish(ctx, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
-	if len(definitionIssues) > 0 || len(questionnaireIssues) > 0 || runtime == nil {
-		return mergeValidationIssues(domainIssues, definitionIssues, questionnaireIssues)
+	return domainIssuesToValidation(s.definitionHandler().ValidateForPublish(ctx, model))
+}
+
+func (s *service) definitionHandler() DefinitionHandler {
+	return DefinitionHandler{QuestionnaireQuery: s.deps.QuestionnaireQuery}
+}
+
+func (s *service) publisher() publication.Publisher {
+	handler := s.definitionHandler()
+	return publication.Publisher{
+		Registry:  appdefinition.NewRegistry(handler),
+		ModelRepo: s.deps.ModelRepo,
+		Repo:      s.deps.PublishedRepo,
 	}
-	runtimeIssues := domainIssuesToValidation(modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, validationContext))
-	return mergeValidationIssues(domainIssues, definitionIssues, questionnaireIssues, runtimeIssues)
 }
 
 func (s *service) loadModel(ctx context.Context, modelCode string) (*domain.AssessmentModel, error) {
@@ -415,38 +411,6 @@ func (s *service) validateQuestionnaireBinding(ctx context.Context, questionnair
 		QuestionnaireCode:    q.Code,
 		QuestionnaireVersion: q.Version,
 	}, nil
-}
-
-func (s *service) questionnaireSnapshotForPublish(ctx context.Context, questionnaireCode, questionnaireVersion string) (modeltypology.QuestionnaireSnapshot, []ValidationIssue) {
-	if questionnaireCode == "" || questionnaireVersion == "" {
-		return modeltypology.QuestionnaireSnapshot{}, nil
-	}
-	if s.deps.QuestionnaireQuery == nil {
-		return modeltypology.QuestionnaireSnapshot{}, []ValidationIssue{{
-			Field: "binding.questionnaire", Message: "问卷查询服务未配置",
-			Code: "binding.questionnaire_query.unavailable", Level: "error",
-		}}
-	}
-	q, err := s.deps.QuestionnaireQuery.GetPublishedByCodeVersion(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil {
-		return modeltypology.QuestionnaireSnapshot{}, []ValidationIssue{{
-			Field: "binding.questionnaire", Message: "绑定问卷不存在或未发布",
-			Code: "binding.questionnaire.not_found", Level: "error",
-		}}
-	}
-	if q == nil {
-		return modeltypology.QuestionnaireSnapshot{}, []ValidationIssue{{
-			Field: "binding.questionnaire", Message: "绑定问卷不存在或未发布",
-			Code: "binding.questionnaire.not_found", Level: "error",
-		}}
-	}
-	if len(q.Questions) == 0 {
-		return modeltypology.QuestionnaireSnapshot{}, []ValidationIssue{{
-			Field: "binding.questionnaire", Message: "绑定问卷题目不能为空",
-			Code: "binding.questionnaire.questions.required", Level: "error",
-		}}
-	}
-	return questionnaireSnapshotFromResult(q), nil
 }
 
 func questionnaireSnapshotFromResult(q *questionnaireapp.QuestionnaireResult) modeltypology.QuestionnaireSnapshot {

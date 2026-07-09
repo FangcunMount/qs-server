@@ -7,48 +7,42 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestExecutionRoutingFromSnapshotUsesKindPrimaryFamilies(t *testing.T) {
+func TestExecutionRoutingFromRouteUsesKindPrimaryFamilies(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name     string
-		snapshot modelcatalog.PublishedModelSnapshot
+		route    evalpipeline.ModelRoute
 		family   modelcatalog.AlgorithmFamily
 		decision modelcatalog.DecisionKind
 	}{
 		{
 			name: "behavioral_rating_default",
-			snapshot: modelcatalog.PublishedModelSnapshot{
-				Model: modelcatalog.ModelDefinition{
-					Kind:      modelcatalog.KindBehavioralRating,
-					Algorithm: modelcatalog.AlgorithmBehavioralRatingDefault,
-				},
-				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindScoreRange},
+			route: evalpipeline.ModelRoute{
+				Kind:         modelcatalog.KindBehavioralRating,
+				Algorithm:    modelcatalog.AlgorithmBehavioralRatingDefault,
+				DecisionKind: modelcatalog.DecisionKindScoreRange,
 			},
 			family:   modelcatalog.AlgorithmFamilyFactorNorm,
 			decision: modelcatalog.DecisionKindNormLookup,
 		},
 		{
 			name: "cognitive_default",
-			snapshot: modelcatalog.PublishedModelSnapshot{
-				Model: modelcatalog.ModelDefinition{
-					Kind:      modelcatalog.KindCognitive,
-					Algorithm: modelcatalog.AlgorithmSPM,
-				},
-				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindScoreRange},
+			route: evalpipeline.ModelRoute{
+				Kind:         modelcatalog.KindCognitive,
+				Algorithm:    modelcatalog.AlgorithmSPM,
+				DecisionKind: modelcatalog.DecisionKindScoreRange,
 			},
 			family:   modelcatalog.AlgorithmFamilyTaskPerformance,
 			decision: modelcatalog.DecisionKindAbilityLevel,
 		},
 		{
 			name: "typology_mbti",
-			snapshot: modelcatalog.PublishedModelSnapshot{
-				Model: modelcatalog.ModelDefinition{
-					Kind:      modelcatalog.KindTypology,
-					SubKind:   modelcatalog.SubKindTypology,
-					Algorithm: modelcatalog.AlgorithmMBTI,
-				},
-				Decision: modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+			route: evalpipeline.ModelRoute{
+				Kind:         modelcatalog.KindTypology,
+				SubKind:      modelcatalog.SubKindTypology,
+				Algorithm:    modelcatalog.AlgorithmMBTI,
+				DecisionKind: modelcatalog.DecisionKindPoleComposition,
 			},
 			family:   modelcatalog.AlgorithmFamilyFactorClassification,
 			decision: modelcatalog.DecisionKindPoleComposition,
@@ -58,9 +52,9 @@ func TestExecutionRoutingFromSnapshotUsesKindPrimaryFamilies(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			key, err := evalpipeline.ExecutionRoutingFromSnapshot(tc.snapshot)
+			key, err := evalpipeline.ExecutionRoutingFromRoute(tc.route)
 			if err != nil {
-				t.Fatalf("ExecutionRoutingFromSnapshot: %v", err)
+				t.Fatalf("ExecutionRoutingFromRoute: %v", err)
 			}
 			if key.AlgorithmFamily != tc.family {
 				t.Fatalf("family=%s want=%s", key.AlgorithmFamily, tc.family)

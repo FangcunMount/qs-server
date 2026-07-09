@@ -1,0 +1,47 @@
+package publishedmodel
+
+import (
+	"encoding/json"
+	"fmt"
+
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+)
+
+func buildTypology(model *domain.AssessmentModel) (*port.AssessmentSnapshot, error) {
+	if !domain.IsTypologyKind(model.Kind) {
+		return nil, fmt.Errorf("model kind %s is not typology", model.Kind)
+	}
+	if model.SubKind != domain.SubKindTypology {
+		return nil, fmt.Errorf("typology model sub_kind %s is not typology", model.SubKind)
+	}
+	if model.Definition.IsEmpty() {
+		return nil, fmt.Errorf("typology model definition is empty")
+	}
+	payload, runtime, err := typology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
+	if err != nil {
+		return nil, err
+	}
+	prepareTypologyPayload(payload, model, runtime)
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal typology payload: %w", err)
+	}
+	decisionKind := runtime.Decision.Kind
+	if decisionKind == "" {
+		return nil, fmt.Errorf("runtime decision.kind is required for publish")
+	}
+	return recordFromModel(model, domain.KindTypology, domain.SubKindTypology, model.Algorithm, domain.PayloadFormatPersonalityTypologyV1, decisionKind, encoded), nil
+}
+
+func prepareTypologyPayload(payload *typology.Payload, model *domain.AssessmentModel, runtime *typology.RuntimeSpec) {
+	payload.Code = model.Code
+	payload.Version = modelVersionString(model)
+	payload.Title = model.Title
+	payload.QuestionnaireCode = model.Binding.QuestionnaireCode
+	payload.QuestionnaireVersion = model.Binding.QuestionnaireVersion
+	payload.Status = string(domain.ModelStatusPublished)
+	payload.Algorithm = model.Algorithm
+	payload.Runtime = runtime
+}
