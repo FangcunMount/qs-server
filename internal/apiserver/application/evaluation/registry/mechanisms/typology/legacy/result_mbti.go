@@ -1,7 +1,7 @@
 package legacy
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 type MBTIDimensionResult struct {

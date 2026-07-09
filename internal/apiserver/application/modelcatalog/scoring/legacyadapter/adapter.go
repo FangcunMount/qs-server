@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

@@ -3,7 +3,7 @@ package ruleset
 import (
 	"context"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // ScaleBindingSource 从量表仓储解析已发布 scale 绑定（静态 catalog 回退）。

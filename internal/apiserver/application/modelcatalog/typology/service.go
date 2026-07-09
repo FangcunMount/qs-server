@@ -11,8 +11,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )

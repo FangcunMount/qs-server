@@ -2,7 +2,7 @@ package typology
 
 import (
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func personalityTypeTemplateForSpec(spec modeltypology.ReportSpec) reporttypology.PersonalityTypeReportTemplate {

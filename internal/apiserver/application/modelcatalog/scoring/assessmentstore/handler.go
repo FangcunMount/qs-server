@@ -8,7 +8,7 @@ import (
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // DefinitionHandler owns medical-scale definition validation and publish shaping.

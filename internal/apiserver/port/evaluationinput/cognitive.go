@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 const EvaluationModelKindCognitive EvaluationModelKind = "cognitive"

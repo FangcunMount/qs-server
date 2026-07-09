@@ -6,8 +6,8 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func SummaryFromPublishedModel(model *port.PublishedModel) (TypologyModelSummaryResult, error) {

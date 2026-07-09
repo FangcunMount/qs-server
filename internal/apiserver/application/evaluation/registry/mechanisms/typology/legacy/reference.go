@@ -2,7 +2,7 @@ package legacy
 
 import (
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // ScoreMBTIReference exposes the legacy MBTI scorer baseline for equivalence and characterization tests.

@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 const EvaluationModelKindBehavioralRating EvaluationModelKind = "behavioral_rating"

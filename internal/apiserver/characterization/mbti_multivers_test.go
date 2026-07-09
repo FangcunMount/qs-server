@@ -6,8 +6,8 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // V1 contract: MBTI_16 and MBTI_32 share AlgorithmMBTI and pole_composition;

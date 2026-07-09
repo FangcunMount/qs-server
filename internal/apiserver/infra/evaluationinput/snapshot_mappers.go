@@ -2,10 +2,10 @@ package evaluationinput
 
 import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // MedicalScaleToSnapshot 将领域量表映射为评估输入快照（供规则同步与执行链路复用）。

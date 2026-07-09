@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {

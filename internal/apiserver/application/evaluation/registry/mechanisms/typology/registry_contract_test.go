@@ -12,8 +12,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

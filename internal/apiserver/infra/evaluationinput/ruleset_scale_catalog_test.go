@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 type stubScalePublishedReader struct {

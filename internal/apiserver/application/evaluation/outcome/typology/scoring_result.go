@@ -2,7 +2,7 @@ package typology
 
 import (
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // ScoringResult 是领域-本地 output of 人格模型适配器。

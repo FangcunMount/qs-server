@@ -5,8 +5,8 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // DecodeBehavioralRatingFromPublished is the single infra entry for behavioral_rating snapshot decode.

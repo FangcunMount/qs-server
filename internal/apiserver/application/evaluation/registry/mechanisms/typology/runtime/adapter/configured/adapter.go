@@ -7,7 +7,7 @@ import (
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // Adapter implements ModelAdapter 通过 配置化人格评估器。

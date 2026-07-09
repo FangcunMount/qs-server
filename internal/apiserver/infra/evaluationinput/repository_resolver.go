@@ -9,12 +9,12 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

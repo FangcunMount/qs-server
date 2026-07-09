@@ -4,9 +4,9 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // scoreQueryService 得分查询服务实现

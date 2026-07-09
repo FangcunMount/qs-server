@@ -6,7 +6,7 @@ import (
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func TestOutcomeAdapterRegistryRejectsUnknownAdapter(t *testing.T) {

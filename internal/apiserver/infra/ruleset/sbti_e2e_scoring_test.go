@@ -5,7 +5,7 @@ import (
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {

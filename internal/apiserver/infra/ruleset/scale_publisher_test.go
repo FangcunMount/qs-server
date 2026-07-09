@@ -10,9 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

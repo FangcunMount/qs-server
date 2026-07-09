@@ -5,7 +5,7 @@ import (
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 type outcomeAdapterFunc func(assessment.EvaluationModelRef, outcometypology.ScoringResult) (*assessment.AssessmentOutcome, error)

@@ -12,10 +12,10 @@ import (
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

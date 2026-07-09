@@ -3,8 +3,8 @@ package scoring
 import (
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

@@ -7,7 +7,7 @@ import (
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	calcspecialrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // Evaluator 计算类型学载荷 通过 配置化运行时 pipeline。

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // Deprecated: 改用 mbti adapter 的 Score，并通过 profile.ScoreGraph 执行；这里只为表征等价测试保留。

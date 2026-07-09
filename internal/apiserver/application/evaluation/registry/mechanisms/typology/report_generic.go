@@ -4,7 +4,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func buildPersonalityTypeReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {

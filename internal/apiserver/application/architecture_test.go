@@ -29,6 +29,41 @@ func TestApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 	})
 }
 
+func TestRuntimeDTOImportsUseModelCatalogPayloadPort(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot": "port/modelcatalog/payload/scale",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology":         "port/modelcatalog/payload/typology",
+	}
+	allowedRelPrefixes := []string{
+		"internal/apiserver/port/modelcatalog/payload/scale/",
+		"internal/apiserver/port/modelcatalog/payload/typology/",
+	}
+	for _, relRoot := range []string{
+		"internal/apiserver/application",
+		"internal/apiserver/infra",
+		"internal/apiserver/port",
+		"internal/apiserver/container",
+		"internal/apiserver/characterization",
+	} {
+		scanGoImports(t, filepath.Join(root, filepath.FromSlash(relRoot)), func(path, importPath string) {
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			for _, allowed := range allowedRelPrefixes {
+				if strings.HasPrefix(rel, allowed) {
+					return
+				}
+			}
+			for forbidden, replacement := range forbiddenImports {
+				if strings.HasPrefix(importPath, forbidden) {
+					t.Fatalf("%s imports %s; runtime DTO callers must use %s", rel, importPath, replacement)
+				}
+			}
+		})
+	}
+}
+
 func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testing.T) {
 	t.Parallel()
 
@@ -435,6 +470,7 @@ func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
 		"internal/apiserver/domain/modelcatalog/scoring/snapshot/",
 		"internal/apiserver/application/modelcatalog/norming/",
 		"internal/apiserver/application/evaluation/calculationadapter/",
+		"internal/apiserver/port/modelcatalog/payload/",
 	}
 	forbiddenTokens := []string{
 		"factor.LegacyFactor",
@@ -583,8 +619,8 @@ func isEvaluationRulesetPayloadImport(importPath string) bool {
 		return true
 	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot",
 	} {

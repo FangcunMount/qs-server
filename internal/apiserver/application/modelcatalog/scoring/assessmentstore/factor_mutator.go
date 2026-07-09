@@ -3,7 +3,7 @@ package assessmentstore
 import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // AddFactorSnapshot adds a validated factor to the scale definition envelope.

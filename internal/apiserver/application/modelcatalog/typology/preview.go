@@ -8,9 +8,9 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 )
 

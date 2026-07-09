@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	rulesetv1 "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/v1envelope"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func EncodeSBTI(model *typology.SBTILegacyModel) ([]byte, string, error) {

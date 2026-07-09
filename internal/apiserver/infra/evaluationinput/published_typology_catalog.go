@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // PublishedTypologyCatalog loads personality typology payloads from v2 published-model snapshots.

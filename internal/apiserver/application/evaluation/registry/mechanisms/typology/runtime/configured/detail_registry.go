@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // DetailInput 携带scored 状态 required 到 assemble typed 明细载荷。

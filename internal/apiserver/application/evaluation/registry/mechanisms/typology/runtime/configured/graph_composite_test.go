@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {

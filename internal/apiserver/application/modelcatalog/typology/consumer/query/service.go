@@ -5,8 +5,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // TypologyModelQueryService 暴露 C 端 typology 模型目录 reads。

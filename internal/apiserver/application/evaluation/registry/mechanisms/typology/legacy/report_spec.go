@@ -2,7 +2,7 @@ package legacy
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // ReportBuildContextFromAlgorithm resolves legacy report context when published payload has no runtime spec.

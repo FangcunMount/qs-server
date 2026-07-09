@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 type EvaluationModelKind string

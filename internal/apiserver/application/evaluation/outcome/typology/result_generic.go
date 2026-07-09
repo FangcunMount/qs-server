@@ -1,6 +1,6 @@
 package typology
 
-import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 
 // PersonalityDimensionResult 是model-中性 scored 因子 shown in 人格类型结果。
 type PersonalityDimensionResult struct {

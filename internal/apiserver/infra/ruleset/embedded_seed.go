@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 //go:embed seed/mbti_oejts.json

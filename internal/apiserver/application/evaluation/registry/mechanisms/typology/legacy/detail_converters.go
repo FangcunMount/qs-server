@@ -2,7 +2,7 @@ package legacy
 
 import (
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // MBTIResultDetailFromPersonalityType 投影通用人格类型明细 为 旧 MBTI 结构。
