@@ -64,6 +64,21 @@ func TestRuntimeDTOImportsUseModelCatalogPayloadPort(t *testing.T) {
 	}
 }
 
+func TestScalePayloadPortOwnsImplementation(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "port", "modelcatalog", "payload", "scale"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		if strings.HasPrefix(importPath, forbidden) {
+			t.Fatalf("%s imports %s; scale payload port must own the implementation", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		}
+	})
+}
+
 func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testing.T) {
 	t.Parallel()
 

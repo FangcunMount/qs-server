@@ -1,64 +1,97 @@
-// Package scale owns the runtime/published JSON DTO for scale-like execution.
 package scale
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"encoding/json"
+	"fmt"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	oldscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 )
 
-type (
-	ScaleSnapshot         = oldscale.ScaleSnapshot
-	FactorSnapshot        = oldscale.FactorSnapshot
-	ScoringParamsSnapshot = oldscale.ScoringParamsSnapshot
-	InterpretRuleSnapshot = oldscale.InterpretRuleSnapshot
-	ExecutionEnvelope     = oldscale.ExecutionEnvelope
-)
-
+// ParsePublishedPayload decodes a published scale payload envelope.
 func ParsePublishedPayload(payload []byte) (*ScaleSnapshot, error) {
-	return oldscale.ParsePublishedPayload(payload)
+	var model ScaleSnapshot
+	if err := json.Unmarshal(payload, &model); err != nil {
+		return nil, fmt.Errorf("decode scale payload: %w", err)
+	}
+	return &model, nil
 }
 
-func InterpretRuleFromScoreRange(r factor.ScoreRangeRule) InterpretRuleSnapshot {
-	return oldscale.InterpretRuleFromScoreRange(r)
+// ScaleSnapshot 已发布量表规则集 载荷（ruleset.scale.v1）。
+type ScaleSnapshot struct {
+	ID                   uint64
+	Code                 string
+	ScaleVersion         string
+	Title                string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Status               string
+	Factors              []FactorSnapshot
 }
 
-func ScoreRangeFromInterpretRule(rule InterpretRuleSnapshot) factor.ScoreRangeRule {
-	return oldscale.ScoreRangeFromInterpretRule(rule)
+func (s *ScaleSnapshot) IsPublished() bool {
+	return s != nil && s.Status == "published"
 }
 
-func FactorFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
-	return oldscale.FactorFromCanonical(f)
+func (s *ScaleSnapshot) FindFactor(code string) (*FactorSnapshot, bool) {
+	if s == nil {
+		return nil, false
+	}
+	for i := range s.Factors {
+		if s.Factors[i].Code == code {
+			return &s.Factors[i], true
+		}
+	}
+	return nil, false
 }
 
-func FactorFromLegacyFactor(f factor.LegacyFactor) FactorSnapshot {
-	return oldscale.FactorFromLegacyFactor(f)
+// CanonicalFactors 投影scale execution 因子 为 规范 目录 form。
+func (s *ScaleSnapshot) CanonicalFactors() []factor.FactorSnapshot {
+	if s == nil {
+		return nil
+	}
+	out := make([]factor.FactorSnapshot, 0, len(s.Factors))
+	for _, item := range s.Factors {
+		out = append(out, item.Canonical())
+	}
+	return out
 }
 
-func FactorSnapshotFromCanonical(f factor.FactorSnapshot) FactorSnapshot {
-	return oldscale.FactorSnapshotFromCanonical(f)
+type FactorSnapshot struct {
+	Code            string
+	Title           string
+	IsTotalScore    bool
+	QuestionCodes   []string
+	ScoringStrategy string
+	ScoringParams   ScoringParamsSnapshot
+	MaxScore        *float64
+	InterpretRules  []InterpretRuleSnapshot
 }
 
-func FactorsFromCanonical(factors []factor.FactorSnapshot) []FactorSnapshot {
-	return oldscale.FactorsFromCanonical(factors)
+func (f FactorSnapshot) QuestionCount() int {
+	return len(f.QuestionCodes)
 }
 
-func FactorsFromLegacy(factors []factor.LegacyFactor) []FactorSnapshot {
-	return oldscale.FactorsFromLegacy(factors)
+func (f FactorSnapshot) FindInterpretRule(score float64) *InterpretRuleSnapshot {
+	for i := range f.InterpretRules {
+		if f.InterpretRules[i].Matches(score) {
+			return &f.InterpretRules[i]
+		}
+	}
+	return nil
 }
 
-func BuildFromLegacyFactors(env ExecutionEnvelope, factors []factor.LegacyFactor) *ScaleSnapshot {
-	return oldscale.BuildFromLegacyFactors(env, factors)
+type ScoringParamsSnapshot struct {
+	CntOptionContents []string
 }
 
-func BuildFromCanonicalFactors(env ExecutionEnvelope, factors []factor.FactorSnapshot) *ScaleSnapshot {
-	return oldscale.BuildFromCanonicalFactors(env, factors)
+type InterpretRuleSnapshot struct {
+	Min        float64
+	Max        float64
+	RiskLevel  string
+	Conclusion string
+	Suggestion string
 }
 
-func DefinitionFromScaleSnapshot(snapshot *ScaleSnapshot) *definition.Definition {
-	return oldscale.DefinitionFromScaleSnapshot(snapshot)
-}
-
-func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definition) *ScaleSnapshot {
-	return oldscale.ScaleSnapshotFromDefinition(env, def)
+func (r InterpretRuleSnapshot) Matches(score float64) bool {
+	return score >= r.Min && score < r.Max
 }

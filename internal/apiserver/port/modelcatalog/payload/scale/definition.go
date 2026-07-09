@@ -1,4 +1,4 @@
-package snapshot
+package scale
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
