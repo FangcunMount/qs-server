@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -17,6 +18,7 @@ import (
 )
 
 type evaluationQueryService interface {
+	ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
 	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
 	GetFactorTrend(ctx context.Context, testeeID uint64, req *evaluation.GetFactorTrendRequest) ([]evaluation.TrendPointResponse, error)
 	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
@@ -50,6 +52,47 @@ func NewEvaluationHandler(
 		queryService:      queryService,
 		waitReportService: waitReportService,
 	}
+}
+
+// ListAssessments 查询医学量表测评列表。
+// @Summary 查询医学量表测评列表
+// @Description 返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。
+// @Tags 测评
+// @Produce json
+// @Param testee_id query int true "受试者ID"
+// @Param status query string false "测评状态"
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param scale_code query string false "量表编码"
+// @Param risk_level query string false "风险等级"
+// @Param date_from query string false "开始日期（YYYY-MM-DD）"
+// @Param date_to query string false "结束日期（YYYY-MM-DD）"
+// @Success 200 {object} core.Response{data=evaluation.ListAssessmentsResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 429 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/assessments [get]
+func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
+		return
+	}
+	if kind := strings.TrimSpace(strings.ToLower(c.Query("assessment_kind"))); kind != "" && kind != "medical" {
+		h.BadRequestResponse(c, "assessment_kind is not supported; use /api/v1/typology-assessments for personality assessments", nil)
+		return
+	}
+	var req evaluation.ListAssessmentsRequest
+	if err := h.BindQuery(c, &req); err != nil {
+		return
+	}
+	req.AssessmentKind = "medical"
+	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
+	if err != nil {
+		h.InternalErrorResponse(c, "list assessments failed", err)
+		return
+	}
+	h.Success(c, result)
 }
 
 // GetAssessmentScores 获取测评得分详情

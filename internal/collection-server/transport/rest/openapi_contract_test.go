@@ -18,6 +18,7 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	assertOpenAPIOperation(t, spec, "/answersheets", "post")
 	assertOpenAPIOperation(t, spec, "/answersheets/submit-status", "get")
+	assertOpenAPIOperation(t, spec, "/assessments", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
@@ -50,7 +51,6 @@ func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
-		"/assessments",
 		"/assessments/{id}",
 		"/assessments/{id}/report",
 		"/answersheets/{id}/assessment",
@@ -142,6 +142,33 @@ func TestCollectionOpenAPIHasNoLegacyPersonalitySessionSchemas(t *testing.T) {
 		if strings.Contains(name, "personalitysession.") {
 			t.Fatalf("legacy personality session schema still in OpenAPI: %s", name)
 		}
+	}
+}
+
+func TestCollectionRESTRegistersMedicalAssessmentListRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	c := container.NewContainer(
+		options.NewOptions(),
+		nil,
+		nil,
+		observability.NewFamilyStatusRegistry("collection-server"),
+	)
+	if err := c.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+
+	router := gin.New()
+	NewRouter(c).RegisterRoutes(router)
+	found := false
+	for _, route := range router.Routes() {
+		if route.Method == "GET" && route.Path == "/api/v1/assessments" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("GET /api/v1/assessments route not registered")
 	}
 }
 

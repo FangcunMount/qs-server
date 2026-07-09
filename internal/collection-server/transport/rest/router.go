@@ -378,6 +378,17 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/assessments")
 	{
+		// 医学量表测评列表（放在 :id 前面避免路由冲突）
+		assessments.GET("", r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.ListAssessments,
+		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
 		assessments.GET("/trend", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),

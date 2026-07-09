@@ -282,6 +282,21 @@ definitions:
       suggestion:
         type: string
     type: object
+  evaluation.ListAssessmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   evaluation.ModelExtraResponse:
     properties:
       commentary:
@@ -1381,6 +1396,74 @@ paths:
       summary: 查询提交状态
       tags:
       - 答卷
+  /api/v1/assessments:
+    get:
+      description: 返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。
+      parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - description: 测评状态
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 量表编码
+        in: query
+        name: scale_code
+        type: string
+      - description: 风险等级
+        in: query
+        name: risk_level
+        type: string
+      - description: 开始日期（YYYY-MM-DD）
+        in: query
+        name: date_from
+        type: string
+      - description: 结束日期（YYYY-MM-DD）
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.ListAssessmentsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 查询医学量表测评列表
+      tags:
+      - 测评
   /api/v1/assessments/{id}/factors/high-risk:
     get:
       description: 获取指定测评的高风险因子列表

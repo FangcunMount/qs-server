@@ -68,7 +68,6 @@ func TestCollectionOpenAPIHasNoK6RemovedLegacyPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
 		"/answersheets/{id}/assessment",
-		"/assessments",
 		"/personality-models",
 		"/personality-assessment-sessions",
 		"/personality-assessments",

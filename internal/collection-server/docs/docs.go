@@ -230,6 +230,114 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessments": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评"
+                ],
+                "summary": "查询医学量表测评列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "量表编码",
+                        "name": "scale_code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "风险等级",
+                        "name": "risk_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "开始日期（YYYY-MM-DD）",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "结束日期（YYYY-MM-DD）",
+                        "name": "date_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.ListAssessmentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessments/trend": {
             "get": {
                 "security": [
@@ -2468,6 +2576,29 @@ const docTemplate = `{
                 },
                 "suggestion": {
                     "type": "string"
+                }
+            }
+        },
+        "evaluation.ListAssessmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
                 }
             }
         },
