@@ -42,8 +42,12 @@ type BindQuestionnaireInput struct {
 	QuestionnaireVersion string
 }
 
+// DefinitionInput is the behavioral authoring command contract. API gateways
+// import legacy payloads before invoking the command.
 type DefinitionInput struct {
-	Payload json.RawMessage
+	Payload      json.RawMessage
+	DefinitionV2 *domain.Definition
+	Norms        []*domain.Norm
 }
 
 type ModelSummary struct {

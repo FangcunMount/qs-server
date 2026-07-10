@@ -5,6 +5,7 @@ import (
 
 	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 type normingKindGateway struct {
@@ -146,7 +147,15 @@ func (g normingKindGateway) updateDefinition(ctx context.Context, modelCode stri
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateDefinition(ctx, modelCode, appNorming.DefinitionInput{Payload: dto.Payload})
+	materialized, err := behavioralpayload.ImportLegacyDefinition(dto.Payload)
+	if err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
+	result, err := cmd.UpdateDefinition(ctx, modelCode, appNorming.DefinitionInput{
+		Payload:      dto.Payload,
+		DefinitionV2: materialized.Definition,
+		Norms:        materialized.Norms,
+	})
 	if err != nil {
 		return nil, err
 	}

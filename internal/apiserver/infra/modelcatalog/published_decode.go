@@ -11,36 +11,6 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// DecodeBehavioralRatingFromPublished is the single infra entry for behavioral_rating snapshot decode.
-func DecodeBehavioralRatingFromPublished(model *port.PublishedModel) (*behavioralsnapshot.Snapshot, error) {
-	if model == nil {
-		return nil, domain.ErrNotFound
-	}
-	if model.Kind != domain.KindBehavioralRating {
-		return nil, fmt.Errorf("published model kind = %q, want behavioral_rating", model.Kind)
-	}
-	if !domain.IsBehavioralRatingPayloadFormat(model.PayloadFormat) {
-		return nil, fmt.Errorf("unsupported behavioral_rating payload format: %s", model.PayloadFormat)
-	}
-	payload, err := behavioralsnapshot.ParsePublishedPayload(
-		model.PayloadFormat,
-		model.Code,
-		model.Version,
-		model.Title,
-		model.Status,
-		model.Payload,
-	)
-	if err != nil {
-		return nil, err
-	}
-	payload.QuestionnaireCode = model.QuestionnaireCode
-	payload.QuestionnaireVersion = model.QuestionnaireVersion
-	if !payload.IsPublished() {
-		return nil, fmt.Errorf("behavioral_rating model is not published: %s", payload.Code)
-	}
-	return payload, nil
-}
-
 // DecodeBehavioralRatingFromDefinition builds a behavioral execution snapshot from DefinitionV2.
 func DecodeBehavioralRatingFromDefinition(model *port.PublishedModel, tables map[string]*norm.Norm) (*behavioralsnapshot.Snapshot, error) {
 	if model == nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-func TestApplyBrief2CompositeMetadata(t *testing.T) {
+func TestLegacyImportAppliesBrief2CompositeMetadata(t *testing.T) {
 	t.Parallel()
 
 	measure := applyBrief2CompositeMetadata(definition.MeasureSpec{
@@ -34,7 +34,7 @@ func TestApplyBrief2CompositeMetadata(t *testing.T) {
 	}
 }
 
-func TestApplyBrief2NormMetadata(t *testing.T) {
+func TestLegacyImportAppliesBrief2NormMetadata(t *testing.T) {
 	t.Parallel()
 
 	measure, calibration := applyBrief2NormMetadata(definition.MeasureSpec{
@@ -56,7 +56,7 @@ func TestApplyBrief2NormMetadata(t *testing.T) {
 	}
 }
 
-func TestBrief2NormRefsFromMetadata(t *testing.T) {
+func TestLegacyImportBuildsBrief2NormRefs(t *testing.T) {
 	t.Parallel()
 
 	refs := brief2NormRefsFromMetadata(brief2MetadataContext{

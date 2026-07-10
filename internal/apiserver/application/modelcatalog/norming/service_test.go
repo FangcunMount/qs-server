@@ -55,6 +55,19 @@ type memoryNormRepo struct {
 	tables map[string]*norm.Norm
 }
 
+func legacyDefinitionInput(t *testing.T, payload []byte) norming.DefinitionInput {
+	t.Helper()
+	materialized, err := behavioralsnapshot.ImportLegacyDefinition(payload)
+	if err != nil {
+		t.Fatalf("ImportLegacyDefinition: %v", err)
+	}
+	return norming.DefinitionInput{
+		Payload:      append([]byte(nil), payload...),
+		DefinitionV2: materialized.Definition,
+		Norms:        materialized.Norms,
+	}
+}
+
 func (r *memoryNormRepo) UpsertNorm(_ context.Context, table *norm.Norm) error {
 	if r.tables == nil {
 		r.tables = map[string]*norm.Norm{}
@@ -148,7 +161,7 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 			"validity_codes": ["inconsistency", "negativity"]
 		}
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, legacyDefinitionInput(t, definition)); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 	if _, err := svc.BindQuestionnaire(context.Background(), norming.BindQuestionnaireInput{
@@ -227,7 +240,7 @@ func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
 			"norms": [{"factor_code": "gec"}]
 		}
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, legacyDefinitionInput(t, definition)); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
@@ -273,7 +286,7 @@ func TestUpdateDefinitionRejectsInvalidFactorHierarchy(t *testing.T) {
 			"parent_code": "gec"
 		}]
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err == nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, legacyDefinitionInput(t, definition)); err == nil {
 		t.Fatal("UpdateDefinition() should reject invalid factor hierarchy")
 	}
 }

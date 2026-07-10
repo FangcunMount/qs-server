@@ -86,6 +86,10 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if draftPayload.Algorithm == "" {
 		t.Fatal("fixture algorithm is required")
 	}
+	materialized, err := modeltypology.MaterializeDefinition(payloadData, draftPayload.Algorithm)
+	if err != nil {
+		t.Fatalf("MaterializeDefinition: %v", err)
+	}
 
 	model, err := domainmodel.NewAssessmentModel(domainmodel.NewAssessmentModelInput{
 		Code:      tc.code,
@@ -103,11 +107,11 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	}, model.CreatedAt); err != nil {
 		t.Fatalf("BindQuestionnaire: %v", err)
 	}
-	if err := model.UpdateDefinition(domainmodel.DefinitionPayload{
+	if err := model.UpdateDefinitionWithV2(domainmodel.DefinitionPayload{
 		Format: domainmodel.PayloadFormatPersonalityTypologyV1,
 		Data:   payloadData,
-	}, model.CreatedAt); err != nil {
-		t.Fatalf("UpdateDefinition: %v", err)
+	}, materialized.Definition, model.CreatedAt); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2: %v", err)
 	}
 	if err := model.MarkPublished(model.CreatedAt); err != nil {
 		t.Fatalf("MarkPublished: %v", err)

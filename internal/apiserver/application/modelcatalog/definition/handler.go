@@ -8,11 +8,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
 
-// SaveInput carries API-facing draft definition fields before family-specific
-// normalization.
+// SaveInput carries a wire payload and, when materialized by an outer adapter,
+// its canonical definition and referenced norm tables.
 type SaveInput struct {
 	PayloadFormat string
 	Payload       []byte
+	DefinitionV2  *domain.Definition
+	Norms         []*norm.Norm
 	Algorithm     string
 	SubKind       string
 }
@@ -41,8 +43,8 @@ type SnapshotBuildResult struct {
 
 // Handler owns family-specific definition validation and publication shaping.
 //
-// Workbench use cases should route DefinitionPayload through this interface
-// instead of switching on model family in each application service.
+// Family handlers validate canonical DefinitionV2 when supplied; legacy wire
+// import belongs at the owning API adapter boundary.
 type Handler interface {
 	Supports(identity domain.Identity) bool
 	PrepareForSave(ctx context.Context, model *domain.AssessmentModel, input SaveInput) (SaveResult, []domain.DomainValidationIssue, error)

@@ -471,6 +471,40 @@ func TestModelCatalogJSONAdaptersDoNotReturnToDomain(t *testing.T) {
 	}
 }
 
+func TestBehavioralLegacyImportStaysAtCatalogGateway(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowed := map[string]struct{}{
+		"internal/apiserver/application/modelcatalog/service_norming_gateway.go":   {},
+		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go": {},
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(string(data), "ImportLegacyDefinition") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if _, ok := allowed[rel]; !ok {
+			t.Fatalf("%s imports behavioral legacy definition semantics; only the behavioral legacy adapter and catalog API gateway may use it", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	t.Parallel()
 

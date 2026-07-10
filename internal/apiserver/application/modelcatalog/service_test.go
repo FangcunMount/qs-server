@@ -138,7 +138,8 @@ func (s *cognitiveCommandStub) Archive(context.Context, string) (*taskperformanc
 }
 
 type behavioralRatingCommandStub struct {
-	createCalled bool
+	createCalled        bool
+	lastDefinitionInput *norming.DefinitionInput
 }
 
 func (s *behavioralRatingCommandStub) List(context.Context, norming.ListInput) (*norming.ModelListResult, error) {
@@ -175,6 +176,7 @@ func (s *behavioralRatingCommandStub) GetDefinition(context.Context, string) (*n
 }
 
 func (s *behavioralRatingCommandStub) UpdateDefinition(_ context.Context, modelCode string, input norming.DefinitionInput) (*norming.DefinitionResult, error) {
+	s.lastDefinitionInput = &input
 	return &norming.DefinitionResult{PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1, Payload: input.Payload}, nil
 }
 
@@ -246,6 +248,41 @@ func TestCreatePersonalityUsesTypologyCommand(t *testing.T) {
 	}
 	if result.Kind != KindTypology {
 		t.Fatalf("result kind = %s, want %s", result.Kind, KindTypology)
+	}
+}
+
+func TestUpdateBehavioralDefinitionMaterializesLegacyPayloadAtGateway(t *testing.T) {
+	t.Parallel()
+
+	command := &behavioralRatingCommandStub{}
+	svc := NewService(Dependencies{NormingCommand: command})
+	payload := json.RawMessage(`{
+		"dimensions":[{"code":"gec","title":"GEC"}],
+		"brief2":{
+			"primary_dimension_code":"gec",
+			"norm_table_version":"2024",
+			"norms":[{"factor_code":"gec"}]
+		}
+	}`)
+	result, err := svc.UpdateDefinition(context.Background(), "behavioral_demo", DefinitionDTO{
+		Kind:    KindBehavioralRating,
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+	if result == nil || string(result.Payload) != string(payload) {
+		t.Fatalf("result payload = %q, want %q", result.Payload, payload)
+	}
+	input := command.lastDefinitionInput
+	if input == nil || input.DefinitionV2 == nil {
+		t.Fatalf("definition input = %#v", input)
+	}
+	if len(input.DefinitionV2.Measure.Factors) != 1 || input.DefinitionV2.Measure.Factors[0].Code != "gec" {
+		t.Fatalf("measure = %#v", input.DefinitionV2.Measure)
+	}
+	if len(input.Norms) != 1 || input.Norms[0].TableVersion != "2024" {
+		t.Fatalf("norms = %#v", input.Norms)
 	}
 }
 

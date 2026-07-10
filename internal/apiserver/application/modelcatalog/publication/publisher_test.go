@@ -25,8 +25,12 @@ func TestDefaultSnapshotBuilderKeepsCurrentPublishContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessmentModel: %v", err)
 	}
-	if err := model.UpdateDefinition(domain.DefinitionPayload{Data: []byte(`{"code":"PHQ9"}`)}, model.CreatedAt); err != nil {
-		t.Fatalf("UpdateDefinition: %v", err)
+	if err := model.UpdateDefinitionWithV2(
+		domain.DefinitionPayload{Data: []byte(`{"code":"PHQ9"}`)},
+		&domain.Definition{},
+		model.CreatedAt,
+	); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2: %v", err)
 	}
 
 	snapshot, err := publication.DefaultSnapshotBuilder(model)
