@@ -1,73 +1,10 @@
 package evaluationinput
 
 import (
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
-
-// MedicalScaleToSnapshot 将领域量表映射为评估输入快照（供规则同步与执行链路复用）。
-func MedicalScaleToSnapshot(m *scaledefinition.MedicalScale) *scalesnapshot.ScaleSnapshot {
-	return scaleToSnapshot(m)
-}
-
-func scaleToSnapshot(m *scaledefinition.MedicalScale) *scalesnapshot.ScaleSnapshot {
-	if m == nil {
-		return nil
-	}
-	domainSnapshots := m.FactorSnapshots()
-	factors := make([]scalesnapshot.FactorSnapshot, 0, len(domainSnapshots))
-	for _, snapshot := range domainSnapshots {
-		factors = append(factors, factorSnapshotToPort(snapshot))
-	}
-	return &scalesnapshot.ScaleSnapshot{
-		ID:                   m.GetID().Uint64(),
-		Code:                 m.GetCode().String(),
-		ScaleVersion:         m.GetScaleVersion(),
-		Title:                m.GetTitle(),
-		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
-		QuestionnaireVersion: m.GetQuestionnaireVersion(),
-		Status:               m.GetStatus().String(),
-		Factors:              factors,
-	}
-}
-
-// factorSnapshotToPort 将领域因子快照映射为评估输入端口的因子快照。
-// 输入是只读的 scaledefinition.FactorSnapshot，避免直接持有领域实体指针。
-func factorSnapshotToPort(snapshot scaledefinition.FactorSnapshot) scalesnapshot.FactorSnapshot {
-	questionCodes := make([]string, 0, len(snapshot.QuestionCodes))
-	for _, code := range snapshot.QuestionCodes {
-		questionCodes = append(questionCodes, code.String())
-	}
-	rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(snapshot.InterpretRules))
-	for _, rule := range snapshot.InterpretRules {
-		rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-			Min:        rule.GetScoreRange().Min(),
-			Max:        rule.GetScoreRange().Max(),
-			RiskLevel:  string(rule.GetRiskLevel()),
-			Conclusion: rule.GetConclusion(),
-			Suggestion: rule.GetSuggestion(),
-		})
-	}
-	cntContents := []string(nil)
-	if snapshot.ScoringParams != nil {
-		cntContents = append([]string(nil), snapshot.ScoringParams.GetCntOptionContents()...)
-	}
-	return scalesnapshot.FactorSnapshot{
-		Code:            snapshot.Code.String(),
-		Title:           snapshot.Title,
-		IsTotalScore:    snapshot.IsTotalScore,
-		QuestionCodes:   questionCodes,
-		ScoringStrategy: snapshot.ScoringStrategy.String(),
-		ScoringParams: scalesnapshot.ScoringParamsSnapshot{
-			CntOptionContents: cntContents,
-		},
-		MaxScore:       snapshot.MaxScore,
-		InterpretRules: rules,
-	}
-}
 
 func answerSheetToSnapshot(sheet *answersheet.AnswerSheet) *port.AnswerSheetSnapshot {
 	if sheet == nil {

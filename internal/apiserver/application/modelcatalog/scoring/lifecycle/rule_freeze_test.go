@@ -7,16 +7,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 func TestPublishedScaleFreezesRuleMutationsButAllowsDisplayUpdate(t *testing.T) {
 	t.Parallel()
 
-	published := newApplicationScaleForFreezeTest(t, scaledefinition.StatusPublished)
-	model := assessmentModelFromScale(t, published)
+	model := newApplicationScaleForFreezeTest(t, domain.ModelStatusPublished)
 	modelRepo := &authoringModelRepoStub{model: model}
 
 	factorSvc := factor.NewService(modelRepo, nil, &scaleEventPublisherStub{})
@@ -73,8 +70,7 @@ func TestQuestionnaireBindingSyncerSyncsDraftOnly(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			scale := newApplicationScaleForFreezeTest(t, scaledefinition.StatusDraft)
-			model := assessmentModelFromScale(t, scale)
+			model := newApplicationScaleForFreezeTest(t, domain.ModelStatusDraft)
 			model.Status = tc.status
 			modelRepo := &authoringModelRepoStub{model: model}
 			syncer := NewQuestionnaireBindingSyncer(modelRepo)
@@ -92,32 +88,17 @@ func TestQuestionnaireBindingSyncerSyncsDraftOnly(t *testing.T) {
 	}
 }
 
-func newApplicationScaleForFreezeTest(t *testing.T, status scaledefinition.Status) *scaledefinition.MedicalScale {
+func newApplicationScaleForFreezeTest(t *testing.T, status domain.ModelStatus) *domain.AssessmentModel {
 	t.Helper()
-
-	factorItem, err := scaledefinition.NewFactor(
-		scaledefinition.NewFactorCode("F1"),
-		"Factor 1",
-		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
-		}),
-	)
-	if err != nil {
-		t.Fatalf("NewFactor() error = %v", err)
-	}
-	item, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("S1"),
+	return newLifecycleScaleAssessmentModel(
+		t,
+		"S1",
 		"Scale 1",
-		scaledefinition.WithID(meta.FromUint64(101)),
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
-		scaledefinition.WithStatus(status),
-		scaledefinition.WithFactors([]*scaledefinition.Factor{factorItem}),
+		"Q1",
+		"1.0",
+		status,
+		lifecycleDefaultFactorSnapshots(),
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	return item
 }
 
 type scaleEventPublisherStub struct {

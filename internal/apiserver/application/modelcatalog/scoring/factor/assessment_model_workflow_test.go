@@ -9,10 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestAddFactorUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
@@ -69,38 +67,47 @@ func TestAddFactorForksPublishedAssessmentModelDraft(t *testing.T) {
 	if err := json.Unmarshal(model.Definition.Data, &snapshot); err != nil {
 		t.Fatalf("unmarshal definition payload: %v", err)
 	}
-	if snapshot.ScaleVersion != "1.0.1" || snapshot.Status != scaledefinition.StatusDraft.String() {
+	if snapshot.ScaleVersion != "1.0.1" || snapshot.Status != "draft" {
 		t.Fatalf("forked payload = version %q status %q, want 1.0.1 draft", snapshot.ScaleVersion, snapshot.Status)
 	}
 }
 
 func newDraftAssessmentModelForFactorTest(t *testing.T) *domain.AssessmentModel {
 	t.Helper()
-	f, err := scaledefinition.NewFactor(
-		scaledefinition.NewFactorCode("F1"),
-		"Factor 1",
-		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
-		}),
-	)
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	model, err := legacyadapter.AssessmentModelFromCreateDTO(shared.CreateScaleDTO{
+		Code:                 "SCL_FACTOR",
+		Title:                "Factor Scale",
+		QuestionnaireCode:    "Q1",
+		QuestionnaireVersion: "1.0",
+	}, now)
 	if err != nil {
-		t.Fatalf("NewFactor() error = %v", err)
+		t.Fatalf("AssessmentModelFromCreateDTO() error = %v", err)
 	}
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SCL_FACTOR"),
-		"Factor Scale",
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
-		scaledefinition.WithFactors([]*scaledefinition.Factor{f}),
-	)
+	snapshot := &scalesnapshot.ScaleSnapshot{
+		Code:                 model.Code,
+		ScaleVersion:         "1.0.0",
+		Title:                model.Title,
+		QuestionnaireCode:    model.Binding.QuestionnaireCode,
+		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Status:               string(model.Status),
+		Factors: []scalesnapshot.FactorSnapshot{{
+			Code:            "F1",
+			Title:           "Factor 1",
+			QuestionCodes:   []string{"Q1"},
+			ScoringStrategy: "sum",
+			InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
+				Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "watch",
+			}},
+		}},
+	}
+	payload, err := legacyadapter.DefinitionPayloadFromScaleSnapshot(snapshot)
 	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
+		t.Fatalf("DefinitionPayloadFromScaleSnapshot() error = %v", err)
 	}
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
+	if err := model.UpdateDefinitionWithV2(payload, scalesnapshot.DefinitionFromScaleSnapshot(snapshot), now); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2() error = %v", err)
 	}
-	model.Code = "SCL_FACTOR"
 	return model
 }
 

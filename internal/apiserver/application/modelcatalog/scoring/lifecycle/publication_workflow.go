@@ -11,8 +11,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code string) (*shared.ScaleResult, error) {
@@ -32,7 +32,7 @@ func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code stri
 	if err := assessmentstore.SyncScaleMetadataInModel(model); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
 	}
-	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusPublished.String()); err != nil {
+	if err := assessmentstore.SyncSnapshotStatus(model, "published"); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "发布量表失败")
 	}
 
@@ -45,7 +45,7 @@ func (s *lifecycleService) publishAssessmentModel(ctx context.Context, code stri
 		return nil, s.mapPublicationError(err)
 	}
 
-	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionPublished)
+	s.publishScaleChangedEvent(ctx, model, eventpayload.ScaleChangeActionPublished)
 	s.refreshListCache(ctx)
 	return assessmentstore.ScaleResult(model)
 }
@@ -66,7 +66,7 @@ func (s *lifecycleService) unpublishAssessmentModel(ctx context.Context, code st
 	if err := model.MarkUnpublished(now); err != nil {
 		return nil, shared.WrapAssessmentModelError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
-	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusDraft.String()); err != nil {
+	if err := assessmentstore.SyncSnapshotStatus(model, "draft"); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
 	if err := s.publishedRepo.DeletePublished(ctx, domain.KindScale, code); err != nil {
@@ -76,7 +76,7 @@ func (s *lifecycleService) unpublishAssessmentModel(ctx context.Context, code st
 		return nil, err
 	}
 
-	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionUnpublished)
+	s.publishScaleChangedEvent(ctx, model, eventpayload.ScaleChangeActionUnpublished)
 	s.refreshListCache(ctx)
 	s.notifyCacheChanged(ctx, code, "unpublish")
 	return assessmentstore.ScaleResult(model)
@@ -96,7 +96,7 @@ func (s *lifecycleService) archiveAssessmentModel(ctx context.Context, code stri
 	if err := model.MarkArchived(now); err != nil {
 		return nil, shared.WrapAssessmentModelError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
-	if err := assessmentstore.SyncSnapshotStatus(model, scaledefinition.StatusArchived.String()); err != nil {
+	if err := assessmentstore.SyncSnapshotStatus(model, "archived"); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
 	if wasPublished {
@@ -108,7 +108,7 @@ func (s *lifecycleService) archiveAssessmentModel(ctx context.Context, code stri
 		return nil, err
 	}
 
-	s.publishScaleChangedEvent(ctx, model, scaledefinition.ChangeActionArchived)
+	s.publishScaleChangedEvent(ctx, model, eventpayload.ScaleChangeActionArchived)
 	s.refreshListCache(ctx)
 	if wasPublished {
 		s.notifyCacheChanged(ctx, code, "archive")

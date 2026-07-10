@@ -42,7 +42,7 @@ func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 	}
 }
 
-func TestScaleReportInputUsesLegacyFactorScoresWithoutHierarchy(t *testing.T) {
+func TestScaleReportInputUsesFlatFactorScoresWithoutHierarchy(t *testing.T) {
 	t.Parallel()
 
 	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{

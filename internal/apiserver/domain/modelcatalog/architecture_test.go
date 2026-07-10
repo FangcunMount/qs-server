@@ -83,8 +83,8 @@ func isAllowedExportSubpackageRoot(sub string) bool {
 		sub = sub[:idx]
 	}
 	switch sub {
-	case "identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat", "legacy",
-		"scoring", "norming", "typology", "taskperformance", "binding":
+	case "identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat",
+		"norming", "taskperformance", "binding":
 		return true
 	default:
 		return false
@@ -96,8 +96,8 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 
 	root := modelCatalogRoot(t)
 	required := []string{
-		"identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat", "legacy",
-		"scoring", "norming", "typology", "taskperformance", "binding",
+		"identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat",
+		"norming", "taskperformance", "binding",
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -139,7 +139,6 @@ func TestTargetDomainPackagesDoNotDependOnPublishing(t *testing.T) {
 		"definition",
 		"factor",
 		"identity",
-		"legacy",
 		"norm",
 		"payloadformat",
 	}
@@ -231,11 +230,6 @@ func TestModelCatalogExportReExportsMechanismRoots(t *testing.T) {
 		"Identity",
 		"Definition",
 		"Conclusion",
-		"FactorSnapshot",
-		"TypologyPayload",
-		"ScaleSnapshot",
-		"RuntimeSpec",
-		"ReportSpec",
 	}
 	for _, symbol := range required {
 		if !strings.Contains(text, symbol) {

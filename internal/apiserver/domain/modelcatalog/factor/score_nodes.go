@@ -44,15 +44,6 @@ func CalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, 
 	return nodes
 }
 
-// CalculationScoreNodesFromLegacyFactors translates legacy flat factors to calculation score nodes.
-func CalculationScoreNodesFromLegacyFactors(factors []LegacyFactor) []calculation.ScoreNode {
-	return CalculationScoreNodesFromMeasureParts(
-		SlimFactorsFromLegacy(factors),
-		FactorGraphFromLegacy(factors),
-		ScoringFromLegacy(factors),
-	)
-}
-
 // ValidateCalculationScoreNodesFromMeasureParts validates the score graph derived from measure-layer parts.
 func ValidateCalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, scoring []Scoring) error {
 	nodes := CalculationScoreNodesFromMeasureParts(factors, graph, scoring)
@@ -65,15 +56,6 @@ func ValidateCalculationScoreNodesFromMeasureParts(factors []Factor, graph Facto
 		msgs = append(msgs, issue.Message)
 	}
 	return fmt.Errorf("invalid score node graph: %s", strings.Join(msgs, "; "))
-}
-
-// ValidateCalculationScoreNodesFromLegacyFactors validates the score graph derived from legacy flat factors.
-func ValidateCalculationScoreNodesFromLegacyFactors(factors []LegacyFactor) error {
-	return ValidateCalculationScoreNodesFromMeasureParts(
-		SlimFactorsFromLegacy(factors),
-		FactorGraphFromLegacy(factors),
-		ScoringFromLegacy(factors),
-	)
 }
 
 func scoringSourceCodes(sources []ScoringSource) []string {

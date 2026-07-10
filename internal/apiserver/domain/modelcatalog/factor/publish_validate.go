@@ -11,10 +11,12 @@ func ValidateDefinitionBodyForPublish(body DefinitionBody) []HierarchyIssue {
 			Message: "dimensions 不能为空",
 		}}
 	}
-	factors := DeriveFactorLevels(ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules))
-	issues := ValidateFactors(factors)
-	issues = append(issues, validateInterpretRuleRefs(body.InterpretRules, factors)...)
-	issues = append(issues, validateNormRefs(factors)...)
+	issues := ValidateMeasureSpecParts(
+		FactorsFromDefinitionDimensions(body.Dimensions),
+		FactorGraphFromDefinitionDimensions(body.Dimensions),
+		ScoringFromDefinitionDimensions(body.Dimensions),
+	)
+	issues = append(issues, validateInterpretRuleRefs(body.InterpretRules, body.Dimensions)...)
 	return issues
 }
 
@@ -27,11 +29,14 @@ func ValidateDefinitionBodyJSONForPublish(payload []byte) ([]HierarchyIssue, err
 	return ValidateDefinitionBodyForPublish(body), nil
 }
 
-func validateInterpretRuleRefs(rules []InterpretRule, factors []LegacyFactor) []HierarchyIssue {
+func validateInterpretRuleRefs(rules []InterpretRule, dimensions []DimensionRule) []HierarchyIssue {
 	if len(rules) == 0 {
 		return nil
 	}
-	byCode := IndexByLegacyFactorCode(factors)
+	byCode := make(map[string]struct{}, len(dimensions))
+	for _, dimension := range dimensions {
+		byCode[dimension.Code] = struct{}{}
+	}
 	issues := make([]HierarchyIssue, 0, len(rules))
 	for _, rule := range rules {
 		field := "interpret_rules"
@@ -51,29 +56,6 @@ func validateInterpretRuleRefs(rules []InterpretRule, factors []LegacyFactor) []
 				Field:   field + ".dimension_code",
 				Code:    "interpret_rules.dimension_code.not_found",
 				Message: fmt.Sprintf("interpret_rules 引用了不存在的维度 %s", rule.DimensionCode),
-			})
-		}
-	}
-	return issues
-}
-
-func validateNormRefs(factors []LegacyFactor) []HierarchyIssue {
-	byCode := IndexByLegacyFactorCode(factors)
-	issues := make([]HierarchyIssue, 0)
-	for _, factor := range factors {
-		if factor.Norm == nil {
-			continue
-		}
-		prefix := fmt.Sprintf("factors[%s].norm", factor.Code)
-		refCode := factor.Norm.FactorCode
-		if refCode == "" {
-			refCode = factor.Code
-		}
-		if _, ok := byCode[refCode]; !ok {
-			issues = append(issues, HierarchyIssue{
-				Field:   prefix + ".factor_code",
-				Code:    "factor.norm.factor_code.not_found",
-				Message: fmt.Sprintf("norm 引用了不存在的因子 %s", refCode),
 			})
 		}
 	}

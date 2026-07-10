@@ -3,32 +3,35 @@ package norming_test
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 )
 
-func TestApplyCompositeMetadataToLegacyFactors(t *testing.T) {
+func TestApplyCompositeMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := norming.ApplyCompositeMetadataToLegacyFactors([]factor.LegacyFactor{
-		{Code: "inhibit", Title: "Inhibit"},
-		{Code: "self_monitor", Title: "Self Monitor"},
-		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
-		{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
+	measure := norming.ApplyCompositeMetadata(definition.MeasureSpec{
+		Factors: []factor.Factor{
+			{Code: "inhibit", Title: "Inhibit"},
+			{Code: "self_monitor", Title: "Self Monitor"},
+			{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
+			{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
+		},
 	}, []norming.CompositeIndexSpec{
 		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
 		{Code: "gec", Strategy: factor.ChildrenAggregationSum, Children: []string{"bri"}},
 	})
 
-	byCode := factor.IndexByLegacyFactorCode(factors)
-	if byCode["inhibit"].ParentCode != "bri" {
-		t.Fatalf("inhibit parent = %q, want bri", byCode["inhibit"].ParentCode)
+	if measure.FactorGraph.ParentCode("inhibit") != "bri" {
+		t.Fatalf("inhibit parent = %q, want bri", measure.FactorGraph.ParentCode("inhibit"))
 	}
-	if byCode["bri"].ChildrenPolicy == nil || len(byCode["bri"].ChildrenPolicy.Children) != 2 {
-		t.Fatalf("bri children policy = %#v", byCode["bri"].ChildrenPolicy)
+	if len(measure.Scoring) != 2 || len(measure.Scoring[0].Sources) != 2 {
+		t.Fatalf("composite scoring = %#v", measure.Scoring)
 	}
-	if byCode["gec"].Level != 1 || byCode["bri"].Level != 2 || byCode["inhibit"].Level != 3 {
-		t.Fatalf("levels = gec:%d bri:%d inhibit:%d", byCode["gec"].Level, byCode["bri"].Level, byCode["inhibit"].Level)
+	levels := measure.FactorGraph.Levels()
+	if levels["gec"] != 1 || levels["bri"] != 2 || levels["inhibit"] != 3 {
+		t.Fatalf("levels = %#v", levels)
 	}
 }
 
@@ -50,27 +53,29 @@ func TestMeasureSpecWithCompositeMetadata(t *testing.T) {
 	}
 }
 
-func TestApplyNormMetadataToLegacyFactors(t *testing.T) {
+func TestApplyNormMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := norming.ApplyNormMetadataToLegacyFactors([]factor.LegacyFactor{
-		{Code: "bri"},
-		{Code: "inconsistency"},
-		{Code: "gec"},
+	measure, calibration := norming.ApplyNormMetadata(definition.MeasureSpec{
+		Factors: []factor.Factor{
+			{Code: "bri"},
+			{Code: "inconsistency"},
+			{Code: "gec"},
+		},
 	}, norming.MetadataContext{
 		NormTableVersion: "2024",
 		IndexCodes:       []string{"bri", "gec"},
 		ValidityCodes:    []string{"inconsistency"},
 		NormFactorCodes:  []string{"gec"},
 	})
-	if factors[0].ResolvedRole() != factor.FactorRoleIndex {
-		t.Fatalf("bri role = %s", factors[0].ResolvedRole())
+	if measure.Factors[0].ResolvedRole() != factor.FactorRoleIndex {
+		t.Fatalf("bri role = %s", measure.Factors[0].ResolvedRole())
 	}
-	if factors[1].ResolvedRole() != factor.FactorRoleValidity {
-		t.Fatalf("validity role = %s", factors[1].ResolvedRole())
+	if measure.Factors[1].ResolvedRole() != factor.FactorRoleValidity {
+		t.Fatalf("validity role = %s", measure.Factors[1].ResolvedRole())
 	}
-	if factors[2].Norm == nil || factors[2].Norm.NormTableVersion != "2024" {
-		t.Fatalf("gec norm = %#v", factors[2].Norm)
+	if len(calibration.NormRefs) != 1 || calibration.NormRefs[0].NormTableVersion != "2024" {
+		t.Fatalf("calibration = %#v", calibration)
 	}
 }
 

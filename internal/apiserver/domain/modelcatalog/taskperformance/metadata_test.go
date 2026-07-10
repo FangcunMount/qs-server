@@ -3,25 +3,28 @@ package taskperformance_test
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 )
 
-func TestApplyNormMetadataToLegacyFactors(t *testing.T) {
+func TestApplyNormMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := taskperformance.ApplyNormMetadataToLegacyFactors([]factor.LegacyFactor{
-		{Code: "A"},
-		{Code: "total", IsTotalScore: true},
+	measure, calibration := taskperformance.ApplyNormMetadata(definition.MeasureSpec{
+		Factors: []factor.Factor{
+			{Code: "A"},
+			{Code: "total", Role: factor.FactorRoleTotal},
+		},
 	}, taskperformance.MetadataContext{
 		NormTableVersion: "2024",
 		ItemSetCodes:     []string{"A"},
 	})
-	if factors[0].ResolvedRole() != factor.FactorRoleTaskSet {
-		t.Fatalf("task set role = %s", factors[0].ResolvedRole())
+	if measure.Factors[0].ResolvedRole() != factor.FactorRoleTaskSet {
+		t.Fatalf("task set role = %s", measure.Factors[0].ResolvedRole())
 	}
-	if factors[1].Norm == nil || factors[1].Norm.NormTableVersion != "2024" {
-		t.Fatalf("total norm = %#v", factors[1].Norm)
+	if len(calibration.NormRefs) != 2 || calibration.NormRefs[1].NormTableVersion != "2024" {
+		t.Fatalf("calibration = %#v", calibration)
 	}
 }
 

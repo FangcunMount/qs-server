@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 )
 
 func TestCreateUsesAssessmentModelRepository(t *testing.T) {
@@ -50,7 +49,7 @@ func TestCreateUsesAssessmentModelRepository(t *testing.T) {
 		t.Fatalf("created model audience metadata stages=%v ages=%v reporters=%v",
 			model.Stages, model.ApplicableAges, model.Reporters)
 	}
-	if got == nil || got.Code != "SCL_CREATE" || got.Title != "Create Scale" || got.Status != scaledefinition.StatusDraft.String() {
+	if got == nil || got.Code != "SCL_CREATE" || got.Title != "Create Scale" || got.Status != "draft" {
 		t.Fatalf("result = %#v, want created draft scale", got)
 	}
 }

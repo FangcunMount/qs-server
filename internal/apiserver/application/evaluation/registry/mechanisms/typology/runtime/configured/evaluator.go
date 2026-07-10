@@ -42,8 +42,10 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.Answer
 		return outcometypology.ScoringResult{}, err
 	}
 	adapterKey := spec.OutcomeMapping.ResolvedDetailAdapterKey(spec.Decision.Kind)
+	specialRules := specialRulesForCalculation(spec.SpecialRules)
+	specialOutcomes := specialRuleOutcomes(payload)
 
-	if match, ok := e.rules.ApplyBeforeScore(spec.SpecialRules, payload, classificationAnswers(sheet)); ok {
+	if match, ok := e.rules.ApplyBeforeScore(specialRules, specialOutcomes, classificationAnswers(sheet)); ok {
 		return e.assembleResult(payload, spec, calcclassification.ProfileVector{}, calcclassification.DecisionSpec{}, calcclassification.OutcomeCandidate{}, SelectedOutcome{
 			Code:       match.OutcomeCode,
 			Similarity: 1,
@@ -73,7 +75,7 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.Answer
 		Similarity: candidate.MatchScore,
 	}
 	var specialMatch *outcometypology.ScoringSpecialMatch
-	if match, ok := e.rules.ApplyAfterDecision(spec.SpecialRules, spec.Decision, payload, candidate.MatchScore); ok {
+	if match, ok := e.rules.ApplyAfterDecision(specialRules, specialRuleDecision(spec.Decision), specialOutcomes, candidate.MatchScore); ok {
 		selected.Code = match.OutcomeCode
 		selected.Trigger = match.Trigger
 		specialMatch = &outcometypology.ScoringSpecialMatch{
@@ -83,6 +85,49 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.Answer
 	}
 
 	return e.assembleResult(payload, spec, vector, decision, candidate, selected, specialMatch, adapterKey)
+}
+
+func specialRulesForCalculation(rules []modeltypology.SpecialRuleSpec) []calcspecialrule.Rule {
+	if len(rules) == 0 {
+		return nil
+	}
+	converted := make([]calcspecialrule.Rule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, calcspecialrule.Rule{
+			Code:        rule.Code,
+			Kind:        calcspecialrule.RuleKind(rule.Kind),
+			Phase:       calcspecialrule.RulePhase(rule.Phase),
+			OutcomeCode: rule.OutcomeCode,
+			Condition: calcspecialrule.Condition{
+				QuestionCodes: append([]string(nil), rule.Condition.QuestionCodes...),
+				OptionValues:  append([]string(nil), rule.Condition.OptionValues...),
+			},
+			QuestionCodes: append([]string(nil), rule.QuestionCodes...),
+			OptionValues:  append([]string(nil), rule.OptionValues...),
+		})
+	}
+	return converted
+}
+
+func specialRuleDecision(decision modeltypology.PersonalityDecisionSpec) calcspecialrule.Decision {
+	return calcspecialrule.Decision{
+		FallbackSimilarityThreshold: decision.FallbackSimilarityThreshold,
+		FallbackCode:                decision.FallbackCode,
+	}
+}
+
+func specialRuleOutcomes(payload *modeltypology.Payload) []calcspecialrule.Outcome {
+	if payload == nil || len(payload.Outcomes) == 0 {
+		return nil
+	}
+	outcomes := make([]calcspecialrule.Outcome, 0, len(payload.Outcomes))
+	for _, outcome := range payload.Outcomes {
+		outcomes = append(outcomes, calcspecialrule.Outcome{
+			Code:    outcome.Code,
+			Trigger: outcome.Trigger,
+		})
+	}
+	return outcomes
 }
 
 func (e Evaluator) assembleResult(

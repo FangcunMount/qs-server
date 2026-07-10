@@ -13,8 +13,6 @@ import (
 	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 	normpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	payloadformatpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/payloadformat"
-	scoringsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
-	typologypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 type (
@@ -39,29 +37,13 @@ type (
 
 	// Mechanism re-exports (factor).
 	Factor                      = factorpkg.Factor
-	FactorSnapshot              = factorpkg.FactorSnapshot
 	FactorGraph                 = factorpkg.FactorGraph
-	DefinitionBody              = factorpkg.DefinitionBody
 	FactorRole                  = factorpkg.FactorRole
 	Scoring                     = factorpkg.Scoring
 	ScoringStrategy             = factorpkg.ScoringStrategy
 	ScoringParams               = factorpkg.ScoringParams
 	ChildrenPolicy              = factorpkg.ChildrenPolicy
 	ChildrenAggregationStrategy = factorpkg.ChildrenAggregationStrategy
-	InterpretRule               = factorpkg.InterpretRule
-	HierarchyIssue              = factorpkg.HierarchyIssue
-
-	// Mechanism re-exports (typology).
-	TypologyPayload = typologypkg.Payload
-	RuntimeSpec     = typologypkg.RuntimeSpec
-	ReportSpec      = typologypkg.ReportSpec
-	FactorGraphSpec = typologypkg.FactorGraphSpec
-	FactorSpec      = typologypkg.FactorSpec
-
-	// Mechanism re-exports (scoring snapshot).
-	ScaleSnapshot         = scoringsnapshot.ScaleSnapshot
-	ScaleFactorSnapshot   = scoringsnapshot.FactorSnapshot
-	InterpretRuleSnapshot = scoringsnapshot.InterpretRuleSnapshot
 
 	AssessmentModel         = assessmentmodelpkg.AssessmentModel
 	NewAssessmentModelInput = assessmentmodelpkg.NewInput
@@ -229,9 +211,4 @@ var (
 
 	NewAssessmentModel = assessmentmodelpkg.New
 	ParseModelStatus   = assessmentmodelpkg.ParseStatus
-
-	ParseDefinitionBodyJSON              = factorpkg.ParseDefinitionBodyJSON
-	ValidateDefinitionBodyForPublish     = factorpkg.ValidateDefinitionBodyForPublish
-	ValidateDefinitionBodyJSONForPublish = factorpkg.ValidateDefinitionBodyJSONForPublish
-	ParsePublishedScalePayload           = scoringsnapshot.ParsePublishedPayload
 )

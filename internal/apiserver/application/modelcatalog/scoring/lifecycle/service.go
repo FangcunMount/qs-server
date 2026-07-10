@@ -10,11 +10,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -152,7 +152,7 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, code, action 
 	s.cacheSignalNotifier.NotifyScaleCacheChanged(ctx, code, action)
 }
 
-func (s *lifecycleService) publishScaleChangedEvent(ctx context.Context, model *domain.AssessmentModel, action scaledefinition.ChangeAction) {
+func (s *lifecycleService) publishScaleChangedEvent(ctx context.Context, model *domain.AssessmentModel, action eventpayload.ScaleChangeAction) {
 	if evt, ok := assessmentstore.ScaleChangedEvent(model, action); ok {
 		eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(evt), nil, nil)
 	}

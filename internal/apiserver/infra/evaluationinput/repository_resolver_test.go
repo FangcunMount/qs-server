@@ -8,87 +8,12 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
-
-func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
-	maxScore := 100.0
-	factor, err := scaledefinition.NewFactor(
-		scaledefinition.NewFactorCode("total"),
-		"总分",
-		scaledefinition.WithIsTotalScore(true),
-		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1"), meta.NewCode("Q2")}),
-		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategyCnt),
-		scaledefinition.WithScoringParams(scaledefinition.NewScoringParams().WithCntOptionContents([]string{"经常"})),
-		scaledefinition.WithMaxScore(&maxScore),
-		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 60), scaledefinition.RiskLevelLow, "低风险", "保持"),
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(60, 100), scaledefinition.RiskLevelHigh, "高风险", "干预"),
-		}),
-	)
-	if err != nil {
-		t.Fatalf("NewFactor returned error: %v", err)
-	}
-	medicalScale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SDS"),
-		"SDS",
-		scaledefinition.WithID(meta.FromUint64(101)),
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q-SDS"), "1.0.0"),
-		scaledefinition.WithScaleVersion("2.0.0"),
-		scaledefinition.WithStatus(scaledefinition.StatusPublished),
-		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale returned error: %v", err)
-	}
-
-	snapshot := scaleToSnapshot(medicalScale)
-	if snapshot == nil {
-		t.Fatal("snapshot is nil")
-		return
-	}
-	if snapshot.ID != 101 ||
-		snapshot.Code != "SDS" ||
-		snapshot.ScaleVersion != "2.0.0" ||
-		snapshot.Title != "SDS" ||
-		snapshot.QuestionnaireCode != "Q-SDS" ||
-		snapshot.QuestionnaireVersion != "1.0.0" ||
-		snapshot.Status != "published" {
-		t.Fatalf("unexpected scale snapshot: %#v", snapshot)
-	}
-	if len(snapshot.Factors) != 1 {
-		t.Fatalf("factor count = %d, want 1", len(snapshot.Factors))
-	}
-	got := snapshot.Factors[0]
-	if got.Code != "total" || got.Title != "总分" || !got.IsTotalScore {
-		t.Fatalf("unexpected factor snapshot: %#v", got)
-	}
-	if got.ScoringStrategy != "cnt" || len(got.ScoringParams.CntOptionContents) != 1 || got.ScoringParams.CntOptionContents[0] != "经常" {
-		t.Fatalf("unexpected scoring params: %#v", got.ScoringParams)
-	}
-	if len(got.QuestionCodes) != 2 || got.QuestionCodes[0] != "Q1" || got.QuestionCodes[1] != "Q2" {
-		t.Fatalf("unexpected question codes: %#v", got.QuestionCodes)
-	}
-	if got.MaxScore == nil || *got.MaxScore != maxScore {
-		t.Fatalf("max score = %v, want %v", got.MaxScore, maxScore)
-	}
-	if len(got.InterpretRules) != 2 ||
-		got.InterpretRules[0].Min != 0 ||
-		got.InterpretRules[0].Max != 60 ||
-		got.InterpretRules[0].RiskLevel != "low" ||
-		got.InterpretRules[0].Conclusion != "低风险" ||
-		got.InterpretRules[0].Suggestion != "保持" ||
-		got.InterpretRules[1].RiskLevel != "high" ||
-		got.InterpretRules[1].Conclusion != "高风险" ||
-		got.InterpretRules[1].Suggestion != "干预" {
-		t.Fatalf("unexpected interpret rules: %#v", got.InterpretRules)
-	}
-}
 
 func TestAnswerSheetToSnapshotPreservesRawValuesAndScores(t *testing.T) {
 	answer, err := answersheet.NewAnswer(

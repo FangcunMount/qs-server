@@ -10,9 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -45,7 +44,7 @@ func (s *queryService) ListHotPublished(ctx context.Context, dto shared.ListHotS
 		hotItems = hotItems[:limit]
 	}
 
-	result := shared.ToHotScaleListResult(ctx, hotItems, limit, windowDays, s.identitySvc)
+	result := shared.ToHotScaleRowsListResult(ctx, hotItems, limit, windowDays, s.identitySvc)
 	s.storeHotScaleListCache(ctx, limit, windowDays, result)
 	return result, nil
 }
@@ -95,9 +94,9 @@ func (s *queryService) storeHotScaleListCache(ctx context.Context, limit, window
 	}
 }
 
-func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]scaledefinition.HotScaleSummary, error) {
+func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]shared.HotScaleSummaryRow, error) {
 	if s == nil || s.hotRank == nil {
-		return []scaledefinition.HotScaleSummary{}, nil
+		return []shared.HotScaleSummaryRow{}, nil
 	}
 	rankItems, err := s.hotRank.Top(ctx, hotrank.Query{
 		WindowDays: windowDays,
@@ -107,14 +106,14 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 		return nil, err
 	}
 
-	result := make([]scaledefinition.HotScaleSummary, 0, limit)
+	result := make([]shared.HotScaleSummaryRow, 0, limit)
 	seen := make(map[string]struct{}, len(rankItems))
 	for _, rankItem := range rankItems {
 		questionnaireCode := strings.TrimSpace(rankItem.QuestionnaireCode)
 		if questionnaireCode == "" {
 			continue
 		}
-		item, err := s.publishedScaleByQuestionnaireCode(ctx, questionnaireCode)
+		item, ok, err := s.publishedScaleRowByQuestionnaireCode(ctx, questionnaireCode)
 		if err != nil {
 			logger.L(ctx).Warnw("failed to resolve hot scale by questionnaire code",
 				"questionnaire_code", questionnaireCode,
@@ -122,15 +121,15 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 			)
 			continue
 		}
-		if item == nil || !item.IsPublished() || !item.GetCategory().IsOpen() {
+		if !ok || !isPublishedOpenScaleRow(item) {
 			continue
 		}
-		code := item.GetCode().String()
+		code := item.Code
 		if _, ok := seen[code]; ok {
 			continue
 		}
 		seen[code] = struct{}{}
-		result = append(result, scaledefinition.HotScaleSummary{
+		result = append(result, shared.HotScaleSummaryRow{
 			Scale:           item,
 			SubmissionCount: rankItem.Score,
 		})
@@ -142,39 +141,31 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 	return result, nil
 }
 
-func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, existing []scaledefinition.HotScaleSummary) ([]scaledefinition.HotScaleSummary, error) {
+func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, existing []shared.HotScaleSummaryRow) ([]shared.HotScaleSummaryRow, error) {
 	seen := make(map[string]struct{}, len(existing))
 	for _, item := range existing {
-		if item.Scale == nil {
+		if item.Scale.Code == "" {
 			continue
 		}
-		seen[item.Scale.GetCode().String()] = struct{}{}
+		seen[item.Scale.Code] = struct{}{}
 	}
 
-	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scaledefinition.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
+	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scalereadmodel.ScaleStatusPublished, PublishedOnly: true}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取热门量表兜底列表失败")
 	}
 
-	result := make([]scaledefinition.HotScaleSummary, 0, limit-len(existing))
+	result := make([]shared.HotScaleSummaryRow, 0, limit-len(existing))
 	for _, row := range rows {
-		item, err := s.publishedScaleByCode(ctx, row.Code)
-		if err != nil {
-			logger.L(ctx).Warnw("failed to resolve fallback hot scale",
-				"scale_code", row.Code,
-				"error", err,
-			)
+		if !isPublishedOpenScaleRow(row) {
 			continue
 		}
-		if item == nil || !item.IsPublished() || !item.GetCategory().IsOpen() {
-			continue
-		}
-		code := item.GetCode().String()
+		code := row.Code
 		if _, ok := seen[code]; ok {
 			continue
 		}
 		seen[code] = struct{}{}
-		result = append(result, scaledefinition.HotScaleSummary{Scale: item})
+		result = append(result, shared.HotScaleSummaryRow{Scale: row})
 		if len(existing)+len(result) >= limit {
 			break
 		}
@@ -182,26 +173,45 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 	return result, nil
 }
 
-func (s *queryService) publishedScaleByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
+func (s *queryService) publishedScaleRowByQuestionnaireCode(ctx context.Context, questionnaireCode string) (scalereadmodel.ScaleSummaryRow, bool, error) {
 	if s == nil || s.readerV2 == nil {
-		return nil, domain.ErrNotFound
+		return scalereadmodel.ScaleSummaryRow{}, false, domain.ErrNotFound
 	}
 	snapshot, err := s.readerV2.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, "")
 	if err != nil {
-		return nil, err
+		return scalereadmodel.ScaleSummaryRow{}, false, err
 	}
-	return legacyadapter.MedicalScaleFromPublishedModel(snapshot)
+	result, err := legacyadapter.ScaleResultFromPublishedModel(snapshot)
+	if err != nil {
+		return scalereadmodel.ScaleSummaryRow{}, false, err
+	}
+	return scaleSummaryRowFromResult(result), true, nil
 }
 
-func (s *queryService) publishedScaleByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	if s == nil || s.published == nil {
-		return nil, domain.ErrNotFound
+func scaleSummaryRowFromResult(result *shared.ScaleResult) scalereadmodel.ScaleSummaryRow {
+	if result == nil {
+		return scalereadmodel.ScaleSummaryRow{}
 	}
-	snapshot, err := s.published.FindLatestPublishedByModelCode(ctx, domain.KindScale, code)
-	if err != nil {
-		return nil, err
+	return scalereadmodel.ScaleSummaryRow{
+		Code:              result.Code,
+		ScaleVersion:      result.ScaleVersion,
+		Title:             result.Title,
+		Description:       result.Description,
+		Category:          result.Category,
+		Stages:            append([]string(nil), result.Stages...),
+		ApplicableAges:    append([]string(nil), result.ApplicableAges...),
+		Reporters:         append([]string(nil), result.Reporters...),
+		Tags:              append([]string(nil), result.Tags...),
+		QuestionnaireCode: result.QuestionnaireCode,
+		QuestionCount:     result.QuestionCount,
+		Status:            result.Status,
+		CreatedAt:         result.CreatedAt,
+		UpdatedAt:         result.UpdatedAt,
 	}
-	return legacyadapter.MedicalScaleFromPublishedModel(snapshot)
+}
+
+func isPublishedOpenScaleRow(row scalereadmodel.ScaleSummaryRow) bool {
+	return row.Status == scalereadmodel.ScaleStatusPublished && isOpenScaleCategory(row.Category)
 }
 
 func hotRankCandidateLimit(limit int) int {

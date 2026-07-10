@@ -21,5 +21,6 @@ func validatePublishedScoreNodes(model *port.PublishedModel) error {
 	if err != nil {
 		return err
 	}
-	return factor.ValidateCalculationScoreNodesFromLegacyFactors(factor.LegacyFactorsFromSnapshots(parsed.Factors))
+	measure := parsed.MeasureSpec()
+	return factor.ValidateCalculationScoreNodesFromMeasureParts(measure.Factors, measure.FactorGraph, measure.Scoring)
 }

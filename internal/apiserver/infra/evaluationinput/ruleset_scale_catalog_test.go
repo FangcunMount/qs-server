@@ -2,6 +2,7 @@ package evaluationinput
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -142,23 +143,31 @@ func TestPublishedScaleCatalogGetScalePrefersDefinitionV2(t *testing.T) {
 	}
 }
 
-func TestPublishedScaleCatalogFallsBackToRepo(t *testing.T) {
+func TestPublishedScaleCatalogDoesNotReadLegacyRepoFallback(t *testing.T) {
+	fallbackCalls := 0
 	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-REPO",
 		ScaleVersion: "1.0.0",
 		Title:        "Repo Scale",
 		Status:       "published",
-	}}
+	}, calls: &fallbackCalls}
 	catalog := NewPublishedScaleCatalog(stubScalePublishedReader{}, fallback)
-	got, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
+	_, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
 		Code:    "SCL-REPO",
 		Version: "1.0.0",
 	})
-	if err != nil {
-		t.Fatalf("GetScaleByRef: %v", err)
+	if err == nil {
+		t.Fatal("expected missing published model to fail")
 	}
-	if got.Title != "Repo Scale" {
-		t.Fatalf("Title = %s, want Repo Scale", got.Title)
+	var kindCarrier port.FailureKindCarrier
+	if !errors.As(err, &kindCarrier) {
+		t.Fatalf("expected resolve error, got %T %v", err, err)
+	}
+	if got := kindCarrier.FailureKind(); got != port.FailureKindModelNotFound {
+		t.Fatalf("failure kind = %s, want %s", got, port.FailureKindModelNotFound)
+	}
+	if fallbackCalls != 0 {
+		t.Fatalf("fallback calls = %d, want 0", fallbackCalls)
 	}
 }

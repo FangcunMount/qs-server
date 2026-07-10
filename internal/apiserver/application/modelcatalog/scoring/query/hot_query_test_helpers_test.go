@@ -3,14 +3,12 @@ package query
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
 )
 
 type hotPublishedReaderStub struct {
@@ -80,13 +78,9 @@ func newHotQueryService(reader *hotScaleReaderStub, publishedReader *hotPublishe
 	).(*queryService)
 }
 
-func publishedSnapshotFromScale(t *testing.T, scale *scaledefinition.MedicalScale) *port.PublishedModel {
+func publishedSnapshotFromScale(t *testing.T, scale scalereadmodel.ScaleSummaryRow) *port.PublishedModel {
 	t.Helper()
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale: %v", err)
-	}
-	model.Code = scale.GetCode().String()
+	model := newScaleAssessmentModelForQueryRefTest(t, scale.Code, scale.Title, scale.QuestionnaireCode, "1.0.0", domain.ModelStatusPublished)
 	snapshot, err := publishedmodel.BuildAssessmentSnapshot(model)
 	if err != nil {
 		t.Fatalf("BuildAssessmentSnapshot: %v", err)
@@ -94,17 +88,17 @@ func publishedSnapshotFromScale(t *testing.T, scale *scaledefinition.MedicalScal
 	return snapshot
 }
 
-func hotPublishedSources(t *testing.T, scales ...*scaledefinition.MedicalScale) (*hotPublishedReaderStub, *hotPublishedRepoStub) {
+func hotPublishedSources(t *testing.T, scales ...scalereadmodel.ScaleSummaryRow) (*hotPublishedReaderStub, *hotPublishedRepoStub) {
 	reader := &hotPublishedReaderStub{byQuestionnaire: map[string]*port.PublishedModel{}}
 	repo := &hotPublishedRepoStub{byCode: map[string]*port.PublishedModel{}}
 	for _, scale := range scales {
-		if scale == nil {
+		if scale.Code == "" {
 			continue
 		}
 		snapshot := publishedSnapshotFromScale(t, scale)
-		reader.byQuestionnaire[scale.GetQuestionnaireCode().String()] = snapshot
-		reader.byQuestionnaire[scale.GetQuestionnaireCode().String()+":"+scale.GetQuestionnaireVersion()] = snapshot
-		repo.byCode[scale.GetCode().String()] = snapshot
+		reader.byQuestionnaire[scale.QuestionnaireCode] = snapshot
+		reader.byQuestionnaire[scale.QuestionnaireCode+":1.0.0"] = snapshot
+		repo.byCode[scale.Code] = snapshot
 	}
 	return reader, repo
 }

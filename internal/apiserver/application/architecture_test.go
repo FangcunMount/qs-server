@@ -33,10 +33,6 @@ func TestRuntimeDTOImportsUseModelCatalogPayloadPort(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot": "port/modelcatalog/payload/scale",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology":         "port/modelcatalog/payload/typology",
-	}
 	allowedRelPrefixes := []string{
 		"internal/apiserver/port/modelcatalog/payload/scale/",
 		"internal/apiserver/port/modelcatalog/payload/typology/",
@@ -55,10 +51,9 @@ func TestRuntimeDTOImportsUseModelCatalogPayloadPort(t *testing.T) {
 					return
 				}
 			}
-			for forbidden, replacement := range forbiddenImports {
-				if strings.HasPrefix(importPath, forbidden) {
-					t.Fatalf("%s imports %s; runtime DTO callers must use %s", rel, importPath, replacement)
-				}
+			if strings.Contains(importPath, "/domain/modelcatalog/"+"scoring/") ||
+				strings.Contains(importPath, "/domain/modelcatalog/"+"typology") {
+				t.Fatalf("%s imports %s; runtime DTO callers must use modelcatalog payload ports", rel, importPath)
 			}
 		})
 	}
@@ -68,13 +63,25 @@ func TestScalePayloadPortOwnsImplementation(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	forbidden := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "port", "modelcatalog", "payload", "scale"), func(path, importPath string) {
+	assertPayloadPortDoesNotImportDomainRuntimeDTO(t, root, filepath.Join(root, "internal", "apiserver", "port", "modelcatalog", "payload", "scale"), "scale")
+}
+
+func TestTypologyPayloadPortOwnsImplementation(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	assertPayloadPortDoesNotImportDomainRuntimeDTO(t, root, filepath.Join(root, "internal", "apiserver", "port", "modelcatalog", "payload", "typology"), "typology")
+}
+
+func assertPayloadPortDoesNotImportDomainRuntimeDTO(t *testing.T, root, dir, name string) {
+	t.Helper()
+	scanGoImports(t, dir, func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
-		if strings.HasPrefix(importPath, forbidden) {
-			t.Fatalf("%s imports %s; scale payload port must own the implementation", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		if strings.Contains(importPath, "/domain/modelcatalog/"+"scoring/") ||
+			strings.Contains(importPath, "/domain/modelcatalog/"+"typology") {
+			t.Fatalf("%s imports %s; %s payload port must own the implementation", filepath.ToSlash(mustRel(t, root, path)), importPath, name)
 		}
 	})
 }
@@ -165,8 +172,7 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                          "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey": "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -214,7 +220,6 @@ func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting"), func(path, importPath string) {
@@ -229,20 +234,15 @@ func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
 	})
 }
 
-func TestScoringDefinitionDoesNotModelMBTIAsCategory(t *testing.T) {
+func TestLegacyScoringDefinitionPackageIsDeleted(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scoring", "definition", "types.go")
-	data, err := os.ReadFile(path)
-	if err != nil {
+	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scoring", "definition")
+	if _, err := os.Stat(path); err == nil {
+		t.Fatalf("%s exists; legacy scale authoring aggregate must stay deleted", filepath.ToSlash(mustRel(t, root, path)))
+	} else if !os.IsNotExist(err) {
 		t.Fatal(err)
-	}
-	text := string(data)
-	for _, token := range []string{`CategoryMBTI`, `Category = "mbti"`} {
-		if strings.Contains(text, token) {
-			t.Fatalf("%s contains %q; MBTI must be a peer interpretation model, not a scale category", filepath.ToSlash(mustRel(t, root, path)), token)
-		}
 	}
 }
 
@@ -412,8 +412,7 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "catalog/read-model snapshot adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                         "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
@@ -432,46 +431,6 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 	})
 }
 
-func TestModelCatalogLegacyImportsStayInRetirementBoundaries(t *testing.T) {
-	t.Parallel()
-
-	root := repoRoot(t)
-	legacyFacadePrefix := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
-	scaleDefinitionPrefix := "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	allowedScaleDefinitionPrefixes := []string{
-		"internal/apiserver/domain/modelcatalog/legacy/",
-		"internal/apiserver/domain/modelcatalog/scoring/definition/",
-		"internal/apiserver/application/modelcatalog/scoring/",
-		"internal/apiserver/application/plan/",
-		"internal/apiserver/container/",
-		"internal/apiserver/infra/cache/",
-		"internal/apiserver/infra/cachequery/",
-		"internal/apiserver/infra/evaluationinput/",
-		"internal/apiserver/infra/mongo/modelcatalog/",
-		"internal/apiserver/infra/ruleset/",
-	}
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
-		if strings.HasSuffix(path, "_test.go") {
-			return
-		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		if importPath == legacyFacadePrefix || strings.HasPrefix(importPath, legacyFacadePrefix+"/") {
-			if strings.HasPrefix(rel, "internal/apiserver/domain/modelcatalog/legacy/") {
-				return
-			}
-			t.Fatalf("%s imports %s; legacy modelcatalog facade is delete-after-rg-zero and must not gain production callers", rel, importPath)
-		}
-		if importPath == scaleDefinitionPrefix || strings.HasPrefix(importPath, scaleDefinitionPrefix+"/") {
-			for _, prefix := range allowedScaleDefinitionPrefixes {
-				if strings.HasPrefix(rel, prefix) {
-					return
-				}
-			}
-			t.Fatalf("%s imports %s; scoring/definition is a legacy scale compatibility surface and must stay in the retirement allowlist", rel, importPath)
-		}
-	})
-}
-
 func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
 	t.Parallel()
 
@@ -482,20 +441,12 @@ func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
 		"internal/apiserver/domain/modelcatalog/definition/",
 		"internal/apiserver/domain/modelcatalog/norming/",
 		"internal/apiserver/domain/modelcatalog/taskperformance/",
-		"internal/apiserver/domain/modelcatalog/scoring/snapshot/",
 		"internal/apiserver/application/modelcatalog/norming/",
 		"internal/apiserver/application/evaluation/calculationadapter/",
 		"internal/apiserver/port/modelcatalog/payload/",
 	}
 	forbiddenTokens := []string{
-		"factor.LegacyFactor",
-		"factor.FactorSnapshot",
 		"factor.DefinitionBody",
-		"LegacyFactorFromSnapshot",
-		"LegacyFactorsFromSnapshots",
-		"SnapshotsFromLegacyFactors",
-		"ParseLegacyFactorsFromDefinitionBody",
-		"ParseFactorSnapshotsFromDefinitionBody",
 	}
 	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -566,16 +517,15 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                           "application error mapping/use cases",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                                 "infrastructure adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                             "transport adapters",
-		"github.com/FangcunMount/component-base/pkg/logger":                                           "application/infra observability",
-		"github.com/FangcunMount/component-base/pkg/errors":                                           "domain-native errors",
-		"github.com/FangcunMount/component-base/pkg/code":                                             "domain-native errors",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                                         "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "evaluation-local snapshots/value objects",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                          "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":           "report-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                 "application error mapping/use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                       "infrastructure adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                   "transport adapters",
+		"github.com/FangcunMount/component-base/pkg/logger":                                 "application/infra observability",
+		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
+		"github.com/FangcunMount/component-base/pkg/code":                                   "domain-native errors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if isEvaluationRootPackageGoFile(root, path) {
@@ -835,7 +785,6 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		"SubKindTrait",
 	}
 	scaleRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "scoring"),
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "scoring"),
 	}
@@ -1179,8 +1128,6 @@ func TestR127RuleSetSymbolsNotReintroduced(t *testing.T) {
 		"scripts/",
 		"internal/apiserver/infra/ruleset/static_composite_catalog",
 		"internal/apiserver/infra/ruleset/scale_publisher_test.go",
-		"internal/apiserver/domain/modelcatalog/export.go",
-		"internal/apiserver/domain/modelcatalog/legacy/",
 	}
 	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -80,15 +79,15 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 	if err != nil {
 		t.Fatalf("NewQuestionnaire() error = %v", err)
 	}
-	otherScale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("S-OTHER"),
+	otherModel := newLifecycleScaleAssessmentModel(
+		t,
+		"S-OTHER",
 		"Other Scale",
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
+		"Q-MS",
+		"1.0",
+		domain.ModelStatusDraft,
+		nil,
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	otherModel := assessmentModelFromScale(t, otherScale)
 
 	svc := &lifecycleService{
 		modelRepo: &authoringModelRepoStub{
@@ -123,15 +122,15 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 	if err != nil {
 		t.Fatalf("NewQuestionnaire() error = %v", err)
 	}
-	scaleItem, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("S-001"),
+	model := newLifecycleScaleAssessmentModel(
+		t,
+		"S-001",
 		"Scale",
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
+		"Q-MS",
+		"1.0",
+		domain.ModelStatusDraft,
+		nil,
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	model := assessmentModelFromScale(t, scaleItem)
 
 	svc := &lifecycleService{
 		modelRepo: &authoringModelRepoStub{

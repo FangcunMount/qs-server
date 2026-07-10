@@ -10,6 +10,33 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
+func TestBuildScalePublishedSnapshotRoundTrip(t *testing.T) {
+	model := &scalesnapshot.ScaleSnapshot{
+		Code:                 "SCL-001",
+		ScaleVersion:         "1.0.0",
+		Title:                "Demo Scale",
+		QuestionnaireCode:    "QNR-001",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Factors: []scalesnapshot.FactorSnapshot{
+			{Code: "total", Title: "Total", IsTotalScore: true},
+		},
+	}
+	snapshot, err := BuildScalePublishedSnapshot(model)
+	if err != nil {
+		t.Fatalf("BuildScalePublishedSnapshot: %v", err)
+	}
+	if snapshot.Kind != domain.KindScale {
+		t.Fatalf("kind = %s", snapshot.Kind)
+	}
+	if snapshot.PayloadFormat != domain.PayloadFormatAssessmentScaleV1 {
+		t.Fatalf("payload format = %s", snapshot.PayloadFormat)
+	}
+	if snapshot.DecisionKind != domain.DecisionKindScoreRange {
+		t.Fatalf("decision = %s", snapshot.DecisionKind)
+	}
+}
+
 func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 	published, err := BuildMBTIPublishedSnapshot(&modeltypology.MBTILegacyModel{
 		Code:              "MBTI_OEJTS",

@@ -13,12 +13,11 @@ import (
 
 // PublishedScaleCatalog reads published scale snapshots from the assessment model catalog.
 type PublishedScaleCatalog struct {
-	reader   rulesetport.PublishedModelReader
-	fallback port.ScaleModelCatalog
+	reader rulesetport.PublishedModelReader
 }
 
 func NewPublishedScaleCatalog(reader rulesetport.PublishedModelReader, fallback port.ScaleModelCatalog) PublishedScaleCatalog {
-	return PublishedScaleCatalog{reader: reader, fallback: fallback}
+	return PublishedScaleCatalog{reader: reader}
 }
 
 func (c PublishedScaleCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
@@ -37,10 +36,7 @@ func (c PublishedScaleCatalog) GetScale(ctx context.Context, code string) (*scal
 			}
 		}
 	}
-	if c.fallback == nil {
-		return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("scale catalog is not configured"), "量表不存在", "加载量表失败")
-	}
-	return c.fallback.GetScale(ctx, code)
+	return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("published scale model is not found"), "量表不存在", "加载量表失败")
 }
 
 func (c PublishedScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
@@ -64,8 +60,5 @@ func (c PublishedScaleCatalog) GetScaleByRef(ctx context.Context, ref port.Model
 			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
 		}
 	}
-	if c.fallback == nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, domain.ErrNotFound, "解释模型不存在", "加载解释模型失败")
-	}
-	return c.fallback.GetScaleByRef(ctx, ref)
+	return nil, port.NewResolveError(port.FailureKindModelNotFound, domain.ErrNotFound, "解释模型不存在", "加载解释模型失败")
 }

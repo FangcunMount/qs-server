@@ -14,55 +14,48 @@ type CompositeIndexSpec struct {
 	ParentCode string
 }
 
-// ApplyCompositeMetadataToLegacyFactors 标注 legacy flat 因子 使用 复合 index 策略。
-func ApplyCompositeMetadataToLegacyFactors(factors []factor.LegacyFactor, specs []CompositeIndexSpec) []factor.LegacyFactor {
-	if len(factors) == 0 || len(specs) == 0 {
-		return factors
+// ApplyCompositeMetadata projects composite index metadata into the target
+// measure layer.
+func ApplyCompositeMetadata(measure definition.MeasureSpec, specs []CompositeIndexSpec) definition.MeasureSpec {
+	if len(measure.Factors) == 0 || len(specs) == 0 {
+		return measure
 	}
-	out := make([]factor.LegacyFactor, len(factors))
-	copy(out, factors)
-	indexPos := make(map[string]int, len(out))
-	for i, item := range out {
+	out := cloneMeasureSpec(measure)
+	indexPos := make(map[string]int, len(out.Factors))
+	for i, item := range out.Factors {
 		indexPos[item.Code] = i
 	}
+	out.FactorGraph.Edges = filterCompositeEdges(out.FactorGraph.Edges, specs)
+	out.Scoring = filterCompositeScoring(out.Scoring, specs)
 	for _, spec := range specs {
-		pos, ok := indexPos[spec.Code]
-		if !ok || len(spec.Children) == 0 {
+		if _, ok := indexPos[spec.Code]; !ok || len(spec.Children) == 0 {
 			continue
 		}
 		strategy := spec.Strategy
 		if strategy == "" {
 			strategy = factor.ChildrenAggregationSum
 		}
-		out[pos].ChildrenPolicy = &factor.ChildrenPolicy{
-			Strategy: strategy,
-			Children: append([]string(nil), spec.Children...),
+		sources := make([]factor.ScoringSource, 0, len(spec.Children))
+		for _, childCode := range spec.Children {
+			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceFactor, Code: childCode})
+			out.FactorGraph.Edges = appendEdge(out.FactorGraph.Edges, factor.FactorEdge{ParentCode: spec.Code, ChildCode: childCode})
 		}
 		if spec.ParentCode != "" {
-			out[pos].ParentCode = spec.ParentCode
+			out.FactorGraph.Edges = appendEdge(out.FactorGraph.Edges, factor.FactorEdge{ParentCode: spec.ParentCode, ChildCode: spec.Code})
 		}
-		for _, childCode := range spec.Children {
-			childPos, ok := indexPos[childCode]
-			if !ok || out[childPos].ParentCode != "" {
-				continue
-			}
-			out[childPos].ParentCode = spec.Code
-		}
+		out.Scoring = append(out.Scoring, factor.Scoring{
+			FactorCode: spec.Code,
+			Sources:    sources,
+			Strategy:   factor.ScoringStrategy(strategy),
+		})
 	}
-	return factor.DeriveFactorLevels(out)
+	out.FactorGraph.Roots = deriveRoots(out.Factors, out.FactorGraph.Edges)
+	return out
 }
 
 // MeasureSpecWithCompositeMetadata projects composite metadata into the target measure layer.
 func MeasureSpecWithCompositeMetadata(factors []factor.Factor, specs []CompositeIndexSpec) definition.MeasureSpec {
-	legacy := make([]factor.LegacyFactor, 0, len(factors))
-	for _, item := range factors {
-		legacy = append(legacy, factor.LegacyFactor{
-			Code:  item.Code,
-			Title: item.Title,
-			Role:  item.Role,
-		})
-	}
-	return definition.MeasureSpecFromLegacyFactors(ApplyCompositeMetadataToLegacyFactors(legacy, specs))
+	return ApplyCompositeMetadata(definition.MeasureSpec{Factors: factors}, specs)
 }
 
 // MetadataContext 携带常模ing 元数据 不使用 embedding 常模表 bodies。
@@ -73,31 +66,24 @@ type MetadataContext struct {
 	NormFactorCodes  []string
 }
 
-// ApplyNormMetadataToLegacyFactors 标注 legacy flat 因子 使用 index/有效ity 角色 和 常模 references。
-func ApplyNormMetadataToLegacyFactors(factors []factor.LegacyFactor, ctx MetadataContext) []factor.LegacyFactor {
-	if len(factors) == 0 {
-		return factors
+// ApplyNormMetadata projects role and norm metadata into the target definition
+// layers.
+func ApplyNormMetadata(measure definition.MeasureSpec, ctx MetadataContext) (definition.MeasureSpec, definition.Calibration) {
+	if len(measure.Factors) == 0 {
+		return measure, definition.Calibration{}
 	}
 	indexCodes := stringSet(ctx.IndexCodes)
 	validityCodes := stringSet(ctx.ValidityCodes)
-	normFactorCodes := stringSet(ctx.NormFactorCodes)
-	out := make([]factor.LegacyFactor, len(factors))
-	for i, item := range factors {
-		out[i] = item
+	out := cloneMeasureSpec(measure)
+	for i, item := range out.Factors {
 		switch {
 		case indexCodes[item.Code]:
-			out[i].Role = factor.FactorRoleIndex
+			out.Factors[i].Role = factor.FactorRoleIndex
 		case validityCodes[item.Code]:
-			out[i].Role = factor.FactorRoleValidity
-		}
-		if normFactorCodes[item.Code] && ctx.NormTableVersion != "" {
-			out[i].Norm = &factor.NormRef{
-				FactorCode:       item.Code,
-				NormTableVersion: ctx.NormTableVersion,
-			}
+			out.Factors[i].Role = factor.FactorRoleValidity
 		}
 	}
-	return out
+	return out, definition.Calibration{NormRefs: NormRefsFromMetadata(ctx)}
 }
 
 // NormRefsFromMetadata projects norming metadata into the target calibration layer.
@@ -132,4 +118,124 @@ func stringSet(values []string) map[string]bool {
 		set[value] = true
 	}
 	return set
+}
+
+func cloneMeasureSpec(measure definition.MeasureSpec) definition.MeasureSpec {
+	out := definition.MeasureSpec{
+		Factors: append([]factor.Factor(nil), measure.Factors...),
+		FactorGraph: factor.FactorGraph{
+			Roots:      append([]string(nil), measure.FactorGraph.Roots...),
+			Edges:      append([]factor.FactorEdge(nil), measure.FactorGraph.Edges...),
+			SortOrders: cloneSortOrders(measure.FactorGraph.SortOrders),
+		},
+		Scoring: cloneScoring(measure.Scoring),
+	}
+	return out
+}
+
+func filterCompositeEdges(edges []factor.FactorEdge, specs []CompositeIndexSpec) []factor.FactorEdge {
+	if len(edges) == 0 || len(specs) == 0 {
+		return edges
+	}
+	specCodes := make(map[string]bool, len(specs))
+	for _, spec := range specs {
+		specCodes[spec.Code] = true
+	}
+	out := edges[:0]
+	for _, edge := range edges {
+		if specCodes[edge.ParentCode] || specCodes[edge.ChildCode] {
+			continue
+		}
+		out = append(out, edge)
+	}
+	return out
+}
+
+func filterCompositeScoring(scoring []factor.Scoring, specs []CompositeIndexSpec) []factor.Scoring {
+	if len(scoring) == 0 || len(specs) == 0 {
+		return scoring
+	}
+	specCodes := make(map[string]bool, len(specs))
+	for _, spec := range specs {
+		specCodes[spec.Code] = true
+	}
+	out := scoring[:0]
+	for _, rule := range scoring {
+		if specCodes[rule.FactorCode] {
+			continue
+		}
+		out = append(out, rule)
+	}
+	return out
+}
+
+func appendEdge(edges []factor.FactorEdge, edge factor.FactorEdge) []factor.FactorEdge {
+	for _, existing := range edges {
+		if existing == edge {
+			return edges
+		}
+	}
+	return append(edges, edge)
+}
+
+func deriveRoots(factors []factor.Factor, edges []factor.FactorEdge) []string {
+	hasParent := make(map[string]bool, len(edges))
+	for _, edge := range edges {
+		hasParent[edge.ChildCode] = true
+	}
+	roots := make([]string, 0, len(factors))
+	for _, item := range factors {
+		if !hasParent[item.Code] {
+			roots = append(roots, item.Code)
+		}
+	}
+	if len(roots) == 0 {
+		return nil
+	}
+	return roots
+}
+
+func cloneSortOrders(items map[string]int) map[string]int {
+	if items == nil {
+		return nil
+	}
+	out := make(map[string]int, len(items))
+	for key, value := range items {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneScoring(scoring []factor.Scoring) []factor.Scoring {
+	if scoring == nil {
+		return nil
+	}
+	out := make([]factor.Scoring, 0, len(scoring))
+	for _, rule := range scoring {
+		copied := rule
+		copied.Sources = append([]factor.ScoringSource(nil), rule.Sources...)
+		if rule.Params != nil {
+			copied.Params = &factor.ScoringParams{
+				CntOptionContents: append([]string(nil), rule.Params.CntOptionContents...),
+			}
+		}
+		if rule.MaxScore != nil {
+			maxScore := *rule.MaxScore
+			copied.MaxScore = &maxScore
+		}
+		copied.Weights = cloneWeights(rule.Weights)
+		out = append(out, copied)
+	}
+	return out
+}
+
+func cloneWeights(weights map[string]float64) map[string]float64 {
+	if weights == nil {
+		return nil
+	}
+	out := make(map[string]float64, len(weights))
+	for key, value := range weights {
+		out[key] = value
+	}
+	return out
 }

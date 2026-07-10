@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
@@ -18,27 +17,103 @@ type MatchResult struct {
 	ReplaceOutcome bool
 }
 
+// RulePhase 选择when special rule 是 evaluated。
+type RulePhase string
+
+const (
+	RuleBeforeScore    RulePhase = "before_score"
+	RuleBeforeDecision RulePhase = "before_decision"
+	RuleAfterDecision  RulePhase = "after_decision"
+)
+
+// RuleKind 选择评估 strategy 用于 special rule。
+type RuleKind string
+
+const (
+	RuleKindAnswerMatch       RuleKind = "answer_match"
+	RuleKindFallbackThreshold RuleKind = "fallback_threshold"
+)
+
+// Rule 描述配置urable special 结果 rule。
+type Rule struct {
+	Code          string
+	Kind          RuleKind
+	Phase         RulePhase
+	OutcomeCode   string
+	Condition     Condition
+	QuestionCodes []string
+	OptionValues  []string
+}
+
+// Condition 携带类型-特定 match parameters。
+type Condition struct {
+	QuestionCodes []string
+	OptionValues  []string
+}
+
+// ResolvedKind 返回配置化 类型, deriving 从 旧版 字段 when needed。
+func (r Rule) ResolvedKind() RuleKind {
+	if r.Kind != "" {
+		return r.Kind
+	}
+	if len(r.ResolvedQuestionCodes()) > 0 {
+		return RuleKindAnswerMatch
+	}
+	if r.Phase == RuleAfterDecision {
+		return RuleKindFallbackThreshold
+	}
+	return ""
+}
+
+// ResolvedQuestionCodes 返回question 编码 从 condition 或 旧版 flat 字段。
+func (r Rule) ResolvedQuestionCodes() []string {
+	if len(r.Condition.QuestionCodes) > 0 {
+		return append([]string(nil), r.Condition.QuestionCodes...)
+	}
+	return append([]string(nil), r.QuestionCodes...)
+}
+
+// ResolvedOptionValues 返回选项 values 从 condition 或 旧版 flat 字段。
+func (r Rule) ResolvedOptionValues() []string {
+	if len(r.Condition.OptionValues) > 0 {
+		return append([]string(nil), r.Condition.OptionValues...)
+	}
+	return append([]string(nil), r.OptionValues...)
+}
+
+// Decision contains the small part of typology decision state used by special rules.
+type Decision struct {
+	FallbackSimilarityThreshold float64
+	FallbackCode                string
+}
+
+// Outcome contains the small part of typology outcome state used by special rules.
+type Outcome struct {
+	Code    string
+	Trigger string
+}
+
 // EvaluationContext 携带rule inputs 用于 一个special-rule phase。
 type EvaluationContext struct {
-	Payload    *modeltypology.Payload
+	Outcomes   []Outcome
 	Answers    []classification.Answer
-	Decision   modeltypology.PersonalityDecisionSpec
+	Decision   Decision
 	Similarity float64
 }
 
-type strategyFunc func(modeltypology.SpecialRuleSpec, EvaluationContext) (MatchResult, bool)
+type strategyFunc func(Rule, EvaluationContext) (MatchResult, bool)
 
 // StrategyRegistry 解析special-rule strategies 按 rule 类型。
 type StrategyRegistry struct {
-	strategies map[modeltypology.SpecialRuleKind]strategyFunc
+	strategies map[RuleKind]strategyFunc
 }
 
 // DefaultStrategyRegistry 返回内置 special-rule strategies。
 func DefaultStrategyRegistry() StrategyRegistry {
 	return StrategyRegistry{
-		strategies: map[modeltypology.SpecialRuleKind]strategyFunc{
-			modeltypology.SpecialRuleKindAnswerMatch:       applyAnswerMatchRule,
-			modeltypology.SpecialRuleKindFallbackThreshold: applyFallbackThresholdRule,
+		strategies: map[RuleKind]strategyFunc{
+			RuleKindAnswerMatch:       applyAnswerMatchRule,
+			RuleKindFallbackThreshold: applyFallbackThresholdRule,
 		},
 	}
 }
@@ -50,40 +125,40 @@ type Engine struct {
 
 // ApplyBeforeScore 检查answer_match rules 和 returns match when answers trigger special 结果。
 func (e Engine) ApplyBeforeScore(
-	rules []modeltypology.SpecialRuleSpec,
-	payload *modeltypology.Payload,
+	rules []Rule,
+	outcomes []Outcome,
 	answers []classification.Answer,
 ) (MatchResult, bool) {
-	return e.applyPhase(modeltypology.SpecialRuleBeforeScore, rules, EvaluationContext{
-		Payload: payload,
-		Answers: answers,
+	return e.applyPhase(RuleBeforeScore, rules, EvaluationContext{
+		Outcomes: outcomes,
+		Answers:  answers,
 	})
 }
 
 // ApplyAfterDecision 检查fallback_threshold rules when similarity falls below 配置化 threshold。
 func (e Engine) ApplyAfterDecision(
-	rules []modeltypology.SpecialRuleSpec,
-	decision modeltypology.PersonalityDecisionSpec,
-	payload *modeltypology.Payload,
+	rules []Rule,
+	decision Decision,
+	outcomes []Outcome,
 	similarity float64,
 ) (MatchResult, bool) {
 	ctx := EvaluationContext{
-		Payload:    payload,
+		Outcomes:   outcomes,
 		Decision:   decision,
 		Similarity: similarity,
 	}
-	if match, ok := e.applyPhase(modeltypology.SpecialRuleAfterDecision, rules, ctx); ok {
+	if match, ok := e.applyPhase(RuleAfterDecision, rules, ctx); ok {
 		return match, true
 	}
 	return applyDefaultFallbackThreshold(ctx)
 }
 
 func (e Engine) applyPhase(
-	phase modeltypology.SpecialRulePhase,
-	rules []modeltypology.SpecialRuleSpec,
+	phase RulePhase,
+	rules []Rule,
 	ctx EvaluationContext,
 ) (MatchResult, bool) {
-	if ctx.Payload == nil {
+	if len(ctx.Outcomes) == 0 {
 		return MatchResult{}, false
 	}
 	strategies := e.strategies
@@ -105,7 +180,7 @@ func (e Engine) applyPhase(
 	return MatchResult{}, false
 }
 
-func (r StrategyRegistry) Resolve(kind modeltypology.SpecialRuleKind) (strategyFunc, bool) {
+func (r StrategyRegistry) Resolve(kind RuleKind) (strategyFunc, bool) {
 	strategy, ok := r.strategies[kind]
 	return strategy, ok
 }
@@ -114,25 +189,25 @@ func (r StrategyRegistry) Len() int {
 	return len(r.strategies)
 }
 
-func ruleMatchesPhase(rule modeltypology.SpecialRuleSpec, phase modeltypology.SpecialRulePhase) bool {
+func ruleMatchesPhase(rule Rule, phase RulePhase) bool {
 	if rule.Phase != "" {
 		return rule.Phase == phase
 	}
 	switch rule.ResolvedKind() {
-	case modeltypology.SpecialRuleKindAnswerMatch:
-		return phase == modeltypology.SpecialRuleBeforeScore
-	case modeltypology.SpecialRuleKindFallbackThreshold:
-		return phase == modeltypology.SpecialRuleAfterDecision
+	case RuleKindAnswerMatch:
+		return phase == RuleBeforeScore
+	case RuleKindFallbackThreshold:
+		return phase == RuleAfterDecision
 	default:
 		return false
 	}
 }
 
-func applyAnswerMatchRule(rule modeltypology.SpecialRuleSpec, ctx EvaluationContext) (MatchResult, bool) {
+func applyAnswerMatchRule(rule Rule, ctx EvaluationContext) (MatchResult, bool) {
 	if !matchesAnswerTrigger(rule, ctx.Answers) {
 		return MatchResult{}, false
 	}
-	outcome, ok := ctx.Payload.FindOutcome(firstNonEmpty(rule.OutcomeCode, rule.Code))
+	outcome, ok := findOutcome(ctx.Outcomes, firstNonEmpty(rule.OutcomeCode, rule.Code))
 	if !ok {
 		return MatchResult{}, false
 	}
@@ -143,7 +218,7 @@ func applyAnswerMatchRule(rule modeltypology.SpecialRuleSpec, ctx EvaluationCont
 	}, true
 }
 
-func applyFallbackThresholdRule(rule modeltypology.SpecialRuleSpec, ctx EvaluationContext) (MatchResult, bool) {
+func applyFallbackThresholdRule(rule Rule, ctx EvaluationContext) (MatchResult, bool) {
 	if !fallbackThresholdExceeded(ctx) {
 		return MatchResult{}, false
 	}
@@ -152,7 +227,7 @@ func applyFallbackThresholdRule(rule modeltypology.SpecialRuleSpec, ctx Evaluati
 	if code != fallbackCode && rule.OutcomeCode != "" {
 		return MatchResult{}, false
 	}
-	outcome, ok := ctx.Payload.FindOutcome(fallbackCode)
+	outcome, ok := findOutcome(ctx.Outcomes, fallbackCode)
 	if !ok {
 		return MatchResult{}, false
 	}
@@ -167,7 +242,7 @@ func applyDefaultFallbackThreshold(ctx EvaluationContext) (MatchResult, bool) {
 	if !fallbackThresholdExceeded(ctx) {
 		return MatchResult{}, false
 	}
-	outcome, ok := ctx.Payload.FindOutcome(ctx.Decision.FallbackCode)
+	outcome, ok := findOutcome(ctx.Outcomes, ctx.Decision.FallbackCode)
 	if !ok {
 		return MatchResult{}, false
 	}
@@ -179,13 +254,22 @@ func applyDefaultFallbackThreshold(ctx EvaluationContext) (MatchResult, bool) {
 }
 
 func fallbackThresholdExceeded(ctx EvaluationContext) bool {
-	return ctx.Payload != nil &&
+	return len(ctx.Outcomes) > 0 &&
 		ctx.Decision.FallbackSimilarityThreshold > 0 &&
 		ctx.Similarity < ctx.Decision.FallbackSimilarityThreshold &&
 		ctx.Decision.FallbackCode != ""
 }
 
-func matchesAnswerTrigger(rule modeltypology.SpecialRuleSpec, answers []classification.Answer) bool {
+func findOutcome(outcomes []Outcome, code string) (Outcome, bool) {
+	for _, outcome := range outcomes {
+		if outcome.Code == code {
+			return outcome, true
+		}
+	}
+	return Outcome{}, false
+}
+
+func matchesAnswerTrigger(rule Rule, answers []classification.Answer) bool {
 	questionCodes := rule.ResolvedQuestionCodes()
 	optionValues := rule.ResolvedOptionValues()
 	if len(questionCodes) == 0 || len(optionValues) == 0 {

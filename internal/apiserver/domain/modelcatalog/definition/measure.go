@@ -4,7 +4,11 @@ import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog
 
 // ParseMeasureSpecFromDefinitionBody materializes target measure/calibration layers from shared legacy payload parts.
 func ParseMeasureSpecFromDefinitionBody(dimensions []factor.DimensionRule, interpretRules []factor.InterpretRule) (MeasureSpec, Calibration) {
-	return MeasureAndCalibrationFromLegacyFactors(factor.ParseLegacyFactorsFromDefinitionBody(dimensions, interpretRules))
+	return MeasureSpec{
+		Factors:     factor.FactorsFromDefinitionDimensions(dimensions),
+		FactorGraph: factor.FactorGraphFromDefinitionDimensions(dimensions),
+		Scoring:     factor.ScoringFromDefinitionDimensions(dimensions),
+	}, Calibration{}
 }
 
 // ValidateMeasureSpec checks measure-layer invariants.

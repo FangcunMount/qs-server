@@ -248,7 +248,7 @@ func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
 	}
 }
 
-func TestApplicationDoesNotImportLegacyFactorMechanismHosts(t *testing.T) {
+func TestApplicationDoesNotImportDeprecatedFactorMechanismHosts(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)

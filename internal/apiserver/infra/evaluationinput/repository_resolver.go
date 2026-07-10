@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -224,109 +223,6 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}, nil
-}
-
-type RepositoryScaleSnapshotCatalog struct {
-	repo ScaleSnapshotRepository
-}
-
-// ScaleSnapshotRepository is the narrow Scale read port needed by evaluation
-// input resolution. Command repositories may implement it, but providers should
-// not depend on Scale mutation capabilities.
-type ScaleSnapshotRepository interface {
-	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
-	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scaledefinition.MedicalScale, error)
-	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error)
-}
-
-type publishedScaleSnapshotRepository interface {
-	FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
-}
-
-func NewRepositoryScaleSnapshotCatalog(repo ScaleSnapshotRepository) *RepositoryScaleSnapshotCatalog {
-	return &RepositoryScaleSnapshotCatalog{repo: repo}
-}
-
-func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
-	l := logger.L(ctx)
-	l.Debugw("加载量表数据",
-		"scale_code", code,
-		"action", "read",
-		"resource", "scale",
-	)
-
-	medicalScale, err := r.findCurrentPublishedScale(ctx, code)
-	if err != nil {
-		l.Errorw("加载量表失败",
-			"scale_code", code,
-			"action", "read",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, port.NewResolveError(port.FailureKindScaleNotFound, err, "量表不存在", "加载量表失败")
-	}
-
-	l.Debugw("量表数据加载成功",
-		"scale_code", code,
-		"scale_title", medicalScale.GetTitle(),
-		"result", "success",
-	)
-	return scaleToSnapshot(medicalScale), nil
-}
-
-func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
-	l := logger.L(ctx)
-	l.Debugw("加载解释模型数据",
-		"model_kind", ref.Kind,
-		"ruleset_kind", ref.Kind,
-		"model_code", ref.Code,
-		"ruleset_version", ref.Version,
-		"action", "read",
-		"resource", "scale",
-	)
-
-	var (
-		medicalScale *scaledefinition.MedicalScale
-		err          error
-	)
-	if ref.Version != "" {
-		medicalScale, err = r.repo.FindByCodeVersion(ctx, ref.Code, ref.Version)
-	} else {
-		medicalScale, err = r.findCurrentPublishedScale(ctx, ref.Code)
-	}
-	if err != nil {
-		l.Errorw("加载解释模型失败",
-			"model_kind", ref.Kind,
-			"ruleset_kind", ref.Kind,
-			"model_code", ref.Code,
-			"ruleset_version", ref.Version,
-			"action", "read",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
-	}
-	snapshot := scaleToSnapshot(medicalScale)
-	if snapshot == nil || (ref.Version != "" && snapshot.ScaleVersion != ref.Version) {
-		err := fmt.Errorf("解释模型版本不存在或不匹配")
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型版本不存在或不匹配", "加载解释模型失败")
-	}
-
-	l.Debugw("解释模型数据加载成功",
-		"model_kind", ref.Kind,
-		"ruleset_kind", ref.Kind,
-		"model_code", ref.Code,
-		"ruleset_version", snapshot.ScaleVersion,
-		"result", "success",
-	)
-	return snapshot, nil
-}
-
-func (r *RepositoryScaleSnapshotCatalog) findCurrentPublishedScale(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	if repo, ok := r.repo.(publishedScaleSnapshotRepository); ok {
-		return repo.FindPublishedByCode(ctx, code)
-	}
-	return r.repo.FindByCode(ctx, code)
 }
 
 type RepositoryAnswerSheetSnapshotReader struct {

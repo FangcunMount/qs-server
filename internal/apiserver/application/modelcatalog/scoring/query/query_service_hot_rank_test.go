@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -28,13 +28,13 @@ func (s *hotRankReadModelStub) Top(_ context.Context, query hotrank.Query) ([]ho
 }
 
 type hotScaleReaderStub struct {
-	summaries        []*scaledefinition.MedicalScale
+	summaries        []scalereadmodel.ScaleSummaryRow
 	findSummaryCalls int
 }
 
 func (r *hotScaleReaderStub) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls++
-	return hotScaleRows(r.summaries), nil
+	return append([]scalereadmodel.ScaleSummaryRow(nil), r.summaries...), nil
 }
 
 func (r *hotScaleReaderStub) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
@@ -46,7 +46,7 @@ func TestListHotPublishedUsesHotRankReadModelOrdering(t *testing.T) {
 	scaleB := mustHotScale(t, "S-B", "Q-B")
 	scaleC := mustHotScale(t, "S-C", "Q-C")
 	reader := &hotScaleReaderStub{
-		summaries: []*scaledefinition.MedicalScale{scaleA, scaleB, scaleC},
+		summaries: []scalereadmodel.ScaleSummaryRow{scaleA, scaleB, scaleC},
 	}
 	rank := &hotRankReadModelStub{
 		entries: []hotrank.Entry{
@@ -91,7 +91,7 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := &hotScaleReaderStub{
-				summaries: []*scaledefinition.MedicalScale{scaleA, scaleB},
+				summaries: []scalereadmodel.ScaleSummaryRow{scaleA, scaleB},
 			}
 			publishedReader, publishedRepo := hotPublishedSources(t, scaleA, scaleB)
 			svc := newHotQueryService(reader, publishedReader, publishedRepo, tc.rank)
@@ -162,40 +162,15 @@ func TestResolveAssessmentScaleContextReturnsRepositoryError(t *testing.T) {
 	}
 }
 
-func hotScaleRows(items []*scaledefinition.MedicalScale) []scalereadmodel.ScaleSummaryRow {
-	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		rows = append(rows, scalereadmodel.ScaleSummaryRow{
-			Code:              item.GetCode().String(),
-			Title:             item.GetTitle(),
-			Description:       item.GetDescription(),
-			Category:          item.GetCategory().String(),
-			QuestionnaireCode: item.GetQuestionnaireCode().String(),
-			Status:            item.GetStatus().String(),
-			CreatedBy:         item.GetCreatedBy(),
-			CreatedAt:         item.GetCreatedAt(),
-			UpdatedBy:         item.GetUpdatedBy(),
-			UpdatedAt:         item.GetUpdatedAt(),
-		})
-	}
-	return rows
-}
-
-func mustHotScale(t *testing.T, code, questionnaireCode string) *scaledefinition.MedicalScale {
+func mustHotScale(t *testing.T, code, questionnaireCode string) scalereadmodel.ScaleSummaryRow {
 	t.Helper()
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode(code),
-		code+" title",
-		scaledefinition.WithID(meta.ID(901)),
-		scaledefinition.WithQuestionnaire(meta.NewCode(questionnaireCode), "1.0.0"),
-		scaledefinition.WithStatus(scaledefinition.StatusPublished),
-		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
+	return scalereadmodel.ScaleSummaryRow{
+		Code:              code,
+		Title:             code + " title",
+		Category:          "adhd",
+		QuestionnaireCode: questionnaireCode,
+		Status:            string(domain.ModelStatusPublished),
+		CreatedBy:         meta.ID(101),
+		UpdatedBy:         meta.ID(102),
 	}
-	return scale
 }

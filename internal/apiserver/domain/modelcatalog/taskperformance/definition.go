@@ -26,14 +26,13 @@ func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return nil, fmt.Errorf("decode cognitive definition: %w", err)
 	}
-	factors := factor.ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	measure, calibration := definition.ParseMeasureSpecFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.SPM != nil {
-		factors = ApplyNormMetadataToLegacyFactors(factors, MetadataContext{
+		measure, calibration = ApplyNormMetadata(measure, MetadataContext{
 			NormTableVersion: body.SPM.NormTableVersion,
 			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
 		})
 	}
-	measure, calibration := definition.MeasureAndCalibrationFromLegacyFactors(factors)
 	return &definition.Definition{
 		Measure:     measure,
 		Calibration: calibration,

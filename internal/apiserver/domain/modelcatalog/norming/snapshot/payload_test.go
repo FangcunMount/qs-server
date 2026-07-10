@@ -98,13 +98,21 @@ func TestParseBrief2PayloadAnnotatesCompositeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	byCode := factor.IndexByLegacyFactorCode(factor.LegacyFactorsFromSnapshots(got.Factors))
+	byCode := indexFactorSnapshotsByCode(got.Factors)
 	if byCode["bri"].ChildrenPolicy == nil || len(byCode["bri"].ChildrenPolicy.Children) != 2 {
 		t.Fatalf("bri policy = %#v", byCode["bri"].ChildrenPolicy)
 	}
 	if byCode["inhibit"].ParentCode != "bri" {
 		t.Fatalf("inhibit parent = %q", byCode["inhibit"].ParentCode)
 	}
+}
+
+func indexFactorSnapshotsByCode(factors []snapshot.FactorSnapshot) map[string]snapshot.FactorSnapshot {
+	out := make(map[string]snapshot.FactorSnapshot, len(factors))
+	for _, item := range factors {
+		out[item.Code] = item
+	}
+	return out
 }
 
 func TestParseBrief2PayloadAnnotatesFactorNormMetadata(t *testing.T) {

@@ -9,10 +9,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestGetByCodeReadsAssessmentModel(t *testing.T) {
@@ -100,10 +99,51 @@ func (emptyScaleReader) CountScales(context.Context, scalereadmodel.ScaleFilter)
 
 func newScaleAssessmentModelForQueryTest(t *testing.T, code string) *domain.AssessmentModel {
 	t.Helper()
-	scale := newLegacyScaleForQueryTest(t, code)
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
+	return newScaleAssessmentModelForQueryRefTest(t, code, "Scale "+code, "Q-"+code, "1.0.0", domain.ModelStatusPublished)
+}
+
+func newScaleAssessmentModelForQueryRefTest(t *testing.T, code, title, questionnaireCode, questionnaireVersion string, status domain.ModelStatus) *domain.AssessmentModel {
+	t.Helper()
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	model, err := legacyadapter.AssessmentModelFromCreateDTO(shared.CreateScaleDTO{
+		Code:                 code,
+		Title:                title,
+		Category:             "adhd",
+		QuestionnaireCode:    questionnaireCode,
+		QuestionnaireVersion: questionnaireVersion,
+	}, now)
 	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale: %v", err)
+		t.Fatalf("AssessmentModelFromCreateDTO: %v", err)
+	}
+	snapshot := &scalesnapshot.ScaleSnapshot{
+		Code:                 model.Code,
+		ScaleVersion:         "1.0.0",
+		Title:                model.Title,
+		QuestionnaireCode:    model.Binding.QuestionnaireCode,
+		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Status:               string(status),
+		Factors: []scalesnapshot.FactorSnapshot{{
+			Code:            "total",
+			Title:           "Total",
+			IsTotalScore:    true,
+			QuestionCodes:   []string{"Q1"},
+			ScoringStrategy: "sum",
+			InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
+				Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "watch",
+			}},
+		}},
+	}
+	payload, err := legacyadapter.DefinitionPayloadFromScaleSnapshot(snapshot)
+	if err != nil {
+		t.Fatalf("DefinitionPayloadFromScaleSnapshot: %v", err)
+	}
+	if err := model.UpdateDefinitionWithV2(payload, scalesnapshot.DefinitionFromScaleSnapshot(snapshot), now); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2: %v", err)
+	}
+	if status == domain.ModelStatusPublished {
+		if err := model.MarkPublished(now); err != nil {
+			t.Fatalf("MarkPublished: %v", err)
+		}
 	}
 	return model
 }
@@ -116,35 +156,6 @@ func newPublishedScaleSnapshotForQueryTest(t *testing.T, code string) *port.Publ
 		t.Fatalf("BuildAssessmentSnapshot: %v", err)
 	}
 	return snapshot
-}
-
-func newLegacyScaleForQueryTest(t *testing.T, code string) *scaledefinition.MedicalScale {
-	t.Helper()
-	factor, err := scaledefinition.NewFactor(
-		scaledefinition.NewFactorCode("total"),
-		"Total",
-		scaledefinition.WithIsTotalScore(true),
-		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategySum),
-		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
-		}),
-	)
-	if err != nil {
-		t.Fatalf("NewFactor: %v", err)
-	}
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode(code),
-		"Scale "+code,
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q-"+code), "1.0.0"),
-		scaledefinition.WithScaleVersion("1.0.0"),
-		scaledefinition.WithStatus(scaledefinition.StatusPublished),
-		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale: %v", err)
-	}
-	return scale
 }
 
 type dualReadModelRepo struct {

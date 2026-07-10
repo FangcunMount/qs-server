@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -108,192 +107,13 @@ type HotScaleListResult struct {
 	WindowDays int
 }
 
+// HotScaleSummaryRow is the read-model shape used by hot scale list assembly.
+type HotScaleSummaryRow struct {
+	Scale           scalereadmodel.ScaleSummaryRow
+	SubmissionCount int64
+}
+
 // ============= Converter 转换器 =============
-
-// ToScaleResult 将领域模型转换为结果对象
-func ToScaleResult(m *scaledefinition.MedicalScale) *ScaleResult {
-	if m == nil {
-		return nil
-	}
-
-	// 转换标签列表
-	tags := make([]string, 0, len(m.GetTags()))
-	for _, tag := range m.GetTags() {
-		tags = append(tags, tag.String())
-	}
-
-	// 转换填报人列表
-	reporters := make([]string, 0, len(m.GetReporters()))
-	for _, reporter := range m.GetReporters() {
-		reporters = append(reporters, reporter.String())
-	}
-
-	// 转换阶段列表
-	stages := make([]string, 0, len(m.GetStages()))
-	for _, stage := range m.GetStages() {
-		stages = append(stages, stage.String())
-	}
-
-	// 转换使用年龄列表
-	applicableAges := make([]string, 0, len(m.GetApplicableAges()))
-	for _, age := range m.GetApplicableAges() {
-		applicableAges = append(applicableAges, age.String())
-	}
-
-	result := &ScaleResult{
-		Code:                 m.GetCode().String(),
-		ScaleVersion:         m.GetScaleVersion(),
-		Title:                m.GetTitle(),
-		Description:          m.GetDescription(),
-		Category:             m.GetCategory().String(),
-		Stages:               stages,
-		ApplicableAges:       applicableAges,
-		Reporters:            reporters,
-		Tags:                 tags,
-		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
-		QuestionnaireVersion: m.GetQuestionnaireVersion(),
-		// QuestionCount 由问卷预存字段提供，若领域未持有则在上层补齐
-		Status:    m.GetStatus().String(),
-		Factors:   make([]FactorResult, 0),
-		CreatedBy: m.GetCreatedBy().String(),
-		CreatedAt: m.GetCreatedAt(),
-		UpdatedBy: m.GetUpdatedBy().String(),
-		UpdatedAt: m.GetUpdatedAt(),
-	}
-
-	for _, snapshot := range m.FactorSnapshots() {
-		result.Factors = append(result.Factors, ToFactorResult(snapshot))
-	}
-
-	return result
-}
-
-func ToScaleResultWithUsers(ctx context.Context, m *scaledefinition.MedicalScale, identitySvc iambridge.IdentityResolver) *ScaleResult {
-	if m == nil {
-		return nil
-	}
-
-	userNames := ResolveIdentityNames(ctx, identitySvc, []meta.ID{m.GetCreatedBy(), m.GetUpdatedBy()})
-	result := ToScaleResult(m)
-	result.CreatedBy = DisplayIdentityName(m.GetCreatedBy(), userNames)
-	result.UpdatedBy = DisplayIdentityName(m.GetUpdatedBy(), userNames)
-	return result
-}
-
-// ToFactorResult 将因子只读快照转换为结果对象。
-func ToFactorResult(snapshot scaledefinition.FactorSnapshot) FactorResult {
-	result := FactorResult{
-		Code:            snapshot.Code.String(),
-		Title:           snapshot.Title,
-		FactorType:      snapshot.FactorType.String(),
-		IsTotalScore:    snapshot.IsTotalScore,
-		IsShow:          snapshot.IsShow,
-		QuestionCodes:   make([]string, 0, len(snapshot.QuestionCodes)),
-		ScoringStrategy: snapshot.ScoringStrategy.String(),
-		ScoringParams:   scoringParamsResultMap(snapshot.ScoringParams, snapshot.ScoringStrategy),
-		MaxScore:        snapshot.MaxScore,
-		RiskLevel:       "",
-		InterpretRules:  make([]InterpretRuleResult, 0, len(snapshot.InterpretRules)),
-	}
-
-	for _, code := range snapshot.QuestionCodes {
-		result.QuestionCodes = append(result.QuestionCodes, code.String())
-	}
-
-	for i, rule := range snapshot.InterpretRules {
-		riskLevel := rule.GetRiskLevel().String()
-		result.InterpretRules = append(result.InterpretRules, InterpretRuleResult{
-			MinScore:   rule.GetScoreRange().Min(),
-			MaxScore:   rule.GetScoreRange().Max(),
-			RiskLevel:  riskLevel,
-			Conclusion: rule.GetConclusion(),
-			Suggestion: rule.GetSuggestion(),
-		})
-		if i == 0 {
-			result.RiskLevel = riskLevel
-		}
-	}
-
-	if len(snapshot.InterpretRules) == 0 {
-		result.RiskLevel = "none"
-	}
-
-	return result
-}
-
-func scoringParamsResultMap(params *scaledefinition.ScoringParams, strategy scaledefinition.ScoringStrategyCode) map[string]interface{} {
-	result := make(map[string]interface{})
-	if params == nil {
-		return result
-	}
-	switch strategy {
-	case scaledefinition.ScoringStrategyCnt:
-		contents := params.GetCntOptionContents()
-		if len(contents) > 0 {
-			result["cnt_option_contents"] = contents
-		}
-	case scaledefinition.ScoringStrategySum, scaledefinition.ScoringStrategyAvg:
-		// These strategies 当前ly do 不 expose 额外 params。
-	default:
-		// Keep unknown strategies 空; strategy 校验 属于 领域。
-	}
-	return result
-}
-
-// ToSummaryListResult 将量表摘要列表转换为结果对象
-func ToSummaryListResult(ctx context.Context, items []*scaledefinition.MedicalScale, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
-	userNames := resolveSummaryUserNames(ctx, items, identitySvc)
-	result := &ScaleSummaryListResult{
-		Items: make([]*ScaleSummaryResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		// 转换标签列表
-		tags := make([]string, 0, len(item.GetTags()))
-		for _, tag := range item.GetTags() {
-			tags = append(tags, tag.String())
-		}
-
-		// 转换填报人列表
-		reporters := make([]string, 0, len(item.GetReporters()))
-		for _, reporter := range item.GetReporters() {
-			reporters = append(reporters, reporter.String())
-		}
-
-		// 转换阶段列表
-		stages := make([]string, 0, len(item.GetStages()))
-		for _, stage := range item.GetStages() {
-			stages = append(stages, stage.String())
-		}
-
-		// 转换使用年龄列表
-		applicableAges := make([]string, 0, len(item.GetApplicableAges()))
-		for _, age := range item.GetApplicableAges() {
-			applicableAges = append(applicableAges, age.String())
-		}
-
-		result.Items = append(result.Items, &ScaleSummaryResult{
-			Code:              item.GetCode().String(),
-			ScaleVersion:      item.GetScaleVersion(),
-			Title:             item.GetTitle(),
-			Description:       item.GetDescription(),
-			Category:          item.GetCategory().String(),
-			Stages:            stages,
-			ApplicableAges:    applicableAges,
-			Reporters:         reporters,
-			Tags:              tags,
-			QuestionnaireCode: item.GetQuestionnaireCode().String(),
-			Status:            item.GetStatus().String(),
-			CreatedBy:         DisplayIdentityName(item.GetCreatedBy(), userNames),
-			CreatedAt:         item.GetCreatedAt(),
-			UpdatedBy:         DisplayIdentityName(item.GetUpdatedBy(), userNames),
-			UpdatedAt:         item.GetUpdatedAt(),
-		})
-	}
-
-	return result
-}
 
 func ToSummaryRowsResult(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
 	userNames := resolveScaleRowUserNames(ctx, items, identitySvc)
@@ -326,16 +146,17 @@ func ToSummaryRowsResult(ctx context.Context, items []scalereadmodel.ScaleSummar
 	return result
 }
 
-func ToHotScaleListResult(ctx context.Context, items []scaledefinition.HotScaleSummary, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
-	hotItems := make([]scaledefinition.HotScaleSummary, 0, len(items))
-	scales := make([]*scaledefinition.MedicalScale, 0, len(items))
+func ToHotScaleRowsListResult(ctx context.Context, items []HotScaleSummaryRow, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
+	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
+	counts := make([]int64, 0, len(items))
 	for _, item := range items {
-		if item.Scale != nil {
-			hotItems = append(hotItems, item)
-			scales = append(scales, item.Scale)
+		if item.Scale.Code == "" {
+			continue
 		}
+		rows = append(rows, item.Scale)
+		counts = append(counts, item.SubmissionCount)
 	}
-	summary := ToSummaryListResult(ctx, scales, int64(len(scales)), identitySvc)
+	summary := ToSummaryRowsResult(ctx, rows, int64(len(rows)), identitySvc)
 
 	result := &HotScaleListResult{
 		Items:      make([]*HotScaleSummaryResult, 0, len(summary.Items)),
@@ -344,7 +165,7 @@ func ToHotScaleListResult(ctx context.Context, items []scaledefinition.HotScaleS
 		WindowDays: windowDays,
 	}
 	for i, summaryItem := range summary.Items {
-		submissionCount := hotItems[i].SubmissionCount
+		submissionCount := counts[i]
 		result.Items = append(result.Items, &HotScaleSummaryResult{
 			ScaleSummaryResult: *summaryItem,
 			Rank:               i + 1,
@@ -353,17 +174,6 @@ func ToHotScaleListResult(ctx context.Context, items []scaledefinition.HotScaleS
 		})
 	}
 	return result
-}
-
-func resolveSummaryUserNames(ctx context.Context, items []*scaledefinition.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
-	userIDs := make([]meta.ID, 0, len(items)*2)
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
-	}
-	return ResolveIdentityNames(ctx, identitySvc, userIDs)
 }
 
 func resolveScaleRowUserNames(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, identitySvc iambridge.IdentityResolver) map[string]string {

@@ -1,6 +1,7 @@
 package taskperformance
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
@@ -12,26 +13,20 @@ type MetadataContext struct {
 	ItemSetCodes     []string
 }
 
-// ApplyNormMetadataToLegacyFactors 标注 legacy flat 因子 使用 task-set 角色 和 常模 references。
-func ApplyNormMetadataToLegacyFactors(factors []factor.LegacyFactor, ctx MetadataContext) []factor.LegacyFactor {
-	if len(factors) == 0 {
-		return factors
+// ApplyNormMetadata projects task-set role and norm metadata into the target
+// definition layers.
+func ApplyNormMetadata(measure definition.MeasureSpec, ctx MetadataContext) (definition.MeasureSpec, definition.Calibration) {
+	if len(measure.Factors) == 0 {
+		return measure, definition.Calibration{}
 	}
 	itemSetCodes := stringSet(ctx.ItemSetCodes)
-	out := make([]factor.LegacyFactor, len(factors))
-	for i, item := range factors {
-		out[i] = item
+	out := cloneMeasureSpec(measure)
+	for i, item := range out.Factors {
 		if itemSetCodes[item.Code] {
-			out[i].Role = factor.FactorRoleTaskSet
-		}
-		if ctx.NormTableVersion != "" && (item.IsTotalScore || itemSetCodes[item.Code]) {
-			out[i].Norm = &factor.NormRef{
-				FactorCode:       item.Code,
-				NormTableVersion: ctx.NormTableVersion,
-			}
+			out.Factors[i].Role = factor.FactorRoleTaskSet
 		}
 	}
-	return out
+	return out, definition.Calibration{NormRefs: NormRefsFromMetadata(out.Factors, ctx)}
 }
 
 // NormRefsFromMetadata projects cognitive metadata into the target calibration layer.
@@ -61,4 +56,61 @@ func stringSet(values []string) map[string]bool {
 		set[value] = true
 	}
 	return set
+}
+
+func cloneMeasureSpec(measure definition.MeasureSpec) definition.MeasureSpec {
+	return definition.MeasureSpec{
+		Factors: append([]factor.Factor(nil), measure.Factors...),
+		FactorGraph: factor.FactorGraph{
+			Roots:      append([]string(nil), measure.FactorGraph.Roots...),
+			Edges:      append([]factor.FactorEdge(nil), measure.FactorGraph.Edges...),
+			SortOrders: cloneSortOrders(measure.FactorGraph.SortOrders),
+		},
+		Scoring: cloneScoring(measure.Scoring),
+	}
+}
+
+func cloneSortOrders(items map[string]int) map[string]int {
+	if items == nil {
+		return nil
+	}
+	out := make(map[string]int, len(items))
+	for key, value := range items {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneScoring(scoring []factor.Scoring) []factor.Scoring {
+	if scoring == nil {
+		return nil
+	}
+	out := make([]factor.Scoring, 0, len(scoring))
+	for _, rule := range scoring {
+		copied := rule
+		copied.Sources = append([]factor.ScoringSource(nil), rule.Sources...)
+		if rule.Params != nil {
+			copied.Params = &factor.ScoringParams{
+				CntOptionContents: append([]string(nil), rule.Params.CntOptionContents...),
+			}
+		}
+		if rule.MaxScore != nil {
+			maxScore := *rule.MaxScore
+			copied.MaxScore = &maxScore
+		}
+		copied.Weights = cloneWeights(rule.Weights)
+		out = append(out, copied)
+	}
+	return out
+}
+
+func cloneWeights(weights map[string]float64) map[string]float64 {
+	if weights == nil {
+		return nil
+	}
+	out := make(map[string]float64, len(weights))
+	for key, value := range weights {
+		out[key] = value
+	}
+	return out
 }

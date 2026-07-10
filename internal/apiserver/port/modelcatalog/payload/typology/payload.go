@@ -1,152 +1,127 @@
-// Package typology owns the runtime/published JSON DTO for typology execution.
 package typology
 
 import (
+	"strings"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	oldtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
-type (
-	Payload         = oldtypology.Payload
-	Source          = oldtypology.Source
-	Dimension       = oldtypology.Dimension
-	QuestionMapping = oldtypology.QuestionMapping
-	Outcome         = oldtypology.Outcome
-	Rarity          = oldtypology.Rarity
-	MatchingSpec    = oldtypology.MatchingSpec
-	SpecialTrigger  = oldtypology.SpecialTrigger
-
-	RuntimeSpec             = oldtypology.RuntimeSpec
-	FactorGraphSpec         = oldtypology.FactorGraphSpec
-	FactorSpec              = oldtypology.FactorSpec
-	FactorSpecKind          = oldtypology.FactorSpecKind
-	FactorAggregation       = oldtypology.FactorAggregation
-	FactorOptionScoring     = oldtypology.FactorOptionScoring
-	FactorContributionSpec  = oldtypology.FactorContributionSpec
-	PersonalityDecisionSpec = oldtypology.PersonalityDecisionSpec
-	LevelRuleSpec           = oldtypology.LevelRuleSpec
-	SpecialRulePhase        = oldtypology.SpecialRulePhase
-	SpecialRuleSpec         = oldtypology.SpecialRuleSpec
-	SpecialRuleKind         = oldtypology.SpecialRuleKind
-	SpecialRuleCondition    = oldtypology.SpecialRuleCondition
-	OutcomeDetailKind       = oldtypology.OutcomeDetailKind
-	OutcomeMappingSpec      = oldtypology.OutcomeMappingSpec
-	DetailAdapterKey        = oldtypology.DetailAdapterKey
-	ReportKind              = oldtypology.ReportKind
-	ReportSpec              = oldtypology.ReportSpec
-	ReportAdapterKey        = oldtypology.ReportAdapterKey
-
-	QuestionnaireSnapshot        = oldtypology.QuestionnaireSnapshot
-	QuestionSnapshot             = oldtypology.QuestionSnapshot
-	RuntimeSpecValidationContext = oldtypology.RuntimeSpecValidationContext
-
-	MBTILegacyModel           = oldtypology.MBTILegacyModel
-	MBTILegacySource          = oldtypology.MBTILegacySource
-	MBTILegacyDimension       = oldtypology.MBTILegacyDimension
-	MBTILegacyQuestionMapping = oldtypology.MBTILegacyQuestionMapping
-	MBTILegacyTypeProfile     = oldtypology.MBTILegacyTypeProfile
-
-	SBTILegacyModel           = oldtypology.SBTILegacyModel
-	SBTILegacySource          = oldtypology.SBTILegacySource
-	SBTILegacyDimension       = oldtypology.SBTILegacyDimension
-	SBTILegacyQuestionMapping = oldtypology.SBTILegacyQuestionMapping
-	SBTILegacyOutcome         = oldtypology.SBTILegacyOutcome
-	SBTILegacyRarity          = oldtypology.SBTILegacyRarity
-	SBTILegacyDrinkTrigger    = oldtypology.SBTILegacyDrinkTrigger
-)
-
-const (
-	FactorSpecKindLeaf      = oldtypology.FactorSpecKindLeaf
-	FactorSpecKindComposite = oldtypology.FactorSpecKindComposite
-
-	FactorAggregationSum         = oldtypology.FactorAggregationSum
-	FactorAggregationAvg         = oldtypology.FactorAggregationAvg
-	FactorAggregationWeightedAvg = oldtypology.FactorAggregationWeightedAvg
-
-	FactorOptionScoringStrict = oldtypology.FactorOptionScoringStrict
-	FactorOptionScoringCompat = oldtypology.FactorOptionScoringCompat
-
-	SpecialRuleBeforeScore    = oldtypology.SpecialRuleBeforeScore
-	SpecialRuleBeforeDecision = oldtypology.SpecialRuleBeforeDecision
-	SpecialRuleAfterDecision  = oldtypology.SpecialRuleAfterDecision
-
-	SpecialRuleKindAnswerMatch       = oldtypology.SpecialRuleKindAnswerMatch
-	SpecialRuleKindFallbackThreshold = oldtypology.SpecialRuleKindFallbackThreshold
-
-	OutcomeDetailPersonalityType = oldtypology.OutcomeDetailPersonalityType
-	OutcomeDetailTraitProfile    = oldtypology.OutcomeDetailTraitProfile
-
-	DetailAdapterPersonalityType = oldtypology.DetailAdapterPersonalityType
-	DetailAdapterTraitProfile    = oldtypology.DetailAdapterTraitProfile
-	DetailAdapterMBTI            = oldtypology.DetailAdapterMBTI
-	DetailAdapterSBTI            = oldtypology.DetailAdapterSBTI
-	DetailAdapterBigFive         = oldtypology.DetailAdapterBigFive
-
-	ReportKindPersonalityType = oldtypology.ReportKindPersonalityType
-	ReportKindTraitProfile    = oldtypology.ReportKindTraitProfile
-	ReportKindTemplate        = oldtypology.ReportKindTemplate
-
-	ReportAdapterPersonalityType = oldtypology.ReportAdapterPersonalityType
-	ReportAdapterTraitProfile    = oldtypology.ReportAdapterTraitProfile
-	ReportAdapterMBTI            = oldtypology.ReportAdapterMBTI
-	ReportAdapterSBTI            = oldtypology.ReportAdapterSBTI
-	ReportAdapterBigFive         = oldtypology.ReportAdapterBigFive
-)
-
-func FromMBTI(model *MBTILegacyModel) *Payload {
-	return oldtypology.FromMBTI(model)
+// Payload 是unified personality 类型学 model 载荷。
+type Payload struct {
+	Code                 string               `json:"code"`
+	Version              string               `json:"version"`
+	Title                string               `json:"title"`
+	QuestionnaireCode    string               `json:"questionnaire_code"`
+	QuestionnaireVersion string               `json:"questionnaire_version"`
+	Status               string               `json:"status"`
+	Source               Source               `json:"source"`
+	Algorithm            binding.Algorithm    `json:"algorithm"`
+	DimensionOrder       []string             `json:"dimension_order"`
+	Dimensions           map[string]Dimension `json:"dimensions"`
+	QuestionMappings     []QuestionMapping    `json:"question_mappings"`
+	Outcomes             []Outcome            `json:"outcomes"`
+	MatchingSpec         MatchingSpec         `json:"matching_spec"`
+	SpecialTriggers      []SpecialTrigger     `json:"special_triggers"`
+	Runtime              *RuntimeSpec         `json:"runtime,omitempty"`
 }
 
-func ToMBTI(payload *Payload) (*MBTILegacyModel, error) {
-	return oldtypology.ToMBTI(payload)
+// HasExplicitRuntime 报告是否 载荷 携带 作者定义 运行时规格。
+func (p *Payload) HasExplicitRuntime() bool {
+	return p != nil && p.Runtime != nil
 }
 
-func FromSBTI(model *SBTILegacyModel) *Payload {
-	return oldtypology.FromSBTI(model)
+func (p *Payload) IsPublished() bool {
+	if p == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(p.Status)) {
+	case "", "published":
+		return true
+	default:
+		return false
+	}
 }
 
-func ToSBTI(payload *Payload) (*SBTILegacyModel, error) {
-	return oldtypology.ToSBTI(payload)
+func (p *Payload) MatchesQuestionnaire(code, version string) bool {
+	if p == nil || p.QuestionnaireCode != code {
+		return false
+	}
+	return p.QuestionnaireVersion == "" || version == "" || p.QuestionnaireVersion == version
 }
 
-func PayloadAndRuntimeSpecFromDefinition(data []byte, defaultAlgorithm binding.Algorithm) (*Payload, *RuntimeSpec, error) {
-	return oldtypology.PayloadAndRuntimeSpecFromDefinition(data, defaultAlgorithm)
+func (p *Payload) FindOutcome(code string) (Outcome, bool) {
+	if p == nil {
+		return Outcome{}, false
+	}
+	for _, outcome := range p.Outcomes {
+		if outcome.Code == code {
+			return outcome, true
+		}
+	}
+	return Outcome{}, false
 }
 
-func DefinitionFromPayload(payload []byte, algorithm binding.Algorithm) (*definition.Definition, error) {
-	return oldtypology.DefinitionFromPayload(payload, algorithm)
+type Source struct {
+	QuestionsRepo string `json:"questions_repo,omitempty"`
+	WikiRepo      string `json:"wiki_repo,omitempty"`
+	SourceSite    string `json:"source_site,omitempty"`
+	License       string `json:"license,omitempty"`
+	Attribution   string `json:"attribution,omitempty"`
+	ImageBaseURL  string `json:"image_base_url,omitempty"`
+	NonCommercial bool   `json:"non_commercial,omitempty"`
 }
 
-func DefinitionFromRuntime(payload *Payload, runtime *RuntimeSpec) *definition.Definition {
-	return oldtypology.DefinitionFromRuntime(payload, runtime)
+type Dimension struct {
+	Code      string  `json:"code"`
+	Name      string  `json:"name"`
+	LeftPole  string  `json:"left_pole,omitempty"`
+	RightPole string  `json:"right_pole,omitempty"`
+	Constant  float64 `json:"constant,omitempty"`
+	Threshold float64 `json:"threshold,omitempty"`
+	Model     string  `json:"model,omitempty"`
 }
 
-func LegacyOutcomeMappingFromAlgorithm(algorithm binding.Algorithm) OutcomeMappingSpec {
-	return oldtypology.LegacyOutcomeMappingFromAlgorithm(algorithm)
+type QuestionMapping struct {
+	QuestionCode string             `json:"question_code"`
+	Dimension    string             `json:"dimension"`
+	Sign         float64            `json:"sign,omitempty"`
+	OptionScores map[string]float64 `json:"option_scores,omitempty"`
 }
 
-func LegacyReportSpecFromPayload(payload *Payload) ReportSpec {
-	return oldtypology.LegacyReportSpecFromPayload(payload)
+type Outcome struct {
+	Code        string   `json:"code"`
+	Name        string   `json:"name"`
+	OneLiner    string   `json:"one_liner,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+	Traits      []string `json:"traits,omitempty"`
+	Strengths   []string `json:"strengths,omitempty"`
+	Weaknesses  []string `json:"weaknesses,omitempty"`
+	Suggestions []string `json:"suggestions,omitempty"`
+	ImageURL    string   `json:"image_url,omitempty"`
+	Pattern     string   `json:"pattern,omitempty"`
+	Image       string   `json:"image,omitempty"`
+	Rarity      Rarity   `json:"rarity,omitempty"`
+	IsSpecial   bool     `json:"is_special,omitempty"`
+	Trigger     string   `json:"trigger,omitempty"`
+	Commentary  string   `json:"commentary,omitempty"`
 }
 
-func LegacyReportSpecFromAlgorithm(algorithm binding.Algorithm) ReportSpec {
-	return oldtypology.LegacyReportSpecFromAlgorithm(algorithm)
+type Rarity struct {
+	Percent float64 `json:"percent,omitempty"`
+	Label   string  `json:"label,omitempty"`
+	OneInX  int     `json:"one_in_x,omitempty"`
 }
 
-func CanonicalFactorsFromGraph(graph FactorGraphSpec) []factor.Factor {
-	return oldtypology.CanonicalFactorsFromGraph(graph)
+type MatchingSpec struct {
+	Kind                        binding.DecisionKind `json:"kind"`
+	FallbackSimilarityThreshold float64              `json:"fallback_similarity_threshold,omitempty"`
 }
 
-func CanonicalMeasureSpecFromGraph(graph FactorGraphSpec) definition.MeasureSpec {
-	return oldtypology.CanonicalMeasureSpecFromGraph(graph)
-}
-
-func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []binding.DomainValidationIssue {
-	return oldtypology.ValidateRuntimeSpecForPublish(spec, questionnaire)
-}
-
-func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []binding.DomainValidationIssue {
-	return oldtypology.ValidateRuntimeSpecForPublishWithContext(spec, questionnaire, validationContext)
+type SpecialTrigger struct {
+	Code          string   `json:"code"`
+	Name          string   `json:"name,omitempty"`
+	Trigger       string   `json:"trigger"`
+	OutcomeCode   string   `json:"outcome_code,omitempty"`
+	QuestionCodes []string `json:"question_codes,omitempty"`
+	OptionValues  []string `json:"option_values,omitempty"`
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+const ScaleStatusPublished = "published"
+
 // PageRequest describes a read-model page request.
 type PageRequest struct {
 	Page     int

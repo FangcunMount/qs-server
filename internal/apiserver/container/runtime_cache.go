@@ -11,7 +11,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -197,7 +196,7 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := infra.ScaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scaledefinition.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, err := infra.ScaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scalereadmodel.ScaleStatusPublished, PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}

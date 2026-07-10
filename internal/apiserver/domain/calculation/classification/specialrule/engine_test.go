@@ -5,31 +5,24 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 )
 
 func TestEngineApplyBeforeScoreMatchesDrinkTrigger(t *testing.T) {
-	payload := modeltypology.FromSBTI(&modeltypology.SBTILegacyModel{
-		Code:           "SBTI_FUN",
-		Version:        "1.0.0",
-		DimensionOrder: []string{"D1"},
-		Dimensions: map[string]modeltypology.SBTILegacyDimension{
-			"D1": {Code: "D1", Name: "D1", Model: "M1"},
+	rules := []specialrule.Rule{
+		{
+			Code: "DRUNK",
+			Kind: specialrule.RuleKindAnswerMatch,
+			Condition: specialrule.Condition{
+				QuestionCodes: []string{"drink_gate_q2"},
+				OptionValues:  []string{"C"},
+			},
 		},
-		SpecialOutcomes: []modeltypology.SBTILegacyOutcome{
-			{Code: "DRUNK", Name: "酒鬼", Trigger: "hidden:drink", IsSpecial: true},
-		},
-		DrinkTrigger: modeltypology.SBTILegacyDrinkTrigger{
-			QuestionCodes: []string{"drink_gate_q2"},
-			OptionValues:  []string{"C"},
-		},
-	})
-	spec, err := payload.ToRuntimeSpec()
-	if err != nil {
-		t.Fatalf("ToRuntimeSpec: %v", err)
+	}
+	outcomes := []specialrule.Outcome{
+		{Code: "DRUNK", Trigger: "hidden:drink"},
 	}
 
-	got, ok := (specialrule.Engine{}).ApplyBeforeScore(spec.SpecialRules, payload, []classification.Answer{
+	got, ok := (specialrule.Engine{}).ApplyBeforeScore(rules, outcomes, []classification.Answer{
 		{QuestionCode: "drink_gate_q2", Value: "C"},
 	})
 	if !ok {
@@ -38,32 +31,21 @@ func TestEngineApplyBeforeScoreMatchesDrinkTrigger(t *testing.T) {
 	if got.OutcomeCode != "DRUNK" || !got.SkipScoring {
 		t.Fatalf("match = %#v", got)
 	}
-	for _, rule := range spec.SpecialRules {
-		if rule.Code == "DRUNK" && rule.Kind != modeltypology.SpecialRuleKindAnswerMatch {
-			t.Fatalf("DRUNK rule Kind = %s, want answer_match", rule.Kind)
-		}
-	}
 }
 
 func TestEngineApplyAfterDecisionUsesFallbackOutcome(t *testing.T) {
-	payload := modeltypology.FromSBTI(&modeltypology.SBTILegacyModel{
-		Code:                        "SBTI_FUN",
-		Version:                     "1.0.0",
+	rules := []specialrule.Rule{
+		{Kind: specialrule.RuleKindFallbackThreshold, Phase: specialrule.RuleAfterDecision},
+	}
+	decision := specialrule.Decision{
 		FallbackSimilarityThreshold: 0.9,
-		DimensionOrder:              []string{"D1"},
-		Dimensions: map[string]modeltypology.SBTILegacyDimension{
-			"D1": {Code: "D1", Name: "D1", Model: "M1"},
-		},
-		SpecialOutcomes: []modeltypology.SBTILegacyOutcome{
-			{Code: "HHHH", Name: "傻乐者", Trigger: "fallback:best_match<60%", IsSpecial: true},
-		},
-	})
-	spec, err := payload.ToRuntimeSpec()
-	if err != nil {
-		t.Fatalf("ToRuntimeSpec: %v", err)
+		FallbackCode:                "HHHH",
+	}
+	outcomes := []specialrule.Outcome{
+		{Code: "HHHH", Trigger: "fallback:best_match<60%"},
 	}
 
-	got, ok := (specialrule.Engine{}).ApplyAfterDecision(spec.SpecialRules, spec.Decision, payload, 0.5)
+	got, ok := (specialrule.Engine{}).ApplyAfterDecision(rules, decision, outcomes, 0.5)
 	if !ok {
 		t.Fatal("expected fallback match")
 	}

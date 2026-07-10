@@ -4,13 +4,12 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 )
 
-func TestToFactorDomainDefaultsAndMapsDTOFields(t *testing.T) {
+func TestToFactorSnapshotDefaultsAndMapsDTOFields(t *testing.T) {
 	maxScore := 10.0
 
-	factor, err := toFactorDomain(
+	factor, err := toFactorSnapshot(
 		"F1",
 		"Factor 1",
 		"",
@@ -23,61 +22,58 @@ func TestToFactorDomainDefaultsAndMapsDTOFields(t *testing.T) {
 		[]shared.InterpretRuleDTO{{MinScore: 0, MaxScore: 5, RiskLevel: "low", Conclusion: "low", Suggestion: "watch"}},
 	)
 	if err != nil {
-		t.Fatalf("toFactorDomain() error = %v", err)
+		t.Fatalf("toFactorSnapshot() error = %v", err)
 	}
 
-	if factor.GetCode().String() != "F1" || factor.GetFactorType() != scaledefinition.FactorTypePrimary {
-		t.Fatalf("unexpected factor identity/type: %#v %q", factor.GetCode(), factor.GetFactorType())
+	if factor.Code != "F1" {
+		t.Fatalf("factor code = %q, want F1", factor.Code)
 	}
-	if factor.GetScoringStrategy() != scaledefinition.ScoringStrategySum {
-		t.Fatalf("scoring strategy = %q, want sum", factor.GetScoringStrategy())
+	if factor.ScoringStrategy != "sum" {
+		t.Fatalf("scoring strategy = %q, want sum", factor.ScoringStrategy)
 	}
-	if got := len(factor.GetQuestionCodes()); got != 2 {
+	if got := len(factor.QuestionCodes); got != 2 {
 		t.Fatalf("question code count = %d, want 2", got)
 	}
-	if got := len(factor.GetInterpretRules()); got != 1 {
+	if got := len(factor.InterpretRules); got != 1 {
 		t.Fatalf("interpret rule count = %d, want 1", got)
 	}
-	if factor.GetMaxScore() == nil || *factor.GetMaxScore() != maxScore {
-		t.Fatalf("max score = %#v, want %v", factor.GetMaxScore(), maxScore)
+	if factor.MaxScore == nil || *factor.MaxScore != maxScore {
+		t.Fatalf("max score = %#v, want %v", factor.MaxScore, maxScore)
 	}
 }
 
-func TestToFactorDomainRejectsCntStrategyWithoutCntOptionContents(t *testing.T) {
-	_, err := toFactorDomain(
+func TestToFactorSnapshotRejectsCntStrategyWithoutCntOptionContents(t *testing.T) {
+	_, err := toFactorSnapshot(
 		"F1",
 		"Factor 1",
 		"",
 		false,
 		true,
-		nil,
-		scaledefinition.ScoringStrategyCnt.String(),
+		[]string{"Q1"},
+		"cnt",
 		nil,
 		nil,
 		nil,
 	)
 	if err == nil {
-		t.Fatal("toFactorDomain() error = nil, want cnt parameter validation error")
+		t.Fatal("toFactorSnapshot() error = nil, want cnt parameter validation error")
 	}
 }
 
-func TestToFactorDomainAcceptsLegacyFactorType(t *testing.T) {
-	factor, err := toFactorDomain(
+func TestToFactorSnapshotAcceptsHistoricalFactorType(t *testing.T) {
+	_, err := toFactorSnapshot(
 		"F1",
 		"Factor 1",
 		"first_grade",
 		false,
 		true,
 		[]string{"Q1"},
-		scaledefinition.ScoringStrategySum.String(),
+		"sum",
 		nil,
 		nil,
 		nil,
 	)
 	if err != nil {
-		t.Fatalf("toFactorDomain() error = %v", err)
-	}
-	if factor.GetFactorType() != scaledefinition.FactorTypePrimary {
-		t.Fatalf("factor type = %q, want %q", factor.GetFactorType(), scaledefinition.FactorTypePrimary)
+		t.Fatalf("toFactorSnapshot() error = %v", err)
 	}
 }

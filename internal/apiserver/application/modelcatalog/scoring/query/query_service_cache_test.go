@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -52,8 +50,8 @@ func TestScaleQueryServiceListPublishedFallsBackWhenCacheMisses(t *testing.T) {
 
 	repo := &scaleCacheQueryRepo{
 		count: 1,
-		pages: map[int][]*scaledefinition.MedicalScale{
-			1: {newScaleCacheQueryScale(t, "SCALE_DB", "DB Scale", scaledefinition.StatusPublished)},
+		pages: map[int][]scalereadmodel.ScaleSummaryRow{
+			1: {newScaleCacheQueryRow("SCALE_DB", "DB Scale", scalereadmodel.ScaleStatusPublished)},
 		},
 	}
 	cache := &publishedScaleListCacheStub{hit: false}
@@ -116,51 +114,14 @@ func (c *publishedScaleListCacheStub) GetPage(context.Context, int, int) (*scale
 
 type scaleCacheQueryRepo struct {
 	count            int64
-	pages            map[int][]*scaledefinition.MedicalScale
-	byCode           map[string]*scaledefinition.MedicalScale
+	pages            map[int][]scalereadmodel.ScaleSummaryRow
 	findSummaryCalls atomic.Int32
 	countCalls       atomic.Int32
-	removeCalls      atomic.Int32
-}
-
-func (r *scaleCacheQueryRepo) Create(context.Context, *scaledefinition.MedicalScale) error {
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) FindByCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	if item, ok := r.byCode[code]; ok {
-		return item, nil
-	}
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *scaleCacheQueryRepo) FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByCode(ctx, code)
-}
-
-func (r *scaleCacheQueryRepo) FindByCodeVersion(ctx context.Context, code, _ string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByCode(ctx, code)
-}
-
-func (r *scaleCacheQueryRepo) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
-}
-
-func (r *scaleCacheQueryRepo) FindPublishedByQuestionnaireCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
-	return r.FindByQuestionnaireCode(ctx, code)
-}
-
-func (r *scaleCacheQueryRepo) FindByQuestionnaireRef(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
-	return nil, scaledefinition.ErrNotFound
 }
 
 func (r *scaleCacheQueryRepo) ListScales(_ context.Context, _ scalereadmodel.ScaleFilter, page scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls.Add(1)
-	return scaleCacheQueryRows(r.pages[page.Page]), nil
+	return append([]scalereadmodel.ScaleSummaryRow(nil), r.pages[page.Page]...), nil
 }
 
 func (r *scaleCacheQueryRepo) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
@@ -168,80 +129,25 @@ func (r *scaleCacheQueryRepo) CountScales(context.Context, scalereadmodel.ScaleF
 	return r.count, nil
 }
 
-func (r *scaleCacheQueryRepo) Update(context.Context, *scaledefinition.MedicalScale) error {
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) Remove(context.Context, string) error {
-	r.removeCalls.Add(1)
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) SetActivePublishedVersion(context.Context, string, string) error {
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) ClearActivePublishedVersion(context.Context, string) error {
-	return nil
-}
-
-func (r *scaleCacheQueryRepo) ExistsByCode(context.Context, string) (bool, error) {
-	return false, nil
-}
-
-func scaleCacheQueryRows(items []*scaledefinition.MedicalScale) []scalereadmodel.ScaleSummaryRow {
-	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		rows = append(rows, scalereadmodel.ScaleSummaryRow{
-			Code:              item.GetCode().String(),
-			Title:             item.GetTitle(),
-			Description:       item.GetDescription(),
-			Category:          item.GetCategory().String(),
-			QuestionnaireCode: item.GetQuestionnaireCode().String(),
-			Status:            item.GetStatus().String(),
-			CreatedBy:         item.GetCreatedBy(),
-			CreatedAt:         item.GetCreatedAt(),
-			UpdatedBy:         item.GetUpdatedBy(),
-			UpdatedAt:         item.GetUpdatedAt(),
-		})
-	}
-	return rows
-}
-
-func newScaleCacheQueryScale(t *testing.T, code, title string, status scaledefinition.Status) *scaledefinition.MedicalScale {
-	t.Helper()
-
+func newScaleCacheQueryRow(code, title, status string) scalereadmodel.ScaleSummaryRow {
 	now := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode(code),
-		title,
-		scaledefinition.WithDescription("description"),
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q_"+code), "v1"),
-		scaledefinition.WithStatus(status),
-		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
-		scaledefinition.WithCreatedBy(meta.ID(101)),
-		scaledefinition.WithUpdatedBy(meta.ID(102)),
-		scaledefinition.WithCreatedAt(now),
-		scaledefinition.WithUpdatedAt(now),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
+	return scalereadmodel.ScaleSummaryRow{
+		Code:              code,
+		Title:             title,
+		Description:       "description",
+		Category:          "adhd",
+		QuestionnaireCode: "Q_" + code,
+		Status:            status,
+		CreatedBy:         meta.ID(101),
+		CreatedAt:         now,
+		UpdatedBy:         meta.ID(102),
+		UpdatedAt:         now,
 	}
-	return scale
 }
 
 func newScaleCacheQueryAssessmentModel(t *testing.T, code, title string) *domain.AssessmentModel {
 	t.Helper()
-	scale := newScaleCacheQueryScale(t, code, title, scaledefinition.StatusDraft)
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
-	}
-	model.Code = code
-	return model
+	return newScaleAssessmentModelForQueryRefTest(t, code, title, "Q_"+code, "v1", domain.ModelStatusDraft)
 }
 
 type scaleCacheDeleteModelRepo struct {

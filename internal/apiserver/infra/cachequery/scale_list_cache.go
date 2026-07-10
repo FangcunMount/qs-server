@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -67,7 +66,7 @@ func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
 	}
 
 	filter := scalereadmodel.ScaleFilter{
-		Status:        scaledefinition.StatusPublished.Value(),
+		Status:        scalereadmodel.ScaleStatusPublished,
 		PublishedOnly: true,
 	}
 

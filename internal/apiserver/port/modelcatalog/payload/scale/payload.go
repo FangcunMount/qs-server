@@ -3,8 +3,6 @@ package scale
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
 // ParsePublishedPayload decodes a published scale payload envelope.
@@ -28,6 +26,18 @@ type ScaleSnapshot struct {
 	Factors              []FactorSnapshot
 }
 
+// ExecutionEnvelope carries non-factor metadata when projecting DefinitionV2
+// into the published scale runtime DTO.
+type ExecutionEnvelope struct {
+	ID                   uint64
+	Code                 string
+	ScaleVersion         string
+	Title                string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Status               string
+}
+
 func (s *ScaleSnapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
 }
@@ -42,18 +52,6 @@ func (s *ScaleSnapshot) FindFactor(code string) (*FactorSnapshot, bool) {
 		}
 	}
 	return nil, false
-}
-
-// CanonicalFactors 投影scale execution 因子 为 规范 目录 form。
-func (s *ScaleSnapshot) CanonicalFactors() []factor.FactorSnapshot {
-	if s == nil {
-		return nil
-	}
-	out := make([]factor.FactorSnapshot, 0, len(s.Factors))
-	for _, item := range s.Factors {
-		out = append(out, item.Canonical())
-	}
-	return out
 }
 
 type FactorSnapshot struct {

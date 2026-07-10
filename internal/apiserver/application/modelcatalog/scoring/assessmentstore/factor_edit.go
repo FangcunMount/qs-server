@@ -3,44 +3,34 @@ package assessmentstore
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-func addFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factor *scaledefinition.Factor) error {
-	if snapshot == nil || factor == nil {
+func addFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factor scalesnapshot.FactorSnapshot) error {
+	if snapshot == nil {
 		return fmt.Errorf("scale snapshot or factor is nil")
 	}
-	code := factor.GetCode().String()
 	for _, existing := range snapshot.Factors {
-		if existing.Code == code {
-			return scaledefinition.ToError([]scaledefinition.ValidationError{{
-				Field:   "factor.code",
-				Message: "factor code already exists",
-			}})
+		if existing.Code == factor.Code {
+			return fmt.Errorf("factor.code: factor code already exists")
 		}
 	}
-	snapshot.Factors = append(snapshot.Factors, legacyadapter.ScaleFactorSnapshotFromMedicalScale(factor.Snapshot()))
+	snapshot.Factors = append(snapshot.Factors, cloneFactorSnapshot(factor))
 	return nil
 }
 
-func updateFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factor *scaledefinition.Factor) error {
-	if snapshot == nil || factor == nil {
+func updateFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factor scalesnapshot.FactorSnapshot) error {
+	if snapshot == nil {
 		return fmt.Errorf("scale snapshot or factor is nil")
 	}
-	code := factor.GetCode().String()
 	for i := range snapshot.Factors {
-		if snapshot.Factors[i].Code != code {
+		if snapshot.Factors[i].Code != factor.Code {
 			continue
 		}
-		snapshot.Factors[i] = legacyadapter.ScaleFactorSnapshotFromMedicalScale(factor.Snapshot())
+		snapshot.Factors[i] = cloneFactorSnapshot(factor)
 		return nil
 	}
-	return scaledefinition.ToError([]scaledefinition.ValidationError{{
-		Field:   "factor.code",
-		Message: "factor not found",
-	}})
+	return fmt.Errorf("factor.code: factor not found")
 }
 
 func removeFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factorCode string) error {
@@ -54,25 +44,22 @@ func removeFactorSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factorCode stri
 		snapshot.Factors = append(snapshot.Factors[:i], snapshot.Factors[i+1:]...)
 		return nil
 	}
-	return scaledefinition.ToError([]scaledefinition.ValidationError{{
-		Field:   "factor.code",
-		Message: "factor not found",
-	}})
+	return fmt.Errorf("factor.code: factor not found")
 }
 
-func replaceFactorSnapshots(snapshot *scalesnapshot.ScaleSnapshot, factors []*scaledefinition.Factor) error {
+func replaceFactorSnapshots(snapshot *scalesnapshot.ScaleSnapshot, factors []scalesnapshot.FactorSnapshot) error {
 	if snapshot == nil {
 		return fmt.Errorf("scale snapshot is nil")
 	}
 	out := make([]scalesnapshot.FactorSnapshot, 0, len(factors))
 	for _, factor := range factors {
-		out = append(out, legacyadapter.ScaleFactorSnapshotFromMedicalScale(factor.Snapshot()))
+		out = append(out, cloneFactorSnapshot(factor))
 	}
 	snapshot.Factors = out
 	return nil
 }
 
-func updateFactorInterpretRulesSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factorCode string, rules []scaledefinition.InterpretationRule) error {
+func updateFactorInterpretRulesSnapshot(snapshot *scalesnapshot.ScaleSnapshot, factorCode string, rules []scalesnapshot.InterpretRuleSnapshot) error {
 	if snapshot == nil {
 		return fmt.Errorf("scale snapshot is nil")
 	}
@@ -80,22 +67,45 @@ func updateFactorInterpretRulesSnapshot(snapshot *scalesnapshot.ScaleSnapshot, f
 		if snapshot.Factors[i].Code != factorCode {
 			continue
 		}
-		snapshotRules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(rules))
-		for _, rule := range rules {
-			scoreRange := rule.GetScoreRange()
-			snapshotRules = append(snapshotRules, scalesnapshot.InterpretRuleSnapshot{
-				Min:        scoreRange.Min(),
-				Max:        scoreRange.Max(),
-				RiskLevel:  string(rule.GetRiskLevel()),
-				Conclusion: rule.GetConclusion(),
-				Suggestion: rule.GetSuggestion(),
-			})
-		}
-		snapshot.Factors[i].InterpretRules = snapshotRules
+		snapshot.Factors[i].InterpretRules = cloneInterpretRuleSnapshots(rules)
 		return nil
 	}
-	return scaledefinition.ToError([]scaledefinition.ValidationError{{
-		Field:   "factor.code",
-		Message: "factor not found",
-	}})
+	return fmt.Errorf("factor.code: factor not found")
+}
+
+func cloneFactorSnapshot(factor scalesnapshot.FactorSnapshot) scalesnapshot.FactorSnapshot {
+	return scalesnapshot.FactorSnapshot{
+		Code:            factor.Code,
+		Title:           factor.Title,
+		IsTotalScore:    factor.IsTotalScore,
+		QuestionCodes:   append([]string(nil), factor.QuestionCodes...),
+		ScoringStrategy: factor.ScoringStrategy,
+		ScoringParams: scalesnapshot.ScoringParamsSnapshot{
+			CntOptionContents: append([]string(nil), factor.ScoringParams.CntOptionContents...),
+		},
+		MaxScore:       cloneFloat64(factor.MaxScore),
+		InterpretRules: cloneInterpretRuleSnapshots(factor.InterpretRules),
+	}
+}
+
+func cloneInterpretRuleSnapshots(rules []scalesnapshot.InterpretRuleSnapshot) []scalesnapshot.InterpretRuleSnapshot {
+	out := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(rules))
+	for _, rule := range rules {
+		out = append(out, scalesnapshot.InterpretRuleSnapshot{
+			Min:        rule.Min,
+			Max:        rule.Max,
+			RiskLevel:  rule.RiskLevel,
+			Conclusion: rule.Conclusion,
+			Suggestion: rule.Suggestion,
+		})
+	}
+	return out
+}
+
+func cloneFloat64(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copied := *value
+	return &copied
 }

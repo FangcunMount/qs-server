@@ -7,6 +7,7 @@ import (
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 )
 
@@ -20,7 +21,7 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 		},
 	}
 	snapshot := &behavioralsnapshot.Snapshot{
-		Factors: []factor.FactorSnapshot{
+		Factors: []behavioralsnapshot.FactorSnapshot{
 			{Code: "inhibit", Title: "Inhibit"},
 			{Code: "self_monitor", Title: "Self Monitor"},
 			{
@@ -36,7 +37,7 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 					Strategy: factor.ChildrenAggregationSum,
 					Children: []string{"bri"},
 				},
-				Norm: &factor.NormRef{FactorCode: "gec", NormTableVersion: "2024"},
+				Norm: &catalognorm.Ref{FactorCode: "gec", NormTableVersion: "2024"},
 			},
 		},
 		Norming: &behavioralsnapshot.NormingProfile{

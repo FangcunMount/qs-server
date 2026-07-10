@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -193,35 +192,20 @@ func newScaleListCacheScale(t *testing.T, code, title string) scalereadmodel.Sca
 	t.Helper()
 
 	now := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode(code),
-		title,
-		scaledefinition.WithDescription("description"),
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q_"+code), "v1"),
-		scaledefinition.WithStatus(scaledefinition.StatusPublished),
-		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
-		scaledefinition.WithCreatedBy(meta.ID(101)),
-		scaledefinition.WithUpdatedBy(meta.ID(102)),
-		scaledefinition.WithCreatedAt(now),
-		scaledefinition.WithUpdatedAt(now),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
 	return scalereadmodel.ScaleSummaryRow{
-		Code:              scale.GetCode().String(),
-		Title:             scale.GetTitle(),
-		Description:       scale.GetDescription(),
-		Category:          scale.GetCategory().String(),
-		Stages:            []string{scaledefinition.StageDeepAssessment.String()},
-		ApplicableAges:    []string{scaledefinition.ApplicableAgeSchoolChild.String()},
-		Reporters:         []string{scaledefinition.ReporterParent.String()},
+		Code:              code,
+		Title:             title,
+		Description:       "description",
+		Category:          "adhd",
+		Stages:            []string{"deep_assessment"},
+		ApplicableAges:    []string{"school_child"},
+		Reporters:         []string{"parent"},
 		Tags:              []string{"tag"},
-		QuestionnaireCode: scale.GetQuestionnaireCode().String(),
-		Status:            scale.GetStatus().String(),
-		CreatedBy:         scale.GetCreatedBy(),
-		CreatedAt:         scale.GetCreatedAt(),
-		UpdatedBy:         scale.GetUpdatedBy(),
-		UpdatedAt:         scale.GetUpdatedAt(),
+		QuestionnaireCode: "Q_" + code,
+		Status:            scalereadmodel.ScaleStatusPublished,
+		CreatedBy:         meta.ID(101),
+		CreatedAt:         now,
+		UpdatedBy:         meta.ID(102),
+		UpdatedAt:         now,
 	}
 }

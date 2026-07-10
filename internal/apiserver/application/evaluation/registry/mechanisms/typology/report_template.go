@@ -6,9 +6,16 @@ import (
 )
 
 func personalityTypeTemplateForSpec(spec modeltypology.ReportSpec) reporttypology.PersonalityTypeReportTemplate {
-	return reporttypology.PersonalityTypeTemplateForSpec(spec)
+	return reporttypology.PersonalityTypeTemplateForSpec(reportTemplateSpec(spec))
 }
 
 func traitProfileTemplateForSpec(spec modeltypology.ReportSpec) reporttypology.TraitProfileReportTemplate {
-	return reporttypology.TraitProfileTemplateForSpec(spec)
+	return reporttypology.TraitProfileTemplateForSpec(reportTemplateSpec(spec))
+}
+
+func reportTemplateSpec(spec modeltypology.ReportSpec) reporttypology.ReportSpec {
+	return reporttypology.ReportSpec{
+		AdapterKey: reporttypology.ReportAdapterKey(spec.AdapterKey),
+		TemplateID: spec.TemplateID,
+	}
 }

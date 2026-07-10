@@ -3,24 +3,15 @@ package lifecycle
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestPublishUsesPublicationPublisherWhenAssessmentModelStoreConfigured(t *testing.T) {
 	ctx := context.Background()
-	legacyScale := newPublishableScaleForTest(t)
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(legacyScale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
-	}
-	model.Code = "SCL-001"
+	model := newPublishableScaleModelForTest(t)
 
 	modelRepo := &publishAssessmentModelRepoStub{model: model}
 	publishedRepo := &publishPublishedModelRepoStub{}
@@ -118,32 +109,17 @@ func (r *publishPublishedModelRepoStub) DeletePublished(_ context.Context, _ dom
 var _ modelcatalogport.ModelRepository = (*publishAssessmentModelRepoStub)(nil)
 var _ modelcatalogport.PublishedModelRepository = (*publishPublishedModelRepoStub)(nil)
 
-func newPublishableScaleForTest(t *testing.T) *scaledefinition.MedicalScale {
+func newPublishableScaleModelForTest(t *testing.T) *domain.AssessmentModel {
 	t.Helper()
-	factor, err := scaledefinition.NewFactor(
-		scaledefinition.NewFactorCode("total"),
-		"总分",
-		scaledefinition.WithIsTotalScore(true),
-		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategySum),
-		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
-			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
-		}),
-	)
-	if err != nil {
-		t.Fatalf("NewFactor: %v", err)
-	}
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SCL-001"),
+	return newLifecycleScaleAssessmentModel(
+		t,
+		"SCL-001",
 		"Demo",
-		scaledefinition.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
-		scaledefinition.WithScaleVersion("1.0.0"),
-		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
+		"QNR-001",
+		"1.0.0",
+		domain.ModelStatusDraft,
+		lifecyclePublishableFactorSnapshots(),
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale: %v", err)
-	}
-	return scale
 }
 
 func publishedQuestionnaireCatalogForScalePublish() *questionnaireCatalogBindingStub {

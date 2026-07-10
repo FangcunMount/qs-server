@@ -37,43 +37,7 @@ type InterpretRule struct {
 
 // ParseFactorsFromDefinitionBody 从共享 payload parts 物化瘦领域 Factor。
 func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []Factor {
-	return SlimFactorsFromLegacy(ParseLegacyFactorsFromDefinitionBody(dimensions, interpretRules))
-}
-
-// ParseLegacyFactorsFromDefinitionBody 从共享 payload parts 物化 legacy flat factor。
-func ParseLegacyFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []LegacyFactor {
-	rulesByDimension := make(map[string][]ScoreRangeRule, len(interpretRules))
-	for _, rule := range interpretRules {
-		rulesByDimension[rule.DimensionCode] = cloneScoreRangeRules(rule.Ranges)
-	}
-	factors := make([]LegacyFactor, 0, len(dimensions))
-	for _, dimension := range dimensions {
-		role := FactorRole(dimension.Role)
-		if role != "" && !role.IsValid() {
-			role = ""
-		}
-		factors = append(factors, LegacyFactor{
-			Code:            dimension.Code,
-			Title:           dimension.Title,
-			Role:            role,
-			ParentCode:      dimension.ParentCode,
-			SortOrder:       dimension.SortOrder,
-			Level:           dimension.Level,
-			IsTotalScore:    dimension.IsTotalScore,
-			QuestionCodes:   cloneStrings(dimension.QuestionCodes),
-			ScoringStrategy: dimension.ScoringStrategy,
-			ScoringParams:   scoringParamsFromPayload(dimension.ScoringParams),
-			MaxScore:        cloneFloat64(dimension.MaxScore),
-			InterpretRules:  cloneScoreRangeRules(rulesByDimension[dimension.Code]),
-			ChildrenPolicy:  childrenPolicyFromPayload(dimension.ChildrenPolicy),
-		})
-	}
-	return factors
-}
-
-// ParseFactorSnapshotsFromDefinitionBody 从共享 payload parts 物化 runtime/published 边界 DTO。
-func ParseFactorSnapshotsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []FactorSnapshot {
-	return SnapshotsFromLegacyFactors(ParseLegacyFactorsFromDefinitionBody(dimensions, interpretRules))
+	return FactorsFromDefinitionDimensions(dimensions)
 }
 
 func childrenPolicyFromPayload(payload *ChildrenPolicyPayload) *ChildrenPolicy {

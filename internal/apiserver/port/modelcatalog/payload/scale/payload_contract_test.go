@@ -6,39 +6,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	oldscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	newscale "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 func TestScalePayloadJSONShapeMatchesLegacySnapshot(t *testing.T) {
 	maxScore := 10.0
-	oldPayload := &oldscale.ScaleSnapshot{
-		ID:                   42,
-		Code:                 "SCL_CONTRACT",
-		ScaleVersion:         "1.0.0",
-		Title:                "Contract Scale",
-		QuestionnaireCode:    "Q_CONTRACT",
-		QuestionnaireVersion: "2.0.0",
-		Status:               "published",
-		Factors: []oldscale.FactorSnapshot{{
-			Code:            "total",
-			Title:           "Total",
-			IsTotalScore:    true,
-			QuestionCodes:   []string{"Q1", "Q2"},
-			ScoringStrategy: "sum",
-			ScoringParams:   oldscale.ScoringParamsSnapshot{CntOptionContents: []string{"yes"}},
-			MaxScore:        &maxScore,
-			InterpretRules: []oldscale.InterpretRuleSnapshot{{
-				Min:        0,
-				Max:        10,
-				RiskLevel:  "low",
-				Conclusion: "low",
-				Suggestion: "watch",
-			}},
-		}},
-	}
-	newPayload := &newscale.ScaleSnapshot{
+	payload := &newscale.ScaleSnapshot{
 		ID:                   42,
 		Code:                 "SCL_CONTRACT",
 		ScaleVersion:         "1.0.0",
@@ -64,24 +37,21 @@ func TestScalePayloadJSONShapeMatchesLegacySnapshot(t *testing.T) {
 		}},
 	}
 
-	oldBytes, err := json.Marshal(oldPayload)
-	if err != nil {
-		t.Fatalf("marshal legacy scale payload: %v", err)
-	}
-	newBytes, err := json.Marshal(newPayload)
+	gotBytes, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("marshal new scale payload: %v", err)
 	}
-	if !bytes.Equal(newBytes, oldBytes) {
-		t.Fatalf("new payload JSON = %s\nlegacy JSON = %s", newBytes, oldBytes)
+	wantBytes := []byte(`{"ID":42,"Code":"SCL_CONTRACT","ScaleVersion":"1.0.0","Title":"Contract Scale","QuestionnaireCode":"Q_CONTRACT","QuestionnaireVersion":"2.0.0","Status":"published","Factors":[{"Code":"total","Title":"Total","IsTotalScore":true,"QuestionCodes":["Q1","Q2"],"ScoringStrategy":"sum","ScoringParams":{"CntOptionContents":["yes"]},"MaxScore":10,"InterpretRules":[{"Min":0,"Max":10,"RiskLevel":"low","Conclusion":"low","Suggestion":"watch"}]}]}`)
+	if !bytes.Equal(gotBytes, wantBytes) {
+		t.Fatalf("payload JSON = %s\nwant JSON = %s", gotBytes, wantBytes)
 	}
 
-	decoded, err := newscale.ParsePublishedPayload(newBytes)
+	decoded, err := newscale.ParsePublishedPayload(gotBytes)
 	if err != nil {
 		t.Fatalf("ParsePublishedPayload: %v", err)
 	}
-	if !reflect.DeepEqual(decoded, oldPayload) {
-		t.Fatalf("decoded = %#v, want %#v", decoded, oldPayload)
+	if !reflect.DeepEqual(decoded, payload) {
+		t.Fatalf("decoded = %#v, want %#v", decoded, payload)
 	}
 }
 
@@ -122,7 +92,7 @@ func TestScalePayloadDefinitionRoundTripMatchesLegacySnapshot(t *testing.T) {
 	if got.Factors[0].Code != "total" || !got.Factors[0].IsTotalScore || got.Factors[0].MaxScore == nil {
 		t.Fatalf("factor round trip = %#v", got.Factors[0])
 	}
-	if got.Factors[0].Canonical().ResolvedRole() != factor.FactorRoleTotal {
-		t.Fatalf("canonical role = %q, want total", got.Factors[0].Canonical().ResolvedRole())
+	if !got.Factors[0].IsTotalScore {
+		t.Fatalf("factor IsTotalScore = false, want true")
 	}
 }

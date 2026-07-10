@@ -1,34 +1,40 @@
 package factor
 
-// SlimFactorsFromLegacy materializes Factor identity nodes from transitional flat factors.
-func SlimFactorsFromLegacy(factors []LegacyFactor) []Factor {
-	if factors == nil {
+// FactorsFromDefinitionDimensions materializes Factor identity nodes from
+// shared legacy payload dimensions.
+func FactorsFromDefinitionDimensions(dimensions []DimensionRule) []Factor {
+	if dimensions == nil {
 		return nil
 	}
-	out := make([]Factor, 0, len(factors))
-	for _, item := range factors {
+	out := make([]Factor, 0, len(dimensions))
+	for _, item := range dimensions {
+		role := FactorRole(item.Role)
+		if role != "" && !role.IsValid() {
+			role = ""
+		}
 		out = append(out, Factor{
 			Code:  item.Code,
 			Title: item.Title,
-			Role:  item.ResolvedRole(),
+			Role:  resolveRole(role, item.IsTotalScore),
 		})
 	}
 	return out
 }
 
-// FactorGraphFromLegacy extracts hierarchy and ordering metadata from transitional flat factors.
-func FactorGraphFromLegacy(factors []LegacyFactor) FactorGraph {
-	if len(factors) == 0 {
+// FactorGraphFromDefinitionDimensions extracts hierarchy and ordering metadata
+// from shared legacy payload dimensions.
+func FactorGraphFromDefinitionDimensions(dimensions []DimensionRule) FactorGraph {
+	if len(dimensions) == 0 {
 		return FactorGraph{}
 	}
 	graph := FactorGraph{
-		Roots:      make([]string, 0, len(factors)),
-		Edges:      make([]FactorEdge, 0, len(factors)),
+		Roots:      make([]string, 0, len(dimensions)),
+		Edges:      make([]FactorEdge, 0, len(dimensions)),
 		SortOrders: make(map[string]int),
 	}
 	seenEdges := make(map[FactorEdge]struct{})
-	hasParent := make(map[string]bool, len(factors))
-	for _, item := range factors {
+	hasParent := make(map[string]bool, len(dimensions))
+	for _, item := range dimensions {
 		if item.SortOrder != 0 {
 			graph.SortOrders[item.Code] = item.SortOrder
 		}
@@ -53,7 +59,7 @@ func FactorGraphFromLegacy(factors []LegacyFactor) FactorGraph {
 			hasParent[childCode] = true
 		}
 	}
-	for _, item := range factors {
+	for _, item := range dimensions {
 		if !hasParent[item.Code] {
 			graph.Roots = append(graph.Roots, item.Code)
 		}
@@ -64,13 +70,14 @@ func FactorGraphFromLegacy(factors []LegacyFactor) FactorGraph {
 	return graph
 }
 
-// ScoringFromLegacy extracts scoring rules from transitional flat factors.
-func ScoringFromLegacy(factors []LegacyFactor) []Scoring {
-	if len(factors) == 0 {
+// ScoringFromDefinitionDimensions extracts scoring rules from shared legacy
+// payload dimensions.
+func ScoringFromDefinitionDimensions(dimensions []DimensionRule) []Scoring {
+	if len(dimensions) == 0 {
 		return nil
 	}
-	out := make([]Scoring, 0, len(factors))
-	for _, item := range factors {
+	out := make([]Scoring, 0, len(dimensions))
+	for _, item := range dimensions {
 		switch {
 		case item.ChildrenPolicy != nil && len(item.ChildrenPolicy.Children) > 0:
 			sources := make([]ScoringSource, 0, len(item.ChildrenPolicy.Children))
@@ -81,7 +88,7 @@ func ScoringFromLegacy(factors []LegacyFactor) []Scoring {
 				FactorCode: item.Code,
 				Sources:    sources,
 				Strategy:   ScoringStrategy(item.ChildrenPolicy.Strategy),
-				Params:     cloneScoringParams(item.ScoringParams),
+				Params:     scoringParamsFromPayload(item.ScoringParams),
 				MaxScore:   cloneFloat64(item.MaxScore),
 				Weights:    cloneWeights(item.ChildrenPolicy.Weights),
 			})
@@ -94,29 +101,10 @@ func ScoringFromLegacy(factors []LegacyFactor) []Scoring {
 				FactorCode: item.Code,
 				Sources:    sources,
 				Strategy:   ScoringStrategy(item.ScoringStrategy),
-				Params:     cloneScoringParams(item.ScoringParams),
+				Params:     scoringParamsFromPayload(item.ScoringParams),
 				MaxScore:   cloneFloat64(item.MaxScore),
 			})
 		}
-	}
-	return out
-}
-
-// NormRefsFromLegacy extracts norm references from transitional flat factors.
-func NormRefsFromLegacy(factors []LegacyFactor) []NormRef {
-	if len(factors) == 0 {
-		return nil
-	}
-	out := make([]NormRef, 0)
-	for _, item := range factors {
-		if item.Norm == nil {
-			continue
-		}
-		ref := *item.Norm
-		if ref.FactorCode == "" {
-			ref.FactorCode = item.Code
-		}
-		out = append(out, ref)
 	}
 	return out
 }

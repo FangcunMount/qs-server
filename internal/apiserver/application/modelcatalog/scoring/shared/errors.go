@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/assessmentmodel"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -18,16 +17,7 @@ func WrapScaleDomainError(err error, fallbackCode int, format string, args ...in
 }
 
 func ScaleDomainErrorCode(err error, fallbackCode int) int {
-	kind, ok := scaledefinition.ErrorKindOf(err)
-	if !ok {
-		return fallbackCode
-	}
-	switch kind {
-	case scaledefinition.ErrorKindInvalidArgument, scaledefinition.ErrorKindRuleFrozen:
-		return errorCode.ErrInvalidArgument
-	default:
-		return fallbackCode
-	}
+	return fallbackCode
 }
 
 // WrapAssessmentModelError maps assessment model domain errors to application codes.

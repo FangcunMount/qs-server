@@ -1,21 +1,17 @@
 package shared
 
 import (
+	"fmt"
 	"testing"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestScaleDomainErrorCodeMapsDomainKindToAPICode(t *testing.T) {
+func TestScaleDomainErrorCodeUsesFallback(t *testing.T) {
 	t.Parallel()
 
-	_, err := scaledefinition.NewMedicalScale(meta.NewCode(""), "Scale")
-	if err == nil {
-		t.Fatal("expected domain error")
-	}
-	if got := ScaleDomainErrorCode(err, errorCode.ErrUnknown); got != errorCode.ErrInvalidArgument {
-		t.Fatalf("mapped code = %d, want %d", got, errorCode.ErrInvalidArgument)
+	err := fmt.Errorf("invalid scale")
+	if got := ScaleDomainErrorCode(err, errorCode.ErrUnknown); got != errorCode.ErrUnknown {
+		t.Fatalf("mapped code = %d, want %d", got, errorCode.ErrUnknown)
 	}
 }

@@ -8,9 +8,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -39,14 +40,89 @@ func newAuthoringLifecycleService(
 	return NewService(catalog, event.NewNopEventPublisher(), nil, append(base, opts...)...)
 }
 
-func assessmentModelFromScale(t *testing.T, scale *scaledefinition.MedicalScale) *domain.AssessmentModel {
+func newLifecycleScaleAssessmentModel(
+	t *testing.T,
+	code, title, questionnaireCode, questionnaireVersion string,
+	status domain.ModelStatus,
+	factors []scalesnapshot.FactorSnapshot,
+) *domain.AssessmentModel {
 	t.Helper()
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	model, err := legacyadapter.AssessmentModelFromCreateDTO(shared.CreateScaleDTO{
+		Code:                 code,
+		Title:                title,
+		QuestionnaireCode:    questionnaireCode,
+		QuestionnaireVersion: questionnaireVersion,
+	}, now)
 	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
+		t.Fatalf("AssessmentModelFromCreateDTO() error = %v", err)
 	}
-	model.Code = scale.GetCode().String()
+	snapshot := &scalesnapshot.ScaleSnapshot{
+		Code:                 model.Code,
+		ScaleVersion:         "1.0.0",
+		Title:                model.Title,
+		QuestionnaireCode:    model.Binding.QuestionnaireCode,
+		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Status:               string(status),
+		Factors:              cloneLifecycleFactorSnapshots(factors),
+	}
+	payload, err := legacyadapter.DefinitionPayloadFromScaleSnapshot(snapshot)
+	if err != nil {
+		t.Fatalf("DefinitionPayloadFromScaleSnapshot() error = %v", err)
+	}
+	if err := model.UpdateDefinitionWithV2(payload, scalesnapshot.DefinitionFromScaleSnapshot(snapshot), now); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2() error = %v", err)
+	}
+	switch status {
+	case domain.ModelStatusPublished:
+		if err := model.MarkPublished(now); err != nil {
+			t.Fatalf("MarkPublished() error = %v", err)
+		}
+	case domain.ModelStatusArchived:
+		if err := model.MarkArchived(now); err != nil {
+			t.Fatalf("MarkArchived() error = %v", err)
+		}
+	default:
+		model.Status = domain.ModelStatusDraft
+	}
 	return model
+}
+
+func lifecycleDefaultFactorSnapshots() []scalesnapshot.FactorSnapshot {
+	return []scalesnapshot.FactorSnapshot{{
+		Code:            "F1",
+		Title:           "Factor 1",
+		QuestionCodes:   []string{"Q1"},
+		ScoringStrategy: "sum",
+		InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
+			Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "watch",
+		}},
+	}}
+}
+
+func lifecyclePublishableFactorSnapshots() []scalesnapshot.FactorSnapshot {
+	return []scalesnapshot.FactorSnapshot{{
+		Code:            "total",
+		Title:           "总分",
+		IsTotalScore:    true,
+		QuestionCodes:   []string{"Q1"},
+		ScoringStrategy: "sum",
+		InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
+			Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "watch",
+		}},
+	}}
+}
+
+func cloneLifecycleFactorSnapshots(factors []scalesnapshot.FactorSnapshot) []scalesnapshot.FactorSnapshot {
+	out := make([]scalesnapshot.FactorSnapshot, 0, len(factors))
+	for _, factor := range factors {
+		copied := factor
+		copied.QuestionCodes = append([]string(nil), factor.QuestionCodes...)
+		copied.ScoringParams.CntOptionContents = append([]string(nil), factor.ScoringParams.CntOptionContents...)
+		copied.InterpretRules = append([]scalesnapshot.InterpretRuleSnapshot(nil), factor.InterpretRules...)
+		out = append(out, copied)
+	}
+	return out
 }
 
 type authoringModelRepoStub struct {

@@ -11,8 +11,8 @@ import (
 func TestValidateFactorsAcceptsFlatModel(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateFactors([]factor.LegacyFactor{{
-		Code: "total", Title: "总分", Role: factor.FactorRoleTotal,
+	issues := validateDimensions([]factor.DimensionRule{{
+		Code: "total", Title: "总分", Role: string(factor.FactorRoleTotal),
 		QuestionCodes: []string{"q1"}, ScoringStrategy: "sum",
 	}})
 	if len(issues) != 0 {
@@ -23,8 +23,8 @@ func TestValidateFactorsAcceptsFlatModel(t *testing.T) {
 func TestValidateFactorsRejectsUnknownParent(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateFactors([]factor.LegacyFactor{{
-		Code: "inhibit", ParentCode: "missing", Role: factor.FactorRoleDimension,
+	issues := validateDimensions([]factor.DimensionRule{{
+		Code: "inhibit", ParentCode: "missing", Role: string(factor.FactorRoleDimension),
 	}})
 	if len(issues) == 0 {
 		t.Fatal("expected parent_code.not_found issue")
@@ -34,8 +34,8 @@ func TestValidateFactorsRejectsUnknownParent(t *testing.T) {
 func TestValidateFactorsRequiresChildrenPolicyForIndex(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateFactors([]factor.LegacyFactor{
-		{Code: "bri", Role: factor.FactorRoleIndex},
+	issues := validateDimensions([]factor.DimensionRule{
+		{Code: "bri", Role: string(factor.FactorRoleIndex)},
 	})
 	if len(issues) == 0 {
 		t.Fatal("expected children_policy.required issue")
@@ -45,8 +45,8 @@ func TestValidateFactorsRequiresChildrenPolicyForIndex(t *testing.T) {
 func TestValidateFactorsRejectsReportGroupScoring(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateFactors([]factor.LegacyFactor{{
-		Code: "section_a", Role: factor.FactorRoleReportGroup, ScoringStrategy: "sum",
+	issues := validateDimensions([]factor.DimensionRule{{
+		Code: "section_a", Role: string(factor.FactorRoleReportGroup), ScoringStrategy: "sum",
 	}})
 	if len(issues) == 0 {
 		t.Fatal("expected report_group.scoring_forbidden issue")
@@ -56,65 +56,68 @@ func TestValidateFactorsRejectsReportGroupScoring(t *testing.T) {
 func TestDeriveFactorLevels(t *testing.T) {
 	t.Parallel()
 
-	factors := factor.DeriveFactorLevels([]factor.LegacyFactor{
-		{Code: "gec", Role: factor.FactorRoleIndex},
-		{Code: "bri", ParentCode: "gec", Role: factor.FactorRoleIndex},
-		{Code: "inhibit", ParentCode: "bri", Role: factor.FactorRoleDimension},
+	graph := factor.FactorGraphFromDefinitionDimensions([]factor.DimensionRule{
+		{Code: "gec", Role: string(factor.FactorRoleIndex)},
+		{Code: "bri", ParentCode: "gec", Role: string(factor.FactorRoleIndex)},
+		{Code: "inhibit", ParentCode: "bri", Role: string(factor.FactorRoleDimension)},
 	})
-	if factors[0].Level != 1 || factors[1].Level != 2 || factors[2].Level != 3 {
-		t.Fatalf("levels = %d,%d,%d, want 1,2,3", factors[0].Level, factors[1].Level, factors[2].Level)
+	levels := graph.Levels()
+	if levels["gec"] != 1 || levels["bri"] != 2 || levels["inhibit"] != 3 {
+		t.Fatalf("levels = %#v, want gec:1 bri:2 inhibit:3", levels)
 	}
 }
 
 func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 	t.Parallel()
 
-	factors := []factor.LegacyFactor{
+	dimensions := []factor.DimensionRule{
 		{
-			Code: "gec", Title: "全局执行指数", Role: factor.FactorRoleIndex,
-			ChildrenPolicy: &factor.ChildrenPolicy{
-				Strategy: factor.ChildrenAggregationWeightedSum,
+			Code: "gec", Title: "全局执行指数", Role: string(factor.FactorRoleIndex),
+			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+				Strategy: string(factor.ChildrenAggregationWeightedSum),
 				Children: []string{"bri", "mi"},
 				Weights:  map[string]float64{"bri": 0.4, "mi": 0.6},
 			},
 		},
 		{
-			Code: "bri", Title: "行为调节指数", Role: factor.FactorRoleIndex, ParentCode: "gec",
-			ChildrenPolicy: &factor.ChildrenPolicy{
-				Strategy: factor.ChildrenAggregationSum,
+			Code: "bri", Title: "行为调节指数", Role: string(factor.FactorRoleIndex), ParentCode: "gec",
+			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"inhibit"},
 			},
 		},
 		{
-			Code: "mi", Title: "元认知指数", Role: factor.FactorRoleIndex, ParentCode: "gec",
-			ChildrenPolicy: &factor.ChildrenPolicy{
-				Strategy: factor.ChildrenAggregationAverage,
+			Code: "mi", Title: "元认知指数", Role: string(factor.FactorRoleIndex), ParentCode: "gec",
+			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+				Strategy: string(factor.ChildrenAggregationAverage),
 				Children: []string{"working_memory"},
 			},
 		},
 		{
-			Code: "inhibit", Title: "抑制", Role: factor.FactorRoleDimension, ParentCode: "bri",
+			Code: "inhibit", Title: "抑制", Role: string(factor.FactorRoleDimension), ParentCode: "bri",
 			QuestionCodes: []string{"q1", "q2"}, ScoringStrategy: "sum",
 		},
 		{
-			Code: "working_memory", Title: "工作记忆", Role: factor.FactorRoleDimension, ParentCode: "mi",
+			Code: "working_memory", Title: "工作记忆", Role: string(factor.FactorRoleDimension), ParentCode: "mi",
 			QuestionCodes: []string{"q3"}, ScoringStrategy: "avg",
 		},
 		{
-			Code: "section_a", Title: "报告分组", Role: factor.FactorRoleReportGroup,
+			Code: "section_a", Title: "报告分组", Role: string(factor.FactorRoleReportGroup),
 		},
 	}
 
-	derived := factor.DeriveFactorLevels(factors)
-	byCode := factor.IndexByLegacyFactorCode(derived)
-	if byCode["gec"].Level != 1 || byCode["bri"].Level != 2 || byCode["inhibit"].Level != 3 {
-		t.Fatalf("levels = gec:%d bri:%d inhibit:%d", byCode["gec"].Level, byCode["bri"].Level, byCode["inhibit"].Level)
+	factors := factor.FactorsFromDefinitionDimensions(dimensions)
+	graph := factor.FactorGraphFromDefinitionDimensions(dimensions)
+	scoring := factor.ScoringFromDefinitionDimensions(dimensions)
+	levels := graph.Levels()
+	if levels["gec"] != 1 || levels["bri"] != 2 || levels["inhibit"] != 3 {
+		t.Fatalf("levels = %#v", levels)
 	}
-	if issues := factor.ValidateFactors(derived); len(issues) != 0 {
+	if issues := factor.ValidateMeasureSpecParts(factors, graph, scoring); len(issues) != 0 {
 		t.Fatalf("issues = %#v, want none", issues)
 	}
 
-	nodes := factor.CalculationScoreNodesFromLegacyFactors(factors)
+	nodes := factor.CalculationScoreNodesFromMeasureParts(factors, graph, scoring)
 	want := []calculation.ScoreNode{
 		{
 			Code: "gec", Name: "全局执行指数", Role: "index", Kind: calculation.DimensionKindIndex, Level: 1,
@@ -140,6 +143,14 @@ func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(nodes, want) {
-		t.Fatalf("CalculationScoreNodesFromLegacyFactors mismatch\n got: %#v\nwant: %#v", nodes, want)
+		t.Fatalf("CalculationScoreNodesFromMeasureParts mismatch\n got: %#v\nwant: %#v", nodes, want)
 	}
+}
+
+func validateDimensions(dimensions []factor.DimensionRule) []factor.HierarchyIssue {
+	return factor.ValidateMeasureSpecParts(
+		factor.FactorsFromDefinitionDimensions(dimensions),
+		factor.FactorGraphFromDefinitionDimensions(dimensions),
+		factor.ScoringFromDefinitionDimensions(dimensions),
+	)
 }

@@ -9,10 +9,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -48,7 +49,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto shared.AddFactorDTO) 
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子标题不能为空")
 	}
 
-	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
+	factor, err := toFactorSnapshot(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto shared.AddFactorDTO) 
 
 	return s.mutateDefinition(ctx, dto.ScaleCode, "添加因子失败", func(model *domain.AssessmentModel) error {
 		return assessmentstore.AddFactorSnapshot(model, factor)
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 // UpdateFactor 更新因子
@@ -68,7 +69,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto shared.UpdateFacto
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
+	factor, err := toFactorSnapshot(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto shared.UpdateFacto
 
 	return s.mutateDefinition(ctx, dto.ScaleCode, "更新因子失败", func(model *domain.AssessmentModel) error {
 		return assessmentstore.UpdateFactorSnapshot(model, factor)
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 // RemoveFactor 删除因子
@@ -90,7 +91,7 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 
 	return s.mutateDefinition(ctx, scaleCode, "删除因子失败", func(model *domain.AssessmentModel) error {
 		return assessmentstore.RemoveFactorSnapshot(model, factorCode)
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 // ReplaceFactors 替换所有因子
@@ -102,31 +103,25 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子列表不能为空")
 	}
 
-	factors := make([]*scaledefinition.Factor, 0, len(factorDTOs))
-	var allValidationErrors []scaledefinition.ValidationError
+	factors := make([]scalesnapshot.FactorSnapshot, 0, len(factorDTOs))
 
 	for _, dto := range factorDTOs {
-		factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
+		factor, err := toFactorSnapshot(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 			dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 		if err != nil {
 			return nil, err
 		}
 
-		factorErrs := scaledefinition.ValidateFactor(factor)
-		if len(factorErrs) > 0 {
-			allValidationErrors = append(allValidationErrors, factorErrs...)
+		if err := validateFactorSnapshotForReplacement(factor); err != nil {
+			return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "验证因子失败")
 		}
 
 		factors = append(factors, factor)
 	}
 
-	if len(allValidationErrors) > 0 {
-		return nil, shared.WrapScaleDomainError(scaledefinition.ToError(allValidationErrors), errorCode.ErrInvalidArgument, "验证因子失败")
-	}
-
 	return s.mutateDefinition(ctx, scaleCode, "替换因子失败", func(model *domain.AssessmentModel) error {
 		return assessmentstore.ReplaceFactorSnapshots(model, factors)
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 // UpdateFactorInterpretRules 更新因子解读规则
@@ -138,11 +133,11 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto shar
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
+	rules := interpretRuleSnapshotsFromDTOsInOrder(dto.InterpretRules)
 
 	return s.mutateDefinition(ctx, dto.ScaleCode, "更新解读规则失败", func(model *domain.AssessmentModel) error {
 		return assessmentstore.UpdateFactorInterpretRulesSnapshot(model, dto.FactorCode, rules)
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 // ReplaceInterpretRules 批量设置所有因子的解读规则
@@ -162,18 +157,18 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 
 	return s.mutateDefinition(ctx, scaleCode, "更新解读规则失败", func(model *domain.AssessmentModel) error {
 		for _, dto := range dtos {
-			rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
+			rules := interpretRuleSnapshotsFromDTOsInOrder(dto.InterpretRules)
 			if err := assessmentstore.UpdateFactorInterpretRulesSnapshot(model, dto.FactorCode, rules); err != nil {
 				return err
 			}
 		}
 		return nil
-	}, scaledefinition.ChangeActionUpdated)
+	}, eventpayload.ScaleChangeActionUpdated)
 }
 
 type definitionMutation func(model *domain.AssessmentModel) error
 
-func (s *factorService) mutateDefinition(ctx context.Context, scaleCode, failureMessage string, mutate definitionMutation, action scaledefinition.ChangeAction) (*shared.ScaleResult, error) {
+func (s *factorService) mutateDefinition(ctx context.Context, scaleCode, failureMessage string, mutate definitionMutation, action eventpayload.ScaleChangeAction) (*shared.ScaleResult, error) {
 	model, err := assessmentstore.LoadScale(ctx, s.modelRepo, scaleCode)
 	if err != nil {
 		return nil, err

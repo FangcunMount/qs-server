@@ -6,31 +6,31 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-func TestInferParentCodesFromFactorChildrenPolicy(t *testing.T) {
+func TestFactorGraphFromDefinitionDimensionsUsesChildrenPolicy(t *testing.T) {
 	t.Parallel()
 
-	derived := factor.InferParentCodesFromFactorChildrenPolicy([]factor.LegacyFactor{
+	graph := factor.FactorGraphFromDefinitionDimensions([]factor.DimensionRule{
 		{Code: "inhibit"},
 		{
-			Code: "bri", Role: factor.FactorRoleIndex,
-			ChildrenPolicy: &factor.ChildrenPolicy{
-				Strategy: factor.ChildrenAggregationSum,
+			Code: "bri", Role: string(factor.FactorRoleIndex),
+			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"inhibit"},
 			},
 		},
 		{
-			Code: "gec", Role: factor.FactorRoleIndex,
-			ChildrenPolicy: &factor.ChildrenPolicy{
-				Strategy: factor.ChildrenAggregationSum,
+			Code: "gec", Role: string(factor.FactorRoleIndex),
+			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"bri"},
 			},
 		},
 	})
-	byCode := factor.IndexByLegacyFactorCode(derived)
-	if byCode["bri"].ParentCode != "gec" || byCode["bri"].Level != 2 {
-		t.Fatalf("bri = %#v, want parent gec level 2", byCode["bri"])
+	levels := graph.Levels()
+	if graph.ParentCode("bri") != "gec" || levels["bri"] != 2 {
+		t.Fatalf("bri parent=%q level=%d, want parent gec level 2", graph.ParentCode("bri"), levels["bri"])
 	}
-	if byCode["inhibit"].ParentCode != "bri" || byCode["inhibit"].Level != 3 {
-		t.Fatalf("inhibit = %#v, want parent bri level 3", byCode["inhibit"])
+	if graph.ParentCode("inhibit") != "bri" || levels["inhibit"] != 3 {
+		t.Fatalf("inhibit parent=%q level=%d, want parent bri level 3", graph.ParentCode("inhibit"), levels["inhibit"])
 	}
 }

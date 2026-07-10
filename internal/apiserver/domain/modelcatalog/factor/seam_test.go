@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/snapshot"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 )
 
@@ -42,42 +41,5 @@ func TestCognitiveParseUsesSharedFactorShape(t *testing.T) {
 	}
 	if len(got.Factors) != 1 || got.Factors[0].ResolvedRole() != factor.FactorRoleTotal {
 		t.Fatalf("factors = %#v", got.Factors)
-	}
-}
-
-func TestScaleCanonicalRoundTripPreservesExecutionShape(t *testing.T) {
-	t.Parallel()
-
-	original := scalesnapshot.FactorSnapshot{
-		Code: "f1", ScoringStrategy: "sum", IsTotalScore: true,
-		ScoringParams: scalesnapshot.ScoringParamsSnapshot{CntOptionContents: []string{"a", "b"}},
-		InterpretRules: []scalesnapshot.InterpretRuleSnapshot{{
-			Min: 0, Max: 5, RiskLevel: "low", Conclusion: "ok",
-		}},
-	}
-	got := scalesnapshot.FactorSnapshotFromCanonical(original.Canonical())
-	if got.Code != original.Code || got.ScoringStrategy != original.ScoringStrategy {
-		t.Fatalf("round trip = %#v", got)
-	}
-	if len(got.ScoringParams.CntOptionContents) != 2 || got.InterpretRules[0].RiskLevel != "low" {
-		t.Fatalf("execution shape = %#v", got)
-	}
-}
-
-func TestBuildFromCanonicalFactorsProjectsInterpretRules(t *testing.T) {
-	t.Parallel()
-
-	scale := scalesnapshot.BuildFromLegacyFactors(
-		scalesnapshot.ExecutionEnvelope{Code: "BA-001", ScaleVersion: "1.0.0", Title: "demo", Status: "published"},
-		[]factor.LegacyFactor{{
-			Code: "total", ScoringStrategy: "sum",
-			InterpretRules: []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Level: "low"}},
-		}},
-	)
-	if scale == nil || len(scale.Factors) != 1 {
-		t.Fatalf("scale = %#v", scale)
-	}
-	if scale.Factors[0].InterpretRules[0].RiskLevel != "low" {
-		t.Fatalf("interpret = %#v", scale.Factors[0].InterpretRules)
 	}
 }

@@ -3,29 +3,22 @@ package lifecycle
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestDeleteUsesAssessmentModelRepository(t *testing.T) {
 	ctx := context.Background()
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SCL_DELETE"),
+	model := newLifecycleScaleAssessmentModel(
+		t,
+		"SCL_DELETE",
 		"Draft Scale",
-		scaledefinition.WithStatus(scaledefinition.StatusDraft),
+		"",
+		"",
+		domain.ModelStatusDraft,
+		nil,
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
-	}
 
 	modelRepo := &deleteAssessmentModelRepoStub{model: model}
 	svc := newAuthoringLifecycleService(nil, modelRepo, nil)
@@ -40,18 +33,15 @@ func TestDeleteUsesAssessmentModelRepository(t *testing.T) {
 
 func TestDeleteRejectsNonDraftAssessmentModel(t *testing.T) {
 	ctx := context.Background()
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SCL_PUBLISHED"),
+	model := newLifecycleScaleAssessmentModel(
+		t,
+		"SCL_PUBLISHED",
 		"Published Scale",
-		scaledefinition.WithStatus(scaledefinition.StatusPublished),
+		"",
+		"",
+		domain.ModelStatusPublished,
+		nil,
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
-	}
 
 	modelRepo := &deleteAssessmentModelRepoStub{model: model}
 	svc := newAuthoringLifecycleService(nil, modelRepo, nil)

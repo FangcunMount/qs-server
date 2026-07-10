@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	oldtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
 	newtypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
+	oldtypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func TestTypologyPayloadJSONShapeMatchesLegacyPayload(t *testing.T) {

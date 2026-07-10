@@ -7,14 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestUpdateBasicInfoUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
@@ -110,28 +107,22 @@ func TestUpdateBasicInfoForksPublishedAssessmentModelDraft(t *testing.T) {
 	if err := json.Unmarshal(model.Definition.Data, &snapshot); err != nil {
 		t.Fatalf("unmarshal definition payload: %v", err)
 	}
-	if snapshot.ScaleVersion != "1.0.1" || snapshot.Status != scaledefinition.StatusDraft.String() {
+	if snapshot.ScaleVersion != "1.0.1" || snapshot.Status != "draft" {
 		t.Fatalf("forked payload = version %q status %q, want 1.0.1 draft", snapshot.ScaleVersion, snapshot.Status)
 	}
 }
 
 func newDraftScaleAssessmentModel(t *testing.T) *domain.AssessmentModel {
 	t.Helper()
-	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
-	scale, err := scaledefinition.NewMedicalScale(
-		meta.NewCode("SCL_BASIC"),
+	return newLifecycleScaleAssessmentModel(
+		t,
+		"SCL_BASIC",
 		"Basic Scale",
-		scaledefinition.WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
+		"Q1",
+		"1.0",
+		domain.ModelStatusDraft,
+		nil,
 	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	model, err := legacyadapter.AssessmentModelFromMedicalScale(scale, now)
-	if err != nil {
-		t.Fatalf("AssessmentModelFromMedicalScale() error = %v", err)
-	}
-	model.Code = "SCL_BASIC"
-	return model
 }
 
 type basicInfoAssessmentModelRepoStub struct {

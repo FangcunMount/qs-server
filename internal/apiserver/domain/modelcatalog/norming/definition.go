@@ -41,17 +41,16 @@ func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return nil, fmt.Errorf("decode behavioral_rating definition: %w", err)
 	}
-	factors := factor.ParseLegacyFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	measure, calibration := definition.ParseMeasureSpecFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.Brief2 != nil {
-		factors = ApplyNormMetadataToLegacyFactors(factors, MetadataContext{
+		measure, calibration = ApplyNormMetadata(measure, MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromBrief2(body.Brief2),
 		})
-		factors = ApplyCompositeMetadataToLegacyFactors(factors, compositeSpecsFromBrief2(body.Brief2))
+		measure = ApplyCompositeMetadata(measure, compositeSpecsFromBrief2(body.Brief2))
 	}
-	measure, calibration := definition.MeasureAndCalibrationFromLegacyFactors(factors)
 	return &definition.Definition{
 		Measure:     measure,
 		Calibration: calibration,

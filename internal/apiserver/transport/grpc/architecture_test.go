@@ -12,13 +12,12 @@ func TestSurveyScaleGRPCServicesUseApplicationDTOs(t *testing.T) {
 	t.Parallel()
 
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel":                   "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":                    "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire":            "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition": "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":                     "application result DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":                      "application result DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":                     "survey/scale application QR-code use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel":        "application query DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":         "application query DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire": "application query DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":          "application result DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":           "application result DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":          "survey/scale application QR-code use cases",
 	}
 	for _, path := range []string{
 		filepath.Join("service", "answersheet.go"),
@@ -52,7 +51,7 @@ func TestGRPCTransportDoesNotHoldScaleDomainRepository(t *testing.T) {
 		}
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition" {
+			if strings.Contains(importPath, "/domain/modelcatalog/"+"scoring/") {
 				t.Fatalf("%s imports %s; gRPC transport must use scale application ports, not scale repositories", path, importPath)
 			}
 		}

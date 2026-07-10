@@ -7,7 +7,6 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
@@ -73,7 +72,7 @@ func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.A
 	if err != nil {
 		return appdefinition.SnapshotBuildResult{}, err
 	}
-	snapshot.Status = scaledefinition.StatusPublished.String()
+	snapshot.Status = "published"
 	snapshot.Title = model.Title
 	snapshot.Code = model.Code
 	snapshot.QuestionnaireCode = model.Binding.QuestionnaireCode

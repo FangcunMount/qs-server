@@ -11,12 +11,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -26,6 +25,9 @@ const (
 	maxHotScaleLimit          = 5
 	defaultHotScaleWindowDays = 30
 	maxHotScaleWindowDays     = 365
+
+	scaleStatusDraft    = "draft"
+	scaleStatusArchived = "archived"
 )
 
 // 查询Service 量表查询服务实现
@@ -290,11 +292,20 @@ func (s *queryService) normalizeScaleFilter(filter shared.ScaleListFilter) (scal
 		Category: filter.Category,
 	}
 	if normalized.Status != "" {
-		parsed, ok := scaledefinition.ParseStatus(normalized.Status)
+		parsed, ok := normalizeScaleStatus(normalized.Status)
 		if !ok {
 			return scalereadmodel.ScaleFilter{}, errors.WithCode(errorCode.ErrInvalidArgument, "状态无效")
 		}
-		normalized.Status = parsed.Value()
+		normalized.Status = parsed
 	}
 	return normalized, nil
+}
+
+func normalizeScaleStatus(value string) (string, bool) {
+	switch value {
+	case scaleStatusDraft, scalereadmodel.ScaleStatusPublished, scaleStatusArchived:
+		return value, true
+	default:
+		return "", false
+	}
 }

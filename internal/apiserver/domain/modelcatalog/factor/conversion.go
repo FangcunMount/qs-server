@@ -1,50 +1,5 @@
 package factor
 
-// LegacyFactorFromSnapshot materializes the legacy flat factor from a compatibility snapshot.
-func LegacyFactorFromSnapshot(snapshot FactorSnapshot) LegacyFactor {
-	return LegacyFactor{
-		Code:            snapshot.Code,
-		Title:           snapshot.Title,
-		Role:            snapshot.Role,
-		ParentCode:      snapshot.ParentCode,
-		SortOrder:       snapshot.SortOrder,
-		Level:           snapshot.Level,
-		IsTotalScore:    snapshot.IsTotalScore,
-		QuestionCodes:   cloneStrings(snapshot.QuestionCodes),
-		ScoringStrategy: snapshot.ScoringStrategy,
-		ScoringParams:   cloneScoringParams(snapshot.ScoringParams),
-		MaxScore:        cloneFloat64(snapshot.MaxScore),
-		InterpretRules:  cloneScoreRangeRules(snapshot.InterpretRules),
-		Classification:  cloneClassificationSpec(snapshot.Classification),
-		Norm:            cloneNormRef(snapshot.Norm),
-		ChildrenPolicy:  cloneChildrenPolicy(snapshot.ChildrenPolicy),
-	}
-}
-
-// LegacyFactorsFromSnapshots materializes legacy flat factors from compatibility snapshots.
-func LegacyFactorsFromSnapshots(snapshots []FactorSnapshot) []LegacyFactor {
-	if snapshots == nil {
-		return nil
-	}
-	out := make([]LegacyFactor, 0, len(snapshots))
-	for _, snapshot := range snapshots {
-		out = append(out, LegacyFactorFromSnapshot(snapshot))
-	}
-	return out
-}
-
-// SnapshotsFromLegacyFactors returns compatibility snapshots for legacy flat factors.
-func SnapshotsFromLegacyFactors(factors []LegacyFactor) []FactorSnapshot {
-	if factors == nil {
-		return nil
-	}
-	out := make([]FactorSnapshot, 0, len(factors))
-	for _, item := range factors {
-		out = append(out, item.Snapshot())
-	}
-	return out
-}
-
 func cloneStrings(items []string) []string {
 	if items == nil {
 		return nil
@@ -74,22 +29,6 @@ func cloneScoreRangeRules(rules []ScoreRangeRule) []ScoreRangeRule {
 		return nil
 	}
 	return append([]ScoreRangeRule(nil), rules...)
-}
-
-func cloneClassificationSpec(spec *ClassificationSpec) *ClassificationSpec {
-	if spec == nil {
-		return nil
-	}
-	cloned := *spec
-	return &cloned
-}
-
-func cloneNormRef(ref *NormRef) *NormRef {
-	if ref == nil {
-		return nil
-	}
-	cloned := *ref
-	return &cloned
 }
 
 func cloneChildrenPolicy(policy *ChildrenPolicy) *ChildrenPolicy {

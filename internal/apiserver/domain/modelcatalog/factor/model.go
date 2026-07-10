@@ -12,49 +12,14 @@ func (f Factor) ResolvedRole() FactorRole {
 	return f.Role.Resolved()
 }
 
-// LegacyFactor 是历史 flat payload 的 compatibility materialization，不是核心领域模型。
-type LegacyFactor struct {
-	Code            string
-	Title           string
-	Role            FactorRole
-	ParentCode      string
-	SortOrder       int
-	Level           int
-	IsTotalScore    bool
-	QuestionCodes   []string
-	ScoringStrategy string
-	ScoringParams   *ScoringParams
-	MaxScore        *float64
-	InterpretRules  []ScoreRangeRule
-	Classification  *ClassificationSpec
-	Norm            *NormRef
-	ChildrenPolicy  *ChildrenPolicy
-}
-
-// ResolvedRole 返回显式 role，或从旧版 total-score flag 推导 role。
-func (f LegacyFactor) ResolvedRole() FactorRole {
-	return resolveRole(f.Role, f.IsTotalScore)
-}
-
-// Snapshot 返回 LegacyFactor 的兼容 read/published 快照形态。
-func (f LegacyFactor) Snapshot() FactorSnapshot {
-	return FactorSnapshot{
-		Code:            f.Code,
-		Title:           f.Title,
-		Role:            f.Role,
-		ParentCode:      f.ParentCode,
-		SortOrder:       f.SortOrder,
-		Level:           f.Level,
-		IsTotalScore:    f.IsTotalScore,
-		QuestionCodes:   cloneStrings(f.QuestionCodes),
-		ScoringStrategy: f.ScoringStrategy,
-		ScoringParams:   cloneScoringParams(f.ScoringParams),
-		MaxScore:        cloneFloat64(f.MaxScore),
-		InterpretRules:  cloneScoreRangeRules(f.InterpretRules),
-		Classification:  cloneClassificationSpec(f.Classification),
-		Norm:            cloneNormRef(f.Norm),
-		ChildrenPolicy:  cloneChildrenPolicy(f.ChildrenPolicy),
+func resolveRole(role FactorRole, isTotalScore bool) FactorRole {
+	if role != "" {
+		return role
 	}
+	if isTotalScore {
+		return FactorRoleTotal
+	}
+	return FactorRoleDimension
 }
 
 // ScoringSourceKind 标识 Factor 计分输入来源。

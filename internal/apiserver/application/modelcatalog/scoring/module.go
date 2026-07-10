@@ -10,12 +10,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scoring/definition/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
