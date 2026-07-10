@@ -1,16 +1,16 @@
-package norming_test
+package behavioral_test
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func TestDefinitionFromPayloadProjectsBrief2Metadata(t *testing.T) {
 	t.Parallel()
 
-	definition, err := norming.DefinitionFromPayload([]byte(`{
+	definition, err := behavioral.DefinitionFromPayload([]byte(`{
 		"dimensions": [
 			{"code": "inhibit", "title": "Inhibit", "question_codes": ["q1"], "scoring_strategy": "sum"},
 			{"code": "self_monitor", "title": "Self Monitor", "question_codes": ["q2"], "scoring_strategy": "sum"},

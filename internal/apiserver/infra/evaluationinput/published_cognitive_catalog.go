@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 // PublishedCognitiveCatalog loads cognitive payloads from v2 published-model snapshots.

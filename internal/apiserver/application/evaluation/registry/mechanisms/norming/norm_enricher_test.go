@@ -6,8 +6,8 @@ import (
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {

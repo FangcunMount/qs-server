@@ -1,4 +1,4 @@
-package snapshot
+package cognitive
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 // Snapshot 是published cognitive 执行载荷 (default.v1 或 spm.v1)。
@@ -39,7 +40,7 @@ type FactorSnapshot struct {
 	ChildrenPolicy  *factor.ChildrenPolicy
 }
 
-type InterpretRuleSnapshot = factor.ScoreRangeRule
+type InterpretRuleSnapshot = sharedpayload.ScoreRangeRule
 
 func (f FactorSnapshot) ResolvedRole() factor.FactorRole {
 	if f.Role != "" {
@@ -52,7 +53,7 @@ func (f FactorSnapshot) ResolvedRole() factor.FactorRole {
 }
 
 type definitionPayload struct {
-	factor.DefinitionBody
+	sharedpayload.DefinitionBody
 	SPM *spmExtension `json:"spm,omitempty"`
 }
 
@@ -65,6 +66,23 @@ type spmExtension struct {
 // ParseDefinitionPayload de编码 cognitive 载荷 body 为 运行时 快照。
 func ParseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
+}
+
+// DefinitionFromPayload projects the cognitive wire payload to DefinitionV2.
+func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+	var body definitionPayload
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return nil, fmt.Errorf("decode cognitive definition: %w", err)
+	}
+	measure := sharedpayload.MeasureSpecFromDefinitionBody(body.DefinitionBody)
+	calibration := definition.Calibration{}
+	if body.SPM != nil {
+		measure, calibration = taskperf.ApplyNormMetadata(measure, taskperf.MetadataContext{
+			NormTableVersion: body.SPM.NormTableVersion,
+			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
+		})
+	}
+	return &definition.Definition{Measure: measure, Calibration: calibration}, nil
 }
 
 // ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
@@ -132,7 +150,7 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	}
 }
 
-func factorSnapshotsFromDefinitionBody(dimensions []factor.DimensionRule, interpretRules []factor.InterpretRule) []FactorSnapshot {
+func factorSnapshotsFromDefinitionBody(dimensions []sharedpayload.DimensionRule, interpretRules []sharedpayload.InterpretRule) []FactorSnapshot {
 	if dimensions == nil {
 		return nil
 	}
@@ -289,14 +307,14 @@ func questionSources(codes []string) []factor.ScoringSource {
 	return out
 }
 
-func scoringParamsFromPayload(payload *factor.ScoringParamsPayload) *factor.ScoringParams {
+func scoringParamsFromPayload(payload *sharedpayload.ScoringParamsPayload) *factor.ScoringParams {
 	if payload == nil || len(payload.CntOptionContents) == 0 {
 		return nil
 	}
 	return &factor.ScoringParams{CntOptionContents: cloneStrings(payload.CntOptionContents)}
 }
 
-func childrenPolicyFromPayload(payload *factor.ChildrenPolicyPayload) *factor.ChildrenPolicy {
+func childrenPolicyFromPayload(payload *sharedpayload.ChildrenPolicyPayload) *factor.ChildrenPolicy {
 	if payload == nil {
 		return nil
 	}

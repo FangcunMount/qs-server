@@ -1,11 +1,17 @@
-package factor
+package shared
 
-// ScoringParamsPayload 是共享 JSON 结构 用于 strategy-特定 计分 params。
+import "encoding/json"
+
+// DefinitionBody is the shared behavioral/cognitive wire payload.
+type DefinitionBody struct {
+	Dimensions     []DimensionRule `json:"dimensions"`
+	InterpretRules []InterpretRule `json:"interpret_rules"`
+}
+
 type ScoringParamsPayload struct {
 	CntOptionContents []string `json:"cnt_option_contents,omitempty"`
 }
 
-// DimensionRule 是共享 draft/published 载荷 维度 结构。
 type DimensionRule struct {
 	Code            string                 `json:"code"`
 	Title           string                 `json:"title"`
@@ -22,51 +28,33 @@ type DimensionRule struct {
 	ChildrenPolicy  *ChildrenPolicyPayload `json:"children_policy,omitempty"`
 }
 
-// ChildrenPolicyPayload 是JSON 结构 用于 父节点 因子 derivation rules。
 type ChildrenPolicyPayload struct {
 	Strategy string             `json:"strategy"`
 	Children []string           `json:"children"`
 	Weights  map[string]float64 `json:"weights,omitempty"`
 }
 
-// InterpretRule 分组score ranges 用于 一个维度 编码。
 type InterpretRule struct {
 	DimensionCode string           `json:"dimension_code"`
 	Ranges        []ScoreRangeRule `json:"ranges"`
 }
 
-// ParseFactorsFromDefinitionBody 从共享 payload parts 物化瘦领域 Factor。
-func ParseFactorsFromDefinitionBody(dimensions []DimensionRule, interpretRules []InterpretRule) []Factor {
-	return FactorsFromDefinitionDimensions(dimensions)
+type ScoreRangeRule struct {
+	MinScore   float64 `json:"min_score"`
+	MaxScore   float64 `json:"max_score"`
+	Level      string  `json:"level,omitempty"`
+	Conclusion string  `json:"conclusion"`
+	Suggestion string  `json:"suggestion,omitempty"`
 }
 
-func childrenPolicyFromPayload(payload *ChildrenPolicyPayload) *ChildrenPolicy {
-	if payload == nil {
-		return nil
-	}
-	return &ChildrenPolicy{
-		Strategy: ChildrenAggregationStrategy(payload.Strategy),
-		Children: cloneStrings(payload.Children),
-		Weights:  cloneWeights(payload.Weights),
-	}
+func (r ScoreRangeRule) Matches(score float64) bool {
+	return score >= r.MinScore && score < r.MaxScore
 }
 
-func cloneWeights(weights map[string]float64) map[string]float64 {
-	if weights == nil {
-		return nil
+func ParseDefinitionBodyJSON(payload []byte) (DefinitionBody, error) {
+	var body DefinitionBody
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return DefinitionBody{}, err
 	}
-	out := make(map[string]float64, len(weights))
-	for key, value := range weights {
-		out[key] = value
-	}
-	return out
-}
-
-func scoringParamsFromPayload(payload *ScoringParamsPayload) *ScoringParams {
-	if payload == nil || len(payload.CntOptionContents) == 0 {
-		return nil
-	}
-	return &ScoringParams{
-		CntOptionContents: append([]string(nil), payload.CntOptionContents...),
-	}
+	return body, nil
 }

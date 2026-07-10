@@ -1,4 +1,4 @@
-package factor_test
+package shared_test
 
 import (
 	"reflect"
@@ -6,12 +6,13 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 func TestValidateFactorsAcceptsFlatModel(t *testing.T) {
 	t.Parallel()
 
-	issues := validateDimensions([]factor.DimensionRule{{
+	issues := validateDimensions([]sharedpayload.DimensionRule{{
 		Code: "total", Title: "总分", Role: string(factor.FactorRoleTotal),
 		QuestionCodes: []string{"q1"}, ScoringStrategy: "sum",
 	}})
@@ -23,7 +24,7 @@ func TestValidateFactorsAcceptsFlatModel(t *testing.T) {
 func TestValidateFactorsRejectsUnknownParent(t *testing.T) {
 	t.Parallel()
 
-	issues := validateDimensions([]factor.DimensionRule{{
+	issues := validateDimensions([]sharedpayload.DimensionRule{{
 		Code: "inhibit", ParentCode: "missing", Role: string(factor.FactorRoleDimension),
 	}})
 	if len(issues) == 0 {
@@ -34,7 +35,7 @@ func TestValidateFactorsRejectsUnknownParent(t *testing.T) {
 func TestValidateFactorsRequiresChildrenPolicyForIndex(t *testing.T) {
 	t.Parallel()
 
-	issues := validateDimensions([]factor.DimensionRule{
+	issues := validateDimensions([]sharedpayload.DimensionRule{
 		{Code: "bri", Role: string(factor.FactorRoleIndex)},
 	})
 	if len(issues) == 0 {
@@ -45,7 +46,7 @@ func TestValidateFactorsRequiresChildrenPolicyForIndex(t *testing.T) {
 func TestValidateFactorsRejectsReportGroupScoring(t *testing.T) {
 	t.Parallel()
 
-	issues := validateDimensions([]factor.DimensionRule{{
+	issues := validateDimensions([]sharedpayload.DimensionRule{{
 		Code: "section_a", Role: string(factor.FactorRoleReportGroup), ScoringStrategy: "sum",
 	}})
 	if len(issues) == 0 {
@@ -56,7 +57,7 @@ func TestValidateFactorsRejectsReportGroupScoring(t *testing.T) {
 func TestDeriveFactorLevels(t *testing.T) {
 	t.Parallel()
 
-	graph := factor.FactorGraphFromDefinitionDimensions([]factor.DimensionRule{
+	graph := sharedpayload.FactorGraphFromDefinitionDimensions([]sharedpayload.DimensionRule{
 		{Code: "gec", Role: string(factor.FactorRoleIndex)},
 		{Code: "bri", ParentCode: "gec", Role: string(factor.FactorRoleIndex)},
 		{Code: "inhibit", ParentCode: "bri", Role: string(factor.FactorRoleDimension)},
@@ -70,10 +71,10 @@ func TestDeriveFactorLevels(t *testing.T) {
 func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 	t.Parallel()
 
-	dimensions := []factor.DimensionRule{
+	dimensions := []sharedpayload.DimensionRule{
 		{
 			Code: "gec", Title: "全局执行指数", Role: string(factor.FactorRoleIndex),
-			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+			ChildrenPolicy: &sharedpayload.ChildrenPolicyPayload{
 				Strategy: string(factor.ChildrenAggregationWeightedSum),
 				Children: []string{"bri", "mi"},
 				Weights:  map[string]float64{"bri": 0.4, "mi": 0.6},
@@ -81,14 +82,14 @@ func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 		},
 		{
 			Code: "bri", Title: "行为调节指数", Role: string(factor.FactorRoleIndex), ParentCode: "gec",
-			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+			ChildrenPolicy: &sharedpayload.ChildrenPolicyPayload{
 				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"inhibit"},
 			},
 		},
 		{
 			Code: "mi", Title: "元认知指数", Role: string(factor.FactorRoleIndex), ParentCode: "gec",
-			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+			ChildrenPolicy: &sharedpayload.ChildrenPolicyPayload{
 				Strategy: string(factor.ChildrenAggregationAverage),
 				Children: []string{"working_memory"},
 			},
@@ -106,9 +107,10 @@ func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 		},
 	}
 
-	factors := factor.FactorsFromDefinitionDimensions(dimensions)
-	graph := factor.FactorGraphFromDefinitionDimensions(dimensions)
-	scoring := factor.ScoringFromDefinitionDimensions(dimensions)
+	measure := sharedpayload.MeasureSpecFromDefinitionBody(sharedpayload.DefinitionBody{Dimensions: dimensions})
+	factors := measure.Factors
+	graph := measure.FactorGraph
+	scoring := measure.Scoring
 	levels := graph.Levels()
 	if levels["gec"] != 1 || levels["bri"] != 2 || levels["inhibit"] != 3 {
 		t.Fatalf("levels = %#v", levels)
@@ -147,10 +149,7 @@ func TestFactorCorePathDerivesValidGraphAndScoreNodes(t *testing.T) {
 	}
 }
 
-func validateDimensions(dimensions []factor.DimensionRule) []factor.HierarchyIssue {
-	return factor.ValidateMeasureSpecParts(
-		factor.FactorsFromDefinitionDimensions(dimensions),
-		factor.FactorGraphFromDefinitionDimensions(dimensions),
-		factor.ScoringFromDefinitionDimensions(dimensions),
-	)
+func validateDimensions(dimensions []sharedpayload.DimensionRule) []factor.HierarchyIssue {
+	measure := sharedpayload.MeasureSpecFromDefinitionBody(sharedpayload.DefinitionBody{Dimensions: dimensions})
+	return factor.ValidateMeasureSpecParts(measure.Factors, measure.FactorGraph, measure.Scoring)
 }

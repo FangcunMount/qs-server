@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 

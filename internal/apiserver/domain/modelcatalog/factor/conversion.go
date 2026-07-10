@@ -24,13 +24,6 @@ func cloneScoringParams(params *ScoringParams) *ScoringParams {
 	}
 }
 
-func cloneScoreRangeRules(rules []ScoreRangeRule) []ScoreRangeRule {
-	if rules == nil {
-		return nil
-	}
-	return append([]ScoreRangeRule(nil), rules...)
-}
-
 func cloneChildrenPolicy(policy *ChildrenPolicy) *ChildrenPolicy {
 	if policy == nil {
 		return nil

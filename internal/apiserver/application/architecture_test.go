@@ -431,22 +431,16 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 	})
 }
 
-func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
+func TestModelCatalogJSONAdaptersDoNotReturnToDomain(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	allowedPrefixes := []string{
-		"internal/apiserver/domain/modelcatalog/export.go",
-		"internal/apiserver/domain/modelcatalog/factor/",
-		"internal/apiserver/domain/modelcatalog/definition/",
-		"internal/apiserver/domain/modelcatalog/norming/",
-		"internal/apiserver/domain/modelcatalog/taskperformance/",
-		"internal/apiserver/application/modelcatalog/norming/",
-		"internal/apiserver/application/evaluation/calculationadapter/",
-		"internal/apiserver/port/modelcatalog/payload/",
-	}
 	forbiddenTokens := []string{
 		"factor.DefinitionBody",
+		"factor.DimensionRule",
+		"factor.ScoreRangeRule",
+		"domain/modelcatalog/norming/snapshot",
+		"domain/modelcatalog/taskperformance/snapshot",
 	}
 	err := filepath.WalkDir(filepath.Join(root, "internal", "apiserver"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -455,14 +449,8 @@ func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
 		if filepath.Base(path) == "architecture_test.go" {
 			return nil
-		}
-		for _, prefix := range allowedPrefixes {
-			if strings.HasPrefix(rel, prefix) {
-				return nil
-			}
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -471,7 +459,8 @@ func TestFlatFactorCompatibilityTokensStayInAdapterBoundaries(t *testing.T) {
 		text := string(data)
 		for _, token := range forbiddenTokens {
 			if strings.Contains(text, token) {
-				t.Fatalf("%s contains %q; flat factor compatibility tokens must stay in adapter boundaries", rel, token)
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				t.Fatalf("%s contains %q; modelcatalog JSON adapters belong under port/modelcatalog/payload", rel, token)
 			}
 		}
 		return nil
@@ -586,8 +575,8 @@ func isEvaluationRulesetPayloadImport(importPath string) bool {
 	for _, allowed := range []string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
 			return true

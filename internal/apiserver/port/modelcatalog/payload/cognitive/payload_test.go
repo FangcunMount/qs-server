@@ -1,10 +1,10 @@
-package snapshot_test
+package cognitive_test
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
@@ -29,7 +29,7 @@ func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
 			}
 		]
 	}`)
-	got, err := snapshot.ParseDefinitionPayload("BA-001", "1.0.0", "认知测评", "published", raw)
+	got, err := cognitive.ParseDefinitionPayload("BA-001", "1.0.0", "认知测评", "published", raw)
 	if err != nil {
 		t.Fatalf("ParseDefinitionPayload: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestParseSPMPayloadAppliesTaskPerformanceMetadata(t *testing.T) {
 			"norm_table_version": "2024"
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := cognitive.ParsePublishedPayload(
 		"assessmentmodel.cognitive.spm.v1",
 		"COG-001", "v1", "SPM", "published", raw,
 	)

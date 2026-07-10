@@ -1,10 +1,10 @@
-package snapshot_test
+package behavioral_test
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
@@ -29,7 +29,7 @@ func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
 			}
 		]
 	}`)
-	got, err := snapshot.ParseDefinitionPayload("BA-001", "1.0.0", "行为能力", "published", raw)
+	got, err := behavioral.ParseDefinitionPayload("BA-001", "1.0.0", "行为能力", "published", raw)
 	if err != nil {
 		t.Fatalf("ParseDefinitionPayload: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestParseBrief2PayloadPreservesProfile(t *testing.T) {
 			"validity_codes": ["inconsistency"]
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := behavioral.ParsePublishedPayload(
 		"assessmentmodel.behavioral_rating.brief2.v1",
 		"BR-001", "v1", "BRIEF-2", "published", raw,
 	)
@@ -91,7 +91,7 @@ func TestParseBrief2PayloadAnnotatesCompositeMetadata(t *testing.T) {
 			]
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := behavioral.ParsePublishedPayload(
 		"assessmentmodel.behavioral_rating.brief2.v1",
 		"BR-004", "v1", "BRIEF-2", "published", raw,
 	)
@@ -107,8 +107,8 @@ func TestParseBrief2PayloadAnnotatesCompositeMetadata(t *testing.T) {
 	}
 }
 
-func indexFactorSnapshotsByCode(factors []snapshot.FactorSnapshot) map[string]snapshot.FactorSnapshot {
-	out := make(map[string]snapshot.FactorSnapshot, len(factors))
+func indexFactorSnapshotsByCode(factors []behavioral.FactorSnapshot) map[string]behavioral.FactorSnapshot {
+	out := make(map[string]behavioral.FactorSnapshot, len(factors))
 	for _, item := range factors {
 		out[item.Code] = item
 	}
@@ -129,7 +129,7 @@ func TestParseBrief2PayloadAnnotatesFactorNormMetadata(t *testing.T) {
 			"norms": [{"factor_code": "gec", "lookup": [{"raw_min": 0, "raw_max": 8, "t_score": 45, "percentile": 30}]}]
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := behavioral.ParsePublishedPayload(
 		"assessmentmodel.behavioral_rating.brief2.v1",
 		"BR-003", "v1", "BRIEF-2", "published", raw,
 	)
@@ -157,7 +157,7 @@ func TestParseBrief2PayloadLegacyPrimaryDimensionFallback(t *testing.T) {
 			"norms": [{"factor_code": "gec", "lookup": [{"raw_min": 0, "raw_max": 8, "t_score": 45, "percentile": 30}]}]
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := behavioral.ParsePublishedPayload(
 		"assessmentmodel.behavioral_rating.brief2.v1",
 		"BR-LEGACY", "v1", "BRIEF-2", "published", raw,
 	)
@@ -187,7 +187,7 @@ func TestParseBrief2PayloadNormTables(t *testing.T) {
 			}]
 		}
 	}`)
-	got, err := snapshot.ParsePublishedPayload(
+	got, err := behavioral.ParsePublishedPayload(
 		"assessmentmodel.behavioral_rating.brief2.v1",
 		"BR-002", "v1", "BRIEF-2", "published", raw,
 	)

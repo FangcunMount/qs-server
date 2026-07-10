@@ -2,8 +2,8 @@ package norming
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming/snapshot"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func validatePublishedScoreNodes(model *port.PublishedModel) error {

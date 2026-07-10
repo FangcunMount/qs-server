@@ -2,7 +2,6 @@ package assessmentmodel
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
 type (
@@ -89,7 +88,8 @@ func (e *legacyPayloadFormatError) Error() string {
 	return "payload format " + `"` + e.format + `"` + " is legacy-decode-only and cannot be published"
 }
 
-// ValidateForPublish checks publish readiness including shared factor hierarchy rules.
+// ValidateForPublish checks domain-owned publish readiness. Family wire payload
+// validation is performed by the application definition handler.
 func (m *AssessmentModel) ValidateForPublish() DomainValidationResult {
 	result := m.ValidateBasic()
 	if m != nil && m.IsArchived() {
@@ -97,46 +97,5 @@ func (m *AssessmentModel) ValidateForPublish() DomainValidationResult {
 			Field: "status", Message: "archived model cannot be published", Code: "status.archived", Level: ValidationLevelError,
 		})
 	}
-	if m != nil && usesSharedFactorDefinitionBody(m.Kind) && !m.Definition.IsEmpty() {
-		result.Issues = append(result.Issues, validateSharedFactorDefinitionForPublish(m.Definition.Data)...)
-	}
 	return result
-}
-
-func usesSharedFactorDefinitionBody(kind binding.Kind) bool {
-	switch kind {
-	case binding.KindBehavioralRating, binding.KindCognitive:
-		return true
-	default:
-		return false
-	}
-}
-
-func validateSharedFactorDefinitionForPublish(data []byte) []DomainValidationIssue {
-	issues, err := factor.ValidateDefinitionBodyJSONForPublish(data)
-	if err != nil {
-		return []DomainValidationIssue{{
-			Field:   "definition.payload",
-			Code:    "definition.payload.invalid",
-			Message: "模型定义 payload 不是有效的 factor 结构",
-			Level:   ValidationLevelError,
-		}}
-	}
-	return hierarchyIssuesToDomain(issues)
-}
-
-func hierarchyIssuesToDomain(issues []factor.HierarchyIssue) []DomainValidationIssue {
-	if len(issues) == 0 {
-		return nil
-	}
-	out := make([]DomainValidationIssue, 0, len(issues))
-	for _, issue := range issues {
-		out = append(out, DomainValidationIssue{
-			Field:   issue.Field,
-			Code:    issue.Code,
-			Message: issue.Message,
-			Level:   ValidationLevelError,
-		})
-	}
-	return out
 }

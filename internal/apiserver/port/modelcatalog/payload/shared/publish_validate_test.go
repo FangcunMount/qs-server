@@ -1,21 +1,22 @@
-package factor_test
+package shared_test
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 func TestValidateDefinitionBodyForPublishAcceptsFlatModel(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateDefinitionBodyForPublish(factor.DefinitionBody{
-		Dimensions: []factor.DimensionRule{{
+	issues := sharedpayload.ValidateDefinitionBodyForPublish(sharedpayload.DefinitionBody{
+		Dimensions: []sharedpayload.DimensionRule{{
 			Code: "total", Title: "总分", ScoringStrategy: "sum", QuestionCodes: []string{"q1"},
 		}},
-		InterpretRules: []factor.InterpretRule{{
+		InterpretRules: []sharedpayload.InterpretRule{{
 			DimensionCode: "total",
-			Ranges:        []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Conclusion: "ok"}},
+			Ranges:        []sharedpayload.ScoreRangeRule{{MinScore: 0, MaxScore: 10, Conclusion: "ok"}},
 		}},
 	})
 	if len(issues) != 0 {
@@ -26,8 +27,8 @@ func TestValidateDefinitionBodyForPublishAcceptsFlatModel(t *testing.T) {
 func TestValidateDefinitionBodyForPublishRejectsInvalidHierarchy(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateDefinitionBodyForPublish(factor.DefinitionBody{
-		Dimensions: []factor.DimensionRule{{
+	issues := sharedpayload.ValidateDefinitionBodyForPublish(sharedpayload.DefinitionBody{
+		Dimensions: []sharedpayload.DimensionRule{{
 			Code: "bri", Role: string(factor.FactorRoleIndex), ParentCode: "gec",
 		}},
 	})
@@ -39,13 +40,13 @@ func TestValidateDefinitionBodyForPublishRejectsInvalidHierarchy(t *testing.T) {
 func TestValidateDefinitionBodyForPublishRejectsUnknownInterpretRuleDimension(t *testing.T) {
 	t.Parallel()
 
-	issues := factor.ValidateDefinitionBodyForPublish(factor.DefinitionBody{
-		Dimensions: []factor.DimensionRule{{
+	issues := sharedpayload.ValidateDefinitionBodyForPublish(sharedpayload.DefinitionBody{
+		Dimensions: []sharedpayload.DimensionRule{{
 			Code: "total", Title: "总分", ScoringStrategy: "sum",
 		}},
-		InterpretRules: []factor.InterpretRule{{
+		InterpretRules: []sharedpayload.InterpretRule{{
 			DimensionCode: "missing",
-			Ranges:        []factor.ScoreRangeRule{{MinScore: 0, MaxScore: 1}},
+			Ranges:        []sharedpayload.ScoreRangeRule{{MinScore: 0, MaxScore: 1}},
 		}},
 	})
 	if len(issues) == 0 {
@@ -56,7 +57,7 @@ func TestValidateDefinitionBodyForPublishRejectsUnknownInterpretRuleDimension(t 
 func TestValidateDefinitionBodyJSONForPublish(t *testing.T) {
 	t.Parallel()
 
-	issues, err := factor.ValidateDefinitionBodyJSONForPublish([]byte(`{"dimensions":[]}`))
+	issues, err := sharedpayload.ValidateDefinitionBodyJSONForPublish([]byte(`{"dimensions":[]}`))
 	if err != nil {
 		t.Fatalf("ValidateDefinitionBodyJSONForPublish: %v", err)
 	}

@@ -1,26 +1,27 @@
-package factor_test
+package shared_test
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 func TestFactorGraphFromDefinitionDimensionsUsesChildrenPolicy(t *testing.T) {
 	t.Parallel()
 
-	graph := factor.FactorGraphFromDefinitionDimensions([]factor.DimensionRule{
+	graph := sharedpayload.FactorGraphFromDefinitionDimensions([]sharedpayload.DimensionRule{
 		{Code: "inhibit"},
 		{
 			Code: "bri", Role: string(factor.FactorRoleIndex),
-			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+			ChildrenPolicy: &sharedpayload.ChildrenPolicyPayload{
 				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"inhibit"},
 			},
 		},
 		{
 			Code: "gec", Role: string(factor.FactorRoleIndex),
-			ChildrenPolicy: &factor.ChildrenPolicyPayload{
+			ChildrenPolicy: &sharedpayload.ChildrenPolicyPayload{
 				Strategy: string(factor.ChildrenAggregationSum),
 				Children: []string{"bri"},
 			},

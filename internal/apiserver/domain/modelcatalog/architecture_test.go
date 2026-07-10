@@ -174,6 +174,34 @@ func TestTargetDomainPackagesDoNotDependOnPublishing(t *testing.T) {
 	}
 }
 
+func TestModelCatalogDomainDoesNotImportRuntimePayloadAdapters(t *testing.T) {
+	t.Parallel()
+
+	root := modelCatalogRoot(t)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imp := range parsed.Imports {
+			importPath := strings.Trim(imp.Path.Value, `"`)
+			if strings.Contains(importPath, "/port/modelcatalog/payload") {
+				t.Fatalf("%s imports %s; runtime JSON adapters must not be dependencies of modelcatalog domain packages", path, importPath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProductionCodeDoesNotDependOnPublishingFacade(t *testing.T) {
 	t.Parallel()
 

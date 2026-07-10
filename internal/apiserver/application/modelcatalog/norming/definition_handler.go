@@ -7,7 +7,7 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modelnorming "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
+	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 // DefinitionHandler owns behavioral-rating definition validation and publish shaping.
@@ -21,7 +21,7 @@ func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentM
 	result := appdefinition.SaveResult{
 		Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
 	}
-	if definitionV2, err := modelnorming.DefinitionFromPayload(input.Payload); err == nil {
+	if definitionV2, err := behavioralpayload.DefinitionFromPayload(input.Payload); err == nil {
 		result.DefinitionV2 = definitionV2
 	}
 	return result, nil, nil
@@ -38,7 +38,8 @@ func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.Ass
 			Field: "definition", Message: "行为评定模型定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError,
 		}}
 	}
-	return model.ValidateForPublish().Issues
+	issues := model.ValidateForPublish().Issues
+	return append(issues, appdefinition.ValidateSharedFactorPayloadForPublish(model.Definition.Data)...)
 }
 
 func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (appdefinition.SnapshotBuildResult, error) {

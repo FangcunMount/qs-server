@@ -1,4 +1,4 @@
-package snapshot
+package behavioral
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 // Snapshot 是published behavioral_rating 执行载荷 (默认.v1 或 brief2.v1)。
@@ -59,7 +60,7 @@ type FactorSnapshot struct {
 	ChildrenPolicy  *factor.ChildrenPolicy
 }
 
-type InterpretRuleSnapshot = factor.ScoreRangeRule
+type InterpretRuleSnapshot = sharedpayload.ScoreRangeRule
 
 func (f FactorSnapshot) ResolvedRole() factor.FactorRole {
 	if f.Role != "" {
@@ -72,7 +73,7 @@ func (f FactorSnapshot) ResolvedRole() factor.FactorRole {
 }
 
 type definitionPayload struct {
-	factor.DefinitionBody
+	sharedpayload.DefinitionBody
 	Brief2 *brief2Extension `json:"brief2,omitempty"`
 }
 
@@ -131,6 +132,26 @@ type brief2TScoreRange struct {
 // ParseDefinitionPayload de编码 behavioral_rating 载荷 body 为 运行时 快照。
 func ParseDefinitionPayload(modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
+}
+
+// DefinitionFromPayload projects the behavioral wire payload to DefinitionV2.
+func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+	var body definitionPayload
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return nil, fmt.Errorf("decode behavioral_rating definition: %w", err)
+	}
+	measure := sharedpayload.MeasureSpecFromDefinitionBody(body.DefinitionBody)
+	calibration := definition.Calibration{}
+	if body.Brief2 != nil {
+		measure, calibration = factornorm.ApplyNormMetadata(measure, factornorm.MetadataContext{
+			NormTableVersion: body.Brief2.NormTableVersion,
+			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
+			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
+			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
+		})
+		measure = factornorm.ApplyCompositeMetadata(measure, compositeSpecsFromPayload(body.Brief2))
+	}
+	return &definition.Definition{Measure: measure, Calibration: calibration}, nil
 }
 
 // ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
@@ -300,7 +321,7 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	}
 }
 
-func factorSnapshotsFromDefinitionBody(dimensions []factor.DimensionRule, interpretRules []factor.InterpretRule) []FactorSnapshot {
+func factorSnapshotsFromDefinitionBody(dimensions []sharedpayload.DimensionRule, interpretRules []sharedpayload.InterpretRule) []FactorSnapshot {
 	if dimensions == nil {
 		return nil
 	}
@@ -541,14 +562,14 @@ func questionSources(codes []string) []factor.ScoringSource {
 	return out
 }
 
-func scoringParamsFromPayload(payload *factor.ScoringParamsPayload) *factor.ScoringParams {
+func scoringParamsFromPayload(payload *sharedpayload.ScoringParamsPayload) *factor.ScoringParams {
 	if payload == nil || len(payload.CntOptionContents) == 0 {
 		return nil
 	}
 	return &factor.ScoringParams{CntOptionContents: cloneStrings(payload.CntOptionContents)}
 }
 
-func childrenPolicyFromPayload(payload *factor.ChildrenPolicyPayload) *factor.ChildrenPolicy {
+func childrenPolicyFromPayload(payload *sharedpayload.ChildrenPolicyPayload) *factor.ChildrenPolicy {
 	if payload == nil {
 		return nil
 	}
