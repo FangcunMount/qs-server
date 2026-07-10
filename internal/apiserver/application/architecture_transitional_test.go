@@ -101,12 +101,9 @@ func TestModelCatalogApplicationDoesNotReintroduceModelFamilyTopLevelDirs(t *tes
 		name := entry.Name()
 		for _, forbidden := range forbiddenDirs {
 			if name == forbidden {
-				t.Fatalf("application/modelcatalog/%s is forbidden; use typology/norming/taskperformance/scoring", forbidden)
+				t.Fatalf("application/modelcatalog/%s is forbidden; use definition strategies and model-specific adapters", forbidden)
 			}
 		}
-	}
-	if _, err := os.Stat(filepath.Join(modelCatalogRoot, "scoring")); err != nil {
-		t.Fatalf("application/modelcatalog/scoring is required after behavior/scale migration: %v", err)
 	}
 }
 

@@ -24,7 +24,7 @@ func (s *lifecycleService) publishQuestionnaireVersion(
 	if err := s.persistPublishedQuestionnaire(ctx, q, code); err != nil {
 		return err
 	}
-	return s.syncScaleQuestionnaireVersion(ctx, code, q.GetVersion().String())
+	return s.syncQuestionnaireBindingVersion(ctx, code, q.GetVersion().String())
 }
 
 func (s *lifecycleService) ensurePublishable(

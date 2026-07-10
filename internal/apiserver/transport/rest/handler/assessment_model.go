@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -16,63 +16,53 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// AssessmentModelHandler is the sole management transport for every
+// assessment-model kind. It deliberately knows no family-specific command or
+// snapshot DTO.
 type AssessmentModelHandler struct {
 	BaseHandler
-	service     modelcatalog.Service
 	management  modelcatalog.CatalogManagementService
+	definition  modelcatalog.DefinitionAuthoringService
 	publication modelcatalog.PublicationService
+	query       modelcatalog.CatalogQueryService
 }
 
-func NewAssessmentModelHandler(service modelcatalog.Service, usecases ...interface{}) *AssessmentModelHandler {
-	handler := &AssessmentModelHandler{service: service}
-	for _, usecase := range usecases {
-		switch value := usecase.(type) {
-		case modelcatalog.CatalogManagementService:
-			handler.management = value
-		case modelcatalog.PublicationService:
-			handler.publication = value
-		}
-	}
-	return handler
+func NewAssessmentModelHandler(
+	management modelcatalog.CatalogManagementService,
+	definition modelcatalog.DefinitionAuthoringService,
+	publication modelcatalog.PublicationService,
+	query modelcatalog.CatalogQueryService,
+) *AssessmentModelHandler {
+	return &AssessmentModelHandler{management: management, definition: definition, publication: publication, query: query}
 }
 
-// List 获取测评模型列表
+// List lists draft catalogue records. Use the published endpoints for
+// immutable execution records.
 // @Summary 获取测评模型列表
-// @Description 管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受 personality 读兼容别名。
+// @Description 统一目录返回 canonical kind；人格模型使用 typology，personality 仅为读兼容别名。
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param kind query string false "模型类型" Enums(typology,personality,behavioral_rating,cognitive,custom,medical_scale)
-// @Param sub_kind query string false "子类型"
+// @Param kind query string false "模型类型"
 // @Param status query string false "状态"
-// @Param keyword query string false "关键词"
-// @Param category query string false "分类"
-// @Param algorithm query string false "算法"
+// @Param questionnaire_code query string false "问卷编码"
+// @Param questionnaire_version query string false "问卷版本"
 // @Param page query int false "页码"
 // @Param page_size query int false "每页数量"
 // @Success 200 {object} core.Response{data=response.AssessmentModelListResponse}
 // @Router /api/v1/assessment-models [get]
 func (h *AssessmentModelHandler) List(c *gin.Context) {
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil || page <= 0 {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "页码无效"))
+	input, err := modelListInput(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	if err != nil || pageSize <= 0 {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	result, err := h.service.List(c.Request.Context(), modelcatalog.ListModelsDTO{
-		Kind:      c.Query("kind"),
-		SubKind:   c.Query("sub_kind"),
-		Status:    c.Query("status"),
-		Keyword:   c.Query("keyword"),
-		Category:  c.Query("category"),
-		Algorithm: c.Query("algorithm"),
-		Page:      page,
-		PageSize:  pageSize,
-	})
+	result, err := h.query.List(c.Request.Context(), actor, input)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -80,14 +70,14 @@ func (h *AssessmentModelHandler) List(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelListResponse)(result))
 }
 
-// Create 创建测评模型
+// Create creates a model aggregate. Scale-specific catalogue attributes are
+// ordinary AssessmentModel metadata and are accepted only with kind=scale.
 // @Summary 创建测评模型
-// @Description 新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用 typology。
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateAssessmentModelRequest true "创建测评模型请求"
+// @Param request body request.CreateAssessmentModelRequest true "创建请求"
 // @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
 // @Router /api/v1/assessment-models [post]
 func (h *AssessmentModelHandler) Create(c *gin.Context) {
@@ -96,34 +86,16 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	input := modelcatalog.CreateModelDTO{
-		Code:                 req.Code,
-		Kind:                 req.Kind,
-		SubKind:              req.SubKind,
-		Algorithm:            req.Algorithm,
-		ProductChannel:       req.ProductChannel,
-		Title:                req.Title,
-		Description:          req.Description,
-		Category:             req.Category,
-		Tags:                 req.Tags,
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-	}
-	if h.management == nil {
-		result, err := h.service.Create(c.Request.Context(), input)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelResponse)(result))
-		return
-	}
 	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.management.Create(c.Request.Context(), actor, input)
+	result, err := h.management.Create(c.Request.Context(), actor, modelcatalog.CreateModelDTO{
+		Code: req.Code, Kind: req.Kind, SubKind: req.SubKind, Algorithm: req.Algorithm, ProductChannel: req.ProductChannel,
+		Title: req.Title, Description: req.Description, Category: req.Category, Stages: req.Stages, ApplicableAges: req.ApplicableAges,
+		Reporters: req.Reporters, Tags: req.Tags, QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion,
+	})
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -131,7 +103,7 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
-// Get 获取测评模型详情
+// Get returns the mutable catalogue aggregate summary.
 // @Summary 获取测评模型详情
 // @Tags AssessmentModel
 // @Produce json
@@ -140,7 +112,12 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
 // @Router /api/v1/assessment-models/{code} [get]
 func (h *AssessmentModelHandler) Get(c *gin.Context) {
-	result, err := h.service.Get(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.query.Get(c.Request.Context(), actor, h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -148,29 +125,20 @@ func (h *AssessmentModelHandler) Get(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
+// UpdateBasicInfo updates generic model metadata.
+// @Summary 更新测评模型基本信息
+// @Tags AssessmentModel
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Param request body request.UpdateAssessmentModelBasicInfoRequest true "更新请求"
+// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
+// @Router /api/v1/assessment-models/{code}/basic-info [put]
 func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 	var req request.UpdateAssessmentModelBasicInfoRequest
 	if err := h.bindAndValidate(c, &req); err != nil {
 		h.Error(c, err)
-		return
-	}
-	input := modelcatalog.UpdateBasicInfoDTO{
-		Code:           h.modelCode(c),
-		Title:          req.Title,
-		Description:    req.Description,
-		SubKind:        req.SubKind,
-		Algorithm:      req.Algorithm,
-		ProductChannel: req.ProductChannel,
-		Category:       req.Category,
-		Tags:           req.Tags,
-	}
-	if h.management == nil {
-		result, err := h.service.UpdateBasicInfo(c.Request.Context(), input)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelResponse)(result))
 		return
 	}
 	actor, err := assessmentModelActorContext(c)
@@ -178,7 +146,11 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.management.UpdateBasicInfo(c.Request.Context(), actor, input)
+	result, err := h.management.UpdateBasicInfo(c.Request.Context(), actor, modelcatalog.UpdateBasicInfoDTO{
+		Code: h.modelCode(c), Title: req.Title, Description: req.Description, SubKind: req.SubKind, Algorithm: req.Algorithm,
+		ProductChannel: req.ProductChannel, Category: req.Category, Stages: req.Stages, ApplicableAges: req.ApplicableAges,
+		Reporters: req.Reporters, Tags: req.Tags,
+	})
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -186,102 +158,96 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
+// @Summary 删除已归档测评模型
+// @Tags AssessmentModel
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response
+// @Router /api/v1/assessment-models/{code} [delete]
 func (h *AssessmentModelHandler) Delete(c *gin.Context) {
-	if h.management != nil {
-		actor, err := assessmentModelActorContext(c)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		if err := h.management.Delete(c.Request.Context(), actor, h.modelCode(c)); err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.SuccessResponseWithMessage(c, "删除成功", nil)
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	if err := h.service.Delete(c.Request.Context(), h.modelCode(c)); err != nil {
+	if err := h.management.Delete(c.Request.Context(), actor, h.modelCode(c)); err != nil {
 		h.Error(c, err)
 		return
 	}
 	h.SuccessResponseWithMessage(c, "删除成功", nil)
 }
 
+// @Summary 发布测评模型
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
+// @Router /api/v1/assessment-models/{code}/publish [post]
 func (h *AssessmentModelHandler) Publish(c *gin.Context) {
-	if h.publication != nil {
-		actor, err := assessmentModelActorContext(c)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		result, err := h.publication.Publish(c.Request.Context(), actor, h.modelCode(c))
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelResponse)(result))
-		return
-	}
-	result, err := h.service.Validate(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	if result != nil && !result.Passed {
-		c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
-			Code:    code.ErrAssessmentModelValidationFailed,
-			Message: "模型校验失败",
-			Data:    (*response.AssessmentModelValidationResponse)(result),
-		})
+	result, err := h.publication.Publish(c.Request.Context(), actor, h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	h.transition(c, h.service.Publish)
+	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
+// @Summary 下架测评模型
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
+// @Router /api/v1/assessment-models/{code}/unpublish [post]
 func (h *AssessmentModelHandler) Unpublish(c *gin.Context) {
-	if h.publication != nil {
-		actor, err := assessmentModelActorContext(c)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		result, err := h.publication.Unpublish(c.Request.Context(), actor, h.modelCode(c))
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelResponse)(result))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	h.transition(c, h.service.Unpublish)
+	result, err := h.publication.Unpublish(c.Request.Context(), actor, h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
+// @Summary 归档测评模型
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
+// @Router /api/v1/assessment-models/{code}/archive [post]
 func (h *AssessmentModelHandler) Archive(c *gin.Context) {
-	if h.management != nil {
-		actor, err := assessmentModelActorContext(c)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		result, err := h.management.Archive(c.Request.Context(), actor, h.modelCode(c))
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelResponse)(result))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
-	h.transition(c, h.service.Archive)
+	result, err := h.management.Archive(c.Request.Context(), actor, h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
-// BindQuestionnaire 绑定问卷
+// BindQuestionnaire binds a draft model to a questionnaire version.
 // @Summary 绑定问卷
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.BindAssessmentModelQuestionnaireRequest true "绑定问卷请求"
+// @Param request body request.BindAssessmentModelQuestionnaireRequest true "绑定请求"
 // @Success 200 {object} core.Response{data=response.AssessmentModelQuestionnaireResponse}
 // @Router /api/v1/assessment-models/{code}/questionnaire [put]
 func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
@@ -290,26 +256,12 @@ func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	input := modelcatalog.BindQuestionnaireDTO{
-		Code:                 h.modelCode(c),
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-	}
-	if h.management == nil {
-		result, err := h.service.BindQuestionnaire(c.Request.Context(), input)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, (*response.AssessmentModelQuestionnaireResponse)(result))
-		return
-	}
 	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.management.BindQuestionnaire(c.Request.Context(), actor, input)
+	result, err := h.management.BindQuestionnaire(c.Request.Context(), actor, modelcatalog.BindQuestionnaireDTO{Code: h.modelCode(c), QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion})
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -317,8 +269,7 @@ func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelQuestionnaireResponse)(result))
 }
 
-// GetQuestionnaire 获取测评模型绑定的问卷
-// @Summary 获取测评模型绑定的问卷
+// @Summary 获取模型问卷绑定
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -326,7 +277,12 @@ func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.AssessmentModelQuestionnaireResponse}
 // @Router /api/v1/assessment-models/{code}/questionnaire [get]
 func (h *AssessmentModelHandler) GetQuestionnaire(c *gin.Context) {
-	result, err := h.service.GetQuestionnaire(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.query.GetQuestionnaire(c.Request.Context(), actor, h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -334,16 +290,21 @@ func (h *AssessmentModelHandler) GetQuestionnaire(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelQuestionnaireResponse)(result))
 }
 
-// GetDefinition 获取测评模型定义
+// GetDefinition returns canonical DefinitionV2.
 // @Summary 获取测评模型定义
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=response.AssessmentModelDefinitionResponse}
 // @Router /api/v1/assessment-models/{code}/definition [get]
 func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
-	result, err := h.service.GetDefinition(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.definition.GetDefinition(c.Request.Context(), actor, h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -351,15 +312,15 @@ func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelDefinitionResponse)(result))
 }
 
-// UpdateDefinition 更新测评模型定义
+// UpdateDefinition replaces the complete canonical DefinitionV2.
 // @Summary 更新测评模型定义
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.UpdateAssessmentModelDefinitionRequest true "更新定义请求"
-// @Success 200 {object} core.Response
+// @Param request body request.UpdateAssessmentModelDefinitionRequest true "DefinitionV2"
+// @Success 200 {object} core.Response{data=response.AssessmentModelDefinitionResponse}
 // @Router /api/v1/assessment-models/{code}/definition [put]
 func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	var req request.UpdateAssessmentModelDefinitionRequest
@@ -367,13 +328,13 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.UpdateDefinition(c.Request.Context(), h.modelCode(c), modelcatalog.DefinitionDTO{
-		Kind:          req.Kind,
-		SubKind:       req.SubKind,
-		Algorithm:     req.Algorithm,
-		PayloadFormat: req.PayloadFormat,
-		Payload:       req.Payload,
-	})
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	definition := domain.Definition(req)
+	result, err := h.definition.SaveDefinition(c.Request.Context(), actor, h.modelCode(c), &definition)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -381,17 +342,21 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelDefinitionResponse)(result))
 }
 
-// Options 获取测评模型选项
+// Options exposes presentation metadata for a model kind.
 // @Summary 获取测评模型选项
-// @Description kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为 personality。
 // @Tags AssessmentModel
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param kind query string false "模型类型" Enums(typology,personality,behavioral_rating,cognitive,custom,medical_scale)
+// @Param kind query string false "模型类型"
 // @Success 200 {object} core.Response{data=response.AssessmentModelOptionsResponse}
 // @Router /api/v1/assessment-models/options [get]
 func (h *AssessmentModelHandler) Options(c *gin.Context) {
-	result, err := h.service.Options(c.Request.Context(), c.Query("kind"))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.query.Options(c.Request.Context(), actor, c.Query("kind"))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -399,14 +364,13 @@ func (h *AssessmentModelHandler) Options(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelOptionsResponse)(result))
 }
 
-// ApplyCodes 申请编码
-// @Summary 申请编码
+// @Summary 申请模型定义编码
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.ApplyAssessmentModelCodesRequest true "申请编码请求"
+// @Param request body request.ApplyAssessmentModelCodesRequest true "编码申请"
 // @Success 200 {object} core.Response{data=response.AssessmentModelCodesResponse}
 // @Router /api/v1/assessment-models/{code}/codes/apply [post]
 func (h *AssessmentModelHandler) ApplyCodes(c *gin.Context) {
@@ -415,20 +379,33 @@ func (h *AssessmentModelHandler) ApplyCodes(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	codes, err := h.service.ApplyCodes(c.Request.Context(), modelcatalog.ApplyCodesDTO{
-		Code:   h.modelCode(c),
-		Target: req.Target,
-		Count:  req.Count,
-	})
+	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, response.AssessmentModelCodesResponse{Codes: codes})
+	values, err := h.definition.ApplyCodes(c.Request.Context(), actor, modelcatalog.ApplyCodesDTO{Code: h.modelCode(c), Target: req.Target, Count: req.Count})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, response.AssessmentModelCodesResponse{Codes: values})
 }
 
+// @Summary 校验测评模型定义
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.AssessmentModelValidationResponse}
+// @Router /api/v1/assessment-models/{code}/validate [post]
 func (h *AssessmentModelHandler) Validate(c *gin.Context) {
-	result, err := h.service.Validate(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.definition.ValidateDefinition(c.Request.Context(), actor, h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -436,14 +413,13 @@ func (h *AssessmentModelHandler) Validate(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelValidationResponse)(result))
 }
 
-// PreviewReport 预览报告
-// @Summary 预览报告
+// @Summary 预览测评模型报告
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.PreviewAssessmentModelReportRequest true "预览报告请求"
+// @Param request body request.PreviewAssessmentModelReportRequest true "预览输入"
 // @Success 200 {object} core.Response{data=response.AssessmentModelPreviewReportResponse}
 // @Router /api/v1/assessment-models/{code}/preview-report [post]
 func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
@@ -453,14 +429,15 @@ func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 		return
 	}
 	payload, _ := json.Marshal(req)
-	result, err := h.service.PreviewReport(c.Request.Context(), h.modelCode(c), payload)
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.definition.PreviewReport(c.Request.Context(), actor, h.modelCode(c), payload)
 	if err != nil {
 		if vf, ok := modelcatalog.ValidationFailedFrom(err); ok {
-			c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
-				Code:    code.ErrAssessmentModelValidationFailed,
-				Message: "模型校验失败",
-				Data:    (*response.AssessmentModelValidationResponse)(vf.Result),
-			})
+			c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{Code: code.ErrAssessmentModelValidationFailed, Message: "模型校验失败", Data: (*response.AssessmentModelValidationResponse)(vf.Result)})
 			return
 		}
 		h.Error(c, err)
@@ -469,22 +446,117 @@ func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelPreviewReportResponse)(result))
 }
 
+// @Summary 获取测评模型二维码
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.QRCodeResponse}
+// @Router /api/v1/assessment-models/{code}/qrcode [get]
 func (h *AssessmentModelHandler) GetQRCode(c *gin.Context) {
-	qrCodeURL, err := h.service.GetQRCode(c.Request.Context(), h.modelCode(c))
+	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, response.NewQRCodeResponse(qrCodeURL))
+	url, err := h.query.GetQRCode(c.Request.Context(), actor, h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, response.NewQRCodeResponse(url))
 }
 
-func (h *AssessmentModelHandler) transition(c *gin.Context, action func(context.Context, string) (*modelcatalog.ModelSummary, error)) {
-	result, err := action(c.Request.Context(), h.modelCode(c))
+// GetPublished returns an immutable published model and its canonical
+// DefinitionV2. It is an admin read contract, not an execution resolver.
+// @Summary 获取已发布测评模型
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Param version query string false "发布版本"
+// @Success 200 {object} core.Response{data=response.PublishedAssessmentModelResponse}
+// @Router /api/v1/assessment-models/published/{code} [get]
+func (h *AssessmentModelHandler) GetPublished(c *gin.Context) {
+	actor, err := assessmentModelActorContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, (*response.AssessmentModelResponse)(result))
+	result, err := h.query.GetPublished(c.Request.Context(), actor, h.modelCode(c), c.Query("version"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.PublishedAssessmentModelResponse)(result))
+}
+
+// @Summary 获取已发布测评模型列表
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param kind query string false "模型类型"
+// @Param questionnaire_code query string false "问卷编码"
+// @Param questionnaire_version query string false "问卷版本"
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 200 {object} core.Response{data=response.PublishedAssessmentModelListResponse}
+// @Router /api/v1/assessment-models/published [get]
+func (h *AssessmentModelHandler) ListPublished(c *gin.Context) {
+	input, err := modelListInput(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.query.ListPublished(c.Request.Context(), actor, input)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.PublishedAssessmentModelListResponse)(result))
+}
+
+// @Summary 获取热门已发布测评模型
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param kind query string false "模型类型"
+// @Param limit query int false "数量"
+// @Param window_days query int false "统计窗口天数"
+// @Success 200 {object} core.Response{data=response.HotAssessmentModelListResponse}
+// @Router /api/v1/assessment-models/hot [get]
+func (h *AssessmentModelHandler) ListHot(c *gin.Context) {
+	input, err := modelListInput(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit, err := queryPositiveInt(c, "limit", 5)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	windowDays, err := queryPositiveInt(c, "window_days", 30)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.query.ListHotPublished(c.Request.Context(), actor, input, limit, windowDays)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.HotAssessmentModelListResponse)(result))
 }
 
 func (h *AssessmentModelHandler) bindAndValidate(c *gin.Context, req interface{}) error {
@@ -497,6 +569,24 @@ func (h *AssessmentModelHandler) bindAndValidate(c *gin.Context, req interface{}
 	return nil
 }
 
-func (h *AssessmentModelHandler) modelCode(c *gin.Context) string {
-	return c.Param("code")
+func (h *AssessmentModelHandler) modelCode(c *gin.Context) string { return c.Param("code") }
+
+func modelListInput(c *gin.Context) (modelcatalog.ListModelsDTO, error) {
+	page, err := queryPositiveInt(c, "page", 1)
+	if err != nil {
+		return modelcatalog.ListModelsDTO{}, err
+	}
+	pageSize, err := queryPositiveInt(c, "page_size", 20)
+	if err != nil {
+		return modelcatalog.ListModelsDTO{}, err
+	}
+	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
+}
+
+func queryPositiveInt(c *gin.Context, key string, fallback int) (int, error) {
+	value, err := strconv.Atoi(c.DefaultQuery(key, strconv.Itoa(fallback)))
+	if err != nil || value <= 0 {
+		return 0, errors.WithCode(code.ErrInvalidArgument, "%s is invalid", key)
+	}
+	return value, nil
 }

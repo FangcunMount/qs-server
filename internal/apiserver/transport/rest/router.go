@@ -18,7 +18,6 @@ import (
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -29,7 +28,6 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -53,7 +51,6 @@ type Deps struct {
 
 	Survey          SurveyDeps
 	AssessmentModel AssessmentModelDeps
-	Scale           ScaleDeps
 	Actor           ActorDeps
 	Evaluation      EvaluationDeps
 	Plan            PlanDeps
@@ -79,21 +76,11 @@ type SurveyDeps struct {
 	AnswerSheetSubmissionService  answerSheetApp.AnswerSheetSubmissionService
 }
 
-type ScaleDeps struct {
-	LifecycleService scaleApp.ScaleLifecycleService
-	FactorService    scaleApp.ScaleFactorService
-	QueryService     scaleApp.ScaleQueryService
-	CategoryService  scaleApp.ScaleCategoryService
-	QRCodeService    scaleApp.ScaleQRCodeQueryService
-	Management       assessmentModelApp.CatalogManagementService
-	Publication      assessmentModelApp.PublicationService
-	ModelRepo        modelcatalogport.ModelRepository
-}
-
 type AssessmentModelDeps struct {
-	Service     assessmentModelApp.Service
 	Management  assessmentModelApp.CatalogManagementService
+	Definition  assessmentModelApp.DefinitionAuthoringService
 	Publication assessmentModelApp.PublicationService
+	Query       assessmentModelApp.CatalogQueryService
 }
 
 type ActorDeps struct {

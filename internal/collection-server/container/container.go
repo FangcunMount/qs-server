@@ -8,10 +8,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
@@ -46,35 +46,35 @@ type Container struct {
 	IAMModule *IAMModule
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
-	answerSheetClient   *grpcclient.AnswerSheetClient
-	questionnaireClient *grpcclient.QuestionnaireClient
-	evaluationClient    *grpcclient.EvaluationClient
-	actorClient         *grpcclient.ActorClient
-	scaleClient         *grpcclient.ScaleClient
-	typologyModelClient *grpcclient.TypologyModelClient
+	answerSheetClient            *grpcclient.AnswerSheetClient
+	questionnaireClient          *grpcclient.QuestionnaireClient
+	evaluationClient             *grpcclient.EvaluationClient
+	actorClient                  *grpcclient.ActorClient
+	assessmentModelCatalogClient *grpcclient.AssessmentModelCatalogClient
+	typologyModelClient          *grpcclient.TypologyModelClient
 
 	// 应用层服务
-	submissionService              *answersheet.SubmissionService
-	questionnaireQueryService      *questionnaire.QueryService
-	evaluationQueryService         *evaluation.QueryService
-	waitReportService              *reportwait.Service
-	scaleQueryService              *scale.QueryService
-	typologyModelQueryService      *typologymodel.QueryService
-	typologyAssessmentQueryService *typologyassessment.QueryService
-	typologySessionService         *typologysession.Service
-	testeeService                  *testee.Service
-	reportStatusReporter           *reportstatus.Reporter
-	reportNotifier                 reportnotify.Notifier
-	waitWatcherCancel              context.CancelFunc
-	reportEventsHandler            *ws.ReportEventsHandler
-	catalogCacheWatcherCancels     []context.CancelFunc
-	l1PeekRegistry                 *catalogpeek.Registry
+	submissionService                  *answersheet.SubmissionService
+	questionnaireQueryService          *questionnaire.QueryService
+	evaluationQueryService             *evaluation.QueryService
+	waitReportService                  *reportwait.Service
+	assessmentModelCatalogQueryService *appmodelcatalog.QueryService
+	typologyModelQueryService          *typologymodel.QueryService
+	typologyAssessmentQueryService     *typologyassessment.QueryService
+	typologySessionService             *typologysession.Service
+	testeeService                      *testee.Service
+	reportStatusReporter               *reportstatus.Reporter
+	reportNotifier                     reportnotify.Notifier
+	waitWatcherCancel                  context.CancelFunc
+	reportEventsHandler                *ws.ReportEventsHandler
+	catalogCacheWatcherCancels         []context.CancelFunc
+	l1PeekRegistry                     *catalogpeek.Registry
 
 	// 接口层处理器
 	answerSheetHandler               *handler.AnswerSheetHandler
 	questionnaireHandler             *handler.QuestionnaireHandler
 	evaluationHandler                *handler.EvaluationHandler
-	scaleHandler                     *handler.ScaleHandler
+	assessmentModelCatalogHandler    *handler.AssessmentModelCatalogHandler
 	typologyModelHandler             *handler.TypologyModelHandler
 	typologyAssessmentHandler        *handler.TypologyAssessmentHandler
 	typologyAssessmentSessionHandler *handler.TypologyAssessmentSessionHandler
@@ -90,12 +90,12 @@ type Container struct {
 // ClientBundle is the collection-server runtime client graph produced by the
 // gRPC integration stage and consumed by the container composition root.
 type ClientBundle struct {
-	AnswerSheet   *grpcclient.AnswerSheetClient
-	Questionnaire *grpcclient.QuestionnaireClient
-	Evaluation    *grpcclient.EvaluationClient
-	Actor         *grpcclient.ActorClient
-	Scale         *grpcclient.ScaleClient
-	TypologyModel *grpcclient.TypologyModelClient
+	AnswerSheet            *grpcclient.AnswerSheetClient
+	Questionnaire          *grpcclient.QuestionnaireClient
+	Evaluation             *grpcclient.EvaluationClient
+	Actor                  *grpcclient.ActorClient
+	AssessmentModelCatalog *grpcclient.AssessmentModelCatalogClient
+	TypologyModel          *grpcclient.TypologyModelClient
 }
 
 // NewContainer 创建新的容器
@@ -157,8 +157,8 @@ func (c *Container) Initialize() error {
 	// 2. 初始化接口层
 	c.initHandlers()
 
-	if c.scaleClient != nil && c.typologyModelClient != nil {
-		catalogcache.WarmCatalogOnStartup(c.scaleQueryService, c.typologyModelQueryService)
+	if c.typologyModelClient != nil {
+		catalogcache.WarmCatalogOnStartup(c.typologyModelQueryService)
 	}
 
 	c.initialized = true
@@ -178,12 +178,12 @@ func (c *Container) initApplicationServices() {
 
 	catalogRuntime := c.buildCatalogRuntime()
 	c.questionnaireQueryService = catalogRuntime.questionnaire
-	c.scaleQueryService = catalogRuntime.scale
+	c.assessmentModelCatalogQueryService = catalogRuntime.assessmentModels
 	c.typologyModelQueryService = catalogRuntime.typology
 
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
-		grpcbridge.NewScaleCatalogReader(c.scaleClient),
+		c.assessmentModelCatalogQueryService,
 	)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
 	c.reportStatusReporter = reportRuntime.reporter
@@ -215,7 +215,7 @@ func (c *Container) initHandlers() {
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.waitReportService)
-	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
+	c.assessmentModelCatalogHandler = handler.NewAssessmentModelCatalogHandler(c.assessmentModelCatalogQueryService)
 	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
 	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.typologyAssessmentQueryService, c.waitReportService)
 	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.typologySessionService)
@@ -270,9 +270,9 @@ func (c *Container) TesteeHandler() *handler.TesteeHandler {
 	return c.testeeHandler
 }
 
-// ScaleHandler 获取量表处理器
-func (c *Container) ScaleHandler() *handler.ScaleHandler {
-	return c.scaleHandler
+// AssessmentModelCatalogHandler returns the generic published-model catalogue handler.
+func (c *Container) AssessmentModelCatalogHandler() *handler.AssessmentModelCatalogHandler {
+	return c.assessmentModelCatalogHandler
 }
 
 // TypologyModelHandler 获取人格测评模型处理器
@@ -328,11 +328,11 @@ func (c *Container) CatalogConcurrencyGate() *concurrency.Gate {
 	return c.catalogConcurrencyGate
 }
 
-func (c *Container) ScaleQueryService() *scale.QueryService {
+func (c *Container) AssessmentModelCatalogQueryService() *appmodelcatalog.QueryService {
 	if c == nil {
 		return nil
 	}
-	return c.scaleQueryService
+	return c.assessmentModelCatalogQueryService
 }
 
 func (c *Container) TypologyModelQueryService() *typologymodel.QueryService {
@@ -443,7 +443,7 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.questionnaireClient = bundle.Questionnaire
 	c.evaluationClient = bundle.Evaluation
 	c.actorClient = bundle.Actor
-	c.scaleClient = bundle.Scale
+	c.assessmentModelCatalogClient = bundle.AssessmentModelCatalog
 	c.typologyModelClient = bundle.TypologyModel
 }
 

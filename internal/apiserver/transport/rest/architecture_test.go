@@ -58,19 +58,17 @@ func TestEvaluationRESTTransportDoesNotExposeV2OutcomeAliases(t *testing.T) {
 	}
 }
 
-func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
+func TestSurveyRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 	t.Parallel()
 
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":   "application DTO mapping",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":    "application DTO mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":   "survey/scale application QR-code use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":   "survey application QR-code use cases",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel": "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":  "application query DTOs",
 	}
 	for _, path := range []string{
 		filepath.Join("handler", "questionnaire.go"),
-		filepath.Join("handler", "scale.go"),
 		filepath.Join("response", "display.go"),
 	} {
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
@@ -80,7 +78,7 @@ func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			if replacement, ok := forbiddenImports[importPath]; ok {
-				t.Fatalf("%s imports %s; survey/scale REST handlers should leave rule construction to %s", path, importPath, replacement)
+				t.Fatalf("%s imports %s; survey REST handlers should leave rule construction to %s", path, importPath, replacement)
 			}
 		}
 	}

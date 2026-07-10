@@ -285,7 +285,6 @@ cache:
     negative: false
   ttl:
     scale: "6h"
-    scale_list: "10m"
     questionnaire: "8h"
     assessment_detail: "1h30m"
     assessment_list: "10m"

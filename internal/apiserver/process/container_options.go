@@ -72,7 +72,6 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 	if cacheCfg.TTL != nil {
 		ttl = container.ContainerCacheTTLOptions{
 			Scale:            cacheCfg.TTL.Scale,
-			ScaleList:        cacheCfg.TTL.ScaleList,
 			Questionnaire:    cacheCfg.TTL.Questionnaire,
 			AssessmentDetail: cacheCfg.TTL.AssessmentDetail,
 			AssessmentList:   cacheCfg.TTL.AssessmentList,

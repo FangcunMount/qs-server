@@ -22,12 +22,12 @@ func (c PublishedModelCacheConfig) enabled() bool {
 	return c.Redis != nil && c.Builder != nil
 }
 
-// NewDefaultStaticCatalog 从内置 SBTI/MBTI 与可选量表 repo 构建静态规则目录。
-// 仅供 oneoff seed/backfill 与测试使用，生产 composition root 禁止引用。
-func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.Catalog, error) {
+// NewDefaultStaticCatalog builds embedded typology fixtures for tests and
+// one-off tooling. Production composition always reads published models.
+func NewDefaultStaticCatalog() (port.Catalog, error) {
 	ruleSets, err := DefaultEmbeddedRuleSets(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return NewStaticCompositeCatalog(ruleSets, scaleSource), nil
+	return NewStaticCompositeCatalog(ruleSets), nil
 }

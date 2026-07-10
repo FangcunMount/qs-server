@@ -190,12 +190,6 @@ func (s *Operator) deactivate() {
 	s.isActive = false
 }
 
-// CanManageScales 是否可以管理量表
-func (s *Operator) CanManageScales() bool {
-	// 内容管理员或管理员可以管理量表
-	return s.HasAnyRole(RoleContentManager, RoleQSAdmin)
-}
-
 // CanEvaluate 是否可以评估
 func (s *Operator) CanEvaluate() bool {
 	// QS 评估员或管理员可以评估

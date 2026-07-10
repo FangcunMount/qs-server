@@ -28,10 +28,6 @@ func (k CacheKeyspace) ScaleVersion(code, version string) string {
 	return k.keyspace.Prefix("scale:" + code + ":" + version)
 }
 
-func (k CacheKeyspace) ScaleList() string {
-	return k.keyspace.Prefix("scale:list:v1")
-}
-
 func (k CacheKeyspace) PublishedScale(code string) string {
 	return k.keyspace.Prefix("scale:published:" + code)
 }

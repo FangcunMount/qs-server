@@ -103,7 +103,8 @@ type QuestionnaireQueryService interface {
 	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)
 }
 
-// ScaleQuestionnaireBindingSyncer 同步量表绑定的问卷版本。
-type ScaleQuestionnaireBindingSyncer interface {
+// QuestionnaireBindingVersionSyncer synchronizes draft assessment-model
+// bindings after a questionnaire version is published.
+type QuestionnaireBindingVersionSyncer interface {
 	SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error
 }

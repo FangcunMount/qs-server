@@ -20,7 +20,7 @@ import (
 
 func testAssessmentBindingResolver(t *testing.T) rulesetport.AssessmentBindingResolver {
 	t.Helper()
-	catalog, err := ruleset.NewDefaultStaticCatalog(nil)
+	catalog, err := ruleset.NewDefaultStaticCatalog()
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}

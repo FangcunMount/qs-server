@@ -69,7 +69,6 @@ definitions:
     enum:
     - static.scale
     - static.questionnaire
-    - static.scale_list
     - static.typology_model
     - query.stats_overview
     - query.stats_system
@@ -79,12 +78,22 @@ definitions:
     x-enum-varnames:
     - WarmupKindStaticScale
     - WarmupKindStaticQuestionnaire
-    - WarmupKindStaticScaleList
     - WarmupKindStaticTypologyModel
     - WarmupKindQueryStatsOverview
     - WarmupKindQueryStatsSystem
     - WarmupKindQueryStatsQuestionnaire
     - WarmupKindQueryStatsPlan
+  conclusion.Outcome:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      summary:
+        type: string
+      title:
+        type: string
+    type: object
   core.ErrResponse:
     properties:
       code:
@@ -113,6 +122,185 @@ definitions:
         description: Reference 返回参考文档（错误时使用）
         type: string
     type: object
+  definition.Calibration:
+    properties:
+      normRefs:
+        items:
+          $ref: '#/definitions/norm.Ref'
+        type: array
+    type: object
+  definition.MeasureSpec:
+    properties:
+      factorGraph:
+        $ref: '#/definitions/factor.FactorGraph'
+      factors:
+        items:
+          $ref: '#/definitions/factor.Factor'
+        type: array
+      scoring:
+        items:
+          $ref: '#/definitions/factor.Scoring'
+        type: array
+    type: object
+  definition.ReportMap:
+    properties:
+      sections:
+        items:
+          $ref: '#/definitions/definition.ReportSection'
+        type: array
+    type: object
+  definition.ReportSection:
+    properties:
+      adapterKey:
+        type: string
+      categoryLabel:
+        type: string
+      code:
+        type: string
+      kind:
+        type: string
+      sourceRefs:
+        items:
+          type: string
+        type: array
+      templateID:
+        type: string
+      title:
+        type: string
+    type: object
+  factor.Factor:
+    properties:
+      code:
+        type: string
+      role:
+        $ref: '#/definitions/factor.FactorRole'
+      title:
+        type: string
+    type: object
+  factor.FactorEdge:
+    properties:
+      childCode:
+        type: string
+      parentCode:
+        type: string
+    type: object
+  factor.FactorGraph:
+    properties:
+      edges:
+        items:
+          $ref: '#/definitions/factor.FactorEdge'
+        type: array
+      roots:
+        items:
+          type: string
+        type: array
+      sortOrders:
+        additionalProperties:
+          type: integer
+        type: object
+    type: object
+  factor.FactorRole:
+    enum:
+    - dimension
+    - total
+    - index
+    - validity
+    - subtest
+    - task_set
+    - report_group
+    - ability_domain
+    type: string
+    x-enum-comments:
+      FactorRoleAbilityDomain: 能力域，task_performance 可选
+      FactorRoleDimension: 叶子计分因子（文档亦称 factor）
+      FactorRoleIndex: 综合指数（文档亦称 composite_index）
+      FactorRoleReportGroup: 报告分组，不参与计分
+    x-enum-varnames:
+    - FactorRoleDimension
+    - FactorRoleTotal
+    - FactorRoleIndex
+    - FactorRoleValidity
+    - FactorRoleSubtest
+    - FactorRoleTaskSet
+    - FactorRoleReportGroup
+    - FactorRoleAbilityDomain
+  factor.OptionScoring:
+    enum:
+    - strict
+    - compat
+    type: string
+    x-enum-varnames:
+    - OptionScoringStrict
+    - OptionScoringCompat
+  factor.Scoring:
+    properties:
+      constant:
+        type: number
+      factorCode:
+        type: string
+      maxScore:
+        type: number
+      optionScoring:
+        $ref: '#/definitions/factor.OptionScoring'
+      params:
+        $ref: '#/definitions/factor.ScoringParams'
+      sources:
+        items:
+          $ref: '#/definitions/factor.ScoringSource'
+        type: array
+      strategy:
+        $ref: '#/definitions/factor.ScoringStrategy'
+      weights:
+        additionalProperties:
+          type: number
+        type: object
+    type: object
+  factor.ScoringParams:
+    properties:
+      cntOptionContents:
+        items:
+          type: string
+        type: array
+    type: object
+  factor.ScoringSource:
+    properties:
+      code:
+        type: string
+      kind:
+        $ref: '#/definitions/factor.ScoringSourceKind'
+      optionScores:
+        additionalProperties:
+          type: number
+        type: object
+      sign:
+        type: number
+    type: object
+  factor.ScoringSourceKind:
+    enum:
+    - question
+    - factor
+    type: string
+    x-enum-varnames:
+    - ScoringSourceQuestion
+    - ScoringSourceFactor
+  factor.ScoringStrategy:
+    enum:
+    - sum
+    - avg
+    - weighted_sum
+    - weighted_avg
+    - max
+    - min
+    - cnt
+    type: string
+    x-enum-varnames:
+    - ScoringStrategySum
+    - ScoringStrategyAvg
+    - ScoringStrategyWeightedSum
+    - ScoringStrategyWeightedAvg
+    - ScoringStrategyMax
+    - ScoringStrategyMin
+    - ScoringStrategyCnt
   handler.questionnaireBatchRequest:
     properties:
       codes:
@@ -126,12 +314,96 @@ definitions:
     type: integer
     x-enum-varnames:
     - ZeroID
+  modelcatalog.Definition:
+    properties:
+      calibration:
+        $ref: '#/definitions/definition.Calibration'
+      conclusions:
+        items: {}
+        type: array
+      measure:
+        $ref: '#/definitions/definition.MeasureSpec'
+      outcomes:
+        items:
+          $ref: '#/definitions/conclusion.Outcome'
+        type: array
+      reportMap:
+        $ref: '#/definitions/definition.ReportMap'
+    type: object
+  modelcatalog.HotModelSummary:
+    properties:
+      algorithm:
+        type: string
+      algorithm_family:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      heat_score:
+        type: integer
+      kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      rank:
+        type: integer
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      sub_kind:
+        example: typology
+        type: string
+      submission_count:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   modelcatalog.ModelSummary:
     properties:
       algorithm:
         type: string
       algorithm_family:
         type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
       category:
         type: string
       code:
@@ -158,6 +430,14 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
       status:
         type: string
       sub_kind:
@@ -197,6 +477,68 @@ definitions:
       title:
         type: string
     type: object
+  modelcatalog.PublishedModelDetail:
+    properties:
+      algorithm:
+        type: string
+      algorithm_family:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      definition:
+        $ref: '#/definitions/modelcatalog.Definition'
+      description:
+        type: string
+      kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      sub_kind:
+        example: typology
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
   modelcatalog.ValidationIssue:
     properties:
       code:
@@ -206,6 +548,13 @@ definitions:
       level:
         type: string
       message:
+        type: string
+    type: object
+  norm.Ref:
+    properties:
+      factorCode:
+        type: string
+      normTableVersion:
         type: string
     type: object
   report.InterpretReport:
@@ -309,13 +658,6 @@ definitions:
           type: integer
         type: array
     type: object
-  request.BatchUpdateFactorsRequest:
-    properties:
-      factors:
-        items:
-          $ref: '#/definitions/request.FactorModel'
-        type: array
-    type: object
   request.BatchUpdateQuestionsRequest:
     properties:
       questions:
@@ -355,6 +697,10 @@ definitions:
     properties:
       algorithm:
         type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
       category:
         type: string
       code:
@@ -382,6 +728,14 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
       sub_kind:
         example: typology
         type: string
@@ -451,35 +805,6 @@ definitions:
       type:
         type: string
     type: object
-  request.CreateScaleRequest:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      description:
-        type: string
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      reporters:
-        items:
-          type: string
-        type: array
-      stages:
-        items:
-          type: string
-        type: array
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-    type: object
   request.CreateStaffRequest:
     properties:
       email:
@@ -522,47 +847,6 @@ definitions:
       testee_id:
         type: string
     type: object
-  request.FactorInterpretRulesModel:
-    properties:
-      factor_code:
-        type: string
-      interpret_rules:
-        items:
-          $ref: '#/definitions/request.InterpretRuleModel'
-        type: array
-    type: object
-  request.FactorModel:
-    properties:
-      code:
-        type: string
-      factor_type:
-        type: string
-      interpret_rules:
-        items:
-          $ref: '#/definitions/request.InterpretRuleModel'
-        type: array
-      is_show:
-        description: 是否显示（用于报告中的维度展示）
-        type: boolean
-      is_total_score:
-        type: boolean
-      max_score:
-        description: 最大分
-        type: number
-      question_codes:
-        items:
-          type: string
-        type: array
-      risk_level:
-        description: 因子级别的风险等级（用于批量设置，如果解读规则未指定则使用此值）
-        type: string
-      scoring_params:
-        $ref: '#/definitions/request.ScoringParamsModel'
-      scoring_strategy:
-        type: string
-      title:
-        type: string
-    type: object
   request.FlexibleTime:
     properties:
       time.Time:
@@ -580,19 +864,6 @@ definitions:
         type: integer
     required:
     - name
-    type: object
-  request.InterpretRuleModel:
-    properties:
-      conclusion:
-        type: string
-      max_score:
-        type: number
-      min_score:
-        type: number
-      risk_level:
-        type: string
-      suggestion:
-        type: string
     type: object
   request.ListTaskWindowRequest:
     properties:
@@ -622,13 +893,6 @@ definitions:
           type: string
         type: array
     type: object
-  request.ReplaceInterpretRulesRequest:
-    properties:
-      factor_rules:
-        items:
-          $ref: '#/definitions/request.FactorInterpretRulesModel'
-        type: array
-    type: object
   request.ResumePlanRequest:
     properties:
       testee_start_dates:
@@ -636,14 +900,6 @@ definitions:
           type: string
         description: 受试者ID -> 开始日期（格式：YYYY-MM-DD）
         type: object
-    type: object
-  request.ScoringParamsModel:
-    properties:
-      cnt_option_contents:
-        description: 计数策略（cnt）专用参数
-        items:
-          type: string
-        type: array
     type: object
   request.TransferPrimaryClinicianRequest:
     properties:
@@ -661,7 +917,52 @@ definitions:
     - testee_id
     - to_clinician_id
     type: object
+  request.UpdateAssessmentModelBasicInfoRequest:
+    properties:
+      algorithm:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      description:
+        type: string
+      product_channel:
+        type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
   request.UpdateAssessmentModelDefinitionRequest:
+    properties:
+      calibration:
+        $ref: '#/definitions/definition.Calibration'
+      conclusions:
+        items: {}
+        type: array
+      measure:
+        $ref: '#/definitions/definition.MeasureSpec'
+      outcomes:
+        items:
+          $ref: '#/definitions/conclusion.Outcome'
+        type: array
+      reportMap:
+        $ref: '#/definitions/definition.ReportMap'
     type: object
   request.UpdateClinicianRequest:
     properties:
@@ -705,38 +1006,6 @@ definitions:
       title:
         type: string
       type:
-        type: string
-    type: object
-  request.UpdateScaleBasicInfoRequest:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      description:
-        type: string
-      reporters:
-        items:
-          type: string
-        type: array
-      stages:
-        items:
-          type: string
-        type: array
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-    type: object
-  request.UpdateScaleQuestionnaireRequest:
-    properties:
-      questionnaire_code:
-        type: string
-      questionnaire_version:
         type: string
     type: object
   request.UpdateStaffRequest:
@@ -823,13 +1092,6 @@ definitions:
       title:
         type: string
     type: object
-  response.ApplicableAgeResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
   response.ApplyCodeResponse:
     properties:
       codes:
@@ -866,6 +1128,22 @@ definitions:
           type: string
         type: array
     type: object
+  response.AssessmentModelDefinitionResponse:
+    properties:
+      calibration:
+        $ref: '#/definitions/definition.Calibration'
+      conclusions:
+        items: {}
+        type: array
+      measure:
+        $ref: '#/definitions/definition.MeasureSpec'
+      outcomes:
+        items:
+          $ref: '#/definitions/conclusion.Outcome'
+        type: array
+      reportMap:
+        $ref: '#/definitions/definition.ReportMap'
+    type: object
   response.AssessmentModelListResponse:
     properties:
       items:
@@ -889,6 +1167,10 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
+      applicable_ages:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
       categories:
         items:
           $ref: '#/definitions/modelcatalog.Option'
@@ -902,6 +1184,14 @@ definitions:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
       product_channels:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
+      reporters:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
+      stages:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
@@ -950,6 +1240,10 @@ definitions:
         type: string
       algorithm_family:
         type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
       category:
         type: string
       code:
@@ -976,6 +1270,14 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
       status:
         type: string
       sub_kind:
@@ -989,6 +1291,23 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  response.AssessmentModelValidationResponse:
+    properties:
+      errors:
+        description: 'Deprecated: 派生 从 Issues 用于 向后兼容。'
+        items:
+          type: string
+        type: array
+      issues:
+        items:
+          $ref: '#/definitions/modelcatalog.ValidationIssue'
+        type: array
+      passed:
+        type: boolean
+      valid:
+        description: 'Deprecated: mirror Passed 用于 向后兼容。'
+        type: boolean
     type: object
   response.AssessmentOutcomeListResponse:
     properties:
@@ -1138,13 +1457,6 @@ definitions:
       total_count:
         description: 总数
         type: integer
-    type: object
-  response.CategoryResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
     type: object
   response.ClinicianAssignmentResponse:
     properties:
@@ -1322,46 +1634,6 @@ definitions:
       trace_id:
         type: string
     type: object
-  response.FactorListResponse:
-    properties:
-      factors:
-        items:
-          $ref: '#/definitions/response.FactorResponse'
-        type: array
-    type: object
-  response.FactorResponse:
-    properties:
-      code:
-        type: string
-      factor_type:
-        type: string
-      interpret_rules:
-        items:
-          $ref: '#/definitions/response.InterpretRuleResponse'
-        type: array
-      is_show:
-        description: 是否显示（用于报告中的维度展示）
-        type: boolean
-      is_total_score:
-        type: boolean
-      max_score:
-        description: 最大分
-        type: number
-      question_codes:
-        items:
-          type: string
-        type: array
-      risk_level:
-        description: 因子级别的风险等级（从解读规则中提取）
-        type: string
-      scoring_params:
-        additionalProperties: true
-        type: object
-      scoring_strategy:
-        type: string
-      title:
-        type: string
-    type: object
   response.FactorScoreItem:
     properties:
       conclusion:
@@ -1435,18 +1707,18 @@ definitions:
         description: 是否需要紧急关注
         type: boolean
     type: object
-  response.InterpretRuleResponse:
+  response.HotAssessmentModelListResponse:
     properties:
-      conclusion:
-        type: string
-      max_score:
-        type: number
-      min_score:
-        type: number
-      risk_level:
-        type: string
-      suggestion:
-        type: string
+      items:
+        items:
+          $ref: '#/definitions/modelcatalog.HotModelSummary'
+        type: array
+      limit:
+        type: integer
+      total:
+        type: integer
+      window_days:
+        type: integer
     type: object
   response.ModelExtraResponse:
     properties:
@@ -1637,6 +1909,81 @@ definitions:
         description: 触发时间：HH:MM:SS
         type: string
     type: object
+  response.PublishedAssessmentModelListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/modelcatalog.PublishedModelDetail'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  response.PublishedAssessmentModelResponse:
+    properties:
+      algorithm:
+        type: string
+      algorithm_family:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      definition:
+        $ref: '#/definitions/modelcatalog.Definition'
+      description:
+        type: string
+      kind:
+        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      product_channel:
+        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      sub_kind:
+        example: typology
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
   response.QRCodeResponse:
     properties:
       qrcode_url:
@@ -1774,13 +2121,6 @@ definitions:
         description: 总分
         type: number
     type: object
-  response.ReporterResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
   response.ResultLevelResponse:
     properties:
       code:
@@ -1826,93 +2166,6 @@ definitions:
       trace_id:
         type: string
     type: object
-  response.ScaleCategoriesResponse:
-    properties:
-      applicable_ages:
-        items:
-          $ref: '#/definitions/response.ApplicableAgeResponse'
-        type: array
-      categories:
-        items:
-          $ref: '#/definitions/response.CategoryResponse'
-        type: array
-      reporters:
-        items:
-          $ref: '#/definitions/response.ReporterResponse'
-        type: array
-      stages:
-        items:
-          $ref: '#/definitions/response.StageResponse'
-        type: array
-      tags:
-        items:
-          $ref: '#/definitions/response.TagResponse'
-        type: array
-    type: object
-  response.ScaleListResponse:
-    properties:
-      page:
-        type: integer
-      page_size:
-        type: integer
-      scales:
-        items:
-          $ref: '#/definitions/response.ScaleResponse'
-        type: array
-      total_count:
-        type: integer
-    type: object
-  response.ScaleResponse:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      code:
-        type: string
-      created_at:
-        description: 创建时间
-        type: string
-      created_by:
-        description: 创建人
-        type: string
-      description:
-        type: string
-      factors:
-        items:
-          $ref: '#/definitions/response.FactorResponse'
-        type: array
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      reporters:
-        items:
-          type: string
-        type: array
-      scale_version:
-        type: string
-      stages:
-        items:
-          type: string
-        type: array
-      status:
-        type: string
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-      updated_at:
-        description: 更新时间
-        type: string
-      updated_by:
-        description: 更新人
-        type: string
-    type: object
   response.ScoreResponse:
     properties:
       assessment_id:
@@ -1944,13 +2197,6 @@ definitions:
       value:
         type: number
     type: object
-  response.StageResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
   response.SuggestionItem:
     properties:
       category:
@@ -1961,15 +2207,6 @@ definitions:
         type: string
       factor_code:
         description: 关联因子编码
-        type: string
-    type: object
-  response.TagResponse:
-    properties:
-      category:
-        type: string
-      label:
-        type: string
-      value:
         type: string
     type: object
   response.TaskListResponse:
@@ -3272,8 +3509,7 @@ paths:
       - AssessmentEntry
   /api/v1/assessment-models:
     get:
-      description: 管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受
-        personality 读兼容别名。
+      description: 统一目录返回 canonical kind；人格模型使用 typology，personality 仅为读兼容别名。
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3281,35 +3517,20 @@ paths:
         required: true
         type: string
       - description: 模型类型
-        enum:
-        - typology
-        - personality
-        - behavioral_rating
-        - cognitive
-        - custom
-        - medical_scale
         in: query
         name: kind
-        type: string
-      - description: 子类型
-        in: query
-        name: sub_kind
         type: string
       - description: 状态
         in: query
         name: status
         type: string
-      - description: 关键词
+      - description: 问卷编码
         in: query
-        name: keyword
+        name: questionnaire_code
         type: string
-      - description: 分类
+      - description: 问卷版本
         in: query
-        name: category
-        type: string
-      - description: 算法
-        in: query
-        name: algorithm
+        name: questionnaire_version
         type: string
       - description: 页码
         in: query
@@ -3337,15 +3558,13 @@ paths:
     post:
       consumes:
       - application/json
-      description: 新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用
-        typology。
       parameters:
       - description: Bearer 用户令牌
         in: header
         name: Authorization
         required: true
         type: string
-      - description: 创建测评模型请求
+      - description: 创建请求
         in: body
         name: request
         required: true
@@ -3367,6 +3586,26 @@ paths:
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}:
+    delete:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 删除已归档测评模型
+      tags:
+      - AssessmentModel
     get:
       parameters:
       - description: Bearer 用户令牌
@@ -3394,6 +3633,70 @@ paths:
       summary: 获取测评模型详情
       tags:
       - AssessmentModel
+  /api/v1/assessment-models/{code}/archive:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 归档测评模型
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/basic-info:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateAssessmentModelBasicInfoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 更新测评模型基本信息
+      tags:
+      - AssessmentModel
   /api/v1/assessment-models/{code}/codes/apply:
     post:
       consumes:
@@ -3409,7 +3712,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: 申请编码请求
+      - description: 编码申请
         in: body
         name: request
         required: true
@@ -3427,7 +3730,7 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentModelCodesResponse'
               type: object
-      summary: 申请编码
+      summary: 申请模型定义编码
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}/definition:
@@ -3449,7 +3752,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelDefinitionResponse'
+              type: object
       summary: 获取测评模型定义
       tags:
       - AssessmentModel
@@ -3467,7 +3775,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: 更新定义请求
+      - description: DefinitionV2
         in: body
         name: request
         required: true
@@ -3479,7 +3787,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelDefinitionResponse'
+              type: object
       summary: 更新测评模型定义
       tags:
       - AssessmentModel
@@ -3498,7 +3811,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: 预览报告请求
+      - description: 预览输入
         in: body
         name: request
         required: true
@@ -3516,7 +3829,63 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentModelPreviewReportResponse'
               type: object
-      summary: 预览报告
+      summary: 预览测评模型报告
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/publish:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 发布测评模型
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/qrcode:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.QRCodeResponse'
+              type: object
+      summary: 获取测评模型二维码
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}/questionnaire:
@@ -3544,7 +3913,7 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentModelQuestionnaireResponse'
               type: object
-      summary: 获取测评模型绑定的问卷
+      summary: 获取模型问卷绑定
       tags:
       - AssessmentModel
     put:
@@ -3561,7 +3930,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: 绑定问卷请求
+      - description: 绑定请求
         in: body
         name: request
         required: true
@@ -3582,10 +3951,64 @@ paths:
       summary: 绑定问卷
       tags:
       - AssessmentModel
-  /api/v1/assessment-models/options:
+  /api/v1/assessment-models/{code}/unpublish:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 下架测评模型
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/validate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelValidationResponse'
+              type: object
+      summary: 校验测评模型定义
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/hot:
     get:
-      description: kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为
-        personality。
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3593,13 +4016,41 @@ paths:
         required: true
         type: string
       - description: 模型类型
-        enum:
-        - typology
-        - personality
-        - behavioral_rating
-        - cognitive
-        - custom
-        - medical_scale
+        in: query
+        name: kind
+        type: string
+      - description: 数量
+        in: query
+        name: limit
+        type: integer
+      - description: 统计窗口天数
+        in: query
+        name: window_days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.HotAssessmentModelListResponse'
+              type: object
+      summary: 获取热门已发布测评模型
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/options:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型类型
         in: query
         name: kind
         type: string
@@ -3616,6 +4067,81 @@ paths:
                   $ref: '#/definitions/response.AssessmentModelOptionsResponse'
               type: object
       summary: 获取测评模型选项
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/published:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      - description: 问卷编码
+        in: query
+        name: questionnaire_code
+        type: string
+      - description: 问卷版本
+        in: query
+        name: questionnaire_version
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PublishedAssessmentModelListResponse'
+              type: object
+      summary: 获取已发布测评模型列表
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/published/{code}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 发布版本
+        in: query
+        name: version
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PublishedAssessmentModelResponse'
+              type: object
+      summary: 获取已发布测评模型
       tags:
       - AssessmentModel
   /api/v1/assessments/{id}/wait-report:
@@ -6317,631 +6843,6 @@ paths:
       summary: 获取已发布问卷
       tags:
       - Questionnaire-Query
-  /api/v1/scales:
-    get:
-      consumes:
-      - application/json
-      description: 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 页码
-        in: query
-        name: page
-        required: true
-        type: integer
-      - description: 每页数量
-        in: query
-        name: page_size
-        required: true
-        type: integer
-      - description: 状态过滤（draft/published/archived）
-        in: query
-        name: status
-        type: string
-      - description: 标题模糊搜索
-        in: query
-        name: title
-        type: string
-      - description: 主类过滤
-        in: query
-        name: category
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleListResponse'
-              type: object
-      summary: 获取量表列表
-      tags:
-      - Scale-Query
-    post:
-      consumes:
-      - application/json
-      description: |-
-        创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
-        字段说明：
-        - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-        - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
-        - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
-        - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
-        - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 创建量表请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateScaleRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 创建量表
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/{code}:
-    delete:
-      consumes:
-      - application/json
-      description: 删除草稿状态的量表
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 删除量表
-      tags:
-      - Scale-Lifecycle
-    get:
-      consumes:
-      - application/json
-      description: |-
-        根据编码获取量表详情。
-        响应字段说明：
-        - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
-        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
-        - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
-        - tags: 标签列表（数组，动态输入）
-        - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-        - max_score: 因子的最大分（可选）
-        - is_show: 是否显示（用于报告中的维度展示）
-        - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 获取量表详情
-      tags:
-      - Scale-Query
-  /api/v1/scales/{code}/archive:
-    post:
-      description: 归档量表。量表编码通过 URL 路径参数传递，不需要请求体。
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 归档量表
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/{code}/basic-info:
-    put:
-      consumes:
-      - application/json
-      description: |-
-        更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。
-        字段说明：
-        - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-        - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
-        - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
-        - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
-        - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      - description: 更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.UpdateScaleBasicInfoRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 更新量表基本信息
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/{code}/factors:
-    get:
-      consumes:
-      - application/json
-      description: |-
-        根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-        响应中的 max_score 为因子的最大分（可选）
-        响应中的 is_show 为是否显示（用于报告中的维度展示）
-        响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.FactorListResponse'
-              type: object
-      summary: 获取量表的因子列表
-      tags:
-      - Scale-Query
-  /api/v1/scales/{code}/factors/batch:
-    put:
-      consumes:
-      - application/json
-      description: |-
-        批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
-        - sum/avg 策略：scoring_params 可为空或省略
-        - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空
-        - max_score：最大分（可选），用于设置因子的最大分数
-        - is_show：是否显示（用于报告中的维度展示），默认为 true
-        - risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe
-        响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-        响应中的 max_score 为因子的最大分（可选）
-        响应中的 is_show 为是否显示字段
-        响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      - description: 批量更新因子请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.BatchUpdateFactorsRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 批量更新因子
-      tags:
-      - Scale-Factor
-  /api/v1/scales/{code}/interpret-rules:
-    put:
-      consumes:
-      - application/json
-      description: |-
-        批量设置量表所有因子的解读规则
-        响应中的 max_score 为因子的最大分（可选）
-        响应中的 is_show 为是否显示字段
-        响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      - description: 设置解读规则请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.ReplaceInterpretRulesRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 批量设置解读规则
-      tags:
-      - Scale-Factor
-  /api/v1/scales/{code}/publish:
-    post:
-      description: 发布量表使其可用。量表编码通过 URL 路径参数传递，不需要请求体。
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 发布量表
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/{code}/qrcode:
-    get:
-      description: 根据量表编码获取小程序码
-      parameters:
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.QRCodeResponse'
-              type: object
-      summary: 获取量表小程序码
-      tags:
-      - Scale-Query
-  /api/v1/scales/{code}/questionnaire:
-    put:
-      consumes:
-      - application/json
-      description: 更新量表关联的问卷编码和版本
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      - description: 更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.UpdateScaleQuestionnaireRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 更新关联的问卷
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/{code}/unpublish:
-    post:
-      description: 下架量表使其不可用。量表编码通过 URL 路径参数传递，不需要请求体。
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 下架量表
-      tags:
-      - Scale-Lifecycle
-  /api/v1/scales/by-questionnaire:
-    get:
-      consumes:
-      - application/json
-      description: |-
-        根据关联的问卷编码获取量表。
-        响应字段说明：
-        - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
-        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
-        - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
-        - tags: 标签列表（数组，动态输入）
-        - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-        - max_score: 因子的最大分（可选）
-        - is_show: 是否显示（用于报告中的维度展示）
-        - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 问卷编码
-        in: query
-        name: questionnaire_code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 根据问卷编码获取量表
-      tags:
-      - Scale-Query
-  /api/v1/scales/categories:
-    get:
-      consumes:
-      - application/json
-      description: |-
-        获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
-        返回说明：
-        - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
-        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
-        - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
-        - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
-        - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleCategoriesResponse'
-              type: object
-      summary: 获取量表分类列表
-      tags:
-      - Scale-Query
-  /api/v1/scales/published:
-    get:
-      consumes:
-      - application/json
-      description: 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 页码
-        in: query
-        name: page
-        required: true
-        type: integer
-      - description: 每页数量
-        in: query
-        name: page_size
-        required: true
-        type: integer
-      - description: 标题模糊搜索
-        in: query
-        name: title
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleListResponse'
-              type: object
-      summary: 获取已发布量表列表
-      tags:
-      - Scale-Query
-  /api/v1/scales/published/{code}:
-    get:
-      consumes:
-      - application/json
-      description: |-
-        根据编码获取已发布的量表。
-        响应字段说明：
-        - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
-        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
-        - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
-        - tags: 标签列表（数组，动态输入）
-        - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-        - max_score: 因子的最大分（可选）
-        - is_show: 是否显示（用于报告中的维度展示）
-        - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleResponse'
-              type: object
-      summary: 获取已发布的量表
-      tags:
-      - Scale-Query
   /api/v1/staff:
     get:
       parameters:

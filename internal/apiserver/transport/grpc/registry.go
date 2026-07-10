@@ -12,7 +12,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	typologyModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -36,15 +36,15 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey                SurveyDeps
-	Actor                 ActorDeps
-	Evaluation            EvaluationDeps
-	Scale                 ScaleDeps
-	TypologyModel         TypologyModelDeps
-	Plan                  PlanDeps
-	Statistics            StatisticsDeps
-	IAM                   IAMDeps
-	PublishedModelCatalog rulesetport.Catalog
+	Survey                 SurveyDeps
+	Actor                  ActorDeps
+	Evaluation             EvaluationDeps
+	AssessmentModelCatalog AssessmentModelCatalogDeps
+	TypologyModel          TypologyModelDeps
+	Plan                   PlanDeps
+	Statistics             StatisticsDeps
+	IAM                    IAMDeps
+	PublishedModelCatalog  rulesetport.Catalog
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
@@ -86,9 +86,8 @@ type EvaluationDeps struct {
 	ReportStatusReporter *reportstatus.Reporter
 }
 
-type ScaleDeps struct {
-	QueryService    scaleApp.ScaleQueryService
-	CategoryService scaleApp.ScaleCategoryService
+type AssessmentModelCatalogDeps struct {
+	QueryService modelcatalogApp.CatalogQueryService
 }
 
 type TypologyModelDeps struct {
@@ -134,7 +133,7 @@ func (r *Registry) RegisterServices() error {
 	if err := r.registerEvaluationService(); err != nil {
 		return err
 	}
-	if err := r.registerScaleService(); err != nil {
+	if err := r.registerAssessmentModelCatalogService(); err != nil {
 		return err
 	}
 	if err := r.registerTypologyModelService(); err != nil {
@@ -223,19 +222,13 @@ func (r *Registry) registerEvaluationService() error {
 	return nil
 }
 
-func (r *Registry) registerScaleService() error {
-	if r.deps.Scale.QueryService == nil || r.deps.Scale.CategoryService == nil {
-		log.Warn("ScaleModule is not initialized, skipping scale service registration")
+func (r *Registry) registerAssessmentModelCatalogService() error {
+	if r.deps.AssessmentModelCatalog.QueryService == nil {
+		log.Warn("AssessmentModelCatalog is not initialized, skipping published catalogue service registration")
 		return nil
 	}
-
-	scaleService := service.NewScaleService(
-		r.deps.Scale.QueryService,
-		r.deps.Scale.CategoryService,
-	)
-
-	r.server.RegisterService(scaleService)
-	log.Info("   📊 Scale service registered (read-only)")
+	r.server.RegisterService(service.NewAssessmentModelCatalogService(r.deps.AssessmentModelCatalog.QueryService))
+	log.Info("   📚 AssessmentModel catalog service registered (published-only)")
 	return nil
 }
 
@@ -256,10 +249,6 @@ func (r *Registry) registerTypologyModelService() error {
 func (r *Registry) registerInternalService() error {
 	if r.deps.Evaluation.SubmissionService == nil || r.deps.Evaluation.ManagementService == nil || r.deps.Evaluation.EvaluationService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
-		return nil
-	}
-	if r.deps.Scale.QueryService == nil {
-		log.Warn("ScaleModule is not initialized, skipping internal service registration")
 		return nil
 	}
 	if r.deps.Survey.AnswerSheetScoringService == nil {
@@ -326,8 +315,8 @@ func (r *Registry) GetRegisteredServices() []string {
 	if r.deps.Survey.AnswerSheetSubmissionService != nil && r.deps.Survey.AnswerSheetManagementService != nil {
 		services = append(services, "AnswerSheetService", "QuestionnaireService")
 	}
-	if r.deps.Scale.QueryService != nil && r.deps.Scale.CategoryService != nil {
-		services = append(services, "ScaleService")
+	if r.deps.AssessmentModelCatalog.QueryService != nil {
+		services = append(services, "AssessmentModelCatalogService")
 	}
 	if r.deps.Actor.TesteeRegistrationService != nil &&
 		r.deps.Actor.TesteeManagementService != nil &&

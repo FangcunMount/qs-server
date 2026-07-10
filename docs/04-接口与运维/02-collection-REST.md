@@ -12,7 +12,7 @@
 | REST 前缀 | 业务 API 在 `/api/v1`，公开信息在 `/api/v1/public` |
 | 健康治理 | `/health`、`/readyz`、`/governance/redis`、`/governance/resilience`、`/ping` |
 | OpenAPI | `/api/rest` 静态挂载，`/swagger-ui` UI，`/swagger` 跳转 |
-| Auth | IAM enabled 时 `/api/v1` 走 JWT + OrgScope + AuthzSnapshot，但 scale read-only 白名单可跳过 |
+| Auth | IAM enabled 时 `/api/v1` 走 JWT + OrgScope + AuthzSnapshot，但已发布模型目录白名单可跳过 |
 | RateLimit | submit/query/wait-report 走 global + user/ip 双层限流，优先 Redis backend，fallback local |
 | SubmitQueue | `POST /answersheets` 入队后返回 202 + request_id，状态通过 `/answersheets/submit-status` 查 |
 | 不负责 | 后台发布、统计同步、cache governance repair、operator 管理 |
@@ -48,7 +48,7 @@ flowchart TB
     Biz --> questionnaire["/questionnaires"]
     Biz --> answersheets["/answersheets"]
     Biz --> assessments["/assessments"]
-    Biz --> scales["/scales"]
+    Biz --> models["/assessment-models"]
     Biz --> typologyModels["/typology-models"]
     Biz --> typologyAssessments["/typology-assessments"]
     Biz --> testees["/testees"]
@@ -91,7 +91,7 @@ collection RegisterRoutes 先设置：
 | questionnaire | `GET /api/v1/questionnaires`、`GET /api/v1/questionnaires/:code` |
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
 | assessment（因子/趋势/状态） | `GET /api/v1/assessments/trend`、`/:id/factors/high-risk`、`/:id/scores`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
-| scale | `GET /api/v1/scales`、`/hot`、`/categories`、`/:code` |
+| assessment-model | `GET /api/v1/assessment-models?kind=scale`、`/hot?kind=scale`、`/options?kind=scale`、`/:code` |
 | typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code` |
 | typology-session | `POST /api/v1/typology-assessment-sessions`（**小程序推荐入口**） |
 | typology-assessment | `GET /api/v1/typology-assessments`、`/:id`、`/:id/report`、`/:id/wait-report`（report/wait 需 `testee_id`） |
@@ -109,19 +109,19 @@ collection RegisterRoutes 先设置：
 
 ## 5. Auth Skip 白名单
 
-collection 中 `isPublicScaleReadOnly` 允许部分 GET 量表/人格模型接口跳过 auth：
+collection 中 `isPublicCatalogReadOnly` 允许部分 GET 已发布模型/人格模型接口跳过 auth：
 
 ```text
-GET /api/v1/scales
-GET /api/v1/scales/hot
-GET /api/v1/scales/categories
+GET /api/v1/assessment-models?kind=scale
+GET /api/v1/assessment-models/hot?kind=scale
+GET /api/v1/assessment-models/options?kind=scale
 GET /api/v1/typology-models
 GET /api/v1/typology-models/categories
 ```
 
-原因：前台可以公开拉取量表/人格测评模型元数据。
+原因：前台可以公开拉取已发布测评模型元数据。
 
-注意：这不是所有 scale 路由都公开，`/scales/:code` 是否公开以代码和中间件 skip 函数为准。
+注意：这不是所有模型路由都公开，详情路由是否公开以代码和中间件 skip 函数为准。
 
 ---
 

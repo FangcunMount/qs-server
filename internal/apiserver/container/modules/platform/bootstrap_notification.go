@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -17,7 +17,7 @@ import (
 type MiniProgramTaskNotificationDeps struct {
 	TesteeQueryService            testeeApp.TesteeQueryService
 	TaskNotificationContextReader planApp.TaskNotificationContextReader
-	ScaleQuery                    scaleApp.ScaleQueryService
+	PublishedTitleResolver        modelcatalogApp.PublishedModelTitleResolver
 	RecipientResolver             iambridge.MiniProgramRecipientResolver
 	WeChatAppService              *iam.WeChatAppService
 	SubscribeSender               wechatmini.MiniProgramSubscribeSender
@@ -78,7 +78,7 @@ func InitMiniProgramTaskNotificationService(
 	result.Service = notificationApp.NewMiniProgramTaskNotificationService(
 		deps.TesteeQueryService,
 		deps.TaskNotificationContextReader,
-		deps.ScaleQuery,
+		deps.PublishedTitleResolver,
 		deps.RecipientResolver,
 		deps.WeChatAppService,
 		deps.SubscribeSender,

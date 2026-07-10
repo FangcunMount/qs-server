@@ -14,7 +14,6 @@ import (
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -154,11 +153,9 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	c := a.container
 	var warmScale func(context.Context, string) error
 	var warmQuestionnaire func(context.Context, string) error
-	var warmScaleList func(context.Context) error
 	if c != nil && c.CacheClient(cacheplane.FamilyStatic) != nil {
 		warmScale = a.warmScaleCacheTarget
 		warmQuestionnaire = a.warmQuestionnaireCacheTarget
-		warmScaleList = a.warmScaleListTarget
 	}
 
 	var warmStatsSystem func(context.Context, int64) error
@@ -178,7 +175,6 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		LookupScaleQuestionnaireCode:    a.lookupScaleQuestionnaireCode,
 		WarmScale:                       warmScale,
 		WarmQuestionnaire:               warmQuestionnaire,
-		WarmScaleList:                   warmScaleList,
 		WarmPublishedTypologyModel:      a.warmPublishedTypologyModel,
 		WarmStatsOverview:               warmStatsOverview,
 		WarmStatsSystem:                 warmStatsSystem,
@@ -188,15 +184,22 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 }
 
 func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]string, error) {
-	infra := a.containerSurveyScaleInfra()
-	if infra == nil || infra.ScaleReader == nil {
+	if a.container == nil {
+		return nil, nil
+	}
+	catalog, err := a.container.ensurePublishedModelCatalog()
+	if err != nil {
+		return nil, err
+	}
+	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
+	if !ok || lister == nil {
 		return nil, nil
 	}
 	const pageSize = 200
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := infra.ScaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scalereadmodel.ScaleStatusPublished, PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, _, err := lister.ListPublishedModels(ctx, modelcatalogport.ListPublishedFilter{Kind: domain.KindScale, Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -242,15 +245,22 @@ func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Cont
 }
 
 func (a cacheGovernanceAdapter) lookupScaleQuestionnaireCode(ctx context.Context, code string) (string, error) {
-	infra := a.containerSurveyScaleInfra()
-	if infra == nil || infra.AssessmentModelRepo == nil {
+	if a.container == nil {
 		return "", nil
 	}
-	model, err := infra.AssessmentModelRepo.FindByCode(ctx, code)
+	catalog, err := a.container.ensurePublishedModelCatalog()
+	if err != nil {
+		return "", err
+	}
+	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
+	if !ok || lister == nil {
+		return "", nil
+	}
+	model, err := lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
 	if err != nil || model == nil {
 		return "", err
 	}
-	return model.Binding.QuestionnaireCode, nil
+	return model.QuestionnaireCode, nil
 }
 
 func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code string) error {
@@ -279,14 +289,6 @@ func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context
 	}
 	_, err := infra.QuestionnaireRepo.FindBaseByCode(ctx, code)
 	return err
-}
-
-func (a cacheGovernanceAdapter) warmScaleListTarget(ctx context.Context) error {
-	infra := a.containerSurveyScaleInfra()
-	if infra == nil || infra.ScaleListCache == nil {
-		return nil
-	}
-	return infra.ScaleListCache.Rebuild(ctx)
 }
 
 func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, code string) error {

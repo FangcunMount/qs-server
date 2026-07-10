@@ -228,10 +228,7 @@ func (s *RedisStore) observeFamilyFailure(family string, err error) {
 	}
 }
 
-func shouldSampleHotset(target cachetarget.WarmupTarget) bool {
-	if target.Kind == cachetarget.WarmupKindStaticScaleList {
-		return true
-	}
+func shouldSampleHotset(_ cachetarget.WarmupTarget) bool {
 	draw, err := cryptorand.Int(cryptorand.Reader, big.NewInt(10000))
 	if err != nil {
 		return false

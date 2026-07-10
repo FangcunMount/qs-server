@@ -148,7 +148,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 		)...)
 		contentStatistics := statistics.Group("", restmiddleware.RequireAnyCapabilityMiddleware(
 			restmiddleware.CapabilityManageQuestionnaires,
-			restmiddleware.CapabilityManageScales,
+			restmiddleware.CapabilityManageAssessmentModels,
 		))
 		contentStatistics.POST("/questionnaires/batch", r.rateLimitedHandlers(
 			r.rateCfg,

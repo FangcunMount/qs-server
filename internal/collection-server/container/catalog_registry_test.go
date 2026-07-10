@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 )
@@ -19,9 +18,6 @@ func TestCatalogL1CacheDisabledReturnsNil(t *testing.T) {
 
 	if got := newCatalogL1Cache(opts, catalogKindQuestionnaire); got != nil {
 		t.Fatalf("questionnaire cache = %T, want nil", got)
-	}
-	if got := newCatalogL1Cache(opts, catalogKindScale); got != nil {
-		t.Fatalf("scale cache = %T, want nil", got)
 	}
 	if got := newCatalogL1Cache(opts, catalogKindTypology); got != nil {
 		t.Fatalf("typology cache = %T, want nil", got)
@@ -39,9 +35,6 @@ func TestCatalogL1CacheEnabledBuildsTypedCaches(t *testing.T) {
 	if _, ok := newCatalogL1Cache(opts, catalogKindQuestionnaire).(*questionnaire.LocalCache); !ok {
 		t.Fatal("questionnaire cache type mismatch")
 	}
-	if _, ok := newCatalogL1Cache(opts, catalogKindScale).(*scale.LocalCatalogCache); !ok {
-		t.Fatal("scale cache type mismatch")
-	}
 	if _, ok := newCatalogL1Cache(opts, catalogKindTypology).(*typologymodel.LocalCatalogCache); !ok {
 		t.Fatal("typology cache type mismatch")
 	}
@@ -51,11 +44,11 @@ func TestCatalogL1SingleflightEnabled(t *testing.T) {
 	t.Parallel()
 
 	opts := options.NewOptions()
-	opts.ScaleCache.Singleflight = true
+	opts.TypologyCache.Singleflight = true
 	opts.QuestionnaireCache.Singleflight = false
 
-	if !catalogL1SingleflightEnabled(opts, catalogKindScale) {
-		t.Fatal("scale singleflight should be enabled")
+	if !catalogL1SingleflightEnabled(opts, catalogKindTypology) {
+		t.Fatal("typology singleflight should be enabled")
 	}
 	if catalogL1SingleflightEnabled(opts, catalogKindQuestionnaire) {
 		t.Fatal("questionnaire singleflight should be disabled by default")

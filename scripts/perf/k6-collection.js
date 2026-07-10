@@ -10,8 +10,8 @@ const ANSWER_BODY = __ENV.ANSWER_BODY || '';
 
 const endpoints = [
   { name: 'public_info', method: 'GET', path: __ENV.PUBLIC_INFO_PATH || '/api/v1/public/info', auth: false },
-  { name: 'scales_categories', method: 'GET', path: __ENV.SCALES_CATEGORIES_PATH || '/api/v1/scales/categories', auth: false },
-  { name: 'scales_list', method: 'GET', path: __ENV.SCALES_PATH || '/api/v1/scales', auth: false },
+  { name: 'assessment_model_options', method: 'GET', path: __ENV.ASSESSMENT_MODEL_OPTIONS_PATH || '/api/v1/assessment-models/options?kind=scale', auth: false },
+  { name: 'assessment_model_list', method: 'GET', path: __ENV.ASSESSMENT_MODEL_LIST_PATH || '/api/v1/assessment-models?kind=scale', auth: false },
   { name: 'questionnaires_list', method: 'GET', path: __ENV.QUESTIONNAIRES_PATH || '/api/v1/questionnaires', auth: true },
   { name: 'assessments_list', method: 'GET', path: __ENV.ASSESSMENTS_PATH || '/api/v1/assessments', auth: true },
   {

@@ -9,14 +9,16 @@ import (
 
 // ListFilter narrows draft-model list queries for admin consoles.
 type ListFilter struct {
-	Kind      domain.Kind
-	SubKind   domain.SubKind
-	Status    domain.ModelStatus
-	Keyword   string
-	Category  string
-	Algorithm domain.Algorithm
-	Page      int
-	PageSize  int
+	Kind                 domain.Kind
+	SubKind              domain.SubKind
+	Status               domain.ModelStatus
+	Keyword              string
+	Category             string
+	Algorithm            domain.Algorithm
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Page                 int
+	PageSize             int
 }
 
 // ModelRepository persists draft assessment models.

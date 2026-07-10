@@ -32,12 +32,6 @@ func (ExecutorRegistryBuilder) Build(deps Dependencies) *WarmupRegistry {
 		}
 		return deps.WarmQuestionnaire(ctx, code)
 	})
-	registry.Register(cachetarget.WarmupKindStaticScaleList, func(ctx context.Context, _ cachetarget.WarmupTarget) error {
-		if deps.WarmScaleList == nil {
-			return nil
-		}
-		return deps.WarmScaleList(ctx)
-	})
 	registry.Register(cachetarget.WarmupKindStaticTypologyModel, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if deps.WarmPublishedTypologyModel == nil {
 			return nil

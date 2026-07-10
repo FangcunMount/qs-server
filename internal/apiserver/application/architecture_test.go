@@ -86,14 +86,13 @@ func assertPayloadPortDoesNotImportDomainRuntimeDTO(t *testing.T, root, dir, nam
 	})
 }
 
-func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testing.T) {
+func TestSurveyApplicationsDoNotContainRepoBackedReadModelAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/modelcatalog/scoring",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -117,7 +116,7 @@ func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testi
 				"CountWithConditions(",
 			} {
 				if strings.Contains(text, token) {
-					t.Fatalf("%s contains %q; survey/scale application read paths must use typed read-model ports", filepath.ToSlash(mustRel(t, root, path)), token)
+					t.Fatalf("%s contains %q; survey application read paths must use typed read-model ports", filepath.ToSlash(mustRel(t, root, path)), token)
 				}
 			}
 			return nil
@@ -128,14 +127,13 @@ func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testi
 	}
 }
 
-func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
+func TestSurveyApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/modelcatalog/scoring",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -155,7 +153,7 @@ func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 				"FactorManager",
 			} {
 				if strings.Contains(text, token) {
-					t.Fatalf("%s contains %q; survey/scale application should call aggregate behavior directly", filepath.ToSlash(mustRel(t, root, path)), token)
+					t.Fatalf("%s contains %q; survey application should call aggregate behavior directly", filepath.ToSlash(mustRel(t, root, path)), token)
 				}
 			}
 			return nil

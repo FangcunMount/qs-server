@@ -153,9 +153,9 @@ apiserver 关心：
 collection-server 允许部分 scale GET 接口跳过 auth：
 
 ```text
-GET /api/v1/scales
-GET /api/v1/scales/hot
-GET /api/v1/scales/categories
+GET /api/v1/assessment-models?kind=scale
+GET /api/v1/assessment-models/hot?kind=scale
+GET /api/v1/assessment-models/options?kind=scale
 ```
 
 这说明 collection 层可以按前台产品体验定义更细的公开边界，而不是把 apiserver 的后台权限模型直接暴露给小程序。

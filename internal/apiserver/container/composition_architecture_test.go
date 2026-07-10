@@ -77,7 +77,7 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 		"internal/apiserver/container/modules/plan/assemble.go",
 		"internal/apiserver/container/modules/statistics/assemble.go",
 		"internal/apiserver/container/modules/survey/assemble.go",
-		"internal/apiserver/container/modules/modelcatalog/assemble_scoring.go",
+		"internal/apiserver/container/modules/modelcatalog/assemble_hot_rank.go",
 		"internal/apiserver/container/modules/evaluation/assemble.go",
 	} {
 		path := filepath.Join(root, rel)
@@ -423,7 +423,7 @@ func TestStatisticsAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	}
 }
 
-func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
+func TestSurveyAndCatalogModulesDoNotExposeInfraAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -432,7 +432,7 @@ func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
 		types []string
 	}{
 		{rel: "internal/apiserver/container/modules/survey/assemble.go", types: []string{"QuestionnaireSubModule", "AnswerSheetSubModule"}},
-		{rel: "internal/apiserver/container/modules/modelcatalog/assemble_scoring.go", types: []string{"Scoring"}},
+		{rel: "internal/apiserver/container/modules/modelcatalog/assemble_hot_rank.go", types: []string{"HotRank"}},
 	} {
 		path := filepath.Join(root, tc.rel)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)

@@ -9,7 +9,6 @@ import (
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
@@ -19,7 +18,6 @@ import (
 
 type catalogCaches struct {
 	questionnaire questionnaire.PublishedDetailCache
-	scale         scale.CatalogCache
 	typology      typologymodel.CatalogCache
 }
 
@@ -28,10 +26,6 @@ func (c *Container) initCatalogCaches() catalogCaches {
 	if cache := newCatalogL1Cache(c.opts, catalogKindQuestionnaire); cache != nil {
 		caches.questionnaire = cache.(questionnaire.PublishedDetailCache)
 		c.startCatalogSignalWatcher(catalogKindQuestionnaire, cache)
-	}
-	if cache := newCatalogL1Cache(c.opts, catalogKindScale); cache != nil {
-		caches.scale = cache.(scale.CatalogCache)
-		c.startCatalogSignalWatcher(catalogKindScale, cache)
 	}
 	if cache := newCatalogL1Cache(c.opts, catalogKindTypology); cache != nil {
 		caches.typology = cache.(typologymodel.CatalogCache)
@@ -99,14 +93,6 @@ func (c *Container) startCatalogSignalWatcher(kind catalogKind, cache any) {
 	switch kind {
 	case catalogKindQuestionnaire:
 		c.startQuestionnaireCacheSignalWatcher(cache.(questionnaire.PublishedDetailCache))
-	case catalogKindScale:
-		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
-			cachesignal.NewScaleSignaler,
-			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal], target scale.CatalogCache) {
-				scale.StartCacheSignalWatcher(ctx, signaler, target)
-			},
-			func(v any) scale.CatalogCache { return v.(scale.CatalogCache) },
-		)
 	case catalogKindTypology:
 		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
 			cachesignal.NewTypologyModelSignaler,

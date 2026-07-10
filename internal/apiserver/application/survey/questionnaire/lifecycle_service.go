@@ -21,7 +21,7 @@ type CacheSignalNotifier interface {
 // 行为者：问卷设计者/管理员
 type lifecycleService struct {
 	repo                questionnaire.Repository
-	scaleSyncer         ScaleQuestionnaireBindingSyncer
+	bindingSyncer       QuestionnaireBindingVersionSyncer
 	validator           questionnaire.Validator
 	lifecycle           questionnaire.Lifecycle
 	eventPublisher      event.EventPublisher
@@ -41,7 +41,7 @@ func WithCacheSignalNotifier(notifier CacheSignalNotifier) LifecycleServiceOptio
 // NewLifecycleService 创建问卷生命周期服务
 func NewLifecycleService(
 	repo questionnaire.Repository,
-	scaleSyncer ScaleQuestionnaireBindingSyncer,
+	bindingSyncer QuestionnaireBindingVersionSyncer,
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
@@ -49,7 +49,7 @@ func NewLifecycleService(
 ) QuestionnaireLifecycleService {
 	s := &lifecycleService{
 		repo:           repo,
-		scaleSyncer:    scaleSyncer,
+		bindingSyncer:  bindingSyncer,
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
@@ -286,8 +286,8 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, q *questionna
 	s.cacheSignalNotifier.NotifyQuestionnaireCacheChanged(ctx, q.GetCode().String(), q.GetVersion().String(), action)
 }
 
-func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
-	if s.scaleSyncer == nil || questionnaireCode == "" || version == "" {
+func (s *lifecycleService) syncQuestionnaireBindingVersion(ctx context.Context, questionnaireCode, version string) error {
+	if s.bindingSyncer == nil || questionnaireCode == "" || version == "" {
 		return nil
 	}
 
@@ -302,5 +302,5 @@ func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, qu
 		return nil
 	}
 
-	return s.scaleSyncer.SyncQuestionnaireVersion(ctx, questionnaireCode, version)
+	return s.bindingSyncer.SyncQuestionnaireVersion(ctx, questionnaireCode, version)
 }

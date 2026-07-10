@@ -122,17 +122,17 @@ func TestSyncScaleQuestionnaireVersion(t *testing.T) {
 						tt.code: q,
 					},
 				},
-				scaleSyncer: syncer,
+				bindingSyncer: syncer,
 			}
 
-			if err := svc.syncScaleQuestionnaireVersion(ctx, tt.code, "2.0"); err != nil {
-				t.Fatalf("syncScaleQuestionnaireVersion() error = %v", err)
+			if err := svc.syncQuestionnaireBindingVersion(ctx, tt.code, "2.0"); err != nil {
+				t.Fatalf("syncQuestionnaireBindingVersion() error = %v", err)
 			}
 			if syncer.syncCalls != tt.wantSyncCalls {
-				t.Fatalf("syncScaleQuestionnaireVersion() syncCalls = %d, want %d", syncer.syncCalls, tt.wantSyncCalls)
+				t.Fatalf("syncQuestionnaireBindingVersion() syncCalls = %d, want %d", syncer.syncCalls, tt.wantSyncCalls)
 			}
 			if tt.wantSyncCalls > 0 && syncer.lastVersion != tt.wantSyncedVersion {
-				t.Fatalf("syncScaleQuestionnaireVersion() synced version = %q, want %q", syncer.lastVersion, tt.wantSyncedVersion)
+				t.Fatalf("syncQuestionnaireBindingVersion() synced version = %q, want %q", syncer.lastVersion, tt.wantSyncedVersion)
 			}
 		})
 	}

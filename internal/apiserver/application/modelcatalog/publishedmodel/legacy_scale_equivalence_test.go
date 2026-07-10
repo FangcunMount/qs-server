@@ -1,13 +1,12 @@
 package publishedmodel_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
@@ -62,26 +61,21 @@ func newPublishedScaleAssessmentModelForEquivalence(t *testing.T, snapshot *scal
 	t.Helper()
 
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
-	model, err := legacyadapter.AssessmentModelFromCreateDTO(shared.CreateScaleDTO{
-		Code:                 snapshot.Code,
-		Title:                snapshot.Title,
-		Description:          "scale definition",
-		Category:             "adhd",
-		Stages:               []string{"deep_assessment"},
-		ApplicableAges:       []string{"school_child"},
-		Reporters:            []string{"parent"},
-		Tags:                 []string{"screening"},
-		QuestionnaireCode:    snapshot.QuestionnaireCode,
-		QuestionnaireVersion: snapshot.QuestionnaireVersion,
-	}, now)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: snapshot.Code, Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: snapshot.Title,
+		Description: "scale definition", Category: "adhd", Stages: []string{"deep_assessment"}, ApplicableAges: []string{"school_child"}, Reporters: []string{"parent"}, Tags: []string{"screening"}, Now: now,
+	})
 	if err != nil {
-		t.Fatalf("AssessmentModelFromCreateDTO: %v", err)
+		t.Fatalf("NewAssessmentModel: %v", err)
 	}
-	payload, err := legacyadapter.DefinitionPayloadFromScaleSnapshot(snapshot)
+	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{QuestionnaireCode: snapshot.QuestionnaireCode, QuestionnaireVersion: snapshot.QuestionnaireVersion}, now); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
+	payload, err := json.Marshal(snapshot)
 	if err != nil {
-		t.Fatalf("DefinitionPayloadFromScaleSnapshot: %v", err)
+		t.Fatalf("Marshal scale payload: %v", err)
 	}
-	if err := model.UpdateDefinitionWithV2(payload, scalesnapshot.DefinitionFromScaleSnapshot(snapshot), now); err != nil {
+	if err := model.UpdateDefinitionWithV2(domain.DefinitionPayload{Format: domain.PayloadFormatAssessmentScaleV1, Data: payload}, scalesnapshot.DefinitionFromScaleSnapshot(snapshot), now); err != nil {
 		t.Fatalf("UpdateDefinitionWithV2: %v", err)
 	}
 	if err := model.MarkPublished(now); err != nil {

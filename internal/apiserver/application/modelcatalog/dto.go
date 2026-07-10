@@ -34,14 +34,16 @@ type Option struct {
 }
 
 type ListModelsDTO struct {
-	Kind      string
-	SubKind   string
-	Status    string
-	Keyword   string
-	Category  string
-	Algorithm string
-	Page      int
-	PageSize  int
+	Kind                 string
+	SubKind              string
+	Status               string
+	Keyword              string
+	Category             string
+	Algorithm            string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Page                 int
+	PageSize             int
 	// ModelFamily filters behavior_ability channel listing 到 一个执行家族。
 	ModelFamily string
 }
@@ -113,11 +115,44 @@ type ModelSummary struct {
 	Description          string   `json:"description,omitempty"`
 	Status               string   `json:"status"`
 	Category             string   `json:"category,omitempty"`
+	Stages               []string `json:"stages,omitempty"`
+	ApplicableAges       []string `json:"applicable_ages,omitempty"`
+	Reporters            []string `json:"reporters,omitempty"`
 	Tags                 []string `json:"tags,omitempty"`
 	QuestionnaireCode    string   `json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string   `json:"questionnaire_version,omitempty"`
 	CreatedAt            string   `json:"created_at,omitempty"`
 	UpdatedAt            string   `json:"updated_at,omitempty"`
+}
+
+// PublishedModelDetail is the transport-neutral published catalogue view.
+// Definition is canonical DefinitionV2 and is never reconstructed from a
+// legacy payload.
+type PublishedModelDetail struct {
+	ModelSummary
+	Version    string             `json:"version"`
+	Definition *domain.Definition `json:"definition"`
+}
+
+type PublishedModelListResult struct {
+	Items    []PublishedModelDetail `json:"items"`
+	Total    int64                  `json:"total"`
+	Page     int                    `json:"page"`
+	PageSize int                    `json:"page_size"`
+}
+
+type HotModelSummary struct {
+	ModelSummary
+	Rank            int   `json:"rank"`
+	SubmissionCount int64 `json:"submission_count"`
+	HeatScore       int64 `json:"heat_score"`
+}
+
+type HotModelListResult struct {
+	Items      []HotModelSummary `json:"items"`
+	Total      int64             `json:"total"`
+	Limit      int               `json:"limit"`
+	WindowDays int               `json:"window_days"`
 }
 
 type ModelListResult struct {
@@ -143,6 +178,9 @@ type OptionsResult struct {
 	Algorithms        []Option `json:"algorithms"`
 	SubKinds          []Option `json:"sub_kinds"`
 	Tags              []Option `json:"tags,omitempty"`
+	Stages            []Option `json:"stages,omitempty"`
+	ApplicableAges    []Option `json:"applicable_ages,omitempty"`
+	Reporters         []Option `json:"reporters,omitempty"`
 }
 
 type ValidationIssue struct {

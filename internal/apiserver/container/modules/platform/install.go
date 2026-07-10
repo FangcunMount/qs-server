@@ -2,7 +2,7 @@ package platform
 
 import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -17,7 +17,7 @@ type InstallHost interface {
 	ApplyPlatformState(IntegrationState)
 	WeChatAppService() *iam.WeChatAppService
 	ProfileLinkService() *iam.ProfileLinkService
-	ScaleQuery() scaleApp.ScaleQueryService
+	PublishedModelTitleResolver() modelcatalogApp.PublishedModelTitleResolver
 	TesteeQuery() testeeApp.TesteeQueryService
 	TaskNotificationContext() planApp.TaskNotificationContextReader
 }
@@ -81,14 +81,14 @@ func InitMiniProgramNotificationFrom(host InstallHost, wechatOptions *options.We
 		return
 	}
 	result := WireMiniProgramTaskNotificationService(MiniProgramNotificationWireInput{
-		State:              host.PlatformState(),
-		WeChatAppService:   host.WeChatAppService(),
-		ProfileLinkService: host.ProfileLinkService(),
-		IdentityService:    host.IdentityService(),
-		ScaleQuery:         host.ScaleQuery(),
-		TesteeQuery:        host.TesteeQuery(),
-		TaskContext:        host.TaskNotificationContext(),
-		WeChatOptions:      wechatOptions,
+		State:                  host.PlatformState(),
+		WeChatAppService:       host.WeChatAppService(),
+		ProfileLinkService:     host.ProfileLinkService(),
+		IdentityService:        host.IdentityService(),
+		PublishedTitleResolver: host.PublishedModelTitleResolver(),
+		TesteeQuery:            host.TesteeQuery(),
+		TaskContext:            host.TaskNotificationContext(),
+		WeChatOptions:          wechatOptions,
 	})
 	if msg := FormatSkipMessage("MiniProgram task notification service", result.SkipReason); msg != "" {
 		host.Printf("⚠️  %s\n", msg)

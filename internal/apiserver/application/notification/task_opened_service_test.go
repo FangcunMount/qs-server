@@ -8,9 +8,9 @@ import (
 	"time"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	modelcatalogDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
@@ -25,13 +25,13 @@ func (s *testeeLookupStub) GetByID(context.Context, uint64) (*testeeApp.TesteeRe
 	return s.result, s.err
 }
 
-type scaleLookupStub struct {
-	result *scaleApp.ScaleResult
-	err    error
+type publishedTitleResolverStub struct {
+	title string
+	err   error
 }
 
-func (s *scaleLookupStub) GetByCode(context.Context, string) (*scaleApp.ScaleResult, error) {
-	return s.result, s.err
+func (s *publishedTitleResolverStub) ResolvePublishedTitle(context.Context, modelcatalogDomain.Kind, string) (string, error) {
+	return s.title, s.err
 }
 
 type recipientResolverStub struct {
@@ -151,7 +151,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 			Name:      "张三",
 		}},
 		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
-		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
+		&publishedTitleResolverStub{title: "儿童抑郁量表"},
 		resolver,
 		&wechatAppLookupStub{},
 		sender,
@@ -221,7 +221,7 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 			Name:      "李四",
 		}},
 		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks[:1])},
-		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "执行功能测评"}},
+		&publishedTitleResolverStub{title: "执行功能测评"},
 		resolver,
 		&wechatAppLookupStub{},
 		sender,
@@ -276,7 +276,7 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 			Name:      "王五",
 		}},
 		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
-		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
+		&publishedTitleResolverStub{title: "儿童抑郁量表"},
 		&recipientResolverStub{
 			enabled: true,
 			recipients: &iambridge.MiniProgramRecipients{
@@ -342,7 +342,7 @@ func TestSendTaskOpenedSkipsSeeddataMockTestee(t *testing.T) {
 					Source:    source,
 				}},
 				&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
-				&scaleLookupStub{},
+				&publishedTitleResolverStub{},
 				resolver,
 				&wechatAppLookupStub{},
 				sender,

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
@@ -28,22 +27,17 @@ func TestCatalogConcurrencyHandlersBypassGateOnL1Hit(t *testing.T) {
 	c := container.NewContainer(opts, nil, nil, nil)
 	c.InitializeRuntimeClients(container.ClientBundle{})
 
-	cache := scale.NewLocalCatalogCache(scale.LocalCatalogCacheOptions{TTL: time.Minute, MaxEntries: 8})
-	cache.SetDetail("ABC", &scale.ScaleResponse{Code: "ABC"})
-	scaleSvc := scale.NewQueryService(nil, cache, true)
-
-	// inject scale service via reflection is heavy; use router peek with manual setup
+	// Generic catalogue has no local projection cache; verify the admission
+	// bypass policy independently from a legacy scale DTO.
 	router := &Router{container: c}
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/scales/ABC", nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models/ABC", nil)
 	ctx.Params = gin.Params{{Key: "code", Value: "ABC"}}
 	ctx.FullPath()
 
-	peek := func(c *gin.Context) bool {
-		return scaleSvc.HasCachedDetail(c.Param("code"))
-	}
+	peek := func(*gin.Context) bool { return true }
 
 	handlers := catalogConcurrencyHandlers(gate, time.Second, peek, func(c *gin.Context) {
 		c.Status(http.StatusOK)
@@ -63,7 +57,7 @@ func TestCatalogConcurrencyHandlersWaitWhenL1MissAndSlotAvailable(t *testing.T) 
 	gate := concurrency.NewGate(2)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/scales/missing", nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models/missing", nil)
 
 	handlers := catalogConcurrencyHandlers(gate, time.Second, func(*gin.Context) bool { return false }, func(c *gin.Context) {
 		c.Status(http.StatusOK)
@@ -221,7 +215,7 @@ func TestAdmissionPolicyCatalogUsesWaitGateOnL1Miss(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/scales/missing", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models/missing", nil)
 
 	handlers := policy.Wrap(admissionCatalog, func(c *gin.Context) {
 		c.Status(http.StatusTeapot)

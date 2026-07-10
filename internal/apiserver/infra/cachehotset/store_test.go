@@ -24,7 +24,7 @@ func (o testFamilyObserver) ObserveFamilyFailure(family string, err error) {
 	observability.ObserveFamilyFailure(o.component, family, err)
 }
 
-func TestRedisStoreRecordAndTopWithScores(t *testing.T) {
+func TestRedisStoreTopWithScores(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
@@ -38,15 +38,12 @@ func TestRedisStoreRecordAndTopWithScores(t *testing.T) {
 	if !ok {
 		t.Fatalf("recorder type = %T, want *RedisStore", recorder)
 	}
-	target := cachetarget.WarmupTarget{
-		Family: cachemodel.FamilyStatic,
-		Kind:   cachetarget.WarmupKindStaticScaleList,
-		Scope:  "published",
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
+	key := store.keys.WarmupHotset(string(target.Family), string(target.Kind))
+	if err := store.client.ZIncrBy(context.Background(), key, 1, target.Scope).Err(); err != nil {
+		t.Fatalf("seed hotset error = %v", err)
 	}
-	if err := store.Record(context.Background(), target); err != nil {
-		t.Fatalf("Record() error = %v", err)
-	}
-	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScaleList, 10)
+	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScale, 10)
 	if err != nil {
 		t.Fatalf("TopWithScores() error = %v", err)
 	}
@@ -70,15 +67,11 @@ func TestRedisStoreNilDisabledNoOpAndSuppression(t *testing.T) {
 		Options{Enable: true},
 	)
 	store := recorder.(*RedisStore)
-	target := cachetarget.WarmupTarget{
-		Family: cachemodel.FamilyStatic,
-		Kind:   cachetarget.WarmupKindStaticScaleList,
-		Scope:  "published",
-	}
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
 	if err := store.Record(cachetarget.SuppressHotsetRecording(context.Background()), target); err != nil {
 		t.Fatalf("Record() suppressed error = %v", err)
 	}
-	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScaleList, 10)
+	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScale, 10)
 	if err != nil {
 		t.Fatalf("TopWithScores() error = %v", err)
 	}
@@ -110,12 +103,14 @@ func TestRedisStoreObserverUsesInjectedComponent(t *testing.T) {
 	if recorder == nil {
 		t.Fatal("recorder = nil, want enabled hotset recorder")
 	}
-	if err := recorder.Record(context.Background(), cachetarget.WarmupTarget{
-		Family: cachemodel.FamilyStatic,
-		Kind:   cachetarget.WarmupKindStaticScaleList,
-		Scope:  "SDS",
-	}); err != nil {
-		t.Fatalf("Record() error = %v", err)
+	store := recorder.(*RedisStore)
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
+	key := store.keys.WarmupHotset(string(target.Family), string(target.Kind))
+	if err := store.client.ZIncrBy(context.Background(), key, 1, target.Scope).Err(); err != nil {
+		t.Fatalf("seed hotset error = %v", err)
+	}
+	if _, err := store.TopWithScores(context.Background(), target.Family, target.Kind, 10); err != nil {
+		t.Fatalf("TopWithScores() error = %v", err)
 	}
 
 	snapshot := observability.SnapshotForComponent("hotset-observer", registry)

@@ -140,6 +140,12 @@ func (r *DraftRepository) List(ctx context.Context, filter port.ListFilter) ([]*
 	if filter.Algorithm != "" {
 		extra["algorithm"] = string(filter.Algorithm)
 	}
+	if filter.QuestionnaireCode != "" {
+		extra["questionnaire_code"] = filter.QuestionnaireCode
+	}
+	if filter.QuestionnaireVersion != "" {
+		extra["questionnaire_version"] = filter.QuestionnaireVersion
+	}
 	mongoFilter := draftFilter(extra)
 	if filter.Keyword != "" {
 		mongoFilter["title"] = bson.M{"$regex": strings.TrimSpace(filter.Keyword), "$options": "i"}

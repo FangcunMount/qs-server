@@ -13,7 +13,7 @@
 | Proto 真值 | `api/grpc/gen` |
 | 注册真值 | `internal/apiserver/transport/grpc/registry.go` |
 | 注册方式 | Registry 按依赖是否 nil 决定是否注册服务，缺模块会 skip |
-| collection 调用 | AnswerSheet、Questionnaire、Actor、Evaluation、Scale |
+| collection 调用 | AnswerSheet、Questionnaire、Actor、Evaluation、AssessmentModelCatalog |
 | worker 调用 | AnswerSheet、Evaluation、Internal |
 | 安全 | gRPC server 支持 TLS/mTLS、IAM auth、AuthzSnapshot interceptor、ACL/Audit |
 
@@ -35,7 +35,7 @@ flowchart LR
         QS["QuestionnaireService"]
         Actor["ActorService"]
         Eval["EvaluationService"]
-        Scale["ScaleService"]
+        Catalog["AssessmentModelCatalogService"]
         Internal["InternalService"]
         Plan["PlanCommandService"]
     end
@@ -61,7 +61,7 @@ flowchart LR
 | QuestionnaireService | Questionnaire query service 非 nil | collection |
 | ActorService | Testee/Clinician 相关 service 非 nil | collection |
 | EvaluationService | Submission/Report/Score service 非 nil | collection、worker |
-| ScaleService | Scale query/category service 非 nil | collection |
+| AssessmentModelCatalogService | CatalogQueryService 非 nil | collection |
 | InternalService | Survey/AssessmentModel/Report/Evaluation/Actor/Plan/Statistics/Warmup/QR/Notification 等依赖满足 | worker |
 | PlanCommandService | Plan command service 非 nil | internal usage / client |
 

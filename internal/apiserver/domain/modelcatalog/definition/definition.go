@@ -32,6 +32,8 @@ type ReportMap struct {
 	Sections []ReportSection
 }
 
+const ReportSectionKindFactorScores = "factor_scores"
+
 type ReportSection struct {
 	Code          string
 	Title         string
@@ -40,4 +42,17 @@ type ReportSection struct {
 	AdapterKey    string
 	TemplateID    string
 	CategoryLabel string
+}
+
+// FactorScoreSources returns the explicitly configured report-visible factor
+// codes. The bool distinguishes an absent mapping from an intentional empty
+// mapping that hides every factor score.
+func (m ReportMap) FactorScoreSources() ([]string, bool) {
+	for _, section := range m.Sections {
+		if section.Kind != ReportSectionKindFactorScores {
+			continue
+		}
+		return append([]string(nil), section.SourceRefs...), true
+	}
+	return nil, false
 }

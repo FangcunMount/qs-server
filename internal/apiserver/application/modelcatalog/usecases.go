@@ -37,6 +37,9 @@ type PublicationService interface {
 type CatalogQueryService interface {
 	Get(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 	List(ctx context.Context, actor ActorContext, input ListModelsDTO) (*ModelListResult, error)
+	GetPublished(ctx context.Context, actor ActorContext, code, version string) (*PublishedModelDetail, error)
+	ListPublished(ctx context.Context, actor ActorContext, input ListModelsDTO) (*PublishedModelListResult, error)
+	ListHotPublished(ctx context.Context, actor ActorContext, input ListModelsDTO, limit, windowDays int) (*HotModelListResult, error)
 	GetQuestionnaire(ctx context.Context, actor ActorContext, code string) (*QuestionnaireBindingResult, error)
 	Options(ctx context.Context, actor ActorContext, kind string) (*OptionsResult, error)
 	GetQRCode(ctx context.Context, actor ActorContext, code string) (string, error)

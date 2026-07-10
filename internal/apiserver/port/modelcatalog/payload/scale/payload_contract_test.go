@@ -80,6 +80,10 @@ func TestScalePayloadDefinitionRoundTripMatchesLegacySnapshot(t *testing.T) {
 	}
 
 	definition := newscale.DefinitionFromScaleSnapshot(original)
+	visible, configured := definition.ReportMap.FactorScoreSources()
+	if !configured || len(visible) != 1 || visible[0] != "total" {
+		t.Fatalf("factor score report map = (%#v, %v)", visible, configured)
+	}
 	got := newscale.ScaleSnapshotFromDefinition(newscale.ExecutionEnvelope{
 		Code:         original.Code,
 		ScaleVersion: original.ScaleVersion,

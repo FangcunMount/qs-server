@@ -69,7 +69,7 @@
       "paths": {
         "questionnaireDetail": [],
         "questionnaireQuery": [
-          "/api/v1/scales/{scale_code}",
+          "/api/v1/assessment-models/{scale_code}",
           "/api/v1/typology-models?page=1&page_size=20"
         ]
       },
@@ -1187,10 +1187,10 @@
   },
   "paths": {
     "medicalQuery": [
-      "/api/v1/scales?page=1&page_size=20&status=published",
-      "/api/v1/scales/categories",
-      "/api/v1/scales/hot?limit=5",
-      "/api/v1/scales/{scale_code}"
+      "/api/v1/assessment-models?kind=scale&page=1&page_size=20",
+      "/api/v1/assessment-models/options?kind=scale",
+      "/api/v1/assessment-models/hot?kind=scale&limit=5",
+      "/api/v1/assessment-models/{scale_code}"
     ],
     "personalityModelQuery": [
       "/api/v1/typology-models?page=1&page_size=20",
@@ -1204,10 +1204,10 @@
       "/api/v1/questionnaires/{personality_questionnaire_code}?version={personality_questionnaire_version}"
     ],
     "questionnaireQuery": [
-      "/api/v1/scales?page=1&page_size=20&status=published",
-      "/api/v1/scales/categories",
-      "/api/v1/scales/hot?limit=5",
-      "/api/v1/scales/{scale_code}",
+      "/api/v1/assessment-models?kind=scale&page=1&page_size=20",
+      "/api/v1/assessment-models/options?kind=scale",
+      "/api/v1/assessment-models/hot?kind=scale&limit=5",
+      "/api/v1/assessment-models/{scale_code}",
       "/api/v1/typology-models?page=1&page_size=20",
       "/api/v1/typology-models/categories",
       "/api/v1/typology-models/{model_code}",

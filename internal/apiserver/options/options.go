@@ -564,7 +564,6 @@ func NewCacheOptions() *CacheOptions {
 		DisableStatisticsCache: false,
 		TTL: &CacheTTLOptions{
 			Scale:            24 * time.Hour,
-			ScaleList:        10 * time.Minute,
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
 			AssessmentList:   10 * time.Minute,
@@ -631,7 +630,6 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c.TTL == nil {
 		c.TTL = &CacheTTLOptions{
 			Scale:            24 * time.Hour,
-			ScaleList:        10 * time.Minute,
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
 			AssessmentList:   10 * time.Minute,
@@ -644,7 +642,6 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis caching for statistics data")
 	fs.DurationVar(&c.TTL.Scale, "cache.ttl.scale", c.TTL.Scale, "TTL for scale cache entries.")
-	fs.DurationVar(&c.TTL.ScaleList, "cache.ttl.scale-list", c.TTL.ScaleList, "TTL for published scale list cache entries.")
 	fs.DurationVar(&c.TTL.Questionnaire, "cache.ttl.questionnaire", c.TTL.Questionnaire, "TTL for questionnaire cache entries.")
 	fs.DurationVar(&c.TTL.AssessmentDetail, "cache.ttl.assessment-detail", c.TTL.AssessmentDetail, "TTL for assessment detail cache entries.")
 	fs.DurationVar(&c.TTL.AssessmentList, "cache.ttl.assessment-list", c.TTL.AssessmentList, "TTL for my-assessment-list cache entries.")
@@ -748,7 +745,6 @@ type CacheFamilyOptions struct {
 // CacheTTLOptions 缓存 TTL 配置
 type CacheTTLOptions struct {
 	Scale            time.Duration `json:"scale" mapstructure:"scale"`
-	ScaleList        time.Duration `json:"scale_list" mapstructure:"scale_list"`
 	Questionnaire    time.Duration `json:"questionnaire" mapstructure:"questionnaire"`
 	AssessmentDetail time.Duration `json:"assessment_detail" mapstructure:"assessment_detail"`
 	AssessmentList   time.Duration `json:"assessment_list" mapstructure:"assessment_list"`

@@ -18,9 +18,6 @@ func TestWarmupTargetFactoriesNormalizeScopes(t *testing.T) {
 	if questionnaire.Scope != "questionnaire:q-001" {
 		t.Fatalf("questionnaire scope = %q", questionnaire.Scope)
 	}
-	if got := NewStaticScaleListWarmupTarget(); got.Scope != "published" {
-		t.Fatalf("scale list scope = %q, want published", got.Scope)
-	}
 	if got := NewQueryStatsSystemWarmupTarget(9); got.Scope != "org:9" {
 		t.Fatalf("system scope = %q, want org:9", got.Scope)
 	}
@@ -74,7 +71,6 @@ func TestFamilyForKind(t *testing.T) {
 	}{
 		{name: "static scale", kind: WarmupKindStaticScale, want: cachemodel.FamilyStatic},
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, want: cachemodel.FamilyStatic},
-		{name: "static scale list", kind: WarmupKindStaticScaleList, want: cachemodel.FamilyStatic},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, want: cachemodel.FamilyQuery},
 		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, want: cachemodel.FamilyQuery},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, want: cachemodel.FamilyQuery},
@@ -104,7 +100,6 @@ func TestParseWarmupTarget(t *testing.T) {
 	}{
 		{name: "static scale", kind: WarmupKindStaticScale, scope: " scale:S-001 ", want: NewStaticScaleWarmupTarget("s-001")},
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: " questionnaire:Q-001 ", want: NewStaticQuestionnaireWarmupTarget("q-001")},
-		{name: "static scale list", kind: WarmupKindStaticScaleList, scope: " published ", want: NewStaticScaleListWarmupTarget()},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, scope: " org:7 ", want: NewQueryStatsSystemWarmupTarget(7)},
 		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, scope: " org:7:preset:30D ", want: NewQueryStatsOverviewWarmupTarget(7, "30d")},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, scope: " org:7:questionnaire:Q-001 ", want: NewQueryStatsQuestionnaireWarmupTarget(7, "q-001")},
@@ -137,7 +132,6 @@ func TestParseWarmupTargetRejectsInvalidScopes(t *testing.T) {
 	}{
 		{name: "static scale", kind: WarmupKindStaticScale, scope: "questionnaire:q-001", wantErr: "invalid static scale warmup scope: questionnaire:q-001"},
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: "scale:s-001", wantErr: "invalid static questionnaire warmup scope: scale:s-001"},
-		{name: "static scale list", kind: WarmupKindStaticScaleList, scope: "draft", wantErr: "invalid static scale list warmup scope: draft"},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, scope: "org:0", wantErr: "invalid stats system warmup scope: org:0"},
 		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, scope: "org:7:preset:90d", wantErr: "invalid stats overview warmup scope: org:7:preset:90d"},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, scope: "org:7", wantErr: "invalid stats questionnaire warmup scope: org:7"},

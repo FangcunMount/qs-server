@@ -122,7 +122,7 @@ container 阶段解决“业务模块如何被接成一个完整服务端”。
 | ---- | ---- |
 | 基础设施句柄 | MySQL、Mongo、Redis、cache subsystem、backpressure、MQ publisher |
 | 事件能力 | `eventPublisher`、`eventCatalog`、`publisherMode` |
-| 业务模块 | `SurveyModule`、`ScaleModule`、`ActorModule`、`EvaluationModule`、`PlanModule`、`StatisticsModule` |
+| 业务模块 | `SurveyModule`、`AssessmentModelModule`、`ActorModule`、`EvaluationModule`、`PlanModule`、`StatisticsModule` |
 | 安全模块 | `IAMModule` |
 | 外部集成 | QRCode、WeChat mini program sender、object storage、notification service |
 | 运行状态 | initialized、silent、module registry、module order |
@@ -132,7 +132,7 @@ container 初始化顺序大致是：
 ```text
 initEventPublisher
   -> initSurveyModule
-  -> initScaleModule
+  -> initModelCatalogModule
   -> initActorModule
   -> initEvaluationModule
   -> initPlanModule
@@ -146,7 +146,7 @@ initEventPublisher
 flowchart LR
     event["Event Publisher"]
     survey["Survey"]
-    scale["Scale"]
+    modelcatalog["AssessmentModel"]
     actor["Actor"]
     evaluation["Evaluation"]
     plan["Plan"]
@@ -155,12 +155,12 @@ flowchart LR
     codes["CodesService"]
     qrcode["QRCode Generator"]
 
-    event --> survey --> scale --> actor --> evaluation --> plan --> statistics --> warmup --> codes --> qrcode
+    event --> survey --> modelcatalog --> actor --> evaluation --> plan --> statistics --> warmup --> codes --> qrcode
 ```
 
 注意这里不是“随便 new 一堆 service”。顺序有业务和依赖含义：
 
-- `Survey` 和 `Scale` 是主业务前置域；
+- `Survey` 和 `AssessmentModel` 是主业务前置域；
 - `Actor` 是身份/受试者/操作者等上下文；
 - `Evaluation` 依赖采集事实和测评模型资产；
 - `Plan` 会和 Actor / Evaluation / Survey 交互；
@@ -208,7 +208,7 @@ resttransport.NewRouter(container.BuildRESTDeps(rateCfg)).RegisterRoutes(httpSer
 `BuildRESTDeps` 从 container 中抽取 handler 需要的 application service，例如：
 
 - Survey：Questionnaire lifecycle/query、AnswerSheet submission/management；
-- Scale：Lifecycle、Factor、Query、Category；
+- AssessmentModel：目录管理、DefinitionV2 设计、发布、目录查询与已发布模型解析；
 - Actor：Testee、Operator、Clinician、AssessmentEntry；
 - Evaluation：Management、Evaluation、ProtectedQuery；
 - Plan：Command、Query；
@@ -229,7 +229,7 @@ grpctransport.NewRegistry(container.BuildGRPCDeps(grpcServer)).RegisterServices(
 - Questionnaire query；
 - Testee / Operator / Clinician 相关服务；
 - Evaluation submission/management/report/score/evaluate；
-- Scale query/category；
+- AssessmentModel catalog query；
 - Plan command；
 - Behavior projector；
 - QRCode 与 Task notification；
@@ -312,7 +312,7 @@ process 可以知道很多基础设施细节，因为它就是组合根的“运
 
 | 职责 | 说明 |
 | ---- | ---- |
-| 模块初始化 | Survey、Scale、Actor、Evaluation、Plan、Statistics |
+| 模块初始化 | Survey、AssessmentModel、Actor、Evaluation、Plan、Statistics |
 | 依赖注入 | 为模块注入 repository、cache、event publisher、IAM 等 |
 | REST/gRPC deps 暴露 | `BuildRESTDeps`、`BuildGRPCDeps` |
 | 跨模块后置连接 | `moduleGraph` 作为显式后置阶段标记 |
@@ -393,7 +393,7 @@ REST 常见能力：
 - JWT / IAM 身份；
 - rate limit；
 - cache governance / event status / resilience snapshot；
-- Survey、Scale、Actor、Evaluation、Plan、Statistics 的应用服务入口。
+- Survey、AssessmentModel、Actor、Evaluation、Plan、Statistics 的应用服务入口。
 
 ### gRPC 侧
 

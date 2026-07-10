@@ -56,7 +56,6 @@ type CachePolicyKey string
 
 const (
 	PolicyScale            CachePolicyKey = "scale"
-	PolicyScaleList        CachePolicyKey = "scale_list"
 	PolicyQuestionnaire    CachePolicyKey = "questionnaire"
 	PolicyPublishedModel   CachePolicyKey = "published_model"
 	PolicyAssessmentDetail CachePolicyKey = "assessment_detail"

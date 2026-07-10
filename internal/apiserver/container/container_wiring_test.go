@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -83,7 +82,7 @@ func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) 
 	c := NewContainer(nil, nil, nil)
 	c.eventPublisher = event.NewNopEventPublisher()
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
-		TTL: ContainerCacheTTLOptions{Scale: 7, ScaleList: 11},
+		TTL: ContainerCacheTTLOptions{Scale: 7},
 	}, nil)
 
 	wire := ammod.WireInput{
@@ -103,13 +102,13 @@ func TestAssessmentModelModuleRegistersAggregateOnly(t *testing.T) {
 
 	c := NewContainer(nil, nil, nil)
 	module := &AssessmentModelModule{
-		Scoring:  &ScaleModule{},
+		HotRank:  &ammod.HotRank{},
 		Typology: &TypologyModelModule{},
 	}
 	c.SetAssessmentModelModule(module)
 
-	if c.ScaleModule != module.Scoring || c.TypologyModelModule != module.Typology {
-		t.Fatalf("legacy field aliases not wired to assessment model module")
+	if c.AssessmentModelModule != module || c.TypologyModelModule != module.Typology {
+		t.Fatalf("assessment model module fields not wired")
 	}
 	got := c.GetLoadedModules()
 	if len(got) != 1 {
@@ -184,7 +183,7 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 	if bindings.ListPublishedScaleCodes == nil || bindings.ListPublishedQuestionnaireCodes == nil || bindings.LookupScaleQuestionnaireCode == nil {
 		t.Fatalf("list/lookup callbacks should always be wired: %#v", bindings)
 	}
-	if bindings.WarmScale != nil || bindings.WarmQuestionnaire != nil || bindings.WarmScaleList != nil || bindings.WarmStatsSystem != nil {
+	if bindings.WarmScale != nil || bindings.WarmQuestionnaire != nil || bindings.WarmStatsSystem != nil {
 		t.Fatalf("warm callbacks = %#v, want nil without available cache clients", bindings)
 	}
 
@@ -199,8 +198,8 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 		"query":  queryClient,
 	})
 	bindings = newCacheGovernanceAdapter(c).bindings()
-	if bindings.WarmScale == nil || bindings.WarmQuestionnaire == nil || bindings.WarmScaleList == nil {
-		t.Fatalf("static warm callbacks should be wired when static family is available: %#v", bindings)
+	if bindings.WarmScale == nil || bindings.WarmQuestionnaire == nil {
+		t.Fatalf("model and questionnaire warm callbacks should be wired: %#v", bindings)
 	}
 	if bindings.WarmStatsSystem == nil || bindings.WarmStatsQuestionnaire == nil || bindings.WarmStatsPlan == nil {
 		t.Fatalf("statistics warm callbacks should be wired when query family is available: %#v", bindings)
@@ -322,14 +321,10 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	planCommand := planApp.NewCommandService(nil, nil, nil, nil, nil, nil)
 	planQuery := planApp.NewQueryService(nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
-	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil, nil)
-	categoryService := scaleApp.NewCategoryService()
-
 	c.SurveyModule = &SurveyModule{
 		Questionnaire: &QuestionnaireSubModule{QueryService: questionnaireQuery},
 		AnswerSheet:   &AnswerSheetSubModule{},
 	}
-	c.ScaleModule = &ScaleModule{QueryService: scaleQuery, CategoryService: categoryService}
 	c.ActorModule = &ActorModule{}
 	c.EvaluationModule = &EvaluationModule{ManagementService: evaluationManagement}
 	c.PlanModule = &PlanModule{CommandService: planCommand, QueryService: planQuery}
@@ -341,9 +336,6 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("survey query service not extracted correctly: %#v", deps.Survey)
-	}
-	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
-		t.Fatalf("scale application services not extracted correctly: %#v", deps.Scale)
 	}
 	if deps.Evaluation.ManagementService != evaluationManagement || deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
 		t.Fatalf("evaluation/plan/statistics dependencies not extracted correctly")
@@ -402,14 +394,8 @@ func TestContainerBuildGRPCDepsExposesTransportSpecificDependencies(t *testing.T
 	c.IAMModule = iammod.NewTestModule(iammod.TestModuleOptions{AuthzSnapshotLoader: authzSnapshot})
 
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
-	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil, nil)
-	categoryService := scaleApp.NewCategoryService()
 	c.SurveyModule = &SurveyModule{
 		Questionnaire: &QuestionnaireSubModule{QueryService: questionnaireQuery},
-	}
-	c.ScaleModule = &ScaleModule{
-		QueryService:    scaleQuery,
-		CategoryService: categoryService,
 	}
 
 	deps := c.BuildGRPCDeps(nil)
@@ -418,9 +404,6 @@ func TestContainerBuildGRPCDepsExposesTransportSpecificDependencies(t *testing.T
 	}
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("Survey.QuestionnaireQueryService = %#v, want %#v", deps.Survey.QuestionnaireQueryService, questionnaireQuery)
-	}
-	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
-		t.Fatalf("scale deps not extracted correctly: %#v", deps.Scale)
 	}
 	if deps.WarmupCoordinator != c.WarmupCoordinator() {
 		t.Fatalf("WarmupCoordinator = %#v, want %#v", deps.WarmupCoordinator, c.WarmupCoordinator())

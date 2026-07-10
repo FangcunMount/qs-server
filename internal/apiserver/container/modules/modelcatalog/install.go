@@ -26,8 +26,6 @@ func InstallFrom(host InstallHost) error {
 		EventPublisher:         host.EventPublisher(),
 		RankRedisClient:        host.CacheClient(cacheplane.FamilyRank),
 		RankCacheBuilder:       host.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:        host.IdentityService(),
-		HotsetRecorder:         host.HotsetRecorder(),
 		CacheSignalNotifier:    host.CacheSignalNotifier(),
 		ScaleInfra:             infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,

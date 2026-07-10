@@ -1,14 +1,11 @@
 package modelcatalog
 
 import (
-	scoringLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	appTypologyModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
@@ -29,9 +26,7 @@ type WireInput struct {
 	EventPublisher         event.EventPublisher
 	RankRedisClient        redis.UniversalClient
 	RankCacheBuilder       *keyspace.Builder
-	IdentityService        *iam.IdentityService
-	HotsetRecorder         cachetarget.HotsetRecorder
-	CacheSignalNotifier    scoringLifecycle.CacheSignalNotifier
+	CacheSignalNotifier    ScaleCacheSignalNotifier
 	ScaleInfra             *surveymod.ScaleInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService
@@ -43,33 +38,24 @@ type WireInput struct {
 
 // Wire builds and bootstraps the assessment-model module from composition inputs.
 func Wire(in WireInput) (*Module, error) {
-	surveyPorts := SurveyBootstrapPorts{}
-	if in.QuestionnairePublisher != nil {
-		surveyPorts.QuestionnairePublisher = in.QuestionnairePublisher
-	}
-	if infra := in.ScaleInfra; infra != nil {
-		surveyPorts.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
-	}
 	return Bootstrap(BootstrapInput{
-		Scoring:  buildScoringDeps(in),
-		Typology: buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
-		Survey:   surveyPorts,
+		HotRank:   buildHotRankDeps(in),
+		Lifecycle: buildLifecycleDeps(in),
+		Typology:  buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
 	})
 }
 
-func buildScoringDeps(in WireInput) ScoringDeps {
-	deps := ScoringDeps{
-		EventPublisher:      in.EventPublisher,
-		RankRedisClient:     in.RankRedisClient,
-		RankCacheBuilder:    in.RankCacheBuilder,
-		IdentityService:     in.IdentityService,
-		HotsetRecorder:      in.HotsetRecorder,
-		CacheSignalNotifier: in.CacheSignalNotifier,
+func buildHotRankDeps(in WireInput) HotRankDeps {
+	return HotRankDeps{RedisClient: in.RankRedisClient, KeyBuilder: in.RankCacheBuilder}
+}
+
+func buildLifecycleDeps(in WireInput) LifecycleDeps {
+	deps := LifecycleDeps{
+		EventPublisher:         in.EventPublisher,
+		QuestionnairePublisher: in.QuestionnairePublisher,
+		CacheSignalNotifier:    in.CacheSignalNotifier,
 	}
 	if infra := in.ScaleInfra; infra != nil {
-		deps.Reader = infra.ScaleReader
-		deps.ListCache = infra.ScaleListCache
-		deps.HotListCache = infra.ScaleHotListCache
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
 	}
 	return deps

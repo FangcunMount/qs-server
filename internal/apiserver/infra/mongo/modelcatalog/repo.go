@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -147,13 +148,31 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	}
 
 	extra := bson.M{}
+	if codeValue := strings.TrimSpace(filter.Code); codeValue != "" {
+		extra["model_code"] = codeValue
+	}
 	if filter.Kind != "" {
 		extra["model_kind"] = kindBSONFilter(filter.Kind)
 	}
 	if filter.Algorithm != "" {
 		extra["model_algorithm"] = string(filter.Algorithm)
 	}
+	if filter.SubKind != "" {
+		extra["model_sub_kind"] = string(filter.SubKind)
+	}
+	if filter.Category != "" {
+		extra["category"] = filter.Category
+	}
+	if filter.QuestionnaireCode != "" {
+		extra["questionnaire_code"] = filter.QuestionnaireCode
+	}
+	if filter.QuestionnaireVersion != "" {
+		extra["questionnaire_version"] = filter.QuestionnaireVersion
+	}
 	mongoFilter := publishedFilter(extra)
+	if filter.Keyword != "" {
+		mongoFilter["title"] = bson.M{"$regex": strings.TrimSpace(filter.Keyword), "$options": "i"}
+	}
 
 	total, err := r.CountDocuments(ctx, mongoFilter)
 	if err != nil {

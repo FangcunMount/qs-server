@@ -9,152 +9,110 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/gin-gonic/gin"
 )
 
-type assessmentModelServiceStub struct {
-	validateResult *modelcatalog.ValidationResult
-	validateErr    error
-	publishResult  *modelcatalog.ModelSummary
-	publishErr     error
-	publishCalled  bool
-	previewResult  *modelcatalog.PreviewReportResult
-	previewErr     error
-	qrCodeURL      string
-	qrCodeErr      error
+type assessmentModelPublicationStub struct {
+	publishResult *modelcatalog.ModelSummary
+	publishErr    error
+	publishCalled bool
 }
 
-func (s *assessmentModelServiceStub) List(context.Context, modelcatalog.ListModelsDTO) (*modelcatalog.ModelListResult, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) Create(context.Context, modelcatalog.CreateModelDTO) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) Get(context.Context, string) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) UpdateBasicInfo(context.Context, modelcatalog.UpdateBasicInfoDTO) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) Delete(context.Context, string) error {
-	return nil
-}
-
-func (s *assessmentModelServiceStub) Publish(context.Context, string) (*modelcatalog.ModelSummary, error) {
+func (s *assessmentModelPublicationStub) Publish(_ context.Context, _ modelcatalog.ActorContext, _ string) (*modelcatalog.ModelSummary, error) {
 	s.publishCalled = true
 	return s.publishResult, s.publishErr
 }
 
-func (s *assessmentModelServiceStub) Unpublish(context.Context, string) (*modelcatalog.ModelSummary, error) {
+func (*assessmentModelPublicationStub) Unpublish(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Archive(context.Context, string) (*modelcatalog.ModelSummary, error) {
+type assessmentModelDefinitionStub struct {
+	previewResult *modelcatalog.PreviewReportResult
+	previewErr    error
+}
+
+func (*assessmentModelDefinitionStub) GetDefinition(context.Context, modelcatalog.ActorContext, string) (*domain.Definition, error) {
 	return nil, nil
 }
-
-func (s *assessmentModelServiceStub) BindQuestionnaire(context.Context, modelcatalog.BindQuestionnaireDTO) (*modelcatalog.QuestionnaireBindingResult, error) {
+func (*assessmentModelDefinitionStub) SaveDefinition(context.Context, modelcatalog.ActorContext, string, *domain.Definition) (*domain.Definition, error) {
 	return nil, nil
 }
-
-func (s *assessmentModelServiceStub) GetQuestionnaire(context.Context, string) (*modelcatalog.QuestionnaireBindingResult, error) {
+func (*assessmentModelDefinitionStub) ValidateDefinition(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ValidationResult, error) {
 	return nil, nil
 }
-
-func (s *assessmentModelServiceStub) GetDefinition(context.Context, string) (*modelcatalog.DefinitionDTO, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) UpdateDefinition(context.Context, string, modelcatalog.DefinitionDTO) (*modelcatalog.DefinitionDTO, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) Options(context.Context, string) (*modelcatalog.OptionsResult, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) ApplyCodes(context.Context, modelcatalog.ApplyCodesDTO) ([]string, error) {
-	return nil, nil
-}
-
-func (s *assessmentModelServiceStub) Validate(context.Context, string) (*modelcatalog.ValidationResult, error) {
-	return s.validateResult, s.validateErr
-}
-
-func (s *assessmentModelServiceStub) PreviewReport(context.Context, string, json.RawMessage) (*modelcatalog.PreviewReportResult, error) {
+func (s *assessmentModelDefinitionStub) PreviewReport(context.Context, modelcatalog.ActorContext, string, json.RawMessage) (*modelcatalog.PreviewReportResult, error) {
 	return s.previewResult, s.previewErr
 }
+func (*assessmentModelDefinitionStub) ApplyCodes(context.Context, modelcatalog.ActorContext, modelcatalog.ApplyCodesDTO) ([]string, error) {
+	return nil, nil
+}
 
-func (s *assessmentModelServiceStub) GetQRCode(context.Context, string) (string, error) {
+type assessmentModelQueryStub struct {
+	qrCodeURL string
+	qrCodeErr error
+}
+
+func (*assessmentModelQueryStub) Get(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ModelSummary, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) List(context.Context, modelcatalog.ActorContext, modelcatalog.ListModelsDTO) (*modelcatalog.ModelListResult, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) GetPublished(context.Context, modelcatalog.ActorContext, string, string) (*modelcatalog.PublishedModelDetail, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) ListPublished(context.Context, modelcatalog.ActorContext, modelcatalog.ListModelsDTO) (*modelcatalog.PublishedModelListResult, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) ListHotPublished(context.Context, modelcatalog.ActorContext, modelcatalog.ListModelsDTO, int, int) (*modelcatalog.HotModelListResult, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) GetQuestionnaire(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.QuestionnaireBindingResult, error) {
+	return nil, nil
+}
+func (*assessmentModelQueryStub) Options(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.OptionsResult, error) {
+	return nil, nil
+}
+func (s *assessmentModelQueryStub) GetQRCode(context.Context, modelcatalog.ActorContext, string) (string, error) {
 	return s.qrCodeURL, s.qrCodeErr
 }
 
-func TestAssessmentModelPublishReturnsValidationResultWhenInvalid(t *testing.T) {
+func setAssessmentModelActor(c *gin.Context) {
+	c.Set(restmiddleware.PrincipalKey, securityplane.Principal{Kind: securityplane.PrincipalKindUser, Source: securityplane.PrincipalSourceHTTPJWT, OrgID: 1, HasOrgID: true})
+	c.Set(restmiddleware.OrgScopeKey, securityplane.OrgScope{OrgID: 1, HasOrgID: true})
+}
+
+func TestAssessmentModelPublishUsesPublicationService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	validation := modelcatalog.NewValidationResult([]modelcatalog.ValidationIssue{
-		{
-			Field:   "definition.payload",
-			Message: "模型定义 payload 不能为空",
-			Code:    "definition.payload.required",
-			Level:   "error",
-		},
-	})
-	svc := &assessmentModelServiceStub{validateResult: validation}
-	handler := NewAssessmentModelHandler(svc)
+	svc := &assessmentModelPublicationStub{publishResult: &modelcatalog.ModelSummary{Code: "model_ok", Title: "Model"}}
+	handler := NewAssessmentModelHandler(nil, nil, svc, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-models/model_bad/publish", nil)
 	c.Params = gin.Params{{Key: "code", Value: "model_bad"}}
+	setAssessmentModelActor(c)
 
 	handler.Publish(c)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if svc.publishCalled {
-		t.Fatal("Publish should not be called when validation fails")
-	}
-	var body struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-		Data    struct {
-			Passed bool                           `json:"passed"`
-			Valid  bool                           `json:"valid"`
-			Issues []modelcatalog.ValidationIssue `json:"issues"`
-			Errors []string                       `json:"errors"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Code != code.ErrAssessmentModelValidationFailed {
-		t.Fatalf("response code = %d, want %d", body.Code, code.ErrAssessmentModelValidationFailed)
-	}
-	if body.Message != "模型校验失败" {
-		t.Fatalf("response message = %q", body.Message)
-	}
-	if body.Data.Passed || body.Data.Valid {
-		t.Fatalf("validation result should be failed, got passed=%v valid=%v", body.Data.Passed, body.Data.Valid)
-	}
-	if len(body.Data.Issues) != 1 || body.Data.Issues[0].Code != "definition.payload.required" {
-		t.Fatalf("unexpected issues: %+v", body.Data.Issues)
-	}
-	if len(body.Data.Errors) != 1 || body.Data.Errors[0] != "模型定义 payload 不能为空" {
-		t.Fatalf("unexpected errors: %+v", body.Data.Errors)
+	if !svc.publishCalled {
+		t.Fatal("publication service was not called")
 	}
 }
 
 func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	svc := &assessmentModelServiceStub{
+	svc := &assessmentModelDefinitionStub{
 		previewErr: modelcatalog.NewValidationFailedError([]modelcatalog.ValidationIssue{
 			{
 				Field:   "answers[0].question_code",
@@ -164,7 +122,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 			},
 		}),
 	}
-	handler := NewAssessmentModelHandler(svc)
+	handler := NewAssessmentModelHandler(nil, svc, nil, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -175,6 +133,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 	)
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Params = gin.Params{{Key: "code", Value: "model_bad"}}
+	setAssessmentModelActor(c)
 
 	handler.PreviewReport(c)
 
@@ -206,13 +165,14 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 func TestAssessmentModelGetQRCodeReturnsURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	svc := &assessmentModelServiceStub{qrCodeURL: "https://example.com/qrcodes/personality_demo.png"}
-	handler := NewAssessmentModelHandler(svc)
+	svc := &assessmentModelQueryStub{qrCodeURL: "https://example.com/qrcodes/personality_demo.png"}
+	handler := NewAssessmentModelHandler(nil, nil, nil, svc)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models/personality_demo/qrcode", nil)
 	c.Params = gin.Params{{Key: "code", Value: "personality_demo"}}
+	setAssessmentModelActor(c)
 
 	handler.GetQRCode(c)
 

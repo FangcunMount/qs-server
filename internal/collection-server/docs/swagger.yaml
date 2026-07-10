@@ -423,32 +423,6 @@ definitions:
       total:
         type: integer
     type: object
-  github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse:
-    properties:
-      limit:
-        type: integer
-      scales:
-        items:
-          $ref: '#/definitions/scale.HotScaleSummaryResponse'
-        type: array
-      total:
-        type: integer
-      window_days:
-        type: integer
-    type: object
-  github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse:
-    properties:
-      page:
-        type: integer
-      page_size:
-        type: integer
-      scales:
-        items:
-          $ref: '#/definitions/scale.ScaleSummaryResponse'
-        type: array
-      total:
-        type: integer
-    type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse:
     properties:
       models:
@@ -465,6 +439,180 @@ definitions:
         type: integer
     type: object
   meta.Birthday:
+    type: object
+  modelcatalog.HotModelResponse:
+    properties:
+      algorithm:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      definition:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      heat_score:
+        type: integer
+      kind:
+        type: string
+      product_channel:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      rank:
+        type: integer
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      sub_kind:
+        type: string
+      submission_count:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  modelcatalog.HotResponse:
+    properties:
+      limit:
+        type: integer
+      models:
+        items:
+          $ref: '#/definitions/modelcatalog.HotModelResponse'
+        type: array
+      total:
+        type: integer
+      window_days:
+        type: integer
+    type: object
+  modelcatalog.ListResponse:
+    properties:
+      models:
+        items:
+          $ref: '#/definitions/modelcatalog.ModelResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  modelcatalog.ModelResponse:
+    properties:
+      algorithm:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      definition:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      kind:
+        type: string
+      product_channel:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  modelcatalog.OptionResponse:
+    properties:
+      disabled:
+        type: boolean
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  modelcatalog.OptionsResponse:
+    properties:
+      algorithm_families:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      algorithms:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      applicable_ages:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      kinds:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      product_channels:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      reporters:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      stages:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
+      sub_kinds:
+        items:
+          $ref: '#/definitions/modelcatalog.OptionResponse'
+        type: array
     type: object
   questionnaire.CalculationRuleResponse:
     properties:
@@ -558,224 +706,6 @@ definitions:
       rule_type:
         type: string
       target_value:
-        type: string
-    type: object
-  scale.ApplicableAgeResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  scale.CategoryResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  scale.FactorResponse:
-    properties:
-      code:
-        type: string
-      factor_type:
-        type: string
-      interpret_rules:
-        items:
-          $ref: '#/definitions/scale.InterpretRuleResponse'
-        type: array
-      is_total_score:
-        type: boolean
-      max_score:
-        description: 最大分
-        type: number
-      question_codes:
-        items:
-          type: string
-        type: array
-      risk_level:
-        type: string
-      scoring_params:
-        additionalProperties:
-          type: string
-        type: object
-      scoring_strategy:
-        type: string
-      title:
-        type: string
-    type: object
-  scale.HotScaleSummaryResponse:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      code:
-        type: string
-      description:
-        type: string
-      heat_score:
-        type: integer
-      question_count:
-        type: integer
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      rank:
-        type: integer
-      reporters:
-        items:
-          type: string
-        type: array
-      stages:
-        items:
-          type: string
-        type: array
-      status:
-        type: string
-      submission_count:
-        type: integer
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-    type: object
-  scale.InterpretRuleResponse:
-    properties:
-      conclusion:
-        type: string
-      max_score:
-        type: number
-      min_score:
-        type: number
-      risk_level:
-        type: string
-      suggestion:
-        type: string
-    type: object
-  scale.ReporterResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  scale.ScaleCategoriesResponse:
-    properties:
-      applicable_ages:
-        items:
-          $ref: '#/definitions/scale.ApplicableAgeResponse'
-        type: array
-      categories:
-        items:
-          $ref: '#/definitions/scale.CategoryResponse'
-        type: array
-      reporters:
-        items:
-          $ref: '#/definitions/scale.ReporterResponse'
-        type: array
-      stages:
-        items:
-          $ref: '#/definitions/scale.StageResponse'
-        type: array
-      tags:
-        items:
-          $ref: '#/definitions/scale.TagResponse'
-        type: array
-    type: object
-  scale.ScaleResponse:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      code:
-        type: string
-      description:
-        type: string
-      factors:
-        items:
-          $ref: '#/definitions/scale.FactorResponse'
-        type: array
-      question_count:
-        type: integer
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      reporters:
-        items:
-          type: string
-        type: array
-      stages:
-        items:
-          type: string
-        type: array
-      status:
-        type: string
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-    type: object
-  scale.ScaleSummaryResponse:
-    properties:
-      applicable_ages:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      code:
-        type: string
-      description:
-        type: string
-      question_count:
-        type: integer
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      reporters:
-        items:
-          type: string
-        type: array
-      stages:
-        items:
-          type: string
-        type: array
-      status:
-        type: string
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-    type: object
-  scale.StageResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  scale.TagResponse:
-    properties:
-      category:
-        type: string
-      label:
-        type: string
-      value:
         type: string
     type: object
   testee.AssessmentStatsDTO:
@@ -1396,6 +1326,98 @@ paths:
       summary: 查询提交状态
       tags:
       - 答卷
+  /api/v1/assessment-models:
+    get:
+      parameters:
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.ListResponse'
+              type: object
+      summary: 获取已发布测评模型列表
+      tags:
+      - AssessmentModelCatalog
+  /api/v1/assessment-models/{code}:
+    get:
+      parameters:
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.ModelResponse'
+              type: object
+      summary: 获取已发布测评模型
+      tags:
+      - AssessmentModelCatalog
+  /api/v1/assessment-models/hot:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.HotResponse'
+              type: object
+      summary: 获取热门已发布测评模型
+      tags:
+      - AssessmentModelCatalog
+  /api/v1/assessment-models/options:
+    get:
+      parameters:
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.OptionsResponse'
+              type: object
+      summary: 获取测评模型目录选项
+      tags:
+      - AssessmentModelCatalog
   /api/v1/assessments:
     get:
       description: 返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。
@@ -1873,202 +1895,6 @@ paths:
       summary: 报告状态 WebSocket 推送
       tags:
       - 报告事件
-  /api/v1/scales:
-    get:
-      description: |-
-        分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
-        查询参数说明：
-        - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
-        - stages: 阶段过滤（数组），可选值：deep_assessment/follow_up/outcome
-        - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
-        - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
-        - tags: 标签过滤（数组），动态标签值
-        响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）、question_count（题目数量，不包含 Section 题型）
-      parameters:
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      - description: 状态过滤（draft/published/archived）
-        in: query
-        name: status
-        type: string
-      - description: 标题过滤
-        in: query
-        name: title
-        type: string
-      - description: 主类过滤
-        in: query
-        name: category
-        type: string
-      - collectionFormat: csv
-        description: 阶段过滤（数组）
-        in: query
-        items:
-          type: string
-        name: stages
-        type: array
-      - collectionFormat: csv
-        description: 使用年龄过滤（数组）
-        in: query
-        items:
-          type: string
-        name: applicable_ages
-        type: array
-      - collectionFormat: csv
-        description: 填报人过滤（数组）
-        in: query
-        items:
-          type: string
-        name: reporters
-        type: array
-      - collectionFormat: csv
-        description: 标签过滤（数组）
-        in: query
-        items:
-          type: string
-        name: tags
-        type: array
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取量表列表
-      tags:
-      - 量表
-  /api/v1/scales/{code}:
-    get:
-      description: |-
-        根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。
-        响应字段说明：
-        - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
-        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
-        - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
-        - tags: 标签列表（数组，动态输入）
-        - question_count: 题目数量（不包含 Section 题型）
-        - factors: 因子列表（只包含 is_show = true 的因子），每个因子包含 max_score（最大分，可选）和 is_show（是否显示）字段
-      parameters:
-      - description: 量表编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/scale.ScaleResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取量表详情
-      tags:
-      - 量表
-  /api/v1/scales/categories:
-    get:
-      description: |-
-        获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
-        返回说明：
-        - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
-        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
-        - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
-        - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
-        - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/scale.ScaleCategoriesResponse'
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取量表分类列表
-      tags:
-      - 量表
-  /api/v1/scales/hot:
-    get:
-      description: 获取当前热门量表排行榜，用于小程序首页展示 3~5 个可填写量表。默认按近 30 天答卷提交量排序。
-      parameters:
-      - default: 5
-        description: 返回数量，服务端限制为 3~5
-        in: query
-        name: limit
-        type: integer
-      - default: 30
-        description: 热度统计窗口天数
-        in: query
-        name: window_days
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取热门量表列表
-      tags:
-      - 量表
   /api/v1/testees:
     get:
       description: 查询当前用户（监护人）的所有受试者列表（支持分页）

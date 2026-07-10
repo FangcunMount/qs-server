@@ -2,17 +2,21 @@ package evaluation
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 )
+
+// FactorVisibilityResolver reads report-visible factor codes from a published
+// DefinitionV2. It deliberately does not expose a scale payload or draft read.
+type FactorVisibilityResolver interface {
+	VisibleFactorCodes(context.Context, string) (map[string]bool, bool, error)
+}
 
 // ReportDimensionFilter 按量表可见因子过滤报告维度。
 type ReportDimensionFilter struct {
-	scaleCatalog scale.CatalogReader
+	resolver FactorVisibilityResolver
 }
 
-func NewReportDimensionFilter(scaleCatalog scale.CatalogReader) *ReportDimensionFilter {
-	return &ReportDimensionFilter{scaleCatalog: scaleCatalog}
+func NewReportDimensionFilter(resolver FactorVisibilityResolver) *ReportDimensionFilter {
+	return &ReportDimensionFilter{resolver: resolver}
 }
 
 // Apply 返回只包含可见因子的报告副本；report 为 nil 时返回 nil。
@@ -25,25 +29,24 @@ func (f *ReportDimensionFilter) Apply(ctx context.Context, report *AssessmentRep
 	if scaleCode == "" {
 		return report, nil
 	}
-	visible := f.visibleFactorCodes(ctx, scaleCode)
+	visible, configured := f.visibleFactorCodes(ctx, scaleCode)
+	if !configured {
+		return report, nil
+	}
 	filtered := *report
 	filtered.Dimensions = filterVisibleDimensions(report.Dimensions, visible)
 	return &filtered, nil
 }
 
-func (f *ReportDimensionFilter) visibleFactorCodes(ctx context.Context, scaleCode string) map[string]bool {
-	if f == nil || f.scaleCatalog == nil || scaleCode == "" {
-		return nil
+func (f *ReportDimensionFilter) visibleFactorCodes(ctx context.Context, scaleCode string) (map[string]bool, bool) {
+	if f == nil || f.resolver == nil || scaleCode == "" {
+		return nil, false
 	}
-	scaleDetail, err := f.scaleCatalog.GetScale(ctx, scaleCode)
-	if err != nil || scaleDetail == nil {
-		return nil
+	visible, configured, err := f.resolver.VisibleFactorCodes(ctx, scaleCode)
+	if err != nil {
+		return nil, false
 	}
-	visible := make(map[string]bool, len(scaleDetail.Factors))
-	for _, factor := range scaleDetail.Factors {
-		visible[factor.Code] = true
-	}
-	return visible
+	return visible, configured
 }
 
 func filterVisibleDimensions(dimensions []DimensionInterpretResponse, visible map[string]bool) []DimensionInterpretResponse {

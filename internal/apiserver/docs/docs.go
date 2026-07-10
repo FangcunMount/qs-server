@@ -410,7 +410,7 @@ const docTemplate = `{
         },
         "/api/v1/assessment-models": {
             "get": {
-                "description": "管理端模型目录。人格测评 kind/product_channel canonical 为 typology；创建/筛选仍接受 personality 读兼容别名。",
+                "description": "统一目录返回 canonical kind；人格模型使用 typology，personality 仅为读兼容别名。",
                 "produces": [
                     "application/json"
                 ],
@@ -427,23 +427,9 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "enum": [
-                            "typology",
-                            "personality",
-                            "behavioral_rating",
-                            "cognitive",
-                            "custom",
-                            "medical_scale"
-                        ],
                         "type": "string",
                         "description": "模型类型",
                         "name": "kind",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "子类型",
-                        "name": "sub_kind",
                         "in": "query"
                     },
                     {
@@ -454,20 +440,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "关键词",
-                        "name": "keyword",
+                        "description": "问卷编码",
+                        "name": "questionnaire_code",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "分类",
-                        "name": "category",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "算法",
-                        "name": "algorithm",
+                        "description": "问卷版本",
+                        "name": "questionnaire_version",
                         "in": "query"
                     },
                     {
@@ -505,7 +485,6 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "新建模型时人格测评请传 kind=typology（personality 为读兼容别名）。product_channel 同步使用 typology。",
                 "consumes": [
                     "application/json"
                 ],
@@ -525,7 +504,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "创建测评模型请求",
+                        "description": "创建请求",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -556,9 +535,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessment-models/hot": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "获取热门已发布测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型类型",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "数量",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "统计窗口天数",
+                        "name": "window_days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.HotAssessmentModelListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessment-models/options": {
             "get": {
-                "description": "kinds 列表中人格测评 apiKind 为 typology。evaluation 结果 model.kind 仍可能为 personality。",
                 "produces": [
                     "application/json"
                 ],
@@ -575,14 +611,6 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "enum": [
-                            "typology",
-                            "personality",
-                            "behavioral_rating",
-                            "cognitive",
-                            "custom",
-                            "medical_scale"
-                        ],
                         "type": "string",
                         "description": "模型类型",
                         "name": "kind",
@@ -602,6 +630,129 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.AssessmentModelOptionsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/published": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "获取已发布测评模型列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型类型",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷编码",
+                        "name": "questionnaire_code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷版本",
+                        "name": "questionnaire_version",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.PublishedAssessmentModelListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/published/{code}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "获取已发布测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "发布版本",
+                        "name": "version",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.PublishedAssessmentModelResponse"
                                         }
                                     }
                                 }
@@ -656,10 +807,87 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "删除已归档测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
             }
         },
-        "/api/v1/assessment-models/{code}/codes/apply": {
+        "/api/v1/assessment-models/{code}/archive": {
             "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "归档测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/basic-info": {
+            "put": {
                 "consumes": [
                     "application/json"
                 ],
@@ -669,7 +897,7 @@ const docTemplate = `{
                 "tags": [
                     "AssessmentModel"
                 ],
-                "summary": "申请编码",
+                "summary": "更新测评模型基本信息",
                 "parameters": [
                     {
                         "type": "string",
@@ -686,7 +914,66 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "申请编码请求",
+                        "description": "更新请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateAssessmentModelBasicInfoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/codes/apply": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "申请模型定义编码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "编码申请",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -746,7 +1033,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelDefinitionResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -778,7 +1077,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "更新定义请求",
+                        "description": "DefinitionV2",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -791,7 +1090,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelDefinitionResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -808,7 +1119,7 @@ const docTemplate = `{
                 "tags": [
                     "AssessmentModel"
                 ],
-                "summary": "预览报告",
+                "summary": "预览测评模型报告",
                 "parameters": [
                     {
                         "type": "string",
@@ -825,7 +1136,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "预览报告请求",
+                        "description": "预览输入",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -856,6 +1167,100 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessment-models/{code}/publish": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "发布测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/qrcode": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "获取测评模型二维码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.QRCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessment-models/{code}/questionnaire": {
             "get": {
                 "produces": [
@@ -864,7 +1269,7 @@ const docTemplate = `{
                 "tags": [
                     "AssessmentModel"
                 ],
-                "summary": "获取测评模型绑定的问卷",
+                "summary": "获取模型问卷绑定",
                 "parameters": [
                     {
                         "type": "string",
@@ -929,7 +1334,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "绑定问卷请求",
+                        "description": "绑定请求",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -951,6 +1356,100 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.AssessmentModelQuestionnaireResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/unpublish": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "下架测评模型",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/validate": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "校验测评模型定义",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelValidationResponse"
                                         }
                                     }
                                 }
@@ -5212,907 +5711,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/scales": {
-            "get": {
-                "description": "分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取量表列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "状态过滤（draft/published/archived）",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "标题模糊搜索",
-                        "name": "title",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "主类过滤",
-                        "name": "category",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "创建量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "创建量表请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.CreateScaleRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/by-questionnaire": {
-            "get": {
-                "description": "根据关联的问卷编码获取量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "根据问卷编码获取量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "问卷编码",
-                        "name": "questionnaire_code",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/categories": {
-            "get": {
-                "description": "获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。\n返回说明：\n- categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）\n- stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）\n- applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）\n- reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）\n- tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取量表分类列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleCategoriesResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/published": {
-            "get": {
-                "description": "分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取已发布量表列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "标题模糊搜索",
-                        "name": "title",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/published/{code}": {
-            "get": {
-                "description": "根据编码获取已发布的量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取已发布的量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}": {
-            "get": {
-                "description": "根据编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取量表详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "删除草稿状态的量表",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "删除量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/archive": {
-            "post": {
-                "description": "归档量表。量表编码通过 URL 路径参数传递，不需要请求体。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "归档量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/basic-info": {
-            "put": {
-                "description": "更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "更新量表基本信息",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.UpdateScaleBasicInfoRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/factors": {
-            "get": {
-                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 max_score 为因子的最大分（可选）\n响应中的 is_show 为是否显示（用于报告中的维度展示）\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取量表的因子列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.FactorListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/factors/batch": {
-            "put": {
-                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空\n- max_score：最大分（可选），用于设置因子的最大分数\n- is_show：是否显示（用于报告中的维度展示），默认为 true\n- risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe\n响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 max_score 为因子的最大分（可选）\n响应中的 is_show 为是否显示字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Factor"
-                ],
-                "summary": "批量更新因子",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "批量更新因子请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.BatchUpdateFactorsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/interpret-rules": {
-            "put": {
-                "description": "批量设置量表所有因子的解读规则\n响应中的 max_score 为因子的最大分（可选）\n响应中的 is_show 为是否显示字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Factor"
-                ],
-                "summary": "批量设置解读规则",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "设置解读规则请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.ReplaceInterpretRulesRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/publish": {
-            "post": {
-                "description": "发布量表使其可用。量表编码通过 URL 路径参数传递，不需要请求体。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "发布量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/qrcode": {
-            "get": {
-                "description": "根据量表编码获取小程序码",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Query"
-                ],
-                "summary": "获取量表小程序码",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.QRCodeResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/questionnaire": {
-            "put": {
-                "description": "更新量表关联的问卷编码和版本",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "更新关联的问卷",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.UpdateScaleQuestionnaireRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/scales/{code}/unpublish": {
-            "post": {
-                "description": "下架量表使其不可用。量表编码通过 URL 路径参数传递，不需要请求体。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Scale-Lifecycle"
-                ],
-                "summary": "下架量表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.ScaleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/staff": {
             "get": {
                 "produces": [
@@ -9124,7 +8722,6 @@ const docTemplate = `{
             "enum": [
                 "static.scale",
                 "static.questionnaire",
-                "static.scale_list",
                 "static.typology_model",
                 "query.stats_overview",
                 "query.stats_system",
@@ -9134,13 +8731,29 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "WarmupKindStaticScale",
                 "WarmupKindStaticQuestionnaire",
-                "WarmupKindStaticScaleList",
                 "WarmupKindStaticTypologyModel",
                 "WarmupKindQueryStatsOverview",
                 "WarmupKindQueryStatsSystem",
                 "WarmupKindQueryStatsQuestionnaire",
                 "WarmupKindQueryStatsPlan"
             ]
+        },
+        "conclusion.Outcome": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
         },
         "core.ErrResponse": {
             "type": "object",
@@ -9179,6 +8792,263 @@ const docTemplate = `{
                 }
             }
         },
+        "definition.Calibration": {
+            "type": "object",
+            "properties": {
+                "normRefs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/norm.Ref"
+                    }
+                }
+            }
+        },
+        "definition.MeasureSpec": {
+            "type": "object",
+            "properties": {
+                "factorGraph": {
+                    "$ref": "#/definitions/factor.FactorGraph"
+                },
+                "factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/factor.Factor"
+                    }
+                },
+                "scoring": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/factor.Scoring"
+                    }
+                }
+            }
+        },
+        "definition.ReportMap": {
+            "type": "object",
+            "properties": {
+                "sections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/definition.ReportSection"
+                    }
+                }
+            }
+        },
+        "definition.ReportSection": {
+            "type": "object",
+            "properties": {
+                "adapterKey": {
+                    "type": "string"
+                },
+                "categoryLabel": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "sourceRefs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "templateID": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "factor.Factor": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/factor.FactorRole"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "factor.FactorEdge": {
+            "type": "object",
+            "properties": {
+                "childCode": {
+                    "type": "string"
+                },
+                "parentCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "factor.FactorGraph": {
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/factor.FactorEdge"
+                    }
+                },
+                "roots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sortOrders": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "factor.FactorRole": {
+            "type": "string",
+            "enum": [
+                "dimension",
+                "total",
+                "index",
+                "validity",
+                "subtest",
+                "task_set",
+                "report_group",
+                "ability_domain"
+            ],
+            "x-enum-comments": {
+                "FactorRoleAbilityDomain": "能力域，task_performance 可选",
+                "FactorRoleDimension": "叶子计分因子（文档亦称 factor）",
+                "FactorRoleIndex": "综合指数（文档亦称 composite_index）",
+                "FactorRoleReportGroup": "报告分组，不参与计分"
+            },
+            "x-enum-varnames": [
+                "FactorRoleDimension",
+                "FactorRoleTotal",
+                "FactorRoleIndex",
+                "FactorRoleValidity",
+                "FactorRoleSubtest",
+                "FactorRoleTaskSet",
+                "FactorRoleReportGroup",
+                "FactorRoleAbilityDomain"
+            ]
+        },
+        "factor.OptionScoring": {
+            "type": "string",
+            "enum": [
+                "strict",
+                "compat"
+            ],
+            "x-enum-varnames": [
+                "OptionScoringStrict",
+                "OptionScoringCompat"
+            ]
+        },
+        "factor.Scoring": {
+            "type": "object",
+            "properties": {
+                "constant": {
+                    "type": "number"
+                },
+                "factorCode": {
+                    "type": "string"
+                },
+                "maxScore": {
+                    "type": "number"
+                },
+                "optionScoring": {
+                    "$ref": "#/definitions/factor.OptionScoring"
+                },
+                "params": {
+                    "$ref": "#/definitions/factor.ScoringParams"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/factor.ScoringSource"
+                    }
+                },
+                "strategy": {
+                    "$ref": "#/definitions/factor.ScoringStrategy"
+                },
+                "weights": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "factor.ScoringParams": {
+            "type": "object",
+            "properties": {
+                "cntOptionContents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "factor.ScoringSource": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "$ref": "#/definitions/factor.ScoringSourceKind"
+                },
+                "optionScores": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "sign": {
+                    "type": "number"
+                }
+            }
+        },
+        "factor.ScoringSourceKind": {
+            "type": "string",
+            "enum": [
+                "question",
+                "factor"
+            ],
+            "x-enum-varnames": [
+                "ScoringSourceQuestion",
+                "ScoringSourceFactor"
+            ]
+        },
+        "factor.ScoringStrategy": {
+            "type": "string",
+            "enum": [
+                "sum",
+                "avg",
+                "weighted_sum",
+                "weighted_avg",
+                "max",
+                "min",
+                "cnt"
+            ],
+            "x-enum-varnames": [
+                "ScoringStrategySum",
+                "ScoringStrategyAvg",
+                "ScoringStrategyWeightedSum",
+                "ScoringStrategyWeightedAvg",
+                "ScoringStrategyMax",
+                "ScoringStrategyMin",
+                "ScoringStrategyCnt"
+            ]
+        },
         "handler.questionnaireBatchRequest": {
             "type": "object",
             "properties": {
@@ -9199,6 +9069,123 @@ const docTemplate = `{
                 "ZeroID"
             ]
         },
+        "modelcatalog.Definition": {
+            "type": "object",
+            "properties": {
+                "calibration": {
+                    "$ref": "#/definitions/definition.Calibration"
+                },
+                "conclusions": {
+                    "type": "array",
+                    "items": {}
+                },
+                "measure": {
+                    "$ref": "#/definitions/definition.MeasureSpec"
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/conclusion.Outcome"
+                    }
+                },
+                "reportMap": {
+                    "$ref": "#/definitions/definition.ReportMap"
+                }
+            }
+        },
+        "modelcatalog.HotModelSummary": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "heat_score": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "product_channel": {
+                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string",
+                    "example": "typology"
+                },
+                "submission_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "modelcatalog.ModelSummary": {
             "type": "object",
             "properties": {
@@ -9207,6 +9194,12 @@ const docTemplate = `{
                 },
                 "algorithm_family": {
                     "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "category": {
                     "type": "string"
@@ -9243,6 +9236,18 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status": {
                     "type": "string"
@@ -9304,6 +9309,96 @@ const docTemplate = `{
                 }
             }
         },
+        "modelcatalog.PublishedModelDetail": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "definition": {
+                    "$ref": "#/definitions/modelcatalog.Definition"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "product_channel": {
+                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string",
+                    "example": "typology"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "modelcatalog.ValidationIssue": {
             "type": "object",
             "properties": {
@@ -9317,6 +9412,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "norm.Ref": {
+            "type": "object",
+            "properties": {
+                "factorCode": {
+                    "type": "string"
+                },
+                "normTableVersion": {
                     "type": "string"
                 }
             }
@@ -9472,17 +9578,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.BatchUpdateFactorsRequest": {
-            "type": "object",
-            "properties": {
-                "factors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/request.FactorModel"
-                    }
-                }
-            }
-        },
         "request.BatchUpdateQuestionsRequest": {
             "type": "object",
             "properties": {
@@ -9543,6 +9638,12 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "category": {
                     "type": "string"
                 },
@@ -9578,6 +9679,18 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "sub_kind": {
                     "type": "string",
@@ -9681,50 +9794,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.CreateScaleRequest": {
-            "type": "object",
-            "properties": {
-                "applicable_ages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "reporters": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "request.CreateStaffRequest": {
             "type": "object",
             "required": [
@@ -9787,67 +9856,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.FactorInterpretRulesModel": {
-            "type": "object",
-            "properties": {
-                "factor_code": {
-                    "type": "string"
-                },
-                "interpret_rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/request.InterpretRuleModel"
-                    }
-                }
-            }
-        },
-        "request.FactorModel": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "factor_type": {
-                    "type": "string"
-                },
-                "interpret_rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/request.InterpretRuleModel"
-                    }
-                },
-                "is_show": {
-                    "description": "是否显示（用于报告中的维度展示）",
-                    "type": "boolean"
-                },
-                "is_total_score": {
-                    "type": "boolean"
-                },
-                "max_score": {
-                    "description": "最大分",
-                    "type": "number"
-                },
-                "question_codes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "risk_level": {
-                    "description": "因子级别的风险等级（用于批量设置，如果解读规则未指定则使用此值）",
-                    "type": "string"
-                },
-                "scoring_params": {
-                    "$ref": "#/definitions/request.ScoringParamsModel"
-                },
-                "scoring_strategy": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "request.FlexibleTime": {
             "type": "object",
             "properties": {
@@ -9873,26 +9881,6 @@ const docTemplate = `{
                 },
                 "profile_id": {
                     "type": "integer"
-                }
-            }
-        },
-        "request.InterpretRuleModel": {
-            "type": "object",
-            "properties": {
-                "conclusion": {
-                    "type": "string"
-                },
-                "max_score": {
-                    "type": "number"
-                },
-                "min_score": {
-                    "type": "number"
-                },
-                "risk_level": {
-                    "type": "string"
-                },
-                "suggestion": {
-                    "type": "string"
                 }
             }
         },
@@ -9939,17 +9927,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.ReplaceInterpretRulesRequest": {
-            "type": "object",
-            "properties": {
-                "factor_rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/request.FactorInterpretRulesModel"
-                    }
-                }
-            }
-        },
         "request.ResumePlanRequest": {
             "type": "object",
             "properties": {
@@ -9957,18 +9934,6 @@ const docTemplate = `{
                     "description": "受试者ID -\u003e 开始日期（格式：YYYY-MM-DD）",
                     "type": "object",
                     "additionalProperties": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "request.ScoringParamsModel": {
-            "type": "object",
-            "properties": {
-                "cnt_option_contents": {
-                    "description": "计数策略（cnt）专用参数",
-                    "type": "array",
-                    "items": {
                         "type": "string"
                     }
                 }
@@ -9998,8 +9963,76 @@ const docTemplate = `{
                 }
             }
         },
+        "request.UpdateAssessmentModelBasicInfoRequest": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "request.UpdateAssessmentModelDefinitionRequest": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "calibration": {
+                    "$ref": "#/definitions/definition.Calibration"
+                },
+                "conclusions": {
+                    "type": "array",
+                    "items": {}
+                },
+                "measure": {
+                    "$ref": "#/definitions/definition.MeasureSpec"
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/conclusion.Outcome"
+                    }
+                },
+                "reportMap": {
+                    "$ref": "#/definitions/definition.ReportMap"
+                }
+            }
         },
         "request.UpdateClinicianRequest": {
             "type": "object",
@@ -10064,55 +10097,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "request.UpdateScaleBasicInfoRequest": {
-            "type": "object",
-            "properties": {
-                "applicable_ages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "reporters": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "request.UpdateScaleQuestionnaireRequest": {
-            "type": "object",
-            "properties": {
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
                     "type": "string"
                 }
             }
@@ -10241,17 +10225,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.ApplicableAgeResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "response.ApplyCodeResponse": {
             "type": "object",
             "properties": {
@@ -10305,6 +10278,30 @@ const docTemplate = `{
                 }
             }
         },
+        "response.AssessmentModelDefinitionResponse": {
+            "type": "object",
+            "properties": {
+                "calibration": {
+                    "$ref": "#/definitions/definition.Calibration"
+                },
+                "conclusions": {
+                    "type": "array",
+                    "items": {}
+                },
+                "measure": {
+                    "$ref": "#/definitions/definition.MeasureSpec"
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/conclusion.Outcome"
+                    }
+                },
+                "reportMap": {
+                    "$ref": "#/definitions/definition.ReportMap"
+                }
+            }
+        },
         "response.AssessmentModelListResponse": {
             "type": "object",
             "properties": {
@@ -10340,6 +10337,12 @@ const docTemplate = `{
                         "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
                 "categories": {
                     "type": "array",
                     "items": {
@@ -10359,6 +10362,18 @@ const docTemplate = `{
                     }
                 },
                 "product_channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
+                "stages": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/modelcatalog.Option"
@@ -10433,6 +10448,12 @@ const docTemplate = `{
                 "algorithm_family": {
                     "type": "string"
                 },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "category": {
                     "type": "string"
                 },
@@ -10469,6 +10490,18 @@ const docTemplate = `{
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "status": {
                     "type": "string"
                 },
@@ -10487,6 +10520,31 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "response.AssessmentModelValidationResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "description": "Deprecated: 派生 从 Issues 用于 向后兼容。",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "issues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.ValidationIssue"
+                    }
+                },
+                "passed": {
+                    "type": "boolean"
+                },
+                "valid": {
+                    "description": "Deprecated: mirror Passed 用于 向后兼容。",
+                    "type": "boolean"
                 }
             }
         },
@@ -10700,17 +10758,6 @@ const docTemplate = `{
                 "total_count": {
                     "description": "总数",
                     "type": "integer"
-                }
-            }
-        },
-        "response.CategoryResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
                 }
             }
         },
@@ -10977,65 +11024,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.FactorListResponse": {
-            "type": "object",
-            "properties": {
-                "factors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.FactorResponse"
-                    }
-                }
-            }
-        },
-        "response.FactorResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "factor_type": {
-                    "type": "string"
-                },
-                "interpret_rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.InterpretRuleResponse"
-                    }
-                },
-                "is_show": {
-                    "description": "是否显示（用于报告中的维度展示）",
-                    "type": "boolean"
-                },
-                "is_total_score": {
-                    "type": "boolean"
-                },
-                "max_score": {
-                    "description": "最大分",
-                    "type": "number"
-                },
-                "question_codes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "risk_level": {
-                    "description": "因子级别的风险等级（从解读规则中提取）",
-                    "type": "string"
-                },
-                "scoring_params": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "scoring_strategy": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "response.FactorScoreItem": {
             "type": "object",
             "properties": {
@@ -11139,23 +11127,23 @@ const docTemplate = `{
                 }
             }
         },
-        "response.InterpretRuleResponse": {
+        "response.HotAssessmentModelListResponse": {
             "type": "object",
             "properties": {
-                "conclusion": {
-                    "type": "string"
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.HotModelSummary"
+                    }
                 },
-                "max_score": {
-                    "type": "number"
+                "limit": {
+                    "type": "integer"
                 },
-                "min_score": {
-                    "type": "number"
+                "total": {
+                    "type": "integer"
                 },
-                "risk_level": {
-                    "type": "string"
-                },
-                "suggestion": {
-                    "type": "string"
+                "window_days": {
+                    "type": "integer"
                 }
             }
         },
@@ -11428,6 +11416,116 @@ const docTemplate = `{
                 }
             }
         },
+        "response.PublishedAssessmentModelListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.PublishedModelDetail"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.PublishedAssessmentModelResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "definition": {
+                    "$ref": "#/definitions/modelcatalog.Definition"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "product_channel": {
+                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string",
+                    "example": "typology"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "response.QRCodeResponse": {
             "type": "object",
             "properties": {
@@ -11629,17 +11727,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.ReporterResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "response.ResultLevelResponse": {
             "type": "object",
             "properties": {
@@ -11709,136 +11796,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.ScaleCategoriesResponse": {
-            "type": "object",
-            "properties": {
-                "applicable_ages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.ApplicableAgeResponse"
-                    }
-                },
-                "categories": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.CategoryResponse"
-                    }
-                },
-                "reporters": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.ReporterResponse"
-                    }
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.StageResponse"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.TagResponse"
-                    }
-                }
-            }
-        },
-        "response.ScaleListResponse": {
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "scales": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.ScaleResponse"
-                    }
-                },
-                "total_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.ScaleResponse": {
-            "type": "object",
-            "properties": {
-                "applicable_ages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "description": "创建时间",
-                    "type": "string"
-                },
-                "created_by": {
-                    "description": "创建人",
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "factors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.FactorResponse"
-                    }
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "reporters": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "scale_version": {
-                    "type": "string"
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "status": {
-                    "type": "string"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "description": "更新时间",
-                    "type": "string"
-                },
-                "updated_by": {
-                    "description": "更新人",
-                    "type": "string"
-                }
-            }
-        },
         "response.ScoreResponse": {
             "type": "object",
             "properties": {
@@ -11884,17 +11841,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.StageResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "response.SuggestionItem": {
             "type": "object",
             "properties": {
@@ -11908,20 +11854,6 @@ const docTemplate = `{
                 },
                 "factor_code": {
                     "description": "关联因子编码",
-                    "type": "string"
-                }
-            }
-        },
-        "response.TagResponse": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "value": {
                     "type": "string"
                 }
             }

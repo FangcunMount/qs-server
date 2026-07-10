@@ -14,7 +14,6 @@ func (c *coordinator) HandleScalePublished(ctx context.Context, code string) err
 	}
 	targets := []cachetarget.WarmupTarget{
 		cachetarget.NewStaticScaleWarmupTarget(code),
-		cachetarget.NewStaticScaleListWarmupTarget(),
 	}
 	if c.deps.LookupScaleQuestionnaireCode != nil {
 		if questionnaireCode, err := c.deps.LookupScaleQuestionnaireCode(ctx, code); err != nil {

@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package assessmentmodel;
+
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/assessmentmodel";
+
+// AssessmentModelCatalogService exposes immutable published catalogue data to
+// trusted downstream services. Definition JSON is canonical DefinitionV2, not
+// a published payload DTO.
+service AssessmentModelCatalogService {
+  rpc GetPublishedModel(GetPublishedModelRequest) returns (GetPublishedModelResponse);
+  rpc ListPublishedModels(ListPublishedModelsRequest) returns (ListPublishedModelsResponse);
+  rpc ListHotPublishedModels(ListHotPublishedModelsRequest) returns (ListHotPublishedModelsResponse);
+  rpc GetCatalogOptions(GetCatalogOptionsRequest) returns (GetCatalogOptionsResponse);
+}
+
+message CatalogModelSummary {
+  string code = 1;
+  string kind = 2;
+  string sub_kind = 3;
+  string algorithm = 4;
+  string product_channel = 5;
+  string title = 6;
+  string description = 7;
+  string status = 8;
+  string category = 9;
+  repeated string stages = 10;
+  repeated string applicable_ages = 11;
+  repeated string reporters = 12;
+  repeated string tags = 13;
+  string questionnaire_code = 14;
+  string questionnaire_version = 15;
+}
+
+message PublishedAssessmentModel {
+  CatalogModelSummary summary = 1;
+  string version = 2;
+  bytes definition_json = 3;
+}
+
+message GetPublishedModelRequest {
+  string code = 1;
+  string version = 2;
+}
+
+message GetPublishedModelResponse {
+  PublishedAssessmentModel model = 1;
+}
+
+message ListPublishedModelsRequest {
+  string kind = 1;
+  string sub_kind = 2;
+  string algorithm = 3;
+  string category = 4;
+  string keyword = 5;
+  string questionnaire_code = 6;
+  string questionnaire_version = 7;
+  int32 page = 8;
+  int32 page_size = 9;
+}
+
+message ListPublishedModelsResponse {
+  repeated PublishedAssessmentModel models = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message ListHotPublishedModelsRequest {
+  string kind = 1;
+  int32 limit = 2;
+  int32 window_days = 3;
+}
+
+message HotPublishedAssessmentModel {
+  CatalogModelSummary summary = 1;
+  int32 rank = 2;
+  int64 submission_count = 3;
+  int64 heat_score = 4;
+}
+
+message ListHotPublishedModelsResponse {
+  repeated HotPublishedAssessmentModel models = 1;
+  int64 total = 2;
+  int32 limit = 3;
+  int32 window_days = 4;
+}
+
+message CatalogOption {
+  string label = 1;
+  string value = 2;
+  bool disabled = 3;
+}
+
+message GetCatalogOptionsRequest {
+  string kind = 1;
+}
+
+message GetCatalogOptionsResponse {
+  repeated CatalogOption kinds = 1;
+  repeated CatalogOption product_channels = 2;
+  repeated CatalogOption algorithm_families = 3;
+  repeated CatalogOption algorithms = 4;
+  repeated CatalogOption sub_kinds = 5;
+  repeated CatalogOption categories = 6;
+  repeated CatalogOption stages = 7;
+  repeated CatalogOption applicable_ages = 8;
+  repeated CatalogOption reporters = 9;
+}

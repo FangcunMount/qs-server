@@ -26,7 +26,6 @@ type (
 	QuestionnaireSubModule  = surveymod.QuestionnaireSubModule
 	AnswerSheetSubModule    = surveymod.AnswerSheetSubModule
 	AssessmentModelModule   = ammod.Module
-	ScaleModule             = ammod.Scoring
 	TypologyModelModule     = ammod.Typology
 	ActorModule             = actormod.Module
 	EvaluationModule        = evalmod.Module

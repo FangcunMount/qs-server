@@ -22,12 +22,16 @@ func (r Ref) IsEmpty() bool {
 
 // ListPublishedFilter narrows published-model list queries for C-side catalogs.
 type ListPublishedFilter struct {
-	Kind      domain.Kind
-	SubKind   domain.SubKind
-	Algorithm domain.Algorithm
-	Category  string
-	Page      int
-	PageSize  int
+	Code                 string
+	Kind                 domain.Kind
+	SubKind              domain.SubKind
+	Algorithm            domain.Algorithm
+	Category             string
+	Keyword              string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Page                 int
+	PageSize             int
 }
 
 // AssessmentSnapshot 是已发布测评模型的不可变运行快照。

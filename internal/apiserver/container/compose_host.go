@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -188,8 +188,10 @@ func (c *Container) SetSurveyModule(module *surveymod.Module) {
 
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
-	c.ScaleModule = module.Scoring
 	c.TypologyModelModule = module.Typology
+	if c.SurveyModule != nil {
+		c.SurveyModule.SetCatalogManagementService(module.Management)
+	}
 	c.registerModule("modelcatalog", module)
 }
 
@@ -255,11 +257,11 @@ func (c *Container) ProfileLinkService() *iam.ProfileLinkService {
 	return c.IAMModule.ProfileLinkService()
 }
 
-func (c *Container) ScaleQuery() scaleApp.ScaleQueryService {
-	if c == nil || c.ScaleModule == nil {
+func (c *Container) PublishedModelTitleResolver() modelcatalogApp.PublishedModelTitleResolver {
+	if c == nil || c.AssessmentModelModule == nil {
 		return nil
 	}
-	return c.ScaleModule.QueryService
+	return c.AssessmentModelModule.TitleResolver
 }
 
 func (c *Container) TesteeQuery() testeeApp.TesteeQueryService {
@@ -287,9 +289,7 @@ func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
 		StaticRedis:         c.CacheClient(cacheplane.FamilyStatic),
 		StaticBuilder:       c.CacheBuilder(cacheplane.FamilyStatic),
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
-		ScaleListPolicy:     c.CachePolicy(cachepolicy.PolicyScaleList),
 		Observer:            c.cacheObserver(),
-		IdentityService:     c.resolveIdentityService(),
 	})
 	if err != nil {
 		return nil, err

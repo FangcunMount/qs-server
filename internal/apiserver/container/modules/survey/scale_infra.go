@@ -4,17 +4,12 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	answerSheetMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	questionnaireMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -31,10 +26,7 @@ type ScaleInfra struct {
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo     *answerSheetMongo.Repository
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
-	ScaleReader         scalereadmodel.ScaleReader
 	AssessmentModelRepo modelcatalogport.ModelRepository
-	ScaleListCache      scalelistcache.PublishedListCache
-	ScaleHotListCache   scalelistcache.HotListCache
 }
 
 // ScaleInfraDeps collects infrastructure inputs for EnsureScaleInfra.
@@ -45,9 +37,7 @@ type ScaleInfraDeps struct {
 	StaticRedis         redis.UniversalClient
 	StaticBuilder       *keyspace.Builder
 	QuestionnairePolicy cachepolicy.CachePolicy
-	ScaleListPolicy     cachepolicy.CachePolicy
 	Observer            *observability.ComponentObserver
-	IdentityService     *iam.IdentityService
 }
 
 // EnsureScaleInfraCached returns cached scale infra or builds it once.
@@ -86,34 +76,12 @@ func EnsureScaleInfra(deps ScaleInfraDeps) (*ScaleInfra, error) {
 	answerSheetReader := answerSheetMongo.NewAnswerSheetReadModel(answerSheetRepo)
 
 	assessmentModelRepo := mongomodelcatalog.NewDraftRepository(deps.MongoDB, mongoOpts)
-	scaleReader := mongomodelcatalog.NewScaleReadModel(assessmentModelRepo)
-
-	var scaleListCache scalelistcache.PublishedListCache
-	var scaleHotListCache scalelistcache.HotListCache
-	if deps.StaticRedis != nil {
-		staticCacheEntry := cacheentry.NewRedisCache(deps.StaticRedis)
-		scaleListCache = cachequery.NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
-			staticCacheEntry,
-			scaleReader,
-			deps.IdentityService,
-			deps.StaticBuilder,
-			deps.ScaleListPolicy,
-		)
-		scaleHotListCache = cachequery.NewPublishedScaleHotListCacheWithPolicyAndKeyBuilder(
-			staticCacheEntry,
-			deps.StaticBuilder,
-			deps.ScaleListPolicy,
-		)
-	}
 
 	return &ScaleInfra{
 		QuestionnaireRepo:   questionnaireRepo,
 		QuestionnaireReader: questionnaireReader,
 		AnswerSheetRepo:     answerSheetRepo,
 		AnswerSheetReader:   answerSheetReader,
-		ScaleReader:         scaleReader,
 		AssessmentModelRepo: assessmentModelRepo,
-		ScaleListCache:      scaleListCache,
-		ScaleHotListCache:   scaleHotListCache,
 	}, nil
 }

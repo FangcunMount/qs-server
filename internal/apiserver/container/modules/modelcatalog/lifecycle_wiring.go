@@ -5,25 +5,41 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
+// ScaleCacheSignalNotifier publishes best-effort invalidation notices after a
+// successful scale lifecycle transition.
+type ScaleCacheSignalNotifier interface {
+	NotifyScaleCacheChanged(context.Context, string, string)
+}
+
+// LifecycleDeps holds catalog-management collaborators. It deliberately has
+// no family command service or legacy list-cache dependency.
+type LifecycleDeps struct {
+	QuestionnaireCatalog   questionnairecatalog.Catalog
+	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
+	EventPublisher         event.EventPublisher
+	CacheSignalNotifier    ScaleCacheSignalNotifier
+}
+
 func questionnaireBindingPolicies(deps Deps) assessmentModelApp.QuestionnaireBindingPolicies {
 	return assessmentModelApp.NewQuestionnaireBindingPolicies(
 		assessmentModelApp.ScaleQuestionnaireBindingPolicy{
-			Models:         deps.Scoring.ModelRepo,
-			Questionnaires: deps.Scoring.QuestionnaireCatalog,
+			Models:         deps.Typology.ModelRepo,
+			Questionnaires: deps.Lifecycle.QuestionnaireCatalog,
 			PublishQuestionnaire: func(ctx context.Context, code string) (string, error) {
-				if deps.Scoring.QuestionnairePublisher == nil {
+				if deps.Lifecycle.QuestionnairePublisher == nil {
 					return "", nil
 				}
-				result, err := deps.Scoring.QuestionnairePublisher.Publish(ctx, code)
+				result, err := deps.Lifecycle.QuestionnairePublisher.Publish(ctx, code)
 				if err != nil || result == nil {
 					return "", err
 				}
@@ -56,7 +72,7 @@ func publishScaleLifecycleEffect(ctx context.Context, deps Deps, model *domain.A
 	if model == nil {
 		return
 	}
-	if deps.Scoring.EventPublisher != nil {
+	if deps.Lifecycle.EventPublisher != nil {
 		if changeAction, ok := scaleChangeAction(action); ok {
 			evt := event.New(eventcatalog.ScaleChanged, "MedicalScale", "0", eventpayload.ScaleChangedData{
 				Code:      model.Code,
@@ -65,16 +81,11 @@ func publishScaleLifecycleEffect(ctx context.Context, deps Deps, model *domain.A
 				Action:    changeAction,
 				ChangedAt: time.Now().UTC(),
 			})
-			eventing.PublishCollectedEvents(ctx, deps.Scoring.EventPublisher, eventing.Collect(evt), nil, nil)
+			eventing.PublishCollectedEvents(ctx, deps.Lifecycle.EventPublisher, eventing.Collect(evt), nil, nil)
 		}
 	}
-	if deps.Scoring.ListCache != nil {
-		if err := deps.Scoring.ListCache.Rebuild(ctx); err != nil {
-			logger.L(ctx).Errorw("rebuild scale list cache after lifecycle transition", "code", model.Code, "action", action, "error", err)
-		}
-	}
-	if deps.Scoring.CacheSignalNotifier != nil {
-		deps.Scoring.CacheSignalNotifier.NotifyScaleCacheChanged(ctx, model.Code, string(action))
+	if deps.Lifecycle.CacheSignalNotifier != nil {
+		deps.Lifecycle.CacheSignalNotifier.NotifyScaleCacheChanged(ctx, model.Code, string(action))
 	}
 }
 

@@ -1,0 +1,69 @@
+package modelcatalog
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
+	"github.com/FangcunMount/qs-server/pkg/event"
+)
+
+type answerSheetSubmittedPayload interface {
+	Payload() domainAnswerSheet.AnswerSheetSubmittedData
+}
+
+type catalogHotRankProjectionHook struct {
+	projection hotrank.Projection
+}
+
+// NewCatalogHotRankProjectionHook projects submitted answer sheets into the
+// generic catalogue hot-rank read model.
+func NewCatalogHotRankProjectionHook(projection hotrank.Projection) appEventing.OutboxBeforePublishHook {
+	if projection == nil {
+		return nil
+	}
+	return catalogHotRankProjectionHook{projection: projection}
+}
+
+func (h catalogHotRankProjectionHook) BeforePublish(ctx context.Context, pending appEventing.PendingOutboxEvent) error {
+	if h.projection == nil || pending.Event == nil || pending.Event.EventType() != domainAnswerSheet.EventTypeSubmitted {
+		return nil
+	}
+	data, err := answerSheetSubmittedDataFromEvent(pending.Event)
+	if err != nil {
+		return err
+	}
+	eventID := strings.TrimSpace(pending.EventID)
+	if eventID == "" {
+		eventID = pending.Event.EventID()
+	}
+	submittedAt := data.SubmittedAt
+	if submittedAt.IsZero() {
+		submittedAt = pending.Event.OccurredAt()
+	}
+	return h.projection.ProjectSubmission(ctx, hotrank.SubmissionFact{EventID: eventID, QuestionnaireCode: data.QuestionnaireCode, SubmittedAt: submittedAt})
+}
+
+func answerSheetSubmittedDataFromEvent(evt event.DomainEvent) (domainAnswerSheet.AnswerSheetSubmittedData, error) {
+	if typed, ok := evt.(answerSheetSubmittedPayload); ok {
+		return typed.Payload(), nil
+	}
+	payload, err := eventcodec.EncodeDomainEvent(evt)
+	if err != nil {
+		return domainAnswerSheet.AnswerSheetSubmittedData{}, err
+	}
+	env, err := eventcodec.DecodeEnvelope(payload)
+	if err != nil {
+		return domainAnswerSheet.AnswerSheetSubmittedData{}, err
+	}
+	var data domainAnswerSheet.AnswerSheetSubmittedData
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		return domainAnswerSheet.AnswerSheetSubmittedData{}, fmt.Errorf("decode answersheet submitted payload: %w", err)
+	}
+	return data, nil
+}

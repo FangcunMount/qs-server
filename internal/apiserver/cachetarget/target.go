@@ -19,15 +19,12 @@ type WarmupKind string
 const (
 	WarmupKindStaticScale             WarmupKind = "static.scale"
 	WarmupKindStaticQuestionnaire     WarmupKind = "static.questionnaire"
-	WarmupKindStaticScaleList         WarmupKind = "static.scale_list"
 	WarmupKindStaticTypologyModel     WarmupKind = "static.typology_model"
 	WarmupKindQueryStatsOverview      WarmupKind = "query.stats_overview"
 	WarmupKindQueryStatsSystem        WarmupKind = "query.stats_system"
 	WarmupKindQueryStatsQuestionnaire WarmupKind = "query.stats_questionnaire"
 	WarmupKindQueryStatsPlan          WarmupKind = "query.stats_plan"
 )
-
-const scaleListWarmupScope = "published"
 
 // WarmupTarget 描述一个稳定的预热目标。
 type WarmupTarget struct {
@@ -78,7 +75,7 @@ func (t WarmupTarget) OrgID() (int64, bool) {
 // FamilyForKind returns the Redis family used by a governance warmup kind.
 func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	switch kind {
-	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList, WarmupKindStaticTypologyModel:
+	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticTypologyModel:
 		return cachemodel.FamilyStatic
 	case WarmupKindQueryStatsOverview, WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
 		return cachemodel.FamilyQuery
@@ -106,15 +103,6 @@ func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticQuestionnaire,
 		Scope:  normalizeCodeScope("questionnaire", code),
-	}
-}
-
-// NewStaticScaleListWarmupTarget 创建量表列表预热目标。
-func NewStaticScaleListWarmupTarget() WarmupTarget {
-	return WarmupTarget{
-		Family: cachemodel.FamilyStatic,
-		Kind:   WarmupKindStaticScaleList,
-		Scope:  scaleListWarmupScope,
 	}
 }
 
@@ -167,7 +155,6 @@ func ParseWarmupKind(raw string) (WarmupKind, bool) {
 	switch WarmupKind(strings.TrimSpace(raw)) {
 	case WarmupKindStaticScale,
 		WarmupKindStaticQuestionnaire,
-		WarmupKindStaticScaleList,
 		WarmupKindStaticTypologyModel,
 		WarmupKindQueryStatsOverview,
 		WarmupKindQueryStatsSystem,
@@ -195,12 +182,6 @@ func ParseWarmupTarget(kind WarmupKind, scope string) (WarmupTarget, error) {
 			return WarmupTarget{}, fmt.Errorf("invalid static questionnaire warmup scope: %s", scope)
 		}
 		return NewStaticQuestionnaireWarmupTarget(code), nil
-	case WarmupKindStaticScaleList:
-		expected := NewStaticScaleListWarmupTarget()
-		if scope != expected.Scope {
-			return WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
-		}
-		return expected, nil
 	case WarmupKindStaticTypologyModel:
 		code, ok := ParseStaticTypologyModelScope(scope)
 		if !ok {

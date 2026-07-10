@@ -45,8 +45,5 @@ func (c *coordinator) startupStaticTargets(ctx context.Context) []cachetarget.Wa
 			}
 		}
 	}
-	if c.deps.WarmScaleList != nil {
-		targets = append(targets, cachetarget.NewStaticScaleListWarmupTarget())
-	}
 	return dedupeTargets(targets)
 }

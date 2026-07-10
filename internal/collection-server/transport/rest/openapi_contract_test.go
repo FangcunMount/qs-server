@@ -22,8 +22,10 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
-	assertOpenAPIOperation(t, spec, "/scales/hot", "get")
-	assertOpenAPIOperation(t, spec, "/scales/categories", "get")
+	assertOpenAPIOperation(t, spec, "/assessment-models", "get")
+	assertOpenAPIOperation(t, spec, "/assessment-models/hot", "get")
+	assertOpenAPIOperation(t, spec, "/assessment-models/options", "get")
+	assertOpenAPIOperation(t, spec, "/assessment-models/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-models", "get")
 	assertOpenAPIOperation(t, spec, "/typology-models/categories", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments", "get")
@@ -57,6 +59,17 @@ func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
 	} {
 		if _, ok := spec.Paths[path]; ok {
 			t.Fatalf("legacy v1 assessment read path still in OpenAPI: %s", path)
+		}
+	}
+}
+
+func TestCollectionOpenAPIHasNoScaleRoutes(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	for path := range spec.Paths {
+		if strings.HasPrefix(path, "/"+"scales") {
+			t.Fatalf("legacy scale path still in OpenAPI: %s", path)
 		}
 	}
 }

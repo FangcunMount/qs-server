@@ -19,7 +19,6 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.DisableEvaluationCache = true
 	opts.Cache.DisableStatisticsCache = true
 	opts.Cache.TTL.Scale = time.Minute
-	opts.Cache.TTL.ScaleList = 2 * time.Minute
 	opts.Cache.TTL.Questionnaire = 3 * time.Minute
 	opts.Cache.TTL.AssessmentDetail = 4 * time.Minute
 	opts.Cache.TTL.AssessmentList = 5 * time.Minute

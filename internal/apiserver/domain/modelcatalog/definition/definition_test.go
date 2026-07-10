@@ -34,3 +34,19 @@ func TestDefinitionComposesTargetLayers(t *testing.T) {
 		t.Fatalf("definition layers not composed: %#v", def)
 	}
 }
+
+func TestReportMapFactorScoreSourcesDistinguishesAbsentAndEmpty(t *testing.T) {
+	t.Parallel()
+
+	if _, configured := (definition.ReportMap{}).FactorScoreSources(); configured {
+		t.Fatal("absent factor score section must not be configured")
+	}
+	mapWithEmpty := definition.ReportMap{Sections: []definition.ReportSection{{
+		Code: definition.ReportSectionKindFactorScores,
+		Kind: definition.ReportSectionKindFactorScores,
+	}}}
+	codes, configured := mapWithEmpty.FactorScoreSources()
+	if !configured || codes != nil {
+		t.Fatalf("empty factor score section = (%#v, %v), want (nil, true)", codes, configured)
+	}
+}

@@ -55,12 +55,8 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 			QRCodeService: c.QRCodeService,
 		})
 	}
-	if c.ScaleModule != nil {
-		deps.Scale = c.ScaleModule.ExportRESTDeps(c.QRCodeService)
-	}
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportRESTDeps(c.QRCodeService, c.CodesService, deps.Survey.QuestionnaireQueryService)
-		deps.Scale = exports.Scale
 		deps.AssessmentModel = exports.AssessmentModel
 	}
 	if c.ActorModule != nil {
@@ -213,12 +209,9 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	}
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportGRPCDeps()
-		deps.Scale = exports.Scale
+		deps.AssessmentModelCatalog = exports.AssessmentModelCatalog
 		deps.TypologyModel = exports.TypologyModel
 	} else {
-		if c.ScaleModule != nil {
-			deps.Scale = c.ScaleModule.ExportGRPCDeps()
-		}
 		if c.TypologyModelModule != nil {
 			deps.TypologyModel = c.TypologyModelModule.ExportGRPCDeps()
 		}

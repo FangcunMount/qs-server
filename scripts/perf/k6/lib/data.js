@@ -562,7 +562,7 @@ export function discoverMedicalCases(testeeIDs) {
   const discovered = [];
   const scaleQuestionnaireCodes = [];
   SCALE_CODES.forEach((scaleCode) => {
-    const scale = getCollectionData(`/api/v1/scales/${encodeURIComponent(scaleCode)}`, 'discover_scale');
+    const scale = getCollectionData(`/api/v1/assessment-models/${encodeURIComponent(scaleCode)}`, 'discover_assessment_model');
     if (!scale) {
       return;
     }

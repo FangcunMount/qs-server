@@ -3,7 +3,7 @@ package grpc
 import (
 	"testing"
 
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )
@@ -17,17 +17,14 @@ func TestRegistryGetRegisteredServicesReflectsTypedDeps(t *testing.T) {
 			AnswerSheetManagementService: answerSheetApp.NewManagementService(nil, nil),
 			QuestionnaireQueryService:    appQuestionnaire.NewQueryService(nil, nil, nil, nil),
 		},
-		Scale: ScaleDeps{
-			QueryService:    scaleApp.NewQueryService(nil, nil, nil, nil, nil),
-			CategoryService: scaleApp.NewCategoryService(),
-		},
+		AssessmentModelCatalog: AssessmentModelCatalogDeps{QueryService: modelcatalog.NewCatalogQueryService(modelcatalog.CatalogQueryDependencies{Authorizer: modelcatalog.SnapshotAuthorizer{}})},
 	})
 
 	got := registry.GetRegisteredServices()
 	want := map[string]bool{
-		"AnswerSheetService":   true,
-		"QuestionnaireService": true,
-		"ScaleService":         true,
+		"AnswerSheetService":            true,
+		"QuestionnaireService":          true,
+		"AssessmentModelCatalogService": true,
 	}
 	for _, name := range got {
 		delete(want, name)

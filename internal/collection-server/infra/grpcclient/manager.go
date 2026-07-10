@@ -52,12 +52,12 @@ type Manager struct {
 	clients map[string]interface{}
 
 	// 已注册的客户端
-	answerSheetClient   *AnswerSheetClient
-	questionnaireClient *QuestionnaireClient
-	evaluationClient    *EvaluationClient
-	actorClient         *ActorClient
-	scaleClient         *ScaleClient
-	typologyModelClient *TypologyModelClient
+	answerSheetClient            *AnswerSheetClient
+	questionnaireClient          *QuestionnaireClient
+	evaluationClient             *EvaluationClient
+	actorClient                  *ActorClient
+	assessmentModelCatalogClient *AssessmentModelCatalogClient
+	typologyModelClient          *TypologyModelClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -254,10 +254,9 @@ func (m *Manager) RegisterClients() error {
 	m.clients["actor"] = m.actorClient
 	log.Info("   👤 Actor client registered")
 
-	// 注册 Scale 客户端
-	m.scaleClient = NewScaleClient(baseClient)
-	m.clients["scale"] = m.scaleClient
-	log.Info("   📊 Scale client registered")
+	m.assessmentModelCatalogClient = NewAssessmentModelCatalogClient(baseClient)
+	m.clients["assessmentModelCatalog"] = m.assessmentModelCatalogClient
+	log.Info("   📚 Assessment model catalog client registered")
 
 	m.typologyModelClient = NewTypologyModelClient(baseClient)
 	m.clients["typologyModel"] = m.typologyModelClient
@@ -287,9 +286,9 @@ func (m *Manager) ActorClient() *ActorClient {
 	return m.actorClient
 }
 
-// ScaleClient 获取量表客户端
-func (m *Manager) ScaleClient() *ScaleClient {
-	return m.scaleClient
+// AssessmentModelCatalogClient returns the published-only generic catalog client.
+func (m *Manager) AssessmentModelCatalogClient() *AssessmentModelCatalogClient {
+	return m.assessmentModelCatalogClient
 }
 
 // TypologyModelClient 获取人格测评模型客户端

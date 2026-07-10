@@ -65,7 +65,7 @@ func TestDecideCapabilityOutcomes(t *testing.T) {
 		{
 			name:       "denied known capability",
 			snapshot:   reader,
-			capability: CapabilityManageScales,
+			capability: CapabilityManageAssessmentModels,
 			outcome:    securityplane.CapabilityOutcomeDenied,
 		},
 		{
@@ -93,14 +93,14 @@ func TestDecideCapabilityOutcomes(t *testing.T) {
 }
 
 func TestDecideAnyCapability(t *testing.T) {
-	snap := &Snapshot{Permissions: []Permission{{Resource: "qs:scales", Action: "read"}}}
+	snap := &Snapshot{Permissions: []Permission{{Resource: "qs:assessment_models", Action: "read"}}}
 
-	decision := DecideAnyCapability(snap, CapabilityManageQuestionnaires, CapabilityReadScales)
+	decision := DecideAnyCapability(snap, CapabilityManageQuestionnaires, CapabilityReadAssessmentModels)
 	if !decision.Allowed || decision.Outcome != securityplane.CapabilityOutcomeAllowed {
 		t.Fatalf("decision = %#v, want allowed", decision)
 	}
 
-	denied := DecideAnyCapability(snap, CapabilityManageQuestionnaires, CapabilityManageScales)
+	denied := DecideAnyCapability(snap, CapabilityManageQuestionnaires, CapabilityManageAssessmentModels)
 	if denied.Allowed || denied.Outcome != securityplane.CapabilityOutcomeDenied {
 		t.Fatalf("denied = %#v, want denied", denied)
 	}

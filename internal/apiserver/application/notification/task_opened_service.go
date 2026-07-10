@@ -13,9 +13,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	modelcatalogDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
@@ -35,10 +36,6 @@ type testeeLookup interface {
 	GetByID(ctx context.Context, testeeID uint64) (*testeeApp.TesteeResult, error)
 }
 
-type scaleLookup interface {
-	GetByCode(ctx context.Context, code string) (*scaleApp.ScaleResult, error)
-}
-
 type templateSpec struct {
 	keys []string
 }
@@ -51,13 +48,13 @@ type taskOpenedTemplateData struct {
 }
 
 type taskOpenedService struct {
-	testeeQueryService testeeLookup
-	taskContextReader  planApp.TaskNotificationContextReader
-	scaleQueryService  scaleLookup
-	recipientResolver  iambridge.MiniProgramRecipientResolver
-	wechatAppService   iambridge.WeChatAppConfigProvider
-	sender             wechatmini.MiniProgramSubscribeSender
-	config             *Config
+	testeeQueryService     testeeLookup
+	taskContextReader      planApp.TaskNotificationContextReader
+	publishedTitleResolver modelcatalogApp.PublishedModelTitleResolver
+	recipientResolver      iambridge.MiniProgramRecipientResolver
+	wechatAppService       iambridge.WeChatAppConfigProvider
+	sender                 wechatmini.MiniProgramSubscribeSender
+	config                 *Config
 
 	templateCache sync.Map
 }
@@ -66,20 +63,20 @@ type taskOpenedService struct {
 func NewMiniProgramTaskNotificationService(
 	testeeQueryService testeeLookup,
 	taskContextReader planApp.TaskNotificationContextReader,
-	scaleQueryService scaleLookup,
+	publishedTitleResolver modelcatalogApp.PublishedModelTitleResolver,
 	recipientResolver iambridge.MiniProgramRecipientResolver,
 	wechatAppService iambridge.WeChatAppConfigProvider,
 	sender wechatmini.MiniProgramSubscribeSender,
 	config *Config,
 ) MiniProgramTaskNotificationService {
 	return &taskOpenedService{
-		testeeQueryService: testeeQueryService,
-		taskContextReader:  taskContextReader,
-		scaleQueryService:  scaleQueryService,
-		recipientResolver:  recipientResolver,
-		wechatAppService:   wechatAppService,
-		sender:             sender,
-		config:             config,
+		testeeQueryService:     testeeQueryService,
+		taskContextReader:      taskContextReader,
+		publishedTitleResolver: publishedTitleResolver,
+		recipientResolver:      recipientResolver,
+		wechatAppService:       wechatAppService,
+		sender:                 sender,
+		config:                 config,
 	}
 }
 
@@ -395,10 +392,10 @@ func (s *taskOpenedService) resolveTaskOpenedTemplateData(ctx context.Context, d
 }
 
 func (s *taskOpenedService) resolveScaleTitle(ctx context.Context, scaleCode string) string {
-	if s == nil || s.scaleQueryService == nil || strings.TrimSpace(scaleCode) == "" {
+	if s == nil || s.publishedTitleResolver == nil || strings.TrimSpace(scaleCode) == "" {
 		return ""
 	}
-	result, err := s.scaleQueryService.GetByCode(ctx, scaleCode)
+	title, err := s.publishedTitleResolver.ResolvePublishedTitle(ctx, modelcatalogDomain.KindScale, scaleCode)
 	if err != nil {
 		logger.L(ctx).Warnw("failed to load scale for mini program notification",
 			"action", "resolve_task_opened_template_data",
@@ -407,10 +404,7 @@ func (s *taskOpenedService) resolveScaleTitle(ctx context.Context, scaleCode str
 		)
 		return ""
 	}
-	if result == nil {
-		return ""
-	}
-	return strings.TrimSpace(result.Title)
+	return strings.TrimSpace(title)
 }
 
 func buildWarmPrompt(count int) string {

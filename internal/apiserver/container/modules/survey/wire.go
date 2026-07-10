@@ -1,7 +1,6 @@
 package survey
 
 import (
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -40,7 +39,6 @@ func Wire(in WireInput) (*Module, error) {
 		IdentityService:                   in.IdentityService,
 		HotsetRecorder:                    in.HotsetRecorder,
 		TopicResolver:                     in.TopicResolver,
-		ScaleSyncer:                       scaleApp.NewQuestionnaireBindingSyncer(nil),
 		OutboxRelayBatchSize:              in.OutboxRelayBatchSize,
 		OutboxRelayPublishWorkers:         in.OutboxRelayPublishWorkers,
 		OutboxRelayImmediateMaxConcurrent: in.OutboxRelayImmediateMaxConcurrent,
@@ -48,7 +46,6 @@ func Wire(in WireInput) (*Module, error) {
 		OpsHandle:                         in.OpsHandle,
 	}
 	if infra := in.ScaleInfra; infra != nil {
-		bootstrap.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.AssessmentModelRepo)
 		bootstrap.QuestionnaireRepo = infra.QuestionnaireRepo
 		bootstrap.QuestionnaireReader = infra.QuestionnaireReader
 		bootstrap.AnswerSheetRepo = infra.AnswerSheetRepo

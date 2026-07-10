@@ -10,13 +10,9 @@ import (
 type Capability string
 
 const (
-	CapabilityOrgAdmin             Capability = "org_admin"
-	CapabilityReadQuestionnaires   Capability = "read_questionnaires"
-	CapabilityManageQuestionnaires Capability = "manage_questionnaires"
-	CapabilityReadScales           Capability = "read_scales"
-	CapabilityManageScales         Capability = "manage_scales"
-	// Assessment-model capabilities are the actor-oriented replacement for the
-	// legacy scale read/manage pair. Keep the latter only while callers migrate.
+	CapabilityOrgAdmin                         Capability = "org_admin"
+	CapabilityReadQuestionnaires               Capability = "read_questionnaires"
+	CapabilityManageQuestionnaires             Capability = "manage_questionnaires"
 	CapabilityReadAssessmentModels             Capability = "read_assessment_models"
 	CapabilityManageAssessmentModels           Capability = "manage_assessment_models"
 	CapabilityEditAssessmentModelDefinitions   Capability = "edit_assessment_model_definitions"
@@ -137,8 +133,6 @@ func isKnownCapability(c Capability) bool {
 	case CapabilityOrgAdmin:
 	case CapabilityReadQuestionnaires:
 	case CapabilityManageQuestionnaires:
-	case CapabilityReadScales:
-	case CapabilityManageScales:
 	case CapabilityReadAssessmentModels:
 	case CapabilityManageAssessmentModels:
 	case CapabilityEditAssessmentModelDefinitions:
@@ -167,47 +161,32 @@ func capabilityAllowed(s *Snapshot, c Capability) bool {
 			return true
 		}
 		return hasAnyResourceAction(s, "qs:questionnaires", []string{"create", "update", "delete", "publish", "unpublish", "archive", "statistics"})
-	case CapabilityReadScales:
-		if s.IsQSAdmin() {
-			return true
-		}
-		return hasAnyResourceAction(s, "qs:scales", []string{"read", "list"})
-	case CapabilityManageScales:
-		if s.IsQSAdmin() {
-			return true
-		}
-		return hasAnyResourceAction(s, "qs:scales", []string{"create", "update", "delete", "publish", "unpublish", "archive"})
 	case CapabilityReadAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"read", "list"}) ||
-			hasAnyResourceAction(s, "qs:scales", []string{"read", "list"})
+		return hasAnyResourceAction(s, "qs:assessment_models", []string{"read", "list"})
 	case CapabilityManageAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"create", "update", "delete", "archive"}) ||
-			hasAnyResourceAction(s, "qs:scales", []string{"create", "update", "delete", "archive"})
+		return hasAnyResourceAction(s, "qs:assessment_models", []string{"create", "update", "delete", "archive"})
 	case CapabilityEditAssessmentModelDefinitions:
 		if s.IsQSAdmin() {
 			return true
 		}
 		return hasAnyResourceAction(s, "qs:assessment_model_definitions", []string{"read", "update", "validate", "preview", "apply_codes"}) ||
-			hasAnyResourceAction(s, "qs:assessment_models", []string{"update"}) ||
-			hasAnyResourceAction(s, "qs:scales", []string{"update"})
+			hasAnyResourceAction(s, "qs:assessment_models", []string{"update"})
 	case CapabilityPublishAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"publish", "unpublish"}) ||
-			hasAnyResourceAction(s, "qs:scales", []string{"publish", "unpublish"})
+		return hasAnyResourceAction(s, "qs:assessment_models", []string{"publish", "unpublish"})
 	case CapabilityResolvePublishedAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"resolve"}) ||
-			hasAnyResourceAction(s, "qs:scales", []string{"read"})
+		return hasAnyResourceAction(s, "qs:assessment_models", []string{"resolve"})
 	case CapabilityReadAnswersheets:
 		if s.IsQSAdmin() {
 			return true

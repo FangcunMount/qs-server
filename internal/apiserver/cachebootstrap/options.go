@@ -63,7 +63,6 @@ type CacheFamilyOptions struct {
 // CacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）。
 type CacheTTLOptions struct {
 	Scale            time.Duration
-	ScaleList        time.Duration
 	Questionnaire    time.Duration
 	AssessmentDetail time.Duration
 	AssessmentList   time.Duration

@@ -11,9 +11,9 @@
 | 权威业务服务 | `qs-apiserver` 是业务状态和领域服务的权威入口，持有 REST 与 gRPC server |
 | 前台同步调用 | `Client -> collection-server REST -> apiserver gRPC` |
 | 异步推进调用 | `apiserver -> MQ -> qs-worker -> apiserver internal gRPC` |
-| collection gRPC 客户端 | collection 创建 `AnswerSheet / Questionnaire / Evaluation / Actor / Scale` client bundle |
+| collection gRPC 客户端 | collection 创建 `AnswerSheet / Questionnaire / Evaluation / Actor / AssessmentModelCatalog` client bundle |
 | worker gRPC 客户端 | worker 创建 `AnswerSheet / Evaluation / Internal` client bundle |
-| apiserver gRPC 服务 | 注册 `AnswerSheetService / QuestionnaireService / ActorService / EvaluationService / ScaleService / InternalService / PlanCommandService` |
+| apiserver gRPC 服务 | 注册 `AnswerSheetService / QuestionnaireService / ActorService / EvaluationService / AssessmentModelCatalogService / InternalService / PlanCommandService` |
 | gRPC 安全链 | apiserver gRPC server 由 `internal/pkg/grpc` 组装 Recovery、RequestID、Logging、mTLS、IAM Auth、AuthzSnapshot、ACL、Audit 等拦截器；是否启用取决于配置 |
 | 不存在的调用 | apiserver 不通过 gRPC 直调 worker；异步只通过 MQ 投递后由 worker 消费 |
 
@@ -70,9 +70,9 @@ flowchart LR
 
 | 调用方向 | 协议 | 代码入口 | 典型用途 | 运行时边界 |
 | -------- | ---- | -------- | -------- | ---------- |
-| Client -> collection | REST | `internal/collection-server/transport/rest/router.go` | 前台提交答卷、查询问卷、查询测评、查询量表、受试者操作 | BFF 入口治理 |
+| Client -> collection | REST | `internal/collection-server/transport/rest/router.go` | 前台提交答卷、查询问卷、查询测评、查询已发布模型、受试者操作 | BFF 入口治理 |
 | Client / Admin -> apiserver | REST | `internal/apiserver/transport/rest` | 后台管理、内部运维、业务管理能力 | apiserver 直接入站 |
-| collection -> apiserver | gRPC | `internal/collection-server/integration/grpcclient/registry.go` | 答卷提交、问卷查询、测评查询、Actor 查询、量表查询 | 同步 RPC，collection 不持有主写模型 |
+| collection -> apiserver | gRPC | `internal/collection-server/integration/grpcclient/registry.go` | 答卷提交、问卷查询、测评查询、Actor 查询、已发布模型查询 | 同步 RPC，collection 不持有主写模型 |
 | worker -> apiserver | gRPC | `internal/worker/integration/grpcclient/registry.go` | 计分、创建测评、评估、打标签、行为投影、任务通知 | 异步事件消费后的业务推进 |
 | apiserver -> MQ | MQ publish | `internal/pkg/eventruntime` + outbox relay | 发布 `answersheet.submitted`、`assessment.*`、`report.generated` 等 | 事件出站面 |
 | MQ -> worker | MQ subscribe | `internal/worker/integration/messaging/runtime.go` | 消费 topic 并派发 handler | 事件入站面 |
@@ -97,7 +97,7 @@ apiserver 的 gRPC transport 由 `internal/apiserver/process/transport_bootstrap
 | `QuestionnaireService` | Questionnaire query service 存在 | collection 查询问卷结构和版本 |
 | `ActorService` | Testee / clinician relationship 等 Actor 服务存在 | collection 查询受试者、监护相关上下文 |
 | `EvaluationService` | Evaluation submission / report / score service 存在 | collection 查询测评、报告、分数 |
-| `ScaleService` | Scale query / category service 存在 | collection 查询量表和分类 |
+| `AssessmentModelCatalogService` | CatalogQueryService 存在 | collection 查询已发布模型和目录选项 |
 | `InternalService` | Survey / Evaluation / Scale / Actor / Plan / Statistics 等关键服务存在 | worker 消费事件后的内部业务推进 |
 | `PlanCommandService` | Plan command service 存在 | plan 写侧命令和任务生命周期推进 |
 
@@ -114,7 +114,7 @@ flowchart TB
     registry --> q[QuestionnaireService]
     registry --> actor[ActorService]
     registry --> eval[EvaluationService]
-    registry --> scale[ScaleService]
+    registry --> catalog[AssessmentModelCatalogService]
     registry --> internal[InternalService]
     registry --> plan[PlanCommandService]
 ```

@@ -2,14 +2,6 @@ package grpcbridge
 
 import "context"
 
-// ScaleReader 量表目录读端口。
-type ScaleReader interface {
-	GetScale(ctx context.Context, code string) (*ScaleOutput, error)
-	ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*ListScalesOutput, error)
-	ListHotScales(ctx context.Context, limit, windowDays int32) (*ListHotScalesOutput, error)
-	GetScaleCategories(ctx context.Context) (*ScaleCategoriesOutput, error)
-}
-
 // QuestionnaireReader 问卷目录读端口。
 type QuestionnaireReader interface {
 	GetQuestionnaire(ctx context.Context, code, version string) (*QuestionnaireOutput, error)

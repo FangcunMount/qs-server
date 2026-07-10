@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -32,6 +32,7 @@ import (
 type Module struct {
 	Questionnaire *QuestionnaireSubModule
 	AnswerSheet   *AnswerSheetSubModule
+	bindingSyncer *catalogBindingSyncer
 
 	eventPublisher event.EventPublisher
 	topicResolver  eventcatalog.TopicResolver
@@ -46,7 +47,6 @@ type Deps struct {
 	IdentityService                   *iam.IdentityService
 	HotsetRecorder                    cachetarget.HotsetRecorder
 	TopicResolver                     eventcatalog.TopicResolver
-	ScaleSyncer                       quesApp.ScaleQuestionnaireBindingSyncer
 	QuestionnaireRepo                 questionnaire.Repository
 	QuestionnaireReader               surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo                   AnswerSheetStore
@@ -94,6 +94,7 @@ func New(deps Deps) (*Module, error) {
 	module := &Module{
 		Questionnaire: &QuestionnaireSubModule{},
 		AnswerSheet:   &AnswerSheetSubModule{},
+		bindingSyncer: &catalogBindingSyncer{},
 	}
 
 	module.eventPublisher = normalized.EventPublisher
@@ -102,7 +103,7 @@ func New(deps Deps) (*Module, error) {
 	if err := module.initQuestionnaireSubModule(
 		normalized.IdentityService,
 		normalized.HotsetRecorder,
-		normalized.ScaleSyncer,
+		module.bindingSyncer,
 		normalized.QuestionnaireRepo,
 		normalized.QuestionnaireReader,
 		normalized.CacheSignalNotifier,
@@ -141,7 +142,7 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	return deps, nil
 }
 
-func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, scaleSyncer quesApp.ScaleQuestionnaireBindingSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader, cacheSignalNotifier quesApp.CacheSignalNotifier) error {
+func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, bindingSyncer quesApp.QuestionnaireBindingVersionSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader, cacheSignalNotifier quesApp.CacheSignalNotifier) error {
 	sub := m.Questionnaire
 
 	validator := questionnaire.Validator{}
@@ -149,7 +150,7 @@ func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, ho
 
 	sub.LifecycleService = quesApp.NewLifecycleService(
 		repo,
-		scaleSyncer,
+		bindingSyncer,
 		validator,
 		lifecycle,
 		m.eventPublisher,
@@ -159,6 +160,15 @@ func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, ho
 	sub.QueryService = quesApp.NewQueryService(repo, identitySvc, hotset, reader)
 
 	return nil
+}
+
+// SetCatalogManagementService completes questionnaire-to-catalog binding
+// synchronization after the assessment-model module is available.
+func (m *Module) SetCatalogManagementService(service modelcatalogApp.CatalogManagementService) {
+	if m == nil {
+		return
+	}
+	m.bindingSyncer.SetCatalogManagementService(service)
 }
 
 func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, outboxRelayImmediateMaxConcurrent int, opsHandle *cacheplane.Handle) error {
@@ -185,7 +195,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClie
 		ImmediateEnabled:        true,
 		RequireDurablePublisher: true,
 		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{
-			scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
+			modelcatalogApp.NewCatalogHotRankProjectionHook(hotRankProjection),
 		},
 	})
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, outboxRuntime.Immediate)

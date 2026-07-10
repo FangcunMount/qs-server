@@ -29,12 +29,12 @@ func NewRegistry(manager *grpcclient.Manager) *GRPCClientRegistry {
 func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 	log.Info("🔧 Building collection gRPC client bundle...")
 	bundle := container.ClientBundle{
-		AnswerSheet:   r.answerSheetClient(),
-		Questionnaire: r.questionnaireClient(),
-		Evaluation:    r.evaluationClient(),
-		Actor:         r.actorClient(),
-		Scale:         r.scaleClient(),
-		TypologyModel: r.typologyModelClient(),
+		AnswerSheet:            r.answerSheetClient(),
+		Questionnaire:          r.questionnaireClient(),
+		Evaluation:             r.evaluationClient(),
+		Actor:                  r.actorClient(),
+		AssessmentModelCatalog: r.assessmentModelCatalogClient(),
+		TypologyModel:          r.typologyModelClient(),
 	}
 	log.Info("✅ Collection gRPC client bundle built")
 	return bundle
@@ -80,13 +80,13 @@ func (r *GRPCClientRegistry) actorClient() *grpcclient.ActorClient {
 	return client
 }
 
-func (r *GRPCClientRegistry) scaleClient() *grpcclient.ScaleClient {
-	client := r.manager.ScaleClient()
+func (r *GRPCClientRegistry) assessmentModelCatalogClient() *grpcclient.AssessmentModelCatalogClient {
+	client := r.manager.AssessmentModelCatalogClient()
 	if client == nil {
-		log.Warn("Scale client is not initialized, skipping registration")
+		log.Warn("Assessment model catalog client is not initialized, skipping registration")
 		return nil
 	}
-	log.Info("   📊 Scale client added to bundle")
+	log.Info("   📚 Assessment model catalog client added to bundle")
 	return client
 }
 

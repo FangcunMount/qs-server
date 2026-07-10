@@ -5,7 +5,7 @@ import (
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -100,14 +100,14 @@ func WireQRCodeService(in QRCodeServiceWireInput) (QRCodeServiceWireResult, erro
 
 // MiniProgramNotificationWireInput carries dependencies for task notification wiring.
 type MiniProgramNotificationWireInput struct {
-	State              IntegrationState
-	WeChatAppService   *iam.WeChatAppService
-	ProfileLinkService *iam.ProfileLinkService
-	IdentityService    *iam.IdentityService
-	ScaleQuery         scaleApp.ScaleQueryService
-	TesteeQuery        testeeApp.TesteeQueryService
-	TaskContext        planApp.TaskNotificationContextReader
-	WeChatOptions      *options.WeChatOptions
+	State                  IntegrationState
+	WeChatAppService       *iam.WeChatAppService
+	ProfileLinkService     *iam.ProfileLinkService
+	IdentityService        *iam.IdentityService
+	PublishedTitleResolver modelcatalogApp.PublishedModelTitleResolver
+	TesteeQuery            testeeApp.TesteeQueryService
+	TaskContext            planApp.TaskNotificationContextReader
+	WeChatOptions          *options.WeChatOptions
 }
 
 // MiniProgramNotificationWireResult describes notification service initialization outcome.
@@ -126,7 +126,7 @@ func WireMiniProgramTaskNotificationService(in MiniProgramNotificationWireInput)
 	result := InitMiniProgramTaskNotificationService(MiniProgramTaskNotificationDeps{
 		TesteeQueryService:            in.TesteeQuery,
 		TaskNotificationContextReader: in.TaskContext,
-		ScaleQuery:                    in.ScaleQuery,
+		PublishedTitleResolver:        in.PublishedTitleResolver,
 		RecipientResolver:             recipientResolver,
 		WeChatAppService:              in.WeChatAppService,
 		SubscribeSender:               in.State.SubscribeSender,

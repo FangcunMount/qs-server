@@ -90,7 +90,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	api := engine.Group("/api/v1")
 
 	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
-	r.applyIAMAuth(api, isPublicScaleReadOnly)
+	r.applyIAMAuth(api, isPublicCatalogReadOnly)
 
 	// 问卷相关路由
 	r.registerQuestionnaireRoutes(api)
@@ -101,8 +101,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	// 测评相关路由
 	r.registerEvaluationRoutes(api)
 
-	// 量表相关路由
-	r.registerScaleRoutes(api)
+	r.registerAssessmentModelCatalogRoutes(api)
 
 	// 类型学模型相关路由
 	r.registerTypologyModelRoutes(api)
@@ -176,22 +175,33 @@ func withAuthSkip(skip func(*gin.Context) bool, next gin.HandlerFunc) gin.Handle
 	}
 }
 
-// isPublicScaleReadOnly 是否开放接口
-func isPublicScaleReadOnly(c *gin.Context) bool {
+// isPublicCatalogReadOnly returns the unauthenticated catalogue read routes.
+func isPublicCatalogReadOnly(c *gin.Context) bool {
 	if c.Request.Method != http.MethodGet {
 		return false
 	}
 
 	// path 白名单
 	whitelist := []string{
-		"/api/v1/scales",
-		"/api/v1/scales/hot",
-		"/api/v1/scales/categories",
+		"/api/v1/assessment-models",
+		"/api/v1/assessment-models/hot",
+		"/api/v1/assessment-models/options",
 		"/api/v1/typology-models",
 		"/api/v1/typology-models/categories",
 	}
 
 	return slices.Contains(whitelist, strings.TrimRight(c.Request.URL.Path, "/"))
+}
+
+func (r *Router) registerAssessmentModelCatalogRoutes(api *gin.RouterGroup) {
+	modelHandler := r.container.AssessmentModelCatalogHandler()
+	models := api.Group("/assessment-models")
+	{
+		models.GET("/hot", r.catalogHandlers(modelHandler.ListHot)...)
+		models.GET("/options", r.catalogHandlers(modelHandler.Options)...)
+		models.GET("", r.catalogHandlers(modelHandler.List)...)
+		models.GET("/:code", r.catalogHandlers(modelHandler.Get)...)
+	}
 }
 
 func requestLimitKey(c *gin.Context) string {
@@ -456,23 +466,6 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 				evaluationHandler.WaitReport,
 			)...,
 		)...)
-	}
-}
-
-// registerScaleRoutes 注册量表相关路由
-func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
-	scaleHandler := r.container.ScaleHandler()
-
-	scales := api.Group("/scales")
-	{
-		// 获取量表分类列表（放在 :code 前面避免路由冲突）
-		scales.GET("/categories", r.catalogHandlers(scaleHandler.GetCategories)...)
-		// 获取热门量表列表（放在 :code 前面避免路由冲突）
-		scales.GET("/hot", r.catalogHandlers(scaleHandler.ListHot)...)
-		// 获取量表列表
-		scales.GET("", r.catalogHandlers(scaleHandler.List)...)
-		// 获取量表详情
-		scales.GET("/:code", r.catalogHandlers(scaleHandler.Get)...)
 	}
 }
 

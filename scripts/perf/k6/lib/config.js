@@ -448,7 +448,7 @@ export const CHAIN_PROBE_PERSONALITY_RPS = resolveChainProbeRps('personality');
 export const MEDICAL_QUERY_PATHS = envOrConfigList(
   'MEDICAL_QUERY_PATHS',
   ['medicalQueryPaths', 'medical_query_paths', 'paths.medicalQuery', 'paths.medical_query'],
-  '/api/v1/scales?page=1&page_size=20&status=published,/api/v1/scales/categories,/api/v1/scales/hot?limit=5,/api/v1/scales/{scale_code}'
+  '/api/v1/assessment-models?kind=scale&page=1&page_size=20,/api/v1/assessment-models/options?kind=scale,/api/v1/assessment-models/hot?kind=scale&limit=5,/api/v1/assessment-models/{scale_code}'
 );
 export const PERSONALITY_QUERY_PATHS = envOrConfigList(
   'PERSONALITY_QUERY_PATHS',
@@ -457,7 +457,7 @@ export const PERSONALITY_QUERY_PATHS = envOrConfigList(
 );
 
 const SMOKE_PROFILE_QUERY_PATHS = [
-  '/api/v1/scales/{scale_code}',
+  '/api/v1/assessment-models/{scale_code}',
   '/api/v1/typology-models?page=1&page_size=20',
 ];
 

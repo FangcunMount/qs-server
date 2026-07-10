@@ -5,7 +5,6 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -26,7 +25,6 @@ type BootstrapInput struct {
 	IdentityService                   *iam.IdentityService
 	HotsetRecorder                    cachetarget.HotsetRecorder
 	TopicResolver                     eventcatalog.TopicResolver
-	ScaleSyncer                       quesApp.ScaleQuestionnaireBindingSyncer
 	QuestionnaireRepo                 questionnaire.Repository
 	QuestionnaireReader               surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo                   AnswerSheetStore
@@ -40,10 +38,6 @@ type BootstrapInput struct {
 
 // Bootstrap assembles the survey module from container integration inputs.
 func Bootstrap(in BootstrapInput) (*Module, error) {
-	scaleSyncer := in.ScaleSyncer
-	if scaleSyncer == nil {
-		scaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(nil)
-	}
 	return New(Deps{
 		MongoDB:                           in.MongoDB,
 		EventPublisher:                    in.EventPublisher,
@@ -52,7 +46,6 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 		IdentityService:                   in.IdentityService,
 		HotsetRecorder:                    in.HotsetRecorder,
 		TopicResolver:                     in.TopicResolver,
-		ScaleSyncer:                       scaleSyncer,
 		QuestionnaireRepo:                 in.QuestionnaireRepo,
 		QuestionnaireReader:               in.QuestionnaireReader,
 		AnswerSheetRepo:                   in.AnswerSheetRepo,

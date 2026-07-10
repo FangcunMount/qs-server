@@ -31,7 +31,7 @@ func TestGateWaitMiddlewareRejectsWhenSlotsExhausted(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/scales", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models", nil)
 
 	rejected := false
 	mw := gate.WaitMiddleware(10*time.Millisecond, func(c *gin.Context) {

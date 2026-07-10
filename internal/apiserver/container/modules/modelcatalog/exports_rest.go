@@ -1,91 +1,58 @@
 package modelcatalog
 
 import (
+	"context"
+	"encoding/json"
+
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
-	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
-	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
-	assessmentModelAppTypology "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
-	typologyModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )
 
 type RESTDeps struct {
-	Scale           resttransport.ScaleDeps
 	AssessmentModel resttransport.AssessmentModelDeps
 }
 
-// ExportRESTDeps exposes unified assessment-model and legacy scale capabilities to REST transport.
+// ExportRESTDeps exposes unified assessment-model capabilities to REST transport.
 func (m *Module) ExportRESTDeps(
 	qrCodeService qrcodeApp.QRCodeService,
 	codesService codesApp.CodesService,
-	questionnaireQuery questionnaireApp.QuestionnaireQueryService,
+	_ questionnaireApp.QuestionnaireQueryService,
 ) RESTDeps {
 	deps := RESTDeps{}
-	if m == nil || m.Scoring == nil {
+	if m == nil {
 		return deps
 	}
-	deps.Scale = m.Scoring.ExportRESTDeps(qrCodeService)
-	deps.Scale.Management = m.Management
-	deps.Scale.Publication = m.Publication
-	deps.Scale.ModelRepo = m.ModelRepo
-	var typologyQuery = m.typologyQuery()
-	var typologyCommand = m.typologyCommand()
-	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
-		TypologyCommand:        typologyCommand,
-		NormingCommand:         m.normingCommand(),
-		TaskPerformanceCommand: m.taskPerformanceCommand(),
-		TypologyQuery:          typologyQuery,
-		QuestionnaireQuery:     questionnaireQuery,
-		Codes:                  codesService,
-		RawQRCodeGenerator:     qrCodeService,
-	})
 	deps.AssessmentModel.Management = m.Management
+	if m.Authoring != nil {
+		m.Authoring.Codes = codesService
+		m.Authoring.Preview = m.previewAdapter()
+	}
+	deps.AssessmentModel.Definition = m.Authoring
 	deps.AssessmentModel.Publication = m.Publication
+	deps.AssessmentModel.Query = assessmentModelApp.NewCatalogQueryService(assessmentModelApp.CatalogQueryDependencies{
+		Models: m.ModelRepo, Published: m.PublishedLister, Authorizer: assessmentModelApp.SnapshotAuthorizer{}, QRCode: qrCodeService, HotRank: m.HotRank.ReadModel,
+	})
 	return deps
 }
 
-// ExportRESTDeps exposes scoring capabilities to REST transport.
-func (s *Scoring) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttransport.ScaleDeps {
-	deps := resttransport.ScaleDeps{}
-	if s == nil {
-		return deps
-	}
-	deps.LifecycleService = s.LifecycleService
-	deps.FactorService = s.FactorService
-	deps.QueryService = s.QueryService
-	deps.CategoryService = s.CategoryService
-	deps.QRCodeService = scoringApp.NewQRCodeQueryService(qrCodeService)
-	return deps
-}
-
-func (m *Module) typologyQuery() typologyModelApp.TypologyModelQueryService {
-	if m == nil || m.Typology == nil {
+func (m *Module) previewAdapter() func(context.Context, string, json.RawMessage) (*assessmentModelApp.PreviewReportResult, error) {
+	if m == nil || m.Typology == nil || m.Typology.CommandService == nil {
 		return nil
 	}
-	return m.Typology.QueryService
-}
-
-func (m *Module) taskPerformanceCommand() appTaskPerformance.Service {
-	if m == nil || m.TaskPerformance == nil {
-		return nil
+	command := m.Typology.CommandService
+	return func(ctx context.Context, code string, input json.RawMessage) (*assessmentModelApp.PreviewReportResult, error) {
+		result, err := command.PreviewReport(ctx, code, input)
+		if err != nil || result == nil {
+			return nil, err
+		}
+		out := &assessmentModelApp.PreviewReportResult{Outcome: assessmentModelApp.PreviewOutcome{Code: result.Outcome.Code, Title: result.Outcome.Title}, ScoreDetail: result.ScoreDetail, RawReport: result.RawReport}
+		out.ReportSections = make([]assessmentModelApp.PreviewReportSection, 0, len(result.ReportSections))
+		for _, section := range result.ReportSections {
+			out.ReportSections = append(out.ReportSections, assessmentModelApp.PreviewReportSection{Title: section.Title, Content: section.Content, Kind: section.Kind})
+		}
+		return out, nil
 	}
-	return m.TaskPerformance.CommandService
-}
-
-func (m *Module) normingCommand() appNorming.Service {
-	if m == nil || m.Norming == nil {
-		return nil
-	}
-	return m.Norming.CommandService
-}
-
-func (m *Module) typologyCommand() assessmentModelAppTypology.Service {
-	if m == nil || m.Typology == nil {
-		return nil
-	}
-	return m.Typology.CommandService
 }

@@ -4,8 +4,8 @@ import grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/trans
 
 // GRPCExports groups assessment-model gRPC transport dependencies.
 type GRPCExports struct {
-	Scale         grpctransport.ScaleDeps
-	TypologyModel grpctransport.TypologyModelDeps
+	AssessmentModelCatalog grpctransport.AssessmentModelCatalogDeps
+	TypologyModel          grpctransport.TypologyModelDeps
 }
 
 // ExportGRPCDeps exposes assessment-model capabilities to gRPC transport.
@@ -14,24 +14,11 @@ func (m *Module) ExportGRPCDeps() GRPCExports {
 	if m == nil {
 		return exports
 	}
-	if m.Scoring != nil {
-		exports.Scale = m.Scoring.ExportGRPCDeps()
-	}
+	exports.AssessmentModelCatalog.QueryService = m.Query
 	if m.Typology != nil {
 		exports.TypologyModel = m.Typology.ExportGRPCDeps()
 	}
 	return exports
-}
-
-// ExportGRPCDeps exposes scoring capabilities to gRPC transport.
-func (s *Scoring) ExportGRPCDeps() grpctransport.ScaleDeps {
-	deps := grpctransport.ScaleDeps{}
-	if s == nil {
-		return deps
-	}
-	deps.QueryService = s.QueryService
-	deps.CategoryService = s.CategoryService
-	return deps
 }
 
 // ExportGRPCDeps exposes typology-model capabilities to gRPC transport.

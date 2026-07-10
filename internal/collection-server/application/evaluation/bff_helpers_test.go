@@ -3,8 +3,6 @@ package evaluation
 import (
 	"context"
 	"testing"
-
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 )
 
 func TestNormalizeAssessmentListRequestDefault(t *testing.T) {
@@ -20,7 +18,7 @@ func TestNormalizeAssessmentListRequestDefault(t *testing.T) {
 func TestReportDimensionFilterKeepsVisibleFactors(t *testing.T) {
 	t.Parallel()
 
-	filter := NewReportDimensionFilter(stubScaleCatalog{factors: []string{"f1", "f2"}})
+	filter := NewReportDimensionFilter(stubFactorVisibility{factors: []string{"f1", "f2"}, configured: true})
 	report := &AssessmentReportResponse{
 		Model: ModelIdentityResponse{Kind: "scale", Code: "scl-1"},
 		Dimensions: []DimensionInterpretResponse{
@@ -41,7 +39,7 @@ func TestReportDimensionFilterKeepsVisibleFactors(t *testing.T) {
 func TestReportDimensionFilterSkipsPersonalityModels(t *testing.T) {
 	t.Parallel()
 
-	filter := NewReportDimensionFilter(stubScaleCatalog{factors: []string{"f1"}})
+	filter := NewReportDimensionFilter(stubFactorVisibility{factors: []string{"f1"}, configured: true})
 	report := &AssessmentReportResponse{
 		Model: ModelIdentityResponse{Kind: personalityModelKind, Code: "MBTI"},
 		Dimensions: []DimensionInterpretResponse{
@@ -58,26 +56,35 @@ func TestReportDimensionFilterSkipsPersonalityModels(t *testing.T) {
 	}
 }
 
-type stubScaleCatalog struct {
-	factors []string
-}
+func TestReportDimensionFilterKeepsDimensionsWhenVisibilityIsNotConfigured(t *testing.T) {
+	t.Parallel()
 
-func (s stubScaleCatalog) GetScale(context.Context, string) (*scale.ScaleResponse, error) {
-	factors := make([]scale.FactorResponse, len(s.factors))
-	for i, code := range s.factors {
-		factors[i] = scale.FactorResponse{Code: code}
+	filter := NewReportDimensionFilter(stubFactorVisibility{})
+	report := &AssessmentReportResponse{
+		Model: ModelIdentityResponse{Kind: "scale", Code: "scl-1"},
+		Dimensions: []DimensionInterpretResponse{
+			{FactorCode: "f1"},
+			{FactorCode: "f2"},
+		},
 	}
-	return &scale.ScaleResponse{Factors: factors}, nil
+	out, err := filter.Apply(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Dimensions) != 2 {
+		t.Fatalf("unconfigured visibility must not filter dimensions: %#v", out.Dimensions)
+	}
 }
 
-func (s stubScaleCatalog) ListScales(context.Context, int32, int32, string, string, string, []string, []string, []string, []string) (*scale.ListScalesResponse, error) {
-	return nil, nil
+type stubFactorVisibility struct {
+	factors    []string
+	configured bool
 }
 
-func (s stubScaleCatalog) ListHotScales(context.Context, int32, int32) (*scale.ListHotScalesResponse, error) {
-	return nil, nil
-}
-
-func (s stubScaleCatalog) GetScaleCategories(context.Context) (*scale.ScaleCategoriesResponse, error) {
-	return nil, nil
+func (s stubFactorVisibility) VisibleFactorCodes(context.Context, string) (map[string]bool, bool, error) {
+	visible := make(map[string]bool, len(s.factors))
+	for _, code := range s.factors {
+		visible[code] = true
+	}
+	return visible, s.configured, nil
 }

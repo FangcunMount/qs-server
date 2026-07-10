@@ -152,13 +152,13 @@ apiserver_token="$(first_token "$apiserver_effective_file")"
 
 if [[ -z "$questionnaire_code" && -n "$collection_token" && -n "$scale_code" ]]; then
   questionnaire_code="$(curl -sS -H "Authorization: Bearer $collection_token" \
-    "${collection_base_url%/}/api/v1/scales/${scale_code}" 2>/dev/null | jq -r '.questionnaire_code // .data.questionnaire_code // empty' 2>/dev/null || true)"
+    "${collection_base_url%/}/api/v1/assessment-models/${scale_code}" 2>/dev/null | jq -r '.questionnaire_code // .data.questionnaire_code // empty' 2>/dev/null || true)"
 fi
 
-http_status "collection scales list" "${collection_base_url%/}/api/v1/scales?page=1&page_size=20&status=published" "$collection_token"
-http_status "collection scales categories" "${collection_base_url%/}/api/v1/scales/categories" "$collection_token"
-http_status "collection scales hot" "${collection_base_url%/}/api/v1/scales/hot?limit=5" "$collection_token"
-http_status "collection scale ${scale_code}" "${collection_base_url%/}/api/v1/scales/${scale_code}" "$collection_token"
+http_status "collection assessment model list" "${collection_base_url%/}/api/v1/assessment-models?kind=scale&page=1&page_size=20" "$collection_token"
+http_status "collection assessment model options" "${collection_base_url%/}/api/v1/assessment-models/options?kind=scale" "$collection_token"
+http_status "collection assessment model hot" "${collection_base_url%/}/api/v1/assessment-models/hot?kind=scale&limit=5" "$collection_token"
+http_status "collection assessment model ${scale_code}" "${collection_base_url%/}/api/v1/assessment-models/${scale_code}" "$collection_token"
 http_status "collection typology models" "${collection_base_url%/}/api/v1/typology-models?page=1&page_size=1" "$collection_token"
 http_status "collection typology categories" "${collection_base_url%/}/api/v1/typology-models/categories" "$collection_token"
 http_status "collection typology model ${personality_model_code}" "${collection_base_url%/}/api/v1/typology-models/${personality_model_code}" "$collection_token"

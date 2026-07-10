@@ -2,7 +2,6 @@ package container
 
 import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 )
@@ -12,7 +11,6 @@ type catalogKind int
 
 const (
 	catalogKindQuestionnaire catalogKind = iota
-	catalogKindScale
 	catalogKindTypology
 )
 
@@ -30,17 +28,6 @@ var catalogSpecs = map[catalogKind]catalogSpec{
 		config:       questionnaireCatalogCfg,
 		build: func(o localCacheOptions) any {
 			return questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
-				TTL: o.TTL, MaxEntries: o.MaxEntries, TTLJitterRatio: o.TTLJitterRatio,
-				OnHit: o.OnHit, OnMiss: o.OnMiss,
-			})
-		},
-	},
-	catalogKindScale: {
-		kind:         "scale",
-		watcherLabel: "scale cache signal watcher",
-		config:       scaleCatalogCfg,
-		build: func(o localCacheOptions) any {
-			return scale.NewLocalCatalogCache(scale.LocalCatalogCacheOptions{
 				TTL: o.TTL, MaxEntries: o.MaxEntries, TTLJitterRatio: o.TTLJitterRatio,
 				OnHit: o.OnHit, OnMiss: o.OnMiss,
 			})
@@ -91,13 +78,6 @@ func questionnaireCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptio
 		return nil
 	}
 	return &opts.QuestionnaireCache.CatalogL1CacheOptions
-}
-
-func scaleCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.ScaleCache == nil {
-		return nil
-	}
-	return &opts.ScaleCache.CatalogL1CacheOptions
 }
 
 func typologyCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {

@@ -119,7 +119,6 @@ func warmupKindEnum() []string {
 	return []string{
 		string(cachetarget.WarmupKindStaticScale),
 		string(cachetarget.WarmupKindStaticQuestionnaire),
-		string(cachetarget.WarmupKindStaticScaleList),
 		string(cachetarget.WarmupKindStaticTypologyModel),
 		string(cachetarget.WarmupKindQueryStatsOverview),
 		string(cachetarget.WarmupKindQueryStatsSystem),

@@ -78,7 +78,6 @@ type Dependencies struct {
 	LookupScaleQuestionnaireCode    func(context.Context, string) (string, error)
 	WarmScale                       func(context.Context, string) error
 	WarmQuestionnaire               func(context.Context, string) error
-	WarmScaleList                   func(context.Context) error
 	WarmPublishedTypologyModel      func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
 	WarmStatsSystem                 func(context.Context, int64) error

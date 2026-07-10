@@ -8,22 +8,20 @@ import (
 	"testing"
 )
 
-func TestSurveyScaleGRPCServicesUseApplicationDTOs(t *testing.T) {
+func TestSurveyGRPCServicesUseApplicationDTOs(t *testing.T) {
 	t.Parallel()
 
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel":        "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":         "application query DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire": "application query DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":          "application result DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":           "application result DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":          "survey/scale application QR-code use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":          "survey application QR-code use cases",
 	}
 	for _, path := range []string{
 		filepath.Join("service", "answersheet.go"),
 		filepath.Join("service", "internal.go"),
 		filepath.Join("service", "questionnaire.go"),
-		filepath.Join("service", "scale.go"),
 	} {
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
@@ -32,7 +30,7 @@ func TestSurveyScaleGRPCServicesUseApplicationDTOs(t *testing.T) {
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			if replacement, ok := forbiddenImports[importPath]; ok {
-				t.Fatalf("%s imports %s; survey/scale gRPC services should use %s", path, importPath, replacement)
+				t.Fatalf("%s imports %s; survey gRPC services should use %s", path, importPath, replacement)
 			}
 		}
 	}

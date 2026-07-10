@@ -6,9 +6,7 @@
 //   - answersheet / testee：application DTO 与 gRPC 形状差异大，由 port/acl 做双向映射。
 package grpcbridge
 
-import (
-	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-)
+import grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 
 type (
 	AnswerInput                   = grpcclient.AnswerInput
@@ -18,13 +16,10 @@ type (
 	AssessmentSummaryOutput       = grpcclient.AssessmentSummaryOutput
 	DimensionInterpretOutput      = grpcclient.DimensionInterpretOutput
 	CreateTesteeRequest           = grpcclient.CreateTesteeRequest
-	FactorOutput                  = grpcclient.FactorOutput
 	FactorScoreOutput             = grpcclient.FactorScoreOutput
 	ListAssessmentsOutput         = grpcclient.ListAssessmentsOutput
-	ListHotScalesOutput           = grpcclient.ListHotScalesOutput
 	ListTypologyModelsOutput      = grpcclient.ListTypologyModelsOutput
 	ListQuestionnairesOutput      = grpcclient.ListQuestionnairesOutput
-	ListScalesOutput              = grpcclient.ListScalesOutput
 	ModelExtraOutput              = grpcclient.ModelExtraOutput
 	ModelIdentityOutput           = grpcclient.ModelIdentityOutput
 	TypologyModelCategoriesOutput = grpcclient.TypologyModelCategoriesOutput
@@ -35,10 +30,6 @@ type (
 	ResultLevelOutput             = grpcclient.ResultLevelOutput
 	SaveAnswerSheetInput          = grpcclient.SaveAnswerSheetInput
 	SaveAnswerSheetOutput         = grpcclient.SaveAnswerSheetOutput
-	ScaleCategoriesOutput         = grpcclient.ScaleCategoriesOutput
-	ScaleOutput                   = grpcclient.ScaleOutput
-	ScaleSummaryOutput            = grpcclient.ScaleSummaryOutput
-	HotScaleSummaryOutput         = grpcclient.HotScaleSummaryOutput
 	ScoreValueOutput              = grpcclient.ScoreValueOutput
 	SuggestionOutput              = grpcclient.SuggestionOutput
 	TesteeResponse                = grpcclient.TesteeResponse

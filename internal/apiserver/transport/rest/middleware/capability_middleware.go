@@ -15,8 +15,6 @@ const (
 	CapabilityOrgAdmin                         = authzapp.CapabilityOrgAdmin
 	CapabilityReadQuestionnaires               = authzapp.CapabilityReadQuestionnaires
 	CapabilityManageQuestionnaires             = authzapp.CapabilityManageQuestionnaires
-	CapabilityReadScales                       = authzapp.CapabilityReadScales
-	CapabilityManageScales                     = authzapp.CapabilityManageScales
 	CapabilityReadAssessmentModels             = authzapp.CapabilityReadAssessmentModels
 	CapabilityManageAssessmentModels           = authzapp.CapabilityManageAssessmentModels
 	CapabilityEditAssessmentModelDefinitions   = authzapp.CapabilityEditAssessmentModelDefinitions

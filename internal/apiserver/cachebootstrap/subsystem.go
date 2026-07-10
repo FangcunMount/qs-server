@@ -27,7 +27,6 @@ type GovernanceBindings struct {
 	LookupScaleQuestionnaireCode    func(context.Context, string) (string, error)
 	WarmScale                       func(context.Context, string) error
 	WarmQuestionnaire               func(context.Context, string) error
-	WarmScaleList                   func(context.Context) error
 	WarmPublishedTypologyModel      func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
 	WarmStatsSystem                 func(context.Context, int64) error
@@ -138,7 +137,6 @@ func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
 		LookupScaleQuestionnaireCode:    bindings.LookupScaleQuestionnaireCode,
 		WarmScale:                       bindings.WarmScale,
 		WarmQuestionnaire:               bindings.WarmQuestionnaire,
-		WarmScaleList:                   bindings.WarmScaleList,
 		WarmPublishedTypologyModel:      bindings.WarmPublishedTypologyModel,
 		WarmStatsOverview:               bindings.WarmStatsOverview,
 		WarmStatsSystem:                 bindings.WarmStatsSystem,
@@ -327,10 +325,6 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 	}, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
 		cachepolicy.PolicyScale: {
 			TTL: cacheConfig.TTL.Scale,
-		},
-		cachepolicy.PolicyScaleList: {
-			TTL:          cacheConfig.TTL.ScaleList,
-			Singleflight: cachepolicy.PolicySwitchDisabled,
 		},
 		cachepolicy.PolicyQuestionnaire: {
 			TTL:         cacheConfig.TTL.Questionnaire,

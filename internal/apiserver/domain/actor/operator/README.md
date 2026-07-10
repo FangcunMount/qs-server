@@ -41,7 +41,7 @@ type Operator struct {
 - `HasRole()`, `HasAnyRole()` - 角色检查
 - `UpdateContactInfo()` - 更新联系方式
 - `Activate()`, `Deactivate()` - 激活/停用
-- `CanManageScales()`, `CanEvaluate()` 等 - 权限检查便捷方法
+- `CanEvaluate()` 等 - 权限检查便捷方法
 
 ---
 

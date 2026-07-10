@@ -368,7 +368,7 @@ GET /api/v1/public/info
 | `/questionnaires` | 问卷列表、问卷详情 |
 | `/answersheets` | 提交答卷、查询提交状态、查询答卷 |
 | `/assessments` | 因子分数、趋势、高风险、报告状态、等待报告等仍在用子资源 |
-| `/scales` | 量表分类、热门量表、列表、详情 |
+| `/assessment-models` | 已发布模型的选项、热门、列表、详情；量表使用 `kind=scale` 过滤 |
 | `/testees` | 受试者存在性、创建、列表、详情、照护上下文、更新 |
 
 这些路由最终都会通过 gRPC client 调 apiserver。collection 不应在 handler 中直接写主业务数据。
@@ -405,15 +405,15 @@ flowchart LR
 
 ### 8.1 白名单边界
 
-Router 允许部分 scale read-only GET 路径跳过认证：
+Router 允许部分已发布模型目录 GET 路径跳过认证：
 
 ```text
-GET /api/v1/scales
-GET /api/v1/scales/hot
-GET /api/v1/scales/categories
+GET /api/v1/assessment-models?kind=scale
+GET /api/v1/assessment-models/hot?kind=scale
+GET /api/v1/assessment-models/options?kind=scale
 ```
 
-这是明确白名单，不应扩展成“所有 scale 接口公开”。如果新增公开接口，必须同步更新 REST 契约、安全文档和对应测试。
+这是明确白名单，不应扩展成“所有模型接口公开”。如果新增公开接口，必须同步更新 REST 契约、安全文档和对应测试。
 
 ### 8.2 authz sync
 

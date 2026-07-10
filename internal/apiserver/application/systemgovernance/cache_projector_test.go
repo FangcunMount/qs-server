@@ -51,8 +51,8 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 	if len(projection.FamilyRows) != 1 || projection.FamilyRows[0].Severity != SeverityWarning {
 		t.Fatalf("family rows = %#v, want one warning row", projection.FamilyRows)
 	}
-	if len(projection.WarmupKinds) != 8 {
-		t.Fatalf("warmup kinds len = %d, want 8", len(projection.WarmupKinds))
+	if len(projection.WarmupKinds) != 7 {
+		t.Fatalf("warmup kinds len = %d, want 7", len(projection.WarmupKinds))
 	}
 	for _, descriptor := range projection.WarmupKinds {
 		if _, ok := cachetarget.ParseWarmupKind(string(descriptor.Kind)); !ok {

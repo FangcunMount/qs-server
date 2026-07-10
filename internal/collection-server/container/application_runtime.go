@@ -8,11 +8,11 @@ import (
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportevents"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
@@ -29,9 +29,9 @@ type submitRuntime struct {
 }
 
 type catalogRuntime struct {
-	questionnaire *questionnaire.QueryService
-	scale         *scale.QueryService
-	typology      *typologymodel.QueryService
+	questionnaire    *questionnaire.QueryService
+	assessmentModels *appmodelcatalog.QueryService
+	typology         *typologymodel.QueryService
 }
 
 type reportRuntime struct {
@@ -73,11 +73,7 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			catalogCaches.questionnaire,
 			catalogL1SingleflightEnabled(c.opts, catalogKindQuestionnaire),
 		),
-		scale: scale.NewQueryService(
-			grpcbridge.NewScaleCatalogReader(c.scaleClient),
-			catalogCaches.scale,
-			catalogL1SingleflightEnabled(c.opts, catalogKindScale),
-		),
+		assessmentModels: appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient)),
 		typology: typologymodel.NewQueryService(
 			grpcbridge.NewTypologyCatalogReader(c.typologyModelClient),
 			catalogCaches.typology,
@@ -85,7 +81,7 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 		),
 	}
 	c.l1PeekRegistry = catalogpeek.NewRegistry()
-	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.scale, rt.typology, rt.questionnaire)
+	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.typology, rt.questionnaire)
 	return rt
 }
 

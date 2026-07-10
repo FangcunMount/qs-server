@@ -14,7 +14,6 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -22,13 +21,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -119,7 +115,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/public/assessment-entries/:token")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/questionnaires")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/answersheets")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/scales")
+	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/"+"scales")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/evaluations/assessments")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/evaluations/assessments")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id")
@@ -322,18 +318,6 @@ func newRouterTestContainer() *container.Container {
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}
-	scaleModelRepo := &routerMatrixModelRepo{}
-	scalePublishedRepo := &routerMatrixPublishedRepo{}
-	scaleModule := &ammod.Scale{
-		LifecycleService: scaleApp.NewLifecycleService(nil, nil, nil,
-			scaleApp.WithAssessmentModelRepository(scaleModelRepo),
-			scaleApp.WithPublishedModelRepository(scalePublishedRepo),
-			scaleApp.WithPublicationPublisher(scaleApp.NewScalePublicationPublisher(scaleModelRepo, scalePublishedRepo)),
-		),
-		FactorService:   scaleApp.NewFactorService(scaleModelRepo, nil, nil),
-		QueryService:    scaleApp.NewQueryService(nil, nil, nil, nil, nil),
-		CategoryService: scaleApp.NewCategoryService(),
-	}
 	evaluationModule := &evalmod.Module{
 		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
 		ReportQueryService: assessmentApp.NewReportQueryService(nil),
@@ -351,7 +335,6 @@ func newRouterTestContainer() *container.Container {
 	)
 	return &container.Container{
 		SurveyModule: surveyModule,
-		ScaleModule:  scaleModule,
 		ActorModule: &actormod.Module{
 			TesteeQueryService:     &routerTesteeQueryStub{},
 			ClinicianQueryService:  clinicianQuery,
@@ -390,6 +373,15 @@ func assertRoutePresent(t *testing.T, routes gin.RoutesInfo, method, path string
 		}
 	}
 	t.Fatalf("route %s %s not registered", method, path)
+}
+
+func assertRouteAbsent(t *testing.T, routes gin.RoutesInfo, method, path string) {
+	t.Helper()
+	for _, route := range routes {
+		if route.Method == method && route.Path == path {
+			t.Fatalf("route %s %s must not be registered", method, path)
+		}
+	}
 }
 
 type routerMatrixOpenAPISpec struct {
@@ -448,40 +440,4 @@ func normalizeOpenAPIPath(path string) string {
 		}
 	}
 	return strings.Join(parts, "/")
-}
-
-type routerMatrixModelRepo struct{}
-
-func (routerMatrixModelRepo) Create(context.Context, *domain.AssessmentModel) error { return nil }
-func (routerMatrixModelRepo) Update(context.Context, *domain.AssessmentModel) error { return nil }
-func (routerMatrixModelRepo) FindByCode(context.Context, string) (*domain.AssessmentModel, error) {
-	return nil, domain.ErrNotFound
-}
-func (routerMatrixModelRepo) FindByQuestionnaireCode(context.Context, domain.Kind, string) (*domain.AssessmentModel, error) {
-	return nil, domain.ErrNotFound
-}
-func (routerMatrixModelRepo) List(context.Context, modelcatalogport.ListFilter) ([]*domain.AssessmentModel, int64, error) {
-	return nil, 0, nil
-}
-func (routerMatrixModelRepo) Delete(context.Context, string) error { return nil }
-
-type routerMatrixPublishedRepo struct{}
-
-func (routerMatrixPublishedRepo) Save(context.Context, *modelcatalogport.PublishedModel) error {
-	return nil
-}
-func (routerMatrixPublishedRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
-	return nil, domain.ErrNotFound
-}
-func (routerMatrixPublishedRepo) FindLatestPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
-	return nil, domain.ErrNotFound
-}
-func (routerMatrixPublishedRepo) FindPublishedByModelCodeVersion(context.Context, domain.Kind, string, string) (*modelcatalogport.PublishedModel, error) {
-	return nil, domain.ErrNotFound
-}
-func (routerMatrixPublishedRepo) ListPublished(context.Context, modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error) {
-	return nil, 0, nil
-}
-func (routerMatrixPublishedRepo) DeletePublished(context.Context, domain.Kind, string) error {
-	return nil
 }

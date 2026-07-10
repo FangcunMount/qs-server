@@ -29,7 +29,7 @@ func (s runtimeStubStore) FindPublishedModelByQuestionnaire(_ context.Context, _
 }
 
 func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.T) {
-	static, err := NewDefaultStaticCatalog(nil)
+	static, err := NewDefaultStaticCatalog()
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}

@@ -18,7 +18,19 @@ func DefinitionFromScaleSnapshot(snapshot *ScaleSnapshot) *definition.Definition
 		Calibration: definition.Calibration{},
 		Conclusions: conclusions,
 		Outcomes:    outcomesFromRiskConclusions(conclusions),
+		ReportMap:   reportMapFromScaleSnapshot(snapshot),
 	}
+}
+
+func reportMapFromScaleSnapshot(snapshot *ScaleSnapshot) definition.ReportMap {
+	if snapshot == nil {
+		return definition.ReportMap{}
+	}
+	return definition.ReportMap{Sections: []definition.ReportSection{{
+		Code:       definition.ReportSectionKindFactorScores,
+		Kind:       definition.ReportSectionKindFactorScores,
+		SourceRefs: scaleFactorCodes(snapshot.Factors),
+	}}}
 }
 
 func outcomesFromRiskConclusions(items []conclusion.Conclusion) []conclusion.Outcome {

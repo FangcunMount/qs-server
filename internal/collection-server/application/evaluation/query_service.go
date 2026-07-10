@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 )
 
 // QueryService 测评查询服务
@@ -22,11 +21,11 @@ type QueryService struct {
 // NewQueryService 创建测评查询服务
 func NewQueryService(
 	evaluationClient BFFReader,
-	scaleClient scale.CatalogReader,
+	visibilityResolver FactorVisibilityResolver,
 ) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
-		reportFilter:     NewReportDimensionFilter(scaleClient),
+		reportFilter:     NewReportDimensionFilter(visibilityResolver),
 	}
 }
 

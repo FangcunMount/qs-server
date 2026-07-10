@@ -17,9 +17,7 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 			return nil
 		}
 		if !strings.HasSuffix(path, ".go") ||
-			path == "architecture_test.go" ||
-			strings.HasPrefix(path, "scoring"+string(filepath.Separator)) ||
-			strings.Contains(path, string(filepath.Separator)+"scoring"+string(filepath.Separator)) {
+			path == "architecture_test.go" {
 			return nil
 		}
 		content, err := os.ReadFile(path)
@@ -27,16 +25,8 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 			return err
 		}
 		text := string(content)
-		for _, forbidden := range []string{
-			"ScaleLifecycleService",
-			"ScaleFactorService",
-			"ScaleQueryService",
-			"ScaleCategoryService",
-			"ScaleQRCodeQueryService",
-		} {
-			if strings.Contains(text, forbidden) {
-				t.Fatalf("%s must not depend on legacy scale port %s; put scale adaptation behind modelcatalog/scoring", path, forbidden)
-			}
+		if strings.Contains(text, "LegacyScaleBindingSource") {
+			t.Fatalf("%s must not depend on legacy scale runtime sources", path)
 		}
 		return nil
 	})

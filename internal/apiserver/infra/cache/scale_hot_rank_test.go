@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel/hotrank"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
