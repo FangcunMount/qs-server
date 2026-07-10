@@ -423,21 +423,6 @@ definitions:
       total:
         type: integer
     type: object
-  github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse:
-    properties:
-      models:
-        items:
-          $ref: '#/definitions/typologymodel.TypologyModelSummaryResponse'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
   meta.Birthday:
     type: object
   modelcatalog.HotModelResponse:
@@ -988,6 +973,21 @@ definitions:
       severity:
         type: string
     type: object
+  typologymodel.ListTypologyModelsResponse:
+    properties:
+      models:
+        items:
+          $ref: '#/definitions/typologymodel.TypologyModelSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   typologymodel.TypologyCategoryResponse:
     properties:
       label:
@@ -1034,10 +1034,8 @@ definitions:
           $ref: '#/definitions/typologymodel.TypologyDimensionResponse'
         type: array
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
         enum:
         - typology
-        - personality
         example: typology
         type: string
       outcomes:
@@ -1047,10 +1045,8 @@ definitions:
       payload_format:
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
         enum:
         - typology
-        - personality
         example: typology
         type: string
       question_count:
@@ -1083,19 +1079,15 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
         enum:
         - typology
-        - personality
         example: typology
         type: string
       payload_format:
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
         enum:
         - typology
-        - personality
         example: typology
         type: string
       question_count:
@@ -2363,7 +2355,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse'
+                  $ref: '#/definitions/typologymodel.ListTypologyModelsResponse'
               type: object
       summary: 获取类型学模型列表
       tags:

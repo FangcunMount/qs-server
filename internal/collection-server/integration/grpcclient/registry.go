@@ -34,7 +34,6 @@ func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 		Evaluation:             r.evaluationClient(),
 		Actor:                  r.actorClient(),
 		AssessmentModelCatalog: r.assessmentModelCatalogClient(),
-		TypologyModel:          r.typologyModelClient(),
 	}
 	log.Info("✅ Collection gRPC client bundle built")
 	return bundle
@@ -87,16 +86,6 @@ func (r *GRPCClientRegistry) assessmentModelCatalogClient() *grpcclient.Assessme
 		return nil
 	}
 	log.Info("   📚 Assessment model catalog client added to bundle")
-	return client
-}
-
-func (r *GRPCClientRegistry) typologyModelClient() *grpcclient.TypologyModelClient {
-	client := r.manager.TypologyModelClient()
-	if client == nil {
-		log.Warn("Typology model client is not initialized, skipping registration")
-		return nil
-	}
-	log.Info("   📊 Typology model client added to bundle")
 	return client
 }
 

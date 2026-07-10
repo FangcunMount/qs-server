@@ -69,11 +69,6 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 		RuntimeExecutable:         true,
 		ExecutionPath:             ExecutionPathCognitiveDescriptor,
 	},
-	{
-		Kind:          KindCustom,
-		Role:          CapabilityRoleModelFamily,
-		ExecutionPath: ExecutionPathNone,
-	},
 }
 
 // FamilyCapabilityByKind resolves model-family capability guards.

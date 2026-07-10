@@ -41,15 +41,15 @@ func TestDraftMapperDerivesMissingProductChannel(t *testing.T) {
 	}
 }
 
-func TestDraftMapperNormalizesLegacyCognitiveProductChannel(t *testing.T) {
+func TestDraftMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 	po := &AssessmentModelPO{
 		Code:           "legacy_cognitive",
 		Kind:           string(domain.KindCognitive),
-		ProductChannel: string(domain.ProductChannelCognitive),
+		ProductChannel: string(domain.ProductChannelBehaviorAbility),
 	}
 	got := NewDraftMapper().ToDomain(po)
 	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("normalized product channel = %q, want behavior_ability", got.ProductChannel)
+		t.Fatalf("product channel = %q, want behavior_ability", got.ProductChannel)
 	}
 }
 
@@ -97,9 +97,9 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 	}
 }
 
-func TestPublishedMapperNormalizesLegacyCognitiveProductChannel(t *testing.T) {
+func TestPublishedMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ModelProductChannel: string(domain.ProductChannelCognitive),
+		ModelProductChannel: string(domain.ProductChannelBehaviorAbility),
 		ModelKind:           string(domain.KindCognitive),
 		ModelAlgorithm:      string(domain.AlgorithmSPM),
 		ModelCode:           "spm",
@@ -111,7 +111,7 @@ func TestPublishedMapperNormalizesLegacyCognitiveProductChannel(t *testing.T) {
 	}
 	got := NewMapper().ToPublished(po)
 	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("normalized product channel = %q, want behavior_ability", got.ProductChannel)
+		t.Fatalf("product channel = %q, want behavior_ability", got.ProductChannel)
 	}
 }
 

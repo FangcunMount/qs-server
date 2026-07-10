@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	typologyModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -40,7 +39,6 @@ type Deps struct {
 	Actor                  ActorDeps
 	Evaluation             EvaluationDeps
 	AssessmentModelCatalog AssessmentModelCatalogDeps
-	TypologyModel          TypologyModelDeps
 	Plan                   PlanDeps
 	Statistics             StatisticsDeps
 	IAM                    IAMDeps
@@ -90,10 +88,6 @@ type AssessmentModelCatalogDeps struct {
 	QueryService modelcatalogApp.CatalogQueryService
 }
 
-type TypologyModelDeps struct {
-	QueryService typologyModelApp.TypologyModelQueryService
-}
-
 type PlanDeps struct {
 	CommandService         planApp.PlanCommandService
 	TaskAssessmentResolver planApp.TaskAssessmentResolver
@@ -134,9 +128,6 @@ func (r *Registry) RegisterServices() error {
 		return err
 	}
 	if err := r.registerAssessmentModelCatalogService(); err != nil {
-		return err
-	}
-	if err := r.registerTypologyModelService(); err != nil {
 		return err
 	}
 	if err := r.registerInternalService(); err != nil {
@@ -229,20 +220,6 @@ func (r *Registry) registerAssessmentModelCatalogService() error {
 	}
 	r.server.RegisterService(service.NewAssessmentModelCatalogService(r.deps.AssessmentModelCatalog.QueryService))
 	log.Info("   📚 AssessmentModel catalog service registered (published-only)")
-	return nil
-}
-
-func (r *Registry) registerTypologyModelService() error {
-	if r.deps.TypologyModel.QueryService == nil {
-		log.Warn("TypologyModelModule is not initialized, skipping typology model service registration")
-		return nil
-	}
-
-	typologyModelService := service.NewTypologyModelService(
-		r.deps.TypologyModel.QueryService,
-	)
-	r.server.RegisterService(typologyModelService)
-	log.Info("   📊 Typology model service registered (read-only)")
 	return nil
 }
 

@@ -2,14 +2,14 @@ package binding
 
 import identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 
-// DecisionKindForIdentity normalizes persisted kinds before deriving a decision.
+// DecisionKindForIdentity derives a decision from canonical model identity.
 func DecisionKindForIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (DecisionKind, bool) {
-	return identitypkg.DecisionKindForIdentity(NormalizeKind(kind), subKind, algorithm)
+	return identitypkg.DecisionKindForIdentity(kind, subKind, algorithm)
 }
 
-// AlgorithmFamilyFromIdentity normalizes persisted kinds before deriving a runtime family.
+// AlgorithmFamilyFromIdentity derives a runtime family from canonical identity.
 func AlgorithmFamilyFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (identitypkg.AlgorithmFamily, bool) {
-	return identitypkg.AlgorithmFamilyFromIdentity(NormalizeKind(kind), subKind, algorithm)
+	return identitypkg.AlgorithmFamilyFromIdentity(kind, subKind, algorithm)
 }
 
 // AlgorithmFamilyStringFromIdentity normalizes persisted kinds before deriving a runtime family string.

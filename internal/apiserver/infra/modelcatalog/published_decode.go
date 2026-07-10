@@ -63,24 +63,5 @@ func DecodeScaleFromPublished(model *port.PublishedModel) (*scalesnapshot.ScaleS
 	if snapshot == nil {
 		return nil, fmt.Errorf("scale definition_v2 cannot produce runtime snapshot: %s", model.Code)
 	}
-	applyScaleWireMetadata(snapshot, model)
 	return snapshot, nil
-}
-
-// applyScaleWireMetadata reads only the legacy wire identifier. It is not part
-// of DefinitionV2 semantics, but legacy binding adapters still need it.
-func applyScaleWireMetadata(snapshot *scalesnapshot.ScaleSnapshot, model *port.PublishedModel) {
-	if snapshot == nil || model == nil {
-		return
-	}
-	legacy, ok := port.LegacyScaleBindingFromPublished(model)
-	if !ok {
-		return
-	}
-	if snapshot.ID == 0 {
-		snapshot.ID = legacy.MedicalScaleID
-	}
-	if legacy.ScaleVersion != "" {
-		snapshot.ScaleVersion = legacy.ScaleVersion
-	}
 }

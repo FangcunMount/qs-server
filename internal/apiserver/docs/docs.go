@@ -9124,21 +9124,11 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "questionnaire_code": {
@@ -9214,21 +9204,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "questionnaire_code": {
@@ -9340,21 +9320,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "questionnaire_code": {
@@ -9654,14 +9624,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
+                    "description": "模型族仅接受 canonical identity。",
                     "type": "string",
                     "enum": [
+                        "scale",
                         "typology",
-                        "personality",
                         "behavioral_rating",
-                        "cognitive",
-                        "custom"
+                        "cognitive"
                     ],
                     "example": "typology"
                 },
@@ -9669,8 +9638,9 @@ const docTemplate = `{
                     "description": "产品通道；人格测评为 typology。",
                     "type": "string",
                     "enum": [
+                        "medical_scale",
                         "typology",
-                        "personality"
+                        "behavior_ability"
                     ],
                     "example": "typology"
                 },
@@ -10467,21 +10437,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "questionnaire_code": {
@@ -11467,21 +11427,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
-                    "enum": [
-                        "typology",
-                        "personality"
-                    ],
                     "example": "typology"
                 },
                 "questionnaire_code": {

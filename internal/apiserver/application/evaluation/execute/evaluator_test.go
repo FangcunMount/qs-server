@@ -136,7 +136,7 @@ func TestEvaluatorRegistryRejectsUnknownKey(t *testing.T) {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	_, err = registry.Resolve(evaluation.ExecutionIdentity{Kind: modelcatalog.KindCustom})
+	_, err = registry.Resolve(evaluation.ExecutionIdentity{Kind: modelcatalog.Kind("custom")})
 	if err == nil {
 		t.Fatal("Resolve error = nil, want unsupported model key")
 	}

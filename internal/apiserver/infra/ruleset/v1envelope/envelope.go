@@ -111,5 +111,5 @@ func identityFromV1(def V1Definition) (binding.Kind, binding.SubKind, binding.Al
 	if kind, subKind, algorithm, ok := binding.LegacyKindMapping(def.Kind); ok {
 		return kind, subKind, algorithm
 	}
-	return binding.NormalizeKind(def.Kind), "", ""
+	return def.Kind, "", ""
 }

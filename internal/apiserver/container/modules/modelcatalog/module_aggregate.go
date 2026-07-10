@@ -7,12 +7,10 @@ import (
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// Module is the assessment-model composition root (scoring + typology/norming/taskperformance catalog).
+// Module is the assessment-model composition root for actor-oriented catalog
+// management, definition authoring, publication and query use cases.
 type Module struct {
 	HotRank         *HotRank
-	Typology        *Typology
-	TaskPerformance *TaskPerformance
-	Norming         *Norming
 	ModelRepo       modelcatalogport.ModelRepository
 	PublishedLister modelcatalogport.PublishedModelLister
 	Management      *assessmentModelApp.AssessmentCatalogManagementService
@@ -22,71 +20,54 @@ type Module struct {
 	TitleResolver   assessmentModelApp.PublishedModelTitleResolver
 }
 
-// Deps groups constructor dependencies for both assessment-model capabilities.
+// Deps groups infrastructure collaborators for the unified assessment catalog.
 type Deps struct {
-	HotRank         HotRankDeps
-	Lifecycle       LifecycleDeps
-	Typology        TypologyDeps
-	TaskPerformance TaskPerformanceDeps
-	Norming         NormingDeps
+	HotRank   HotRankDeps
+	Lifecycle LifecycleDeps
+	Catalog   CatalogDeps
 }
 
-// New assembles scoring and typology catalog capabilities.
+// New assembles the five assessment-model application use cases.
 func New(deps Deps) (*Module, error) {
 	registry := definitionRegistry(deps)
 	bindings := questionnaireBindingPolicies(deps)
 	effects := lifecycleEffects(deps)
 	hotRank := NewHotRank(deps.HotRank)
-	typology, err := NewTypology(deps.Typology)
-	if err != nil {
-		return nil, err
-	}
-	taskPerformance, err := NewTaskPerformance(deps.TaskPerformance)
-	if err != nil {
-		return nil, err
-	}
-	norming, err := NewNorming(deps.Norming)
-	if err != nil {
-		return nil, err
-	}
 	management := &assessmentModelApp.AssessmentCatalogManagementService{
-		ModelRepo:       deps.Typology.ModelRepo,
-		Published:       deps.Typology.PublishedRepo,
+		ModelRepo:       deps.Catalog.ModelRepo,
+		Published:       deps.Catalog.PublishedRepo,
 		Authorizer:      assessmentModelApp.SnapshotAuthorizer{},
 		BindingPolicies: bindings,
 		Effects:         effects,
 	}
 	authoring := &appauthoring.Service{
-		ModelRepo:  deps.Typology.ModelRepo,
+		ModelRepo:  deps.Catalog.ModelRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		Registry:   registry,
 	}
 	publication := &assessmentModelApp.AssessmentPublicationService{
-		ModelRepo:  deps.Typology.ModelRepo,
-		Published:  deps.Typology.PublishedRepo,
+		ModelRepo:  deps.Catalog.ModelRepo,
+		Published:  deps.Catalog.PublishedRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		Registry:   registry,
 		Bindings:   bindings,
 		Effects:    effects,
 	}
 	query := assessmentModelApp.NewCatalogQueryService(assessmentModelApp.CatalogQueryDependencies{
-		Models:     deps.Typology.ModelRepo,
-		Published:  deps.Typology.PublishedLister,
+		Models:     deps.Catalog.ModelRepo,
+		Published:  deps.Catalog.PublishedLister,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		HotRank:    hotRank.ReadModel,
 	})
 	return &Module{
 		HotRank:         hotRank,
-		Typology:        typology,
-		TaskPerformance: taskPerformance,
-		Norming:         norming,
-		ModelRepo:       deps.Typology.ModelRepo,
-		PublishedLister: deps.Typology.PublishedLister,
+		ModelRepo:       deps.Catalog.ModelRepo,
+		PublishedLister: deps.Catalog.PublishedLister,
 		Management:      management,
 		Authoring:       authoring,
 		Publication:     publication,
 		Query:           query,
-		TitleResolver:   assessmentModelApp.NewPublishedModelTitleResolver(deps.Typology.PublishedLister),
+		TitleResolver:   assessmentModelApp.NewPublishedModelTitleResolver(deps.Catalog.PublishedLister),
 	}, nil
 }
 
@@ -100,19 +81,6 @@ func (m *Module) Cleanup() error {
 			return err
 		}
 	}
-	if m.Typology != nil {
-		if err := m.Typology.Cleanup(); err != nil {
-			return err
-		}
-	}
-	if m.TaskPerformance != nil {
-		if err := m.TaskPerformance.Cleanup(); err != nil {
-			return err
-		}
-	}
-	if m.Norming != nil {
-		return m.Norming.Cleanup()
-	}
 	return nil
 }
 
@@ -125,19 +93,6 @@ func (m *Module) CheckHealth() error {
 		if err := m.HotRank.CheckHealth(); err != nil {
 			return err
 		}
-	}
-	if m.Typology != nil {
-		if err := m.Typology.CheckHealth(); err != nil {
-			return err
-		}
-	}
-	if m.TaskPerformance != nil {
-		if err := m.TaskPerformance.CheckHealth(); err != nil {
-			return err
-		}
-	}
-	if m.Norming != nil {
-		return m.Norming.CheckHealth()
 	}
 	return nil
 }

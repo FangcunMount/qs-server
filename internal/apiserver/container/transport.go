@@ -210,11 +210,6 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportGRPCDeps()
 		deps.AssessmentModelCatalog = exports.AssessmentModelCatalog
-		deps.TypologyModel = exports.TypologyModel
-	} else {
-		if c.TypologyModelModule != nil {
-			deps.TypologyModel = c.TypologyModelModule.ExportGRPCDeps()
-		}
 	}
 	if c.PlanModule != nil {
 		deps.Plan = c.PlanModule.ExportGRPCDeps()

@@ -16,7 +16,7 @@ func (m *AssessmentModel) DecisionKindForDefinition() (binding.DecisionKind, err
 	if m.DefinitionV2 == nil {
 		return "", fmt.Errorf("definition_v2 is required")
 	}
-	switch binding.NormalizeKind(m.Kind) {
+	switch m.Kind {
 	case binding.KindScale:
 		return binding.DecisionKindScoreRange, nil
 	case binding.KindBehavioralRating:

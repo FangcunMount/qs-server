@@ -3,21 +3,30 @@ package modelcatalog
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestBehaviorAbilityIsProductChannelOnly(t *testing.T) {
+func TestAPIKindMapperAcceptsOnlyCanonicalKinds(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := APIKindToDomainKind(KindBehaviorAbility); ok {
-		t.Fatal("APIKindToDomainKind(behavior_ability) should not map to a domain kind")
+	for apiKind, want := range map[string]domain.Kind{
+		KindScale:            domain.KindScale,
+		KindTypology:         domain.KindTypology,
+		KindBehavioralRating: domain.KindBehavioralRating,
+		KindCognitive:        domain.KindCognitive,
+	} {
+		got, ok := APIKindToDomainKind(apiKind)
+		if !ok || got != want {
+			t.Fatalf("APIKindToDomainKind(%q) = %q, %v; want %q, true", apiKind, got, ok, want)
+		}
 	}
-	if !IsSupportedAPIKind(KindBehaviorAbility) {
-		t.Fatal("behavior_ability must remain a supported API channel kind")
-	}
-	if !option.IsBehaviorAbilityProductChannelAPIKind(KindBehaviorAbility) {
-		t.Fatal("behavior_ability must be a product channel API kind")
+	for _, legacy := range []string{"medical_scale", "personality", "behavior_ability", "custom"} {
+		if _, ok := APIKindToDomainKind(legacy); ok {
+			t.Fatalf("APIKindToDomainKind(%q) unexpectedly succeeded", legacy)
+		}
+		if IsSupportedAPIKind(legacy) {
+			t.Fatalf("IsSupportedAPIKind(%q) = true", legacy)
+		}
 	}
 }
 
@@ -33,15 +42,15 @@ func TestBehavioralRatingKindMapperBoundary(t *testing.T) {
 	}
 }
 
-func TestMedicalScalePayloadFormatBoundary(t *testing.T) {
+func TestPayloadFormatMappingIsIdentity(t *testing.T) {
 	t.Parallel()
 
-	got := APIPayloadFormatToDomain(PayloadFormatMedicalScaleV1)
+	got := APIPayloadFormatToDomain(domain.PayloadFormatAssessmentScaleV1)
 	if got != domain.PayloadFormatAssessmentScaleV1 {
 		t.Fatalf("APIPayloadFormatToDomain() = %q, want %q", got, domain.PayloadFormatAssessmentScaleV1)
 	}
-	roundTrip := DomainPayloadFormatToAPI(KindMedicalScale, got)
-	if roundTrip != PayloadFormatMedicalScaleV1 {
-		t.Fatalf("DomainPayloadFormatToAPI() = %q, want %q", roundTrip, PayloadFormatMedicalScaleV1)
+	roundTrip := DomainPayloadFormatToAPI(KindScale, got)
+	if roundTrip != domain.PayloadFormatAssessmentScaleV1 {
+		t.Fatalf("DomainPayloadFormatToAPI() = %q, want %q", roundTrip, domain.PayloadFormatAssessmentScaleV1)
 	}
 }

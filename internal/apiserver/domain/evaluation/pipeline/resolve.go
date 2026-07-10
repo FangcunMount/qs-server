@@ -69,7 +69,7 @@ func ExecutionDecisionFromRoute(route ModelRoute, family modelcatalog.AlgorithmF
 
 func legacyTypologyFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
 	switch route.Kind {
-	case modelcatalog.KindTypology, modelcatalog.KindPersonality:
+	case modelcatalog.KindTypology:
 		if route.SubKind == "" {
 			return modelcatalog.AlgorithmFamilyFactorClassification, true
 		}

@@ -3,42 +3,24 @@ package modelcatalog
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
-
-func modelFamilyRegistryOptions() []option.RegisteredOption {
-	out := make([]option.RegisteredOption, 0)
-	for _, entry := range option.DefaultRegistry().RegisteredOptions() {
-		if !entry.IsProductChannel() {
-			out = append(out, entry)
-		}
-	}
-	return out
-}
 
 func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	t.Parallel()
 
-	registry := option.DefaultRegistry()
-	for _, entry := range modelFamilyRegistryOptions() {
+	for _, entry := range catalogKinds {
 		entry := entry
-		t.Run(entry.APIKind, func(t *testing.T) {
+		t.Run(string(entry.Kind), func(t *testing.T) {
 			t.Parallel()
 
-			mapped, ok := APIKindToDomainKind(entry.APIKind)
+			apiKind := DomainKindToAPIKind(entry.Kind)
+			mapped, ok := APIKindToDomainKind(apiKind)
 			if !ok || mapped != entry.Kind {
-				t.Fatalf("APIKindToDomainKind(%q) = %q, %v; want %q, true", entry.APIKind, mapped, ok, entry.Kind)
-			}
-			if got := DomainKindToAPIKind(entry.Kind); got != entry.APIKind {
-				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", entry.Kind, got, entry.APIKind)
-			}
-			registered, ok := registry.ByAPIKind(entry.APIKind)
-			if !ok || registered.OptionsEnabled != entry.OptionsEnabled {
-				t.Fatalf("registry option for %q = %#v, %v", entry.APIKind, registered, ok)
+				t.Fatalf("APIKindToDomainKind(%q) = %q, %v; want %q, true", apiKind, mapped, ok, entry.Kind)
 			}
 			capability, ok := domain.FamilyCapabilityByKind(entry.Kind)
-			if !ok || capability.CreateSupported != entry.Operations.CreateSupported {
+			if !ok || capability.ExecutionPath == "" {
 				t.Fatalf("family capability for %q = %#v, %v", entry.Kind, capability, ok)
 			}
 		})
@@ -58,7 +40,7 @@ func TestProductModelRuntimeContractMatrix(t *testing.T) {
 		family         domain.AlgorithmFamily
 		executionPath  domain.ExecutionPath
 	}{
-		{"scale", KindMedicalScale, domain.ProductChannelMedicalScale, domain.KindScale, "", domain.AlgorithmScaleDefault, domain.AlgorithmFamilyFactorScoring, domain.ExecutionPathScaleDescriptor},
+		{"scale", KindScale, domain.ProductChannelMedicalScale, domain.KindScale, "", domain.AlgorithmScaleDefault, domain.AlgorithmFamilyFactorScoring, domain.ExecutionPathScaleDescriptor},
 		{"typology", KindTypology, domain.ProductChannelTypology, domain.KindTypology, domain.SubKindTypology, domain.AlgorithmMBTI, domain.AlgorithmFamilyFactorClassification, domain.ExecutionPathTypologyDescriptor},
 		{"behavioral_rating", KindBehavioralRating, domain.ProductChannelBehaviorAbility, domain.KindBehavioralRating, "", domain.AlgorithmBrief2, domain.AlgorithmFamilyFactorNorm, domain.ExecutionPathBehavioralRatingDescriptor},
 		{"cognitive", KindCognitive, domain.ProductChannelBehaviorAbility, domain.KindCognitive, "", domain.AlgorithmSPM, domain.AlgorithmFamilyTaskPerformance, domain.ExecutionPathCognitiveDescriptor},

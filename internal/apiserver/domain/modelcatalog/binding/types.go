@@ -14,10 +14,8 @@ type (
 const (
 	KindScale            = identitypkg.KindScale
 	KindTypology         = identitypkg.KindTypology
-	KindPersonality      = identitypkg.KindPersonality
 	KindBehavioralRating = identitypkg.KindBehavioralRating
 	KindCognitive        = identitypkg.KindCognitive
-	KindCustom           = identitypkg.KindCustom
 
 	SubKindEmpty    = identitypkg.SubKindEmpty
 	SubKindTrait    = identitypkg.SubKindTrait

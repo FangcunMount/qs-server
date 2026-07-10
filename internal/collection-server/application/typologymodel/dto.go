@@ -10,12 +10,10 @@ type TypologyModelResponse struct {
 	QuestionnaireVersion string `json:"questionnaire_version"`
 	Status               string `json:"status"`
 	QuestionCount        int32  `json:"question_count"`
-	// 模型族；R128b canonical 为 typology，读兼容 personality。
-	Kind string `json:"kind,omitempty" example:"typology" enums:"typology,personality"`
+	Kind                 string `json:"kind,omitempty" example:"typology" enums:"typology"`
 	// 子机制，人格测评固定 typology。
-	SubKind string `json:"sub_kind,omitempty" example:"typology"`
-	// 产品通道；R128b canonical 为 typology，读兼容 personality。
-	ProductChannel  string                      `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
+	SubKind         string                      `json:"sub_kind,omitempty" example:"typology"`
+	ProductChannel  string                      `json:"product_channel,omitempty" example:"typology" enums:"typology"`
 	AlgorithmFamily string                      `json:"algorithm_family,omitempty"`
 	PayloadFormat   string                      `json:"payload_format,omitempty"`
 	DecisionKind    string                      `json:"decision_kind,omitempty"`
@@ -48,12 +46,10 @@ type TypologyModelSummaryResponse struct {
 	QuestionnaireVersion string `json:"questionnaire_version"`
 	Status               string `json:"status"`
 	QuestionCount        int32  `json:"question_count"`
-	// 模型族；R128b canonical 为 typology，读兼容 personality。
-	Kind string `json:"kind,omitempty" example:"typology" enums:"typology,personality"`
+	Kind                 string `json:"kind,omitempty" example:"typology" enums:"typology"`
 	// 子机制，人格测评固定 typology。
-	SubKind string `json:"sub_kind,omitempty" example:"typology"`
-	// 产品通道；R128b canonical 为 typology，读兼容 personality。
-	ProductChannel  string `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
+	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
+	ProductChannel  string `json:"product_channel,omitempty" example:"typology" enums:"typology"`
 	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 	PayloadFormat   string `json:"payload_format,omitempty"`
 	DecisionKind    string `json:"decision_kind,omitempty"`

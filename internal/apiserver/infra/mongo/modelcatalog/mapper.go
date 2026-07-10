@@ -28,8 +28,8 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 	if schemaVersion == "" {
 		schemaVersion = domain.SchemaVersionV2
 	}
-	kind := domain.NormalizeKind(model.Kind)
-	productChannel := domain.NormalizeProductChannel(domain.ResolveProductChannel(kind, model.ProductChannel))
+	kind := model.Kind
+	productChannel := domain.ResolveProductChannel(kind, model.ProductChannel)
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:           schemaVersion,
 		PayloadFormat:           model.PayloadFormat,
@@ -65,8 +65,8 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 	for key, value := range po.Source {
 		source[key] = value
 	}
-	kind := domain.NormalizeKind(domain.Kind(po.ModelKind))
-	productChannel := domain.NormalizeProductChannel(domain.ProductChannel(po.ModelProductChannel))
+	kind := domain.Kind(po.ModelKind)
+	productChannel := domain.ProductChannel(po.ModelProductChannel)
 	if productChannel == "" {
 		productChannel = domain.DefaultProductChannelFor(kind)
 	}

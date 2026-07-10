@@ -1,7 +1,6 @@
 package modelcatalog
 
 import (
-	appTypologyModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -41,7 +40,7 @@ func Wire(in WireInput) (*Module, error) {
 	return Bootstrap(BootstrapInput{
 		HotRank:   buildHotRankDeps(in),
 		Lifecycle: buildLifecycleDeps(in),
-		Typology:  buildTypologyDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, typologyCacheConfig(in)),
+		Catalog:   buildCatalogDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, catalogCacheConfig(in)),
 	})
 }
 
@@ -61,17 +60,17 @@ func buildLifecycleDeps(in WireInput) LifecycleDeps {
 	return deps
 }
 
-type typologyCacheWireConfig struct {
+type catalogCacheWireConfig struct {
 	rulesetInfra.PublishedModelCacheConfig
-	Notifier appTypologyModel.CacheSignalNotifier
+	Notifier TypologyCacheSignalNotifier
 }
 
-func typologyCacheConfig(in WireInput) typologyCacheWireConfig {
-	var notifier appTypologyModel.CacheSignalNotifier
-	if n, ok := in.CacheSignalNotifier.(appTypologyModel.CacheSignalNotifier); ok {
+func catalogCacheConfig(in WireInput) catalogCacheWireConfig {
+	var notifier TypologyCacheSignalNotifier
+	if n, ok := in.CacheSignalNotifier.(TypologyCacheSignalNotifier); ok {
 		notifier = n
 	}
-	return typologyCacheWireConfig{
+	return catalogCacheWireConfig{
 		PublishedModelCacheConfig: rulesetInfra.PublishedModelCacheConfig{
 			Redis:    in.StaticRedisClient,
 			Builder:  in.StaticCacheBuilder,
@@ -82,14 +81,14 @@ func typologyCacheConfig(in WireInput) typologyCacheWireConfig {
 	}
 }
 
-func buildTypologyDeps(
+func buildCatalogDeps(
 	mongoDB *mongo.Database,
 	mongoLimiter backpressure.Acquirer,
 	questionnaireQuery quesApp.QuestionnaireQueryService,
-	cacheCfg typologyCacheWireConfig,
-) TypologyDeps {
+	cacheCfg catalogCacheWireConfig,
+) CatalogDeps {
 	if mongoDB == nil {
-		return TypologyDeps{}
+		return CatalogDeps{}
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
@@ -98,23 +97,17 @@ func buildTypologyDeps(
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
 	dualStore := modelcatalog.NewPublishedStore(v2Repo)
 	publishedLister := port.PublishedModelLister(dualStore)
-	publishedReader := port.PublishedModelReader(dualStore)
-	algorithmLister := port.PublishedAlgorithmLister(dualStore)
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
 		cached := cache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
 		publishedLister = cached
-		publishedReader = cached
-		algorithmLister = cached
 		publishedRepo = cache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
-	return TypologyDeps{
-		PublishedLister:          publishedLister,
-		PublishedReader:          publishedReader,
-		PublishedAlgorithmLister: algorithmLister,
-		ModelRepo:                draftRepo,
-		PublishedRepo:            publishedRepo,
-		NormRepo:                 normRepo,
-		QuestionnaireQuery:       questionnaireQuery,
-		CacheSignalNotifier:      cacheCfg.Notifier,
+	return CatalogDeps{
+		PublishedLister:     publishedLister,
+		ModelRepo:           draftRepo,
+		PublishedRepo:       publishedRepo,
+		NormRepo:            normRepo,
+		QuestionnaireQuery:  questionnaireQuery,
+		CacheSignalNotifier: cacheCfg.Notifier,
 	}
 }

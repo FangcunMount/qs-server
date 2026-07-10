@@ -7,22 +7,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// SnapshotBuilder converts a draft AssessmentModel into an immutable runtime snapshot.
-type SnapshotBuilder func(*domain.AssessmentModel) (*port.AssessmentSnapshot, error)
-
-// DefaultSnapshotBuilder keeps the current payload bytes and publish contract unchanged.
-func DefaultSnapshotBuilder(model *domain.AssessmentModel) (*port.AssessmentSnapshot, error) {
-	return publishedmodel.BuildAssessmentSnapshot(model)
-}
-
 // Publisher coordinates snapshot materialization and persistence.
 type Publisher struct {
-	Build     SnapshotBuilder
 	Registry  definition.Registry
 	ModelRepo port.ModelRepository
 	Repo      port.PublishedModelRepository
@@ -38,18 +28,15 @@ func (p Publisher) BuildSnapshot(ctx context.Context, model *domain.AssessmentMo
 	if model == nil {
 		return nil, fmt.Errorf("assessment model is nil")
 	}
-	if handler, ok := p.Registry.Resolve(identityFromModel(model)); ok {
-		result, err := handler.BuildSnapshotPayload(ctx, model)
-		if err != nil {
-			return nil, err
-		}
-		return snapshotFromModel(model, result), nil
+	handler, err := p.Registry.MustResolve(identityFromModel(model))
+	if err != nil {
+		return nil, err
 	}
-	build := p.Build
-	if build == nil {
-		build = DefaultSnapshotBuilder
+	result, err := handler.BuildSnapshotPayload(ctx, model)
+	if err != nil {
+		return nil, err
 	}
-	return build(model)
+	return snapshotFromModel(model, result), nil
 }
 
 func (p Publisher) Save(ctx context.Context, snapshot *port.AssessmentSnapshot) error {
@@ -148,9 +135,6 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 		Source:               map[string]any{},
 		Payload:              result.Payload,
 		DefinitionV2:         model.DefinitionV2,
-	}
-	if snapshot.Kind == domain.KindScale {
-		port.SetLegacyScaleBinding(snapshot, port.LegacyScaleBinding{ScaleVersion: snapshot.Version})
 	}
 	return snapshot
 }

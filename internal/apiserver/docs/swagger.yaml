@@ -351,17 +351,9 @@ definitions:
       heat_score:
         type: integer
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       questionnaire_code:
@@ -413,17 +405,9 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       questionnaire_code:
@@ -498,17 +482,9 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       questionnaire_code:
@@ -708,20 +684,20 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
+        description: 模型族仅接受 canonical identity。
         enum:
+        - scale
         - typology
-        - personality
         - behavioral_rating
         - cognitive
-        - custom
         example: typology
         type: string
       product_channel:
         description: 产品通道；人格测评为 typology。
         enum:
+        - medical_scale
         - typology
-        - personality
+        - behavior_ability
         example: typology
         type: string
       questionnaire_code:
@@ -1253,17 +1229,9 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       questionnaire_code:
@@ -1943,17 +1911,9 @@ definitions:
       description:
         type: string
       kind:
-        description: 模型族；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       product_channel:
-        description: 产品通道；R128b canonical 为 typology，读兼容 personality。
-        enum:
-        - typology
-        - personality
         example: typology
         type: string
       questionnaire_code:

@@ -6,22 +6,18 @@ import (
 	"testing"
 )
 
-func TestTypologyDepsUseSeparatePublishedWriteRepository(t *testing.T) {
+func TestCatalogDepsUseDedicatedPublishedWriteRepository(t *testing.T) {
 	content, err := os.ReadFile("wire.go")
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	text := string(content)
-	if !strings.Contains(text, "PublishedRepo:") || !strings.Contains(text, "publishedRepo") {
-		t.Fatal("wire.go must wire PublishedRepo from publishedRepo adapter")
+	for _, required := range []string{"func buildCatalogDeps", "PublishedRepo:", "publishedRepo", "ModelRepo:", "draftRepo"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("wire.go must contain %q", required)
+		}
 	}
-	if !strings.Contains(text, "PublishedReader:") || !strings.Contains(text, "publishedReader") {
-		t.Fatal("wire.go must wire PublishedReader from published model store")
-	}
-	if !strings.Contains(text, "ModelRepo:") || !strings.Contains(text, "draftRepo") {
-		t.Fatal("wire.go must wire ModelRepo from draftRepo")
-	}
-	if strings.Contains(text, "PublishedRepo: dualStore") || strings.Contains(text, "PublishedRepo: dualStore,") {
-		t.Fatal("PublishedRepo must not use dualStore; admin publish writes v2 snapshots only")
+	if strings.Contains(text, "application/modelcatalog/"+"typology") || strings.Contains(text, "Typology"+"Deps") {
+		t.Fatal("wire.go must not assemble family command dependencies")
 	}
 }

@@ -76,7 +76,6 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "cognitive_spm", kind: binding.KindCognitive, algorithm: binding.AlgorithmSPM, want: identity.AlgorithmFamilyTaskPerformance, wantOK: true},
 		{name: "cognitive_empty_algo", kind: binding.KindCognitive, algorithm: "", want: identity.AlgorithmFamilyTaskPerformance, wantOK: true},
-		{name: "custom", kind: binding.KindCustom, wantOK: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -146,7 +145,7 @@ func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
 func TestIdentityRoutingStringHelpers(t *testing.T) {
 	t.Parallel()
 
-	if got := binding.ProductChannelForIdentity(binding.KindCognitive, "cognitive"); got != string(binding.ProductChannelBehaviorAbility) {
+	if got := binding.ProductChannelForIdentity(binding.KindCognitive, string(binding.ProductChannelBehaviorAbility)); got != string(binding.ProductChannelBehaviorAbility) {
 		t.Fatalf("ProductChannelForIdentity() = %q, want behavior_ability", got)
 	}
 	if got := identity.AlgorithmFamilyStringFromIdentity(binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM); got != string(identity.AlgorithmFamilyTaskPerformance) {

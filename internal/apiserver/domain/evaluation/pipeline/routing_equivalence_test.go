@@ -155,21 +155,15 @@ func TestRouteIdentityFamilyMatchesRuntimeFamily(t *testing.T) {
 	}
 }
 
-func TestRouteRoutingPreservesLegacyTypologyKindAliases(t *testing.T) {
+func TestRouteRoutingUsesCanonicalTypologyKind(t *testing.T) {
 	t.Parallel()
 
-	for _, kind := range []modelcatalog.Kind{modelcatalog.KindTypology, modelcatalog.KindPersonality} {
-		kind := kind
-		t.Run(kind.String(), func(t *testing.T) {
-			t.Parallel()
-			family, ok := evalpipeline.ExecutionFamilyFromRoute(evalpipeline.ModelRoute{Kind: kind})
-			if !ok {
-				t.Fatalf("ExecutionFamilyFromRoute(%s) ok = false", kind)
-			}
-			if family != modelcatalog.AlgorithmFamilyFactorClassification {
-				t.Fatalf("family = %s, want %s", family, modelcatalog.AlgorithmFamilyFactorClassification)
-			}
-		})
+	family, ok := evalpipeline.ExecutionFamilyFromRoute(evalpipeline.ModelRoute{Kind: modelcatalog.KindTypology})
+	if !ok {
+		t.Fatal("ExecutionFamilyFromRoute(typology) ok = false")
+	}
+	if family != modelcatalog.AlgorithmFamilyFactorClassification {
+		t.Fatalf("family = %s, want %s", family, modelcatalog.AlgorithmFamilyFactorClassification)
 	}
 }
 

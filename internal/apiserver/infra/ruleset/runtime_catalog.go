@@ -64,7 +64,7 @@ func (c *RuntimePublishedCatalog) ResolveByQuestionnaire(
 		}
 		return port.Ref{}, false, err
 	}
-	return aminfra.RefFromPublished(snapshot), true, nil
+	return port.RefFromPublished(snapshot), true, nil
 }
 
 func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {

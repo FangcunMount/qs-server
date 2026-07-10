@@ -8,13 +8,6 @@ type QuestionnaireReader interface {
 	ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*ListQuestionnairesOutput, error)
 }
 
-// TypologyModelReader 类型学模型目录读端口。
-type TypologyModelReader interface {
-	GetTypologyModel(ctx context.Context, code string) (*TypologyModelOutput, error)
-	ListTypologyModels(ctx context.Context, page, pageSize int32) (*ListTypologyModelsOutput, error)
-	GetTypologyModelCategories(ctx context.Context) (*TypologyModelCategoriesOutput, error)
-}
-
 // EvaluationReader 测评读端口（collection BFF 使用的方法集合）。
 type EvaluationReader interface {
 	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)

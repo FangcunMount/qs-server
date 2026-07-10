@@ -1,119 +1,33 @@
 package modelcatalog
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
-	root := "."
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") ||
-			path == "architecture_test.go" {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		text := string(content)
-		if strings.Contains(text, "LegacyScaleBindingSource") {
-			t.Fatalf("%s must not depend on legacy scale runtime sources", path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
+func TestRetiredFamilyApplicationPackagesContainNoGoFiles(t *testing.T) {
+	t.Parallel()
 
-func TestTypologyCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
-	root := filepath.Join("typology")
-	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/ruleset",
-	}
-	forbiddenTokens := []string{
-		"mongoruleset",
-		"evaluation_rule_sets",
-		"UpsertPublished",
-		"NewPublishedStore",
-		"KindMBTIMigration",
-		"KindSBTIMigration",
-	}
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		text := string(content)
-		for _, importPath := range forbiddenImports {
-			if strings.Contains(text, importPath) {
-				t.Fatalf("%s must not import %s; typology command writes only v2 published snapshots", path, importPath)
+	for _, directory := range []string{
+		"norming",
+		"taskperformance",
+		"typology",
+		"publishedmodel",
+		"option",
+		"scoring",
+	} {
+		err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
+			if os.IsNotExist(err) {
+				return filepath.SkipDir
 			}
-		}
-		for _, token := range forbiddenTokens {
-			if strings.Contains(text, token) {
-				t.Fatalf("%s must not reference legacy ruleset token %s", path, token)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestRuntimeTypologyReadsDoNotUseDraftModelRepository(t *testing.T) {
-	scanRoots := []string{
-		"typology/consumer",
-		"../evaluation",
-		"../../collection-server/application",
-		"../../infra/evaluationinput",
-	}
-	forbiddenTokens := []string{
-		"ModelRepository",
-		"DraftRepository",
-		"NewDraftRepository",
-	}
-	for _, root := range scanRoots {
-		if _, err := os.Stat(root); err != nil {
-			continue
-		}
-		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return nil
-			}
-			if strings.Contains(path, string(filepath.Separator)+"modelcatalog"+string(filepath.Separator)+"typology"+string(filepath.Separator)) {
-				return nil
-			}
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			text := string(content)
-			for _, token := range forbiddenTokens {
-				if strings.Contains(text, token) {
-					t.Fatalf("%s must not reference draft model repository token %s; runtime reads use published snapshots only", path, token)
-				}
+			if !entry.IsDir() && strings.HasSuffix(path, ".go") {
+				return &forbiddenReferenceError{path: path, token: "retired application package"}
 			}
 			return nil
 		})
@@ -123,27 +37,54 @@ func TestRuntimeTypologyReadsDoNotUseDraftModelRepository(t *testing.T) {
 	}
 }
 
-func TestFamilyServicesDoNotBypassPublicationSnapshotBuilder(t *testing.T) {
-	scanRoots := []string{"typology", "norming", "taskperformance"}
-	for _, root := range scanRoots {
-		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return nil
-			}
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			if strings.Contains(string(content), "/application/modelcatalog/publishedmodel") {
-				t.Fatalf("%s must use publication.Publisher and definition.Handler instead of publishedmodel directly", path)
-			}
-			return nil
-		})
+func TestApplicationDoesNotReintroduceRetiredModelCatalogPaths(t *testing.T) {
+	t.Parallel()
+
+	forbidden := retiredModelCatalogTokens()
+	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, token := range forbidden {
+			if strings.Contains(string(data), token) {
+				return &forbiddenReferenceError{path: path, token: token}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
+}
+
+func retiredModelCatalogTokens() []string {
+	base := "/application/modelcatalog/"
+	return []string{
+		base + "norming",
+		base + "taskperformance",
+		base + "typology",
+		base + "published" + "model",
+		base + "option",
+		base + "scoring",
+		"Legacy" + "ScaleBinding",
+		"Legacy" + "ScaleBindingSource",
+		"Scale" + "QueryService",
+		"Scale" + "CategoryService",
+	}
+}
+
+type forbiddenReferenceError struct {
+	path  string
+	token string
+}
+
+func (e *forbiddenReferenceError) Error() string {
+	return e.path + " reintroduces retired ModelCatalog surface " + e.token
 }

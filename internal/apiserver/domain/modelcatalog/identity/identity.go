@@ -96,8 +96,6 @@ func DecisionKindForIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (D
 		return DecisionKindNormLookup, true
 	case KindCognitive:
 		return DecisionKindAbilityLevel, true
-	case KindCustom:
-		return "", false
 	default:
 		return "", false
 	}

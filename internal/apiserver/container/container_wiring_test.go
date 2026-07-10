@@ -102,12 +102,11 @@ func TestAssessmentModelModuleRegistersAggregateOnly(t *testing.T) {
 
 	c := NewContainer(nil, nil, nil)
 	module := &AssessmentModelModule{
-		HotRank:  &ammod.HotRank{},
-		Typology: &TypologyModelModule{},
+		HotRank: &ammod.HotRank{},
 	}
 	c.SetAssessmentModelModule(module)
 
-	if c.AssessmentModelModule != module || c.TypologyModelModule != module.Typology {
+	if c.AssessmentModelModule != module {
 		t.Fatalf("assessment model module fields not wired")
 	}
 	got := c.GetLoadedModules()

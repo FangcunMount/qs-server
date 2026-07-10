@@ -1920,7 +1920,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse"
+                                            "$ref": "#/definitions/typologymodel.ListTypologyModelsResponse"
                                         }
                                     }
                                 }
@@ -2674,29 +2674,6 @@ const docTemplate = `{
                     }
                 },
                 "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse": {
-            "type": "object",
-            "properties": {
-                "models": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
                     "type": "integer"
                 }
             }
@@ -3526,6 +3503,29 @@ const docTemplate = `{
                 }
             }
         },
+        "typologymodel.ListTypologyModelsResponse": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/typologymodel.TypologyModelSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
         "typologymodel.TypologyCategoryResponse": {
             "type": "object",
             "properties": {
@@ -3596,11 +3596,9 @@ const docTemplate = `{
                     }
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
                     "enum": [
-                        "typology",
-                        "personality"
+                        "typology"
                     ],
                     "example": "typology"
                 },
@@ -3614,11 +3612,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
                     "enum": [
-                        "typology",
-                        "personality"
+                        "typology"
                     ],
                     "example": "typology"
                 },
@@ -3666,11 +3662,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "模型族；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
                     "enum": [
-                        "typology",
-                        "personality"
+                        "typology"
                     ],
                     "example": "typology"
                 },
@@ -3678,11 +3672,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "product_channel": {
-                    "description": "产品通道；R128b canonical 为 typology，读兼容 personality。",
                     "type": "string",
                     "enum": [
-                        "typology",
-                        "personality"
+                        "typology"
                     ],
                     "example": "typology"
                 },

@@ -30,7 +30,7 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 		return fmt.Errorf("%w: typology model version is required", evalassessment.ErrEvaluationModelNotPublished)
 	}
 	snapshot, err := v.reader.GetPublishedModelByRef(ctx, port.Ref{
-		Kind:      domainmodel.KindPersonality,
+		Kind:      domainmodel.KindTypology,
 		SubKind:   modelRef.SubKind(),
 		Algorithm: modelRef.Algorithm(),
 		Code:      modelRef.Code().String(),

@@ -13,35 +13,6 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func TestDefaultSnapshotBuilderKeepsCurrentPublishContract(t *testing.T) {
-	t.Parallel()
-
-	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:      "PHQ9",
-		Kind:      domain.KindScale,
-		Algorithm: domain.AlgorithmScaleDefault,
-		Title:     "PHQ-9",
-	})
-	if err != nil {
-		t.Fatalf("NewAssessmentModel: %v", err)
-	}
-	if err := model.UpdateDefinitionWithV2(
-		domain.DefinitionPayload{Data: []byte(`{"code":"PHQ9"}`)},
-		&domain.Definition{},
-		model.CreatedAt,
-	); err != nil {
-		t.Fatalf("UpdateDefinitionWithV2: %v", err)
-	}
-
-	snapshot, err := publication.DefaultSnapshotBuilder(model)
-	if err != nil {
-		t.Fatalf("DefaultSnapshotBuilder: %v", err)
-	}
-	if snapshot.Kind != domain.KindScale || snapshot.PayloadFormat != domain.PayloadFormatAssessmentScaleV1 {
-		t.Fatalf("snapshot = %#v", snapshot)
-	}
-}
-
 func TestPublisherBuildSnapshotUsesDefinitionHandler(t *testing.T) {
 	t.Parallel()
 

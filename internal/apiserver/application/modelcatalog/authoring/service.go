@@ -20,7 +20,6 @@ type Service struct {
 	Authorizer modelcatalog.Authorizer
 	Registry   appdefinition.Registry
 	Codes      codes.CodesService
-	Preview    func(context.Context, string, json.RawMessage) (*modelcatalog.PreviewReportResult, error)
 	Now        func() time.Time
 }
 
@@ -93,13 +92,24 @@ func (s Service) ApplyCodes(ctx context.Context, actor modelcatalog.ActorContext
 }
 
 func (s Service) PreviewReport(ctx context.Context, actor modelcatalog.ActorContext, modelCode string, input json.RawMessage) (*modelcatalog.PreviewReportResult, error) {
-	if _, err := s.loadAndAuthorize(ctx, actor, modelCode); err != nil {
+	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
+	if err != nil {
 		return nil, err
 	}
-	if s.Preview == nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "report preview is not configured for this model")
+	result, err := s.Registry.PreviewReport(ctx, model, input)
+	if err != nil {
+		return nil, err
 	}
-	return s.Preview(ctx, modelCode, input)
+	out := &modelcatalog.PreviewReportResult{
+		Outcome:     modelcatalog.PreviewOutcome{Code: result.OutcomeCode, Title: result.OutcomeTitle},
+		ScoreDetail: result.ScoreDetail,
+		RawReport:   result.RawReport,
+	}
+	out.ReportSections = make([]modelcatalog.PreviewReportSection, 0, len(result.ReportSections))
+	for _, section := range result.ReportSections {
+		out.ReportSections = append(out.ReportSections, modelcatalog.PreviewReportSection{Title: section.Title, Content: section.Content, Kind: section.Kind})
+	}
+	return out, nil
 }
 
 func (s Service) loadAndAuthorize(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*domain.AssessmentModel, error) {

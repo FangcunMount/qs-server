@@ -293,14 +293,14 @@ func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context
 
 func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, code string) error {
 	c := a.container
-	if c == nil || c.AssessmentModelModule == nil || c.AssessmentModelModule.Typology == nil {
+	if c == nil || c.AssessmentModelModule == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	query := c.AssessmentModelModule.Typology.QueryService
-	if query == nil || strings.TrimSpace(code) == "" {
+	lister := c.AssessmentModelModule.PublishedLister
+	if lister == nil {
 		return nil
 	}
-	_, err := query.GetPublishedByCode(ctx, code)
+	_, err := lister.FindPublishedModelByCode(ctx, domain.KindTypology, code)
 	return err
 }
 

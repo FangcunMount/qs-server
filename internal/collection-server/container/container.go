@@ -51,7 +51,6 @@ type Container struct {
 	evaluationClient             *grpcclient.EvaluationClient
 	actorClient                  *grpcclient.ActorClient
 	assessmentModelCatalogClient *grpcclient.AssessmentModelCatalogClient
-	typologyModelClient          *grpcclient.TypologyModelClient
 
 	// 应用层服务
 	submissionService                  *answersheet.SubmissionService
@@ -95,7 +94,6 @@ type ClientBundle struct {
 	Evaluation             *grpcclient.EvaluationClient
 	Actor                  *grpcclient.ActorClient
 	AssessmentModelCatalog *grpcclient.AssessmentModelCatalogClient
-	TypologyModel          *grpcclient.TypologyModelClient
 }
 
 // NewContainer 创建新的容器
@@ -157,7 +155,7 @@ func (c *Container) Initialize() error {
 	// 2. 初始化接口层
 	c.initHandlers()
 
-	if c.typologyModelClient != nil {
+	if c.assessmentModelCatalogClient != nil {
 		catalogcache.WarmCatalogOnStartup(c.typologyModelQueryService)
 	}
 
@@ -444,7 +442,6 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.evaluationClient = bundle.Evaluation
 	c.actorClient = bundle.Actor
 	c.assessmentModelCatalogClient = bundle.AssessmentModelCatalog
-	c.typologyModelClient = bundle.TypologyModel
 }
 
 // ActorClient 获取 Actor 客户端

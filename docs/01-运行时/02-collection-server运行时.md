@@ -369,6 +369,7 @@ GET /api/v1/public/info
 | `/answersheets` | 提交答卷、查询提交状态、查询答卷 |
 | `/assessments` | 因子分数、趋势、高风险、报告状态、等待报告等仍在用子资源 |
 | `/assessment-models` | 已发布模型的选项、热门、列表、详情；量表使用 `kind=scale` 过滤 |
+| `/typology-models` | generic catalog 的人格业务 BFF 投影；不调用专用 typology gRPC |
 | `/testees` | 受试者存在性、创建、列表、详情、照护上下文、更新 |
 
 这些路由最终都会通过 gRPC client 调 apiserver。collection 不应在 handler 中直接写主业务数据。

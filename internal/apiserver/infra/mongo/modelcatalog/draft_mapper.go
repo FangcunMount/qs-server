@@ -16,7 +16,7 @@ func (DraftMapper) ToPO(model *domain.AssessmentModel) *AssessmentModelPO {
 	}
 	return &AssessmentModelPO{
 		Code:                    model.Code,
-		ProductChannel:          string(domain.NormalizeProductChannel(domain.ResolveProductChannel(model.Kind, model.ProductChannel))),
+		ProductChannel:          string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		Kind:                    string(model.Kind),
 		SubKind:                 string(model.SubKind),
 		Algorithm:               string(model.Algorithm),
@@ -45,7 +45,7 @@ func (DraftMapper) ToDomain(po *AssessmentModelPO) *domain.AssessmentModel {
 		return nil
 	}
 	kind := domain.Kind(po.Kind)
-	productChannel := domain.NormalizeProductChannel(domain.ProductChannel(po.ProductChannel))
+	productChannel := domain.ProductChannel(po.ProductChannel)
 	if productChannel == "" {
 		productChannel = domain.DefaultProductChannelFor(kind)
 	}

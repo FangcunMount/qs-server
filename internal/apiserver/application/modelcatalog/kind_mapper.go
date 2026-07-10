@@ -1,37 +1,19 @@
 package modelcatalog
 
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-)
+import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
 const AlgorithmCustomTypology = "custom_typology"
 
-// normalizeAPIKind maps deprecated API aliases to canonical catalog API kinds.
-func normalizeAPIKind(kind string) string {
-	if kind == KindPersonality {
-		return KindTypology
-	}
-	return kind
-}
-
-func isTypologyAPIKind(kind string) bool {
-	return kind == KindTypology || kind == KindPersonality
-}
-
-// behavior_ability 是产品通道聚合槽位，不映射为领域 Kind（列表 API 专用）。
 func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	switch kind {
-	case KindTypology, KindPersonality:
+	case KindTypology:
 		return domain.KindTypology, true
 	case string(domain.KindBehavioralRating):
 		return domain.KindBehavioralRating, true
-	case KindMedicalScale, "scale":
+	case KindScale:
 		return domain.KindScale, true
 	case KindCognitive:
 		return domain.KindCognitive, true
-	case KindCustom:
-		return domain.KindCustom, true
 	default:
 		return "", false
 	}
@@ -39,20 +21,15 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 
 // DomainKindToAPIKind 映射规范领域类型 到 外部 API 契约。
 func DomainKindToAPIKind(kind domain.Kind) string {
-	if entry, ok := catalogRegistry.ByKind(kind); ok && entry.APIKind != "" {
-		return entry.APIKind
-	}
 	switch kind {
 	case domain.KindTypology:
 		return KindTypology
 	case domain.KindBehavioralRating:
 		return string(domain.KindBehavioralRating)
 	case domain.KindScale:
-		return KindMedicalScale
+		return KindScale
 	case domain.KindCognitive:
 		return KindCognitive
-	case domain.KindCustom:
-		return KindCustom
 	default:
 		return string(kind)
 	}
@@ -60,28 +37,15 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 
 // APIPayloadFormatToDomain 归一化API 载荷格式 到 规范领域格式。
 func APIPayloadFormatToDomain(format string) string {
-	switch format {
-	case PayloadFormatMedicalScaleV1:
-		return domain.PayloadFormatAssessmentScaleV1
-	default:
-		return format
-	}
+	return format
 }
 
 // DomainPayloadFormatToAPI 映射规范 领域载荷格式 back 到 API 值。
 func DomainPayloadFormatToAPI(kind string, format string) string {
-	switch format {
-	case domain.PayloadFormatAssessmentScaleV1:
-		return PayloadFormatMedicalScaleV1
-	default:
-		return format
-	}
+	return format
 }
 
 func IsSupportedAPIKind(kind string) bool {
-	if option.IsBehaviorAbilityProductChannelAPIKind(kind) {
-		return true
-	}
-	_, ok := catalogRegistry.ByAPIKind(kind)
+	_, ok := APIKindToDomainKind(kind)
 	return ok
 }

@@ -9,10 +9,8 @@ func TestDefaultProductChannelFor(t *testing.T) {
 	}{
 		{KindScale, ProductChannelMedicalScale},
 		{KindTypology, ProductChannelTypology},
-		{KindPersonality, ProductChannelTypology},
 		{KindBehavioralRating, ProductChannelBehaviorAbility},
 		{KindCognitive, ProductChannelBehaviorAbility},
-		{KindCustom, ""},
 	}
 	for _, tc := range tests {
 		if got := DefaultProductChannelFor(tc.kind); got != tc.want {
@@ -30,12 +28,8 @@ func TestCompleteProductChannel(t *testing.T) {
 		t.Fatalf("got %q, want medical_scale", got)
 	}
 
-	got, err = CompleteProductChannel(KindCognitive, ProductChannelCognitive)
-	if err != nil {
-		t.Fatalf("CompleteProductChannel legacy cognitive: %v", err)
-	}
-	if got != ProductChannelBehaviorAbility {
-		t.Fatalf("legacy cognitive channel = %q, want behavior_ability", got)
+	if _, err := CompleteProductChannel(KindCognitive, ProductChannel("cognitive")); err == nil {
+		t.Fatal("expected removed cognitive channel alias to be rejected")
 	}
 
 	if _, err := CompleteProductChannel(KindBehavioralRating, ProductChannel("invalid")); err == nil {
@@ -77,9 +71,7 @@ func TestProductFromChannelNormalizesToThreeProducts(t *testing.T) {
 	}{
 		{ProductChannelMedicalScale, ProductMedicalScale},
 		{ProductChannelTypology, ProductTypology},
-		{ProductChannelPersonality, ProductTypology},
 		{ProductChannelBehaviorAbility, ProductBehaviorAbility},
-		{ProductChannelCognitive, ProductBehaviorAbility},
 	}
 	for _, tc := range cases {
 		got, err := ProductFromChannel(tc.channel)

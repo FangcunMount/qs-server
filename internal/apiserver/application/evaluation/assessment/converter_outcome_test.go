@@ -53,7 +53,7 @@ func TestReportRowToOutcomeResultPrefersExplicitModelProjection(t *testing.T) {
 	row := evaluationreadmodel.ReportRow{
 		AssessmentID: 202,
 		Model: evaluationreadmodel.ModelIdentityRow{
-			Kind:            "personality",
+			Kind:            "typology",
 			SubKind:         "typology",
 			Algorithm:       "mbti",
 			Code:            "MBTI-16P",
@@ -76,7 +76,7 @@ func TestReportRowToOutcomeResultPrefersExplicitModelProjection(t *testing.T) {
 	}
 
 	result := reportRowToOutcomeResult(row)
-	if result.Model.Kind != "personality" || result.Model.SubKind != "typology" {
+	if result.Model.Kind != "typology" || result.Model.SubKind != "typology" {
 		t.Fatalf("unexpected model: %#v", result.Model)
 	}
 	if result.Model.ProductChannel != "behavior_ability" {

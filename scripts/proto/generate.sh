@@ -22,6 +22,5 @@ generate "${PROTO_PATH}/actor/actor.proto"
 generate "${PROTO_PATH}/evaluation/evaluation.proto"
 generate "${PROTO_PATH}/internalapi/internal.proto"
 generate "${PROTO_PATH}/assessmentmodel/assessment_model_catalog.proto"
-generate "${PROTO_PATH}/typologymodel/typology_model.proto"
 
 echo "Proto files generated successfully!"

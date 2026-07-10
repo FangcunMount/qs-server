@@ -33,7 +33,7 @@ type LifecycleDeps struct {
 func questionnaireBindingPolicies(deps Deps) assessmentModelApp.QuestionnaireBindingPolicies {
 	return assessmentModelApp.NewQuestionnaireBindingPolicies(
 		assessmentModelApp.ScaleQuestionnaireBindingPolicy{
-			Models:         deps.Typology.ModelRepo,
+			Models:         deps.Catalog.ModelRepo,
 			Questionnaires: deps.Lifecycle.QuestionnaireCatalog,
 			PublishQuestionnaire: func(ctx context.Context, code string) (string, error) {
 				if deps.Lifecycle.QuestionnairePublisher == nil {
@@ -46,7 +46,7 @@ func questionnaireBindingPolicies(deps Deps) assessmentModelApp.QuestionnaireBin
 				return result.Version, nil
 			},
 		},
-		assessmentModelApp.TypologyQuestionnaireBindingPolicy{Questionnaires: deps.Typology.QuestionnaireQuery},
+		assessmentModelApp.TypologyQuestionnaireBindingPolicy{Questionnaires: deps.Catalog.QuestionnaireQuery},
 	)
 }
 
@@ -60,8 +60,8 @@ func lifecycleEffects(deps Deps) assessmentModelApp.LifecycleEffectsRegistry {
 	typologyEffect := assessmentModelApp.LifecycleEffectFunc{
 		Match: func(identity domain.Identity) bool { return identity.Kind == domain.KindTypology },
 		Run: func(ctx context.Context, model *domain.AssessmentModel, action assessmentModelApp.LifecycleAction) {
-			if deps.Typology.CacheSignalNotifier != nil && model != nil {
-				deps.Typology.CacheSignalNotifier.NotifyTypologyModelCacheChanged(ctx, model.Code, string(action))
+			if deps.Catalog.CacheSignalNotifier != nil && model != nil {
+				deps.Catalog.CacheSignalNotifier.NotifyTypologyModelCacheChanged(ctx, model.Code, string(action))
 			}
 		},
 	}

@@ -2,18 +2,22 @@ package modelcatalog
 
 import "testing"
 
-func TestAPIKindOptionsMarksReservedKindsDisabled(t *testing.T) {
+func TestAPIKindOptionsExposeOnlyCanonicalKinds(t *testing.T) {
 	t.Parallel()
 
-	disabled := make(map[string]bool)
-	for _, opt := range apiKindOptions() {
-		if opt.Disabled {
-			disabled[opt.Value] = true
-		}
+	got := apiKindOptions()
+	want := []Option{
+		{Label: "医学量表", Value: KindScale},
+		{Label: "人格测评", Value: KindTypology},
+		{Label: "行为评分", Value: KindBehavioralRating},
+		{Label: "认知测评", Value: KindCognitive},
 	}
-	for _, apiKind := range []string{KindCustom} {
-		if !disabled[apiKind] {
-			t.Fatalf("api kind option %q must be disabled", apiKind)
+	if len(got) != len(want) {
+		t.Fatalf("apiKindOptions() = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("apiKindOptions()[%d] = %#v, want %#v", i, got[i], want[i])
 		}
 	}
 }

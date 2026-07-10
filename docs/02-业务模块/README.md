@@ -15,7 +15,7 @@
 | 支撑阅读顺序 | `50-actor -> 60-plan -> 70-statistics` |
 | 代码注册事实 | 以 [`internal/apiserver/container/modules/registry.go`](../../internal/apiserver/container/modules/registry.go) 的 `BusinessPackages` 为准 |
 | 代码包名 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
-| 兼容注册名 | `modelcatalog` 兼容注册 `scale`、`typologymodel`；二者不再作为独立核心模块维护 |
+| 模型目录边界 | `modelcatalog` 是唯一模型资产模块；collection 的 `typology-models` 仅是业务 BFF facade |
 | 旧文档处理 | 旧未编号目录已归档到 [`docs/_archive/2026-07-06-business-module-redesign`](../_archive/2026-07-06-business-module-redesign/) |
 
 一句话概括：**qs-server 的测评业务由作答事实、模型资产、测评执行、解释报告四层核心链路组成，actor、plan、statistics 是围绕这条链路的支撑模块。**
@@ -77,7 +77,7 @@ Survey
 | 文档业务名称 | 当前代码包名 / 注册名 | 说明 |
 | ------------ | --------------------- | ---- |
 | `survey` | `survey` | 问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实 |
-| `model-catalog` | `modelcatalog`，兼容注册 `scale/typologymodel` | 统一测评模型资产层，旧 Scale 和 Personality Model 归入这一层 |
+| `model-catalog` | `modelcatalog` | 统一测评模型资产层，四类 canonical identity 共享 `DefinitionV2` 主路径 |
 | `evaluation` | `evaluation` | 一次测评执行、执行状态、计分和结果生成 |
 | `interpretation` | `interpretation` | 解释模型、报告模型、builder、adapter、`InterpretReport` 输出 |
 | `actor` | `actor` | 受试者、从业者、操作者、访问上下文 |

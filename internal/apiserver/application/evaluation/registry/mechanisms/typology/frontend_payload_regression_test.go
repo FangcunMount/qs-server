@@ -8,7 +8,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -117,7 +117,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 		t.Fatalf("MarkPublished: %v", err)
 	}
 
-	snapshot, err := publishedmodel.BuildAssessmentSnapshot(model)
+	snapshot, err := (appdefinition.TypologyDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {
 		t.Fatalf("Build published model: %v", err)
 	}

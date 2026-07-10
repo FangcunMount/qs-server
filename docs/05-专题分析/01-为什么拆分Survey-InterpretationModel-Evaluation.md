@@ -153,9 +153,9 @@ EvaluatorKey
 需要特别注意：
 
 ```text
-scale/typologymodel 是 modelcatalog 的 legacy register name（R108 后 `personalitymodel` 注册名已改为 `typologymodel`）；
-application/scale 与 collection `application/typologymodel` 等为能力路径；
-它们不再表示文档层的独立核心模块。
+modelcatalog 是唯一模型资产模块；
+collection 的 typology REST facade 只负责前台投影；
+它们不表示额外的模型领域或专用目录 gRPC。
 ```
 
 ---
@@ -412,14 +412,13 @@ Interpretation Model / Report
 
 文档应该先统一业务语言，但代码包名不一定马上改。
 
-当前代码仍有：
+当前命名仍有：
 
 ```text
 modelcatalog
 report
 statistics
-application/scale
-application/modelcatalog/typology/consumer
+collection typology REST facade
 ```
 
 如果马上把它们改成：
@@ -505,12 +504,8 @@ statistic
 ### Assessment Model
 
 - `internal/apiserver/container/modules/modelcatalog`
-- `internal/apiserver/container/modules/modelcatalog/module.go`
 - `internal/apiserver/domain/modelcatalog`
-- `internal/apiserver/domain/modelcatalog/scale`
 - `internal/apiserver/application/modelcatalog`
-- `internal/apiserver/application/scale`
-- `internal/apiserver/application/modelcatalog/typology/consumer`
 - `internal/apiserver/port/modelcatalog`
 
 ### Evaluation
@@ -525,8 +520,8 @@ statistic
 
 - `internal/apiserver/container/modules/interpretation`
 - `internal/apiserver/domain/interpretation`
-- `internal/apiserver/domain/interpretation/score`
-- `internal/apiserver/domain/interpretation/personality`
+- `internal/apiserver/domain/interpretation/scoring`
+- `internal/apiserver/domain/interpretation/typology`
 - `internal/apiserver/container/modules/modelcatalog/report_builders.go`
 
 ### Cross-boundary Infrastructure

@@ -1,10 +1,8 @@
 package modelcatalog
 
 import (
+	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
-	appNorming "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
-	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
-	appTypology "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 )
 
 // definitionRegistry is the sole composition point for family-specific
@@ -13,8 +11,8 @@ import (
 func definitionRegistry(deps Deps) appdefinition.Registry {
 	return appdefinition.NewRegistry(
 		appdefinition.ScaleDefinitionHandler{},
-		appNorming.DefinitionHandler{NormRepo: deps.Norming.NormRepo},
-		appTaskPerformance.DefinitionHandler{NormRepo: deps.TaskPerformance.NormRepo},
-		appTypology.DefinitionHandler{QuestionnaireQuery: deps.Typology.QuestionnaireQuery},
+		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: deps.Catalog.NormRepo},
+		appdefinition.CognitiveDefinitionHandler{NormRepo: deps.Catalog.NormRepo},
+		appdefinition.TypologyDefinitionHandler{QuestionnaireQuery: deps.Catalog.QuestionnaireQuery, ReportPreviewer: previewadapter.NewPreviewer()},
 	)
 }

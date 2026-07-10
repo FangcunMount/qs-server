@@ -63,7 +63,6 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 		"InternalService":               "NewInternalService",
 		"PlanCommandService":            "NewPlanCommandService",
 		"QuestionnaireService":          "NewQuestionnaireService",
-		"TypologyModelService":          "NewTypologyModelService",
 	}
 
 	err = filepath.WalkDir(protoRoot, func(path string, d os.DirEntry, err error) error {
@@ -137,28 +136,6 @@ func TestInternalProtoEvaluateAssessmentResponseHasNoLegacyFields(t *testing.T) 
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("EvaluateAssessmentResponse still contains legacy field: %s", forbidden)
 		}
-	}
-}
-
-func TestListTypologyModelsRequestHasNoAlgorithmFilter(t *testing.T) {
-	t.Parallel()
-
-	data, err := os.ReadFile("../../../../api/grpc/proto/typologymodel/typology_model.proto")
-	if err != nil {
-		t.Fatal(err)
-	}
-	source := string(data)
-	msgStart := strings.Index(source, "message ListTypologyModelsRequest {")
-	if msgStart < 0 {
-		t.Fatal("missing ListTypologyModelsRequest message")
-	}
-	msgEnd := strings.Index(source[msgStart:], "\n}")
-	if msgEnd < 0 {
-		t.Fatal("unterminated ListTypologyModelsRequest message")
-	}
-	body := source[msgStart : msgStart+msgEnd]
-	if strings.Contains(body, "algorithm =") {
-		t.Fatal("ListTypologyModelsRequest still contains legacy algorithm filter")
 	}
 }
 

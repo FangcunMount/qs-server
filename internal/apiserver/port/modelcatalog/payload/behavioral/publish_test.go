@@ -1,10 +1,11 @@
 package behavioral_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publishedmodel"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -23,9 +24,9 @@ func TestBuildPublishedModelUsesDefinitionV2Decision(t *testing.T) {
 		}},
 	}
 
-	snapshot, err := publishedmodel.BuildAssessmentSnapshot(model)
+	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {
-		t.Fatalf("BuildAssessmentSnapshot: %v", err)
+		t.Fatalf("BuildSnapshotPayload: %v", err)
 	}
 	if snapshot.DecisionKind != domain.DecisionKindNormLookup {
 		t.Fatalf("decision kind = %q, want norm_lookup", snapshot.DecisionKind)
@@ -49,7 +50,7 @@ func TestBuildPublishedModelPreservesConfiguredBrief2PrimaryDimension(t *testing
 		}},
 	}
 
-	snapshot, err := publishedmodel.BuildAssessmentSnapshot(model)
+	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {
 		t.Fatalf("Build published model: %v", err)
 	}

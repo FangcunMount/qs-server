@@ -57,7 +57,6 @@ type Manager struct {
 	evaluationClient             *EvaluationClient
 	actorClient                  *ActorClient
 	assessmentModelCatalogClient *AssessmentModelCatalogClient
-	typologyModelClient          *TypologyModelClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -258,10 +257,6 @@ func (m *Manager) RegisterClients() error {
 	m.clients["assessmentModelCatalog"] = m.assessmentModelCatalogClient
 	log.Info("   📚 Assessment model catalog client registered")
 
-	m.typologyModelClient = NewTypologyModelClient(baseClient)
-	m.clients["typologyModel"] = m.typologyModelClient
-	log.Info("   📊 Personality model client registered")
-
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
 	return nil
 }
@@ -289,11 +284,6 @@ func (m *Manager) ActorClient() *ActorClient {
 // AssessmentModelCatalogClient returns the published-only generic catalog client.
 func (m *Manager) AssessmentModelCatalogClient() *AssessmentModelCatalogClient {
 	return m.assessmentModelCatalogClient
-}
-
-// TypologyModelClient 获取人格测评模型客户端
-func (m *Manager) TypologyModelClient() *TypologyModelClient {
-	return m.typologyModelClient
 }
 
 // GetClient 根据名称获取客户端

@@ -188,7 +188,6 @@ func (c *Container) SetSurveyModule(module *surveymod.Module) {
 
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
-	c.TypologyModelModule = module.Typology
 	if c.SurveyModule != nil {
 		c.SurveyModule.SetCatalogManagementService(module.Management)
 	}

@@ -44,7 +44,7 @@ flowchart LR
     Collection --> QS
     Collection --> Actor
     Collection --> Eval
-    Collection --> Scale
+    Collection --> Catalog
 
     Worker --> AS
     Worker --> Eval
@@ -78,6 +78,12 @@ Registry 里如果依赖缺失，会记录 warning 并 skip 注册，不直接 p
 | registry | `internal/apiserver/transport/grpc/registry.go` |
 | grpc server config | `internal/pkg/grpc/server.go` |
 | transport bootstrap | `internal/apiserver/process/transport_bootstrap.go` |
+
+### 3.1 AssessmentModelCatalogService
+
+`AssessmentModelCatalogService` 是唯一的内部测评模型目录 gRPC。它只提供已发布模型的详情、列表、热榜和选项；详情中的 `definition_json` 是带 conclusion `Kind` 的 canonical `DefinitionV2` JSON。
+
+调用方不得从该服务的 published payload 推导模型语义。collection 的 `/typology-models` 是 generic catalog 的 REST BFF 投影，不对应专用 typology gRPC。
 
 ---
 

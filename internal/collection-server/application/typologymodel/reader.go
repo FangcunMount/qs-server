@@ -2,9 +2,11 @@ package typologymodel
 
 import "context"
 
-// CatalogReader 类型学模型目录读端口（application-owned DTO）。
+// CatalogReader is the typology presentation projection consumed by the BFF.
+// Its port adapter reads the generic published-model catalog and projects
+// DefinitionV2 without calling a typology-specific gRPC service.
 type CatalogReader interface {
-	GetTypologyModel(ctx context.Context, code string) (*TypologyModelResponse, error)
-	ListTypologyModels(ctx context.Context, page, pageSize int32) (*ListTypologyModelsResponse, error)
-	GetTypologyModelCategories(ctx context.Context) (*TypologyModelCategoriesResponse, error)
+	GetTypologyModel(context.Context, string) (*TypologyModelResponse, error)
+	ListTypologyModels(context.Context, int32, int32) (*ListTypologyModelsResponse, error)
+	GetTypologyModelCategories(context.Context) (*TypologyModelCategoriesResponse, error)
 }

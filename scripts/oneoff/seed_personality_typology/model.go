@@ -8,8 +8,9 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -67,10 +68,14 @@ func seedAssessmentModel(
 	if err := model.BindQuestionnaire(binding, now); err != nil {
 		return fmt.Errorf("bind questionnaire %s: %w", plan.Code, err)
 	}
-	if err := model.UpdateDefinition(domain.DefinitionPayload{
+	materialized, err := modeltypology.ImportLegacyDefinition(definitionBytes, plan.Algorithm)
+	if err != nil {
+		return fmt.Errorf("materialize definition %s: %w", plan.Code, err)
+	}
+	if err := model.UpdateDefinitionWithV2(domain.DefinitionPayload{
 		Format: domain.PayloadFormatPersonalityTypologyV1,
 		Data:   definitionBytes,
-	}, now); err != nil {
+	}, materialized.Definition, now); err != nil {
 		return fmt.Errorf("update definition %s: %w", plan.Code, err)
 	}
 	if err := draftRepo.Create(ctx, model); err != nil {
@@ -83,16 +88,7 @@ func seedAssessmentModel(
 		}
 	}
 
-	publishPayloadBytes, err := fullPayloadDefinitionBytes(payload)
-	if err != nil {
-		return err
-	}
-	publishModel := *model
-	publishModel.Definition = domain.DefinitionPayload{
-		Format: domain.PayloadFormatPersonalityTypologyV1,
-		Data:   publishPayloadBytes,
-	}
-	snapshot, err := aminfra.BuildPersonalityPublishedSnapshot(&publishModel)
+	snapshot, err := (publication.Publisher{Registry: appdefinition.NewRegistry(appdefinition.TypologyDefinitionHandler{})}).BuildSnapshot(ctx, model)
 	if err != nil {
 		return fmt.Errorf("build published snapshot %s: %w", plan.Code, err)
 	}

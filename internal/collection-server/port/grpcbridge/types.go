@@ -9,31 +9,27 @@ package grpcbridge
 import grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 
 type (
-	AnswerInput                   = grpcclient.AnswerInput
-	AnswerSheetOutput             = grpcclient.AnswerSheetOutput
-	AssessmentDetailOutput        = grpcclient.AssessmentDetailOutput
-	AssessmentReportOutput        = grpcclient.AssessmentReportOutput
-	AssessmentSummaryOutput       = grpcclient.AssessmentSummaryOutput
-	DimensionInterpretOutput      = grpcclient.DimensionInterpretOutput
-	CreateTesteeRequest           = grpcclient.CreateTesteeRequest
-	FactorScoreOutput             = grpcclient.FactorScoreOutput
-	ListAssessmentsOutput         = grpcclient.ListAssessmentsOutput
-	ListTypologyModelsOutput      = grpcclient.ListTypologyModelsOutput
-	ListQuestionnairesOutput      = grpcclient.ListQuestionnairesOutput
-	ModelExtraOutput              = grpcclient.ModelExtraOutput
-	ModelIdentityOutput           = grpcclient.ModelIdentityOutput
-	TypologyModelCategoriesOutput = grpcclient.TypologyModelCategoriesOutput
-	TypologyModelOutput           = grpcclient.TypologyModelOutput
-	TypologyModelSummaryOutput    = grpcclient.TypologyModelSummaryOutput
-	QuestionOutput                = grpcclient.QuestionOutput
-	QuestionnaireOutput           = grpcclient.QuestionnaireOutput
-	ResultLevelOutput             = grpcclient.ResultLevelOutput
-	SaveAnswerSheetInput          = grpcclient.SaveAnswerSheetInput
-	SaveAnswerSheetOutput         = grpcclient.SaveAnswerSheetOutput
-	ScoreValueOutput              = grpcclient.ScoreValueOutput
-	SuggestionOutput              = grpcclient.SuggestionOutput
-	TesteeResponse                = grpcclient.TesteeResponse
-	TesteeCareContextResponse     = grpcclient.TesteeCareContextResponse
-	TrendPointOutput              = grpcclient.TrendPointOutput
-	UpdateTesteeRequest           = grpcclient.UpdateTesteeRequest
+	AnswerInput               = grpcclient.AnswerInput
+	AnswerSheetOutput         = grpcclient.AnswerSheetOutput
+	AssessmentDetailOutput    = grpcclient.AssessmentDetailOutput
+	AssessmentReportOutput    = grpcclient.AssessmentReportOutput
+	AssessmentSummaryOutput   = grpcclient.AssessmentSummaryOutput
+	DimensionInterpretOutput  = grpcclient.DimensionInterpretOutput
+	CreateTesteeRequest       = grpcclient.CreateTesteeRequest
+	FactorScoreOutput         = grpcclient.FactorScoreOutput
+	ListAssessmentsOutput     = grpcclient.ListAssessmentsOutput
+	ListQuestionnairesOutput  = grpcclient.ListQuestionnairesOutput
+	ModelExtraOutput          = grpcclient.ModelExtraOutput
+	ModelIdentityOutput       = grpcclient.ModelIdentityOutput
+	QuestionOutput            = grpcclient.QuestionOutput
+	QuestionnaireOutput       = grpcclient.QuestionnaireOutput
+	ResultLevelOutput         = grpcclient.ResultLevelOutput
+	SaveAnswerSheetInput      = grpcclient.SaveAnswerSheetInput
+	SaveAnswerSheetOutput     = grpcclient.SaveAnswerSheetOutput
+	ScoreValueOutput          = grpcclient.ScoreValueOutput
+	SuggestionOutput          = grpcclient.SuggestionOutput
+	TesteeResponse            = grpcclient.TesteeResponse
+	TesteeCareContextResponse = grpcclient.TesteeCareContextResponse
+	TrendPointOutput          = grpcclient.TrendPointOutput
+	UpdateTesteeRequest       = grpcclient.UpdateTesteeRequest
 )

@@ -92,7 +92,7 @@ collection RegisterRoutes 先设置：
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
 | assessment（因子/趋势/状态） | `GET /api/v1/assessments/trend`、`/:id/factors/high-risk`、`/:id/scores`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
 | assessment-model | `GET /api/v1/assessment-models?kind=scale`、`/hot?kind=scale`、`/options?kind=scale`、`/:code` |
-| typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code` |
+| typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code`；由 generic catalog 的 DefinitionV2 投影 |
 | typology-session | `POST /api/v1/typology-assessment-sessions`（**小程序推荐入口**） |
 | typology-assessment | `GET /api/v1/typology-assessments`、`/:id`、`/:id/report`、`/:id/wait-report`（report/wait 需 `testee_id`） |
 | testee | `POST/GET /api/v1/testees`、`/exists`、`/:id`、`/:id/care-context`、`PUT /:id` |

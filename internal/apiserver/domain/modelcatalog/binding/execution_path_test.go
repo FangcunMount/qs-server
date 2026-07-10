@@ -13,7 +13,6 @@ func TestFamilyCapabilityExecutionPathMatrix(t *testing.T) {
 		{KindTypology, ExecutionPathTypologyDescriptor},
 		{KindBehavioralRating, ExecutionPathBehavioralRatingDescriptor},
 		{KindCognitive, ExecutionPathCognitiveDescriptor},
-		{KindCustom, ExecutionPathNone},
 	}
 	for _, tc := range tests {
 		got, ok := FamilyCapabilityByKind(tc.kind)

@@ -40,6 +40,27 @@ func TestRegistryResolveByIdentity(t *testing.T) {
 	}
 }
 
+func TestRegistryResolvesAllCanonicalDefinitionStrategies(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry(
+		ScaleDefinitionHandler{},
+		BehavioralRatingDefinitionHandler{},
+		CognitiveDefinitionHandler{},
+		TypologyDefinitionHandler{},
+	)
+	for _, identity := range []domain.Identity{
+		{Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault},
+		{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2},
+		{Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM},
+		{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI},
+	} {
+		if _, ok := registry.Resolve(identity); !ok {
+			t.Fatalf("Resolve(%s/%s/%s) = no handler", identity.Kind, identity.SubKind, identity.Algorithm)
+		}
+	}
+}
+
 func TestValidationErrorPreservesIssues(t *testing.T) {
 	t.Parallel()
 

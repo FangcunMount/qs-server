@@ -2,8 +2,10 @@ package definition
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
@@ -52,6 +54,28 @@ type Handler interface {
 	BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error)
 }
 
+// PreviewResult is the strategy-owned representation of a definition report
+// preview. The authoring use case owns its transport projection.
+type PreviewResult struct {
+	OutcomeCode    string
+	OutcomeTitle   string
+	ScoreDetail    map[string]float64
+	ReportSections []PreviewSection
+	RawReport      *report.InterpretReport
+}
+
+type PreviewSection struct {
+	Title   string
+	Content string
+	Kind    string
+}
+
+// PreviewHandler is implemented only by definition strategies that support
+// report preview. It keeps family-specific execution shaping inside Registry.
+type PreviewHandler interface {
+	PreviewReport(context.Context, *domain.AssessmentModel, json.RawMessage) (*PreviewResult, error)
+}
+
 // Registry resolves family handlers by model identity.
 type Registry struct {
 	handlers []Handler
@@ -82,6 +106,21 @@ func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
 		return handler, nil
 	}
 	return nil, fmt.Errorf("unsupported assessment model identity %s/%s/%s", identity.Kind, identity.SubKind, identity.Algorithm)
+}
+
+func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentModel, input json.RawMessage) (*PreviewResult, error) {
+	if model == nil {
+		return nil, fmt.Errorf("assessment model is nil")
+	}
+	handler, err := r.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
+	if err != nil {
+		return nil, err
+	}
+	preview, ok := handler.(PreviewHandler)
+	if !ok {
+		return nil, fmt.Errorf("report preview is not configured for model identity %s/%s/%s", model.Kind, model.SubKind, model.Algorithm)
+	}
+	return preview.PreviewReport(ctx, model, input)
 }
 
 // ValidationError keeps structured validation issues visible across

@@ -122,7 +122,7 @@ func (s *catalogQueryService) ListHotPublished(ctx context.Context, actor ActorC
 	if s.deps.HotRank == nil {
 		return &HotModelListResult{Items: []HotModelSummary{}, Limit: normalizeHotLimit(limit), WindowDays: normalizeHotWindow(windowDays)}, nil
 	}
-	if input.Kind != "" && normalizeAPIKind(input.Kind) != string(domain.KindScale) {
+	if input.Kind != "" && input.Kind != KindScale {
 		return &HotModelListResult{Items: []HotModelSummary{}, Limit: normalizeHotLimit(limit), WindowDays: normalizeHotWindow(windowDays)}, nil
 	}
 	entries, err := s.deps.HotRank.Top(ctx, hotrank.Query{Limit: normalizeHotLimit(limit), WindowDays: normalizeHotWindow(windowDays)})
@@ -156,21 +156,11 @@ func (s *catalogQueryService) Options(ctx context.Context, actor ActorContext, k
 	if err := s.authorize(ctx, actor, Resource{}); err != nil {
 		return nil, err
 	}
-	result := &OptionsResult{
-		Kinds:             apiKindOptions(),
-		ProductChannels:   productChannelOptions(),
-		AlgorithmFamilies: algorithmFamilyOptions(),
-		Algorithms:        []Option{{Label: "MBTI", Value: "mbti"}, {Label: "SBTI", Value: "sbti"}, {Label: "Big Five", Value: "bigfive"}, {Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)}, {Label: "SPM", Value: string(domain.AlgorithmSPM)}},
-		SubKinds:          []Option{{Label: "类型人格", Value: "typology"}, {Label: "量表评分", Value: SubKindScale}},
+	if kind != "" && !IsSupportedAPIKind(kind) {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}
-	if normalizeAPIKind(kind) == string(domain.KindScale) {
-		result.Categories = scaleCategoryOptions()
-		result.Stages = scaleStageOptions()
-		result.ApplicableAges = scaleApplicableAgeOptions()
-		result.Reporters = scaleReporterOptions()
-		result.Tags = []Option{}
-	}
-	return result, nil
+	result := catalogOptionsForKind(kind)
+	return &result, nil
 }
 
 func (s *catalogQueryService) GetQRCode(ctx context.Context, actor ActorContext, codeValue string) (string, error) {
@@ -221,7 +211,7 @@ func kindFromListInput(input ListModelsDTO) (domain.Kind, error) {
 	if input.Kind == "" {
 		return "", nil
 	}
-	kind, ok := APIKindToDomainKind(normalizeAPIKind(input.Kind))
+	kind, ok := APIKindToDomainKind(input.Kind)
 	if !ok {
 		return "", errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}

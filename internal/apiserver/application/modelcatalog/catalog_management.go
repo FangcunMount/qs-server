@@ -28,7 +28,7 @@ type AssessmentCatalogManagementService struct {
 
 func (s AssessmentCatalogManagementService) Create(ctx context.Context, actor ActorContext, input CreateModelDTO) (*ModelSummary, error) {
 	kind, ok := APIKindToDomainKind(input.Kind)
-	if !ok || kind == domain.KindCustom {
+	if !ok {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}
 	if err := s.authorize(ctx, actor, Resource{Kind: kind}); err != nil {

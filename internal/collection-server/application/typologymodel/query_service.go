@@ -8,17 +8,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type typologyModelClient = CatalogReader
-
 // QueryService is the BFF layer for typology model catalog reads.
 type QueryService struct {
-	client          typologyModelClient
+	client          CatalogReader
 	cache           CatalogCache
 	coalescer       loadguard.Coalescer
 	useSingleflight bool
 }
 
-func NewQueryService(client typologyModelClient, cache CatalogCache, useSingleflight bool) *QueryService {
+func NewQueryService(client CatalogReader, cache CatalogCache, useSingleflight bool) *QueryService {
 	svc := &QueryService{
 		client:          client,
 		cache:           cache,
@@ -75,7 +73,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*TypologyModelResp
 			log.Infof("Getting typology model: code=%s", code)
 			result, err := s.client.GetTypologyModel(ctx, code)
 			if err != nil {
-				logTypologyGRPCError("Failed to get typology model via gRPC", err)
+				logTypologyGRPCError("Failed to get typology model from generic catalog", err)
 				return nil, err
 			}
 			return result, nil
@@ -101,7 +99,7 @@ func (s *QueryService) List(ctx context.Context, req *ListTypologyModelsRequest)
 		func() (*ListTypologyModelsResponse, error) {
 			result, err := s.client.ListTypologyModels(ctx, req.Page, req.PageSize)
 			if err != nil {
-				logTypologyGRPCError("Failed to list typology models via gRPC", err)
+				logTypologyGRPCError("Failed to list typology models from generic catalog", err)
 				return nil, err
 			}
 			return result, nil
@@ -122,7 +120,7 @@ func (s *QueryService) GetCategories(ctx context.Context) (*TypologyModelCategor
 		func() (*TypologyModelCategoriesResponse, error) {
 			result, err := s.client.GetTypologyModelCategories(ctx)
 			if err != nil {
-				logTypologyGRPCError("Failed to get typology model categories via gRPC", err)
+				logTypologyGRPCError("Failed to get typology model categories from generic catalog", err)
 				return nil, err
 			}
 			return result, nil

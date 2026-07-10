@@ -1319,7 +1319,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse'
+                      $ref: '#/components/schemas/typologymodel.ListTypologyModelsResponse'
   /typology-models/categories:
     get:
       tags:
@@ -1814,21 +1814,6 @@ components:
           items:
             $ref: '#/components/schemas/questionnaire.QuestionnaireSummaryResponse'
         total:
-          type: integer
-    github_com_FangcunMount_qs-server_internal_collection-server_application_typologymodel.ListTypologyModelsResponse:
-      type: object
-      properties:
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/typologymodel.TypologyModelSummaryResponse'
-        page:
-          type: integer
-        page_size:
-          type: integer
-        total:
-          type: integer
-        total_pages:
           type: integer
     meta.Birthday:
       type: object
@@ -2380,6 +2365,21 @@ components:
           type: string
         severity:
           type: string
+    typologymodel.ListTypologyModelsResponse:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/typologymodel.TypologyModelSummaryResponse'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
     typologymodel.TypologyCategoryResponse:
       type: object
       properties:
@@ -2427,11 +2427,9 @@ components:
           items:
             $ref: '#/components/schemas/typologymodel.TypologyDimensionResponse'
         kind:
-          description: 模型族；R128b canonical 为 typology，读兼容 personality。
           type: string
           enum:
           - typology
-          - personality
           example: typology
         outcomes:
           type: array
@@ -2440,11 +2438,9 @@ components:
         payload_format:
           type: string
         product_channel:
-          description: 产品通道；R128b canonical 为 typology，读兼容 personality。
           type: string
           enum:
           - typology
-          - personality
           example: typology
         question_count:
           type: integer
@@ -2476,20 +2472,16 @@ components:
         description:
           type: string
         kind:
-          description: 模型族；R128b canonical 为 typology，读兼容 personality。
           type: string
           enum:
           - typology
-          - personality
           example: typology
         payload_format:
           type: string
         product_channel:
-          description: 产品通道；R128b canonical 为 typology，读兼容 personality。
           type: string
           enum:
           - typology
-          - personality
           example: typology
         question_count:
           type: integer

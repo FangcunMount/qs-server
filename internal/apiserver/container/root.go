@@ -55,7 +55,6 @@ type Container struct {
 	// 业务模块
 	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
 	AssessmentModelModule *AssessmentModelModule // 测评解释模型资产（量表 + 类型学模型目录）
-	TypologyModelModule   *TypologyModelModule   // Typology 能力别名（AssessmentModelModule.Typology）
 	ActorModule           *ActorModule           // Actor 模块
 	EvaluationModule      *EvaluationModule      // Evaluation 模块（测评、得分、报告）
 	ReportModule          *ReportModule          // Report 模块（报告读模型与 builder registry）

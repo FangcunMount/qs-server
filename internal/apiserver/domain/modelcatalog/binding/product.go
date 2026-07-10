@@ -24,7 +24,7 @@ func (p Product) IsValid() bool {
 
 // ProductFromChannel normalizes a persisted product channel to the product taxonomy.
 func ProductFromChannel(channel ProductChannel) (Product, error) {
-	product := Product(NormalizeProductChannel(channel))
+	product := Product(channel)
 	if !product.IsValid() {
 		return "", fmt.Errorf("%w: product %q is invalid", ErrInvalidArgument, channel)
 	}
@@ -35,8 +35,8 @@ func (p Product) Channel() ProductChannel { return ProductChannel(p) }
 
 // ProductChannelForIdentity resolves an explicit persisted channel or the model-family default.
 func ProductChannelForIdentity(kind Kind, explicitChannel string) string {
-	if explicitChannel != "" {
-		return string(NormalizeProductChannel(ProductChannel(explicitChannel)))
+	if explicitChannel != "" && ProductChannel(explicitChannel).IsValid() {
+		return explicitChannel
 	}
 	if kind == "" {
 		return ""

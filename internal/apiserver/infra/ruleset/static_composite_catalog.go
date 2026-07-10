@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -38,7 +37,7 @@ func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
 		return port.Ref{}, false, nil
 	}
 	if snapshot := c.findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion); snapshot != nil {
-		return aminfra.RefFromPublished(snapshot), true, nil
+		return port.RefFromPublished(snapshot), true, nil
 	}
 	return port.Ref{}, false, nil
 }
@@ -84,7 +83,7 @@ func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.Ref) *port.PublishedM
 		if model == nil {
 			continue
 		}
-		if aminfra.RefMatchesPublished(ref, model) {
+		if port.RefMatchesPublished(ref, model) {
 			return model
 		}
 	}

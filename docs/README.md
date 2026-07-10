@@ -19,7 +19,7 @@
 | 当前业务模块 | 4 个核心模块：`survey / model-catalog / evaluation / report`；3 个支撑模块：`actor / plan / statistics` |
 | 代码映射 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
 | 执行主线 | Survey 提供答卷事实，Assessment Model 提供发布模型资产，Evaluation 执行测评并产出结果，Interpretation Model / Report 输出最终解释报告 |
-| 兼容说明 | `scale/typologymodel` 是 `modelcatalog` 的旧注册名或具体模型资产入口，不再作为独立核心模块 |
+| 模型目录 | `modelcatalog` 是唯一模型资产模块；collection 可保留 `/typology-models` 业务 BFF，不对应独立模块或 gRPC |
 
 ---
 
@@ -44,8 +44,8 @@ Survey
     管问卷定义、题目结构、答卷提交和 AnswerSheet 事实
 
 Assessment Model
-    管测评模型资产：Kind / Snapshot / Binding / Payload
-    Scale / MBTI / BigFive 等都是模型资产或执行插件
+    管测评模型资产：Identity / DefinitionV2 / Binding / Published Snapshot
+    Scale / MBTI / BigFive 等都是模型 identity 或 Definition strategy
 
 Evaluation
     管一次测评执行：Assessment / Outcome / Retry / Events

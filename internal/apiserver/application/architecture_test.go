@@ -474,9 +474,6 @@ func TestLegacyDefinitionImportsStayAtInputAdapters(t *testing.T) {
 
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/apiserver/application/modelcatalog/service_norming_gateway.go":          {},
-		"internal/apiserver/application/modelcatalog/service_task_performance_gateway.go": {},
-		"internal/apiserver/application/modelcatalog/typology/legacy_definition_input.go": {},
 		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go":        {},
 		"internal/apiserver/port/modelcatalog/payload/cognitive/payload.go":               {},
 		"internal/apiserver/port/modelcatalog/payload/typology/definition.go":             {},

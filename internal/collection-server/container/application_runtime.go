@@ -75,7 +75,7 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 		),
 		assessmentModels: appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient)),
 		typology: typologymodel.NewQueryService(
-			grpcbridge.NewTypologyCatalogReader(c.typologyModelClient),
+			grpcbridge.NewTypologyCatalogProjector(appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient))),
 			catalogCaches.typology,
 			catalogL1SingleflightEnabled(c.opts, catalogKindTypology),
 		),

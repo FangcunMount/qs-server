@@ -3,27 +3,21 @@ package modelcatalog
 import (
 	"encoding/json"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const (
-	KindTypology = "typology"
-	// KindPersonality is a deprecated API alias accepted for read-compat.
-	KindPersonality = "personality"
-	// KindBehaviorAbility 是 API 产品通道类型；List 聚合已移除，Options 仍暴露 channel 元数据。
-	KindBehaviorAbility                = option.APIKindBehaviorAbility
+	KindScale                          = string(domain.KindScale)
+	KindTypology                       = string(domain.KindTypology)
 	KindBehavioralRating               = string(domain.KindBehavioralRating)
-	KindMedicalScale                   = "medical_scale"
-	KindCognitive                      = "cognitive"
-	KindCustom                         = "custom"
+	KindCognitive                      = string(domain.KindCognitive)
 	SubKindTypology                    = "typology"
 	SubKindScale                       = "scale"
 	StatusDraft                        = "draft"
 	StatusPublished                    = "published"
 	StatusArchived                     = "archived"
-	PayloadFormatMedicalScaleV1        = "assessmentmodel.medical_scale.scale.v1"
+	PayloadFormatScaleV1               = domain.PayloadFormatAssessmentScaleV1
 	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
 )
 
@@ -44,8 +38,6 @@ type ListModelsDTO struct {
 	QuestionnaireVersion string
 	Page                 int
 	PageSize             int
-	// ModelFamily filters behavior_ability channel listing 到 一个执行家族。
-	ModelFamily string
 }
 
 type CreateModelDTO struct {
@@ -86,8 +78,7 @@ type BindQuestionnaireDTO struct {
 }
 
 type DefinitionDTO struct {
-	// 模型族；R128b canonical 为 typology，读兼容 personality。
-	Kind            string          `json:"kind" example:"typology" enums:"typology,personality"`
+	Kind            string          `json:"kind" example:"typology"`
 	SubKind         string          `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm       string          `json:"algorithm,omitempty"`
 	ProductChannel  string          `json:"product_channel,omitempty"`
@@ -103,13 +94,11 @@ type ApplyCodesDTO struct {
 }
 
 type ModelSummary struct {
-	Code string `json:"code"`
-	// 模型族；R128b canonical 为 typology，读兼容 personality。
-	Kind      string `json:"kind" example:"typology" enums:"typology,personality"`
-	SubKind   string `json:"sub_kind,omitempty" example:"typology"`
-	Algorithm string `json:"algorithm,omitempty"`
-	// 产品通道；R128b canonical 为 typology，读兼容 personality。
-	ProductChannel       string   `json:"product_channel,omitempty" example:"typology" enums:"typology,personality"`
+	Code                 string   `json:"code"`
+	Kind                 string   `json:"kind" example:"typology"`
+	SubKind              string   `json:"sub_kind,omitempty" example:"typology"`
+	Algorithm            string   `json:"algorithm,omitempty"`
+	ProductChannel       string   `json:"product_channel,omitempty" example:"typology"`
 	AlgorithmFamily      string   `json:"algorithm_family,omitempty"`
 	Title                string   `json:"title"`
 	Description          string   `json:"description,omitempty"`

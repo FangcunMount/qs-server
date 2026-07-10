@@ -1,51 +1,24 @@
 # ModelCatalog
 
-**本文回答**：ModelCatalog 模块文档应该从哪里读，哪些是当前模块设计，哪些是规划草案。
-
-ModelCatalog 是**测评模型资产目录**。它负责管理“如何解释答卷”的模型配置，并把可变配置发布成可查询、可缓存、可执行的快照。
-
-核心问题：
+ModelCatalog 是测评模型资产目录：它管理可编辑模型定义、发布不可变模型快照，并向运行时提供已发布的 `DefinitionV2`。
 
 ```text
-针对某个已发布问卷版本，应该使用哪套测评模型定义来解释答卷？
+AssessmentModel + DefinitionV2
+  -> publish
+Published AssessmentSnapshot + DefinitionV2
+  -> resolver
+evaluation / collection / survey / notification
 ```
 
----
+当前事实：`DefinitionV2` 是配置和运行语义事实；`port/modelcatalog/payload/*` 下的 JSON 是 published wire/runtime DTO，不参与领域判断。运行时只读取 published model，不读取 draft、旧 `scales` collection，也不从 payload 回退推导语义。
 
-## 1. 阅读顺序
+| 文档 | 内容 |
+| --- | --- |
+| [01-模块设计](./01-模块设计.md) | 职责、应用服务和边界 |
+| [02-领域模型设计](./02-领域模型设计.md) | `AssessmentModel` 与四层 `DefinitionV2` |
+| [03-关键链路分析](./03-关键链路分析.md) | 编辑、发布、运行和 collection BFF 链路 |
+| [04-存储与契约](./04-存储与契约.md) | Mongo、REST、gRPC、payload 契约 |
+| [05-目标设计草案](./05-目标设计草案.md) | 已落地的终局不变量 |
+| [06-重构计划](./06-重构计划.md) | 数据迁移、发布和故障处理运行手册 |
 
-| 顺序 | 文档 | 类型 | 回答的问题 |
-| ---- | ---- | ---- | ---------- |
-| 1 | [01-模块设计.md](./01-模块设计.md) | 模块文档 | ModelCatalog 的职责、边界、当前代码分层和上下游 |
-| 2 | [02-领域模型设计.md](./02-领域模型设计.md) | 模块文档 | 当前领域模型和目标模型如何对应 |
-| 3 | [03-关键链路分析.md](./03-关键链路分析.md) | 模块文档 | 创建、绑定、发布、查询、运行解析这些链路如何走 |
-| 4 | [04-存储与契约.md](./04-存储与契约.md) | 模块文档 | Mongo、port、cache、legacy storage 的边界 |
-| 5 | [05-目标设计草案.md](./05-目标设计草案.md) | 设计草案 | 目标模型命名、Definition 四层结构、版本语义 |
-| 6 | [06-重构计划.md](./06-重构计划.md) | 重构计划 | 如何从当前代码迁移到目标模型 |
-
----
-
-## 2. 当前权威来源
-
-事实优先级：
-
-1. 当前源码与运行时行为。
-2. Mongo PO、port interface、REST/gRPC 契约、迁移脚本等机器可读事实。
-3. 本目录下的当前模块文档。
-4. `_archive` 中历史文档，仅作为迁移输入和历史背景。
-
-旧文档已归档到：
-
-[docs/_archive/2026-07-09-model-catalog-redesign](../../_archive/2026-07-09-model-catalog-redesign/)
-
-归档文档不再作为当前设计权威来源。
-
----
-
-## 3. 当前模块结论
-
-- 当前代码已经有统一 `AssessmentModel` 草稿聚合和 `PublishedModel` 发布读模型。
-- 当前 domain 仍混合了目标模型、运行 payload、legacy 医学量表聚合和兼容 adapter。
-- 当前运行侧以 `published_assessment_models` 为发布模型读取入口，evaluation 不应读取草稿模型。
-- 当前 `scales` 仍是医学量表 legacy authoring store，不应再作为目标领域模型来源。
-- 目标设计应把 ModelCatalog 写成“模块设计 + 领域模型 + 关键链路”，而不只是模型命名草案。
+历史设计与已完成的迁移记录放在 `docs/_archive/2026-07-09-model-catalog-redesign/`，不再代表现行实现。

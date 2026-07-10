@@ -50,7 +50,7 @@ func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
 		t.Fatal("cognitive evaluator not materialized")
 	}
 	for _, forbidden := range []domain.Kind{
-		domain.KindCustom,
+		domain.Kind("custom"),
 	} {
 		for key := range keys {
 			if key.Kind == forbidden {

@@ -17,8 +17,8 @@
 // （assessmentmodel.behavioral_rating.default.v1 用于旧版默认模型；
 // assessmentmodel.behavioral_rating.brief2.v1 用于 Brief-2）。
 //
-// KindCustom 是保留的目录类型（API 选项禁用），与类型学算法 custom_typology
-// 或计划 scheduleType=custom 无关。KindCognitive 通过 ExecutionPathCognitive 描述符执行。
+// KindCognitive 通过 ExecutionPathCognitive 描述符执行。类型学算法 custom_typology
+// 与测评模型 Kind 无关。
 // (assessmentmodel.cognitive.默认.v1 旧版; assessmentmodel.cognitive.spm.v1 用于 SPM)。
 //
 // # 根包门面（export.go）
@@ -36,7 +36,8 @@
 //
 // 深 import 目标领域子包用于机制专用逻辑；跨机制常用读路径类型经 export.go 薄 re-export。
 // 新增机制专用逻辑仍优先落在子包；仅将跨包高频叶子类型提升到根包别名。
-// application 展示选项见 application/modelcatalog/option.ModelCatalogOption（与 domain ModelFamilyCapability 分离）。
+// application 展示选项由 application/modelcatalog.CatalogQueryService 投影，
+// 与 domain ModelFamilyCapability 分离。
 //
 // # 子包
 //
