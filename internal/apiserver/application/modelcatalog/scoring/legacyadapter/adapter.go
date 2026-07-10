@@ -124,12 +124,24 @@ func ScaleResultFromPublishedModel(snapshot *port.PublishedModel) (*shared.Scale
 	if snapshot.Kind != "" && snapshot.Kind != domain.KindScale {
 		return nil, fmt.Errorf("published model kind %s is not scale", snapshot.Kind)
 	}
-	scaleSnapshot, err := ScaleSnapshotFromDefinitionPayload(domain.DefinitionPayload{
-		Format: snapshot.PayloadFormat,
-		Data:   snapshot.Payload,
-	})
-	if err != nil {
-		return nil, err
+	if snapshot.DefinitionV2 == nil {
+		return nil, fmt.Errorf("published scale definition_v2 is required")
+	}
+	legacy, _ := port.LegacyScaleBindingFromPublished(snapshot)
+	version := legacy.ScaleVersion
+	if version == "" {
+		version = snapshot.Version
+	}
+	scaleSnapshot := scalesnapshot.ScaleSnapshotFromDefinition(scalesnapshot.ExecutionEnvelope{
+		Code:                 snapshot.Code,
+		ScaleVersion:         version,
+		Title:                snapshot.Title,
+		QuestionnaireCode:    snapshot.QuestionnaireCode,
+		QuestionnaireVersion: snapshot.QuestionnaireVersion,
+		Status:               snapshot.Status,
+	}, snapshot.DefinitionV2)
+	if scaleSnapshot == nil {
+		return nil, fmt.Errorf("published scale definition_v2 cannot produce runtime snapshot")
 	}
 	model := &domain.AssessmentModel{
 		Code:           snapshot.Code,
@@ -148,10 +160,7 @@ func ScaleResultFromPublishedModel(snapshot *port.PublishedModel) (*shared.Scale
 			QuestionnaireCode:    snapshot.QuestionnaireCode,
 			QuestionnaireVersion: snapshot.QuestionnaireVersion,
 		},
-		Definition: domain.DefinitionPayload{
-			Format: snapshot.PayloadFormat,
-			Data:   append([]byte(nil), snapshot.Payload...),
-		},
+		DefinitionV2: snapshot.DefinitionV2,
 	}
 	return ScaleResultFromSnapshot(model, scaleSnapshot), nil
 }

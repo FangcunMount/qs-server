@@ -125,7 +125,7 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 	if result.Version != "" {
 		version = result.Version
 	}
-	return &port.AssessmentSnapshot{
+	snapshot := &port.AssessmentSnapshot{
 		SchemaVersion:        domain.SchemaVersionV2,
 		PayloadFormat:        result.PayloadFormat,
 		ProductChannel:       domain.ResolveProductChannel(model.Kind, model.ProductChannel),
@@ -149,6 +149,10 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 		Payload:              result.Payload,
 		DefinitionV2:         model.DefinitionV2,
 	}
+	if snapshot.Kind == domain.KindScale {
+		port.SetLegacyScaleBinding(snapshot, port.LegacyScaleBinding{ScaleVersion: snapshot.Version})
+	}
+	return snapshot
 }
 
 func modelVersionString(model *domain.AssessmentModel) string {

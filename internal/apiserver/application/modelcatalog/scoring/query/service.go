@@ -266,8 +266,9 @@ func (s *queryService) assessmentScaleContextFromPublishedModel(ctx context.Cont
 
 func publishedScaleContext(snapshot *modelcatalogport.PublishedModel) *shared.AssessmentScaleContextResult {
 	scaleVersion := snapshot.Version
-	if result, err := legacyadapter.ScaleResultFromPublishedModel(snapshot); err == nil && result != nil && result.ScaleVersion != "" {
-		scaleVersion = result.ScaleVersion
+	legacy, _ := modelcatalogport.LegacyScaleBindingFromPublished(snapshot)
+	if legacy.ScaleVersion != "" {
+		scaleVersion = legacy.ScaleVersion
 	}
 	scaleCode := snapshot.Code
 	scaleName := snapshot.Title

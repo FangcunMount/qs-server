@@ -1,7 +1,6 @@
 package modelcatalog
 
 import (
-	"encoding/json"
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -64,20 +63,24 @@ func DecodeScaleFromPublished(model *port.PublishedModel) (*scalesnapshot.ScaleS
 	if snapshot == nil {
 		return nil, fmt.Errorf("scale definition_v2 cannot produce runtime snapshot: %s", model.Code)
 	}
-	applyScaleWireMetadata(snapshot, model.Payload)
+	applyScaleWireMetadata(snapshot, model)
 	return snapshot, nil
 }
 
 // applyScaleWireMetadata reads only the legacy wire identifier. It is not part
 // of DefinitionV2 semantics, but legacy binding adapters still need it.
-func applyScaleWireMetadata(snapshot *scalesnapshot.ScaleSnapshot, payload []byte) {
-	if snapshot == nil || len(payload) == 0 {
+func applyScaleWireMetadata(snapshot *scalesnapshot.ScaleSnapshot, model *port.PublishedModel) {
+	if snapshot == nil || model == nil {
 		return
 	}
-	var wire struct {
-		ID uint64 `json:"id"`
+	legacy, ok := port.LegacyScaleBindingFromPublished(model)
+	if !ok {
+		return
 	}
-	if json.Unmarshal(payload, &wire) == nil && snapshot.ID == 0 {
-		snapshot.ID = wire.ID
+	if snapshot.ID == 0 {
+		snapshot.ID = legacy.MedicalScaleID
+	}
+	if legacy.ScaleVersion != "" {
+		snapshot.ScaleVersion = legacy.ScaleVersion
 	}
 }

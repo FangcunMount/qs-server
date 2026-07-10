@@ -96,8 +96,10 @@ func TestScaleResultFromPublishedModelProjectsResponseShape(t *testing.T) {
 		QuestionnaireCode:    model.Binding.QuestionnaireCode,
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		PayloadFormat:        model.Definition.Format,
-		Payload:              append([]byte(nil), model.Definition.Data...),
+		Payload:              []byte(`not-json`),
+		DefinitionV2:         model.DefinitionV2,
 	}
+	port.SetLegacyScaleBinding(published, port.LegacyScaleBinding{ScaleVersion: "1.0.0"})
 	result, err := ScaleResultFromPublishedModel(published)
 	if err != nil {
 		t.Fatalf("ScaleResultFromPublishedModel: %v", err)
