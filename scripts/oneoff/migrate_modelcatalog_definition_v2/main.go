@@ -124,7 +124,7 @@ func migratePublished(ctx context.Context, repo *mongomodelcatalog.Repository, n
 }
 
 func materialize(kind domain.Kind, algorithm domain.Algorithm, payload []byte) (shared.DefinitionMaterialization, error) {
-	switch kind {
+	switch domain.NormalizeKind(kind) {
 	case domain.KindScale:
 		snapshot, err := scale.ParsePublishedPayload(payload)
 		if err != nil {
