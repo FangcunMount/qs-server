@@ -49,7 +49,7 @@ func (p *Payload) deriveLegacyRuntimeSpec(requireAlgorithm bool) (*RuntimeSpec, 
 	}
 	if p.Algorithm != "" {
 		spec.OutcomeMapping = LegacyOutcomeMappingFromAlgorithm(p.Algorithm)
-		spec.Report = LegacyReportSpecFromPayload(p)
+		spec.Report = LegacyReportSpecFromAlgorithm(p.Algorithm)
 	}
 	return spec, nil
 }

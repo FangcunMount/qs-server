@@ -7,26 +7,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// CanonicalFactorsFromGraph 投影类型学 因子图 配置 为 规范 目录 因子。
-// The adapter 是 只读: 类型学 运行时 keeps owning 图执行语义。
-func CanonicalFactorsFromGraph(fg FactorGraphSpec) []factor.Factor {
-	return CanonicalMeasureSpecFromGraph(fg).Factors
-}
-
-// CanonicalMeasureSpecFromGraph 投影类型学 因子图 配置 为测量层配置。
-func CanonicalMeasureSpecFromGraph(fg FactorGraphSpec) definition.MeasureSpec {
+func canonicalMeasureSpecFromGraph(fg FactorGraphSpec) definition.MeasureSpec {
 	if fg.HasExplicitFactorGraph() {
 		return canonicalMeasureFromExplicitGraph(fg)
 	}
 	return canonicalMeasureFromLegacyLayout(fg)
-}
-
-// CanonicalFactors 投影运行时规格 为 规范 目录 因子。
-func (s *RuntimeSpec) CanonicalFactors() []factor.Factor {
-	if s == nil {
-		return nil
-	}
-	return CanonicalFactorsFromGraph(s.FactorGraph)
 }
 
 // CanonicalMeasureSpec 投影运行时规格 为测量层配置。
@@ -34,25 +19,7 @@ func (s *RuntimeSpec) CanonicalMeasureSpec() definition.MeasureSpec {
 	if s == nil {
 		return definition.MeasureSpec{}
 	}
-	return CanonicalMeasureSpecFromGraph(s.FactorGraph)
-}
-
-// CanonicalFactors 解析运行时规格 和 投影 类型学 配置 为 规范 因子。
-func (p *Payload) CanonicalFactors() ([]factor.Factor, error) {
-	spec, err := p.ToRuntimeSpec()
-	if err != nil {
-		return nil, err
-	}
-	return spec.CanonicalFactors(), nil
-}
-
-// CanonicalMeasureSpec 解析运行时规格 和 投影 类型学 配置 为测量层配置。
-func (p *Payload) CanonicalMeasureSpec() (definition.MeasureSpec, error) {
-	spec, err := p.ToRuntimeSpec()
-	if err != nil {
-		return definition.MeasureSpec{}, err
-	}
-	return spec.CanonicalMeasureSpec(), nil
+	return canonicalMeasureSpecFromGraph(s.FactorGraph)
 }
 
 func canonicalMeasureFromLegacyLayout(fg FactorGraphSpec) definition.MeasureSpec {

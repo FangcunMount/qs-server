@@ -26,14 +26,6 @@ func LegacyOutcomeMappingFromAlgorithm(algorithm binding.Algorithm) OutcomeMappi
 	}
 }
 
-// LegacyReportSpecFromPayload 推导report spec 从 旧版 载荷 算法 field。
-func LegacyReportSpecFromPayload(p *Payload) ReportSpec {
-	if p == nil {
-		return ReportSpec{}
-	}
-	return LegacyReportSpecFromAlgorithm(p.Algorithm)
-}
-
 // LegacyReportSpecFromAlgorithm 推导report spec 从 旧版 算法 identifier。
 func LegacyReportSpecFromAlgorithm(algorithm binding.Algorithm) ReportSpec {
 	switch algorithm {

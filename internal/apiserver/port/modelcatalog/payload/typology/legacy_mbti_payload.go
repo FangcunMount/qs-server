@@ -15,17 +15,6 @@ type MBTILegacyModel struct {
 	TypeProfiles         []MBTILegacyTypeProfile        `json:"type_profiles"`
 }
 
-func (m *MBTILegacyModel) IsPublished() bool {
-	return m != nil && (m.Status == "" || m.Status == "published")
-}
-
-func (m *MBTILegacyModel) MatchesQuestionnaire(code, version string) bool {
-	if m == nil || m.QuestionnaireCode != code {
-		return false
-	}
-	return m.QuestionnaireVersion == "" || version == "" || m.QuestionnaireVersion == version
-}
-
 func (m *MBTILegacyModel) FindTypeProfile(typeCode string) (MBTILegacyTypeProfile, bool) {
 	if m == nil {
 		return MBTILegacyTypeProfile{}, false

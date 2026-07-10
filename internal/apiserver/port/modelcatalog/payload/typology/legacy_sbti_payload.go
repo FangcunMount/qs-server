@@ -21,17 +21,6 @@ type SBTILegacyModel struct {
 	DrinkTrigger                SBTILegacyDrinkTrigger         `json:"drink_trigger"`
 }
 
-func (m *SBTILegacyModel) IsPublished() bool {
-	return m != nil && (m.Status == "" || m.Status == "published")
-}
-
-func (m *SBTILegacyModel) MatchesQuestionnaire(code, version string) bool {
-	if m == nil || m.QuestionnaireCode != code {
-		return false
-	}
-	return m.QuestionnaireVersion == "" || version == "" || m.QuestionnaireVersion == version
-}
-
 type SBTILegacySource struct {
 	WikiRepo      string `json:"wiki_repo"`
 	SourceSite    string `json:"source_site"`

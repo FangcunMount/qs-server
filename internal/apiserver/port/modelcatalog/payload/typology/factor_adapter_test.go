@@ -27,14 +27,14 @@ func TestCanonicalFactorsFromLegacyMBTIGraph(t *testing.T) {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
 
-	factors := typology.CanonicalFactorsFromGraph(spec.FactorGraph)
+	measure := spec.CanonicalMeasureSpec()
+	factors := measure.Factors
 	if len(factors) != 1 {
 		t.Fatalf("factors = %#v", factors)
 	}
 	if factors[0].Code != "EI" || factors[0].ResolvedRole() != factor.FactorRoleDimension {
 		t.Fatalf("factor = %#v", factors[0])
 	}
-	measure := typology.CanonicalMeasureSpecFromGraph(spec.FactorGraph)
 	if len(measure.Scoring) != 1 ||
 		measure.Scoring[0].Sources[0].Kind != factor.ScoringSourceQuestion ||
 		measure.Scoring[0].Sources[0].Code != "q1" {
@@ -42,7 +42,7 @@ func TestCanonicalFactorsFromLegacyMBTIGraph(t *testing.T) {
 	}
 }
 
-func TestPayloadCanonicalFactorsUsesRuntimeSpec(t *testing.T) {
+func TestRuntimeSpecCanonicalMeasureSpecUsesExplicitGraph(t *testing.T) {
 	t.Parallel()
 
 	payload := &typology.Payload{
@@ -75,16 +75,13 @@ func TestPayloadCanonicalFactorsUsesRuntimeSpec(t *testing.T) {
 		},
 	}
 
-	factors, err := payload.CanonicalFactors()
+	spec, err := payload.ToRuntimeSpec()
 	if err != nil {
-		t.Fatalf("CanonicalFactors: %v", err)
+		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if len(factors) != 1 || factors[0].Code != "O" {
-		t.Fatalf("factors = %#v", factors)
-	}
-	measure, err := payload.CanonicalMeasureSpec()
-	if err != nil {
-		t.Fatalf("CanonicalMeasureSpec: %v", err)
+	measure := spec.CanonicalMeasureSpec()
+	if len(measure.Factors) != 1 || measure.Factors[0].Code != "O" {
+		t.Fatalf("factors = %#v", measure.Factors)
 	}
 	if len(measure.Scoring) != 1 || measure.Scoring[0].Sources[0].Code != "q1" {
 		t.Fatalf("scoring = %#v", measure.Scoring)
@@ -94,7 +91,7 @@ func TestPayloadCanonicalFactorsUsesRuntimeSpec(t *testing.T) {
 func TestCanonicalFactorsSkipsCompositeNodes(t *testing.T) {
 	t.Parallel()
 
-	factors := typology.CanonicalFactorsFromGraph(typology.FactorGraphSpec{
+	measure := (&typology.RuntimeSpec{FactorGraph: typology.FactorGraphSpec{
 		Factors: map[string]typology.FactorSpec{
 			"root": {
 				ID:       "root",
@@ -111,7 +108,8 @@ func TestCanonicalFactorsSkipsCompositeNodes(t *testing.T) {
 			},
 		},
 		Roots: []string{"root"},
-	})
+	}}).CanonicalMeasureSpec()
+	factors := measure.Factors
 	if len(factors) != 1 || factors[0].Code != "L1" {
 		t.Fatalf("factors = %#v", factors)
 	}

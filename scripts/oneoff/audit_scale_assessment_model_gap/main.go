@@ -43,16 +43,16 @@ func main() {
 }
 
 type auditReport struct {
-	scalesTotal                int64
-	scalesHead                 int64
-	scalesPublishedSnapshot    int64
-	scalesDeleted              int64
-	assessmentModelsTotal      int64
-	assessmentModelsScaleKind  int64
-	publishedAssessmentTotal   int64
-	publishedAssessmentScale   int64
-	missingInAssessmentModels  []string
-	extraInAssessmentModels    []string
+	scalesTotal               int64
+	scalesHead                int64
+	scalesPublishedSnapshot   int64
+	scalesDeleted             int64
+	assessmentModelsTotal     int64
+	assessmentModelsScaleKind int64
+	publishedAssessmentTotal  int64
+	publishedAssessmentScale  int64
+	missingInAssessmentModels []string
+	extraInAssessmentModels   []string
 }
 
 func audit(ctx context.Context, db *mongo.Database) (*auditReport, error) {
@@ -76,8 +76,8 @@ func audit(ctx context.Context, db *mongo.Database) (*auditReport, error) {
 		return nil, err
 	}
 	report.scalesPublishedSnapshot, err = scales.CountDocuments(ctx, bson.M{
-		"deleted_at":   nil,
-		"record_role":  "published_snapshot",
+		"deleted_at":  nil,
+		"record_role": "published_snapshot",
 	})
 	if err != nil {
 		return nil, err
