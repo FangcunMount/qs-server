@@ -55,7 +55,7 @@ type ScoringDeps struct {
 }
 
 // NewScoring assembles the scoring capability.
-func NewScoring(deps ScoringDeps) (*Scoring, error) {
+func NewScoring(deps ScoringDeps, registry appdefinition.Registry) (*Scoring, error) {
 	normalized, err := normalizeScoringDeps(deps)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 	definitionAuthoring := appauthoring.Service{
 		ModelRepo:  normalized.ModelRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
-		Registry:   appdefinition.NewRegistry(assessmentstore.DefinitionHandler{}),
+		Registry:   registry,
 	}
 	module.FactorService = scoringApp.NewFactorService(
 		normalized.ModelRepo,
@@ -164,5 +164,5 @@ type ScaleDeps = ScoringDeps
 
 // NewScale is a deprecated alias for NewScoring (container compat).
 func NewScale(deps ScaleDeps) (*Scale, error) {
-	return NewScoring(deps)
+	return NewScoring(deps, appdefinition.NewRegistry(assessmentstore.DefinitionHandler{}))
 }

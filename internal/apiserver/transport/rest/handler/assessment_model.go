@@ -18,11 +18,22 @@ import (
 
 type AssessmentModelHandler struct {
 	BaseHandler
-	service modelcatalog.Service
+	service     modelcatalog.Service
+	management  modelcatalog.CatalogManagementService
+	publication modelcatalog.PublicationService
 }
 
-func NewAssessmentModelHandler(service modelcatalog.Service) *AssessmentModelHandler {
-	return &AssessmentModelHandler{service: service}
+func NewAssessmentModelHandler(service modelcatalog.Service, usecases ...interface{}) *AssessmentModelHandler {
+	handler := &AssessmentModelHandler{service: service}
+	for _, usecase := range usecases {
+		switch value := usecase.(type) {
+		case modelcatalog.CatalogManagementService:
+			handler.management = value
+		case modelcatalog.PublicationService:
+			handler.publication = value
+		}
+	}
+	return handler
 }
 
 // List 获取测评模型列表
@@ -85,7 +96,7 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.Create(c.Request.Context(), modelcatalog.CreateModelDTO{
+	input := modelcatalog.CreateModelDTO{
 		Code:                 req.Code,
 		Kind:                 req.Kind,
 		SubKind:              req.SubKind,
@@ -97,7 +108,22 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		Tags:                 req.Tags,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
-	})
+	}
+	if h.management == nil {
+		result, err := h.service.Create(c.Request.Context(), input)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelResponse)(result))
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.management.Create(c.Request.Context(), actor, input)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -128,7 +154,7 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.UpdateBasicInfo(c.Request.Context(), modelcatalog.UpdateBasicInfoDTO{
+	input := modelcatalog.UpdateBasicInfoDTO{
 		Code:           h.modelCode(c),
 		Title:          req.Title,
 		Description:    req.Description,
@@ -137,7 +163,22 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		ProductChannel: req.ProductChannel,
 		Category:       req.Category,
 		Tags:           req.Tags,
-	})
+	}
+	if h.management == nil {
+		result, err := h.service.UpdateBasicInfo(c.Request.Context(), input)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelResponse)(result))
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.management.UpdateBasicInfo(c.Request.Context(), actor, input)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -146,6 +187,19 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 }
 
 func (h *AssessmentModelHandler) Delete(c *gin.Context) {
+	if h.management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if err := h.management.Delete(c.Request.Context(), actor, h.modelCode(c)); err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.SuccessResponseWithMessage(c, "删除成功", nil)
+		return
+	}
 	if err := h.service.Delete(c.Request.Context(), h.modelCode(c)); err != nil {
 		h.Error(c, err)
 		return
@@ -154,6 +208,20 @@ func (h *AssessmentModelHandler) Delete(c *gin.Context) {
 }
 
 func (h *AssessmentModelHandler) Publish(c *gin.Context) {
+	if h.publication != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.publication.Publish(c.Request.Context(), actor, h.modelCode(c))
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelResponse)(result))
+		return
+	}
 	result, err := h.service.Validate(c.Request.Context(), h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)
@@ -171,10 +239,38 @@ func (h *AssessmentModelHandler) Publish(c *gin.Context) {
 }
 
 func (h *AssessmentModelHandler) Unpublish(c *gin.Context) {
+	if h.publication != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.publication.Unpublish(c.Request.Context(), actor, h.modelCode(c))
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelResponse)(result))
+		return
+	}
 	h.transition(c, h.service.Unpublish)
 }
 
 func (h *AssessmentModelHandler) Archive(c *gin.Context) {
+	if h.management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.management.Archive(c.Request.Context(), actor, h.modelCode(c))
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelResponse)(result))
+		return
+	}
 	h.transition(c, h.service.Archive)
 }
 
@@ -194,11 +290,26 @@ func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.BindQuestionnaire(c.Request.Context(), modelcatalog.BindQuestionnaireDTO{
+	input := modelcatalog.BindQuestionnaireDTO{
 		Code:                 h.modelCode(c),
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
-	})
+	}
+	if h.management == nil {
+		result, err := h.service.BindQuestionnaire(c.Request.Context(), input)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, (*response.AssessmentModelQuestionnaireResponse)(result))
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.management.BindQuestionnaire(c.Request.Context(), actor, input)
 	if err != nil {
 		h.Error(c, err)
 		return

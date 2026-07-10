@@ -19,24 +19,33 @@ type AssessmentPublicationService struct {
 	Published  modelcatalogport.PublishedModelRepository
 	Authorizer Authorizer
 	Registry   appdefinition.Registry
+	Bindings   QuestionnaireBindingPolicies
+	Effects    LifecycleEffectsRegistry
 	Now        func() time.Time
-	After      func(context.Context, *domain.AssessmentModel, string)
 }
 
-func (s AssessmentPublicationService) Publish(ctx context.Context, actor ActorContext, modelCode string) (*domain.AssessmentModel, error) {
+func (s AssessmentPublicationService) Publish(ctx context.Context, actor ActorContext, modelCode string) (*ModelSummary, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
 		return nil, err
+	}
+	if err := s.Bindings.BeforePublish(ctx, model); err != nil {
+		return nil, err
+	}
+	if model.Kind == domain.KindScale {
+		if err := refreshScaleDraftProjection(model); err != nil {
+			return nil, err
+		}
 	}
 	publisher := publication.Publisher{Registry: s.Registry, ModelRepo: s.ModelRepo, Repo: s.Published, Now: s.Now}
 	if _, err := publisher.Publish(ctx, model, publication.PublishOptions{ReplaceKind: model.Kind}); err != nil {
 		return nil, err
 	}
-	s.after(ctx, model, "publish")
-	return model, nil
+	s.Effects.AfterTransition(ctx, model, LifecycleActionPublished)
+	return modelSummaryFromAssessmentModel(model), nil
 }
 
-func (s AssessmentPublicationService) Unpublish(ctx context.Context, actor ActorContext, modelCode string) (*domain.AssessmentModel, error) {
+func (s AssessmentPublicationService) Unpublish(ctx context.Context, actor ActorContext, modelCode string) (*ModelSummary, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
 		return nil, err
@@ -50,8 +59,8 @@ func (s AssessmentPublicationService) Unpublish(ctx context.Context, actor Actor
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err
 	}
-	s.after(ctx, model, "unpublish")
-	return model, nil
+	s.Effects.AfterTransition(ctx, model, LifecycleActionUnpublished)
+	return modelSummaryFromAssessmentModel(model), nil
 }
 
 func (s AssessmentPublicationService) loadAndAuthorize(ctx context.Context, actor ActorContext, modelCode string) (*domain.AssessmentModel, error) {
@@ -76,10 +85,4 @@ func (s AssessmentPublicationService) now() time.Time {
 		return s.Now().UTC()
 	}
 	return time.Now().UTC()
-}
-
-func (s AssessmentPublicationService) after(ctx context.Context, model *domain.AssessmentModel, action string) {
-	if s.After != nil && model != nil {
-		s.After(ctx, model, action)
-	}
 }

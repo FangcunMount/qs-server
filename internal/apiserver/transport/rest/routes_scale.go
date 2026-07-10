@@ -11,7 +11,7 @@ import (
 // registerScaleProtectedRoutes 注册量表相关的受保护路由。
 func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 	deps := r.deps.Scale
-	if deps.LifecycleService == nil || deps.FactorService == nil || deps.QueryService == nil || deps.CategoryService == nil {
+	if deps.FactorService == nil || deps.QueryService == nil || deps.CategoryService == nil {
 		return
 	}
 	scaleHandler := codesHandler.NewScaleHandler(
@@ -20,6 +20,7 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		deps.QueryService,
 		deps.CategoryService,
 		deps.QRCodeService,
+		codesHandler.ScaleCatalogCommands{Management: deps.Management, Publication: deps.Publication, ModelRepo: deps.ModelRepo},
 	)
 
 	scales := apiV1.Group("/scales")

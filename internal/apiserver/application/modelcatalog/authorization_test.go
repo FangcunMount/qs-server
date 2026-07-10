@@ -50,3 +50,17 @@ func TestSnapshotAuthorizerRejectsCommandWithoutOrganizationScope(t *testing.T) 
 		t.Fatal("Authorize() succeeded without organization scope")
 	}
 }
+
+func TestSnapshotAuthorizerAllowsTrustedServiceCatalogCommandWithoutOrganizationScope(t *testing.T) {
+	t.Parallel()
+	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
+		Permissions: []appauthz.Permission{{Resource: "qs:assessment_models", Action: "create"}},
+	})
+	actor := ActorContext{Principal: securityplane.Principal{
+		Kind:   securityplane.PrincipalKindService,
+		Source: securityplane.PrincipalSourceServiceAuth,
+	}}
+	if err := (SnapshotAuthorizer{}).Authorize(ctx, actor, ActionManageCatalog, Resource{}); err != nil {
+		t.Fatalf("Authorize() trusted service actor error = %v", err)
+	}
+}

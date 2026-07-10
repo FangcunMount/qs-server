@@ -15,6 +15,7 @@ type CatalogManagementService interface {
 	BindQuestionnaire(ctx context.Context, actor ActorContext, input BindQuestionnaireDTO) (*QuestionnaireBindingResult, error)
 	Archive(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 	Delete(ctx context.Context, actor ActorContext, code string) error
+	SynchronizeQuestionnaireVersion(ctx context.Context, actor ActorContext, questionnaireCode, questionnaireVersion string) error
 }
 
 // DefinitionAuthoringService owns canonical DefinitionV2 editing commands.

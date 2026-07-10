@@ -1,6 +1,11 @@
 package modelcatalog
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+import (
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	appauthoring "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+)
 
 // Module is the assessment-model composition root (scoring + typology/norming/taskperformance catalog).
 type Module struct {
@@ -8,6 +13,10 @@ type Module struct {
 	Typology        *Typology
 	TaskPerformance *TaskPerformance
 	Norming         *Norming
+	ModelRepo       modelcatalogport.ModelRepository
+	Management      *assessmentModelApp.AssessmentCatalogManagementService
+	Authoring       *appauthoring.Service
+	Publication     *assessmentModelApp.AssessmentPublicationService
 }
 
 // Deps groups constructor dependencies for both assessment-model capabilities.
@@ -20,7 +29,10 @@ type Deps struct {
 
 // New assembles scoring and typology catalog capabilities.
 func New(deps Deps) (*Module, error) {
-	scoring, err := NewScoring(deps.Scoring)
+	registry := definitionRegistry(deps)
+	bindings := questionnaireBindingPolicies(deps)
+	effects := lifecycleEffects(deps)
+	scoring, err := NewScoring(deps.Scoring, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -36,11 +48,35 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	management := &assessmentModelApp.AssessmentCatalogManagementService{
+		ModelRepo:       deps.Typology.ModelRepo,
+		Published:       deps.Typology.PublishedRepo,
+		Authorizer:      assessmentModelApp.SnapshotAuthorizer{},
+		BindingPolicies: bindings,
+		Effects:         effects,
+	}
+	authoring := &appauthoring.Service{
+		ModelRepo:  deps.Typology.ModelRepo,
+		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
+		Registry:   registry,
+	}
+	publication := &assessmentModelApp.AssessmentPublicationService{
+		ModelRepo:  deps.Typology.ModelRepo,
+		Published:  deps.Typology.PublishedRepo,
+		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
+		Registry:   registry,
+		Bindings:   bindings,
+		Effects:    effects,
+	}
 	return &Module{
 		Scoring:         scoring,
 		Typology:        typology,
 		TaskPerformance: taskPerformance,
 		Norming:         norming,
+		ModelRepo:       deps.Typology.ModelRepo,
+		Management:      management,
+		Authoring:       authoring,
+		Publication:     publication,
 	}, nil
 }
 

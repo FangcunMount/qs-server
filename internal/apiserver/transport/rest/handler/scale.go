@@ -7,6 +7,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -24,6 +26,16 @@ type ScaleHandler struct {
 	queryService     scale.ScaleQueryService
 	categoryService  scale.ScaleCategoryService
 	qrCodeService    scale.ScaleQRCodeQueryService // 小程序码生成服务（可选）
+	catalog          ScaleCatalogCommands
+}
+
+// ScaleCatalogCommands is the legacy /scales lifecycle adapter input. It
+// deliberately exposes the unified services rather than another scale command
+// service.
+type ScaleCatalogCommands struct {
+	Management  assessmentModelApp.CatalogManagementService
+	Publication assessmentModelApp.PublicationService
+	ModelRepo   modelcatalogport.ModelRepository
 }
 
 // NewScaleHandler 创建量表处理器
@@ -33,14 +45,19 @@ func NewScaleHandler(
 	queryService scale.ScaleQueryService,
 	categoryService scale.ScaleCategoryService,
 	qrCodeService scale.ScaleQRCodeQueryService, // 小程序码生成服务（可选）
+	commands ...ScaleCatalogCommands,
 ) *ScaleHandler {
-	return &ScaleHandler{
+	handler := &ScaleHandler{
 		lifecycleService: lifecycleService,
 		factorService:    factorService,
 		queryService:     queryService,
 		categoryService:  categoryService,
 		qrCodeService:    qrCodeService,
 	}
+	if len(commands) > 0 {
+		handler.catalog = commands[0]
+	}
+	return handler
 }
 
 // ============= Lifecycle API (生命周期管理) =============
@@ -82,6 +99,37 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 		Tags:                 req.Tags,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
+	}
+	if h.catalog.Management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		summary, err := h.catalog.Management.Create(c.Request.Context(), actor, assessmentModelApp.CreateModelDTO{
+			Code:                 dto.Code,
+			Kind:                 assessmentModelApp.KindMedicalScale,
+			Title:                dto.Title,
+			Description:          dto.Description,
+			Category:             dto.Category,
+			Stages:               dto.Stages,
+			ApplicableAges:       dto.ApplicableAges,
+			Reporters:            dto.Reporters,
+			Tags:                 dto.Tags,
+			QuestionnaireCode:    dto.QuestionnaireCode,
+			QuestionnaireVersion: dto.QuestionnaireVersion,
+		})
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, summary.Code)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
+		return
 	}
 
 	result, err := h.lifecycleService.Create(c.Request.Context(), dto)
@@ -137,6 +185,34 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 		Reporters:      req.Reporters,
 		Tags:           req.Tags,
 	}
+	if h.catalog.Management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		summary, err := h.catalog.Management.UpdateBasicInfo(c.Request.Context(), actor, assessmentModelApp.UpdateBasicInfoDTO{
+			Code:           dto.Code,
+			Title:          dto.Title,
+			Description:    dto.Description,
+			Category:       dto.Category,
+			Stages:         dto.Stages,
+			ApplicableAges: dto.ApplicableAges,
+			Reporters:      dto.Reporters,
+			Tags:           dto.Tags,
+		})
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, summary.Code)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
+		return
+	}
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
 	if err != nil {
@@ -180,6 +256,24 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 	}
+	if h.catalog.Management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if _, err := h.catalog.Management.BindQuestionnaire(c.Request.Context(), actor, assessmentModelApp.BindQuestionnaireDTO{Code: dto.Code, QuestionnaireCode: dto.QuestionnaireCode, QuestionnaireVersion: dto.QuestionnaireVersion}); err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, dto.Code)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
+		return
+	}
 
 	result, err := h.lifecycleService.UpdateQuestionnaire(c.Request.Context(), dto)
 	if err != nil {
@@ -204,6 +298,24 @@ func (h *ScaleHandler) Publish(c *gin.Context) {
 	logger.L(c.Request.Context()).Infow("Publish: 发布量表", "scaleCode", scaleCode)
 	if scaleCode == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/publish"))
+		return
+	}
+	if h.catalog.Publication != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if _, err := h.catalog.Publication.Publish(c.Request.Context(), actor, scaleCode); err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, scaleCode)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
 		return
 	}
 
@@ -231,6 +343,24 @@ func (h *ScaleHandler) Unpublish(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/unpublish"))
 		return
 	}
+	if h.catalog.Publication != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if _, err := h.catalog.Publication.Unpublish(c.Request.Context(), actor, scaleCode); err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, scaleCode)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
+		return
+	}
 
 	result, err := h.lifecycleService.Unpublish(c.Request.Context(), scaleCode)
 	if err != nil {
@@ -254,6 +384,24 @@ func (h *ScaleHandler) Archive(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/archive"))
+		return
+	}
+	if h.catalog.Management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if _, err := h.catalog.Management.Archive(c.Request.Context(), actor, scaleCode); err != nil {
+			h.Error(c, err)
+			return
+		}
+		result, err := h.projectScale(c, scaleCode)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, response.NewScaleResponse(result))
 		return
 	}
 
@@ -280,6 +428,19 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		return
+	}
+	if h.catalog.Management != nil {
+		actor, err := assessmentModelActorContext(c)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if err := h.catalog.Management.Delete(c.Request.Context(), actor, scaleCode); err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.SuccessResponseWithMessage(c, "删除成功", nil)
 		return
 	}
 
@@ -382,6 +543,17 @@ func assessmentModelActorContext(c *gin.Context) (assessmentModelApp.ActorContex
 		return assessmentModelApp.ActorContext{}, errors.WithCode(code.ErrPermissionDenied, "resolved organization scope is required")
 	}
 	return assessmentModelApp.ActorContext{Principal: principal, Scope: scope}, nil
+}
+
+func (h *ScaleHandler) projectScale(c *gin.Context, modelCode string) (*scale.ScaleResult, error) {
+	if h.catalog.ModelRepo == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "assessment model repository is not configured")
+	}
+	model, err := h.catalog.ModelRepo.FindByCode(c.Request.Context(), modelCode)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentstore.ScaleResult(model)
 }
 
 // ReplaceInterpretRules 批量设置解读规则

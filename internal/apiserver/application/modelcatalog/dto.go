@@ -56,6 +56,9 @@ type CreateModelDTO struct {
 	Description          string
 	Category             string
 	Tags                 []string
+	Stages               []string
+	ApplicableAges       []string
+	Reporters            []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 }
@@ -69,6 +72,9 @@ type UpdateBasicInfoDTO struct {
 	ProductChannel string
 	Category       string
 	Tags           []string
+	Stages         []string
+	ApplicableAges []string
+	Reporters      []string
 }
 
 type BindQuestionnaireDTO struct {

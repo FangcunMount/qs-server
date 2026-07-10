@@ -48,7 +48,7 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	if actor.Principal.Kind == securityplane.PrincipalKindUnknown {
 		return errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
 	}
-	if action != ActionResolvePublished && !actor.Scope.HasOrgID {
+	if action != ActionResolvePublished && !actor.Scope.HasOrgID && !isTrustedServiceActor(actor) {
 		return errors.WithCode(code.ErrPermissionDenied, "resolved organization scope is required")
 	}
 	if action == ActionResolvePublished && actor.Principal.Kind != securityplane.PrincipalKindService {
@@ -62,6 +62,14 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 		return errors.WithCode(code.ErrPermissionDenied, "%s", decision.Reason)
 	}
 	return nil
+}
+
+func isTrustedServiceActor(actor ActorContext) bool {
+	if actor.Principal.Kind != securityplane.PrincipalKindService {
+		return false
+	}
+	return actor.Principal.Source == securityplane.PrincipalSourceServiceAuth ||
+		actor.Principal.Source == securityplane.PrincipalSourceMTLS
 }
 
 func capabilityForAction(action Action) appauthz.Capability {

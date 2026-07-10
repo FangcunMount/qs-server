@@ -29,6 +29,9 @@ func (m *Module) ExportRESTDeps(
 		return deps
 	}
 	deps.Scale = m.Scoring.ExportRESTDeps(qrCodeService)
+	deps.Scale.Management = m.Management
+	deps.Scale.Publication = m.Publication
+	deps.Scale.ModelRepo = m.ModelRepo
 	var typologyQuery = m.typologyQuery()
 	var typologyCommand = m.typologyCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
@@ -40,6 +43,8 @@ func (m *Module) ExportRESTDeps(
 		Codes:                  codesService,
 		RawQRCodeGenerator:     qrCodeService,
 	})
+	deps.AssessmentModel.Management = m.Management
+	deps.AssessmentModel.Publication = m.Publication
 	return deps
 }
 

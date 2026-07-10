@@ -12,11 +12,11 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 	if r.deps.AssessmentModel.Service == nil {
 		return
 	}
-	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Service)
+	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Service, r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Publication)
 	models := apiV1.Group("/assessment-models")
 	{
-		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageScales))
-		read := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadScales))
+		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageAssessmentModels))
+		read := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAssessmentModels))
 		registerRouteSpecs(manage, assessmentModelManageRoutes(handler))
 		registerRouteSpecs(read, assessmentModelReadRoutes(handler))
 	}

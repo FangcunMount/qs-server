@@ -29,6 +29,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -84,10 +85,15 @@ type ScaleDeps struct {
 	QueryService     scaleApp.ScaleQueryService
 	CategoryService  scaleApp.ScaleCategoryService
 	QRCodeService    scaleApp.ScaleQRCodeQueryService
+	Management       assessmentModelApp.CatalogManagementService
+	Publication      assessmentModelApp.PublicationService
+	ModelRepo        modelcatalogport.ModelRepository
 }
 
 type AssessmentModelDeps struct {
-	Service assessmentModelApp.Service
+	Service     assessmentModelApp.Service
+	Management  assessmentModelApp.CatalogManagementService
+	Publication assessmentModelApp.PublicationService
 }
 
 type ActorDeps struct {
