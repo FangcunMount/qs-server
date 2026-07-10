@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 type memoryModelRepo struct {
@@ -46,6 +47,19 @@ func (r *memoryModelRepo) Delete(context.Context, string) error { return nil }
 
 type memoryPublishedRepo struct {
 	snapshots map[string]*port.PublishedModel
+}
+
+func legacyDefinitionInput(t *testing.T, payload []byte) taskperformance.DefinitionInput {
+	t.Helper()
+	materialized, err := cognitivepayload.ImportLegacyDefinition(payload)
+	if err != nil {
+		t.Fatalf("ImportLegacyDefinition: %v", err)
+	}
+	return taskperformance.DefinitionInput{
+		Payload:      append([]byte(nil), payload...),
+		DefinitionV2: materialized.Definition,
+		Norms:        materialized.Norms,
+	}
 }
 
 func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *port.PublishedModel) error {
@@ -115,7 +129,7 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]
 		}]
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, taskperformance.DefinitionInput{Payload: definition}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, legacyDefinitionInput(t, definition)); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 	if _, err := svc.BindQuestionnaire(context.Background(), taskperformance.BindQuestionnaireInput{
@@ -175,7 +189,7 @@ func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
 			"norm_table_version": "spm-cn-2026"
 		}
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, taskperformance.DefinitionInput{Payload: payload}); err != nil {
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, legacyDefinitionInput(t, payload)); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 

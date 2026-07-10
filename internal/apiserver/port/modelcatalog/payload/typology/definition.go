@@ -22,8 +22,8 @@ type DefinitionEnvelope struct {
 	Algorithm            binding.Algorithm
 }
 
-// MaterializeDefinition materializes a complete typology Definition from legacy or explicit wire payload.
-func MaterializeDefinition(payload []byte, algorithm binding.Algorithm) (sharedpayload.DefinitionMaterialization, error) {
+// ImportLegacyDefinition imports a complete typology Definition from legacy or explicit wire payload.
+func ImportLegacyDefinition(payload []byte, algorithm binding.Algorithm) (sharedpayload.DefinitionMaterialization, error) {
 	decoded, runtime, err := PayloadAndRuntimeSpecFromDefinition(payload, algorithm)
 	if err != nil {
 		return sharedpayload.DefinitionMaterialization{}, err
@@ -35,10 +35,10 @@ func MaterializeDefinition(payload []byte, algorithm binding.Algorithm) (sharedp
 	return sharedpayload.DefinitionMaterialization{Definition: def}, nil
 }
 
-// DefinitionFromPayload materializes the target typology definition model from
-// the legacy/runtime payload without changing the payload contract.
-func DefinitionFromPayload(payload []byte, algorithm binding.Algorithm) (*definition.Definition, error) {
-	materialized, err := MaterializeDefinition(payload, algorithm)
+// DefinitionFromLegacyPayload imports the target typology definition model
+// without changing the payload contract.
+func DefinitionFromLegacyPayload(payload []byte, algorithm binding.Algorithm) (*definition.Definition, error) {
+	materialized, err := ImportLegacyDefinition(payload, algorithm)
 	if err != nil {
 		return nil, err
 	}

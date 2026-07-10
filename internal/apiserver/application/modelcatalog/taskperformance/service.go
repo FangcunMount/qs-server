@@ -175,7 +175,11 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if err != nil {
 		return nil, err
 	}
-	save, issues, err := s.definitionHandler().PrepareForSave(ctx, model, appdefinition.SaveInput{Payload: input.Payload})
+	save, issues, err := s.definitionHandler().PrepareForSave(ctx, model, appdefinition.SaveInput{
+		Payload:      input.Payload,
+		DefinitionV2: input.DefinitionV2,
+		Norms:        input.Norms,
+	})
 	if len(issues) > 0 {
 		return nil, invalidArgument("%s", issues[0].Message)
 	}

@@ -26,9 +26,9 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
 		}]
 	}`)
-	materialized, err := cognitive.MaterializeDefinition(raw)
+	materialized, err := cognitive.ImportLegacyDefinition(raw)
 	if err != nil {
-		t.Fatalf("MaterializeDefinition: %v", err)
+		t.Fatalf("ImportLegacyDefinition: %v", err)
 	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion:        domain.SchemaVersionV2,
@@ -70,9 +70,9 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"spm": {"time_limit_seconds": 900, "item_set_codes": ["A", "B"], "norm_table_version": "2024"}
 	}`)
-	materialized, err := cognitive.MaterializeDefinition(raw)
+	materialized, err := cognitive.ImportLegacyDefinition(raw)
 	if err != nil {
-		t.Fatalf("MaterializeDefinition: %v", err)
+		t.Fatalf("ImportLegacyDefinition: %v", err)
 	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,

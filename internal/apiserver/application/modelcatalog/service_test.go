@@ -85,7 +85,8 @@ func (s *typologyCommandStub) Archive(context.Context, string) (*typology.ModelS
 }
 
 type cognitiveCommandStub struct {
-	createCalled bool
+	createCalled        bool
+	lastDefinitionInput *taskperformance.DefinitionInput
 }
 
 func (s *cognitiveCommandStub) List(context.Context, taskperformance.ListInput) (*taskperformance.ModelListResult, error) {
@@ -122,6 +123,7 @@ func (s *cognitiveCommandStub) GetDefinition(context.Context, string) (*taskperf
 }
 
 func (s *cognitiveCommandStub) UpdateDefinition(_ context.Context, modelCode string, input taskperformance.DefinitionInput) (*taskperformance.DefinitionResult, error) {
+	s.lastDefinitionInput = &input
 	return &taskperformance.DefinitionResult{Payload: input.Payload}, nil
 }
 
@@ -283,6 +285,34 @@ func TestUpdateBehavioralDefinitionMaterializesLegacyPayloadAtGateway(t *testing
 	}
 	if len(input.Norms) != 1 || input.Norms[0].TableVersion != "2024" {
 		t.Fatalf("norms = %#v", input.Norms)
+	}
+}
+
+func TestUpdateCognitiveDefinitionMaterializesLegacyPayloadAtGateway(t *testing.T) {
+	t.Parallel()
+
+	command := &cognitiveCommandStub{}
+	svc := NewService(Dependencies{TaskPerformanceCommand: command})
+	payload := json.RawMessage(`{
+		"dimensions":[{"code":"total","title":"Total"}],
+		"spm":{"item_set_codes":["total"],"norm_table_version":"spm-2026"}
+	}`)
+	result, err := svc.UpdateDefinition(context.Background(), "cognitive_demo", DefinitionDTO{
+		Kind:    KindCognitive,
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+	if result == nil || string(result.Payload) != string(payload) {
+		t.Fatalf("result payload = %q, want %q", result.Payload, payload)
+	}
+	input := command.lastDefinitionInput
+	if input == nil || input.DefinitionV2 == nil {
+		t.Fatalf("definition input = %#v", input)
+	}
+	if len(input.DefinitionV2.Calibration.NormRefs) != 1 || input.DefinitionV2.Calibration.NormRefs[0].NormTableVersion != "spm-2026" {
+		t.Fatalf("calibration = %#v", input.DefinitionV2.Calibration)
 	}
 }
 

@@ -86,9 +86,9 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if draftPayload.Algorithm == "" {
 		t.Fatal("fixture algorithm is required")
 	}
-	materialized, err := modeltypology.MaterializeDefinition(payloadData, draftPayload.Algorithm)
+	materialized, err := modeltypology.ImportLegacyDefinition(payloadData, draftPayload.Algorithm)
 	if err != nil {
-		t.Fatalf("MaterializeDefinition: %v", err)
+		t.Fatalf("ImportLegacyDefinition: %v", err)
 	}
 
 	model, err := domainmodel.NewAssessmentModel(domainmodel.NewAssessmentModelInput{

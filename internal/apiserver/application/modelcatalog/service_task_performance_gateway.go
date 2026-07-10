@@ -5,6 +5,7 @@ import (
 
 	appTaskPerformance "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 type taskPerformanceKindGateway struct {
@@ -146,7 +147,15 @@ func (g taskPerformanceKindGateway) updateDefinition(ctx context.Context, modelC
 	if err != nil {
 		return nil, err
 	}
-	result, err := cmd.UpdateDefinition(ctx, modelCode, appTaskPerformance.DefinitionInput{Payload: dto.Payload})
+	materialized, err := cognitivepayload.ImportLegacyDefinition(dto.Payload)
+	if err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
+	result, err := cmd.UpdateDefinition(ctx, modelCode, appTaskPerformance.DefinitionInput{
+		Payload:      dto.Payload,
+		DefinitionV2: materialized.Definition,
+		Norms:        materialized.Norms,
+	})
 	if err != nil {
 		return nil, err
 	}

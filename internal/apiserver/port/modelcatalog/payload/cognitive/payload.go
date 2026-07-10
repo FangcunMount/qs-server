@@ -87,8 +87,8 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// MaterializeDefinition projects cognitive wire payload semantics to DefinitionV2.
-func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterialization, error) {
+// ImportLegacyDefinition projects cognitive wire payload semantics to DefinitionV2.
+func ImportLegacyDefinition(payload []byte) (sharedpayload.DefinitionMaterialization, error) {
 	var body definitionPayload
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return sharedpayload.DefinitionMaterialization{}, fmt.Errorf("decode cognitive definition: %w", err)
@@ -108,9 +108,9 @@ func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterializat
 	}}, nil
 }
 
-// DefinitionFromPayload projects the cognitive wire payload to DefinitionV2.
-func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
-	materialized, err := MaterializeDefinition(payload)
+// DefinitionFromLegacyPayload imports the cognitive wire payload as DefinitionV2.
+func DefinitionFromLegacyPayload(payload []byte) (*definition.Definition, error) {
+	materialized, err := ImportLegacyDefinition(payload)
 	if err != nil {
 		return nil, err
 	}

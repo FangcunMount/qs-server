@@ -8,7 +8,6 @@ import (
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 // DefinitionHandler owns cognitive task-performance definition validation and publish shaping.
@@ -21,17 +20,13 @@ func (DefinitionHandler) Supports(identity domain.Identity) bool {
 }
 
 func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
-	materialized, err := cognitivepayload.MaterializeDefinition(input.Payload)
-	if err != nil {
-		return appdefinition.SaveResult{}, nil, err
-	}
-	if issues := appdefinition.ValidateDefinitionV2(materialized.Definition); len(issues) > 0 {
+	if issues := appdefinition.ValidateDefinitionV2(input.DefinitionV2); len(issues) > 0 {
 		return appdefinition.SaveResult{}, issues, nil
 	}
 	return appdefinition.SaveResult{
 		Payload:      domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
-		DefinitionV2: materialized.Definition,
-		Norms:        materialized.Norms,
+		DefinitionV2: input.DefinitionV2,
+		Norms:        append([]*domain.Norm(nil), input.Norms...),
 	}, nil, nil
 }
 

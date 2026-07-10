@@ -15,9 +15,9 @@ func TestDecodePublishedTypologyModelUsesDefinitionV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	definition, err := typology.DefinitionFromPayload(raw, binding.AlgorithmMBTI)
+	definition, err := typology.DefinitionFromLegacyPayload(raw, binding.AlgorithmMBTI)
 	if err != nil {
-		t.Fatalf("DefinitionFromPayload: %v", err)
+		t.Fatalf("DefinitionFromLegacyPayload: %v", err)
 	}
 	got, err := decodePublishedTypologyModel(&port.PublishedModel{
 		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,

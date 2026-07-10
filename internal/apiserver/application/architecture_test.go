@@ -471,13 +471,17 @@ func TestModelCatalogJSONAdaptersDoNotReturnToDomain(t *testing.T) {
 	}
 }
 
-func TestBehavioralLegacyImportStaysAtCatalogGateway(t *testing.T) {
+func TestLegacyDefinitionImportsStayAtInputAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/apiserver/application/modelcatalog/service_norming_gateway.go":   {},
-		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go": {},
+		"internal/apiserver/application/modelcatalog/service_norming_gateway.go":          {},
+		"internal/apiserver/application/modelcatalog/service_task_performance_gateway.go": {},
+		"internal/apiserver/application/modelcatalog/typology/legacy_definition_input.go": {},
+		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go":        {},
+		"internal/apiserver/port/modelcatalog/payload/cognitive/payload.go":               {},
+		"internal/apiserver/port/modelcatalog/payload/typology/definition.go":             {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -491,12 +495,12 @@ func TestBehavioralLegacyImportStaysAtCatalogGateway(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if !strings.Contains(string(data), "ImportLegacyDefinition") {
+		if !strings.Contains(string(data), "ImportLegacyDefinition(") {
 			return nil
 		}
 		rel := filepath.ToSlash(mustRel(t, root, path))
 		if _, ok := allowed[rel]; !ok {
-			t.Fatalf("%s imports behavioral legacy definition semantics; only the behavioral legacy adapter and catalog API gateway may use it", rel)
+			t.Fatalf("%s imports legacy definition semantics outside an approved input adapter", rel)
 		}
 		return nil
 	})

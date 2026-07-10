@@ -202,9 +202,17 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if err != nil {
 		return nil, err
 	}
+	input, err = ImportLegacyDefinitionInput(model.Algorithm, input)
+	if err != nil {
+		if _, ok := AsValidationFailed(err); ok {
+			return nil, err
+		}
+		return nil, invalidArgument("%s", err.Error())
+	}
 	save, issues, err := s.definitionHandler().PrepareForSave(ctx, model, appdefinition.SaveInput{
 		PayloadFormat: input.PayloadFormat,
 		Payload:       input.Payload,
+		DefinitionV2:  input.DefinitionV2,
 		Algorithm:     input.Algorithm,
 		SubKind:       input.SubKind,
 	})

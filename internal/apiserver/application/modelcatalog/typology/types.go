@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const (
@@ -57,11 +58,14 @@ type BindQuestionnaireInput struct {
 	QuestionnaireVersion string
 }
 
+// DefinitionInput is the typology authoring command contract. The legacy
+// input adapter normalizes payloads before the handler validates DefinitionV2.
 type DefinitionInput struct {
 	SubKind       string
 	Algorithm     string
 	PayloadFormat string
 	Payload       json.RawMessage
+	DefinitionV2  *domain.Definition
 }
 
 type ModelSummary struct {

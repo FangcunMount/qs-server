@@ -20,30 +20,20 @@ func (h DefinitionHandler) Supports(identity domain.Identity) bool {
 	return domain.IsTypologyKind(identity.Kind)
 }
 
-func (h DefinitionHandler) PrepareForSave(_ context.Context, model *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
+func (h DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
 	format := input.PayloadFormat
 	if format == "" {
 		format = domain.PayloadFormatPersonalityTypologyV1
 	}
-	if issues := validateDefinitionPayloadForSave(format, input.Payload); len(issues) > 0 {
-		return appdefinition.SaveResult{}, validationIssuesToDomain(issues), nil
-	}
-	algorithm := domain.Algorithm(input.Algorithm)
-	if model != nil && model.Algorithm != "" {
-		algorithm = model.Algorithm
-	}
-	storedPayload, err := normalizeDefinitionPayloadForStorage(input.Payload, algorithm)
-	if err != nil {
-		return appdefinition.SaveResult{}, nil, err
+	if issues := appdefinition.ValidateDefinitionV2(input.DefinitionV2); len(issues) > 0 {
+		return appdefinition.SaveResult{}, issues, nil
 	}
 	result := appdefinition.SaveResult{
 		Payload: domain.DefinitionPayload{
 			Format: format,
-			Data:   storedPayload,
+			Data:   append([]byte(nil), input.Payload...),
 		},
-	}
-	if materialized, err := modeltypology.MaterializeDefinition(storedPayload, algorithm); err == nil {
-		result.DefinitionV2 = materialized.Definition
+		DefinitionV2: input.DefinitionV2,
 	}
 	if input.Algorithm != "" {
 		result.Algorithm = domain.Algorithm(input.Algorithm)

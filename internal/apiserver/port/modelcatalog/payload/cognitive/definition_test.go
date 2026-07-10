@@ -7,10 +7,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
-func TestDefinitionFromPayloadProjectsSPMMetadata(t *testing.T) {
+func TestDefinitionFromLegacyPayloadProjectsSPMMetadata(t *testing.T) {
 	t.Parallel()
 
-	got, err := cognitive.DefinitionFromPayload([]byte(`{
+	got, err := cognitive.DefinitionFromLegacyPayload([]byte(`{
 		"dimensions": [
 			{"code": "A", "title": "A", "question_codes": ["q1"], "scoring_strategy": "sum"},
 			{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}
@@ -21,7 +21,7 @@ func TestDefinitionFromPayloadProjectsSPMMetadata(t *testing.T) {
 		}
 	}`))
 	if err != nil {
-		t.Fatalf("DefinitionFromPayload: %v", err)
+		t.Fatalf("DefinitionFromLegacyPayload: %v", err)
 	}
 	if got.Measure.Factors[0].ResolvedRole() != factor.FactorRoleTaskSet {
 		t.Fatalf("task-set role = %s", got.Measure.Factors[0].ResolvedRole())
