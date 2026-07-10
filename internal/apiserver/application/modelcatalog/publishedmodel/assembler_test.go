@@ -137,14 +137,29 @@ func newSnapshotTestModel(t *testing.T, input domain.NewAssessmentModelInput, fo
 	}, input.Now); err != nil {
 		t.Fatalf("BindQuestionnaire: %v", err)
 	}
-	if err := model.UpdateDefinition(domain.DefinitionPayload{
+	if err := model.UpdateDefinitionWithV2(domain.DefinitionPayload{
 		Format: format,
 		Data:   payload,
-	}, input.Now); err != nil {
-		t.Fatalf("UpdateDefinition: %v", err)
+	}, snapshotDefinitionForKind(input.Kind), input.Now); err != nil {
+		t.Fatalf("UpdateDefinitionWithV2: %v", err)
 	}
 	if err := model.MarkPublished(input.Now); err != nil {
 		t.Fatalf("MarkPublished: %v", err)
 	}
 	return model
+}
+
+func snapshotDefinitionForKind(kind domain.Kind) *domain.Definition {
+	switch kind {
+	case domain.KindBehavioralRating:
+		return &domain.Definition{Conclusions: []domain.Conclusion{
+			domain.NormConclusion{FactorCode: "bri", Primary: true},
+		}}
+	case domain.KindTypology:
+		return &domain.Definition{Conclusions: []domain.Conclusion{
+			domain.TypeConclusion{Decision: domain.TypeDecision{Kind: domain.DecisionKindPoleComposition}},
+		}}
+	default:
+		return &domain.Definition{}
+	}
 }

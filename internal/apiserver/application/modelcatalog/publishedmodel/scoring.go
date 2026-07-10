@@ -16,6 +16,9 @@ func buildScoring(model *domain.AssessmentModel) (*port.AssessmentSnapshot, erro
 	if model.Definition.IsEmpty() {
 		return nil, fmt.Errorf("scale model definition is empty")
 	}
+	if model.DefinitionV2 == nil {
+		return nil, fmt.Errorf("scale definition_v2 is required")
+	}
 	encoded := append([]byte(nil), model.Definition.Data...)
 	if !json.Valid(encoded) {
 		return nil, fmt.Errorf("scale model definition is not valid json")
@@ -24,7 +27,11 @@ func buildScoring(model *domain.AssessmentModel) (*port.AssessmentSnapshot, erro
 	if algorithm == "" {
 		algorithm = domain.AlgorithmScaleDefault
 	}
-	record := recordFromModel(model, domain.KindScale, domain.SubKindEmpty, algorithm, domain.PayloadFormatAssessmentScaleV1, domain.DecisionKindScoreRange, encoded)
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return nil, err
+	}
+	record := recordFromModel(model, domain.KindScale, domain.SubKindEmpty, algorithm, domain.PayloadFormatAssessmentScaleV1, decisionKind, encoded)
 	if version := scaleVersionFromPayload(encoded); version != "" {
 		record.Version = version
 	}

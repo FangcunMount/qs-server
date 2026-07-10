@@ -12,6 +12,9 @@ func buildTaskPerformance(model *domain.AssessmentModel) (*port.AssessmentSnapsh
 	if model.Definition.IsEmpty() {
 		return nil, fmt.Errorf("cognitive model definition is empty")
 	}
+	if model.DefinitionV2 == nil {
+		return nil, fmt.Errorf("cognitive definition_v2 is required")
+	}
 	encoded := append([]byte(nil), model.Definition.Data...)
 	if !json.Valid(encoded) {
 		return nil, fmt.Errorf("cognitive model definition is not valid json")
@@ -20,5 +23,9 @@ func buildTaskPerformance(model *domain.AssessmentModel) (*port.AssessmentSnapsh
 	if algorithm == "" {
 		algorithm = domain.AlgorithmSPM
 	}
-	return recordFromModel(model, domain.KindCognitive, domain.SubKindEmpty, algorithm, domain.PayloadFormatForCognitive(algorithm), domain.DecisionKindAbilityLevel, encoded), nil
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return nil, err
+	}
+	return recordFromModel(model, domain.KindCognitive, domain.SubKindEmpty, algorithm, domain.PayloadFormatForCognitive(algorithm), decisionKind, encoded), nil
 }

@@ -85,12 +85,16 @@ func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.A
 	if algorithm == "" {
 		algorithm = domain.AlgorithmScaleDefault
 	}
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return appdefinition.SnapshotBuildResult{}, err
+	}
 	return appdefinition.SnapshotBuildResult{
 		Kind:          domain.KindScale,
 		SubKind:       domain.SubKindEmpty,
 		Algorithm:     algorithm,
 		PayloadFormat: domain.PayloadFormatAssessmentScaleV1,
-		DecisionKind:  domain.DecisionKindScoreRange,
+		DecisionKind:  decisionKind,
 		Payload:       encoded,
 		Version:       snapshot.ScaleVersion,
 	}, nil

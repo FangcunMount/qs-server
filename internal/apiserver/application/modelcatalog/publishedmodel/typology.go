@@ -19,6 +19,9 @@ func buildTypology(model *domain.AssessmentModel) (*port.AssessmentSnapshot, err
 	if model.Definition.IsEmpty() {
 		return nil, fmt.Errorf("typology model definition is empty")
 	}
+	if model.DefinitionV2 == nil {
+		return nil, fmt.Errorf("typology definition_v2 is required")
+	}
 	payload, runtime, err := typology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
 	if err != nil {
 		return nil, err
@@ -28,9 +31,9 @@ func buildTypology(model *domain.AssessmentModel) (*port.AssessmentSnapshot, err
 	if err != nil {
 		return nil, fmt.Errorf("marshal typology payload: %w", err)
 	}
-	decisionKind := runtime.Decision.Kind
-	if decisionKind == "" {
-		return nil, fmt.Errorf("runtime decision.kind is required for publish")
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return nil, err
 	}
 	return recordFromModel(model, domain.KindTypology, domain.SubKindTypology, model.Algorithm, domain.PayloadFormatPersonalityTypologyV1, decisionKind, encoded), nil
 }

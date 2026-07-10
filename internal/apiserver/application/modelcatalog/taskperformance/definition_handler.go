@@ -21,14 +21,18 @@ func (DefinitionHandler) Supports(identity domain.Identity) bool {
 }
 
 func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input appdefinition.SaveInput) (appdefinition.SaveResult, []domain.DomainValidationIssue, error) {
-	result := appdefinition.SaveResult{
-		Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
+	materialized, err := cognitivepayload.MaterializeDefinition(input.Payload)
+	if err != nil {
+		return appdefinition.SaveResult{}, nil, err
 	}
-	if materialized, err := cognitivepayload.MaterializeDefinition(input.Payload); err == nil {
-		result.DefinitionV2 = materialized.Definition
-		result.Norms = materialized.Norms
+	if issues := appdefinition.ValidateDefinitionV2(materialized.Definition); len(issues) > 0 {
+		return appdefinition.SaveResult{}, issues, nil
 	}
-	return result, nil, nil
+	return appdefinition.SaveResult{
+		Payload:      domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
+		DefinitionV2: materialized.Definition,
+		Norms:        materialized.Norms,
+	}, nil, nil
 }
 
 func (h DefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
@@ -44,12 +48,18 @@ func (h DefinitionHandler) ValidateForPublish(ctx context.Context, model *domain
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, appdefinition.ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, h.NormRepo)...)
-	return append(issues, appdefinition.ValidateSharedFactorPayloadForPublish(model.Definition.Data)...)
+	if _, err := model.DecisionKindForDefinition(); err != nil {
+		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
+	}
+	return issues
 }
 
 func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (appdefinition.SnapshotBuildResult, error) {
 	if model.Definition.IsEmpty() {
 		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("cognitive model definition is empty")
+	}
+	if model.DefinitionV2 == nil {
+		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("cognitive definition_v2 is required")
 	}
 	encoded := append([]byte(nil), model.Definition.Data...)
 	if !json.Valid(encoded) {
@@ -59,12 +69,16 @@ func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.A
 	if algorithm == "" {
 		algorithm = domain.AlgorithmSPM
 	}
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return appdefinition.SnapshotBuildResult{}, err
+	}
 	return appdefinition.SnapshotBuildResult{
 		Kind:          domain.KindCognitive,
 		SubKind:       domain.SubKindEmpty,
 		Algorithm:     algorithm,
 		PayloadFormat: domain.PayloadFormatForCognitive(algorithm),
-		DecisionKind:  domain.DecisionKindAbilityLevel,
+		DecisionKind:  decisionKind,
 		Payload:       encoded,
 	}, nil
 }

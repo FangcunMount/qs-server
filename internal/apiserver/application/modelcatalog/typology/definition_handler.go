@@ -99,9 +99,9 @@ func (h DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain
 	if err != nil {
 		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("marshal typology payload: %w", err)
 	}
-	decisionKind := runtime.Decision.Kind
-	if decisionKind == "" {
-		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("runtime decision.kind is required for publish")
+	decisionKind, err := model.DecisionKindForDefinition()
+	if err != nil {
+		return appdefinition.SnapshotBuildResult{}, err
 	}
 	return appdefinition.SnapshotBuildResult{
 		Kind:          domain.KindTypology,

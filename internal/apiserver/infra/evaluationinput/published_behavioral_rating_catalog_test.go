@@ -27,7 +27,7 @@ func TestPublishedBehavioralRatingCatalogDecodesPublishedModel(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
 		}]
 	}`)
-	materialized, err := behavioral.MaterializeDefinition(raw)
+	materialized, err := behavioral.ImportLegacyDefinition(raw)
 	if err != nil {
 		t.Fatalf("MaterializeDefinition: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 			"t_score_rules": [{"factor_code": "gec", "ranges": [{"min_t": 0, "max_t": 100, "level": "average", "conclusion": "ok"}]}]
 		}
 	}`)
-	materialized, err := behavioral.MaterializeDefinition(raw)
+	materialized, err := behavioral.ImportLegacyDefinition(raw)
 	if err != nil {
 		t.Fatalf("MaterializeDefinition: %v", err)
 	}

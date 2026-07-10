@@ -1,3 +1,5 @@
+// Legacy BRIEF-2 payload semantics are isolated here for import and decode
+// adapters. Publishing and V2 runtime paths consume DefinitionV2 instead.
 package behavioral
 
 import (

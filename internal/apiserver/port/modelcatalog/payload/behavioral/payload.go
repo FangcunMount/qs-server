@@ -134,44 +134,6 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// MaterializeDefinition projects behavioral wire payload semantics to DefinitionV2.
-func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterialization, error) {
-	var body definitionPayload
-	if err := json.Unmarshal(payload, &body); err != nil {
-		return sharedpayload.DefinitionMaterialization{}, fmt.Errorf("decode behavioral_rating definition: %w", err)
-	}
-	measure := sharedpayload.MeasureSpecFromDefinitionBody(body.DefinitionBody)
-	calibration := definition.Calibration{}
-	conclusions := make([]conclusion.Conclusion, 0)
-	materializedNorms := make([]*catalognorm.Norm, 0, 1)
-	if body.Brief2 != nil {
-		measure, calibration = applyBrief2NormMetadata(measure, brief2MetadataContext{
-			NormTableVersion: body.Brief2.NormTableVersion,
-			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
-			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
-			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
-		})
-		measure = applyBrief2CompositeMetadata(measure, compositeSpecsFromPayload(body.Brief2))
-		conclusions = append(conclusions, normConclusionsFromPayload(body.Brief2)...)
-		if table := normFromPayload(body.Brief2); table != nil {
-			materializedNorms = append(materializedNorms, table)
-		}
-	}
-	return sharedpayload.DefinitionMaterialization{
-		Definition: &definition.Definition{Measure: measure, Calibration: calibration, Conclusions: conclusions},
-		Norms:      materializedNorms,
-	}, nil
-}
-
-// DefinitionFromPayload projects the behavioral wire payload to DefinitionV2.
-func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
-	materialized, err := MaterializeDefinition(payload)
-	if err != nil {
-		return nil, err
-	}
-	return materialized.Definition, nil
-}
-
 // ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
 func ParsePublishedPayload(payloadFormat, modelCode, modelVersion, title, status string, payload []byte) (*Snapshot, error) {
 	switch payloadFormat {

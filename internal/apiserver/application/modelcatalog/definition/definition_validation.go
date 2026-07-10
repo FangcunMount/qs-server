@@ -8,9 +8,9 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// ValidateDefinitionV2ForPublish translates target-domain validation errors to
-// the application validation contract and verifies external norm references.
-func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.Definition, norms port.NormRepository) []domain.DomainValidationIssue {
+// ValidateDefinitionV2 translates target-domain validation errors to the
+// application validation contract without consulting external repositories.
+func ValidateDefinitionV2(value *modeldefinition.Definition) []domain.DomainValidationIssue {
 	if value == nil {
 		return []domain.DomainValidationIssue{{
 			Field: "definition_v2", Code: "definition_v2.required", Message: "DefinitionV2 不能为空", Level: domain.ValidationLevelError,
@@ -21,6 +21,15 @@ func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.
 		issues = append(issues, domain.DomainValidationIssue{
 			Field: item.Field, Code: item.Code, Message: item.Message, Level: domain.ValidationLevelError,
 		})
+	}
+	return issues
+}
+
+// ValidateDefinitionV2ForPublish validates DefinitionV2 and verifies external norm references.
+func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.Definition, norms port.NormRepository) []domain.DomainValidationIssue {
+	issues := ValidateDefinitionV2(value)
+	if value == nil {
+		return issues
 	}
 	for _, ref := range value.Calibration.NormRefs {
 		if ref.NormTableVersion == "" {

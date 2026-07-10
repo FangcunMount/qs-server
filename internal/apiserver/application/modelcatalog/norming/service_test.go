@@ -250,14 +250,12 @@ func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
 	}
 }
 
-func TestPublishRejectsInvalidFactorHierarchy(t *testing.T) {
+func TestUpdateDefinitionRejectsInvalidFactorHierarchy(t *testing.T) {
 	t.Parallel()
 
 	modelRepo := &memoryModelRepo{}
-	publishedRepo := &memoryPublishedRepo{}
 	svc := norming.NewService(norming.Dependencies{
-		ModelRepo:     modelRepo,
-		PublishedRepo: publishedRepo,
+		ModelRepo: modelRepo,
 	})
 
 	created, err := svc.Create(context.Background(), norming.CreateInput{
@@ -275,18 +273,7 @@ func TestPublishRejectsInvalidFactorHierarchy(t *testing.T) {
 			"parent_code": "gec"
 		}]
 	}`)
-	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err != nil {
-		t.Fatalf("UpdateDefinition: %v", err)
-	}
-	if _, err := svc.BindQuestionnaire(context.Background(), norming.BindQuestionnaireInput{
-		Code:                 created.Code,
-		QuestionnaireCode:    "Q-001",
-		QuestionnaireVersion: "1.0.0",
-	}); err != nil {
-		t.Fatalf("BindQuestionnaire: %v", err)
-	}
-
-	if _, err := svc.Publish(context.Background(), created.Code); err == nil {
-		t.Fatal("Publish() should reject invalid factor hierarchy")
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, norming.DefinitionInput{Payload: definition}); err == nil {
+		t.Fatal("UpdateDefinition() should reject invalid factor hierarchy")
 	}
 }

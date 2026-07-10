@@ -3,6 +3,7 @@ package behavioral_test
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
@@ -10,7 +11,7 @@ import (
 func TestDefinitionFromPayloadProjectsBrief2Metadata(t *testing.T) {
 	t.Parallel()
 
-	definition, err := behavioral.DefinitionFromPayload([]byte(`{
+	definition, err := behavioral.DefinitionFromLegacyPayload([]byte(`{
 		"dimensions": [
 			{"code": "inhibit", "title": "Inhibit", "question_codes": ["q1"], "scoring_strategy": "sum"},
 			{"code": "self_monitor", "title": "Self Monitor", "question_codes": ["q2"], "scoring_strategy": "sum"},
@@ -30,7 +31,7 @@ func TestDefinitionFromPayloadProjectsBrief2Metadata(t *testing.T) {
 		}
 	}`))
 	if err != nil {
-		t.Fatalf("DefinitionFromPayload: %v", err)
+		t.Fatalf("DefinitionFromLegacyPayload: %v", err)
 	}
 
 	roles := map[string]factor.FactorRole{}
@@ -51,5 +52,24 @@ func TestDefinitionFromPayloadProjectsBrief2Metadata(t *testing.T) {
 	}
 	if len(definition.Calibration.NormRefs) != 1 || definition.Calibration.NormRefs[0].FactorCode != "gec" {
 		t.Fatalf("norm refs = %#v", definition.Calibration.NormRefs)
+	}
+}
+
+func TestDefinitionFromLegacyPayloadProjectsRiskConclusions(t *testing.T) {
+	t.Parallel()
+
+	definition, err := behavioral.DefinitionFromLegacyPayload([]byte(`{
+		"dimensions": [{"code": "total", "title": "Total", "question_codes": ["q1"], "scoring_strategy": "sum"}],
+		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "level": "low", "conclusion": "Low", "suggestion": "Review"}]}]
+	}`))
+	if err != nil {
+		t.Fatalf("DefinitionFromLegacyPayload: %v", err)
+	}
+	if len(definition.Conclusions) != 1 {
+		t.Fatalf("conclusions = %#v", definition.Conclusions)
+	}
+	risk, ok := definition.Conclusions[0].(conclusion.RiskConclusion)
+	if !ok || risk.FactorCode != "total" || len(risk.Rules) != 1 || risk.Rules[0].Level != "low" {
+		t.Fatalf("risk conclusion = %#v", definition.Conclusions[0])
 	}
 }
