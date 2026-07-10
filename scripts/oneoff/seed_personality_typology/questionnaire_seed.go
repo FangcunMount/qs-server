@@ -1,6 +1,6 @@
 package main
 
-import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/typology"
+import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 
 func traitItemsFromSeed(seed questionnaireSeedFile) []traitItem {
 	items := make([]traitItem, 0, len(seed.Questions))

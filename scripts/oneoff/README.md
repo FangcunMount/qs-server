@@ -40,12 +40,24 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `rebuild_statistics_aggregates_and_cache/main.go` | 重建统计聚合表并刷新统计查询缓存 | MySQL 统计聚合表，Redis 统计查询缓存 |
 | `rebuild_seeddata_access_statistics/main.go` | 一站式修复 seeddata 接入统计历史数据 | MySQL intake/resolve log、`behavior_footprint`、`statistics_journey_daily` |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
-| `backfill_published_assessment_models/main.go` | 从 legacy `evaluation_rule_sets` 回填 `published_assessment_models` | Mongo `published_assessment_models` |
-| `seed_evaluation_rule_sets/main.go` | 写入内置 MBTI/SBTI + 已发布量表到 `published_assessment_models` | Mongo `published_assessment_models` |
 | `seed_personality_typology/` | **统一入口**：重初始化 MBTI@2.0.1、MBTI_FC_93、SBTI、Big5、九型 问卷与解释模型 | Mongo `questionnaires` + `assessment_models` + `published_assessment_models` |
 | `observe_outbox_by_event_type/` | 只读观测 outbox 按 `event_type` 积压与近期写入，输出 legacy 退役 Gate | 无写入 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
+
+### 已退役（ModelCatalog 迁移完成，脚本已删）
+
+以下脚本仅用于一次性数据迁移/审计，生产已跑通后从仓库移除；需复现可查 git 历史：
+
+| 脚本 | 原用途 |
+| ---- | ------ |
+| `backfill_draft_assessment_models_from_scales/` | `scales` head → `assessment_models` draft |
+| `audit_scale_assessment_model_gap/` | scales head 与 assessment_models 差集审计 |
+| `backfill_published_assessment_models/` | legacy `evaluation_rule_sets` → `published_assessment_models` |
+| `seed_evaluation_rule_sets/` | 内置 MBTI/SBTI + 量表 published 种子（已由 `seed_personality_typology` 取代） |
+| `audit_published_model_payload_formats/` | legacy payload_format 审计 |
+| `audit_personality_kind_values/` / `migrate_personality_kind_values/` | `personality` → `typology` kind 迁移 |
+| `migrate_modelcatalog_definition_v2/` | DefinitionV2 + norm 行回填 |
 
 ## observe_outbox_by_event_type
 
@@ -86,44 +98,6 @@ go run ./scripts/oneoff/observe_outbox_by_event_type/ \
 > **注意**：包目录，使用 `go run ./scripts/oneoff/observe_outbox_by_event_type/`（带尾部 `/`）。
 
 > **注意**：`seed_personality_typology/` 是包目录，必须用 `go run ./scripts/oneoff/seed_personality_typology/`（带尾部 `/`），**不要** `go run .../main.go`。
-
-## backfill_published_assessment_models / seed_evaluation_rule_sets
-
-### 做什么
-
-- `backfill_published_assessment_models`：仅当 Mongo 里已有 legacy `evaluation_rule_sets` 已发布行、但 `published_assessment_models` 为空时才有数据可迁。
-- `seed_evaluation_rule_sets`：写入内置 SBTI/MBTI，并从已发布量表快照生成 scale 规则到 `published_assessment_models`。
-
-`seed_evaluation_rule_sets` 扫描量表时，个别历史量表因子配置不合法会打 ERROR 日志（如 duplicate question code、`multi_grade`），**通常会跳过该因子但继续处理其余模型**；以脚本最终 `seeded N published assessment model(s)` 为准。
-
-### 如何调用
-
-```bash
-# 1. legacy 回填（dry-run 为 0 则无需 --apply）
-go run ./scripts/oneoff/backfill_published_assessment_models/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs
-
-# 2. 种子解释模型（先 dry-run 看 plan，再 --apply）
-go run ./scripts/oneoff/seed_evaluation_rule_sets/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
-```
-
-仅补 MBTI/SBTI、不扫量表：
-
-```bash
-go run ./scripts/oneoff/seed_evaluation_rule_sets/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-scales --apply
-```
-
-验收：
-
-```javascript
-db.published_assessment_models.countDocuments({ status: "published", deleted_at: null })
-db.published_assessment_models.find(
-  { model_code: { $in: ["MBTI_OEJTS", "SBTI_FUN"] } },
-  { model_kind: 1, model_code: 1, model_version: 1, questionnaire_code: 1 }
-)
-```
 
 ## seed_personality_typology
 
