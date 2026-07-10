@@ -5,6 +5,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
@@ -23,18 +25,29 @@ type factorService struct {
 	modelRepo      modelcatalogport.ModelRepository
 	listCache      scalelistcache.PublishedListCache
 	eventPublisher event.EventPublisher
+	authoring      *authoring.Service
+}
+
+type ServiceOption func(*factorService)
+
+func WithDefinitionAuthoring(service authoring.Service) ServiceOption {
+	return func(s *factorService) { s.authoring = &service }
 }
 
 // NewService 创建量表因子编辑应用服务。
-func NewService(modelRepo modelcatalogport.ModelRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ports.ScaleFactorService {
+func NewService(modelRepo modelcatalogport.ModelRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher, opts ...ServiceOption) ports.ScaleFactorService {
 	if modelRepo == nil {
 		panic("factor: assessment model repository is required")
 	}
-	return &factorService{
+	service := &factorService{
 		modelRepo:      modelRepo,
 		listCache:      listCache,
 		eventPublisher: eventPublisher,
 	}
+	for _, opt := range opts {
+		opt(service)
+	}
+	return service
 }
 
 // AddFactor 添加因子
@@ -124,6 +137,31 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 	}, eventpayload.ScaleChangeActionUpdated)
 }
 
+// ReplaceFactorsWithActor is the DefinitionV2-first replacement path used by
+// the REST batch editor. Legacy snapshot mutation remains only for endpoints
+// that have not yet been migrated to ActorContext.
+func (s *factorService) ReplaceFactorsWithActor(ctx context.Context, actor modelcatalog.ActorContext, scaleCode string, factorDTOs []shared.FactorDTO) (*shared.ScaleResult, error) {
+	if s.authoring == nil {
+		return nil, errors.WithCode(errorCode.ErrInternalServerError, "definition authoring service is not configured")
+	}
+	definition, err := definitionFromFactorDTOs(factorDTOs)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.authoring.SaveDefinition(ctx, actor, scaleCode, definition); err != nil {
+		return nil, err
+	}
+	model, err := assessmentstore.LoadScale(ctx, s.modelRepo, scaleCode)
+	if err != nil {
+		return nil, err
+	}
+	if evt, ok := assessmentstore.ScaleChangedEvent(model, eventpayload.ScaleChangeActionUpdated); ok {
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(evt), nil, nil)
+	}
+	s.refreshListCache(ctx)
+	return assessmentstore.ScaleResult(model)
+}
+
 // UpdateFactorInterpretRules 更新因子解读规则
 func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto shared.UpdateFactorInterpretRulesDTO) (*shared.ScaleResult, error) {
 	if dto.ScaleCode == "" {
@@ -164,6 +202,32 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		}
 		return nil
 	}, eventpayload.ScaleChangeActionUpdated)
+}
+
+func (s *factorService) ReplaceInterpretRulesWithActor(ctx context.Context, actor modelcatalog.ActorContext, scaleCode string, dtos []shared.UpdateFactorInterpretRulesDTO) (*shared.ScaleResult, error) {
+	if s.authoring == nil {
+		return nil, errors.WithCode(errorCode.ErrInternalServerError, "definition authoring service is not configured")
+	}
+	current, err := s.authoring.GetDefinition(ctx, actor, scaleCode)
+	if err != nil {
+		return nil, err
+	}
+	definition, err := definitionWithInterpretRules(current, dtos)
+	if err != nil {
+		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子解读规则失败")
+	}
+	if _, err := s.authoring.SaveDefinition(ctx, actor, scaleCode, definition); err != nil {
+		return nil, err
+	}
+	model, err := assessmentstore.LoadScale(ctx, s.modelRepo, scaleCode)
+	if err != nil {
+		return nil, err
+	}
+	if evt, ok := assessmentstore.ScaleChangedEvent(model, eventpayload.ScaleChangeActionUpdated); ok {
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(evt), nil, nil)
+	}
+	s.refreshListCache(ctx)
+	return assessmentstore.ScaleResult(model)
 }
 
 type definitionMutation func(model *domain.AssessmentModel) error

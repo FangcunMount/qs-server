@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/legacyadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -41,6 +45,38 @@ func TestAddFactorUsesAssessmentModelRepositoryWhenConfigured(t *testing.T) {
 	if len(publisher.events) != 1 {
 		t.Fatalf("published event count = %d, want 1", len(publisher.events))
 	}
+}
+
+func TestReplaceFactorsWithActorSavesDefinitionV2ThroughAuthoring(t *testing.T) {
+	t.Parallel()
+	model := newDraftAssessmentModelForFactorTest(t)
+	modelRepo := &factorAssessmentModelRepoStub{model: model}
+	authoringService := authoring.Service{
+		ModelRepo:  modelRepo,
+		Authorizer: allowFactorAuthorizer{},
+		Registry:   appdefinition.NewRegistry(assessmentstore.DefinitionHandler{}),
+	}
+	svc := NewService(modelRepo, nil, &scaleEventPublisherStub{}, WithDefinitionAuthoring(authoringService))
+
+	result, err := svc.ReplaceFactorsWithActor(context.Background(), modelcatalog.ActorContext{}, model.Code, []shared.FactorDTO{{
+		Code: "total", Title: "Total", IsTotalScore: true, QuestionCodes: []string{"Q1"}, ScoringStrategy: "sum",
+		InterpretRules: []shared.InterpretRuleDTO{{MinScore: 0, MaxScore: 10, RiskLevel: "low", Conclusion: "low"}},
+	}})
+	if err != nil {
+		t.Fatalf("ReplaceFactorsWithActor() error = %v", err)
+	}
+	if modelRepo.updateCount != 1 || model.DefinitionV2 == nil || len(model.DefinitionV2.Measure.Factors) != 1 || model.DefinitionV2.Measure.Factors[0].Code != "total" {
+		t.Fatalf("saved definition = %#v, updates = %d", model.DefinitionV2, modelRepo.updateCount)
+	}
+	if result == nil || len(result.Factors) != 1 || result.Factors[0].Code != "total" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+type allowFactorAuthorizer struct{}
+
+func (allowFactorAuthorizer) Authorize(context.Context, modelcatalog.ActorContext, modelcatalog.Action, modelcatalog.Resource) error {
+	return nil
 }
 
 func TestAddFactorForksPublishedAssessmentModelDraft(t *testing.T) {

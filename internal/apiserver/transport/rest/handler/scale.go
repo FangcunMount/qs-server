@@ -5,7 +5,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -356,13 +358,30 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 		})
 	}
 
-	result, err := h.factorService.ReplaceFactors(c.Request.Context(), scaleCode, factorDTOs)
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.factorService.ReplaceFactorsWithActor(c.Request.Context(), actor, scaleCode, factorDTOs)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
 	h.Success(c, response.NewScaleResponse(result))
+}
+
+func assessmentModelActorContext(c *gin.Context) (assessmentModelApp.ActorContext, error) {
+	principal, ok := restmiddleware.GetPrincipal(c)
+	if !ok {
+		return assessmentModelApp.ActorContext{}, errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
+	}
+	scope, ok := restmiddleware.GetOrgScope(c)
+	if !ok {
+		return assessmentModelApp.ActorContext{}, errors.WithCode(code.ErrPermissionDenied, "resolved organization scope is required")
+	}
+	return assessmentModelApp.ActorContext{Principal: principal, Scope: scope}, nil
 }
 
 // ReplaceInterpretRules 批量设置解读规则
@@ -406,7 +425,12 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 		})
 	}
 
-	result, err := h.factorService.ReplaceInterpretRules(c.Request.Context(), scaleCode, dtos)
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.factorService.ReplaceInterpretRulesWithActor(c.Request.Context(), actor, scaleCode, dtos)
 	if err != nil {
 		h.Error(c, err)
 		return

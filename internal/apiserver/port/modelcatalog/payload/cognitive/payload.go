@@ -117,6 +117,50 @@ func DefinitionFromLegacyPayload(payload []byte) (*definition.Definition, error)
 	return materialized.Definition, nil
 }
 
+// PayloadFromDefinition projects canonical cognitive semantics to the legacy
+// wire body. The norm table itself remains external; its version is retained
+// through Calibration.NormRefs.
+func PayloadFromDefinition(def *definition.Definition) ([]byte, error) {
+	body := definitionPayload{DefinitionBody: sharedpayload.DefinitionBodyFromDefinition(def)}
+	spm := spmExtensionFromDefinition(def)
+	if spm != nil {
+		body.SPM = spm
+	}
+	return json.Marshal(body)
+}
+
+func spmExtensionFromDefinition(def *definition.Definition) *spmExtension {
+	if def == nil {
+		return nil
+	}
+	ext := &spmExtension{}
+	for _, ref := range def.Calibration.NormRefs {
+		if ext.NormTableVersion == "" {
+			ext.NormTableVersion = ref.NormTableVersion
+		}
+	}
+	for _, item := range def.Measure.Factors {
+		if item.ResolvedRole() == factor.FactorRoleTaskSet {
+			ext.ItemSetCodes = append(ext.ItemSetCodes, item.Code)
+		}
+	}
+	for _, item := range def.Conclusions {
+		ability, ok := item.(conclusion.AbilityConclusion)
+		if !ok {
+			continue
+		}
+		entry := abilityConclusionPayload{FactorCode: ability.FactorCode, ScoreBasis: string(ability.ScoreBasis), Ranges: make([]abilityConclusionRange, 0, len(ability.Rules))}
+		for _, value := range ability.Rules {
+			entry.Ranges = append(entry.Ranges, abilityConclusionRange{MinScore: value.MinScore, MaxScore: value.MaxScore, Level: value.Level, OutcomeCode: value.OutcomeCode, Title: value.Title, Summary: value.Summary, Description: value.Description})
+		}
+		ext.AbilityConclusions = append(ext.AbilityConclusions, entry)
+	}
+	if ext.NormTableVersion == "" && len(ext.ItemSetCodes) == 0 && len(ext.AbilityConclusions) == 0 {
+		return nil
+	}
+	return ext
+}
+
 func abilityConclusionsFromPayload(spm *spmExtension) []conclusion.Conclusion {
 	if spm == nil || len(spm.AbilityConclusions) == 0 {
 		return nil

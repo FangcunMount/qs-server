@@ -6,9 +6,94 @@ import (
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
+
+// definitionFromFactorDTOs constructs the canonical scale measure and risk
+// conclusion layers directly from the legacy editor DTOs. It deliberately does
+// not materialize a ScaleSnapshot; payload projection belongs to authoring.
+func definitionFromFactorDTOs(dtos []shared.FactorDTO) (*definition.Definition, error) {
+	if len(dtos) == 0 {
+		return nil, fmt.Errorf("factor list cannot be empty")
+	}
+	result := &definition.Definition{
+		Measure: definition.MeasureSpec{
+			Factors: make([]factor.Factor, 0, len(dtos)),
+			Scoring: make([]factor.Scoring, 0, len(dtos)),
+		},
+		Conclusions: make([]conclusion.Conclusion, 0, len(dtos)),
+	}
+	for _, dto := range dtos {
+		if err := validateFactorSnapshotInput(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules, true); err != nil {
+			return nil, pkgerrors.WrapC(err, errorCode.ErrInvalidArgument, "验证因子失败")
+		}
+		role := factor.FactorRoleDimension
+		if dto.IsTotalScore {
+			role = factor.FactorRoleTotal
+		}
+		result.Measure.Factors = append(result.Measure.Factors, factor.Factor{Code: dto.Code, Title: dto.Title, Role: role})
+		sources := make([]factor.ScoringSource, 0, len(dto.QuestionCodes))
+		for _, questionCode := range dto.QuestionCodes {
+			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: questionCode})
+		}
+		var params *factor.ScoringParams
+		if dto.ScoringParams != nil {
+			params = &factor.ScoringParams{CntOptionContents: append([]string(nil), dto.ScoringParams.CntOptionContents...)}
+		}
+		result.Measure.Scoring = append(result.Measure.Scoring, factor.Scoring{FactorCode: dto.Code, Sources: sources, Strategy: factor.ScoringStrategy(resolvedScoringStrategy(dto.ScoringStrategy)), Params: params, MaxScore: cloneFloat64(dto.MaxScore)})
+		rules := make([]conclusion.ScoreRangeOutcome, 0, len(dto.InterpretRules))
+		for _, rule := range dto.InterpretRules {
+			rules = append(rules, conclusion.ScoreRangeOutcome{MinScore: rule.MinScore, MaxScore: rule.MaxScore, Level: rule.RiskLevel, Summary: rule.Conclusion, Description: rule.Suggestion})
+		}
+		result.Conclusions = append(result.Conclusions, conclusion.RiskConclusion{FactorCode: dto.Code, Rules: rules})
+	}
+	if issues := definition.Validate(*result); len(issues) > 0 {
+		return nil, fmt.Errorf("definition validation failed: %s", issues[0].Message)
+	}
+	return result, nil
+}
+
+func definitionWithInterpretRules(current *definition.Definition, dtos []shared.UpdateFactorInterpretRulesDTO) (*definition.Definition, error) {
+	if current == nil {
+		return nil, fmt.Errorf("definition_v2 is required")
+	}
+	next := *current
+	updated := make(map[string]struct{}, len(dtos))
+	for _, dto := range dtos {
+		if dto.FactorCode == "" {
+			return nil, fmt.Errorf("factor code cannot be empty")
+		}
+		if err := validateInterpretRules(dto.InterpretRules); err != nil {
+			return nil, err
+		}
+		updated[dto.FactorCode] = struct{}{}
+	}
+	conclusions := make([]conclusion.Conclusion, 0, len(current.Conclusions)+len(dtos))
+	for _, item := range current.Conclusions {
+		if risk, ok := item.(conclusion.RiskConclusion); ok {
+			if _, replace := updated[risk.FactorCode]; replace {
+				continue
+			}
+		}
+		conclusions = append(conclusions, item)
+	}
+	for _, dto := range dtos {
+		rules := make([]conclusion.ScoreRangeOutcome, 0, len(dto.InterpretRules))
+		for _, rule := range dto.InterpretRules {
+			rules = append(rules, conclusion.ScoreRangeOutcome{MinScore: rule.MinScore, MaxScore: rule.MaxScore, Level: rule.RiskLevel, Summary: rule.Conclusion, Description: rule.Suggestion})
+		}
+		conclusions = append(conclusions, conclusion.RiskConclusion{FactorCode: dto.FactorCode, Rules: rules})
+	}
+	next.Conclusions = conclusions
+	if issues := definition.Validate(next); len(issues) > 0 {
+		return nil, fmt.Errorf("definition validation failed: %s", issues[0].Message)
+	}
+	return &next, nil
+}
 
 func toFactorSnapshot(
 	code, title, factorType string,

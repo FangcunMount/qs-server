@@ -3,6 +3,7 @@ package ports
 import (
 	"context"
 
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/shared"
 )
 
@@ -23,8 +24,10 @@ type ScaleFactorService interface {
 	UpdateFactor(ctx context.Context, dto shared.UpdateFactorDTO) (*shared.ScaleResult, error)
 	RemoveFactor(ctx context.Context, scaleCode, factorCode string) (*shared.ScaleResult, error)
 	ReplaceFactors(ctx context.Context, scaleCode string, factors []shared.FactorDTO) (*shared.ScaleResult, error)
+	ReplaceFactorsWithActor(ctx context.Context, actor modelcatalog.ActorContext, scaleCode string, factors []shared.FactorDTO) (*shared.ScaleResult, error)
 	UpdateFactorInterpretRules(ctx context.Context, dto shared.UpdateFactorInterpretRulesDTO) (*shared.ScaleResult, error)
 	ReplaceInterpretRules(ctx context.Context, scaleCode string, rules []shared.UpdateFactorInterpretRulesDTO) (*shared.ScaleResult, error)
+	ReplaceInterpretRulesWithActor(ctx context.Context, actor modelcatalog.ActorContext, scaleCode string, rules []shared.UpdateFactorInterpretRulesDTO) (*shared.ScaleResult, error)
 }
 
 // ScaleQueryService 量表只读查询服务。

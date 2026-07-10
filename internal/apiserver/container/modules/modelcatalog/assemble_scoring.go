@@ -6,7 +6,11 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	appauthoring "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
+	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	scoringApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	scoringLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -70,10 +74,16 @@ func NewScoring(deps ScoringDeps) (*Scoring, error) {
 		scoringApp.WithPublishedModelRepository(normalized.PublishedRepo),
 		scoringApp.WithPublicationPublisher(scoringApp.NewScalePublicationPublisher(normalized.ModelRepo, normalized.PublishedRepo)),
 	)
+	definitionAuthoring := appauthoring.Service{
+		ModelRepo:  normalized.ModelRepo,
+		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
+		Registry:   appdefinition.NewRegistry(assessmentstore.DefinitionHandler{}),
+	}
 	module.FactorService = scoringApp.NewFactorService(
 		normalized.ModelRepo,
 		normalized.ListCache,
 		module.eventPublisher,
+		scoringApp.WithDefinitionAuthoring(definitionAuthoring),
 	)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
 	module.QueryService = scoringApp.NewQueryServiceWithModelCatalogSources(

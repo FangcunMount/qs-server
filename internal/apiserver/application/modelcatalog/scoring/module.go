@@ -4,6 +4,7 @@ import (
 	"context"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/assessmentstore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/scoring/factor"
@@ -69,8 +70,12 @@ func (f QuestionnairePublisherFunc) PublishQuestionnaire(ctx context.Context, co
 }
 
 // NewFactorService 创建量表因子编辑应用服务。
-func NewFactorService(modelRepo modelcatalogport.ModelRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
-	return factor.NewService(modelRepo, listCache, eventPublisher)
+func NewFactorService(modelRepo modelcatalogport.ModelRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher, opts ...factor.ServiceOption) ScaleFactorService {
+	return factor.NewService(modelRepo, listCache, eventPublisher, opts...)
+}
+
+func WithDefinitionAuthoring(service authoring.Service) factor.ServiceOption {
+	return factor.WithDefinitionAuthoring(service)
 }
 
 // NewQueryService 创建量表查询应用服务。
