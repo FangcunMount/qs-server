@@ -75,19 +75,19 @@ func TestRegistryUsesApplicationOwnedCatalogMatrix(t *testing.T) {
 		if entry.Kind != tc.kind || entry.DisplayName != tc.displayName || entry.OptionsEnabled != tc.optionsEnabled {
 			t.Fatalf("entry(%q) = %#v", tc.apiKind, entry)
 		}
-		if reg.Allows(tc.apiKind, binding.CatalogOpCreate) != tc.create {
+		if reg.Allows(tc.apiKind, option.CatalogOpCreate) != tc.create {
 			t.Fatalf("create(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, binding.CatalogOpList) != tc.list {
+		if reg.Allows(tc.apiKind, option.CatalogOpList) != tc.list {
 			t.Fatalf("list(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, binding.CatalogOpPublish) != tc.publish {
+		if reg.Allows(tc.apiKind, option.CatalogOpPublish) != tc.publish {
 			t.Fatalf("publish(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, binding.CatalogOpPreview) != tc.preview {
+		if reg.Allows(tc.apiKind, option.CatalogOpPreview) != tc.preview {
 			t.Fatalf("preview(%q) mismatch", tc.apiKind)
 		}
-		if reg.Allows(tc.apiKind, binding.CatalogOpQRCode) != tc.qrcode {
+		if reg.Allows(tc.apiKind, option.CatalogOpQRCode) != tc.qrcode {
 			t.Fatalf("qrcode(%q) mismatch", tc.apiKind)
 		}
 	}

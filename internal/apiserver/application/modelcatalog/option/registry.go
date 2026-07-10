@@ -19,23 +19,23 @@ type CatalogOperations struct {
 }
 
 // Allows 报告是否 操作 是 permitted 用于 这个API 类型。
-func (o CatalogOperations) Allows(op binding.CatalogOperation) bool {
+func (o CatalogOperations) Allows(op CatalogOperation) bool {
 	switch op {
-	case binding.CatalogOpCreate:
+	case CatalogOpCreate:
 		return o.CreateSupported
-	case binding.CatalogOpList:
+	case CatalogOpList:
 		return o.ListSupported
-	case binding.CatalogOpUpdateBasicInfo, binding.CatalogOpDelete:
+	case CatalogOpUpdateBasicInfo, CatalogOpDelete:
 		return o.CreateSupported
-	case binding.CatalogOpPublish, binding.CatalogOpUnpublish, binding.CatalogOpArchive:
+	case CatalogOpPublish, CatalogOpUnpublish, CatalogOpArchive:
 		return o.PublishSupported
-	case binding.CatalogOpBindQuestionnaire:
+	case CatalogOpBindQuestionnaire:
 		return o.BindQuestionnaire
-	case binding.CatalogOpUpdateDefinition:
+	case CatalogOpUpdateDefinition:
 		return o.DefinitionUpdateSupported
-	case binding.CatalogOpPreview:
+	case CatalogOpPreview:
 		return o.PreviewSupported
-	case binding.CatalogOpQRCode:
+	case CatalogOpQRCode:
 		return o.QRCodeSupported
 	default:
 		return false
@@ -99,7 +99,7 @@ func (r *Registry) ByAPIKind(apiKind string) (RegisteredOption, bool) {
 }
 
 // Allows 报告是否 API 类型 supports 操作。
-func (r *Registry) Allows(apiKind string, op binding.CatalogOperation) bool {
+func (r *Registry) Allows(apiKind string, op CatalogOperation) bool {
 	entry, ok := r.ByAPIKind(apiKind)
 	if !ok && apiKind == "personality" {
 		entry, ok = r.ByAPIKind("typology")
@@ -230,9 +230,9 @@ var defaultRegisteredOptions = []RegisteredOption{
 		apiKind: "custom", displayName: "自定义测评",
 	}),
 	{
-		Kind:        binding.Kind(modelcatalog.APIKindBehaviorAbility),
+		Kind:        binding.Kind(APIKindBehaviorAbility),
 		Role:        binding.CapabilityRoleProductChannel,
-		APIKind:     modelcatalog.APIKindBehaviorAbility,
+		APIKind:     APIKindBehaviorAbility,
 		DisplayName: "行为能力",
 		Operations: CatalogOperations{
 			ListSupported:   false,

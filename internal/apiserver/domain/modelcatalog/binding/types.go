@@ -1,66 +1,42 @@
 package binding
 
-// Kind 是规范 assessment 模型家族。
-type Kind string
+import identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 
-const (
-	KindScale            Kind = "scale"
-	KindTypology         Kind = "typology"
-	KindPersonality      Kind = "personality" // Deprecated: persisted read-compat; use KindTypology.
-	KindBehavioralRating Kind = "behavioral_rating"
-	KindCognitive        Kind = "cognitive"
-	KindCustom           Kind = "custom"
+// Canonical model identity types live in identity. These aliases preserve the
+// binding package as the compatibility boundary for existing callers.
+type (
+	Kind         = identitypkg.Kind
+	SubKind      = identitypkg.SubKind
+	Algorithm    = identitypkg.Algorithm
+	DecisionKind = identitypkg.DecisionKind
 )
 
-// SubKind nar行 类型 when multiple 载荷 结构s share same 家族。
-type SubKind string
-
 const (
-	SubKindEmpty    SubKind = ""
-	SubKindTrait    SubKind = "trait"
-	SubKindTypology SubKind = "typology"
-)
+	KindScale            = identitypkg.KindScale
+	KindTypology         = identitypkg.KindTypology
+	KindPersonality      = identitypkg.KindPersonality
+	KindBehavioralRating = identitypkg.KindBehavioralRating
+	KindCognitive        = identitypkg.KindCognitive
+	KindCustom           = identitypkg.KindCustom
 
-// Algorithm 选择评估 算法 在 模型家族。
-type Algorithm string
+	SubKindEmpty    = identitypkg.SubKindEmpty
+	SubKindTrait    = identitypkg.SubKindTrait
+	SubKindTypology = identitypkg.SubKindTypology
 
-const (
-	AlgorithmScaleDefault            Algorithm = "scale_default"
-	AlgorithmPersonalityTypology     Algorithm = "personality_typology"
-	AlgorithmBigFive                 Algorithm = "bigfive"
-	AlgorithmMBTI                    Algorithm = "mbti"
-	AlgorithmSBTI                    Algorithm = "sbti"
-	AlgorithmBrief2                  Algorithm = "brief2"
-	AlgorithmSPM                     Algorithm = "spm"
-	AlgorithmBehavioralRatingDefault Algorithm = "behavioral_rating_default"
-)
+	AlgorithmScaleDefault            = identitypkg.AlgorithmScaleDefault
+	AlgorithmPersonalityTypology     = identitypkg.AlgorithmPersonalityTypology
+	AlgorithmBigFive                 = identitypkg.AlgorithmBigFive
+	AlgorithmMBTI                    = identitypkg.AlgorithmMBTI
+	AlgorithmSBTI                    = identitypkg.AlgorithmSBTI
+	AlgorithmBrief2                  = identitypkg.AlgorithmBrief2
+	AlgorithmSPM                     = identitypkg.AlgorithmSPM
+	AlgorithmBehavioralRatingDefault = identitypkg.AlgorithmBehavioralRatingDefault
 
-func (k Kind) String() string { return string(k) }
-
-func (k Kind) IsValid() bool {
-	switch NormalizeKind(k) {
-	case KindScale, KindTypology, KindBehavioralRating, KindCognitive, KindCustom:
-		return true
-	default:
-		return false
-	}
-}
-
-func (s SubKind) String() string { return string(s) }
-
-func (a Algorithm) String() string { return string(a) }
-
-// DecisionKind 描述如何原始分 映射到 结果。
-type DecisionKind string
-
-const (
-	DecisionKindScoreRange      DecisionKind = "score_range"
-	DecisionKindPoleComposition DecisionKind = "pole_composition"
-	DecisionKindTraitProfile    DecisionKind = "trait_profile"
-	DecisionKindNearestPattern  DecisionKind = "nearest_pattern"
-	DecisionKindNormLookup      DecisionKind = "norm_lookup"
-	DecisionKindAbilityLevel    DecisionKind = "ability_level"
-
-	// Deprecated: 使用 DecisionKindScoreRange。
-	DecisionKindScoreRangeInterpretation DecisionKind = "score_range_interpretation"
+	DecisionKindScoreRange               = identitypkg.DecisionKindScoreRange
+	DecisionKindPoleComposition          = identitypkg.DecisionKindPoleComposition
+	DecisionKindTraitProfile             = identitypkg.DecisionKindTraitProfile
+	DecisionKindNearestPattern           = identitypkg.DecisionKindNearestPattern
+	DecisionKindNormLookup               = identitypkg.DecisionKindNormLookup
+	DecisionKindAbilityLevel             = identitypkg.DecisionKindAbilityLevel
+	DecisionKindScoreRangeInterpretation = identitypkg.DecisionKindScoreRangeInterpretation
 )

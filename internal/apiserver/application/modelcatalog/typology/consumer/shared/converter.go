@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -179,10 +179,10 @@ func applyPublishedModelRouting(result *TypologyModelSummaryResult, model *port.
 	}
 	result.Kind = string(model.Kind)
 	result.SubKind = string(model.SubKind)
-	result.ProductChannel = identitypkg.ProductChannelForIdentity(model.Kind, string(model.ProductChannel))
+	result.ProductChannel = binding.ProductChannelForIdentity(model.Kind, string(model.ProductChannel))
 	result.PayloadFormat = model.PayloadFormat
 	result.DecisionKind = string(model.DecisionKind)
-	result.AlgorithmFamily = identitypkg.AlgorithmFamilyStringFromIdentity(
+	result.AlgorithmFamily = binding.AlgorithmFamilyStringFromIdentity(
 		model.Kind,
 		model.SubKind,
 		model.Algorithm,

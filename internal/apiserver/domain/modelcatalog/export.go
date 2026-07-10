@@ -16,12 +16,12 @@ import (
 )
 
 type (
-	Kind           = binding.Kind
-	SubKind        = binding.SubKind
-	Algorithm      = binding.Algorithm
-	DecisionKind   = binding.DecisionKind
+	Kind           = identitypkg.Kind
+	SubKind        = identitypkg.SubKind
+	Algorithm      = identitypkg.Algorithm
+	DecisionKind   = identitypkg.DecisionKind
 	ProductChannel = binding.ProductChannel
-	Product        = identitypkg.Product
+	Product        = binding.Product
 	Identity       = identitypkg.Identity
 	Family         = identitypkg.Family
 
@@ -31,7 +31,6 @@ type (
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
 	CapabilityRole        = binding.CapabilityRole
-	CatalogOperation      = binding.CatalogOperation
 
 	QuestionnaireBinding = binding.QuestionnaireBinding
 
@@ -84,33 +83,33 @@ type (
 )
 
 const (
-	KindScale            = binding.KindScale
-	KindTypology         = binding.KindTypology
-	KindPersonality      = binding.KindPersonality
-	KindBehavioralRating = binding.KindBehavioralRating
-	KindCognitive        = binding.KindCognitive
-	KindCustom           = binding.KindCustom
+	KindScale            = identitypkg.KindScale
+	KindTypology         = identitypkg.KindTypology
+	KindPersonality      = identitypkg.KindPersonality
+	KindBehavioralRating = identitypkg.KindBehavioralRating
+	KindCognitive        = identitypkg.KindCognitive
+	KindCustom           = identitypkg.KindCustom
 
-	SubKindEmpty    = binding.SubKindEmpty
-	SubKindTypology = binding.SubKindTypology
-	SubKindTrait    = binding.SubKindTrait
+	SubKindEmpty    = identitypkg.SubKindEmpty
+	SubKindTypology = identitypkg.SubKindTypology
+	SubKindTrait    = identitypkg.SubKindTrait
 
-	AlgorithmScaleDefault            = binding.AlgorithmScaleDefault
-	AlgorithmPersonalityTypology     = binding.AlgorithmPersonalityTypology
-	AlgorithmBigFive                 = binding.AlgorithmBigFive
-	AlgorithmMBTI                    = binding.AlgorithmMBTI
-	AlgorithmSBTI                    = binding.AlgorithmSBTI
-	AlgorithmBrief2                  = binding.AlgorithmBrief2
-	AlgorithmSPM                     = binding.AlgorithmSPM
-	AlgorithmBehavioralRatingDefault = binding.AlgorithmBehavioralRatingDefault
+	AlgorithmScaleDefault            = identitypkg.AlgorithmScaleDefault
+	AlgorithmPersonalityTypology     = identitypkg.AlgorithmPersonalityTypology
+	AlgorithmBigFive                 = identitypkg.AlgorithmBigFive
+	AlgorithmMBTI                    = identitypkg.AlgorithmMBTI
+	AlgorithmSBTI                    = identitypkg.AlgorithmSBTI
+	AlgorithmBrief2                  = identitypkg.AlgorithmBrief2
+	AlgorithmSPM                     = identitypkg.AlgorithmSPM
+	AlgorithmBehavioralRatingDefault = identitypkg.AlgorithmBehavioralRatingDefault
 
-	DecisionKindScoreRange                            = binding.DecisionKindScoreRange
-	DecisionKindPoleComposition                       = binding.DecisionKindPoleComposition
-	DecisionKindTraitProfile                          = binding.DecisionKindTraitProfile
-	DecisionKindNearestPattern                        = binding.DecisionKindNearestPattern
-	DecisionKindNormLookup                            = binding.DecisionKindNormLookup
-	DecisionKindAbilityLevel                          = binding.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation DecisionKind = binding.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
+	DecisionKindScoreRange                            = identitypkg.DecisionKindScoreRange
+	DecisionKindPoleComposition                       = identitypkg.DecisionKindPoleComposition
+	DecisionKindTraitProfile                          = identitypkg.DecisionKindTraitProfile
+	DecisionKindNearestPattern                        = identitypkg.DecisionKindNearestPattern
+	DecisionKindNormLookup                            = identitypkg.DecisionKindNormLookup
+	DecisionKindAbilityLevel                          = identitypkg.DecisionKindAbilityLevel
+	DecisionKindScoreRangeInterpretation DecisionKind = identitypkg.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
 
 	ScoringSourceQuestion      = factorpkg.ScoringSourceQuestion
 	ScoringSourceFactor        = factorpkg.ScoringSourceFactor
@@ -129,9 +128,9 @@ const (
 	ProductChannelCognitive       = binding.ProductChannelCognitive
 	ProductChannelCustom          = binding.ProductChannelCustom
 
-	ProductMedicalScale    = identitypkg.ProductMedicalScale
-	ProductTypology        = identitypkg.ProductTypology
-	ProductBehaviorAbility = identitypkg.ProductBehaviorAbility
+	ProductMedicalScale    = binding.ProductMedicalScale
+	ProductTypology        = binding.ProductTypology
+	ProductBehaviorAbility = binding.ProductBehaviorAbility
 
 	FamilyFactorScoring        = identitypkg.FamilyFactorScoring
 	FamilyFactorClassification = identitypkg.FamilyFactorClassification
@@ -166,22 +165,8 @@ const (
 	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
 	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
 
-	CatalogOpCreate            = binding.CatalogOpCreate
-	CatalogOpList              = binding.CatalogOpList
-	CatalogOpUpdateBasicInfo   = binding.CatalogOpUpdateBasicInfo
-	CatalogOpDelete            = binding.CatalogOpDelete
-	CatalogOpPublish           = binding.CatalogOpPublish
-	CatalogOpUnpublish         = binding.CatalogOpUnpublish
-	CatalogOpArchive           = binding.CatalogOpArchive
-	CatalogOpBindQuestionnaire = binding.CatalogOpBindQuestionnaire
-	CatalogOpUpdateDefinition  = binding.CatalogOpUpdateDefinition
-	CatalogOpPreview           = binding.CatalogOpPreview
-	CatalogOpQRCode            = binding.CatalogOpQRCode
-
 	SchemaVersionV1 = payloadformatpkg.SchemaVersionV1
 	SchemaVersionV2 = payloadformatpkg.SchemaVersionV2
-
-	APIKindBehaviorAbility = binding.APIKindBehaviorAbility
 
 	ModelStatusDraft     = assessmentmodelpkg.StatusDraft
 	ModelStatusPublished = assessmentmodelpkg.StatusPublished
@@ -192,31 +177,27 @@ const (
 )
 
 var (
-	NormalizeKind                          = binding.NormalizeKind
-	KindsEqual                             = binding.KindsEqual
-	IsTypologyKind                         = binding.IsTypologyKind
-	KindQueryValues                        = binding.KindQueryValues
-	NormalizeProductChannel                = binding.NormalizeProductChannel
-	ProductChannelsEqual                   = binding.ProductChannelsEqual
-	IsTypologyProductChannel               = binding.IsTypologyProductChannel
-	ProductChannelQueryValues              = binding.ProductChannelQueryValues
-	DefaultProductChannelFor               = binding.DefaultProductChannelFor
-	ResolveProductChannel                  = binding.ResolveProductChannel
-	CompleteProductChannel                 = binding.CompleteProductChannel
-	AllProductChannels                     = binding.AllProductChannels
-	LegacyKindMapping                      = binding.LegacyKindMapping
-	IsBehaviorAbilityProductChannelAPIKind = binding.IsBehaviorAbilityProductChannelAPIKind
-	BehaviorAbilityChannelModelFamilies    = binding.BehaviorAbilityChannelModelFamilies
-	IsBehaviorAbilityChannelFamily         = binding.IsBehaviorAbilityChannelFamily
-	ResolveBehaviorAbilityChannelFamily    = binding.ResolveBehaviorAbilityChannelFamily
-	ProductFromChannel                     = identitypkg.ProductFromChannel
-	NewIdentity                            = identitypkg.New
-	FamilyFromDecisionKind                 = identitypkg.FamilyFromDecisionKind
-	FamilyFromIdentity                     = identitypkg.FamilyFromIdentity
+	NormalizeKind             = binding.NormalizeKind
+	KindsEqual                = binding.KindsEqual
+	IsTypologyKind            = binding.IsTypologyKind
+	KindQueryValues           = binding.KindQueryValues
+	NormalizeProductChannel   = binding.NormalizeProductChannel
+	ProductChannelsEqual      = binding.ProductChannelsEqual
+	IsTypologyProductChannel  = binding.IsTypologyProductChannel
+	ProductChannelQueryValues = binding.ProductChannelQueryValues
+	DefaultProductChannelFor  = binding.DefaultProductChannelFor
+	ResolveProductChannel     = binding.ResolveProductChannel
+	CompleteProductChannel    = binding.CompleteProductChannel
+	AllProductChannels        = binding.AllProductChannels
+	LegacyKindMapping         = binding.LegacyKindMapping
+	ProductFromChannel        = binding.ProductFromChannel
+	NewIdentity               = identitypkg.New
+	FamilyFromDecisionKind    = identitypkg.FamilyFromDecisionKind
+	FamilyFromIdentity        = identitypkg.FamilyFromIdentity
 
 	AlgorithmFamilyFromDecisionKind = identitypkg.AlgorithmFamilyFromDecisionKind
-	DecisionKindForIdentity         = identitypkg.DecisionKindForIdentity
-	AlgorithmFamilyFromIdentity     = identitypkg.AlgorithmFamilyFromIdentity
+	DecisionKindForIdentity         = binding.DecisionKindForIdentity
+	AlgorithmFamilyFromIdentity     = binding.AlgorithmFamilyFromIdentity
 	AllAlgorithmFamilies            = identitypkg.AllAlgorithmFamilies
 
 	IsScalePayloadFormat               = payloadformatpkg.IsScalePayloadFormat

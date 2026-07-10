@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/taskperformance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology"
 	typologyconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/typology/consumer"
@@ -70,10 +71,10 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 		dto.PageSize = 20
 	}
 	if dto.Kind != "" {
-		if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
+		if option.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
 			return nil, invalidArgument("behavior_ability 产品通道不再支持 List 聚合，请分别调用 behavioral_rating 或 cognitive")
 		}
-		if err := requireCatalogOperation(dto.Kind, domain.CatalogOpList); err != nil {
+		if err := requireCatalogOperation(dto.Kind, option.CatalogOpList); err != nil {
 			return nil, err
 		}
 	}
@@ -110,10 +111,10 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	if dto.Kind == "" {
 		return nil, invalidArgument("模型类型不能为空")
 	}
-	if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
+	if option.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
 		return nil, invalidArgument("模型类型无效")
 	}
-	if err := requireCatalogOperation(dto.Kind, domain.CatalogOpCreate); err != nil {
+	if err := requireCatalogOperation(dto.Kind, option.CatalogOpCreate); err != nil {
 		return nil, err
 	}
 	switch dto.Kind {
@@ -156,7 +157,7 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 }
 
 func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
-	kind, err := s.requireModelOperation(ctx, dto.Code, "", domain.CatalogOpUpdateBasicInfo)
+	kind, err := s.requireModelOperation(ctx, dto.Code, "", option.CatalogOpUpdateBasicInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (
 }
 
 func (s *service) Delete(ctx context.Context, modelCode string) error {
-	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpDelete)
+	kind, err := s.requireModelOperation(ctx, modelCode, "", option.CatalogOpDelete)
 	if err != nil {
 		return err
 	}
@@ -190,7 +191,7 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 }
 
 func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpPublish)
+	kind, err := s.requireModelOperation(ctx, modelCode, "", option.CatalogOpPublish)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 }
 
 func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpUnpublish)
+	kind, err := s.requireModelOperation(ctx, modelCode, "", option.CatalogOpUnpublish)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +225,7 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 }
 
 func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpArchive)
+	kind, err := s.requireModelOperation(ctx, modelCode, "", option.CatalogOpArchive)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +242,7 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 }
 
 func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
-	kind, err := s.requireModelOperation(ctx, dto.Code, "", domain.CatalogOpBindQuestionnaire)
+	kind, err := s.requireModelOperation(ctx, dto.Code, "", option.CatalogOpBindQuestionnaire)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +321,7 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 }
 
 func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
-	kind, err := s.requireModelOperation(ctx, modelCode, dto.Kind, domain.CatalogOpUpdateDefinition)
+	kind, err := s.requireModelOperation(ctx, modelCode, dto.Kind, option.CatalogOpUpdateDefinition)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +354,7 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 			{Label: "量表评分", Value: SubKindScale},
 		},
 	}
-	if kind == "" || domain.IsBehaviorAbilityProductChannelAPIKind(kind) {
+	if kind == "" || option.IsBehaviorAbilityProductChannelAPIKind(kind) {
 		result.ModelFamilies = behaviorAbilityProductChannelModelFamilyOptions()
 		result.Algorithms = append(result.Algorithms,
 			Option{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)},
@@ -401,7 +402,7 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 }
 
 func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
-	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", domain.CatalogOpPreview, modelNotFoundError())
+	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", option.CatalogOpPreview, modelNotFoundError())
 	if err != nil {
 		if errors.IsCode(err, code.ErrInvalidArgument) {
 			return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
@@ -418,7 +419,7 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	if modelCode == "" {
 		return "", invalidArgument("模型编码不能为空")
 	}
-	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", domain.CatalogOpQRCode, modelNotFoundError())
+	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", option.CatalogOpQRCode, modelNotFoundError())
 	if err != nil {
 		return "", err
 	}

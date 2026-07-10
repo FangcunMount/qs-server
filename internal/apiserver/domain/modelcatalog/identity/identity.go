@@ -1,54 +1,13 @@
 package identity
 
-import (
-	"fmt"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-)
-
-// Product 是面向产品的测评分类，不参与运行时执行家族选择。
-type Product string
-
-const (
-	ProductMedicalScale    Product = Product(binding.ProductChannelMedicalScale)
-	ProductTypology        Product = Product(binding.ProductChannelTypology)
-	ProductBehaviorAbility Product = Product(binding.ProductChannelBehaviorAbility)
-)
-
-func (p Product) String() string { return string(p) }
-
-func (p Product) IsValid() bool {
-	switch p {
-	case ProductMedicalScale, ProductTypology, ProductBehaviorAbility:
-		return true
-	default:
-		return false
-	}
-}
-
-// ProductFromChannel normalizes legacy persisted channel values into the
-// target three-product taxonomy.
-func ProductFromChannel(channel binding.ProductChannel) (Product, error) {
-	normalized := binding.NormalizeProductChannel(channel)
-	product := Product(normalized)
-	if !product.IsValid() {
-		return "", fmt.Errorf("%w: product %q is invalid", binding.ErrInvalidArgument, channel)
-	}
-	return product, nil
-}
-
-func (p Product) Channel() binding.ProductChannel {
-	return binding.ProductChannel(p)
-}
-
 // Identity 是测评模型的算法身份，不表达产品概念。
 type Identity struct {
-	Kind      binding.Kind
-	SubKind   binding.SubKind
-	Algorithm binding.Algorithm
+	Kind      Kind
+	SubKind   SubKind
+	Algorithm Algorithm
 }
 
-func New(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) Identity {
+func New(kind Kind, subKind SubKind, algorithm Algorithm) Identity {
 	return Identity{Kind: kind, SubKind: subKind, Algorithm: algorithm}
 }
 
@@ -60,7 +19,7 @@ func (i Identity) Family() (Family, bool) {
 	return FamilyFromIdentity(i)
 }
 
-func (i Identity) DecisionKind() (binding.DecisionKind, bool) {
+func (i Identity) DecisionKind() (DecisionKind, bool) {
 	return DecisionKindForIdentity(i.Kind, i.SubKind, i.Algorithm)
 }
 
@@ -97,7 +56,7 @@ const (
 	FamilyTaskPerformance      Family = AlgorithmFamilyTaskPerformance
 )
 
-func FamilyFromDecisionKind(decision binding.DecisionKind) (Family, bool) {
+func FamilyFromDecisionKind(decision DecisionKind) (Family, bool) {
 	return AlgorithmFamilyFromDecisionKind(decision)
 }
 
@@ -106,15 +65,15 @@ func FamilyFromIdentity(identity Identity) (Family, bool) {
 }
 
 // AlgorithmFamilyFromDecisionKind 映射 published 判定策略到执行家族。
-func AlgorithmFamilyFromDecisionKind(decision binding.DecisionKind) (AlgorithmFamily, bool) {
+func AlgorithmFamilyFromDecisionKind(decision DecisionKind) (AlgorithmFamily, bool) {
 	switch decision {
-	case binding.DecisionKindScoreRange, binding.DecisionKind("score_range_interpretation"):
+	case DecisionKindScoreRange, DecisionKindScoreRangeInterpretation:
 		return AlgorithmFamilyFactorScoring, true
-	case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern:
+	case DecisionKindPoleComposition, DecisionKindTraitProfile, DecisionKindNearestPattern:
 		return AlgorithmFamilyFactorClassification, true
-	case binding.DecisionKindNormLookup:
+	case DecisionKindNormLookup:
 		return AlgorithmFamilyFactorNorm, true
-	case binding.DecisionKindAbilityLevel:
+	case DecisionKindAbilityLevel:
 		return AlgorithmFamilyTaskPerformance, true
 	default:
 		return "", false
@@ -124,20 +83,20 @@ func AlgorithmFamilyFromDecisionKind(decision binding.DecisionKind) (AlgorithmFa
 // DecisionKindForIdentity mirrors publish-builder decision selection for non-typology draft binding.
 // Personality typology requires explicit decision.kind in payload; no algorithm fallback.
 // Cognitive/projection currently uses task_performance as the implementation family.
-func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) (binding.DecisionKind, bool) {
+func DecisionKindForIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (DecisionKind, bool) {
 	switch kind {
-	case binding.KindScale:
-		return binding.DecisionKindScoreRange, true
-	case binding.KindTypology:
-		if subKind != binding.SubKindTypology {
+	case KindScale:
+		return DecisionKindScoreRange, true
+	case KindTypology:
+		if subKind != SubKindTypology {
 			return "", false
 		}
 		return "", false
-	case binding.KindBehavioralRating:
-		return binding.DecisionKindNormLookup, true
-	case binding.KindCognitive:
-		return binding.DecisionKindAbilityLevel, true
-	case binding.KindCustom:
+	case KindBehavioralRating:
+		return DecisionKindNormLookup, true
+	case KindCognitive:
+		return DecisionKindAbilityLevel, true
+	case KindCustom:
 		return "", false
 	default:
 		return "", false
@@ -145,8 +104,8 @@ func DecisionKindForIdentity(kind binding.Kind, subKind binding.SubKind, algorit
 }
 
 // AlgorithmFamilyFromIdentity 推导执行家族 from draft model binding.
-func AlgorithmFamilyFromIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) (AlgorithmFamily, bool) {
-	if binding.IsTypologyKind(kind) && subKind == binding.SubKindTypology {
+func AlgorithmFamilyFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (AlgorithmFamily, bool) {
+	if kind == KindTypology && subKind == SubKindTypology {
 		return AlgorithmFamilyFactorClassification, true
 	}
 	decision, ok := DecisionKindForIdentity(kind, subKind, algorithm)
@@ -166,19 +125,8 @@ func AllAlgorithmFamilies() []AlgorithmFamily {
 	}
 }
 
-// ProductChannelForIdentity resolves the product channel from an explicit snapshot value or kind fallback.
-func ProductChannelForIdentity(kind binding.Kind, explicitChannel string) string {
-	if explicitChannel != "" {
-		return string(binding.NormalizeProductChannel(binding.ProductChannel(explicitChannel)))
-	}
-	if kind == "" {
-		return ""
-	}
-	return string(binding.DefaultProductChannelFor(kind))
-}
-
 // AlgorithmFamilyStringFromIdentity derives the algorithm family string from model identity fields.
-func AlgorithmFamilyStringFromIdentity(kind binding.Kind, subKind binding.SubKind, algorithm binding.Algorithm) string {
+func AlgorithmFamilyStringFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm) string {
 	if kind == "" {
 		return ""
 	}

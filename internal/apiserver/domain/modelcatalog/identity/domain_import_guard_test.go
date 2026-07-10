@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestIdentityDoesNotDependOnPublishing(t *testing.T) {
+func TestIdentityDoesNotDependOnBinding(t *testing.T) {
 	t.Parallel()
 
 	matches, err := filepath.Glob("*.go")
@@ -24,9 +24,8 @@ func TestIdentityDoesNotDependOnPublishing(t *testing.T) {
 			t.Fatalf("ParseFile(%s) returned error: %v", file, err)
 		}
 		for _, imp := range parsed.Imports {
-			path := strings.Trim(imp.Path.Value, `"`)
-			if strings.Contains(path, "/domain/modelcatalog/publishing") {
-				t.Fatalf("identity must not import publishing compatibility package in %s", file)
+			if strings.Contains(strings.Trim(imp.Path.Value, `\"`), "/domain/modelcatalog/binding") {
+				t.Fatalf("identity must not import binding compatibility package in %s", file)
 			}
 		}
 	}

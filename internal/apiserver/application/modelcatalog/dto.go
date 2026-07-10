@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	"encoding/json"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -12,7 +13,7 @@ const (
 	// KindPersonality is a deprecated API alias accepted for read-compat.
 	KindPersonality = "personality"
 	// KindBehaviorAbility 是 API 产品通道类型；List 聚合已移除，Options 仍暴露 channel 元数据。
-	KindBehaviorAbility                = domain.APIKindBehaviorAbility
+	KindBehaviorAbility                = option.APIKindBehaviorAbility
 	KindBehavioralRating               = string(domain.KindBehavioralRating)
 	KindMedicalScale                   = "medical_scale"
 	KindCognitive                      = "cognitive"

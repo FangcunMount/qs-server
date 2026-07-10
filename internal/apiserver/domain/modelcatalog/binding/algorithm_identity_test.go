@@ -23,10 +23,10 @@ func TestAlgorithmConstantsStayFrozen(t *testing.T) {
 		"AlgorithmBehavioralRatingDefault": "behavioral_rating_default",
 	}
 
-	text := readRepoFile(t, "internal/apiserver/domain/modelcatalog/binding/types.go")
+	text := readRepoFile(t, "internal/apiserver/domain/modelcatalog/identity/types.go")
 	matches := regexp.MustCompile(`Algorithm(\w+)\s+Algorithm\s*=\s*"([^"]+)"`).FindAllStringSubmatch(text, -1)
 	if len(matches) == 0 {
-		t.Fatal("no Algorithm constants found in binding/types.go")
+		t.Fatal("no Algorithm constants found in identity/types.go")
 	}
 
 	got := make(map[string]string, len(matches))

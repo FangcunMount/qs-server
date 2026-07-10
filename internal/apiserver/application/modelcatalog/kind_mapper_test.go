@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -15,7 +16,7 @@ func TestBehaviorAbilityIsProductChannelOnly(t *testing.T) {
 	if !IsSupportedAPIKind(KindBehaviorAbility) {
 		t.Fatal("behavior_ability must remain a supported API channel kind")
 	}
-	if !domain.IsBehaviorAbilityProductChannelAPIKind(KindBehaviorAbility) {
+	if !option.IsBehaviorAbilityProductChannelAPIKind(KindBehaviorAbility) {
 		t.Fatal("behavior_ability must be a product channel API kind")
 	}
 }

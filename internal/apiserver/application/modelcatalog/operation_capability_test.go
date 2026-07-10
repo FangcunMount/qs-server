@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -148,13 +149,13 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 func TestRequireCatalogOperationRejectsUnknownKind(t *testing.T) {
 	t.Parallel()
 
-	if err := requireCatalogOperation("cognitive", domain.CatalogOpCreate); err != nil {
+	if err := requireCatalogOperation("cognitive", option.CatalogOpCreate); err != nil {
 		t.Fatal("expected cognitive create to be allowed")
 	}
-	if err := requireCatalogOperation("custom", domain.CatalogOpCreate); err == nil {
+	if err := requireCatalogOperation("custom", option.CatalogOpCreate); err == nil {
 		t.Fatal("expected custom create to be rejected")
 	}
-	if err := requireCatalogOperation(KindMedicalScale, domain.CatalogOpUpdateDefinition); err == nil {
+	if err := requireCatalogOperation(KindMedicalScale, option.CatalogOpUpdateDefinition); err == nil {
 		t.Fatal("expected medical_scale definition update to be rejected")
 	}
 }

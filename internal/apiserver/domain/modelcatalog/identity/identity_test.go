@@ -7,30 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
-func TestProductFromChannelNormalizesToThreeProducts(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		channel binding.ProductChannel
-		want    identity.Product
-	}{
-		{binding.ProductChannelMedicalScale, identity.ProductMedicalScale},
-		{binding.ProductChannelTypology, identity.ProductTypology},
-		{binding.ProductChannelPersonality, identity.ProductTypology},
-		{binding.ProductChannelBehaviorAbility, identity.ProductBehaviorAbility},
-		{binding.ProductChannelCognitive, identity.ProductBehaviorAbility},
-	}
-	for _, tc := range cases {
-		got, err := identity.ProductFromChannel(tc.channel)
-		if err != nil {
-			t.Fatalf("ProductFromChannel(%q): %v", tc.channel, err)
-		}
-		if got != tc.want {
-			t.Fatalf("ProductFromChannel(%q) = %q, want %q", tc.channel, got, tc.want)
-		}
-	}
-}
-
 func TestIdentityDerivesFamilyAndDecision(t *testing.T) {
 	t.Parallel()
 
@@ -170,7 +146,7 @@ func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
 func TestIdentityRoutingStringHelpers(t *testing.T) {
 	t.Parallel()
 
-	if got := identity.ProductChannelForIdentity(binding.KindCognitive, "cognitive"); got != string(binding.ProductChannelBehaviorAbility) {
+	if got := binding.ProductChannelForIdentity(binding.KindCognitive, "cognitive"); got != string(binding.ProductChannelBehaviorAbility) {
 		t.Fatalf("ProductChannelForIdentity() = %q, want behavior_ability", got)
 	}
 	if got := identity.AlgorithmFamilyStringFromIdentity(binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM); got != string(identity.AlgorithmFamilyTaskPerformance) {

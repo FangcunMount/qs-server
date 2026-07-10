@@ -67,3 +67,27 @@ func TestAllProductChannelsOnlyReturnsProductConcepts(t *testing.T) {
 		}
 	}
 }
+
+func TestProductFromChannelNormalizesToThreeProducts(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		channel ProductChannel
+		want    Product
+	}{
+		{ProductChannelMedicalScale, ProductMedicalScale},
+		{ProductChannelTypology, ProductTypology},
+		{ProductChannelPersonality, ProductTypology},
+		{ProductChannelBehaviorAbility, ProductBehaviorAbility},
+		{ProductChannelCognitive, ProductBehaviorAbility},
+	}
+	for _, tc := range cases {
+		got, err := ProductFromChannel(tc.channel)
+		if err != nil {
+			t.Fatalf("ProductFromChannel(%q): %v", tc.channel, err)
+		}
+		if got != tc.want {
+			t.Fatalf("ProductFromChannel(%q) = %q, want %q", tc.channel, got, tc.want)
+		}
+	}
+}

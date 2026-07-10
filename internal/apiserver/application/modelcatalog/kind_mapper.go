@@ -1,6 +1,9 @@
 package modelcatalog
 
-import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/option"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+)
 
 const AlgorithmCustomTypology = "custom_typology"
 
@@ -76,7 +79,7 @@ func DomainPayloadFormatToAPI(kind string, format string) string {
 }
 
 func IsSupportedAPIKind(kind string) bool {
-	if domain.IsBehaviorAbilityProductChannelAPIKind(kind) {
+	if option.IsBehaviorAbilityProductChannelAPIKind(kind) {
 		return true
 	}
 	_, ok := catalogRegistry.ByAPIKind(kind)
