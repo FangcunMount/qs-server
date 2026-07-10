@@ -1,24 +1,23 @@
-package norming_test
+package behavioral
 
 import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 )
 
-func TestApplyCompositeMetadata(t *testing.T) {
+func TestApplyBrief2CompositeMetadata(t *testing.T) {
 	t.Parallel()
 
-	measure := norming.ApplyCompositeMetadata(definition.MeasureSpec{
+	measure := applyBrief2CompositeMetadata(definition.MeasureSpec{
 		Factors: []factor.Factor{
 			{Code: "inhibit", Title: "Inhibit"},
 			{Code: "self_monitor", Title: "Self Monitor"},
 			{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
 			{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
 		},
-	}, []norming.CompositeIndexSpec{
+	}, []brief2CompositeIndexSpec{
 		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
 		{Code: "gec", Strategy: factor.ChildrenAggregationSum, Children: []string{"bri"}},
 	})
@@ -35,34 +34,12 @@ func TestApplyCompositeMetadata(t *testing.T) {
 	}
 }
 
-func TestMeasureSpecWithCompositeMetadata(t *testing.T) {
+func TestApplyBrief2NormMetadata(t *testing.T) {
 	t.Parallel()
 
-	measure := norming.MeasureSpecWithCompositeMetadata([]factor.Factor{
-		{Code: "inhibit", Title: "Inhibit"},
-		{Code: "self_monitor", Title: "Self Monitor"},
-		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
-	}, []norming.CompositeIndexSpec{
-		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
-	})
-	if len(measure.FactorGraph.Edges) != 2 {
-		t.Fatalf("edges = %#v", measure.FactorGraph.Edges)
-	}
-	if len(measure.Scoring) != 1 || measure.Scoring[0].Sources[0].Kind != factor.ScoringSourceFactor {
-		t.Fatalf("scoring = %#v", measure.Scoring)
-	}
-}
-
-func TestApplyNormMetadata(t *testing.T) {
-	t.Parallel()
-
-	measure, calibration := norming.ApplyNormMetadata(definition.MeasureSpec{
-		Factors: []factor.Factor{
-			{Code: "bri"},
-			{Code: "inconsistency"},
-			{Code: "gec"},
-		},
-	}, norming.MetadataContext{
+	measure, calibration := applyBrief2NormMetadata(definition.MeasureSpec{
+		Factors: []factor.Factor{{Code: "bri"}, {Code: "inconsistency"}, {Code: "gec"}},
+	}, brief2MetadataContext{
 		NormTableVersion: "2024",
 		IndexCodes:       []string{"bri", "gec"},
 		ValidityCodes:    []string{"inconsistency"},
@@ -79,10 +56,10 @@ func TestApplyNormMetadata(t *testing.T) {
 	}
 }
 
-func TestNormRefsFromMetadata(t *testing.T) {
+func TestBrief2NormRefsFromMetadata(t *testing.T) {
 	t.Parallel()
 
-	refs := norming.NormRefsFromMetadata(norming.MetadataContext{
+	refs := brief2NormRefsFromMetadata(brief2MetadataContext{
 		NormTableVersion: "2024",
 		NormFactorCodes:  []string{"gec", "gec", "bri"},
 	})

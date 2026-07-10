@@ -62,7 +62,7 @@ func TestAlgorithmFamilyFromDecisionKind(t *testing.T) {
 		want     identity.AlgorithmFamily
 	}{
 		{binding.DecisionKindScoreRange, identity.AlgorithmFamilyFactorScoring},
-		{binding.DecisionKindScoreRangeInterpretation, identity.AlgorithmFamilyFactorScoring},
+		{binding.DecisionKind("score_range_interpretation"), identity.AlgorithmFamilyFactorScoring},
 		{binding.DecisionKindPoleComposition, identity.AlgorithmFamilyFactorClassification},
 		{binding.DecisionKindTraitProfile, identity.AlgorithmFamilyFactorClassification},
 		{binding.DecisionKindNearestPattern, identity.AlgorithmFamilyFactorClassification},

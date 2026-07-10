@@ -84,7 +84,7 @@ func isAllowedExportSubpackageRoot(sub string) bool {
 	}
 	switch sub {
 	case "identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat",
-		"norming", "taskperformance", "binding":
+		"taskperformance", "binding":
 		return true
 	default:
 		return false
@@ -97,7 +97,7 @@ func TestModelCatalogTopLevelPackages(t *testing.T) {
 	root := modelCatalogRoot(t)
 	required := []string{
 		"identity", "assessmentmodel", "definition", "factor", "norm", "conclusion", "payloadformat",
-		"norming", "taskperformance", "binding",
+		"taskperformance", "binding",
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {

@@ -12,16 +12,6 @@ func (f Factor) ResolvedRole() FactorRole {
 	return f.Role.Resolved()
 }
 
-func resolveRole(role FactorRole, isTotalScore bool) FactorRole {
-	if role != "" {
-		return role
-	}
-	if isTotalScore {
-		return FactorRoleTotal
-	}
-	return FactorRoleDimension
-}
-
 // ScoringSourceKind 标识 Factor 计分输入来源。
 type ScoringSourceKind string
 

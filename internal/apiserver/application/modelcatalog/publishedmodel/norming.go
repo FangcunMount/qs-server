@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func buildNorming(model *domain.AssessmentModel) (*port.AssessmentSnapshot, error) {
@@ -22,9 +22,9 @@ func buildNorming(model *domain.AssessmentModel) (*port.AssessmentSnapshot, erro
 		algorithm = domain.AlgorithmBehavioralRatingDefault
 	}
 	var err error
-	encoded, err = norming.RequirePrimaryDimensionCodeForPublish(encoded)
+	encoded, err = behavioral.PrepareDefinitionForPublish(encoded)
 	if err != nil {
 		return nil, err
 	}
-	return recordFromModel(model, domain.KindBehavioralRating, domain.SubKindEmpty, algorithm, domain.PayloadFormatForBehavioralRating(algorithm), norming.DecisionKindFromDefinitionPayload(encoded), encoded), nil
+	return recordFromModel(model, domain.KindBehavioralRating, domain.SubKindEmpty, algorithm, domain.PayloadFormatForBehavioralRating(algorithm), behavioral.DecisionKindFromDefinitionPayload(encoded), encoded), nil
 }

@@ -113,7 +113,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 		t.Fatalf("MarkPublished: %v", err)
 	}
 
-	snapshot, err := publishedmodel.Build(model)
+	snapshot, err := publishedmodel.BuildAssessmentSnapshot(model)
 	if err != nil {
 		t.Fatalf("Build published model: %v", err)
 	}

@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
-	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
@@ -146,13 +145,13 @@ func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterializat
 	conclusions := make([]conclusion.Conclusion, 0)
 	materializedNorms := make([]*catalognorm.Norm, 0, 1)
 	if body.Brief2 != nil {
-		measure, calibration = factornorm.ApplyNormMetadata(measure, factornorm.MetadataContext{
+		measure, calibration = applyBrief2NormMetadata(measure, brief2MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
-		measure = factornorm.ApplyCompositeMetadata(measure, compositeSpecsFromPayload(body.Brief2))
+		measure = applyBrief2CompositeMetadata(measure, compositeSpecsFromPayload(body.Brief2))
 		conclusions = append(conclusions, normConclusionsFromPayload(body.Brief2)...)
 		if table := normFromPayload(body.Brief2); table != nil {
 			materializedNorms = append(materializedNorms, table)
@@ -196,7 +195,7 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	}
 	factors := factorSnapshotsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.Brief2 != nil {
-		factors = applyNormMetadataToFactorSnapshots(factors, factornorm.MetadataContext{
+		factors = applyBrief2NormMetadataToFactorSnapshots(factors, brief2MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
@@ -332,16 +331,16 @@ func normFactorCodesFromPayload(body *brief2Extension) []string {
 	return codes
 }
 
-func compositeSpecsFromPayload(body *brief2Extension) []factornorm.CompositeIndexSpec {
+func compositeSpecsFromPayload(body *brief2Extension) []brief2CompositeIndexSpec {
 	if body == nil || len(body.CompositeIndexes) == 0 {
 		return nil
 	}
-	specs := make([]factornorm.CompositeIndexSpec, 0, len(body.CompositeIndexes))
+	specs := make([]brief2CompositeIndexSpec, 0, len(body.CompositeIndexes))
 	for _, item := range body.CompositeIndexes {
 		if item.Code == "" || len(item.Children) == 0 {
 			continue
 		}
-		specs = append(specs, factornorm.CompositeIndexSpec{
+		specs = append(specs, brief2CompositeIndexSpec{
 			Code:       item.Code,
 			Strategy:   factor.ChildrenAggregationStrategy(item.Strategy),
 			Children:   append([]string(nil), item.Children...),
@@ -434,7 +433,7 @@ func factorSnapshotsFromDefinitionBody(dimensions []sharedpayload.DimensionRule,
 	return out
 }
 
-func applyNormMetadataToFactorSnapshots(factors []FactorSnapshot, ctx factornorm.MetadataContext) []FactorSnapshot {
+func applyBrief2NormMetadataToFactorSnapshots(factors []FactorSnapshot, ctx brief2MetadataContext) []FactorSnapshot {
 	if len(factors) == 0 {
 		return factors
 	}
@@ -457,7 +456,7 @@ func applyNormMetadataToFactorSnapshots(factors []FactorSnapshot, ctx factornorm
 	return out
 }
 
-func applyCompositeMetadataToFactorSnapshots(factors []FactorSnapshot, specs []factornorm.CompositeIndexSpec) []FactorSnapshot {
+func applyCompositeMetadataToFactorSnapshots(factors []FactorSnapshot, specs []brief2CompositeIndexSpec) []FactorSnapshot {
 	if len(factors) == 0 || len(specs) == 0 {
 		return factors
 	}

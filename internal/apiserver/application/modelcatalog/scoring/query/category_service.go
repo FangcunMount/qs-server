@@ -15,10 +15,7 @@ func NewCategoryService() ports.ScaleCategoryService {
 }
 
 func (s *categoryService) GetCategories(_ context.Context) (*shared.ScaleCategoriesResult, error) {
-	categories := []shared.CategoryOption{}
-	for _, category := range allScaleCategoryOptions() {
-		categories = append(categories, category)
-	}
+	categories := append([]shared.CategoryOption(nil), allScaleCategoryOptions()...)
 
 	return &shared.ScaleCategoriesResult{
 		Categories:     categories,

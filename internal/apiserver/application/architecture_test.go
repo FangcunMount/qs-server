@@ -439,6 +439,7 @@ func TestModelCatalogJSONAdaptersDoNotReturnToDomain(t *testing.T) {
 		"factor.DefinitionBody",
 		"factor.DimensionRule",
 		"factor.ScoreRangeRule",
+		"domain/modelcatalog/norming",
 		"domain/modelcatalog/norming/snapshot",
 		"domain/modelcatalog/taskperformance/snapshot",
 	}

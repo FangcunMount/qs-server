@@ -108,7 +108,7 @@ func FamilyFromIdentity(identity Identity) (Family, bool) {
 // AlgorithmFamilyFromDecisionKind 映射 published 判定策略到执行家族。
 func AlgorithmFamilyFromDecisionKind(decision binding.DecisionKind) (AlgorithmFamily, bool) {
 	switch decision {
-	case binding.DecisionKindScoreRange, binding.DecisionKindScoreRangeInterpretation:
+	case binding.DecisionKindScoreRange, binding.DecisionKind("score_range_interpretation"):
 		return AlgorithmFamilyFactorScoring, true
 	case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern:
 		return AlgorithmFamilyFactorClassification, true

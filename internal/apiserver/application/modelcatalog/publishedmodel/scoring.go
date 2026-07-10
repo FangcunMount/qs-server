@@ -79,10 +79,3 @@ func BuildAssessmentSnapshotFromScale(model *scalesnapshot.ScaleSnapshot) (*port
 		DefinitionV2:         scalesnapshot.DefinitionFromScaleSnapshot(model),
 	}, nil
 }
-
-// BuildFromScale materializes a published runtime record from a legacy scale snapshot.
-//
-// Deprecated: use BuildAssessmentSnapshotFromScale.
-func BuildFromScale(model *scalesnapshot.ScaleSnapshot) (*port.PublishedModel, error) {
-	return BuildAssessmentSnapshotFromScale(model)
-}

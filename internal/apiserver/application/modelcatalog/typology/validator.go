@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func validateDefinitionPayloadForSave(format string, data []byte) []ValidationIssue {
@@ -28,47 +27,4 @@ func validateDefinitionPayloadForSave(format string, data []byte) []ValidationIs
 		}}
 	}
 	return nil
-}
-
-func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, modeltypology.RuntimeSpecValidationContext, []ValidationIssue) {
-	validationContext := modeltypology.RuntimeSpecValidationContext{}
-	if model == nil || model.Definition.IsEmpty() {
-		return nil, validationContext, []ValidationIssue{{
-			Field: "definition.payload", Message: "模型定义 payload 不能为空",
-			Code: "definition.payload.required", Level: "error",
-		}}
-	}
-	validationContext.Algorithm = model.Algorithm
-	if issues := validateDefinitionPayloadForSave(model.Definition.Format, model.Definition.Data); len(issues) > 0 {
-		return nil, validationContext, issues
-	}
-	payload, runtime, err := modeltypology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
-	if err != nil {
-		return nil, validationContext, []ValidationIssue{{
-			Field: "definition.payload", Message: err.Error(),
-			Code: "definition.payload.invalid", Level: "error",
-		}}
-	}
-	if payload != nil {
-		if payload.Algorithm != "" {
-			validationContext.Algorithm = payload.Algorithm
-		}
-		validationContext.Outcomes = append([]modeltypology.Outcome(nil), payload.Outcomes...)
-	}
-	return runtime, validationContext, nil
-}
-
-func mergeValidationIssues(groups ...[]ValidationIssue) []ValidationIssue {
-	total := 0
-	for _, group := range groups {
-		total += len(group)
-	}
-	if total == 0 {
-		return nil
-	}
-	out := make([]ValidationIssue, 0, total)
-	for _, group := range groups {
-		out = append(out, group...)
-	}
-	return out
 }

@@ -30,13 +30,6 @@ func BuildAssessmentSnapshot(model *domain.AssessmentModel) (*port.AssessmentSna
 	return builder(model)
 }
 
-// Build materializes a published runtime record from the single AssessmentModel aggregate.
-//
-// Deprecated: use BuildAssessmentSnapshot.
-func Build(model *domain.AssessmentModel) (*port.PublishedModel, error) {
-	return BuildAssessmentSnapshot(model)
-}
-
 func recordFromModel(model *domain.AssessmentModel, kind domain.Kind, subKind domain.SubKind, algorithm domain.Algorithm, payloadFormat string, decisionKind domain.DecisionKind, payload []byte) *port.AssessmentSnapshot {
 	return &port.AssessmentSnapshot{
 		SchemaVersion:        domain.SchemaVersionV2,

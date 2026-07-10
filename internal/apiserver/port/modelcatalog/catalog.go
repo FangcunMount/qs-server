@@ -59,11 +59,7 @@ type AssessmentSnapshot struct {
 	DefinitionV2         *domain.Definition
 }
 
-// PublishedModel 是 AssessmentSnapshot 的兼容名称。
-//
-// Deprecated: use AssessmentSnapshot in new application/runtime code. The old
-// name is retained because REST/gRPC behavior, Mongo fields, and existing
-// repository interfaces still use "published model" terminology.
+// PublishedModel 是 AssessmentSnapshot 的兼容名称，与 REST/gRPC、Mongo 字段及仓储接口术语一致。
 type PublishedModel = AssessmentSnapshot
 
 // PublishedWriter writes v2 published assessment models (seed / admin paths).
