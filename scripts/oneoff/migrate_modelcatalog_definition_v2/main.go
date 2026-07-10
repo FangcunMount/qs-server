@@ -119,8 +119,7 @@ func migratePublished(ctx context.Context, repo *mongomodelcatalog.Repository, n
 	if !apply {
 		return nil
 	}
-	model.DefinitionV2 = materialized.Definition
-	return repo.UpsertPublishedModel(ctx, model)
+	return repo.BackfillPublishedDefinitionV2(ctx, model, materialized.Definition)
 }
 
 func materialize(kind domain.Kind, algorithm domain.Algorithm, payload []byte) (shared.DefinitionMaterialization, error) {

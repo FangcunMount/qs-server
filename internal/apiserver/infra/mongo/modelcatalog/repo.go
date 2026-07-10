@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -37,6 +39,32 @@ func (r *Repository) UpsertPublishedModel(ctx context.Context, model *port.Publi
 		return mongo.ErrNilDocument
 	}
 	return r.upsertPublishedModel(ctx, model)
+}
+
+// BackfillPublishedDefinitionV2 updates only DefinitionV2 on the exact
+// historical published row. It intentionally does not normalize identity or
+// rewrite payload fields, which makes it safe for one-off migrations.
+func (r *Repository) BackfillPublishedDefinitionV2(ctx context.Context, model *port.PublishedModel, definitionV2 *modeldefinition.Definition) error {
+	if model == nil || definitionV2 == nil || model.Code == "" || model.Version == "" {
+		return fmt.Errorf("%w: published model and definition_v2 are required", domain.ErrInvalidArgument)
+	}
+	filter := publishedFilter(bson.M{
+		"model_code":    model.Code,
+		"model_version": model.Version,
+		"payload":       model.Payload,
+	})
+	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": bson.M{
+		"definition_schema_version": definitionSchemaVersion(definitionV2),
+		"definition_v2":             definitionToPO(definitionV2),
+		"updated_at":                time.Now(),
+	}})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%w: published model %s@%s", domain.ErrNotFound, model.Code, model.Version)
+	}
+	return nil
 }
 
 func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
