@@ -32,18 +32,22 @@ const (
 
 // ScoringSource 指向一个计分输入，可以是题目或子 Factor。
 type ScoringSource struct {
-	Kind ScoringSourceKind
-	Code string
+	Kind         ScoringSourceKind
+	Code         string
+	Sign         float64
+	OptionScores map[string]float64
 }
 
 // Scoring 描述一个 Factor 的分数如何由输入来源聚合得到。
 type Scoring struct {
-	FactorCode string
-	Sources    []ScoringSource
-	Strategy   ScoringStrategy
-	Params     *ScoringParams
-	MaxScore   *float64
-	Weights    map[string]float64
+	FactorCode    string
+	Sources       []ScoringSource
+	Strategy      ScoringStrategy
+	Params        *ScoringParams
+	MaxScore      *float64
+	Weights       map[string]float64
+	Constant      float64
+	OptionScoring OptionScoring
 }
 
 // FactorEdge 描述 FactorGraph 中一条父子边。

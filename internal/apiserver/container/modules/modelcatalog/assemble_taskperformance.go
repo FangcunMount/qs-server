@@ -14,6 +14,7 @@ type TaskPerformance struct {
 type TaskPerformanceDeps struct {
 	ModelRepo     port.ModelRepository
 	PublishedRepo port.PublishedModelRepository
+	NormRepo      port.NormRepository
 }
 
 // NewTaskPerformance assembles the cognitive-model catalog capability.
@@ -23,6 +24,7 @@ func NewTaskPerformance(deps TaskPerformanceDeps) (*TaskPerformance, error) {
 		commandService = appTaskPerformance.NewService(appTaskPerformance.Dependencies{
 			ModelRepo:     deps.ModelRepo,
 			PublishedRepo: deps.PublishedRepo,
+			NormRepo:      deps.NormRepo,
 		})
 	}
 	return &TaskPerformance{CommandService: commandService}, nil

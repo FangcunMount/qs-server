@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/norming"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
@@ -48,6 +49,26 @@ func (r *memoryModelRepo) Delete(context.Context, string) error { return nil }
 
 type memoryPublishedRepo struct {
 	snapshots map[string]*port.PublishedModel
+}
+
+type memoryNormRepo struct {
+	tables map[string]*norm.Norm
+}
+
+func (r *memoryNormRepo) UpsertNorm(_ context.Context, table *norm.Norm) error {
+	if r.tables == nil {
+		r.tables = map[string]*norm.Norm{}
+	}
+	r.tables[table.TableVersion] = table
+	return nil
+}
+
+func (r *memoryNormRepo) FindNorm(_ context.Context, version string) (*norm.Norm, error) {
+	table, ok := r.tables[version]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return table, nil
 }
 
 func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *port.PublishedModel) error {
@@ -180,7 +201,7 @@ func TestUpdateDefinitionStoresTargetDefinitionV2(t *testing.T) {
 	t.Parallel()
 
 	modelRepo := &memoryModelRepo{}
-	svc := norming.NewService(norming.Dependencies{ModelRepo: modelRepo})
+	svc := norming.NewService(norming.Dependencies{ModelRepo: modelRepo, NormRepo: &memoryNormRepo{}})
 
 	created, err := svc.Create(context.Background(), norming.CreateInput{
 		Code:  "BR-V2",

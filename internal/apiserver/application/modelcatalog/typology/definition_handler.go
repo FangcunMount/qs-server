@@ -42,8 +42,8 @@ func (h DefinitionHandler) PrepareForSave(_ context.Context, model *domain.Asses
 			Data:   storedPayload,
 		},
 	}
-	if definitionV2, err := modeltypology.DefinitionFromPayload(storedPayload, algorithm); err == nil {
-		result.DefinitionV2 = definitionV2
+	if materialized, err := modeltypology.MaterializeDefinition(storedPayload, algorithm); err == nil {
+		result.DefinitionV2 = materialized.Definition
 	}
 	if input.Algorithm != "" {
 		result.Algorithm = domain.Algorithm(input.Algorithm)
@@ -56,12 +56,19 @@ func (h DefinitionHandler) PrepareForSave(_ context.Context, model *domain.Asses
 
 func (h DefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	domainIssues := model.ValidateForPublish().Issues
-	runtime, validationContext, definitionIssues := validateDefinitionPayloadForPublish(model)
-	questionnaire, questionnaireIssues := questionnaireSnapshotForPublish(ctx, h.QuestionnaireQuery, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
-	if len(definitionIssues) > 0 || len(questionnaireIssues) > 0 || runtime == nil {
-		return mergeDomainValidationIssues(domainIssues, validationIssuesToDomain(definitionIssues), validationIssuesToDomain(questionnaireIssues))
+	definitionIssues := appdefinition.ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)
+	if len(definitionIssues) > 0 {
+		return mergeDomainValidationIssues(domainIssues, definitionIssues)
 	}
-	runtimeIssues := modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, validationContext)
+	runtime, runtimeErr := modeltypology.RuntimeSpecFromDefinition(model.DefinitionV2)
+	questionnaire, questionnaireIssues := questionnaireSnapshotForPublish(ctx, h.QuestionnaireQuery, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
+	if runtimeErr != nil || len(questionnaireIssues) > 0 || runtime == nil {
+		if runtimeErr != nil {
+			definitionIssues = append(definitionIssues, domain.DomainValidationIssue{Field: "definition_v2", Code: "definition_v2.runtime.invalid", Message: runtimeErr.Error(), Level: domain.ValidationLevelError})
+		}
+		return mergeDomainValidationIssues(domainIssues, definitionIssues, validationIssuesToDomain(questionnaireIssues))
+	}
+	runtimeIssues := modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{})
 	return mergeDomainValidationIssues(domainIssues, runtimeIssues)
 }
 
@@ -75,10 +82,18 @@ func (h DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain
 	if model.Definition.IsEmpty() {
 		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("typology model definition is empty")
 	}
-	payload, runtime, err := modeltypology.PayloadAndRuntimeSpecFromDefinition(model.Definition.Data, model.Algorithm)
+	if model.DefinitionV2 == nil {
+		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("typology definition_v2 is required")
+	}
+	payload, err := modeltypology.PayloadFromDefinition(modeltypology.DefinitionEnvelope{
+		Code: model.Code, Version: "v" + fmt.Sprint(model.Revision()), Title: model.Title,
+		QuestionnaireCode: model.Binding.QuestionnaireCode, QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Status: string(domain.ModelStatusPublished), Algorithm: model.Algorithm,
+	}, model.DefinitionV2)
 	if err != nil {
 		return appdefinition.SnapshotBuildResult{}, err
 	}
+	runtime := payload.Runtime
 	prepareTypologySnapshotPayload(payload, model, runtime)
 	encoded, err := json.Marshal(payload)
 	if err != nil {

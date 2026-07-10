@@ -58,10 +58,11 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	if !ok {
 		return nil, evaluationexecute.ErrDescriptorPipelineContext
 	}
-	scaleSnapshot, ok := portevaluationinput.CognitiveScaleSnapshot(execInput.Input)
-	if !ok || scaleSnapshot == nil {
+	cognitivePayload, ok := portevaluationinput.CognitivePayload(execInput.Input)
+	if !ok || cognitivePayload.Snapshot == nil {
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
+	scaleSnapshot := cognitivePayload.Snapshot.ToScaleSnapshot()
 	outcome, err := c.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
@@ -69,7 +70,7 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	if err != nil {
 		return nil, err
 	}
-	return taskPerformancePipelineResult{outcome: outcome}, nil
+	return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(NormalizeOutcome(outcome), cognitivePayload.Snapshot.AbilityConclusions)}, nil
 }
 
 type taskPerformanceOutcomeAssembler struct{}
@@ -79,5 +80,5 @@ func (taskPerformanceOutcomeAssembler) Assemble(result any) (any, error) {
 	if !ok || pipelineResult.outcome == nil {
 		return nil, fmt.Errorf("task_performance outcome assembler received invalid type %T", result)
 	}
-	return NormalizeOutcome(pipelineResult.outcome), nil
+	return pipelineResult.outcome, nil
 }

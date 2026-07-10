@@ -24,6 +24,7 @@ type TypologyDeps struct {
 	PublishedAlgorithmLister port.PublishedAlgorithmLister
 	ModelRepo                port.ModelRepository
 	PublishedRepo            port.PublishedModelRepository
+	NormRepo                 port.NormRepository
 	QuestionnaireQuery       questionnaireapp.QuestionnaireQueryService
 	CacheSignalNotifier      appTypologyModel.CacheSignalNotifier
 }

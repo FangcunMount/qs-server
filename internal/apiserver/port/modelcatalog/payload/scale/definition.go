@@ -12,11 +12,38 @@ func DefinitionFromScaleSnapshot(snapshot *ScaleSnapshot) *definition.Definition
 	if snapshot == nil {
 		return nil
 	}
+	conclusions := riskConclusionsFromScaleSnapshot(snapshot)
 	return &definition.Definition{
 		Measure:     measureSpecFromScaleSnapshot(snapshot),
 		Calibration: definition.Calibration{},
-		Conclusions: riskConclusionsFromScaleSnapshot(snapshot),
+		Conclusions: conclusions,
+		Outcomes:    outcomesFromRiskConclusions(conclusions),
 	}
+}
+
+func outcomesFromRiskConclusions(items []conclusion.Conclusion) []conclusion.Outcome {
+	seen := make(map[string]struct{})
+	out := make([]conclusion.Outcome, 0)
+	for _, item := range items {
+		risk, ok := item.(conclusion.RiskConclusion)
+		if !ok {
+			continue
+		}
+		for _, outcome := range risk.Outcomes {
+			if outcome.Code == "" {
+				continue
+			}
+			if _, exists := seen[outcome.Code]; exists {
+				continue
+			}
+			seen[outcome.Code] = struct{}{}
+			out = append(out, outcome)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // ScaleSnapshotFromDefinition projects target definition layers back to the

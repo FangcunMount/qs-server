@@ -88,7 +88,7 @@ func cloneScoring(scoring []factor.Scoring) []factor.Scoring {
 	out := make([]factor.Scoring, 0, len(scoring))
 	for _, rule := range scoring {
 		copied := rule
-		copied.Sources = append([]factor.ScoringSource(nil), rule.Sources...)
+		copied.Sources = cloneSources(rule.Sources)
 		if rule.Params != nil {
 			copied.Params = &factor.ScoringParams{
 				CntOptionContents: append([]string(nil), rule.Params.CntOptionContents...),
@@ -99,6 +99,19 @@ func cloneScoring(scoring []factor.Scoring) []factor.Scoring {
 			copied.MaxScore = &maxScore
 		}
 		copied.Weights = cloneWeights(rule.Weights)
+		out = append(out, copied)
+	}
+	return out
+}
+
+func cloneSources(sources []factor.ScoringSource) []factor.ScoringSource {
+	if sources == nil {
+		return nil
+	}
+	out := make([]factor.ScoringSource, 0, len(sources))
+	for _, source := range sources {
+		copied := source
+		copied.OptionScores = cloneWeights(source.OptionScores)
 		out = append(out, copied)
 	}
 	return out

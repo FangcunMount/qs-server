@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -129,6 +130,7 @@ func Wire(in WireInput) (WireResult, error) {
 			infra.QuestionnaireRepo,
 			catalog,
 			modelDescriptors,
+			mongomodelcatalog.NewNormRepository(in.MongoDB, mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}),
 		)
 		if err != nil {
 			return WireResult{}, fmt.Errorf("evaluation input resolver: %w", err)

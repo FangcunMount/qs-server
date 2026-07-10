@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
 
 // SaveInput carries API-facing draft definition fields before family-specific
@@ -20,6 +21,7 @@ type SaveInput struct {
 type SaveResult struct {
 	Payload      domain.DefinitionPayload
 	DefinitionV2 *domain.Definition
+	Norms        []*norm.Norm
 	Algorithm    domain.Algorithm
 	SubKind      domain.SubKind
 }

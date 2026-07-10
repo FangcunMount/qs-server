@@ -50,10 +50,12 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 		TaskPerformance: TaskPerformanceDeps{
 			ModelRepo:     in.Typology.ModelRepo,
 			PublishedRepo: in.Typology.PublishedRepo,
+			NormRepo:      in.Typology.NormRepo,
 		},
 		Norming: NormingDeps{
 			ModelRepo:     in.Typology.ModelRepo,
 			PublishedRepo: in.Typology.PublishedRepo,
+			NormRepo:      in.Typology.NormRepo,
 		},
 	})
 }

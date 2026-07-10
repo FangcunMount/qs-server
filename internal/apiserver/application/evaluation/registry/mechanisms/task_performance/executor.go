@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -41,10 +42,11 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if e == nil || e.scoring == nil {
 		return nil, fmt.Errorf("task_performance evaluation executor is not configured")
 	}
-	scaleSnapshot, ok := portevaluationinput.CognitiveScaleSnapshot(input.Input)
-	if !ok || scaleSnapshot == nil {
+	cognitivePayload, ok := portevaluationinput.CognitivePayload(input.Input)
+	if !ok || cognitivePayload.Snapshot == nil {
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
+	scaleSnapshot := cognitivePayload.Snapshot.ToScaleSnapshot()
 	outcome, err := e.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
 		Assessment: input.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(input.Input, scaleSnapshot),
@@ -52,5 +54,34 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if err != nil {
 		return nil, err
 	}
-	return NormalizeOutcome(outcome), nil
+	return ApplyAbilityConclusions(NormalizeOutcome(outcome), cognitivePayload.Snapshot.AbilityConclusions), nil
+}
+
+// ApplyAbilityConclusions projects optional DefinitionV2 ability ranges onto
+// calculated cognitive factor results. No configured rule means no change.
+func ApplyAbilityConclusions(outcome *assessment.AssessmentOutcome, rules []conclusion.AbilityConclusion) *assessment.AssessmentOutcome {
+	if outcome == nil || len(rules) == 0 {
+		return outcome
+	}
+	for i := range outcome.Dimensions {
+		dimension := &outcome.Dimensions[i]
+		if dimension.Score == nil {
+			continue
+		}
+		for _, rule := range rules {
+			if rule.ScoreBasis != conclusion.ScoreBasisRaw || rule.FactorCode != dimension.Code {
+				continue
+			}
+			for _, item := range rule.Rules {
+				if dimension.Score.Value < item.MinScore || dimension.Score.Value > item.MaxScore {
+					continue
+				}
+				dimension.Level = &assessment.OutcomeResultLevel{Code: item.Level, Label: item.Title}
+				dimension.Description = item.Summary
+				dimension.Suggestion = item.Description
+				break
+			}
+		}
+	}
+	return outcome
 }

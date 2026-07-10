@@ -7,6 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	cognitive "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
@@ -25,6 +26,10 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
 		}]
 	}`)
+	materialized, err := cognitive.MaterializeDefinition(raw)
+	if err != nil {
+		t.Fatalf("MaterializeDefinition: %v", err)
+	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion:        domain.SchemaVersionV2,
 		PayloadFormat:        domain.PayloadFormatCognitiveDefaultV1,
@@ -36,7 +41,8 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 		Status:               "published",
 		QuestionnaireCode:    "Q-001",
 		QuestionnaireVersion: "1.0.0",
-		Payload:              raw,
+		Payload:              []byte("not-json"),
+		DefinitionV2:         materialized.Definition,
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
@@ -64,6 +70,10 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
 		"spm": {"time_limit_seconds": 900, "item_set_codes": ["A", "B"], "norm_table_version": "2024"}
 	}`)
+	materialized, err := cognitive.MaterializeDefinition(raw)
+	if err != nil {
+		t.Fatalf("MaterializeDefinition: %v", err)
+	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatCognitiveSPMV1,
@@ -73,7 +83,8 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 		Version:       "1.0.0",
 		Title:         "SPM",
 		Status:        "published",
-		Payload:       raw,
+		Payload:       []byte("not-json"),
+		DefinitionV2:  materialized.Definition,
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{

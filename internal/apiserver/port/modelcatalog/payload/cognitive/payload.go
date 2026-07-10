@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
@@ -21,6 +22,7 @@ type Snapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
+	AbilityConclusions   []conclusion.AbilityConclusion
 }
 
 type FactorSnapshot struct {
@@ -58,9 +60,26 @@ type definitionPayload struct {
 }
 
 type spmExtension struct {
-	TimeLimitSeconds int      `json:"time_limit_seconds,omitempty"`
-	ItemSetCodes     []string `json:"item_set_codes,omitempty"`
-	NormTableVersion string   `json:"norm_table_version,omitempty"`
+	TimeLimitSeconds   int                        `json:"time_limit_seconds,omitempty"`
+	ItemSetCodes       []string                   `json:"item_set_codes,omitempty"`
+	NormTableVersion   string                     `json:"norm_table_version,omitempty"`
+	AbilityConclusions []abilityConclusionPayload `json:"ability_conclusions,omitempty"`
+}
+
+type abilityConclusionPayload struct {
+	FactorCode string                   `json:"factor_code"`
+	ScoreBasis string                   `json:"score_basis"`
+	Ranges     []abilityConclusionRange `json:"ranges"`
+}
+
+type abilityConclusionRange struct {
+	MinScore    float64 `json:"min_score"`
+	MaxScore    float64 `json:"max_score"`
+	Level       string  `json:"level,omitempty"`
+	OutcomeCode string  `json:"outcome_code,omitempty"`
+	Title       string  `json:"title,omitempty"`
+	Summary     string  `json:"summary,omitempty"`
+	Description string  `json:"description,omitempty"`
 }
 
 // ParseDefinitionPayload de编码 cognitive 载荷 body 为 运行时 快照。
@@ -68,21 +87,54 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// DefinitionFromPayload projects the cognitive wire payload to DefinitionV2.
-func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+// MaterializeDefinition projects cognitive wire payload semantics to DefinitionV2.
+func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterialization, error) {
 	var body definitionPayload
 	if err := json.Unmarshal(payload, &body); err != nil {
-		return nil, fmt.Errorf("decode cognitive definition: %w", err)
+		return sharedpayload.DefinitionMaterialization{}, fmt.Errorf("decode cognitive definition: %w", err)
 	}
 	measure := sharedpayload.MeasureSpecFromDefinitionBody(body.DefinitionBody)
 	calibration := definition.Calibration{}
+	conclusions := make([]conclusion.Conclusion, 0)
 	if body.SPM != nil {
 		measure, calibration = taskperf.ApplyNormMetadata(measure, taskperf.MetadataContext{
 			NormTableVersion: body.SPM.NormTableVersion,
 			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
 		})
+		conclusions = append(conclusions, abilityConclusionsFromPayload(body.SPM)...)
 	}
-	return &definition.Definition{Measure: measure, Calibration: calibration}, nil
+	return sharedpayload.DefinitionMaterialization{Definition: &definition.Definition{
+		Measure: measure, Calibration: calibration, Conclusions: conclusions,
+	}}, nil
+}
+
+// DefinitionFromPayload projects the cognitive wire payload to DefinitionV2.
+func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+	materialized, err := MaterializeDefinition(payload)
+	if err != nil {
+		return nil, err
+	}
+	return materialized.Definition, nil
+}
+
+func abilityConclusionsFromPayload(spm *spmExtension) []conclusion.Conclusion {
+	if spm == nil || len(spm.AbilityConclusions) == 0 {
+		return nil
+	}
+	out := make([]conclusion.Conclusion, 0, len(spm.AbilityConclusions))
+	for _, item := range spm.AbilityConclusions {
+		ranges := make([]conclusion.ScoreRangeOutcome, 0, len(item.Ranges))
+		for _, value := range item.Ranges {
+			ranges = append(ranges, conclusion.ScoreRangeOutcome{
+				MinScore: value.MinScore, MaxScore: value.MaxScore, Level: value.Level, OutcomeCode: value.OutcomeCode,
+				Title: value.Title, Summary: value.Summary, Description: value.Description,
+			})
+		}
+		out = append(out, conclusion.AbilityConclusion{
+			FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Rules: ranges,
+		})
+	}
+	return out
 }
 
 // ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。

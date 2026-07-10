@@ -40,8 +40,11 @@ type (
 	FactorGraph                 = factorpkg.FactorGraph
 	FactorRole                  = factorpkg.FactorRole
 	Scoring                     = factorpkg.Scoring
+	ScoringSource               = factorpkg.ScoringSource
+	ScoringSourceKind           = factorpkg.ScoringSourceKind
 	ScoringStrategy             = factorpkg.ScoringStrategy
 	ScoringParams               = factorpkg.ScoringParams
+	OptionScoring               = factorpkg.OptionScoring
 	ChildrenPolicy              = factorpkg.ChildrenPolicy
 	ChildrenAggregationStrategy = factorpkg.ChildrenAggregationStrategy
 
@@ -53,20 +56,31 @@ type (
 	DomainValidationIssue   = assessmentmodelpkg.DomainValidationIssue
 	DomainValidationResult  = assessmentmodelpkg.DomainValidationResult
 
-	Definition        = definitionpkg.Definition
-	MeasureSpec       = definitionpkg.MeasureSpec
-	Calibration       = definitionpkg.Calibration
-	ReportMap         = definitionpkg.ReportMap
-	ReportSection     = definitionpkg.ReportSection
-	Norm              = normpkg.Norm
-	NormRef           = normpkg.Ref
-	Conclusion        = conclusionpkg.Conclusion
-	Outcome           = conclusionpkg.Outcome
-	ScoreRangeOutcome = conclusionpkg.ScoreRangeOutcome
-	RiskConclusion    = conclusionpkg.RiskConclusion
-	TypeConclusion    = conclusionpkg.TypeConclusion
-	NormConclusion    = conclusionpkg.NormConclusion
-	AbilityConclusion = conclusionpkg.AbilityConclusion
+	Definition                = definitionpkg.Definition
+	MeasureSpec               = definitionpkg.MeasureSpec
+	Calibration               = definitionpkg.Calibration
+	ReportMap                 = definitionpkg.ReportMap
+	ReportSection             = definitionpkg.ReportSection
+	Norm                      = normpkg.Norm
+	NormRef                   = normpkg.Ref
+	NormFactorTable           = normpkg.FactorTable
+	NormBand                  = normpkg.Band
+	NormLookupEntry           = normpkg.LookupEntry
+	Conclusion                = conclusionpkg.Conclusion
+	Outcome                   = conclusionpkg.Outcome
+	ScoreRangeOutcome         = conclusionpkg.ScoreRangeOutcome
+	ScoreBasis                = conclusionpkg.ScoreBasis
+	TypeDecision              = conclusionpkg.TypeDecision
+	TypeLevelRule             = conclusionpkg.TypeLevelRule
+	TypePole                  = conclusionpkg.TypePole
+	TypeSpecialRule           = conclusionpkg.TypeSpecialRule
+	TypeOutcomeMapping        = conclusionpkg.TypeOutcomeMapping
+	TypeOutcomeProfile        = conclusionpkg.TypeOutcomeProfile
+	RiskConclusion            = conclusionpkg.RiskConclusion
+	TypeConclusion            = conclusionpkg.TypeConclusion
+	NormConclusion            = conclusionpkg.NormConclusion
+	AbilityConclusion         = conclusionpkg.AbilityConclusion
+	DefinitionValidationIssue = definitionpkg.ValidationIssue
 )
 
 const (
@@ -97,6 +111,16 @@ const (
 	DecisionKindNormLookup                            = binding.DecisionKindNormLookup
 	DecisionKindAbilityLevel                          = binding.DecisionKindAbilityLevel
 	DecisionKindScoreRangeInterpretation DecisionKind = binding.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
+
+	ScoringSourceQuestion      = factorpkg.ScoringSourceQuestion
+	ScoringSourceFactor        = factorpkg.ScoringSourceFactor
+	ScoringStrategyWeightedAvg = factorpkg.ScoringStrategyWeightedAvg
+	OptionScoringStrict        = factorpkg.OptionScoringStrict
+	OptionScoringCompat        = factorpkg.OptionScoringCompat
+
+	ScoreBasisRaw        = conclusionpkg.ScoreBasisRaw
+	ScoreBasisTScore     = conclusionpkg.ScoreBasisTScore
+	ScoreBasisPercentile = conclusionpkg.ScoreBasisPercentile
 
 	ProductChannelMedicalScale    = binding.ProductChannelMedicalScale
 	ProductChannelTypology        = binding.ProductChannelTypology
@@ -211,4 +235,5 @@ var (
 
 	NewAssessmentModel = assessmentmodelpkg.New
 	ParseModelStatus   = assessmentmodelpkg.ParseStatus
+	ValidateDefinition = definitionpkg.Validate
 )

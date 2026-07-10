@@ -39,17 +39,21 @@ type FactorEdgePO struct {
 }
 
 type ScoringPO struct {
-	FactorCode string             `bson:"factor_code"`
-	Sources    []ScoringSourcePO  `bson:"sources,omitempty"`
-	Strategy   string             `bson:"strategy,omitempty"`
-	Params     *ScoringParamsPO   `bson:"params,omitempty"`
-	MaxScore   *float64           `bson:"max_score,omitempty"`
-	Weights    map[string]float64 `bson:"weights,omitempty"`
+	FactorCode    string             `bson:"factor_code"`
+	Sources       []ScoringSourcePO  `bson:"sources,omitempty"`
+	Strategy      string             `bson:"strategy,omitempty"`
+	Params        *ScoringParamsPO   `bson:"params,omitempty"`
+	MaxScore      *float64           `bson:"max_score,omitempty"`
+	Weights       map[string]float64 `bson:"weights,omitempty"`
+	Constant      float64            `bson:"constant,omitempty"`
+	OptionScoring string             `bson:"option_scoring,omitempty"`
 }
 
 type ScoringSourcePO struct {
-	Kind string `bson:"kind"`
-	Code string `bson:"code"`
+	Kind         string             `bson:"kind"`
+	Code         string             `bson:"code"`
+	Sign         float64            `bson:"sign,omitempty"`
+	OptionScores map[string]float64 `bson:"option_scores,omitempty"`
 }
 
 type ScoringParamsPO struct {
@@ -66,11 +70,17 @@ type NormRefPO struct {
 }
 
 type ConclusionPO struct {
-	Kind        string                `bson:"kind"`
-	FactorCode  string                `bson:"factor_code,omitempty"`
-	FactorCodes []string              `bson:"factor_codes,omitempty"`
-	Rules       []ScoreRangeOutcomePO `bson:"rules,omitempty"`
-	Outcomes    []OutcomePO           `bson:"outcomes,omitempty"`
+	Kind           string                 `bson:"kind"`
+	FactorCode     string                 `bson:"factor_code,omitempty"`
+	FactorCodes    []string               `bson:"factor_codes,omitempty"`
+	ScoreBasis     string                 `bson:"score_basis,omitempty"`
+	Primary        bool                   `bson:"primary,omitempty"`
+	Rules          []ScoreRangeOutcomePO  `bson:"rules,omitempty"`
+	Outcomes       []OutcomePO            `bson:"outcomes,omitempty"`
+	TypeDecision   *TypeDecisionPO        `bson:"type_decision,omitempty"`
+	SpecialRules   []TypeSpecialRulePO    `bson:"special_rules,omitempty"`
+	OutcomeMapping *TypeOutcomeMappingPO  `bson:"outcome_mapping,omitempty"`
+	Profiles       []TypeOutcomeProfilePO `bson:"profiles,omitempty"`
 }
 
 type OutcomePO struct {
@@ -83,10 +93,69 @@ type OutcomePO struct {
 type ScoreRangeOutcomePO struct {
 	MinScore    float64 `bson:"min_score"`
 	MaxScore    float64 `bson:"max_score"`
+	Level       string  `bson:"level,omitempty"`
 	OutcomeCode string  `bson:"outcome_code,omitempty"`
 	Title       string  `bson:"title,omitempty"`
 	Summary     string  `bson:"summary,omitempty"`
 	Description string  `bson:"description,omitempty"`
+}
+
+type TypeDecisionPO struct {
+	Kind                        string           `bson:"kind,omitempty"`
+	FallbackSimilarityThreshold float64          `bson:"fallback_similarity_threshold,omitempty"`
+	FallbackCode                string           `bson:"fallback_code,omitempty"`
+	LevelRule                   *TypeLevelRulePO `bson:"level_rule,omitempty"`
+	Poles                       []TypePolePO     `bson:"poles,omitempty"`
+}
+
+type TypeLevelRulePO struct {
+	LowMax  float64 `bson:"low_max,omitempty"`
+	HighMin float64 `bson:"high_min,omitempty"`
+}
+
+type TypePolePO struct {
+	FactorCode string  `bson:"factor_code"`
+	LeftPole   string  `bson:"left_pole,omitempty"`
+	RightPole  string  `bson:"right_pole,omitempty"`
+	Threshold  float64 `bson:"threshold,omitempty"`
+	Model      string  `bson:"model,omitempty"`
+}
+
+type TypeSpecialRulePO struct {
+	Code          string   `bson:"code"`
+	Kind          string   `bson:"kind,omitempty"`
+	Phase         string   `bson:"phase,omitempty"`
+	Trigger       string   `bson:"trigger,omitempty"`
+	OutcomeCode   string   `bson:"outcome_code,omitempty"`
+	QuestionCodes []string `bson:"question_codes,omitempty"`
+	OptionValues  []string `bson:"option_values,omitempty"`
+}
+
+type TypeOutcomeMappingPO struct {
+	DetailKind       string `bson:"detail_kind,omitempty"`
+	DetailAdapterKey string `bson:"detail_adapter_key,omitempty"`
+	Algorithm        string `bson:"algorithm,omitempty"`
+}
+
+type TypeOutcomeProfilePO struct {
+	OutcomeCode string   `bson:"outcome_code"`
+	Pattern     string   `bson:"pattern,omitempty"`
+	Traits      []string `bson:"traits,omitempty"`
+	Strengths   []string `bson:"strengths,omitempty"`
+	Weaknesses  []string `bson:"weaknesses,omitempty"`
+	Suggestions []string `bson:"suggestions,omitempty"`
+	ImageURL    string   `bson:"image_url,omitempty"`
+	Image       string   `bson:"image,omitempty"`
+	Rarity      RarityPO `bson:"rarity,omitempty"`
+	IsSpecial   bool     `bson:"is_special,omitempty"`
+	Trigger     string   `bson:"trigger,omitempty"`
+	Commentary  string   `bson:"commentary,omitempty"`
+}
+
+type RarityPO struct {
+	Percent float64 `bson:"percent,omitempty"`
+	Label   string  `bson:"label,omitempty"`
+	OneInX  int     `bson:"one_in_x,omitempty"`
 }
 
 type ReportMapPO struct {
@@ -94,9 +163,13 @@ type ReportMapPO struct {
 }
 
 type ReportSectionPO struct {
-	Code       string   `bson:"code"`
-	Title      string   `bson:"title,omitempty"`
-	SourceRefs []string `bson:"source_refs,omitempty"`
+	Code          string   `bson:"code"`
+	Title         string   `bson:"title,omitempty"`
+	SourceRefs    []string `bson:"source_refs,omitempty"`
+	Kind          string   `bson:"kind,omitempty"`
+	AdapterKey    string   `bson:"adapter_key,omitempty"`
+	TemplateID    string   `bson:"template_id,omitempty"`
+	CategoryLabel string   `bson:"category_label,omitempty"`
 }
 
 func definitionToPO(def *domain.Definition) *DefinitionPO {
@@ -201,12 +274,14 @@ func scoringToPO(scoring []factor.Scoring) []ScoringPO {
 	out := make([]ScoringPO, 0, len(scoring))
 	for _, item := range scoring {
 		out = append(out, ScoringPO{
-			FactorCode: item.FactorCode,
-			Sources:    scoringSourcesToPO(item.Sources),
-			Strategy:   item.Strategy.String(),
-			Params:     scoringParamsToPO(item.Params),
-			MaxScore:   cloneFloat64(item.MaxScore),
-			Weights:    cloneFloat64Map(item.Weights),
+			FactorCode:    item.FactorCode,
+			Sources:       scoringSourcesToPO(item.Sources),
+			Strategy:      item.Strategy.String(),
+			Params:        scoringParamsToPO(item.Params),
+			MaxScore:      cloneFloat64(item.MaxScore),
+			Weights:       cloneFloat64Map(item.Weights),
+			Constant:      item.Constant,
+			OptionScoring: string(item.OptionScoring),
 		})
 	}
 	return out
@@ -219,12 +294,14 @@ func scoringFromPO(items []ScoringPO) []factor.Scoring {
 	out := make([]factor.Scoring, 0, len(items))
 	for _, item := range items {
 		out = append(out, factor.Scoring{
-			FactorCode: item.FactorCode,
-			Sources:    scoringSourcesFromPO(item.Sources),
-			Strategy:   factor.ScoringStrategy(item.Strategy),
-			Params:     scoringParamsFromPO(item.Params),
-			MaxScore:   cloneFloat64(item.MaxScore),
-			Weights:    cloneFloat64Map(item.Weights),
+			FactorCode:    item.FactorCode,
+			Sources:       scoringSourcesFromPO(item.Sources),
+			Strategy:      factor.ScoringStrategy(item.Strategy),
+			Params:        scoringParamsFromPO(item.Params),
+			MaxScore:      cloneFloat64(item.MaxScore),
+			Weights:       cloneFloat64Map(item.Weights),
+			Constant:      item.Constant,
+			OptionScoring: factor.OptionScoring(item.OptionScoring),
 		})
 	}
 	return out
@@ -236,7 +313,7 @@ func scoringSourcesToPO(sources []factor.ScoringSource) []ScoringSourcePO {
 	}
 	out := make([]ScoringSourcePO, 0, len(sources))
 	for _, source := range sources {
-		out = append(out, ScoringSourcePO{Kind: string(source.Kind), Code: source.Code})
+		out = append(out, ScoringSourcePO{Kind: string(source.Kind), Code: source.Code, Sign: source.Sign, OptionScores: cloneFloat64Map(source.OptionScores)})
 	}
 	return out
 }
@@ -247,7 +324,7 @@ func scoringSourcesFromPO(items []ScoringSourcePO) []factor.ScoringSource {
 	}
 	out := make([]factor.ScoringSource, 0, len(items))
 	for _, item := range items {
-		out = append(out, factor.ScoringSource{Kind: factor.ScoringSourceKind(item.Kind), Code: item.Code})
+		out = append(out, factor.ScoringSource{Kind: factor.ScoringSourceKind(item.Kind), Code: item.Code, Sign: item.Sign, OptionScores: cloneFloat64Map(item.OptionScores)})
 	}
 	return out
 }
@@ -297,11 +374,25 @@ func conclusionsToPO(conclusions []domain.Conclusion) []ConclusionPO {
 				Outcomes:   outcomesToPO(typed.Outcomes),
 			})
 		case domain.TypeConclusion:
-			out = append(out, ConclusionPO{Kind: string(conclusion.KindType), FactorCodes: append([]string(nil), typed.FactorCodes...), Outcomes: outcomesToPO(typed.Outcomes)})
+			out = append(out, ConclusionPO{
+				Kind:           string(conclusion.KindType),
+				FactorCodes:    append([]string(nil), typed.FactorCodes...),
+				Outcomes:       outcomesToPO(typed.Outcomes),
+				TypeDecision:   typeDecisionToPO(typed.Decision),
+				SpecialRules:   typeSpecialRulesToPO(typed.SpecialRules),
+				OutcomeMapping: typeOutcomeMappingToPO(typed.OutcomeMapping),
+				Profiles:       typeOutcomeProfilesToPO(typed.Profiles),
+			})
 		case domain.NormConclusion:
-			out = append(out, ConclusionPO{Kind: string(conclusion.KindNorm), FactorCode: typed.FactorCode, Outcomes: outcomesToPO(typed.Outcomes)})
+			out = append(out, ConclusionPO{
+				Kind: string(conclusion.KindNorm), FactorCode: typed.FactorCode, ScoreBasis: string(typed.ScoreBasis), Primary: typed.Primary,
+				Rules: scoreRangeOutcomesToPO(typed.Rules), Outcomes: outcomesToPO(typed.Outcomes),
+			})
 		case domain.AbilityConclusion:
-			out = append(out, ConclusionPO{Kind: string(conclusion.KindAbility), FactorCode: typed.FactorCode, Outcomes: outcomesToPO(typed.Outcomes)})
+			out = append(out, ConclusionPO{
+				Kind: string(conclusion.KindAbility), FactorCode: typed.FactorCode, ScoreBasis: string(typed.ScoreBasis),
+				Rules: scoreRangeOutcomesToPO(typed.Rules), Outcomes: outcomesToPO(typed.Outcomes),
+			})
 		}
 	}
 	return out
@@ -321,11 +412,18 @@ func conclusionsFromPO(items []ConclusionPO) []domain.Conclusion {
 				Outcomes:   outcomesFromPO(item.Outcomes),
 			})
 		case conclusion.KindType:
-			out = append(out, domain.TypeConclusion{FactorCodes: append([]string(nil), item.FactorCodes...), Outcomes: outcomesFromPO(item.Outcomes)})
+			out = append(out, domain.TypeConclusion{
+				FactorCodes:    append([]string(nil), item.FactorCodes...),
+				Outcomes:       outcomesFromPO(item.Outcomes),
+				Decision:       typeDecisionFromPO(item.TypeDecision),
+				SpecialRules:   typeSpecialRulesFromPO(item.SpecialRules),
+				OutcomeMapping: typeOutcomeMappingFromPO(item.OutcomeMapping),
+				Profiles:       typeOutcomeProfilesFromPO(item.Profiles),
+			})
 		case conclusion.KindNorm:
-			out = append(out, domain.NormConclusion{FactorCode: item.FactorCode, Outcomes: outcomesFromPO(item.Outcomes)})
+			out = append(out, domain.NormConclusion{FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Primary: item.Primary, Rules: scoreRangeOutcomesFromPO(item.Rules), Outcomes: outcomesFromPO(item.Outcomes)})
 		case conclusion.KindAbility:
-			out = append(out, domain.AbilityConclusion{FactorCode: item.FactorCode, Outcomes: outcomesFromPO(item.Outcomes)})
+			out = append(out, domain.AbilityConclusion{FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Rules: scoreRangeOutcomesFromPO(item.Rules), Outcomes: outcomesFromPO(item.Outcomes)})
 		}
 	}
 	return out
@@ -372,6 +470,7 @@ func scoreRangeOutcomesToPO(rules []conclusion.ScoreRangeOutcome) []ScoreRangeOu
 		out = append(out, ScoreRangeOutcomePO{
 			MinScore:    item.MinScore,
 			MaxScore:    item.MaxScore,
+			Level:       item.Level,
 			OutcomeCode: item.OutcomeCode,
 			Title:       item.Title,
 			Summary:     item.Summary,
@@ -390,6 +489,7 @@ func scoreRangeOutcomesFromPO(items []ScoreRangeOutcomePO) []conclusion.ScoreRan
 		out = append(out, conclusion.ScoreRangeOutcome{
 			MinScore:    item.MinScore,
 			MaxScore:    item.MaxScore,
+			Level:       item.Level,
 			OutcomeCode: item.OutcomeCode,
 			Title:       item.Title,
 			Summary:     item.Summary,
@@ -403,9 +503,13 @@ func reportMapToPO(reportMap domain.ReportMap) ReportMapPO {
 	sections := make([]ReportSectionPO, 0, len(reportMap.Sections))
 	for _, section := range reportMap.Sections {
 		sections = append(sections, ReportSectionPO{
-			Code:       section.Code,
-			Title:      section.Title,
-			SourceRefs: append([]string(nil), section.SourceRefs...),
+			Code:          section.Code,
+			Title:         section.Title,
+			SourceRefs:    append([]string(nil), section.SourceRefs...),
+			Kind:          section.Kind,
+			AdapterKey:    section.AdapterKey,
+			TemplateID:    section.TemplateID,
+			CategoryLabel: section.CategoryLabel,
 		})
 	}
 	return ReportMapPO{Sections: sections}
@@ -415,12 +519,124 @@ func reportMapFromPO(po ReportMapPO) domain.ReportMap {
 	sections := make([]domain.ReportSection, 0, len(po.Sections))
 	for _, section := range po.Sections {
 		sections = append(sections, domain.ReportSection{
-			Code:       section.Code,
-			Title:      section.Title,
-			SourceRefs: append([]string(nil), section.SourceRefs...),
+			Code:          section.Code,
+			Title:         section.Title,
+			SourceRefs:    append([]string(nil), section.SourceRefs...),
+			Kind:          section.Kind,
+			AdapterKey:    section.AdapterKey,
+			TemplateID:    section.TemplateID,
+			CategoryLabel: section.CategoryLabel,
 		})
 	}
 	return domain.ReportMap{Sections: sections}
+}
+
+func typeDecisionToPO(value conclusion.TypeDecision) *TypeDecisionPO {
+	if value.Kind == "" && value.LevelRule == nil && len(value.Poles) == 0 && value.FallbackCode == "" && value.FallbackSimilarityThreshold == 0 {
+		return nil
+	}
+	out := &TypeDecisionPO{
+		Kind: string(value.Kind), FallbackSimilarityThreshold: value.FallbackSimilarityThreshold, FallbackCode: value.FallbackCode,
+		Poles: typePolesToPO(value.Poles),
+	}
+	if value.LevelRule != nil {
+		out.LevelRule = &TypeLevelRulePO{LowMax: value.LevelRule.LowMax, HighMin: value.LevelRule.HighMin}
+	}
+	return out
+}
+
+func typeDecisionFromPO(value *TypeDecisionPO) conclusion.TypeDecision {
+	if value == nil {
+		return conclusion.TypeDecision{}
+	}
+	out := conclusion.TypeDecision{
+		Kind: domain.DecisionKind(value.Kind), FallbackSimilarityThreshold: value.FallbackSimilarityThreshold, FallbackCode: value.FallbackCode,
+		Poles: typePolesFromPO(value.Poles),
+	}
+	if value.LevelRule != nil {
+		out.LevelRule = &conclusion.TypeLevelRule{LowMax: value.LevelRule.LowMax, HighMin: value.LevelRule.HighMin}
+	}
+	return out
+}
+
+func typePolesToPO(items []conclusion.TypePole) []TypePolePO {
+	if items == nil {
+		return nil
+	}
+	out := make([]TypePolePO, 0, len(items))
+	for _, item := range items {
+		out = append(out, TypePolePO{FactorCode: item.FactorCode, LeftPole: item.LeftPole, RightPole: item.RightPole, Threshold: item.Threshold, Model: item.Model})
+	}
+	return out
+}
+
+func typePolesFromPO(items []TypePolePO) []conclusion.TypePole {
+	if items == nil {
+		return nil
+	}
+	out := make([]conclusion.TypePole, 0, len(items))
+	for _, item := range items {
+		out = append(out, conclusion.TypePole{FactorCode: item.FactorCode, LeftPole: item.LeftPole, RightPole: item.RightPole, Threshold: item.Threshold, Model: item.Model})
+	}
+	return out
+}
+
+func typeSpecialRulesToPO(items []conclusion.TypeSpecialRule) []TypeSpecialRulePO {
+	if items == nil {
+		return nil
+	}
+	out := make([]TypeSpecialRulePO, 0, len(items))
+	for _, item := range items {
+		out = append(out, TypeSpecialRulePO{Code: item.Code, Kind: string(item.Kind), Phase: string(item.Phase), Trigger: item.Trigger, OutcomeCode: item.OutcomeCode, QuestionCodes: append([]string(nil), item.QuestionCodes...), OptionValues: append([]string(nil), item.OptionValues...)})
+	}
+	return out
+}
+
+func typeSpecialRulesFromPO(items []TypeSpecialRulePO) []conclusion.TypeSpecialRule {
+	if items == nil {
+		return nil
+	}
+	out := make([]conclusion.TypeSpecialRule, 0, len(items))
+	for _, item := range items {
+		out = append(out, conclusion.TypeSpecialRule{Code: item.Code, Kind: conclusion.TypeSpecialRuleKind(item.Kind), Phase: conclusion.TypeSpecialRulePhase(item.Phase), Trigger: item.Trigger, OutcomeCode: item.OutcomeCode, QuestionCodes: append([]string(nil), item.QuestionCodes...), OptionValues: append([]string(nil), item.OptionValues...)})
+	}
+	return out
+}
+
+func typeOutcomeMappingToPO(value conclusion.TypeOutcomeMapping) *TypeOutcomeMappingPO {
+	if value.DetailKind == "" && value.DetailAdapterKey == "" && value.Algorithm == "" {
+		return nil
+	}
+	return &TypeOutcomeMappingPO{DetailKind: value.DetailKind, DetailAdapterKey: value.DetailAdapterKey, Algorithm: string(value.Algorithm)}
+}
+
+func typeOutcomeMappingFromPO(value *TypeOutcomeMappingPO) conclusion.TypeOutcomeMapping {
+	if value == nil {
+		return conclusion.TypeOutcomeMapping{}
+	}
+	return conclusion.TypeOutcomeMapping{DetailKind: value.DetailKind, DetailAdapterKey: value.DetailAdapterKey, Algorithm: domain.Algorithm(value.Algorithm)}
+}
+
+func typeOutcomeProfilesToPO(items []conclusion.TypeOutcomeProfile) []TypeOutcomeProfilePO {
+	if items == nil {
+		return nil
+	}
+	out := make([]TypeOutcomeProfilePO, 0, len(items))
+	for _, item := range items {
+		out = append(out, TypeOutcomeProfilePO{OutcomeCode: item.OutcomeCode, Pattern: item.Pattern, Traits: append([]string(nil), item.Traits...), Strengths: append([]string(nil), item.Strengths...), Weaknesses: append([]string(nil), item.Weaknesses...), Suggestions: append([]string(nil), item.Suggestions...), ImageURL: item.ImageURL, Image: item.Image, Rarity: RarityPO{Percent: item.Rarity.Percent, Label: item.Rarity.Label, OneInX: item.Rarity.OneInX}, IsSpecial: item.IsSpecial, Trigger: item.Trigger, Commentary: item.Commentary})
+	}
+	return out
+}
+
+func typeOutcomeProfilesFromPO(items []TypeOutcomeProfilePO) []conclusion.TypeOutcomeProfile {
+	if items == nil {
+		return nil
+	}
+	out := make([]conclusion.TypeOutcomeProfile, 0, len(items))
+	for _, item := range items {
+		out = append(out, conclusion.TypeOutcomeProfile{OutcomeCode: item.OutcomeCode, Pattern: item.Pattern, Traits: append([]string(nil), item.Traits...), Strengths: append([]string(nil), item.Strengths...), Weaknesses: append([]string(nil), item.Weaknesses...), Suggestions: append([]string(nil), item.Suggestions...), ImageURL: item.ImageURL, Image: item.Image, Rarity: conclusion.Rarity{Percent: item.Rarity.Percent, Label: item.Rarity.Label, OneInX: item.Rarity.OneInX}, IsSpecial: item.IsSpecial, Trigger: item.Trigger, Commentary: item.Commentary})
+	}
+	return out
 }
 
 func cloneIntMap(values map[string]int) map[string]int {

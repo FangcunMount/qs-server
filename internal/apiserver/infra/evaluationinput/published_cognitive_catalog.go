@@ -68,19 +68,16 @@ func decodePublishedCognitiveModel(model *rulesetport.PublishedModel) (*taskperf
 	if !domain.IsCognitivePayloadFormat(model.PayloadFormat) {
 		return nil, fmt.Errorf("unsupported cognitive payload format: %s", model.PayloadFormat)
 	}
-	payload, err := taskperfsnapshot.ParsePublishedPayload(
-		model.PayloadFormat,
-		model.Code,
-		model.Version,
-		model.Title,
-		model.Status,
-		model.Payload,
-	)
+	if model.DefinitionV2 == nil {
+		return nil, fmt.Errorf("cognitive definition_v2 is required for runtime: %s", model.Code)
+	}
+	payload, err := taskperfsnapshot.SnapshotFromDefinition(taskperfsnapshot.DefinitionEnvelope{
+		Code: model.Code, Version: model.Version, Title: model.Title, QuestionnaireCode: model.QuestionnaireCode,
+		QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
+	}, model.DefinitionV2)
 	if err != nil {
 		return nil, err
 	}
-	payload.QuestionnaireCode = model.QuestionnaireCode
-	payload.QuestionnaireVersion = model.QuestionnaireVersion
 	if !payload.IsPublished() {
 		return nil, fmt.Errorf("cognitive model is not published: %s", payload.Code)
 	}

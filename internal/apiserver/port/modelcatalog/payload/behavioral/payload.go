@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
@@ -134,14 +135,16 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	return parseDefinitionPayload(modelCode, modelVersion, title, status, payload)
 }
 
-// DefinitionFromPayload projects the behavioral wire payload to DefinitionV2.
-func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+// MaterializeDefinition projects behavioral wire payload semantics to DefinitionV2.
+func MaterializeDefinition(payload []byte) (sharedpayload.DefinitionMaterialization, error) {
 	var body definitionPayload
 	if err := json.Unmarshal(payload, &body); err != nil {
-		return nil, fmt.Errorf("decode behavioral_rating definition: %w", err)
+		return sharedpayload.DefinitionMaterialization{}, fmt.Errorf("decode behavioral_rating definition: %w", err)
 	}
 	measure := sharedpayload.MeasureSpecFromDefinitionBody(body.DefinitionBody)
 	calibration := definition.Calibration{}
+	conclusions := make([]conclusion.Conclusion, 0)
+	materializedNorms := make([]*catalognorm.Norm, 0, 1)
 	if body.Brief2 != nil {
 		measure, calibration = factornorm.ApplyNormMetadata(measure, factornorm.MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
@@ -150,8 +153,24 @@ func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
 		measure = factornorm.ApplyCompositeMetadata(measure, compositeSpecsFromPayload(body.Brief2))
+		conclusions = append(conclusions, normConclusionsFromPayload(body.Brief2)...)
+		if table := normFromPayload(body.Brief2); table != nil {
+			materializedNorms = append(materializedNorms, table)
+		}
 	}
-	return &definition.Definition{Measure: measure, Calibration: calibration}, nil
+	return sharedpayload.DefinitionMaterialization{
+		Definition: &definition.Definition{Measure: measure, Calibration: calibration, Conclusions: conclusions},
+		Norms:      materializedNorms,
+	}, nil
+}
+
+// DefinitionFromPayload projects the behavioral wire payload to DefinitionV2.
+func DefinitionFromPayload(payload []byte) (*definition.Definition, error) {
+	materialized, err := MaterializeDefinition(payload)
+	if err != nil {
+		return nil, err
+	}
+	return materialized.Definition, nil
 }
 
 // ParsePublishedPayload de编码 已发布快照 using its 载荷格式 label。
@@ -237,6 +256,67 @@ func normTablesFromPayload(body *brief2Extension) *calcnorm.NormTables {
 		tables.TScoreRules = append(tables.TScoreRules, converted)
 	}
 	return tables
+}
+
+func normFromPayload(body *brief2Extension) *catalognorm.Norm {
+	if body == nil || body.NormTableVersion == "" || len(body.Norms) == 0 {
+		return nil
+	}
+	out := &catalognorm.Norm{
+		TableVersion: body.NormTableVersion,
+		FormVariant:  body.FormVariant,
+		Factors:      make([]catalognorm.FactorTable, 0, len(body.Norms)),
+	}
+	for _, factorPayload := range body.Norms {
+		factorTable := catalognorm.FactorTable{
+			FactorCode: factorPayload.FactorCode,
+			Bands:      make([]catalognorm.Band, 0, len(factorPayload.Bands)),
+			Lookup:     make([]catalognorm.LookupEntry, 0, len(factorPayload.Lookup)),
+		}
+		for _, band := range factorPayload.Bands {
+			factorTable.Bands = append(factorTable.Bands, catalognorm.Band{
+				MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender,
+				Mean: cloneFloat64(band.Mean), StdDev: cloneFloat64(band.StdDev),
+			})
+		}
+		for _, entry := range factorPayload.Lookup {
+			factorTable.Lookup = append(factorTable.Lookup, catalognorm.LookupEntry{
+				RawScoreMin: entry.RawMin, RawScoreMax: entry.RawMax, TScore: entry.TScore, Percentile: entry.Percentile,
+			})
+		}
+		out.Factors = append(out.Factors, factorTable)
+	}
+	return out
+}
+
+func normConclusionsFromPayload(body *brief2Extension) []conclusion.Conclusion {
+	if body == nil {
+		return nil
+	}
+	items := make([]conclusion.Conclusion, 0, len(body.TScoreRules)+1)
+	seen := make(map[string]struct{}, len(body.TScoreRules))
+	for _, rule := range body.TScoreRules {
+		if rule.FactorCode == "" {
+			continue
+		}
+		ranges := make([]conclusion.ScoreRangeOutcome, 0, len(rule.Ranges))
+		for _, item := range rule.Ranges {
+			ranges = append(ranges, conclusion.ScoreRangeOutcome{
+				MinScore: item.MinT, MaxScore: item.MaxT, Level: item.Level, Summary: item.Conclusion, Description: item.Suggestion,
+			})
+		}
+		items = append(items, conclusion.NormConclusion{
+			FactorCode: rule.FactorCode, ScoreBasis: conclusion.ScoreBasisTScore,
+			Primary: rule.FactorCode == body.PrimaryDimensionCode, Rules: ranges,
+		})
+		seen[rule.FactorCode] = struct{}{}
+	}
+	if body.PrimaryDimensionCode != "" {
+		if _, ok := seen[body.PrimaryDimensionCode]; !ok {
+			items = append(items, conclusion.NormConclusion{FactorCode: body.PrimaryDimensionCode, ScoreBasis: conclusion.ScoreBasisTScore, Primary: true})
+		}
+	}
+	return items
 }
 
 func normFactorCodesFromPayload(body *brief2Extension) []string {

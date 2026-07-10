@@ -7,11 +7,14 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 // DefinitionHandler owns behavioral-rating definition validation and publish shaping.
-type DefinitionHandler struct{}
+type DefinitionHandler struct {
+	NormRepo port.NormRepository
+}
 
 func (DefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindBehavioralRating
@@ -21,13 +24,14 @@ func (DefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentM
 	result := appdefinition.SaveResult{
 		Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)},
 	}
-	if definitionV2, err := behavioralpayload.DefinitionFromPayload(input.Payload); err == nil {
-		result.DefinitionV2 = definitionV2
+	if materialized, err := behavioralpayload.MaterializeDefinition(input.Payload); err == nil {
+		result.DefinitionV2 = materialized.Definition
+		result.Norms = materialized.Norms
 	}
 	return result, nil, nil
 }
 
-func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
+func (h DefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{
 			Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError,
@@ -39,6 +43,7 @@ func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.Ass
 		}}
 	}
 	issues := model.ValidateForPublish().Issues
+	issues = append(issues, appdefinition.ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, h.NormRepo)...)
 	return append(issues, appdefinition.ValidateSharedFactorPayloadForPublish(model.Definition.Data)...)
 }
 

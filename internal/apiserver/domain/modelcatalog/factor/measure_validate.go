@@ -55,11 +55,11 @@ func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Sco
 				Message: fmt.Sprintf("role %s 不允许绑定 question_codes", role),
 			})
 		}
-		if RequiresChildrenPolicy(role) && !hasFactorSources {
+		if RequiresChildrenPolicy(role) && !hasFactorSources && !hasQuestionSources {
 			issues = append(issues, HierarchyIssue{
 				Field:   prefix + ".children_policy",
-				Code:    "factor.children_policy.required",
-				Message: "composite index 必须定义 children_policy",
+				Code:    "factor.scoring.required",
+				Message: "index 必须定义题目或子因子计分来源",
 			})
 		}
 		if hasFactorSources && !RequiresChildrenPolicy(role) && role != FactorRoleTotal {
@@ -135,6 +135,19 @@ func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 					Message: fmt.Sprintf("children_policy 引用不存在的子因子 %s", source.Code),
 				})
 			}
+			if len(source.OptionScores) > 0 {
+				issues = append(issues, HierarchyIssue{
+					Field:   fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
+					Code:    "factor.scoring.option_scores.role_forbidden",
+					Message: "factor scoring source cannot define option_scores",
+				})
+			}
+		} else if source.Kind == ScoringSourceQuestion && source.OptionScores != nil && len(source.OptionScores) == 0 {
+			issues = append(issues, HierarchyIssue{
+				Field:   fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
+				Code:    "factor.scoring.option_scores.empty",
+				Message: "question option_scores cannot be an empty map",
+			})
 		}
 	}
 	return issues

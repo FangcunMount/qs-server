@@ -61,22 +61,22 @@ func (DefinitionHandler) ValidateForPublish(_ context.Context, model *domain.Ass
 			Field: "definition", Message: "量表定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError,
 		}}
 	}
-	return model.ValidateForPublish().Issues
+	issues := model.ValidateForPublish().Issues
+	return append(issues, appdefinition.ValidateDefinitionV2ForPublish(context.Background(), model.DefinitionV2, nil)...)
 }
 
 func (DefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (appdefinition.SnapshotBuildResult, error) {
 	if model.Definition.IsEmpty() {
 		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("scale model definition is empty")
 	}
-	snapshot, err := scalesnapshot.ParsePublishedPayload(model.Definition.Data)
-	if err != nil {
-		return appdefinition.SnapshotBuildResult{}, err
+	if model.DefinitionV2 == nil {
+		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("scale definition_v2 is required")
 	}
-	snapshot.Status = "published"
-	snapshot.Title = model.Title
-	snapshot.Code = model.Code
-	snapshot.QuestionnaireCode = model.Binding.QuestionnaireCode
-	snapshot.QuestionnaireVersion = model.Binding.QuestionnaireVersion
+	snapshot := scalesnapshot.ScaleSnapshotFromDefinition(scalesnapshot.ExecutionEnvelope{
+		Code: model.Code, ScaleVersion: "v" + fmt.Sprint(model.Revision()), Title: model.Title,
+		QuestionnaireCode: model.Binding.QuestionnaireCode, QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Status: "published",
+	}, model.DefinitionV2)
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
 		return appdefinition.SnapshotBuildResult{}, fmt.Errorf("marshal scale snapshot: %w", err)

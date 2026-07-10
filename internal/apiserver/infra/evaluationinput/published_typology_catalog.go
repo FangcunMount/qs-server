@@ -2,7 +2,6 @@ package evaluationinput
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -69,11 +68,17 @@ func decodePublishedTypologyModel(model *rulesetport.PublishedModel) (*modeltypo
 	if model.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
 		return nil, fmt.Errorf("unsupported typology payload format %q", model.PayloadFormat)
 	}
-	var payload modeltypology.Payload
-	if err := json.Unmarshal(model.Payload, &payload); err != nil {
+	if model.DefinitionV2 == nil {
+		return nil, fmt.Errorf("typology definition_v2 is required for runtime: %s", model.Code)
+	}
+	payload, err := modeltypology.PayloadFromDefinition(modeltypology.DefinitionEnvelope{
+		Code: model.Code, Version: model.Version, Title: model.Title, QuestionnaireCode: model.QuestionnaireCode,
+		QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status, Algorithm: model.Algorithm,
+	}, model.DefinitionV2)
+	if err != nil {
 		return nil, err
 	}
-	return ensurePublishedTypologyPayload(&payload)
+	return ensurePublishedTypologyPayload(payload)
 }
 
 func ensurePublishedTypologyPayload(payload *modeltypology.Payload) (*modeltypology.Payload, error) {

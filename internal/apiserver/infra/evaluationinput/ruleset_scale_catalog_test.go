@@ -80,6 +80,7 @@ func TestPublishedScaleCatalogPrefersPublishedPayload(t *testing.T) {
 		Title:         fromMongo.Title,
 		Status:        fromMongo.Status,
 		Payload:       payload,
+		DefinitionV2:  scalesnapshot.DefinitionFromScaleSnapshot(fromMongo),
 	}}
 	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",

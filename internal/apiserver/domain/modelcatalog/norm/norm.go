@@ -6,16 +6,30 @@ type Ref struct {
 	NormTableVersion string
 }
 
-// Norm 是常模资料的领域占位，后续由 norm repository 或外部资料源承载。
+// Norm is immutable reference material addressed by TableVersion.
 type Norm struct {
 	TableVersion string
-	FactorCode   string
-	Entries      []Entry
+	FormVariant  string
+	Factors      []FactorTable
 }
 
-type Entry struct {
+type FactorTable struct {
+	FactorCode string
+	Bands      []Band
+	Lookup     []LookupEntry
+}
+
+type Band struct {
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
+	Mean         *float64
+	StdDev       *float64
+}
+
+type LookupEntry struct {
 	RawScoreMin float64
 	RawScoreMax float64
-	Level       string
-	Percentile  *float64
+	TScore      float64
+	Percentile  float64
 }

@@ -33,7 +33,11 @@ type ReportMap struct {
 }
 
 type ReportSection struct {
-	Code       string
-	Title      string
-	SourceRefs []string
+	Code          string
+	Title         string
+	SourceRefs    []string
+	Kind          string
+	AdapterKey    string
+	TemplateID    string
+	CategoryLabel string
 }

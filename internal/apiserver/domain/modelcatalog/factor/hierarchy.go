@@ -9,7 +9,7 @@ func RequiresChildrenPolicy(role FactorRole) bool {
 func BindsQuestions(role FactorRole) bool {
 	switch role.Resolved() {
 	case FactorRoleDimension, FactorRoleTotal, FactorRoleValidity,
-		FactorRoleSubtest, FactorRoleTaskSet, FactorRoleAbilityDomain:
+		FactorRoleSubtest, FactorRoleTaskSet, FactorRoleAbilityDomain, FactorRoleIndex:
 		return true
 	default:
 		return false

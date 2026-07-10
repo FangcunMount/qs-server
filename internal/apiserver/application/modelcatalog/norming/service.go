@@ -30,6 +30,7 @@ type Service interface {
 type Dependencies struct {
 	ModelRepo     port.ModelRepository
 	PublishedRepo port.PublishedModelRepository
+	NormRepo      port.NormRepository
 }
 
 type service struct {
@@ -180,6 +181,17 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 		return nil, invalidArgument("%s", err.Error())
 	}
 	now := time.Now().UTC()
+	for _, table := range save.Norms {
+		if table == nil {
+			continue
+		}
+		if s.deps.NormRepo == nil {
+			return nil, unavailable("常模仓储未配置")
+		}
+		if err := s.deps.NormRepo.UpsertNorm(ctx, table); err != nil {
+			return nil, err
+		}
+	}
 	if err := model.UpdateDefinitionWithV2(save.Payload, save.DefinitionV2, now); err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -290,7 +302,7 @@ func (s *service) loadModel(ctx context.Context, modelCode string) (*domain.Asse
 }
 
 func (s *service) definitionHandler() DefinitionHandler {
-	return DefinitionHandler{}
+	return DefinitionHandler{NormRepo: s.deps.NormRepo}
 }
 
 func (s *service) publisher() publication.Publisher {

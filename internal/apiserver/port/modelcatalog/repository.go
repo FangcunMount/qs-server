@@ -4,6 +4,7 @@ import (
 	"context"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
 
 // ListFilter narrows draft-model list queries for admin consoles.
@@ -36,4 +37,10 @@ type PublishedModelRepository interface {
 	FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*PublishedModel, error)
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*PublishedModel, int64, error)
 	DeletePublished(ctx context.Context, kind domain.Kind, code string) error
+}
+
+// NormRepository persists immutable norm tables addressed by table version.
+type NormRepository interface {
+	UpsertNorm(ctx context.Context, table *norm.Norm) error
+	FindNorm(ctx context.Context, tableVersion string) (*norm.Norm, error)
 }

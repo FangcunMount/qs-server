@@ -107,6 +107,7 @@ func buildTypologyDeps(
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
+	normRepo := mongomodelcatalog.NewNormRepository(mongoDB, mongoOpts)
 	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
 	dualStore := modelcatalog.NewPublishedStore(v2Repo)
@@ -126,6 +127,7 @@ func buildTypologyDeps(
 		PublishedAlgorithmLister: algorithmLister,
 		ModelRepo:                draftRepo,
 		PublishedRepo:            publishedRepo,
+		NormRepo:                 normRepo,
 		QuestionnaireQuery:       questionnaireQuery,
 		CacheSignalNotifier:      cacheCfg.Notifier,
 	}

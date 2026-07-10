@@ -30,6 +30,7 @@ func NewRepositoryResolver(
 	questionnaireRepo questionnaire.Repository,
 	modelCatalog rulesetport.Catalog,
 	descs []evaldomain.ModelDescriptor,
+	normRepos ...rulesetport.NormRepository,
 ) (*RepositoryResolver, error) {
 	if len(descs) == 0 {
 		return nil, fmt.Errorf("evaluation model descriptors are required")
@@ -44,8 +45,12 @@ func NewRepositoryResolver(
 		cognitiveCatalog        port.CognitiveModelCatalog
 	)
 	if publishedReader, ok := modelCatalog.(rulesetport.PublishedModelReader); ok {
+		var normRepo rulesetport.NormRepository
+		if len(normRepos) > 0 {
+			normRepo = normRepos[0]
+		}
 		typologyCatalog = NewPublishedTypologyCatalog(publishedReader)
-		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader)
+		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader, normRepo)
 		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader)
 	} else {
 		return nil, fmt.Errorf("ruleset catalog must implement PublishedModelReader")

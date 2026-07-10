@@ -14,6 +14,7 @@ type Norming struct {
 type NormingDeps struct {
 	ModelRepo     port.ModelRepository
 	PublishedRepo port.PublishedModelRepository
+	NormRepo      port.NormRepository
 }
 
 // NewNorming assembles the behavioral_rating catalog capability.
@@ -23,6 +24,7 @@ func NewNorming(deps NormingDeps) (*Norming, error) {
 		commandService = appNorming.NewService(appNorming.Dependencies{
 			ModelRepo:     deps.ModelRepo,
 			PublishedRepo: deps.PublishedRepo,
+			NormRepo:      deps.NormRepo,
 		})
 	}
 	return &Norming{CommandService: commandService}, nil
