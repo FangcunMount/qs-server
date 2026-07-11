@@ -101,3 +101,26 @@ func TestRuntimeCheckpointMigrationMergesLegacyTables(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationOutcomeMigrationCreatesImmutableFactTable(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000042_add_evaluation_outcome.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"CREATE TABLE IF NOT EXISTS `evaluation_outcome`",
+		"`assessment_id`",
+		"`evaluation_run_id`",
+		"`payload_json` longtext NOT NULL",
+		"`schema_version`",
+		"UNIQUE KEY `uk_evaluation_outcome_assessment_id`",
+		"UNIQUE KEY `uk_evaluation_outcome_run_id`",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("evaluation outcome migration does not contain %q", token)
+		}
+	}
+}

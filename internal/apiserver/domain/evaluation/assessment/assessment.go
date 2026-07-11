@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Assessment 测评聚合根
@@ -268,12 +269,15 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 	return nil
 }
 
-// StageEvaluatedEvent 记录that 计分完成 和 报告生成 应该 follow。
-func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time) {
+// StageEvaluatedEvent records the durable outcome and run references that
+// Interpretation must consume after scoring completes.
+func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
 	a.addEvent(NewAssessmentEvaluatedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,
+		outcomeID,
+		runID,
 		evaluatedAt,
 	))
 }

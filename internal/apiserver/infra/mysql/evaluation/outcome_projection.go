@@ -20,7 +20,7 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 			po.EvaluationModelAlgorithm = strPtr(string(algorithm))
 		}
 	}
-	if a.Status().IsInterpreted() {
+	if a.Status().IsEvaluated() || a.Status().IsInterpreted() {
 		applyPrimaryScoreFields(po, a)
 		applyLevelFields(po, a)
 	}

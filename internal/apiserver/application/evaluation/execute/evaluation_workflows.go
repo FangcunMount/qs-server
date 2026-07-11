@@ -53,8 +53,8 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 		"result", "success",
 	)
 
-	if a.Status().IsInterpreted() {
-		log.Infow("测评已解读，跳过重复评估",
+	if a.Status().IsEvaluated() || a.Status().IsInterpreted() {
+		log.Infow("测评已有成功评估事实，跳过重复评估",
 			"assessment_id", assessmentID,
 			"status", a.Status().String(),
 			"result", "duplicate_skipped",

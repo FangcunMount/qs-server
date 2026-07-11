@@ -7,6 +7,7 @@ import (
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
 )
 
@@ -33,18 +34,26 @@ func (r *Repository) Save(ctx context.Context, run evalrun.EvaluationRun) error 
 	}
 	po := runToPO(run)
 	var existing RuntimeCheckpointPO
-	err := r.db.WithContext(ctx).
+	db := checkpointDB(ctx, r.db)
+	err := db.
 		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
 			scopeEvaluationRun, po.ResourceID, po.AttemptNo).
 		First(&existing).Error
 	if err == gorm.ErrRecordNotFound {
-		return r.db.WithContext(ctx).Create(po).Error
+		return db.Create(po).Error
 	}
 	if err != nil {
 		return err
 	}
 	po.ID = existing.ID
-	return r.db.WithContext(ctx).Save(po).Error
+	return db.Save(po).Error
+}
+
+func checkpointDB(ctx context.Context, db *gorm.DB) *gorm.DB {
+	if tx, ok := mysql.TxFromContext(ctx); ok {
+		return tx.WithContext(ctx)
+	}
+	return db.WithContext(ctx)
 }
 
 func (r *Repository) FindLatestByAssessmentID(ctx context.Context, assessmentID uint64) (*evalrun.EvaluationRun, error) {

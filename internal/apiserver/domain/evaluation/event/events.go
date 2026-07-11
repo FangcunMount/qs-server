@@ -114,14 +114,18 @@ func NewEvaluatedEvent(
 	orgID int64,
 	assessmentID int64,
 	testeeID uint64,
+	outcomeID string,
+	evaluationRunID string,
 	evaluatedAt time.Time,
 ) EvaluatedEvent {
 	return event.New(TypeEvaluated, AggregateType, strconv.FormatInt(assessmentID, 10),
 		EvaluatedData{
-			OrgID:        orgID,
-			AssessmentID: assessmentID,
-			TesteeID:     testeeID,
-			EvaluatedAt:  evaluatedAt,
+			OrgID:           orgID,
+			AssessmentID:    assessmentID,
+			TesteeID:        testeeID,
+			OutcomeID:       outcomeID,
+			EvaluationRunID: evaluationRunID,
+			EvaluatedAt:     evaluatedAt,
 		},
 	)
 }

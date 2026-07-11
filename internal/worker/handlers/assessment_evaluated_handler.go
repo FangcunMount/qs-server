@@ -22,6 +22,8 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
 			"testee_id", data.TesteeID,
+			"outcome_id", data.OutcomeID,
+			"evaluation_run_id", data.EvaluationRunID,
 		)
 
 		if deps.InternalClient == nil {

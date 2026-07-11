@@ -9,6 +9,7 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
@@ -20,6 +21,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -40,6 +42,7 @@ type service struct {
 	runtimeResolver       *RuntimeResolver
 	runRepo               evaluationrun.Repository
 	scoringWriter         outcomescoring.Writer
+	evaluationCommitter   outcomecommit.Committer
 	interpretationService interpretationapp.Service
 	scoringSnapshotStore  outcomescoring.SnapshotStore
 	asyncInterpretation   bool
@@ -116,6 +119,13 @@ func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
 func WithScoringWriter(writer outcomescoring.Writer) ServiceOption {
 	return func(s *service) {
 		s.scoringWriter = writer
+	}
+}
+
+// WithEvaluationCommitter configures the canonical Evaluation success boundary.
+func WithEvaluationCommitter(committer outcomecommit.Committer) ServiceOption {
+	return func(s *service) {
+		s.evaluationCommitter = committer
 	}
 }
 
@@ -277,13 +287,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	// 执行评估成功，写入计分结果并生成报告
-	if err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
+	// 执行评估成功，可靠提交规范 EvaluationOutcome。
+	committed, err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
 		Assessment:           a,
 		Input:                input,
 		Execution:            evaluationOutcome,
 		RuntimeDescriptorKey: resolved.DescriptorKey,
-	}); err != nil {
+	}, &evaluationRun)
+	if err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_key", resolved.ExecutionIdentity.String(),
@@ -292,6 +303,13 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", err.Error(),
 		)
+		if committed {
+			// The Evaluation fact and succeeded run are already durable. Keep the
+			// current compatibility behavior for Assessment until Batch 4, but do
+			// not rewrite EvaluationRun as failed because reporting failed.
+			s.failureFinalizer().MarkAsFailed(ctx, a, "报告生成持久化失败: "+err.Error())
+			return err
+		}
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error(), Retryable: true})
 		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
@@ -300,9 +318,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	evaluationRun.Succeed(time.Now())
-	if err := s.persistTerminalEvaluationRun(ctx, evaluationRun); err != nil {
-		return err
+	if !committed {
+		evaluationRun.Succeed(time.Now())
+		if err := s.persistTerminalEvaluationRun(ctx, evaluationRun); err != nil {
+			return err
+		}
 	}
 	l.Infow("评估执行完成",
 		"action", "evaluate",
@@ -320,21 +340,45 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	return nil
 }
 
-func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaloutcome.Outcome) error {
+func (s *service) persistEvaluationOutcome(
+	ctx context.Context,
+	outcome evaloutcome.Outcome,
+	evaluationRun *evalrun.EvaluationRun,
+) (bool, error) {
+	if s.evaluationCommitter != nil {
+		if _, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
+			Outcome:     outcome,
+			Run:         evaluationRun,
+			EvaluatedAt: time.Now(),
+		}); err != nil {
+			return false, err
+		}
+		if s.asyncInterpretation {
+			return true, nil
+		}
+		if s.interpretationService == nil {
+			return true, evalerrors.ModuleNotConfigured("interpretation service is not configured")
+		}
+		return true, s.interpretationService.GenerateAndPersist(ctx, outcome)
+	}
 	if s.scoringWriter == nil || s.interpretationService == nil {
-		return evalerrors.ModuleNotConfigured("evaluation split-phase writers are not configured")
+		return false, evalerrors.ModuleNotConfigured("evaluation split-phase writers are not configured")
 	}
 	if s.asyncInterpretation {
 		if err := s.scoringWriter.Write(ctx, outcome); err != nil {
-			return err
+			return false, err
 		}
-		outcome.Assessment.StageEvaluatedEvent(time.Now())
-		return s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
+		var runID evalrun.ID
+		if evaluationRun != nil {
+			runID = evaluationRun.RunID
+		}
+		outcome.Assessment.StageEvaluatedEvent(time.Now(), meta.ZeroID, runID)
+		return false, s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
 	}
 	if err := s.scoringWriter.Write(ctx, outcome); err != nil {
-		return err
+		return false, err
 	}
-	return s.interpretationService.GenerateAndPersist(ctx, outcome)
+	return false, s.interpretationService.GenerateAndPersist(ctx, outcome)
 }
 
 // GenerateReport 生成并持久化解释报告 用于 已完成评估的测评。

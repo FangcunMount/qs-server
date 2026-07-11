@@ -36,8 +36,10 @@ type AssessmentFailedData struct {
 
 // AssessmentEvaluatedData is emitted after scoring completes and before report generation.
 type AssessmentEvaluatedData struct {
-	OrgID        int64     `json:"org_id"`
-	AssessmentID int64     `json:"assessment_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	EvaluatedAt  time.Time `json:"evaluated_at"`
+	OrgID           int64     `json:"org_id"`
+	AssessmentID    int64     `json:"assessment_id"`
+	TesteeID        uint64    `json:"testee_id"`
+	OutcomeID       string    `json:"outcome_id"`
+	EvaluationRunID string    `json:"evaluation_run_id"`
+	EvaluatedAt     time.Time `json:"evaluated_at"`
 }

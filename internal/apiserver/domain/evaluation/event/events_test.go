@@ -32,3 +32,13 @@ func TestNewSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
 	}
 }
+
+func TestNewEvaluatedEventIncludesDurableOutcomeAndRunReferences(t *testing.T) {
+	t.Parallel()
+
+	evt := NewEvaluatedEvent(1, 42, 1001, "9001", "42:1", time.Unix(100, 0))
+	data := evt.Payload()
+	if data.OutcomeID != "9001" || data.EvaluationRunID != "42:1" {
+		t.Fatalf("evaluated references = outcome:%q run:%q", data.OutcomeID, data.EvaluationRunID)
+	}
+}

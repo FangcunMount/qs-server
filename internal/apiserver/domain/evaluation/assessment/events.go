@@ -6,7 +6,9 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -78,7 +80,16 @@ func NewAssessmentEvaluatedEvent(
 	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
+	outcomeID meta.ID,
+	evaluationRunID evalrun.ID,
 	evaluatedAt time.Time,
 ) AssessmentEvaluatedEvent {
-	return evaldomainevent.NewEvaluatedEvent(orgID, int64(assessmentID), testeeID.Uint64(), evaluatedAt)
+	return evaldomainevent.NewEvaluatedEvent(
+		orgID,
+		int64(assessmentID),
+		testeeID.Uint64(),
+		outcomeID.String(),
+		evaluationRunID.String(),
+		evaluatedAt,
+	)
 }

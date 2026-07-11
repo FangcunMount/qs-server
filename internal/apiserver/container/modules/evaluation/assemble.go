@@ -15,6 +15,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
@@ -28,6 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -144,6 +146,7 @@ func New(deps Deps) (*Module, error) {
 type evaluationInfra struct {
 	assessmentRepo               assessment.Repository
 	runRepo                      evaluationrun.Repository
+	outcomeRepo                  domainoutcome.Repository
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
 	latestRiskReader             evaluationreadmodel.LatestRiskReader
@@ -175,6 +178,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
+	infra.outcomeRepo = mysqlEval.NewOutcomeRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
 	var opsClient redis.UniversalClient
 	if normalized.OpsHandle != nil {
@@ -224,10 +228,8 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		wiringDeps := WiringDeps{
 			ScaleReportBuilder: reportBuilder,
 			ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-			ScoreRepo:          infra.scoreRepo,
 			TypologyRegistry:   normalized.TypologyRegistry,
 		}
-		descs := normalized.ModelDescriptors
 		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
@@ -244,20 +246,12 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
-		scoreProjectors, err := MaterializeScoreProjectors(descs, wiringDeps)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation score projectors: %v", err)
-		}
-		scoreProjectorRegistry, err := interpretationreporting.NewScoreProjectorRegistry(scoreProjectors...)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
-		}
 		if normalized.ReportBuilderRegistry == nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
 		}
 		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
 			infra.assessmentRepo,
-			scoreProjectorRegistry,
+			nil,
 			normalized.ReportBuilderRegistry,
 			normalized.ReportDurableSaver,
 			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
@@ -280,7 +274,17 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			return err
 		}
 		infra.scoringSnapshotStore = scoringSnapshotStore
-		scoringWriter := outcomescoring.NewWriter(infra.assessmentRepo, scoreProjectorRegistry, scoringSnapshotStore)
+		scoreProjector := outcomescoring.NewAssessmentScoreProjector(infra.scoreRepo)
+		evaluationCommitter := outcomecommit.NewCommitter(
+			infra.txRunner,
+			infra.assessmentRepo,
+			infra.outcomeRepo,
+			infra.runRepo,
+			scoreProjector,
+			scoringSnapshotStore,
+			infra.assessmentOutboxStore,
+			infra.postCommitReadyIndexer,
+		)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
 
 		m.EvaluationService = execute.NewService(
@@ -293,7 +297,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithFamilyEvaluators(familyEvaluators),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithReportStatusReporter(reportStatusReporter),
-			execute.WithScoringWriter(scoringWriter),
+			execute.WithEvaluationCommitter(evaluationCommitter),
 			execute.WithInterpretationService(interpretationService),
 			execute.WithScoringSnapshotStore(scoringSnapshotStore),
 			execute.WithAsyncInterpretation(normalized.AsyncInterpretation),

@@ -54,6 +54,30 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 	}
 }
 
+func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
+	t.Parallel()
+
+	a := newSubmittedScaleAssessment(t)
+	outcome := assessment.NewAssessmentOutcome(
+		*a.EvaluationModelRef(),
+		assessment.ResultSummary{PrimaryLabel: "high"},
+		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	)
+	outcome.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 18.5}
+	outcome.Level = &assessment.OutcomeResultLevel{Code: "high", Label: "高风险", Severity: "high"}
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatal(err)
+	}
+
+	po := NewAssessmentMapper().ToPO(a)
+	if po.Status != "evaluated" || po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != domainreport.ScoreKindRawTotal {
+		t.Fatalf("evaluated projection status=%s primary_kind=%v", po.Status, po.PrimaryScoreKind)
+	}
+	if po.PrimaryScoreValue == nil || *po.PrimaryScoreValue != 18.5 || po.LevelCode == nil || *po.LevelCode != "high" || po.Severity == nil || *po.Severity != "high" {
+		t.Fatalf("evaluated v2 fields: score=%v level=%v severity=%v", po.PrimaryScoreValue, po.LevelCode, po.Severity)
+	}
+}
+
 func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
