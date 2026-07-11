@@ -38,28 +38,6 @@ func (s stubScalePublishedReader) ListPublishedModels(context.Context, rulesetpo
 	return nil, 0, domain.ErrNotFound
 }
 
-type stubScaleFallbackCatalog struct {
-	byRef *scalesnapshot.ScaleSnapshot
-	calls *int
-}
-
-func (s stubScaleFallbackCatalog) GetScale(context.Context, string) (*scalesnapshot.ScaleSnapshot, error) {
-	if s.calls != nil {
-		(*s.calls)++
-	}
-	return nil, domain.ErrNotFound
-}
-
-func (s stubScaleFallbackCatalog) GetScaleByRef(context.Context, port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
-	if s.calls != nil {
-		(*s.calls)++
-	}
-	if s.byRef == nil {
-		return nil, domain.ErrNotFound
-	}
-	return s.byRef, nil
-}
-
 func TestPublishedScaleCatalogPrefersPublishedPayload(t *testing.T) {
 	fromMongo := &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",
@@ -82,13 +60,7 @@ func TestPublishedScaleCatalogPrefersPublishedPayload(t *testing.T) {
 		Payload:       payload,
 		DefinitionV2:  scalesnapshot.DefinitionFromScaleSnapshot(fromMongo),
 	}}
-	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
-		Code:         "SCL-MONGO",
-		ScaleVersion: "1.0.0",
-		Title:        "Repo Scale",
-		Status:       "published",
-	}}
-	catalog := NewPublishedScaleCatalog(reader, fallback)
+	catalog := NewPublishedScaleCatalog(reader)
 	got, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
 		Code:    "SCL-MONGO",
@@ -116,7 +88,6 @@ func TestPublishedScaleCatalogGetScalePrefersDefinitionV2(t *testing.T) {
 			ScoringStrategy: "sum",
 		}},
 	}
-	fallbackCalls := 0
 	catalog := NewPublishedScaleCatalog(
 		stubScalePublishedReader{snapshot: &rulesetport.PublishedModel{
 			SchemaVersion: domain.SchemaVersionV2,
@@ -129,7 +100,6 @@ func TestPublishedScaleCatalogGetScalePrefersDefinitionV2(t *testing.T) {
 			Payload:       []byte(`not-json`),
 			DefinitionV2:  scalesnapshot.DefinitionFromScaleSnapshot(fromDefinition),
 		}},
-		stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{Title: "Repo Scale"}, calls: &fallbackCalls},
 	)
 
 	got, err := catalog.GetScale(t.Context(), "SCL-V2")
@@ -139,20 +109,10 @@ func TestPublishedScaleCatalogGetScalePrefersDefinitionV2(t *testing.T) {
 	if got.Title != "Definition Scale" || got.Factors[0].Code != "total" {
 		t.Fatalf("scale = %#v", got)
 	}
-	if fallbackCalls != 0 {
-		t.Fatalf("fallback calls = %d, want 0", fallbackCalls)
-	}
 }
 
-func TestPublishedScaleCatalogDoesNotReadLegacyRepoFallback(t *testing.T) {
-	fallbackCalls := 0
-	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
-		Code:         "SCL-REPO",
-		ScaleVersion: "1.0.0",
-		Title:        "Repo Scale",
-		Status:       "published",
-	}, calls: &fallbackCalls}
-	catalog := NewPublishedScaleCatalog(stubScalePublishedReader{}, fallback)
+func TestPublishedScaleCatalogRejectsMissingPublishedModel(t *testing.T) {
+	catalog := NewPublishedScaleCatalog(stubScalePublishedReader{})
 	_, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
 		Code:    "SCL-REPO",
@@ -167,8 +127,5 @@ func TestPublishedScaleCatalogDoesNotReadLegacyRepoFallback(t *testing.T) {
 	}
 	if got := kindCarrier.FailureKind(); got != port.FailureKindModelNotFound {
 		t.Fatalf("failure kind = %s, want %s", got, port.FailureKindModelNotFound)
-	}
-	if fallbackCalls != 0 {
-		t.Fatalf("fallback calls = %d, want 0", fallbackCalls)
 	}
 }

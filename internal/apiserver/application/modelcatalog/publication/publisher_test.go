@@ -64,10 +64,6 @@ func (snapshotHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindCognitive
 }
 
-func (snapshotHandler) PrepareForSave(context.Context, *domain.AssessmentModel, definition.SaveInput) (definition.SaveResult, []domain.DomainValidationIssue, error) {
-	return definition.SaveResult{}, nil, nil
-}
-
 func (snapshotHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return nil
 }

@@ -7,9 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	answerSheetMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
-	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	questionnaireMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -20,17 +18,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// ScaleInfra holds shared survey/scale Mongo repositories and caches for module wiring.
-type ScaleInfra struct {
+// SurveyRuntimeInfra holds shared survey Mongo repositories and caches for module wiring.
+type SurveyRuntimeInfra struct {
 	QuestionnaireRepo   questionnaire.Repository
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo     *answerSheetMongo.Repository
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
-	AssessmentModelRepo modelcatalogport.ModelRepository
 }
 
-// ScaleInfraDeps collects infrastructure inputs for EnsureScaleInfra.
-type ScaleInfraDeps struct {
+// SurveyRuntimeInfraDeps collects infrastructure inputs for EnsureSurveyRuntimeInfra.
+type SurveyRuntimeInfraDeps struct {
 	MongoDB             *mongo.Database
 	EventCatalog        *eventcatalog.Catalog
 	MongoLimiter        backpressure.Acquirer
@@ -40,16 +37,16 @@ type ScaleInfraDeps struct {
 	Observer            *observability.ComponentObserver
 }
 
-// EnsureScaleInfraCached returns cached scale infra or builds it once.
-func EnsureScaleInfraCached(existing *ScaleInfra, deps ScaleInfraDeps) (*ScaleInfra, error) {
+// EnsureSurveyRuntimeInfraCached returns cached survey runtime infrastructure or builds it once.
+func EnsureSurveyRuntimeInfraCached(existing *SurveyRuntimeInfra, deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra, error) {
 	if existing != nil {
 		return existing, nil
 	}
-	return EnsureScaleInfra(deps)
+	return EnsureSurveyRuntimeInfra(deps)
 }
 
-// EnsureScaleInfra builds shared survey/scale repositories and caches.
-func EnsureScaleInfra(deps ScaleInfraDeps) (*ScaleInfra, error) {
+// EnsureSurveyRuntimeInfra builds shared survey repositories and caches.
+func EnsureSurveyRuntimeInfra(deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra, error) {
 	if deps.MongoDB == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
@@ -75,13 +72,10 @@ func EnsureScaleInfra(deps ScaleInfraDeps) (*ScaleInfra, error) {
 	}
 	answerSheetReader := answerSheetMongo.NewAnswerSheetReadModel(answerSheetRepo)
 
-	assessmentModelRepo := mongomodelcatalog.NewDraftRepository(deps.MongoDB, mongoOpts)
-
-	return &ScaleInfra{
+	return &SurveyRuntimeInfra{
 		QuestionnaireRepo:   questionnaireRepo,
 		QuestionnaireReader: questionnaireReader,
 		AnswerSheetRepo:     answerSheetRepo,
 		AnswerSheetReader:   answerSheetReader,
-		AssessmentModelRepo: assessmentModelRepo,
 	}, nil
 }

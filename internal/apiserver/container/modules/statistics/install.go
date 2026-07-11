@@ -12,7 +12,7 @@ import (
 // InstallHost extends the shared compose seam with statistics module bindings.
 type InstallHost interface {
 	compose.Host
-	SurveyScaleInfra() *surveymod.ScaleInfra
+	SurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra
 	SetStatisticsModule(*Module)
 }
 
@@ -20,7 +20,7 @@ type InstallHost interface {
 func InstallFrom(host InstallHost) error {
 	var answerSheetReader surveyreadmodel.AnswerSheetReader
 	var answerSheetScanSource statisticsApp.AnswerSheetScanSource
-	if infra := host.SurveyScaleInfra(); infra != nil {
+	if infra := host.SurveyRuntimeInfra(); infra != nil {
 		answerSheetReader = infra.AnswerSheetReader
 		answerSheetScanSource = infra.AnswerSheetRepo
 	}

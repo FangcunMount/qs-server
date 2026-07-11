@@ -52,7 +52,7 @@ type WireInput struct {
 	TesteeAccessChecker                         assessment.TesteeAccessChecker
 	OpsHandle                                   *cacheplane.Handle
 	ReportStatusConfig                          reportstatus.Config
-	ScaleInfra                                  *surveymod.ScaleInfra
+	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog                       rulesetport.Catalog
 	StaticRedisClient                           redis.UniversalClient
 	StaticCacheBuilder                          *keyspace.Builder
@@ -110,7 +110,7 @@ func Wire(in WireInput) (WireResult, error) {
 	catalog := in.PublishedModelCatalog
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
-	if infra := in.ScaleInfra; infra != nil {
+	if infra := in.SurveyRuntimeInfra; infra != nil {
 		var err error
 		if catalog == nil {
 			catalog, err = EnsurePublishedModelCatalog(PublishedModelCatalogInput{

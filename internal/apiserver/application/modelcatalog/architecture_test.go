@@ -77,6 +77,9 @@ func retiredModelCatalogTokens() []string {
 		"Legacy" + "ScaleBindingSource",
 		"Scale" + "QueryService",
 		"Scale" + "CategoryService",
+		"Prepare" + "ForSave",
+		"Save" + "Input",
+		"Save" + "Result",
 	}
 }
 

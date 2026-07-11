@@ -26,7 +26,7 @@ type WireInput struct {
 	OutboxRelayImmediateMaxConcurrent int
 	CacheSignalNotifier               quesApp.CacheSignalNotifier
 	OpsHandle                         *cacheplane.Handle
-	ScaleInfra                        *ScaleInfra
+	SurveyRuntimeInfra                *SurveyRuntimeInfra
 }
 
 // Wire builds and bootstraps the survey module from composition inputs.
@@ -45,7 +45,7 @@ func Wire(in WireInput) (*Module, error) {
 		CacheSignalNotifier:               in.CacheSignalNotifier,
 		OpsHandle:                         in.OpsHandle,
 	}
-	if infra := in.ScaleInfra; infra != nil {
+	if infra := in.SurveyRuntimeInfra; infra != nil {
 		bootstrap.QuestionnaireRepo = infra.QuestionnaireRepo
 		bootstrap.QuestionnaireReader = infra.QuestionnaireReader
 		bootstrap.AnswerSheetRepo = infra.AnswerSheetRepo

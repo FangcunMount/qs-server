@@ -14,16 +14,16 @@ import (
 
 // WireInput carries composition-root inputs for plan module installation.
 type WireInput struct {
-	MySQLDB             *gorm.DB
-	EventPublisher      event.EventPublisher
-	AssessmentModelRepo modelcatalogport.ModelRepository
-	RedisClient         redis.UniversalClient
-	CacheBuilder        *keyspace.Builder
-	PlanPolicy          cachepolicy.CachePolicy
-	EntryBaseURL        string
-	Observer            *observability.ComponentObserver
-	MySQLLimiter        backpressure.Acquirer
-	TesteeAccess        actorAccessApp.TesteeAccessService
+	MySQLDB         *gorm.DB
+	EventPublisher  event.EventPublisher
+	PublishedModels modelcatalogport.PublishedModelLister
+	RedisClient     redis.UniversalClient
+	CacheBuilder    *keyspace.Builder
+	PlanPolicy      cachepolicy.CachePolicy
+	EntryBaseURL    string
+	Observer        *observability.ComponentObserver
+	MySQLLimiter    backpressure.Acquirer
+	TesteeAccess    actorAccessApp.TesteeAccessService
 }
 
 // Wire builds and bootstraps the plan module from composition inputs.

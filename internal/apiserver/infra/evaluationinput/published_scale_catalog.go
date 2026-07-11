@@ -16,7 +16,7 @@ type PublishedScaleCatalog struct {
 	reader rulesetport.PublishedModelReader
 }
 
-func NewPublishedScaleCatalog(reader rulesetport.PublishedModelReader, fallback port.ScaleModelCatalog) PublishedScaleCatalog {
+func NewPublishedScaleCatalog(reader rulesetport.PublishedModelReader) PublishedScaleCatalog {
 	return PublishedScaleCatalog{reader: reader}
 }
 

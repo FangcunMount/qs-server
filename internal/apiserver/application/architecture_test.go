@@ -474,9 +474,9 @@ func TestLegacyDefinitionImportsStayAtInputAdapters(t *testing.T) {
 
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go":        {},
-		"internal/apiserver/port/modelcatalog/payload/cognitive/payload.go":               {},
-		"internal/apiserver/port/modelcatalog/payload/typology/definition.go":             {},
+		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go": {},
+		"internal/apiserver/port/modelcatalog/payload/cognitive/payload.go":        {},
+		"internal/apiserver/port/modelcatalog/payload/typology/definition.go":      {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -1212,4 +1212,78 @@ func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 			t.Fatalf("port/evaluationinput missing v2 RuleSetKind: %q", want)
 		}
 	}
+}
+
+func TestPlanDoesNotReadDraftAssessmentModels(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "plan")
+	forbiddenTokens := []string{
+		"NewAssessmentModel" + "ScaleCatalog",
+		"Model" + "Repository",
+	}
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, token := range forbiddenTokens {
+			if strings.Contains(string(data), token) {
+				return &forbiddenApplicationReferenceError{path: path, token: token}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBehavioralPublishedProjectionDoesNotReadLegacyDefinition(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, scanRoot := range []string{
+		filepath.Join(root, "internal", "apiserver", "application", "modelcatalog", "definition"),
+		filepath.Join(root, "internal", "apiserver", "port", "modelcatalog", "payload", "behavioral"),
+	} {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range []string{"Preserve" + "LegacyNormTables", "Definition" + ".Data"} {
+				if strings.Contains(text, token) {
+					return &forbiddenApplicationReferenceError{path: path, token: token}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+type forbiddenApplicationReferenceError struct {
+	path  string
+	token string
+}
+
+func (e *forbiddenApplicationReferenceError) Error() string {
+	return e.path + " reintroduces retired ModelCatalog surface " + e.token
 }

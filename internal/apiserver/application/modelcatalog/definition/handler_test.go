@@ -15,10 +15,6 @@ func (h stubHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == h.kind
 }
 
-func (h stubHandler) PrepareForSave(context.Context, *domain.AssessmentModel, SaveInput) (SaveResult, []domain.DomainValidationIssue, error) {
-	return SaveResult{}, nil, nil
-}
-
 func (h stubHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return nil
 }

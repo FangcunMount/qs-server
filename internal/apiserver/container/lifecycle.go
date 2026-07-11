@@ -195,10 +195,10 @@ func (c *Container) assessmentOutboxReadyIndex() *outboxready.Index {
 }
 
 func (c *Container) mongoOutboxPendingLister() outboxport.PendingEventRefLister {
-	if c == nil || c.surveyScaleInfra == nil || c.surveyScaleInfra.AnswerSheetRepo == nil {
+	if c == nil || c.surveyRuntimeInfra == nil || c.surveyRuntimeInfra.AnswerSheetRepo == nil {
 		return nil
 	}
-	return c.surveyScaleInfra.AnswerSheetRepo
+	return c.surveyRuntimeInfra.AnswerSheetRepo
 }
 
 func (c *Container) assessmentOutboxPendingLister() outboxport.PendingEventRefLister {

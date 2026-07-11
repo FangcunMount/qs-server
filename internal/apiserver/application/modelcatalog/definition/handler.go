@@ -7,28 +7,7 @@ import (
 
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
-
-// SaveInput carries a wire payload and, when materialized by an outer adapter,
-// its canonical definition and referenced norm tables.
-type SaveInput struct {
-	PayloadFormat string
-	Payload       []byte
-	DefinitionV2  *domain.Definition
-	Norms         []*norm.Norm
-	Algorithm     string
-	SubKind       string
-}
-
-// SaveResult is the normalized draft definition update produced by a handler.
-type SaveResult struct {
-	Payload      domain.DefinitionPayload
-	DefinitionV2 *domain.Definition
-	Norms        []*norm.Norm
-	Algorithm    domain.Algorithm
-	SubKind      domain.SubKind
-}
 
 // SnapshotBuildResult carries only the family-specific pieces needed to
 // materialize an AssessmentSnapshot.
@@ -49,7 +28,6 @@ type SnapshotBuildResult struct {
 // import belongs at the owning API adapter boundary.
 type Handler interface {
 	Supports(identity domain.Identity) bool
-	PrepareForSave(ctx context.Context, model *domain.AssessmentModel, input SaveInput) (SaveResult, []domain.DomainValidationIssue, error)
 	ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue
 	BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error)
 }

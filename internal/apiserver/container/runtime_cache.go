@@ -218,7 +218,7 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 }
 
 func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Context) ([]string, error) {
-	infra := a.containerSurveyScaleInfra()
+	infra := a.containerSurveyRuntimeInfra()
 	if infra == nil || infra.QuestionnaireReader == nil {
 		return nil, nil
 	}
@@ -280,7 +280,7 @@ func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code s
 }
 
 func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context, code string) error {
-	infra := a.containerSurveyScaleInfra()
+	infra := a.containerSurveyRuntimeInfra()
 	if infra == nil || infra.QuestionnaireRepo == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
@@ -304,11 +304,11 @@ func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, 
 	return err
 }
 
-func (a cacheGovernanceAdapter) containerSurveyScaleInfra() *surveymod.ScaleInfra {
+func (a cacheGovernanceAdapter) containerSurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra {
 	if a.container == nil {
 		return nil
 	}
-	return a.container.surveyScaleInfra
+	return a.container.surveyRuntimeInfra
 }
 
 func (a cacheGovernanceAdapter) warmSystemStatsTarget(ctx context.Context, orgID int64) error {

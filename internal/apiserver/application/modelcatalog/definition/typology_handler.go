@@ -27,24 +27,6 @@ func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindTypology
 }
 
-func (TypologyDefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input SaveInput) (SaveResult, []domain.DomainValidationIssue, error) {
-	if issues := ValidateDefinitionV2(input.DefinitionV2); len(issues) > 0 {
-		return SaveResult{}, issues, nil
-	}
-	format := input.PayloadFormat
-	if format == "" {
-		format = domain.PayloadFormatPersonalityTypologyV1
-	}
-	result := SaveResult{Payload: domain.DefinitionPayload{Format: format, Data: append([]byte(nil), input.Payload...)}, DefinitionV2: input.DefinitionV2}
-	if input.Algorithm != "" {
-		result.Algorithm = domain.Algorithm(input.Algorithm)
-	}
-	if input.SubKind != "" {
-		result.SubKind = domain.SubKind(input.SubKind)
-	}
-	return result, nil, nil
-}
-
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}

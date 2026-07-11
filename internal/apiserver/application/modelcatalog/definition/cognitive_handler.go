@@ -19,13 +19,6 @@ func (CognitiveDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindCognitive
 }
 
-func (CognitiveDefinitionHandler) PrepareForSave(_ context.Context, _ *domain.AssessmentModel, input SaveInput) (SaveResult, []domain.DomainValidationIssue, error) {
-	if issues := ValidateDefinitionV2(input.DefinitionV2); len(issues) > 0 {
-		return SaveResult{}, issues, nil
-	}
-	return SaveResult{Payload: domain.DefinitionPayload{Data: append([]byte(nil), input.Payload...)}, DefinitionV2: input.DefinitionV2, Norms: append([]*domain.Norm(nil), input.Norms...)}, nil, nil
-}
-
 func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}

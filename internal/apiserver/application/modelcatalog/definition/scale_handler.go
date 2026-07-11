@@ -9,66 +9,12 @@ import (
 	scalepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// ScaleDefinitionHandler owns the scale-specific wire projection. Its domain
-// input and publish validation are DefinitionV2-first; JSON parsing remains
-// only for importing a legacy definition envelope.
+// ScaleDefinitionHandler owns the scale-specific wire projection and publish
+// validation. DefinitionV2 is its only authoring input.
 type ScaleDefinitionHandler struct{}
 
 func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindScale
-}
-
-func (h ScaleDefinitionHandler) PrepareForSave(ctx context.Context, model *domain.AssessmentModel, input SaveInput) (SaveResult, []domain.DomainValidationIssue, error) {
-	if input.DefinitionV2 != nil {
-		if issues := ValidateDefinitionV2(input.DefinitionV2); len(issues) > 0 {
-			return SaveResult{}, issues, nil
-		}
-		if model == nil {
-			return SaveResult{}, []domain.DomainValidationIssue{{
-				Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError,
-			}}, nil
-		}
-		candidate := *model
-		candidate.DefinitionV2 = input.DefinitionV2
-		built, err := h.BuildSnapshotPayload(ctx, &candidate)
-		if err != nil {
-			return SaveResult{}, nil, err
-		}
-		return SaveResult{
-			Payload:      domain.DefinitionPayload{Format: built.PayloadFormat, Data: append([]byte(nil), built.Payload...)},
-			DefinitionV2: input.DefinitionV2,
-			Algorithm:    built.Algorithm,
-			SubKind:      built.SubKind,
-		}, nil, nil
-	}
-
-	format := input.PayloadFormat
-	if format == "" {
-		format = domain.PayloadFormatAssessmentScaleV1
-	}
-	if format != domain.PayloadFormatAssessmentScaleV1 {
-		return SaveResult{}, []domain.DomainValidationIssue{{
-			Field: "definition.format", Message: "unsupported scale payload format", Code: "definition.format.unsupported", Level: domain.ValidationLevelError,
-		}}, nil
-	}
-	if len(input.Payload) == 0 {
-		return SaveResult{}, []domain.DomainValidationIssue{{
-			Field: "definition", Message: "量表定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError,
-		}}, nil
-	}
-	if !json.Valid(input.Payload) {
-		return SaveResult{}, []domain.DomainValidationIssue{{
-			Field: "definition.payload", Message: "量表定义不是有效 JSON", Code: "definition.payload.invalid", Level: domain.ValidationLevelError,
-		}}, nil
-	}
-	snapshot, err := scalepayload.ParsePublishedPayload(input.Payload)
-	if err != nil {
-		return SaveResult{}, nil, err
-	}
-	return SaveResult{
-		Payload:      domain.DefinitionPayload{Format: format, Data: append([]byte(nil), input.Payload...)},
-		DefinitionV2: scalepayload.DefinitionFromScaleSnapshot(snapshot),
-	}, nil, nil
 }
 
 func (ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {

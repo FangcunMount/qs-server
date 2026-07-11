@@ -8,13 +8,13 @@ import (
 // InstallHost extends the shared compose seam with survey-specific bindings.
 type InstallHost interface {
 	compose.Host
-	EnsureSurveyScaleInfra() (*ScaleInfra, error)
+	EnsureSurveyRuntimeInfra() (*SurveyRuntimeInfra, error)
 	SetSurveyModule(*Module)
 }
 
 // InstallFrom wires and registers the survey module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
-	infra, err := host.EnsureSurveyScaleInfra()
+	infra, err := host.EnsureSurveyRuntimeInfra()
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func InstallFrom(host InstallHost) error {
 		OutboxRelayImmediateMaxConcurrent: host.OutboxRelayMongoImmediateMaxConcurrent(),
 		CacheSignalNotifier:               host.CacheSignalNotifier(),
 		OpsHandle:                         host.CacheHandle(cacheplane.FamilyOps),
-		ScaleInfra:                        infra,
+		SurveyRuntimeInfra:                infra,
 	})
 	if err != nil {
 		return err

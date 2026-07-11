@@ -134,12 +134,12 @@ func (c *Container) ActorIAMPorts() compose.ActorIAMPorts {
 	return ports
 }
 
-func (c *Container) EnsureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
-	return c.ensureSurveyScaleInfra()
+func (c *Container) EnsureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, error) {
+	return c.ensureSurveyRuntimeInfra()
 }
 
-func (c *Container) SurveyScaleInfra() *surveymod.ScaleInfra {
-	return c.surveyScaleInfra
+func (c *Container) SurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra {
+	return c.surveyRuntimeInfra
 }
 
 func (c *Container) DefaultEvaluationCatalog() (compose.EvaluationCatalog, error) {
@@ -263,6 +263,13 @@ func (c *Container) PublishedModelTitleResolver() modelcatalogApp.PublishedModel
 	return c.AssessmentModelModule.TitleResolver
 }
 
+func (c *Container) PublishedModelLister() rulesetport.PublishedModelLister {
+	if c == nil || c.AssessmentModelModule == nil {
+		return nil
+	}
+	return c.AssessmentModelModule.PublishedLister
+}
+
 func (c *Container) TesteeQuery() testeeApp.TesteeQueryService {
 	if c == nil || c.ActorModule == nil {
 		return nil
@@ -277,11 +284,11 @@ func (c *Container) TaskNotificationContext() planApp.TaskNotificationContextRea
 	return c.PlanModule.TaskNotificationContextReader
 }
 
-func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
+func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, error) {
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
-	infra, err := surveymod.EnsureScaleInfraCached(c.surveyScaleInfra, surveymod.ScaleInfraDeps{
+	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
 		MongoDB:             c.mongoDB,
 		EventCatalog:        c.eventCatalog,
 		MongoLimiter:        c.backpressure.Mongo,
@@ -293,7 +300,7 @@ func (c *Container) ensureSurveyScaleInfra() (*surveymod.ScaleInfra, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.surveyScaleInfra = infra
+	c.surveyRuntimeInfra = infra
 	return infra, nil
 }
 

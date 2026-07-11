@@ -10,13 +10,13 @@ import (
 // InstallHost extends the shared compose seam with assessment-model bindings.
 type InstallHost interface {
 	compose.Host
-	EnsureSurveyScaleInfra() (*surveymod.ScaleInfra, error)
+	EnsureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, error)
 	SetAssessmentModelModule(*Module)
 }
 
 // InstallFrom wires and registers the assessment-model module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
-	infra, err := host.EnsureSurveyScaleInfra()
+	infra, err := host.EnsureSurveyRuntimeInfra()
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func InstallFrom(host InstallHost) error {
 		RankRedisClient:        host.CacheClient(cacheplane.FamilyRank),
 		RankCacheBuilder:       host.CacheBuilder(cacheplane.FamilyRank),
 		CacheSignalNotifier:    host.CacheSignalNotifier(),
-		ScaleInfra:             infra,
+		SurveyRuntimeInfra:     infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
 		StaticRedisClient:      host.CacheClient(cacheplane.FamilyStatic),

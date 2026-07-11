@@ -40,16 +40,16 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the plan module.
 type Deps struct {
-	MySQLDB             *gorm.DB
-	EventPublisher      event.EventPublisher
-	AssessmentModelRepo modelcatalogport.ModelRepository
-	RedisClient         redis.UniversalClient
-	CacheBuilder        *keyspace.Builder
-	PlanPolicy          cachepolicy.CachePolicy
-	EntryBaseURL        string
-	Observer            *observability.ComponentObserver
-	MySQLLimiter        backpressure.Acquirer
-	TesteeAccess        actorAccessApp.TesteeAccessService
+	MySQLDB         *gorm.DB
+	EventPublisher  event.EventPublisher
+	PublishedModels modelcatalogport.PublishedModelLister
+	RedisClient     redis.UniversalClient
+	CacheBuilder    *keyspace.Builder
+	PlanPolicy      cachepolicy.CachePolicy
+	EntryBaseURL    string
+	Observer        *observability.ComponentObserver
+	MySQLLimiter    backpressure.Acquirer
+	TesteeAccess    actorAccessApp.TesteeAccessService
 }
 
 // New assembles the plan module.
@@ -73,7 +73,7 @@ func New(deps Deps) (*Module, error) {
 
 	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
-	scaleCatalog := planApp.NewAssessmentModelScaleCatalog(normalized.AssessmentModelRepo)
+	scaleCatalog := planApp.NewPublishedScaleCatalog(normalized.PublishedModels)
 	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
 	module.FollowUpQueueReader = planReadModel
 

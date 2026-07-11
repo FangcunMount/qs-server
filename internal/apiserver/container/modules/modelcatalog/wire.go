@@ -26,7 +26,7 @@ type WireInput struct {
 	RankRedisClient        redis.UniversalClient
 	RankCacheBuilder       *keyspace.Builder
 	CacheSignalNotifier    ScaleCacheSignalNotifier
-	ScaleInfra             *surveymod.ScaleInfra
+	SurveyRuntimeInfra     *surveymod.SurveyRuntimeInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService
 	StaticRedisClient      redis.UniversalClient
@@ -54,7 +54,7 @@ func buildLifecycleDeps(in WireInput) LifecycleDeps {
 		QuestionnairePublisher: in.QuestionnairePublisher,
 		CacheSignalNotifier:    in.CacheSignalNotifier,
 	}
-	if infra := in.ScaleInfra; infra != nil {
+	if infra := in.SurveyRuntimeInfra; infra != nil {
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.QuestionnaireRepo)
 	}
 	return deps

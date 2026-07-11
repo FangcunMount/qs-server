@@ -13,7 +13,7 @@ type ReportIntegrationPorts = compose.ReportIntegrationPorts
 // InstallHost extends the shared compose seam with evaluation module bindings.
 type InstallHost interface {
 	compose.Host
-	SurveyScaleInfra() *surveymod.ScaleInfra
+	SurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra
 	SetEvaluationModule(*Module)
 }
 
@@ -45,7 +45,7 @@ func InstallFrom(host InstallHost) error {
 		TesteeAccessChecker:                         NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
 		OpsHandle:                                   host.CacheHandle(cacheplane.FamilyOps),
 		ReportStatusConfig:                          host.ReportStatusConfig(),
-		ScaleInfra:                                  host.SurveyScaleInfra(),
+		SurveyRuntimeInfra:                          host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:                       host.PublishedModelCatalog(),
 		StaticRedisClient:                           host.CacheClient(cacheplane.FamilyStatic),
 		StaticCacheBuilder:                          host.CacheBuilder(cacheplane.FamilyStatic),

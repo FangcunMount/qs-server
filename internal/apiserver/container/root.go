@@ -66,7 +66,7 @@ type Container struct {
 	publishedModelCatalog rulesetport.Catalog
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
-	surveyScaleInfra *surveymod.ScaleInfra
+	surveyRuntimeInfra *surveymod.SurveyRuntimeInfra
 
 	// 基础设施服务
 	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
