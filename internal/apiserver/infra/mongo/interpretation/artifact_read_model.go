@@ -14,24 +14,12 @@ import (
 
 // reportReadModel reads current artifacts and immutable historical archives.
 type reportReadModel struct {
-	legacy    *legacyReportReadModel
 	artifacts base.BaseRepository
 	archives  base.BaseRepository
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
-	return NewReportReadModelWithLegacyFallback(db, false, opts...)
-}
-
-// NewReportReadModelWithLegacyFallback keeps cutover explicit: production
-// Deprecated: only use true while diagnosing a failed archive migration.
-func NewReportReadModelWithLegacyFallback(db *mongo.Database, legacyFallback bool, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
-	var legacy *legacyReportReadModel
-	if legacyFallback {
-		legacy = newLegacyReportReadModel(db, opts...)
-	}
 	return &reportReadModel{
-		legacy:    legacy,
 		artifacts: base.NewBaseRepository(db, (InterpretReportArtifactPO{}).CollectionName(), opts...),
 		archives:  base.NewBaseRepository(db, "archived_reports", opts...),
 	}
@@ -48,9 +36,6 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	if row, err := r.findArchive(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil); err != nil || row != nil {
 		return row, err
 	}
-	if r.legacy != nil {
-		return r.legacy.GetReportByID(ctx, reportID)
-	}
 	return nil, mongo.ErrNoDocuments
 }
 
@@ -65,9 +50,6 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 	if row, err := r.findArchive(ctx, bson.M{"domain_id": assessmentID, "deleted_at": nil}, nil); err != nil || row != nil {
 		return row, err
 	}
-	if r.legacy != nil {
-		return r.legacy.GetReportByAssessmentID(ctx, assessmentID)
-	}
 	return nil, mongo.ErrNoDocuments
 }
 
@@ -80,15 +62,7 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationread
 	if err != nil {
 		return nil, 0, err
 	}
-	legacy := archives
-	if r.legacy != nil {
-		var err error
-		legacy, err = r.listLegacy(ctx, filter)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-	merged := mergeNewFirstReportRows(artifacts, legacy)
+	merged := mergeNewFirstReportRows(artifacts, archives)
 	total := int64(len(merged))
 	offset, limit := page.Offset(), page.Limit()
 	if offset >= len(merged) {
@@ -173,23 +147,6 @@ func (r *reportReadModel) listArtifacts(ctx context.Context, filter evaluationre
 			return nil, err
 		}
 		rows = append(rows, artifactPOToReadRow(&po))
-	}
-	return rows, cursor.Err()
-}
-
-func (r *reportReadModel) listLegacy(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
-	cursor, err := r.legacy.Find(ctx, buildReportReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	rows := make([]evaluationreadmodel.ReportRow, 0)
-	for cursor.Next(ctx) {
-		var po InterpretReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		rows = append(rows, reportPOToReadRow(&po))
 	}
 	return rows, cursor.Err()
 }
