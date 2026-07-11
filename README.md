@@ -2,7 +2,7 @@
 
 > **qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统。它不是普通问卷 CRUD，而是一个多测评模型平台：Survey 负责作答事实，Assessment Model 定义统一模型资产与接入协议，Scale / Personality Typology 等具体模型家族负责规则表达，Evaluation 作为通用测评执行引擎按 EvaluatorKey 路由执行，并产出 AssessmentOutcome 与 InterpretReport。**
 
-[![Go Version](https://img.shields.io/badge/Go-1.25.11-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.25.12-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---

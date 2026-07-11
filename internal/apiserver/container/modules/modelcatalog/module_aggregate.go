@@ -3,6 +3,10 @@ package modelcatalog
 import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appauthoring "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
+	appmanagement "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/management"
+	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
+	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
+	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -13,9 +17,9 @@ type Module struct {
 	HotRank         *HotRank
 	ModelRepo       modelcatalogport.ModelRepository
 	PublishedLister modelcatalogport.PublishedModelLister
-	Management      *assessmentModelApp.AssessmentCatalogManagementService
+	Management      assessmentModelApp.CatalogManagementService
 	Authoring       *appauthoring.Service
-	Publication     *assessmentModelApp.AssessmentPublicationService
+	Publication     assessmentModelApp.PublicationService
 	Query           assessmentModelApp.CatalogQueryService
 	TitleResolver   assessmentModelApp.PublishedModelTitleResolver
 }
@@ -38,7 +42,7 @@ func New(deps Deps) (*Module, error) {
 	hotRank := NewHotRank(deps.HotRank)
 
 	// 管理服务
-	management := &assessmentModelApp.AssessmentCatalogManagementService{
+	management := &appmanagement.Service{
 		ModelRepo:       deps.Catalog.ModelRepo,
 		Published:       deps.Catalog.PublishedRepo,
 		Authorizer:      assessmentModelApp.SnapshotAuthorizer{},
@@ -52,7 +56,7 @@ func New(deps Deps) (*Module, error) {
 		Registry:   registry,
 	}
 	// 发布服务
-	publication := &assessmentModelApp.AssessmentPublicationService{
+	publication := &apppublication.Service{
 		ModelRepo:  deps.Catalog.ModelRepo,
 		Published:  deps.Catalog.PublishedRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
@@ -61,7 +65,7 @@ func New(deps Deps) (*Module, error) {
 		Effects:    effects,
 	}
 	// 查询服务
-	query := assessmentModelApp.NewCatalogQueryService(assessmentModelApp.CatalogQueryDependencies{
+	query := appquery.NewService(appquery.Dependencies{
 		Models:     deps.Catalog.ModelRepo,
 		Published:  deps.Catalog.PublishedLister,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
@@ -76,7 +80,7 @@ func New(deps Deps) (*Module, error) {
 		Authoring:       authoring,
 		Publication:     publication,
 		Query:           query,
-		TitleResolver:   assessmentModelApp.NewPublishedModelTitleResolver(deps.Catalog.PublishedLister),
+		TitleResolver:   modelcatalogRuntime.NewTitleResolver(deps.Catalog.PublishedLister),
 	}, nil
 }
 

@@ -1,4 +1,4 @@
-package modelcatalog
+package hotrank
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func TestCatalogHotRankProjectionHookProjectsSubmittedAnswerSheet(t *testing.T) 
 	submittedAt := time.Date(2026, 5, 1, 9, 30, 0, 0, time.UTC)
 	evt := event.New(domainAnswerSheet.EventTypeSubmitted, domainAnswerSheet.AggregateType, "sheet-1", domainAnswerSheet.AnswerSheetSubmittedData{AnswerSheetID: "sheet-1", QuestionnaireCode: "QNR-1", SubmittedAt: submittedAt})
 	projection := &hotRankProjectionCapture{}
-	hook := NewCatalogHotRankProjectionHook(projection)
+	hook := NewProjectionHook(projection)
 	if err := hook.BeforePublish(context.Background(), appEventing.PendingOutboxEvent{EventID: "evt-1", Event: evt}); err != nil {
 		t.Fatalf("BeforePublish() error = %v", err)
 	}
@@ -45,7 +45,7 @@ func TestCatalogHotRankProjectionHookDecodesStoredOutboxEvent(t *testing.T) {
 		t.Fatalf("DecodeDomainEvent: %v", err)
 	}
 	projection := &hotRankProjectionCapture{}
-	if err := NewCatalogHotRankProjectionHook(projection).BeforePublish(context.Background(), appEventing.PendingOutboxEvent{EventID: "evt-1", Event: decoded}); err != nil {
+	if err := NewProjectionHook(projection).BeforePublish(context.Background(), appEventing.PendingOutboxEvent{EventID: "evt-1", Event: decoded}); err != nil {
 		t.Fatalf("BeforePublish() error = %v", err)
 	}
 	if len(projection.facts) != 1 || projection.facts[0].QuestionnaireCode != "QNR-1" {

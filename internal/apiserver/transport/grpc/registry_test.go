@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	modelcatalogquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )
@@ -17,7 +18,7 @@ func TestRegistryGetRegisteredServicesReflectsTypedDeps(t *testing.T) {
 			AnswerSheetManagementService: answerSheetApp.NewManagementService(nil, nil),
 			QuestionnaireQueryService:    appQuestionnaire.NewQueryService(nil, nil, nil, nil),
 		},
-		AssessmentModelCatalog: AssessmentModelCatalogDeps{QueryService: modelcatalog.NewCatalogQueryService(modelcatalog.CatalogQueryDependencies{Authorizer: modelcatalog.SnapshotAuthorizer{}})},
+		AssessmentModelCatalog: AssessmentModelCatalogDeps{QueryService: modelcatalogquery.NewService(modelcatalogquery.Dependencies{Authorizer: modelcatalog.SnapshotAuthorizer{}})},
 	})
 
 	got := registry.GetRegisteredServices()

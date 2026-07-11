@@ -108,7 +108,7 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)",
 		"outboxruntime.Build(",
 		"RequireDurablePublisher: true",
-		"modelcatalogApp.NewCatalogHotRankProjectionHook(hotRankProjection)",
+		"modelcatalogHotRank.NewProjectionHook(hotRankProjection)",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

@@ -2,7 +2,8 @@ package modelcatalog
 
 import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
-func populateModelSummaryIdentity(summary *ModelSummary, kind domain.Kind, subKind domain.SubKind, algorithm domain.Algorithm, productChannel domain.ProductChannel) {
+// PopulateModelSummaryIdentity adds API identity fields to a catalog summary.
+func PopulateModelSummaryIdentity(summary *ModelSummary, kind domain.Kind, subKind domain.SubKind, algorithm domain.Algorithm, productChannel domain.ProductChannel) {
 	if summary == nil {
 		return
 	}
@@ -12,17 +13,8 @@ func populateModelSummaryIdentity(summary *ModelSummary, kind domain.Kind, subKi
 	}
 }
 
-func populateDefinitionIdentity(dto *DefinitionDTO, kind domain.Kind, subKind domain.SubKind, algorithm domain.Algorithm, productChannel domain.ProductChannel) {
-	if dto == nil {
-		return
-	}
-	dto.ProductChannel = string(domain.ResolveProductChannel(kind, productChannel))
-	if family, ok := domain.AlgorithmFamilyFromIdentity(kind, subKind, algorithm); ok {
-		dto.AlgorithmFamily = string(family)
-	}
-}
-
-func productChannelOptions() []Option {
+// ProductChannelOptions returns the canonical product-channel catalog options.
+func ProductChannelOptions() []Option {
 	channels := domain.AllProductChannels()
 	options := make([]Option, 0, len(channels))
 	labels := map[domain.ProductChannel]string{
@@ -40,7 +32,8 @@ func productChannelOptions() []Option {
 	return options
 }
 
-func algorithmFamilyOptions() []Option {
+// AlgorithmFamilyOptions returns the canonical algorithm-family catalog options.
+func AlgorithmFamilyOptions() []Option {
 	families := domain.AllAlgorithmFamilies()
 	options := make([]Option, 0, len(families))
 	labels := map[domain.AlgorithmFamily]string{

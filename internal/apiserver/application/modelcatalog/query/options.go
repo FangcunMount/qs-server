@@ -1,6 +1,9 @@
-package modelcatalog
+package query
 
-import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+import (
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+)
 
 type catalogKindOption struct {
 	Kind  domain.Kind
@@ -14,35 +17,35 @@ var catalogKinds = []catalogKindOption{
 	{Kind: domain.KindCognitive, Label: "认知测评"},
 }
 
-func apiKindOptions() []Option {
-	items := make([]Option, 0, len(catalogKinds))
+func apiKindOptions() []modelcatalog.Option {
+	items := make([]modelcatalog.Option, 0, len(catalogKinds))
 	for _, item := range catalogKinds {
-		items = append(items, Option{Label: item.Label, Value: DomainKindToAPIKind(item.Kind)})
+		items = append(items, modelcatalog.Option{Label: item.Label, Value: modelcatalog.DomainKindToAPIKind(item.Kind)})
 	}
 	return items
 }
 
-func catalogOptionsForKind(kind string) OptionsResult {
-	result := OptionsResult{
+func catalogOptionsForKind(kind string) modelcatalog.OptionsResult {
+	result := modelcatalog.OptionsResult{
 		Kinds:             apiKindOptions(),
-		ProductChannels:   productChannelOptions(),
-		AlgorithmFamilies: algorithmFamilyOptions(),
+		ProductChannels:   modelcatalog.ProductChannelOptions(),
+		AlgorithmFamilies: modelcatalog.AlgorithmFamilyOptions(),
 		Algorithms:        algorithmOptions(kind),
 		SubKinds:          subKindOptions(kind),
-		Categories:        []Option{},
+		Categories:        []modelcatalog.Option{},
 	}
-	if kind == KindScale {
+	if kind == modelcatalog.KindScale {
 		result.Categories = scaleCategoryOptions()
 		result.Stages = scaleStageOptions()
 		result.ApplicableAges = scaleApplicableAgeOptions()
 		result.Reporters = scaleReporterOptions()
-		result.Tags = []Option{}
+		result.Tags = []modelcatalog.Option{}
 	}
 	return result
 }
 
-func algorithmOptions(kind string) []Option {
-	all := []Option{
+func algorithmOptions(kind string) []modelcatalog.Option {
+	all := []modelcatalog.Option{
 		{Label: "默认量表", Value: string(domain.AlgorithmScaleDefault)},
 		{Label: "MBTI", Value: string(domain.AlgorithmMBTI)},
 		{Label: "SBTI", Value: string(domain.AlgorithmSBTI)},
@@ -51,29 +54,29 @@ func algorithmOptions(kind string) []Option {
 		{Label: "SPM", Value: string(domain.AlgorithmSPM)},
 	}
 	switch kind {
-	case "", KindScale, KindTypology, KindBehavioralRating, KindCognitive:
+	case "", modelcatalog.KindScale, modelcatalog.KindTypology, modelcatalog.KindBehavioralRating, modelcatalog.KindCognitive:
 	default:
-		return []Option{}
+		return []modelcatalog.Option{}
 	}
 	if kind == "" {
 		return all
 	}
-	filtered := make([]Option, 0, 3)
+	filtered := make([]modelcatalog.Option, 0, 3)
 	for _, item := range all {
 		switch kind {
-		case KindScale:
+		case modelcatalog.KindScale:
 			if item.Value == string(domain.AlgorithmScaleDefault) {
 				filtered = append(filtered, item)
 			}
-		case KindTypology:
+		case modelcatalog.KindTypology:
 			if item.Value == string(domain.AlgorithmMBTI) || item.Value == string(domain.AlgorithmSBTI) || item.Value == string(domain.AlgorithmBigFive) {
 				filtered = append(filtered, item)
 			}
-		case KindBehavioralRating:
+		case modelcatalog.KindBehavioralRating:
 			if item.Value == string(domain.AlgorithmBrief2) {
 				filtered = append(filtered, item)
 			}
-		case KindCognitive:
+		case modelcatalog.KindCognitive:
 			if item.Value == string(domain.AlgorithmSPM) {
 				filtered = append(filtered, item)
 			}
@@ -82,16 +85,16 @@ func algorithmOptions(kind string) []Option {
 	return filtered
 }
 
-func subKindOptions(kind string) []Option {
+func subKindOptions(kind string) []modelcatalog.Option {
 	if kind == "" {
-		return []Option{{Label: "量表评分", Value: SubKindScale}, {Label: "类型人格", Value: SubKindTypology}}
+		return []modelcatalog.Option{{Label: "量表评分", Value: modelcatalog.SubKindScale}, {Label: "类型人格", Value: modelcatalog.SubKindTypology}}
 	}
 	switch kind {
-	case KindScale:
-		return []Option{{Label: "量表评分", Value: SubKindScale}}
-	case KindTypology:
-		return []Option{{Label: "类型人格", Value: SubKindTypology}}
+	case modelcatalog.KindScale:
+		return []modelcatalog.Option{{Label: "量表评分", Value: modelcatalog.SubKindScale}}
+	case modelcatalog.KindTypology:
+		return []modelcatalog.Option{{Label: "类型人格", Value: modelcatalog.SubKindTypology}}
 	default:
-		return []Option{}
+		return []modelcatalog.Option{}
 	}
 }

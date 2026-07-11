@@ -1,28 +1,26 @@
-package modelcatalog
+package runtime
 
 import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// PublishedModelTitleResolver is a narrow trusted-runtime read service for
-// integrations that only need display metadata from an immutable model.
-type PublishedModelTitleResolver interface {
-	ResolvePublishedTitle(ctx context.Context, kind domain.Kind, codeValue string) (string, error)
-}
-
+// publishedModelTitleResolver 已发布模型标题解析器
 type publishedModelTitleResolver struct {
-	lister modelcatalogport.PublishedModelLister
+	lister modelcatalogport.PublishedModelLister // 已发布模型列表器
 }
 
-func NewPublishedModelTitleResolver(lister modelcatalogport.PublishedModelLister) PublishedModelTitleResolver {
+// NewTitleResolver 创建已发布模型标题解析器
+func NewTitleResolver(lister modelcatalogport.PublishedModelLister) modelcatalog.PublishedModelTitleResolver {
 	return &publishedModelTitleResolver{lister: lister}
 }
 
+// ResolvePublishedTitle 解析已发布模型标题
 func (r *publishedModelTitleResolver) ResolvePublishedTitle(ctx context.Context, kind domain.Kind, codeValue string) (string, error) {
 	if r == nil || r.lister == nil {
 		return "", errors.WithCode(code.ErrInternalServerError, "published model title resolver is not configured")
@@ -40,4 +38,5 @@ func (r *publishedModelTitleResolver) ResolvePublishedTitle(ctx context.Context,
 	return model.Title, nil
 }
 
-var _ PublishedModelTitleResolver = (*publishedModelTitleResolver)(nil)
+// 验证接口实现
+var _ modelcatalog.PublishedModelTitleResolver = (*publishedModelTitleResolver)(nil)

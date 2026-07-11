@@ -64,6 +64,37 @@ func TestApplicationDoesNotReintroduceRetiredModelCatalogPaths(t *testing.T) {
 	}
 }
 
+func TestRootPackageContainsOnlySharedContracts(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"architecture_test.go":      {},
+		"authorization.go":          {},
+		"authorization_test.go":     {},
+		"capability_matrix_test.go": {},
+		"doc.go":                    {},
+		"dto.go":                    {},
+		"errors.go":                 {},
+		"identity.go":               {},
+		"kind_mapper.go":            {},
+		"kind_mapper_test.go":       {},
+		"projection.go":             {},
+		"usecases.go":               {},
+	}
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		if _, ok := allowed[entry.Name()]; !ok {
+			t.Fatalf("root application package contains concrete or unclassified file %q; place it in a focused child package", entry.Name())
+		}
+	}
+}
+
 func retiredModelCatalogTokens() []string {
 	base := "/application/modelcatalog/"
 	return []string{

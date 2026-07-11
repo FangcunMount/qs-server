@@ -1,4 +1,4 @@
-package modelcatalog
+package hotrank
 
 import (
 	"context"
@@ -21,9 +21,9 @@ type catalogHotRankProjectionHook struct {
 	projection hotrank.Projection
 }
 
-// NewCatalogHotRankProjectionHook projects submitted answer sheets into the
+// NewProjectionHook projects submitted answer sheets into the
 // generic catalogue hot-rank read model.
-func NewCatalogHotRankProjectionHook(projection hotrank.Projection) appEventing.OutboxBeforePublishHook {
+func NewProjectionHook(projection hotrank.Projection) appEventing.OutboxBeforePublishHook {
 	if projection == nil {
 		return nil
 	}

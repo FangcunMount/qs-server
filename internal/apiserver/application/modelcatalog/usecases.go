@@ -52,3 +52,9 @@ type PublishedModelResolver interface {
 	ResolveLatestByCode(ctx context.Context, actor ActorContext, kind domain.Kind, code string) (*modelcatalogport.PublishedModel, error)
 	ListPublished(ctx context.Context, actor ActorContext, filter modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error)
 }
+
+// PublishedModelTitleResolver owns the narrow trusted-runtime lookup used by
+// integrations that only need immutable display metadata.
+type PublishedModelTitleResolver interface {
+	ResolvePublishedTitle(ctx context.Context, kind domain.Kind, code string) (string, error)
+}

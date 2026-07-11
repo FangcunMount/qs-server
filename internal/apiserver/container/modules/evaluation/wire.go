@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
-	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -89,7 +89,7 @@ func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Cat
 		}
 		catalog = created
 	}
-	if trusted, ok := catalog.(*assessmentModelApp.TrustedRuntimeCatalog); ok {
+	if trusted, ok := catalog.(*modelcatalogRuntime.TrustedRuntimeCatalog); ok {
 		return trusted, nil
 	}
 	reader, ok := catalog.(rulesetport.PublishedModelReader)
@@ -100,7 +100,7 @@ func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Cat
 	if !ok {
 		return nil, fmt.Errorf("runtime published model catalog must implement PublishedModelLister")
 	}
-	return assessmentModelApp.NewTrustedRuntimeCatalog(reader, lister), nil
+	return modelcatalogRuntime.NewTrustedRuntimeCatalog(reader, lister), nil
 }
 
 // PublishedModelCatalogInput collects dependencies for published-model catalog construction.

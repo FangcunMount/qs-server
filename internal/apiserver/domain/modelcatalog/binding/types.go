@@ -30,11 +30,10 @@ const (
 	AlgorithmSPM                     = identitypkg.AlgorithmSPM
 	AlgorithmBehavioralRatingDefault = identitypkg.AlgorithmBehavioralRatingDefault
 
-	DecisionKindScoreRange               = identitypkg.DecisionKindScoreRange
-	DecisionKindPoleComposition          = identitypkg.DecisionKindPoleComposition
-	DecisionKindTraitProfile             = identitypkg.DecisionKindTraitProfile
-	DecisionKindNearestPattern           = identitypkg.DecisionKindNearestPattern
-	DecisionKindNormLookup               = identitypkg.DecisionKindNormLookup
-	DecisionKindAbilityLevel             = identitypkg.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation = identitypkg.DecisionKindScoreRangeInterpretation
+	DecisionKindScoreRange      = identitypkg.DecisionKindScoreRange
+	DecisionKindPoleComposition = identitypkg.DecisionKindPoleComposition
+	DecisionKindTraitProfile    = identitypkg.DecisionKindTraitProfile
+	DecisionKindNearestPattern  = identitypkg.DecisionKindNearestPattern
+	DecisionKindNormLookup      = identitypkg.DecisionKindNormLookup
+	DecisionKindAbilityLevel    = identitypkg.DecisionKindAbilityLevel
 )

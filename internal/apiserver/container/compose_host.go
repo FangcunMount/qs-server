@@ -5,6 +5,7 @@ import (
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -261,7 +262,7 @@ func (c *Container) PublishedModelTitleResolver() modelcatalogApp.PublishedModel
 	if lister == nil {
 		return nil
 	}
-	return modelcatalogApp.NewPublishedModelTitleResolver(lister)
+	return modelcatalogRuntime.NewTitleResolver(lister)
 }
 
 func (c *Container) PublishedModelLister() rulesetport.PublishedModelLister {

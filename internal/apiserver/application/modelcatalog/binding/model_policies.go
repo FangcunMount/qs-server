@@ -1,4 +1,4 @@
-package modelcatalog
+package binding
 
 import (
 	"context"
@@ -12,17 +12,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// TypologyQuestionnaireBindingPolicy keeps the typology contract that a bound
+// TypologyPolicy keeps the typology contract that a bound
 // questionnaire must already be published and contain questions.
-type TypologyQuestionnaireBindingPolicy struct {
+type TypologyPolicy struct {
 	Questionnaires questionnaireapp.QuestionnaireQueryService
 }
 
-func (p TypologyQuestionnaireBindingPolicy) Supports(identity domain.Identity) bool {
+func (p TypologyPolicy) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindTypology
 }
 
-func (p TypologyQuestionnaireBindingPolicy) Validate(ctx context.Context, _ *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
+func (p TypologyPolicy) Validate(ctx context.Context, _ *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
 	if binding.QuestionnaireCode == "" {
 		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "questionnaire code is required")
 	}
@@ -47,24 +47,24 @@ func (p TypologyQuestionnaireBindingPolicy) Validate(ctx context.Context, _ *dom
 	return domain.QuestionnaireBinding{QuestionnaireCode: result.Code, QuestionnaireVersion: result.Version}, nil
 }
 
-func (TypologyQuestionnaireBindingPolicy) BeforePublish(context.Context, *domain.AssessmentModel) error {
+func (TypologyPolicy) BeforePublish(context.Context, *domain.AssessmentModel) error {
 	return nil
 }
 
-// ScaleQuestionnaireBindingPolicy keeps the scale-only questionnaire type,
+// ScalePolicy keeps the scale-only questionnaire type,
 // uniqueness, and publish-version synchronization rules at the application
 // boundary rather than in the scale lifecycle command service.
-type ScaleQuestionnaireBindingPolicy struct {
+type ScalePolicy struct {
 	Models               modelcatalogport.ModelRepository
 	Questionnaires       questionnairecatalog.Catalog
 	PublishQuestionnaire func(context.Context, string) (string, error)
 }
 
-func (p ScaleQuestionnaireBindingPolicy) Supports(identity domain.Identity) bool {
+func (p ScalePolicy) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindScale
 }
 
-func (p ScaleQuestionnaireBindingPolicy) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
+func (p ScalePolicy) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
 	if binding.QuestionnaireCode == "" {
 		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "questionnaire code is required")
 	}
@@ -97,7 +97,7 @@ func (p ScaleQuestionnaireBindingPolicy) Validate(ctx context.Context, model *do
 	return binding, nil
 }
 
-func (p ScaleQuestionnaireBindingPolicy) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
+func (p ScalePolicy) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
 	if model == nil || model.Binding.QuestionnaireCode == "" {
 		return nil
 	}

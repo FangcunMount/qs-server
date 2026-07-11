@@ -9,19 +9,19 @@ import (
 func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	t.Parallel()
 
-	for _, entry := range catalogKinds {
-		entry := entry
-		t.Run(string(entry.Kind), func(t *testing.T) {
+	for _, kind := range []domain.Kind{domain.KindScale, domain.KindTypology, domain.KindBehavioralRating, domain.KindCognitive} {
+		kind := kind
+		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
 
-			apiKind := DomainKindToAPIKind(entry.Kind)
+			apiKind := DomainKindToAPIKind(kind)
 			mapped, ok := APIKindToDomainKind(apiKind)
-			if !ok || mapped != entry.Kind {
-				t.Fatalf("APIKindToDomainKind(%q) = %q, %v; want %q, true", apiKind, mapped, ok, entry.Kind)
+			if !ok || mapped != kind {
+				t.Fatalf("APIKindToDomainKind(%q) = %q, %v; want %q, true", apiKind, mapped, ok, kind)
 			}
-			capability, ok := domain.FamilyCapabilityByKind(entry.Kind)
+			capability, ok := domain.FamilyCapabilityByKind(kind)
 			if !ok || capability.ExecutionPath == "" {
-				t.Fatalf("family capability for %q = %#v, %v", entry.Kind, capability, ok)
+				t.Fatalf("family capability for %q = %#v, %v", kind, capability, ok)
 			}
 		})
 	}

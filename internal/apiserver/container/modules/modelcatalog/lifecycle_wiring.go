@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
@@ -31,9 +32,9 @@ type LifecycleDeps struct {
 }
 
 // questionnaireBindingPolicies 问卷绑定策略
-func questionnaireBindingPolicies(deps Deps) assessmentModelApp.QuestionnaireBindingPolicies {
-	return assessmentModelApp.NewQuestionnaireBindingPolicies(
-		assessmentModelApp.ScaleQuestionnaireBindingPolicy{
+func questionnaireBindingPolicies(deps Deps) appbinding.Policies {
+	return appbinding.NewPolicies(
+		appbinding.ScalePolicy{
 			Models:         deps.Catalog.ModelRepo,
 			Questionnaires: deps.Lifecycle.QuestionnaireCatalog,
 			PublishQuestionnaire: func(ctx context.Context, code string) (string, error) {
@@ -47,34 +48,34 @@ func questionnaireBindingPolicies(deps Deps) assessmentModelApp.QuestionnaireBin
 				return result.Version, nil
 			},
 		},
-		assessmentModelApp.TypologyQuestionnaireBindingPolicy{Questionnaires: deps.Catalog.QuestionnaireQuery},
+		appbinding.TypologyPolicy{Questionnaires: deps.Catalog.QuestionnaireQuery},
 	)
 }
 
 // lifecycleEffects 生命周期效果
-func lifecycleEffects(deps Deps) assessmentModelApp.LifecycleEffectsRegistry {
+func lifecycleEffects(deps Deps) lifecycle.EffectsRegistry {
 	// 模型生命周期
-	modelEffect := assessmentModelApp.LifecycleEffectFunc{
+	modelEffect := lifecycle.EffectFunc{
 		Match: func(domain.Identity) bool { return true },
-		Run: func(ctx context.Context, model *domain.AssessmentModel, action assessmentModelApp.LifecycleAction) {
+		Run: func(ctx context.Context, model *domain.AssessmentModel, action lifecycle.Action) {
 			publishAssessmentModelLifecycleEffect(ctx, deps, model, action)
 		},
 	}
 	// 模型算法
-	typologyEffect := assessmentModelApp.LifecycleEffectFunc{
+	typologyEffect := lifecycle.EffectFunc{
 		Match: func(identity domain.Identity) bool { return identity.Kind == domain.KindTypology },
-		Run: func(ctx context.Context, model *domain.AssessmentModel, action assessmentModelApp.LifecycleAction) {
+		Run: func(ctx context.Context, model *domain.AssessmentModel, action lifecycle.Action) {
 			if deps.Catalog.CacheSignalNotifier != nil && model != nil {
 				deps.Catalog.CacheSignalNotifier.NotifyTypologyModelCacheChanged(ctx, model.Code, string(action))
 			}
 		},
 	}
 	// 组合生命周期效果
-	return assessmentModelApp.NewLifecycleEffectsRegistry(modelEffect, typologyEffect)
+	return lifecycle.NewEffectsRegistry(modelEffect, typologyEffect)
 }
 
 // publishAssessmentModelLifecycleEffect 发布模型生命周期效果
-func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model *domain.AssessmentModel, action assessmentModelApp.LifecycleAction) {
+func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model *domain.AssessmentModel, action lifecycle.Action) {
 	if model == nil {
 		return
 	}
@@ -97,13 +98,13 @@ func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model
 }
 
 // assessmentModelChangeAction 模型生命周期动作
-func assessmentModelChangeAction(action assessmentModelApp.LifecycleAction) (eventpayload.AssessmentModelChangeAction, bool) {
+func assessmentModelChangeAction(action lifecycle.Action) (eventpayload.AssessmentModelChangeAction, bool) {
 	switch action {
-	case assessmentModelApp.LifecycleActionPublished:
+	case lifecycle.ActionPublished:
 		return eventpayload.AssessmentModelChangeActionPublished, true
-	case assessmentModelApp.LifecycleActionUnpublished:
+	case lifecycle.ActionUnpublished:
 		return eventpayload.AssessmentModelChangeActionUnpublished, true
-	case assessmentModelApp.LifecycleActionArchived:
+	case lifecycle.ActionArchived:
 		return eventpayload.AssessmentModelChangeActionArchived, true
 	default:
 		return "", false

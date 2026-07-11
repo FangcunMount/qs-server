@@ -219,11 +219,3 @@ func payloadDefinitionBytes(payload *modeltypology.Payload) ([]byte, error) {
 	}
 	return data, nil
 }
-
-func fullPayloadDefinitionBytes(payload *modeltypology.Payload) ([]byte, error) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("marshal payload: %w", err)
-	}
-	return data, nil
-}

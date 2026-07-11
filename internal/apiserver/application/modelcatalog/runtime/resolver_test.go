@@ -1,9 +1,10 @@
-package modelcatalog
+package runtime
 
 import (
 	"context"
 	"testing"
 
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
@@ -30,14 +31,14 @@ func (s resolverReaderStub) ListPublishedModels(context.Context, modelcatalogpor
 
 type resolverAuthorizerStub struct{}
 
-func (resolverAuthorizerStub) Authorize(context.Context, ActorContext, Action, Resource) error {
+func (resolverAuthorizerStub) Authorize(context.Context, modelcatalog.ActorContext, modelcatalog.Action, modelcatalog.Resource) error {
 	return nil
 }
 
 func TestPublishedResolverRequiresDefinitionV2(t *testing.T) {
 	t.Parallel()
 	resolver := Resolver{Reader: resolverReaderStub{model: &modelcatalogport.PublishedModel{Code: "S"}}, Authorizer: resolverAuthorizerStub{}}
-	_, err := resolver.ResolveByRef(context.Background(), ActorContext{Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService}}, modelcatalogport.Ref{Kind: domain.KindScale, Code: "S", Version: "v1"})
+	_, err := resolver.ResolveByRef(context.Background(), modelcatalog.ActorContext{Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService}}, modelcatalogport.Ref{Kind: domain.KindScale, Code: "S", Version: "v1"})
 	if err == nil {
 		t.Fatal("ResolveByRef() error = nil, want missing definition_v2")
 	}

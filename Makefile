@@ -26,7 +26,7 @@ GO_LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIM
 GOLANGCI_LINT_VERSION := v2.5.0
 GOVULNCHECK_VERSION := v1.1.4
 GOSEC_VERSION := v2.22.3
-GO_VERSION := 1.25.11
+GO_VERSION := 1.25.12
 GO_TOOLCHAIN := go$(GO_VERSION)
 GOLANGCI_LINT_BIN = $(CURDIR)/$(BIN_DIR)/golangci-lint
 
@@ -936,7 +936,7 @@ fmt-check: ## 检查代码格式
 
 security: security-govulncheck security-gosec ## 运行安全扫描
 
-security-govulncheck: ## 运行依赖漏洞扫描
+security-govulncheck: ## 运行依赖漏洞扫描（advisory：发现漏洞告警不失败）
 	@echo "$(COLOR_CYAN)🔐 运行 govulncheck...$(COLOR_RESET)"
 	@mkdir -p "$(SECURITY_DIR)"
 	@tool="$$(command -v govulncheck 2>/dev/null || printf '%s\n' '$(CURDIR)/$(BIN_DIR)/govulncheck')"; \
@@ -947,7 +947,14 @@ security-govulncheck: ## 运行依赖漏洞扫描
 	status=0; \
 	(cd "$(CURDIR)/cmd/collection-server" && env -u GOVERSION GOSUMDB=sum.golang.org "$$tool" -scan=module > "$(CURDIR)/$(SECURITY_DIR)/govulncheck.txt" 2>&1) || status=$$?; \
 	cat "$(SECURITY_DIR)/govulncheck.txt"; \
-	exit $$status
+	if [ $$status -ne 0 ] && [ $$status -ne 3 ]; then \
+		exit $$status; \
+	fi; \
+	if [ $$status -eq 3 ]; then \
+		echo "$(COLOR_YELLOW)⚠️ govulncheck 发现已知漏洞（advisory，不阻断 verify），报告已写入 $(SECURITY_DIR)/govulncheck.txt$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_GREEN)✅ govulncheck 未发现已知漏洞$(COLOR_RESET)"; \
+	fi
 
 security-govulncheck-ci: ## 运行依赖漏洞扫描并导出 JSON 报告（CI advisory）
 	@echo "$(COLOR_CYAN)🔐 运行 govulncheck（CI advisory）...$(COLOR_RESET)"

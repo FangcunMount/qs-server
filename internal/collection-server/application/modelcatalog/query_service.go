@@ -241,7 +241,7 @@ func modelResponse(value *CatalogModel) *ModelResponse {
 func options(values []CatalogOption) []OptionResponse {
 	result := make([]OptionResponse, 0, len(values))
 	for _, value := range values {
-		result = append(result, OptionResponse{Label: value.Label, Value: value.Value, Disabled: value.Disabled})
+		result = append(result, OptionResponse(value))
 	}
 	return result
 }

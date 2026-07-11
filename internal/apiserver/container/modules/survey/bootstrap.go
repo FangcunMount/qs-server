@@ -38,22 +38,5 @@ type BootstrapInput struct {
 
 // Bootstrap assembles the survey module from container integration inputs.
 func Bootstrap(in BootstrapInput) (*Module, error) {
-	return New(Deps{
-		MongoDB:                           in.MongoDB,
-		EventPublisher:                    in.EventPublisher,
-		RankRedisClient:                   in.RankRedisClient,
-		RankCacheBuilder:                  in.RankCacheBuilder,
-		IdentityService:                   in.IdentityService,
-		HotsetRecorder:                    in.HotsetRecorder,
-		TopicResolver:                     in.TopicResolver,
-		QuestionnaireRepo:                 in.QuestionnaireRepo,
-		QuestionnaireReader:               in.QuestionnaireReader,
-		AnswerSheetRepo:                   in.AnswerSheetRepo,
-		AnswerSheetReader:                 in.AnswerSheetReader,
-		OutboxRelayBatchSize:              in.OutboxRelayBatchSize,
-		OutboxRelayPublishWorkers:         in.OutboxRelayPublishWorkers,
-		OutboxRelayImmediateMaxConcurrent: in.OutboxRelayImmediateMaxConcurrent,
-		CacheSignalNotifier:               in.CacheSignalNotifier,
-		OpsHandle:                         in.OpsHandle,
-	})
+	return New(Deps(in))
 }

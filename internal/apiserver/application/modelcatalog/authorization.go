@@ -46,7 +46,7 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	if actor.Principal.Kind == securityplane.PrincipalKindUnknown {
 		return errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
 	}
-	if action != ActionResolvePublished && !actor.Scope.HasOrgID && !isTrustedServiceActor(actor) {
+	if action != ActionResolvePublished && !actor.Scope.HasOrgID && !IsTrustedServiceActor(actor) {
 		return errors.WithCode(code.ErrPermissionDenied, "resolved organization scope is required")
 	}
 	if action == ActionResolvePublished && actor.Principal.Kind != securityplane.PrincipalKindService {
@@ -62,8 +62,9 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	return nil
 }
 
-// isTrustedServiceActor 是否为受信任的服务演员
-func isTrustedServiceActor(actor ActorContext) bool {
+// IsTrustedServiceActor reports whether an actor originates from a trusted
+// internal service channel.
+func IsTrustedServiceActor(actor ActorContext) bool {
 	if actor.Principal.Kind != securityplane.PrincipalKindService {
 		return false
 	}

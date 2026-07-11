@@ -9,9 +9,5 @@ type BootstrapInput struct {
 
 // Bootstrap 模型目录的启动函数
 func Bootstrap(in BootstrapInput) (*Module, error) {
-	return New(Deps{
-		HotRank:   in.HotRank,
-		Lifecycle: in.Lifecycle,
-		Catalog:   in.Catalog,
-	})
+	return New(Deps(in))
 }

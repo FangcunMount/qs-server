@@ -239,10 +239,6 @@ func (e inputFailure) FailureReason() string {
 	return e.reason
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
