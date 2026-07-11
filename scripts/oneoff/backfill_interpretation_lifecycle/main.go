@@ -76,6 +76,10 @@ func archiveV0(ctx context.Context, db *mongo.Database, cfg config) error {
 	_, err = legacy.Aggregate(ctx, mongo.Pipeline{
 		{{Key: "$match", Value: filter}},
 		{{Key: "$set", Value: bson.M{"archive_source": "legacy_v0", "archived_at": time.Now().UTC()}}},
+		// archived_reports has its own Mongo _id. Excluding the legacy _id lets
+		// $merge replace matching domain_id rows without altering that immutable
+		// target identity on a rerun.
+		{{Key: "$project", Value: bson.M{"_id": 0}}},
 		{{Key: "$merge", Value: bson.M{"into": "archived_reports", "on": "domain_id", "whenMatched": "replace", "whenNotMatched": "insert"}}},
 	})
 	if err == nil {

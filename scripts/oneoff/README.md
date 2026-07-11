@@ -32,6 +32,7 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 
 | 脚本 | 用途 | 主要写入对象 |
 | ---- | ---- | ------------ |
+| `audit_evaluation_cleanup.sql` | Batch E 清理前只读审计 Outcome/Run/Assessment 一致性、schema 版本与 legacy payload 存量 | 无写入 |
 | `dedupe_interpret_reports_domain/` | 清理 `interpret_reports` 未删除重复 `domain_id`，解除 `uk_report_domain_deleted` 建索引阻塞 | Mongo `interpret_reports`（软删除重复行） |
 | `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
 | `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/reports/outbox |
