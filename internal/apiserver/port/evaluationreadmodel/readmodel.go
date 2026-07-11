@@ -134,10 +134,18 @@ type FactorTrendFilter struct {
 	Limit      int
 }
 
-type ScoreReader interface {
+// ScoreProjectionReader reads the mutable assessment_score query projection.
+// It is suitable for analytical views such as trends, never as the canonical
+// source for one Evaluation outcome.
+type ScoreProjectionReader interface {
 	GetScoreByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreRow, error)
 	ListFactorTrend(ctx context.Context, filter FactorTrendFilter) ([]ScoreRow, error)
 }
+
+// ScoreReader is retained for compatibility. New code should depend on
+// ScoreProjectionReader to make the projection boundary explicit.
+// Deprecated: use ScoreProjectionReader.
+type ScoreReader = ScoreProjectionReader
 
 type ReportFilter struct {
 	TesteeID     *uint64

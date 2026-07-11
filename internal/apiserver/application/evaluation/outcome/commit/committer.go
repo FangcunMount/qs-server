@@ -126,7 +126,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 			return err
 		}
 		if c.scoreProjector != nil {
-			if err := c.scoreProjector.Project(txCtx, request.Outcome); err != nil {
+			if err := c.scoreProjector.Project(txCtx, record, request.Outcome); err != nil {
 				return err
 			}
 		}

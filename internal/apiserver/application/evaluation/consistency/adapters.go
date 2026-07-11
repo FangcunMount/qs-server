@@ -2,24 +2,28 @@ package consistency
 
 import (
 	"context"
+	stderrors "errors"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"gorm.io/gorm"
 )
 
-// CompositeScoringArtifactChecker checks durable score projections.
-type CompositeScoringArtifactChecker struct {
-	ScoreReader evaluationreadmodel.ScoreReader
+// OutcomeExistenceChecker checks the canonical immutable evaluation fact.
+type OutcomeExistenceChecker struct {
+	Repository domainoutcome.Repository
 }
 
-func (c CompositeScoringArtifactChecker) HasScoringArtifact(ctx context.Context, assessmentID uint64) (bool, error) {
-	if c.ScoreReader != nil {
-		row, err := c.ScoreReader.GetScoreByAssessmentID(ctx, assessmentID)
-		if err != nil {
-			return false, err
-		}
-		if row != nil {
-			return true, nil
-		}
+func (c OutcomeExistenceChecker) HasOutcome(ctx context.Context, assessmentID uint64) (bool, error) {
+	if c.Repository == nil {
+		return false, nil
 	}
-	return false, nil
+	record, err := c.Repository.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
+	if stderrors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return record != nil, nil
 }

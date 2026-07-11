@@ -14,7 +14,7 @@ import (
 type MismatchKind string
 
 const (
-	MismatchScoringArtifactWithoutEvaluatedStatus MismatchKind = "scoring_artifact_without_evaluated_status"
+	MismatchOutcomeWithoutEvaluatedStatus MismatchKind = "outcome_without_evaluated_status"
 )
 
 // Mismatch 描述一次检测到的跨存储终态漂移。
@@ -29,15 +29,16 @@ type AssessmentStatusReader interface {
 	FindByID(ctx context.Context, id assessment.ID) (*assessment.Assessment, error)
 }
 
-// ScoringArtifactChecker 判断计分产物是否已落库（快照或分数）。
-type ScoringArtifactChecker interface {
-	HasScoringArtifact(ctx context.Context, assessmentID uint64) (bool, error)
+// OutcomeChecker determines whether the canonical scoring fact exists.
+// Assessment score rows are projections and must not be used for this decision.
+type OutcomeChecker interface {
+	HasOutcome(ctx context.Context, assessmentID uint64) (bool, error)
 }
 
 // Reconciler 扫描并修复 scoring/reporting 跨库部分成功窗口。
 type Reconciler struct {
 	assessments     AssessmentStatusReader
-	artifacts       ScoringArtifactChecker
+	outcomes        OutcomeChecker
 	outcomeRepo     domainoutcome.Repository
 	assessmentSaver assessment.Repository
 }
@@ -45,13 +46,13 @@ type Reconciler struct {
 // NewReconciler 创建跨存储对账器。
 func NewReconciler(
 	assessments AssessmentStatusReader,
-	artifacts ScoringArtifactChecker,
+	outcomes OutcomeChecker,
 	outcomeRepo domainoutcome.Repository,
 	assessmentSaver assessment.Repository,
 ) *Reconciler {
 	return &Reconciler{
 		assessments:     assessments,
-		artifacts:       artifacts,
+		outcomes:        outcomes,
 		outcomeRepo:     outcomeRepo,
 		assessmentSaver: assessmentSaver,
 	}
@@ -86,15 +87,15 @@ func (r *Reconciler) scanOne(ctx context.Context, assessmentID uint64, detectedA
 		return nil, nil
 	}
 	var mismatches []Mismatch
-	if r.artifacts != nil && a.Status().IsSubmitted() {
-		hasArtifact, err := r.artifacts.HasScoringArtifact(ctx, assessmentID)
+	if r.outcomes != nil && a.Status().IsSubmitted() {
+		hasOutcome, err := r.outcomes.HasOutcome(ctx, assessmentID)
 		if err != nil {
 			return nil, err
 		}
-		if hasArtifact {
+		if hasOutcome {
 			mismatches = append(mismatches, Mismatch{
 				AssessmentID: assessmentID,
-				Kind:         MismatchScoringArtifactWithoutEvaluatedStatus,
+				Kind:         MismatchOutcomeWithoutEvaluatedStatus,
 				DetectedAt:   detectedAt,
 			})
 		}
@@ -120,13 +121,13 @@ func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessment
 	if !a.Status().IsSubmitted() {
 		return fmt.Errorf("assessment %d status %s cannot finalize evaluated", assessmentID, a.Status())
 	}
-	if r.artifacts != nil {
-		hasArtifact, err := r.artifacts.HasScoringArtifact(ctx, assessmentID)
+	if r.outcomes != nil {
+		hasOutcome, err := r.outcomes.HasOutcome(ctx, assessmentID)
 		if err != nil {
 			return err
 		}
-		if !hasArtifact {
-			return fmt.Errorf("assessment %d has no scoring artifact to finalize", assessmentID)
+		if !hasOutcome {
+			return fmt.Errorf("assessment %d has no evaluation outcome to finalize", assessmentID)
 		}
 	}
 	record, err := r.outcomeRepo.FindByAssessmentID(ctx, assessment.NewID(assessmentID))

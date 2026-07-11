@@ -41,7 +41,7 @@ func (r *memoryAssessmentRepo) Delete(context.Context, assessment.ID) error {
 	return nil
 }
 
-type stubArtifactChecker struct {
+type stubOutcomeChecker struct {
 	exists bool
 }
 
@@ -57,7 +57,7 @@ func (r stubOutcomeRepo) FindByAssessmentID(context.Context, assessment.ID) (*do
 	return r.record, nil
 }
 
-func (s stubArtifactChecker) HasScoringArtifact(context.Context, uint64) (bool, error) {
+func (s stubOutcomeChecker) HasOutcome(context.Context, uint64) (bool, error) {
 	return s.exists, nil
 }
 
@@ -81,19 +81,19 @@ func submittedAssessmentForConsistency(t *testing.T, id uint64) *assessment.Asse
 	return a
 }
 
-func TestScanDetectsScoringArtifactWithoutEvaluatedStatus(t *testing.T) {
+func TestScanDetectsOutcomeWithoutEvaluatedStatus(t *testing.T) {
 	t.Parallel()
 
 	a := submittedAssessmentForConsistency(t, 7002)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, nil, repo)
+	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true}, nil, repo)
 
 	mismatches, err := reconciler.Scan(context.Background(), []uint64{a.ID().Uint64()})
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	if len(mismatches) != 1 || mismatches[0].Kind != consistency.MismatchScoringArtifactWithoutEvaluatedStatus {
-		t.Fatalf("mismatches = %#v, want scoring_artifact_without_evaluated_status", mismatches)
+	if len(mismatches) != 1 || mismatches[0].Kind != consistency.MismatchOutcomeWithoutEvaluatedStatus {
+		t.Fatalf("mismatches = %#v, want outcome_without_evaluated_status", mismatches)
 	}
 }
 
@@ -107,7 +107,7 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 		assessment.ResultSummary{PrimaryLabel: "ok"},
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
 	)
-	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, outcomeRecordForConsistency(t, a, execution), repo)
+	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true}, outcomeRecordForConsistency(t, a, execution), repo)
 
 	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("RepairEvaluatedFinalization first: %v", err)
@@ -125,7 +125,7 @@ func TestRepairEvaluatedFinalizationRequiresOutcome(t *testing.T) {
 
 	a := submittedAssessmentForConsistency(t, 7006)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, stubOutcomeRepo{}, repo)
+	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{}, stubOutcomeRepo{}, repo)
 
 	err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64())
 	if err == nil {

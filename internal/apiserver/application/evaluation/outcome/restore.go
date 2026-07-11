@@ -17,22 +17,11 @@ import (
 // EvaluationOutcome. The synthetic Assessment is read-only compatibility data
 // for existing report builders and must never be persisted by Interpretation.
 func Restore(record *domainoutcome.Record) (Outcome, error) {
-	if record == nil {
-		return Outcome{}, fmt.Errorf("evaluation outcome is required")
-	}
-	var execution domainoutcome.Execution
-	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
-		return Outcome{}, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
-	}
-	model := record.Model()
-	execution.ModelRef = domainoutcome.ModelRef{
-		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
-		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
-	}
-	if err := restoreTypedDetail(record, &execution); err != nil {
+	execution, err := RestoreExecution(record)
+	if err != nil {
 		return Outcome{}, err
 	}
-	modelRef := AssessmentOutcomeFromExecution(&execution).ModelRef
+	modelRef := AssessmentOutcomeFromExecution(execution).ModelRef
 	a := assessment.Reconstruct(
 		record.AssessmentID(),
 		record.OrgID(),
@@ -51,13 +40,35 @@ func Restore(record *domainoutcome.Record) (Outcome, error) {
 	return Outcome{
 		Assessment: a,
 		Input:      reportInput,
-		Execution:  &execution,
+		Execution:  execution,
 		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{
 			AlgorithmFamily: record.Runtime().AlgorithmFamily,
 			DecisionKind:    record.Runtime().DecisionKind,
 			PayloadFormat:   record.Runtime().PayloadFormat,
 		},
 	}, nil
+}
+
+// RestoreExecution reconstructs only the immutable Evaluation execution fact.
+// It intentionally does not load report input or synthesize an Assessment, so
+// score queries can read the fact without depending on report compatibility data.
+func RestoreExecution(record *domainoutcome.Record) (*domainoutcome.Execution, error) {
+	if record == nil {
+		return nil, fmt.Errorf("evaluation outcome is required")
+	}
+	var execution domainoutcome.Execution
+	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
+		return nil, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
+	}
+	model := record.Model()
+	execution.ModelRef = domainoutcome.ModelRef{
+		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
+		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
+	}
+	if err := restoreTypedDetail(record, &execution); err != nil {
+		return nil, err
+	}
+	return &execution, nil
 }
 
 func restoreReportInput(record *domainoutcome.Record) (*evaluationinput.InputSnapshot, error) {

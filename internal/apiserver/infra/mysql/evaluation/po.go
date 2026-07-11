@@ -90,7 +90,8 @@ type AssessmentScorePO struct {
 	mysql.AuditFields
 
 	// 关联 Assessment
-	AssessmentID uint64 `gorm:"column:assessment_id;not null"`
+	AssessmentID        uint64  `gorm:"column:assessment_id;not null"`
+	EvaluationOutcomeID *uint64 `gorm:"column:evaluation_outcome_id;index:idx_assessment_score_outcome"`
 
 	// 受试者（冗余，用于趋势分析查询）
 	TesteeID uint64 `gorm:"column:testee_id;not null"`

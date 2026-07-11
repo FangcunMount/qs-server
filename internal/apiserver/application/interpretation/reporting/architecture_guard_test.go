@@ -22,6 +22,9 @@ func TestReportingUsesMechanismBuilderNames(t *testing.T) {
 		"NewBehavioralRatingScoreProjector(",
 		"NewCognitiveReportBuilder(",
 		"NewCognitiveScoreProjector(",
+		"ScoreRepository",
+		"ScoreProjector",
+		"SaveProjectionFromOutcome",
 	}
 	err := filepath.WalkDir(reportingRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {

@@ -14,33 +14,6 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-type FactorScoringScoreProjector struct {
-	scoreRepo assessment.ScoreRepository
-}
-
-func NewFactorScoringScoreProjector(scoreRepo assessment.ScoreRepository) FactorScoringScoreProjector {
-	return FactorScoringScoreProjector{scoreRepo: scoreRepo}
-}
-
-func (p FactorScoringScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityScaleDefault
-}
-
-func (p FactorScoringScoreProjector) Key() evaluation.ExecutionIdentity {
-	return p.ExecutionIdentity()
-}
-
-func (p FactorScoringScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
-	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.Execution == nil {
-		return nil
-	}
-	score := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
-	if err := p.scoreRepo.SaveScoresWithContext(ctx, outcome.Assessment, score); err != nil {
-		return evalerrors.Database(err, "保存测评得分失败")
-	}
-	return nil
-}
-
 type FactorScoringReportBuilder struct {
 	composer domainReport.ReportBuilder
 }

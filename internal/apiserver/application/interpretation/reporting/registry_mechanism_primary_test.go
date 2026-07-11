@@ -179,28 +179,6 @@ func behavioralRatingInputSnapshotForMechanismKey(t *testing.T) *evaluationinput
 	}
 }
 
-func TestScoreProjectorResolveByMechanism(t *testing.T) {
-	t.Parallel()
-
-	registry, err := NewScoreProjectorRegistry(
-		NewFactorScoringScoreProjector(nil),
-		NewNormProfileScoreProjector(nil),
-		NewTaskPerformanceScoreProjector(nil),
-	)
-	if err != nil {
-		t.Fatalf("NewScoreProjectorRegistry: %v", err)
-	}
-	mechanismKey := MechanismReportBuilderKey{
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
-		DecisionKind:    modelcatalog.DecisionKindScoreRange,
-		ReportType:      domainReport.ReportTypeStandard,
-	}
-	projector := registry.ResolveByMechanism(mechanismKey)
-	if projector.Key() != evaluation.ExecutionIdentityScaleDefault {
-		t.Fatalf("projector key=%s", projector.Key())
-	}
-}
-
 func TestEventAssemblerResolveByMechanism(t *testing.T) {
 	t.Parallel()
 

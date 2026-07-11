@@ -324,6 +324,7 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 						"reportRepo",
 						"assessmentReader",
 						"scoreReader",
+						"scoreProjectionReader",
 						"reportReader",
 						"eventPublisher",
 						"assessmentOutboxStore",

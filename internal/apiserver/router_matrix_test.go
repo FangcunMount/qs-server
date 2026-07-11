@@ -321,7 +321,7 @@ func newRouterTestContainer() *container.Container {
 	evaluationModule := &evalmod.Module{
 		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
 		ReportQueryService: assessmentApp.NewReportQueryService(nil),
-		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil),
+		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
 	}
 	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.ManagementService, nil)
 	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(

@@ -1,6 +1,10 @@
 package assessment
 
-import "context"
+import (
+	"context"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // === Assessment 仓储 ===
 
@@ -29,9 +33,9 @@ type Repository interface {
 type ScoreRepository interface {
 	// === 批量保存 ===
 
-	// SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
-	// 需要传入 Assessment 对象来获取必要的辅助信息（testeeID, scaleID 等）
-	SaveScoresWithContext(ctx context.Context, assessmentDomain *Assessment, score *ScaleScoreProjection) error
+	// SaveProjectionFromOutcome persists a query projection derived from one
+	// immutable EvaluationOutcome. It is not an independent score fact.
+	SaveProjectionFromOutcome(ctx context.Context, outcomeID meta.ID, assessmentDomain *Assessment, score *ScaleScoreProjection) error
 
 	// === 基础查询 ===
 

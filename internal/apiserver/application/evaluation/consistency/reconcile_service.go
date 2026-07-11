@@ -70,7 +70,7 @@ func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, e
 
 		var repairErr error
 		switch mismatch.Kind {
-		case MismatchScoringArtifactWithoutEvaluatedStatus:
+		case MismatchOutcomeWithoutEvaluatedStatus:
 			repairErr = s.reconciler.RepairEvaluatedFinalization(ctx, mismatch.AssessmentID)
 		default:
 			continue

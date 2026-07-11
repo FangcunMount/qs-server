@@ -375,10 +375,16 @@ type scoreReadModel struct {
 	mysql.BaseRepository[*AssessmentScorePO]
 }
 
-func NewScoreReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) evaluationreadmodel.ScoreReader {
+func NewScoreProjectionReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) evaluationreadmodel.ScoreProjectionReader {
 	return &scoreReadModel{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentScorePO](db, opts...),
 	}
+}
+
+// NewScoreReadModel is retained for compatibility with legacy consumers.
+// Deprecated: use NewScoreProjectionReadModel.
+func NewScoreReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) evaluationreadmodel.ScoreProjectionReader {
+	return NewScoreProjectionReadModel(db, opts...)
 }
 
 func (r *scoreReadModel) GetScoreByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ScoreRow, error) {

@@ -143,7 +143,7 @@ type evaluationInfra struct {
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
 	latestRiskReader             evaluationreadmodel.LatestRiskReader
-	scoreReader                  evaluationreadmodel.ScoreReader
+	scoreProjectionReader        evaluationreadmodel.ScoreProjectionReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
 	txRunner                     apptransaction.Runner
 	waiterRegistry               *waiter.WaiterRegistry
@@ -168,7 +168,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.assessmentReader = assessmentReadModel
 	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
-	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.scoreProjectionReader = mysqlEval.NewScoreProjectionReadModel(normalized.MySQLDB, mysqlOptions)
 	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
 	infra.outcomeRepo = mysqlEval.NewOutcomeRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
@@ -304,7 +304,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		m.ReportQueryService = assessmentApp.NewReportQueryService(normalized.ReportReader)
 	}
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
-		infra.scoreReader,
+		infra.outcomeRepo,
+		infra.scoreProjectionReader,
 		infra.assessmentReader,
 		normalized.ScaleCatalog,
 	)
@@ -331,8 +332,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
 	reconciler := consistencyApp.NewReconciler(
 		infra.assessmentRepo,
-		consistencyApp.CompositeScoringArtifactChecker{
-			ScoreReader: infra.scoreReader,
+		consistencyApp.OutcomeExistenceChecker{
+			Repository: infra.outcomeRepo,
 		},
 		infra.outcomeRepo,
 		infra.assessmentRepo,

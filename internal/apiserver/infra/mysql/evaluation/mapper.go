@@ -179,7 +179,7 @@ func NewScoreMapper() *ScoreMapper {
 }
 
 // ToPOs 将领域对象转换为持久化对象列表（一个 AssessmentScore 对应多个 PO）
-func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID uint64) []*AssessmentScorePO {
+func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID uint64, outcomeID meta.ID) []*AssessmentScorePO {
 	if domain == nil {
 		return nil
 	}
@@ -196,6 +196,10 @@ func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID ui
 			IsTotalScore: fs.IsTotalScore(),
 			RawScore:     fs.RawScore(),
 			RiskLevel:    string(fs.RiskLevel()),
+		}
+		if !outcomeID.IsZero() {
+			id := outcomeID.Uint64()
+			po.EvaluationOutcomeID = &id
 		}
 		pos = append(pos, po)
 	}

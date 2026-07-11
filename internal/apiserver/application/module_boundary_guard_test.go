@@ -57,8 +57,6 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"internal/apiserver/application/interpretation/reporting/projection/events.go",
 				"internal/apiserver/application/interpretation/reporting/projection/mechanism_events.go",
 				"internal/apiserver/application/interpretation/reporting/projection/report_projection.go",
-				"internal/apiserver/application/interpretation/reporting/projection/score_projector.go",
-				"internal/apiserver/application/interpretation/reporting/projection/score_projector_registry.go",
 				"internal/apiserver/application/interpretation/reporting/registry/mechanism_key.go",
 				"internal/apiserver/application/interpretation/reporting/registry/registry.go",
 				"internal/apiserver/application/interpretation/reporting/registry/report_builder.go",

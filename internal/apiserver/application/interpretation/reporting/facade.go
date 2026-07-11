@@ -8,15 +8,11 @@ import (
 
 type (
 	ReportBuilder                     = interpretationregistry.ReportBuilder
-	ScoreProjector                    = interpretationprojection.ScoreProjector
-	ScoreProjectorRegistry            = interpretationprojection.ScoreProjectorRegistry
 	Generation                        = interpretationwriter.Generation
 	Generator                         = interpretationwriter.Generator
 	MechanismReportBuilderKey         = interpretationregistry.MechanismReportBuilderKey
 	MechanismKeyedReportBuilder       = interpretationregistry.MechanismKeyedReportBuilder
 	MultiMechanismKeyedReportBuilder  = interpretationregistry.MultiMechanismKeyedReportBuilder
-	MechanismKeyedScoreProjector      = interpretationprojection.MechanismKeyedScoreProjector
-	MultiMechanismKeyedScoreProjector = interpretationprojection.MultiMechanismKeyedScoreProjector
 	ReportBuilderRegistry             = interpretationregistry.ReportBuilderRegistry
 	ReportRoutingContext              = interpretationregistry.ReportRoutingContext
 	ReportDurableSaver                = interpretationwriter.ReportDurableSaver
@@ -43,9 +39,7 @@ var (
 	NewGenerator                                      = interpretationwriter.NewGenerator
 	ExecutionPathForMechanismFamily                   = interpretationwriter.ExecutionPathForMechanismFamily
 	ExecutionPathForReportBuilder                     = interpretationwriter.ExecutionPathForReportBuilder
-	ExecutionPathForScoreProjector                    = interpretationwriter.ExecutionPathForScoreProjector
 	ResolveOutcomeKey                                 = interpretationwriter.ResolveOutcomeKey
-	NewScoreProjectorRegistry                         = interpretationprojection.NewScoreProjectorRegistry
 	NewEventAssemblerRegistry                         = interpretationprojection.NewEventAssemblerRegistry
 	NewMechanismCanonicalEventAssembler               = interpretationprojection.NewMechanismCanonicalEventAssembler
 	DefaultMechanismEventAssemblers                   = interpretationprojection.DefaultMechanismEventAssemblers

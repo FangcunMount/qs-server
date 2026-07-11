@@ -6,7 +6,6 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -37,26 +36,6 @@ func (b NormProfileReportBuilder) Build(ctx context.Context, outcome evaloutcome
 	return b.scoring.Build(ctx, outcome)
 }
 
-type NormProfileScoreProjector struct {
-	scoring FactorScoringScoreProjector
-}
-
-func NewNormProfileScoreProjector(scoreRepo assessment.ScoreRepository) NormProfileScoreProjector {
-	return NormProfileScoreProjector{scoring: NewFactorScoringScoreProjector(scoreRepo)}
-}
-
-func (NormProfileScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityBehavioralRatingDefault
-}
-
-func (NormProfileScoreProjector) Key() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityBehavioralRatingDefault
-}
-
-func (p NormProfileScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
-	return p.scoring.Project(ctx, outcome)
-}
-
 type TaskPerformanceReportBuilder struct {
 	scoring FactorScoringReportBuilder
 }
@@ -82,24 +61,4 @@ func (b TaskPerformanceReportBuilder) Build(ctx context.Context, outcome evalout
 		return nil, evalerrors.ModuleNotConfigured("task_performance report builder is not configured")
 	}
 	return b.scoring.Build(ctx, outcome)
-}
-
-type TaskPerformanceScoreProjector struct {
-	scoring FactorScoringScoreProjector
-}
-
-func NewTaskPerformanceScoreProjector(scoreRepo assessment.ScoreRepository) TaskPerformanceScoreProjector {
-	return TaskPerformanceScoreProjector{scoring: NewFactorScoringScoreProjector(scoreRepo)}
-}
-
-func (TaskPerformanceScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityCognitiveDefault
-}
-
-func (TaskPerformanceScoreProjector) Key() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityCognitiveDefault
-}
-
-func (p TaskPerformanceScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
-	return p.scoring.Project(ctx, outcome)
 }

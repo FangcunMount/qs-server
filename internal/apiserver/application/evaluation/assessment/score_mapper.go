@@ -30,21 +30,52 @@ func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *scalesnap
 	}
 }
 
+func scoreResultFromScaleProjection(projection *assessment.ScaleScoreProjection, medicalScale *scalesnapshot.ScaleSnapshot) *ScoreResult {
+	if projection == nil {
+		return nil
+	}
+	factorMaxScoreMap := factorMaxScores(medicalScale)
+	factorScores := make([]FactorScoreResult, 0, len(projection.FactorScores()))
+	for _, score := range projection.FactorScores() {
+		factorCode := score.FactorCode().String()
+		factorScores = append(factorScores, FactorScoreResult{
+			FactorCode:   factorCode,
+			FactorName:   score.FactorName(),
+			RawScore:     score.RawScore(),
+			MaxScore:     factorMaxScoreMap[factorCode],
+			RiskLevel:    string(score.RiskLevel()),
+			IsTotalScore: score.IsTotalScore(),
+		})
+	}
+	return &ScoreResult{
+		AssessmentID: projection.AssessmentID().Uint64(),
+		TotalScore:   projection.TotalScore(),
+		RiskLevel:    string(projection.RiskLevel()),
+		FactorScores: factorScores,
+	}
+}
+
 func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *scalesnapshot.ScaleSnapshot) *HighRiskFactorsResult {
 	if row == nil {
 		return emptyHighRiskFactorsResult(assessmentID)
 	}
 
-	scoreResult := scoreRowToResult(row, medicalScale)
+	return highRiskFactorsResultFromScoreResult(scoreRowToResult(row, medicalScale))
+}
+
+func highRiskFactorsResultFromScoreResult(scoreResult *ScoreResult) *HighRiskFactorsResult {
+	if scoreResult == nil {
+		return emptyHighRiskFactorsResult(0)
+	}
 	highRiskFactors := make([]FactorScoreResult, 0)
 	for _, fs := range scoreResult.FactorScores {
 		if fs.RiskLevel == string(assessment.RiskLevelHigh) || fs.RiskLevel == string(assessment.RiskLevelSevere) {
 			highRiskFactors = append(highRiskFactors, fs)
 		}
 	}
-	needsUrgentCare := row.RiskLevel == string(assessment.RiskLevelSevere) || len(highRiskFactors) >= 3
+	needsUrgentCare := scoreResult.RiskLevel == string(assessment.RiskLevelSevere) || len(highRiskFactors) >= 3
 	return &HighRiskFactorsResult{
-		AssessmentID:    assessmentID,
+		AssessmentID:    scoreResult.AssessmentID,
 		HasHighRisk:     len(highRiskFactors) > 0,
 		HighRiskFactors: highRiskFactors,
 		NeedsUrgentCare: needsUrgentCare,

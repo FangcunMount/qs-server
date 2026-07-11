@@ -29,16 +29,20 @@ func NewScoreRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assess
 	return repo
 }
 
-// SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
-func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentDomain *assessment.Assessment, score *assessment.ScaleScoreProjection) error {
+// SaveProjectionFromOutcome persists an Assessment score query projection with
+// its immutable EvaluationOutcome provenance.
+func (r *scoreRepository) SaveProjectionFromOutcome(ctx context.Context, outcomeID meta.ID, assessmentDomain *assessment.Assessment, score *assessment.ScaleScoreProjection) error {
 	if score == nil || assessmentDomain == nil {
 		return nil
+	}
+	if outcomeID.IsZero() {
+		return errors.WithCode(code.ErrAssessmentScoreSaveFailed, "evaluation outcome id is required for score projection")
 	}
 
 	testeeID := assessmentDomain.TesteeID().Uint64()
 
 	// 转换为 PO 列表
-	pos := r.mapper.ToPOs(score, testeeID)
+	pos := r.mapper.ToPOs(score, testeeID, outcomeID)
 	if len(pos) == 0 {
 		return nil
 	}

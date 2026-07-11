@@ -85,7 +85,7 @@ type commitScoreProjectorStub struct {
 	order *[]string
 }
 
-func (p commitScoreProjectorStub) Project(ctx context.Context, _ evaloutcome.Outcome) error {
+func (p commitScoreProjectorStub) Project(ctx context.Context, _ *domainoutcome.Record, _ evaloutcome.Outcome) error {
 	requireCommitTx(ctx)
 	*p.order = append(*p.order, "score")
 	return nil

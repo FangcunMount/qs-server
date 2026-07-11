@@ -3,7 +3,6 @@ package writer
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/projection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -35,17 +34,4 @@ func ExecutionPathForReportBuilder(builder registry.ReportBuilder) (modelcatalog
 		}
 	}
 	return "", fmt.Errorf("unsupported report builder execution path")
-}
-
-// ExecutionPathForScoreProjector 解析执行路径 用于 score 投影器。
-func ExecutionPathForScoreProjector(projector projection.ScoreProjector) (modelcatalog.ExecutionPath, error) {
-	if projector == nil {
-		return "", fmt.Errorf("interpretation score projector is nil")
-	}
-	if keyed, ok := projector.(projection.MechanismKeyedScoreProjector); ok {
-		if path, ok := ExecutionPathForMechanismFamily(keyed.MechanismKey().AlgorithmFamily); ok {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("unsupported score projector execution path")
 }

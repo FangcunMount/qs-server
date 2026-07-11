@@ -2,17 +2,23 @@ package assessment
 
 import (
 	"context"
+	"fmt"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // scoreQueryService 得分查询服务实现
 // 行为者：报告查询者、数据分析系统
 type scoreQueryService struct {
-	scoreReader      evaluationreadmodel.ScoreReader
+	outcomes         domainoutcome.Repository
+	projectionReader evaluationreadmodel.ScoreProjectionReader
 	assessmentReader evaluationreadmodel.AssessmentReader
 	scaleCatalog     evaluationinput.ScaleCatalog
 }
@@ -22,12 +28,14 @@ var _ ScoreQueryService = &scoreQueryService{}
 
 // NewScoreQueryService 创建得分查询服务实例
 func NewScoreQueryService(
-	scoreReader evaluationreadmodel.ScoreReader,
+	outcomes domainoutcome.Repository,
+	projectionReader evaluationreadmodel.ScoreProjectionReader,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 	scaleCatalog evaluationinput.ScaleCatalog,
 ) ScoreQueryService {
 	return &scoreQueryService{
-		scoreReader:      scoreReader,
+		outcomes:         outcomes,
+		projectionReader: projectionReader,
 		assessmentReader: assessmentReader,
 		scaleCatalog:     scaleCatalog,
 	}
@@ -35,15 +43,11 @@ func NewScoreQueryService(
 
 // GetByAssessmentID 获取测评的所有因子得分
 func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreResult, error) {
-	if s.scoreReader == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
-	}
-	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
+	result, err := s.scoreFromOutcome(ctx, assessmentID)
 	if err != nil {
 		return nil, evalerrors.AssessmentScoreNotFound(err, "得分不存在")
 	}
-	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
-	return scoreRowToResult(scoreRow, medicalScale), nil
+	return result, nil
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -63,10 +67,10 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 		limit = 50
 	}
 
-	if s.scoreReader == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
+	if s.projectionReader == nil {
+		return nil, evalerrors.ModuleNotConfigured("assessment score projection read model is not configured")
 	}
-	rows, err := s.scoreReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
+	rows, err := s.projectionReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
 		TesteeID:   dto.TesteeID,
 		FactorCode: dto.FactorCode,
 		Limit:      limit,
@@ -101,12 +105,10 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 
 // GetHighRiskFactors 获取高风险因子
 func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID uint64) (*HighRiskFactorsResult, error) {
-	if s.scoreReader == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
-	}
-	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
+	result, err := s.scoreFromOutcome(ctx, assessmentID)
 	if err != nil {
-		if evalerrors.IsAssessmentScoreNotFound(err) {
+		wrapped := evalerrors.AssessmentScoreNotFound(err, "得分不存在")
+		if evalerrors.IsAssessmentScoreNotFound(wrapped) {
 			return &HighRiskFactorsResult{
 				AssessmentID:    assessmentID,
 				HasHighRisk:     false,
@@ -114,10 +116,31 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 				NeedsUrgentCare: false,
 			}, nil
 		}
-		return nil, evalerrors.AssessmentScoreNotFound(err, "得分不存在")
+		return nil, wrapped
 	}
-	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
-	return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
+	return highRiskFactorsResultFromScoreResult(result), nil
+}
+
+func (s *scoreQueryService) scoreFromOutcome(ctx context.Context, assessmentID uint64) (*ScoreResult, error) {
+	if s.outcomes == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation outcome repository is not configured")
+	}
+	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, fmt.Errorf("evaluation outcome not found")
+	}
+	execution, err := evaloutcome.RestoreExecution(record)
+	if err != nil {
+		return nil, err
+	}
+	projection := domainassessment.ScaleScoreProjectionFromOutcome(record.AssessmentID(), evaloutcome.AssessmentOutcomeFromExecution(execution))
+	if projection == nil {
+		return nil, fmt.Errorf("evaluation outcome does not project scale scores")
+	}
+	return scoreResultFromScaleProjection(projection, s.loadScaleForAssessmentRow(ctx, assessmentID)), nil
 }
 
 func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *scalesnapshot.ScaleSnapshot {
