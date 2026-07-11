@@ -76,6 +76,18 @@ application/evaluation/
 
 不再存在于主干 package 名称中。
 
+### 默认扩展规则（已锁定）
+
+本轮重构后的日常扩展目标是“在既有 AlgorithmFamily 下发布新模型”，而不是频繁新增算法家族：
+
+| 扩展类型 | 目标改动面 |
+|----------|------------|
+| 新模型实例，现有 family / payload 已可表达 | 只改 ModelCatalog 配置、发布数据和必要 fixture；不改 Evaluation 主流程 |
+| 新 algorithm 名称，但仍由现有机制和配置语言表达 | 扩展 catalog 校验或策略注册；不新增主流程 switch |
+| 现有机制无法表达新的计算语义 | 才新增 AlgorithmFamily、RuntimeDescriptor、Calculation 能力和对应 Interpretation adapter |
+
+因此当前不建设重量级垂直插件平台。先保证 RuntimeDescriptor/registry 边界稳定，让普通新模型退化为配置；只有真实出现新机制时再扩展插件式装配点。
+
 ## Round 1 已完成（机制骨架）
 
 | 交付 | 位置 |

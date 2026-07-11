@@ -24,6 +24,49 @@
 | run 聚合 | **不新增独立 run 聚合**；`domain/evaluation/run` 承载 attempt/failure/retry 执行阶段语义，`assessment` 保留生命周期与结果 |
 | 机制轴 | `AlgorithmFamily` + `DecisionKind` + `PayloadFormat` |
 
+## 模块生命周期边界决策（已锁定，待实现）
+
+> 2026-07-11 确认：Evaluation 负责形成可信的评估事实，Interpretation 负责把该事实转换为报告；报告生成的成败不能改写已经成立的评估事实。
+
+| 决策项 | 选择 |
+|--------|------|
+| `Assessment` 归属 | **Evaluation** |
+| Assessment 成功终态 | **`evaluated`**；不再由 Interpretation 推进到 `interpreted` |
+| Interpretation 聚合 | `InterpretReport` / Report，独立维护 `pending / generating / generated / failed` |
+| 跨模块完成态 | 由 Journey / ReadModel 根据 Assessment、EvaluationRun、Report 派生 `evaluating / interpreting / completed / failed` |
+| Interpretation 失败 | Assessment 保持 `evaluated`，报告独立失败并重试，不清除评分事实 |
+| 报告重试 | 读取持久化的 EvaluationOutcome，不重新执行 Calculation |
+| 兼容状态 | API 可暂时把 `Assessment=evaluated && Report=generated` 投影为 legacy `interpreted` |
+
+当前代码仍处于迁移前状态：`application/interpretation/reporting.Writer` 会调用 `Assessment.ApplyOutcome` 并保存 Assessment；`evaluation/execute.GenerateReport` 失败时也会把 Assessment 标记为 failed。后续实现必须先以表征测试保护现有契约，再按上述边界拆分。
+
+## 提交边界决策（已锁定，待实现）
+
+面向小程序的“发起测评”REST 用例同步推进到 Assessment 已持久化：成功响应同时提供 `answersheet_id` 与真实可查询的 `assessment_id`。Evaluation 计分和 Interpretation 报告仍异步执行。
+
+- 该编排属于 Survey 与 Evaluation 之上的组合应用用例，不放入 `domain/survey`。
+- `answersheet.submitted` 消费者保留为幂等补偿路径；同步路径已创建 Assessment 时返回已有实例。
+- AnswerSheet 与 Assessment 跨 Mongo/MySQL，不能伪装成单库原子事务；部分成功通过幂等、outbox 与补偿恢复。
+- 不返回尚未对应持久化 Assessment 的预分配 ID。
+
+## 评估事实与运行边界决策（已锁定，待实现）
+
+| 决策项 | 选择 |
+|--------|------|
+| `assessment_score` 归属 | **Evaluation 评估事实**；表达一次 Assessment 下的因子/维度分数，不是 Report 投影 |
+| 评估事实内容 | 原始分、标准分、T 分、百分位、分类/等级代码、风险等级等由模型规则确定的结果 |
+| Interpretation 内容 | `conclusion`、`suggestion`、章节、图表、受众化表达和模板版本 |
+| 当前表兼容债 | `assessment_score.conclusion / suggestion` 当前混入报告内容；迁移期可保留列，但不再作为权威评估事实扩展 |
+| `EvaluationRun.succeeded` | 机制执行成功，canonical EvaluationOutcome 已持久化，Assessment 已进入 `evaluated`，`assessment.evaluated` 已获得可靠出站条件 |
+| Report 与 Run | Report 生成不属于 EvaluationRun；Report failed 时 Run 仍保持 succeeded，报告重试不创建新 Run |
+| 生产同步模式 | 目标态取消“Evaluate 内联生成 Report”的生产模式；Preview / 测试可在进程内组合，但不复用生产 Assessment 状态机 |
+| 默认扩展方式 | 在既有 AlgorithmFamily 下通过 ModelCatalog 配置发布新模型，不修改 Evaluation 主流程 |
+| 新 AlgorithmFamily | 仅当现有配置语言和计算机制无法表达新语义时新增 RuntimeDescriptor / Calculation / Evaluation / Interpretation 能力 |
+
+“评分成功”不是正式 Run 定义，因为 typology、norming、task performance 不一定产出传统分数。统一术语使用“EvaluationOutcome 已可靠提交”。
+
+当前代码仍有两处目标差距：`asyncInterpretation=false` 会在 `Evaluate` 调用栈内继续生成报告；`outcome/scoring.Writer` 通过 Interpretation 的 ScoreProjectorRegistry 写入 score 投影。后续应拆开生产编排和 registry 所有权。
+
 ## 三模块差异承载
 
 | 模块 | 可按测评策略拆包？ | 承载什么差异 |
@@ -41,7 +84,9 @@ PublishedModelSnapshot
   → AlgorithmFamily / PayloadFormat / DecisionKind
   → RuntimeDescriptorRegistry
   → EvaluationPipeline
-  → AssessmentOutcome
+  → AssessmentOutcome / EvaluationOutcome（可靠持久化）
+  → Assessment evaluated + EvaluationRun succeeded
+  → assessment.evaluated
   → Interpretation builder registry（机制键）
   → ReportTemplate + Rule
   → InterpretReport
