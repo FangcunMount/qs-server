@@ -255,10 +255,7 @@ func (a *Assessment) ApplyScoringProjectionAt(projection ScoringProjection, eval
 	if evaluatedAt.IsZero() {
 		return ErrInvalidArgument
 	}
-	modelRef := projection.ModelRef
-	if modelRef.IsEmpty() {
-		modelRef = *a.modelRef
-	} else if !a.modelRef.SameIdentity(modelRef) {
+	if !projection.ModelRef.IsEmpty() && !a.modelRef.SameIdentity(projection.ModelRef) {
 		return ErrEvaluationModelMismatch
 	}
 	if projection.Score != nil {
