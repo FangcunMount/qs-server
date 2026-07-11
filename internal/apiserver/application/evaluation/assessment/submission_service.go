@@ -23,12 +23,6 @@ type assessmentListCache interface {
 	Invalidate(ctx context.Context, userID uint64) error
 }
 
-// submissionService 是拆分前 AssessmentSubmissionService 的兼容门面。
-type submissionService struct {
-	intake      AnswerSheetAssessmentIntakeService
-	testeeQuery TesteeAssessmentQueryService
-}
-
 // assessmentIntakeService 服务于答卷提交后的 Assessment 编排。
 type assessmentIntakeService struct {
 	repo        assessment.Repository
@@ -44,18 +38,6 @@ type testeeAssessmentQueryService struct {
 	repo      assessment.Repository
 	reader    evaluationreadmodel.AssessmentReader
 	listCache assessmentListCache
-}
-
-type submissionServiceOptions struct {
-	immediate *appEventing.ImmediateDispatcher
-}
-
-type SubmissionServiceOption func(*submissionServiceOptions)
-
-func WithImmediateDispatcher(dispatcher *appEventing.ImmediateDispatcher) SubmissionServiceOption {
-	return func(opts *submissionServiceOptions) {
-		opts.immediate = dispatcher
-	}
 }
 
 type IntakeServiceOption func(*assessmentIntakeService)
@@ -101,43 +83,6 @@ func NewTesteeAssessmentQueryService(
 		reader:    reader,
 		listCache: listCache,
 	}
-}
-
-// NewAssessmentSubmissionCompatibilityService preserves the former combined port
-// for callers that have not yet migrated to actor-specific services.
-func NewAssessmentSubmissionCompatibilityService(
-	intake AnswerSheetAssessmentIntakeService,
-	testeeQuery TesteeAssessmentQueryService,
-) AssessmentSubmissionService {
-	return &submissionService{intake: intake, testeeQuery: testeeQuery}
-}
-
-// NewSubmissionService 创建测评提交服务实例
-func NewSubmissionService(
-	repo assessment.Repository,
-	reader evaluationreadmodel.AssessmentReader,
-	creator assessment.AssessmentCreator,
-	txRunner apptransaction.Runner,
-	eventStager EventStager,
-	listCache assessmentListCache,
-	opts ...SubmissionServiceOption,
-) AssessmentSubmissionService {
-	options := submissionServiceOptions{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&options)
-		}
-	}
-	intake := NewAnswerSheetAssessmentIntakeService(
-		repo,
-		creator,
-		txRunner,
-		eventStager,
-		listCache,
-		WithIntakeImmediateDispatcher(options.immediate),
-	)
-	testeeQuery := NewTesteeAssessmentQueryService(repo, reader, listCache)
-	return NewAssessmentSubmissionCompatibilityService(intake, testeeQuery)
 }
 
 // CreateForAnswerSheet creates the Assessment for a submitted answer sheet.
@@ -350,28 +295,6 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 	}
 
 	return result, nil
-}
-
-// Create is the compatibility entry point for CreateForAnswerSheet.
-func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error) {
-	return s.intake.CreateForAnswerSheet(ctx, dto)
-}
-
-// Submit is the compatibility entry point for SubmitForEvaluation.
-func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
-	return s.intake.SubmitForEvaluation(ctx, assessmentID)
-}
-
-func (s *submissionService) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error) {
-	return s.testeeQuery.GetMine(ctx, testeeID, assessmentID)
-}
-
-func (s *submissionService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error) {
-	return s.intake.FindByAnswerSheetID(ctx, answerSheetID)
-}
-
-func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error) {
-	return s.testeeQuery.ListMine(ctx, dto)
 }
 
 // normalizePagination 规范化分页参数

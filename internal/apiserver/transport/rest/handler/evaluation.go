@@ -20,25 +20,25 @@ import (
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
-	evaluationService       execute.Service
-	protectedQueryService   assessmentApp.AssessmentProtectedQueryService
-	reportWaitJourney       reportwaitjourney.Service
+	operatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
+	operatorExecutionService execute.OperatorExecutionService
+	protectedQueryService    assessmentApp.AssessmentProtectedQueryService
+	reportWaitJourney        reportwaitjourney.Service
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
 	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
-	evaluationService execute.Service,
+	operatorExecutionService execute.OperatorExecutionService,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
 	reportWaitJourney reportwaitjourney.Service,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
-		BaseHandler:             &BaseHandler{},
-		operatorRecoveryService: operatorRecoveryService,
-		evaluationService:       evaluationService,
-		protectedQueryService:   protectedQueryService,
-		reportWaitJourney:       reportWaitJourney,
+		BaseHandler:              &BaseHandler{},
+		operatorRecoveryService:  operatorRecoveryService,
+		operatorExecutionService: operatorExecutionService,
+		protectedQueryService:    protectedQueryService,
+		reportWaitJourney:        reportWaitJourney,
 	}
 }
 
@@ -355,11 +355,11 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	if h.evaluationService == nil {
+	if h.operatorExecutionService == nil {
 		h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "评估引擎服务未初始化"))
 		return
 	}
-	result, err := h.evaluationService.EvaluateBatch(ctx, orgID, req.AssessmentIDs)
+	result, err := h.operatorExecutionService.EvaluateBatch(ctx, orgID, req.AssessmentIDs)
 	if err != nil {
 		h.Error(c, err)
 		return

@@ -39,37 +39,6 @@ type TesteeAssessmentQueryService interface {
 	ListMine(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error)
 }
 
-// ==================== 兼容服务 ====================
-
-// AssessmentSubmissionService 是拆分前的兼容门面。
-//
-// 新代码应依行为者使用 AnswerSheetAssessmentIntakeService 或
-// TesteeAssessmentQueryService。保留该接口仅为尚未迁移的调用方和测试提供
-// 无行为变化的过渡路径。
-type AssessmentSubmissionService interface {
-	// Create 创建测评
-	// 场景：答题者开始填写问卷时，创建测评记录
-	// 说明：创建后状态为 pending，等待提交
-	Create(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error)
-
-	// Submit 提交测评
-	// 场景：答题者完成答卷后，提交测评
-	// 说明：提交后状态变为 submitted，触发 AssessmentSubmittedEvent
-	Submit(ctx context.Context, assessmentID uint64) (*AssessmentResult, error)
-
-	// GetMyAssessment 获取我的测评详情
-	// 场景：答题者查看自己的测评结果
-	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error)
-
-	// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
-	// 场景：通过答卷ID直接查看测评结果
-	GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error)
-
-	// ListMyAssessments 查询我的测评列表
-	// 场景：答题者查看自己的所有测评记录
-	ListMyAssessments(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error)
-}
-
 // ==================== 管理员服务 ====================
 
 // AssessmentOperatorQueryService 服务于后台操作者的 Assessment 查询。
@@ -80,27 +49,15 @@ type AssessmentOperatorQueryService interface {
 	List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error)
 }
 
-// AssessmentOperatorRecoveryService 服务于后台操作者的失败恢复动作。
-type AssessmentOperatorRecoveryService interface {
-	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
+// AssessmentResultReader is the narrow, trusted read port used by internal
+// execution adapters after an Evaluation has completed. It intentionally does
+// not expose operator mutation actions or the legacy combined facade.
+type AssessmentResultReader interface {
+	GetByID(ctx context.Context, id uint64) (*AssessmentResult, error)
 }
 
-// AssessmentManagementService 是拆分前后台管理端口的兼容门面。
-//
-// 新的后台查询应使用 AssessmentOperatorQueryService，失败恢复应使用
-// AssessmentOperatorRecoveryService。保留该接口以支撑尚未迁移的 worker 和
-// actor 组合调用，直到后续批次将它们迁走。
-type AssessmentManagementService interface {
-	// GetByID 根据ID获取测评详情
-	// 场景：管理员查看测评的完整信息
-	GetByID(ctx context.Context, id uint64) (*AssessmentResult, error)
-
-	// List 查询测评列表
-	// 场景：管理员查询测评列表，支持按状态、受试者、时间等条件筛选
-	List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error)
-
-	// Retry 重试失败的测评
-	// 场景：管理员对评估失败的测评进行重试
+// AssessmentOperatorRecoveryService 服务于后台操作者的失败恢复动作。
+type AssessmentOperatorRecoveryService interface {
 	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
 }
 

@@ -20,7 +20,7 @@ func TestScaleAnalysisQueryGroupsAndSortsEvaluatedAssessments(t *testing.T) {
 	scaleAName := "Scale A"
 	scaleBName := "Scale B"
 	scaleKind := "scale"
-	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
+	assessmentQuery := &scaleAnalysisAssessmentQueryStub{
 		items: []*assessmentApp.AssessmentResult{
 			{ID: 3, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleB, ModelTitle: &scaleBName, EvaluatedAt: &evaluatedLate, SubmittedAt: &submittedAt, TotalScore: &score, RiskLevel: &risk},
 			{ID: 9, Status: "submitted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, EvaluatedAt: &evaluatedEarly},
@@ -39,18 +39,18 @@ func TestScaleAnalysisQueryGroupsAndSortsEvaluatedAssessments(t *testing.T) {
 			4: {AssessmentID: 4},
 		},
 	}
-	service := NewScaleAnalysisQueryService(assessmentManagement, scoreQuery)
+	service := NewScaleAnalysisQueryService(assessmentQuery, scoreQuery)
 
 	result, err := service.GetScaleAnalysis(context.Background(), ScaleAnalysisQueryDTO{OrgID: 1, TesteeID: 20})
 	if err != nil {
 		t.Fatalf("GetScaleAnalysis returned error: %v", err)
 	}
 
-	if assessmentManagement.listCalls != 1 {
-		t.Fatalf("expected assessment list to be called once, got %d", assessmentManagement.listCalls)
+	if assessmentQuery.listCalls != 1 {
+		t.Fatalf("expected assessment list to be called once, got %d", assessmentQuery.listCalls)
 	}
-	if assessmentManagement.lastDTO.OrgID != 1 || assessmentManagement.lastDTO.TesteeID == nil || *assessmentManagement.lastDTO.TesteeID != 20 {
-		t.Fatalf("unexpected assessment list dto: %+v", assessmentManagement.lastDTO)
+	if assessmentQuery.lastDTO.OrgID != 1 || assessmentQuery.lastDTO.TesteeID == nil || *assessmentQuery.lastDTO.TesteeID != 20 {
+		t.Fatalf("unexpected assessment list dto: %+v", assessmentQuery.lastDTO)
 	}
 	if len(result.Scales) != 2 {
 		t.Fatalf("expected two scale groups, got %d", len(result.Scales))
@@ -74,7 +74,7 @@ func TestScaleAnalysisQuerySortsTestsByDateAndFallsBackOnScoreError(t *testing.T
 	newer := time.Date(2026, 4, 2, 10, 0, 0, 0, time.UTC)
 	scaleCode := "scale-a"
 	scaleKind := "scale"
-	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
+	assessmentQuery := &scaleAnalysisAssessmentQueryStub{
 		items: []*assessmentApp.AssessmentResult{
 			{ID: 2, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &newer},
 			{ID: 1, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &older},
@@ -86,7 +86,7 @@ func TestScaleAnalysisQuerySortsTestsByDateAndFallsBackOnScoreError(t *testing.T
 			2: stderrors.New("score query failed"),
 		},
 	}
-	service := NewScaleAnalysisQueryService(assessmentManagement, scoreQuery)
+	service := NewScaleAnalysisQueryService(assessmentQuery, scoreQuery)
 
 	result, err := service.GetScaleAnalysis(context.Background(), ScaleAnalysisQueryDTO{OrgID: 1, TesteeID: 20})
 	if err != nil {
@@ -106,24 +106,20 @@ func TestScaleAnalysisQuerySortsTestsByDateAndFallsBackOnScoreError(t *testing.T
 	}
 }
 
-type scaleAnalysisAssessmentManagementStub struct {
+type scaleAnalysisAssessmentQueryStub struct {
 	items     []*assessmentApp.AssessmentResult
 	listCalls int
 	lastDTO   assessmentApp.ListAssessmentsDTO
 }
 
-func (s *scaleAnalysisAssessmentManagementStub) GetByID(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
+func (s *scaleAnalysisAssessmentQueryStub) GetByID(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
 	return nil, nil
 }
 
-func (s *scaleAnalysisAssessmentManagementStub) List(_ context.Context, dto assessmentApp.ListAssessmentsDTO) (*assessmentApp.AssessmentListResult, error) {
+func (s *scaleAnalysisAssessmentQueryStub) List(_ context.Context, dto assessmentApp.ListAssessmentsDTO) (*assessmentApp.AssessmentListResult, error) {
 	s.listCalls++
 	s.lastDTO = dto
 	return &assessmentApp.AssessmentListResult{Items: s.items, Total: len(s.items), Page: dto.Page, PageSize: dto.PageSize}, nil
-}
-
-func (s *scaleAnalysisAssessmentManagementStub) Retry(context.Context, int64, uint64) (*assessmentApp.AssessmentResult, error) {
-	return nil, nil
 }
 
 type scaleAnalysisScoreQueryStub struct {

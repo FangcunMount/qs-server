@@ -200,7 +200,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	err := s.executeService.Evaluate(ctx, req.AssessmentId)
+	err := s.workerExecutionService.Evaluate(ctx, req.AssessmentId)
 	if err != nil {
 		l.Errorw("执行评估失败",
 			"action", "evaluate_assessment",
@@ -211,7 +211,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 		return evaluateFailureResponse(ctx, s.runQueryService, req.AssessmentId, err.Error()), nil
 	}
 
-	result, err := s.managementService.GetByID(ctx, req.AssessmentId)
+	result, err := s.assessmentResultReader.GetByID(ctx, req.AssessmentId)
 	if err != nil {
 		l.Warnw("获取评估结果失败",
 			"assessment_id", req.AssessmentId,

@@ -58,7 +58,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
 	familyEvaluators := newV1FamilyEvaluators(t)
 
-	opts := []evaluationexecute.ServiceOption{
+	opts := []evaluationexecute.EngineOption{
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
 		evaluationexecute.WithFamilyEvaluators(familyEvaluators),
@@ -72,13 +72,13 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		})),
 	}
 
-	core := evaluationexecute.NewService(
+	core := evaluationexecute.NewEngine(
 		repo,
 		&charInputResolver{snapshot: cfg.Input},
 		opts...,
 	)
 	return &charSplitPhaseService{
-		Service:      core,
+		Engine:       core,
 		capture:      committer,
 		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
@@ -121,14 +121,14 @@ func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request o
 }
 
 type charSplitPhaseService struct {
-	evaluationexecute.Service
+	evaluationexecute.Engine
 	capture        *charCapturingEvaluationCommitter
 	inlineLegacy   bool
 	generateReport func(context.Context, evaloutcome.Outcome) error
 }
 
 func (s *charSplitPhaseService) Evaluate(ctx context.Context, assessmentID uint64) error {
-	if err := s.Service.Evaluate(ctx, assessmentID); err != nil {
+	if err := s.Engine.Evaluate(ctx, assessmentID); err != nil {
 		return err
 	}
 	if s.inlineLegacy {
@@ -231,7 +231,7 @@ func newV1RecordingExecuteService(
 	t.Helper()
 	capture := &charSplitPhaseCapture{}
 	recording := &charCapturingEvaluationCommitter{}
-	core := evaluationexecute.NewService(
+	core := evaluationexecute.NewEngine(
 		&charAssessmentRepo{assessment: a},
 		input,
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
@@ -242,7 +242,7 @@ func newV1RecordingExecuteService(
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
 	return &charSplitPhaseService{
-		Service:      core,
+		Engine:       core,
 		capture:      recording,
 		inlineLegacy: true,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {

@@ -150,7 +150,7 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
 	runRepo := &stubRunRepo{}
-	svc := NewService(
+	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
@@ -186,7 +186,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
 	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
-	svc := NewService(
+	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),

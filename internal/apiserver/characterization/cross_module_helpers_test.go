@@ -40,8 +40,8 @@ type charScaleBinding struct {
 type charCrossModuleHarness struct {
 	repo               *charAssessmentRepo
 	assessment         *assessment.Assessment
-	submitSvc          assessmentapp.AssessmentSubmissionService
-	executeSvc         evaluationexecute.Service
+	intakeSvc          assessmentapp.AnswerSheetAssessmentIntakeService
+	executeSvc         evaluationexecute.Engine
 	reportSaver        *charSplitPhaseReportSaver
 	submitStaged       *[]event.DomainEvent
 	evaluateStaged     []event.DomainEvent
@@ -100,9 +100,8 @@ func buildCharCrossModuleHarnessCore(
 	h.executeSvc = executeSvc
 	h.reportSaver = reportSaver
 
-	h.submitSvc = assessmentapp.NewSubmissionService(
+	h.intakeSvc = assessmentapp.NewAnswerSheetAssessmentIntakeService(
 		repo,
-		nil,
 		assessment.NewSimpleAssessmentCreator(),
 		&charTxRunner{},
 		submitStager,
@@ -113,7 +112,7 @@ func buildCharCrossModuleHarnessCore(
 		execute:        executeSvc,
 		generateReport: executeSvc.GenerateReport,
 		repo:           repo,
-		submitSvc:      h.submitSvc,
+		intakeSvc:      h.intakeSvc,
 		scaleBinding:   h.scaleBinding,
 	}
 	deps := &workerhandlers.Dependencies{
@@ -135,7 +134,7 @@ func (h *charCrossModuleHarness) syncAssessmentFromRepo() {
 
 func (h *charCrossModuleHarness) submitAssessment(t *testing.T, ctx context.Context) {
 	t.Helper()
-	if _, err := h.submitSvc.Submit(ctx, h.assessment.ID().Uint64()); err != nil {
+	if _, err := h.intakeSvc.SubmitForEvaluation(ctx, h.assessment.ID().Uint64()); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
 	h.syncAssessmentFromRepo()
@@ -240,10 +239,10 @@ func buildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []byte
 }
 
 type charBridgeInternalClient struct {
-	execute        evaluationexecute.Service
+	execute        evaluationexecute.Engine
 	generateReport func(context.Context, uint64) error
 	repo           *charAssessmentRepo
-	submitSvc      assessmentapp.AssessmentSubmissionService
+	intakeSvc      assessmentapp.AnswerSheetAssessmentIntakeService
 	scaleBinding   charScaleBinding
 }
 
@@ -350,7 +349,7 @@ func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
 		dto.OriginType = req.OriginType
 	}
 
-	result, err := b.submitSvc.Create(ctx, dto)
+	result, err := b.intakeSvc.CreateForAnswerSheet(ctx, dto)
 	if err != nil {
 		return &pb.CreateAssessmentFromAnswerSheetResponse{
 			Success: false,
@@ -360,7 +359,7 @@ func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
 
 	autoSubmitted := false
 	if dto.ModelCode != nil {
-		if _, err := b.submitSvc.Submit(ctx, result.ID); err != nil {
+		if _, err := b.intakeSvc.SubmitForEvaluation(ctx, result.ID); err != nil {
 			return &pb.CreateAssessmentFromAnswerSheetResponse{
 				Success: false,
 				Message: err.Error(),

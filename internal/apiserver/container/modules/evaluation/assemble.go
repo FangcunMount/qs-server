@@ -59,15 +59,11 @@ type Module struct {
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
-	// SubmissionService is retained only for callers that have not migrated to
-	// actor-specific ports. New transport wiring uses IntakeService and
-	// TesteeQueryService directly.
-	SubmissionService       assessmentApp.AssessmentSubmissionService
 	IntakeService           assessmentApp.AnswerSheetAssessmentIntakeService
 	TesteeQueryService      assessmentApp.TesteeAssessmentQueryService
 	OperatorQueryService    assessmentApp.AssessmentOperatorQueryService
 	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
-	ManagementService       assessmentApp.AssessmentManagementService
+	WorkerResultReader      assessmentApp.AssessmentResultReader
 	ReportQueryService      assessmentApp.ReportQueryService
 	ScoreQueryService       assessmentApp.ScoreQueryService
 	WaitService             assessmentApp.AssessmentWaitService
@@ -78,7 +74,8 @@ type Module struct {
 	LatestRiskReader        evaluationreadmodel.LatestRiskReader
 	AssessmentReader        evaluationreadmodel.AssessmentReader
 
-	EvaluationService           execute.Service
+	WorkerExecutionService      execute.WorkerExecutionService
+	OperatorExecutionService    execute.OperatorExecutionService
 	ReportStatusReporter        *reportstatus.Reporter
 	ConsistencyReconcileService consistencyApp.Service
 
@@ -253,7 +250,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.assessmentOutboxStore,
 			infra.postCommitReadyIndexer,
 		)
-		m.EvaluationService = execute.NewService(
+		engine := execute.NewEngine(
 			infra.assessmentRepo,
 			normalized.InputResolver,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
@@ -265,6 +262,8 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithEvaluationCommitter(evaluationCommitter),
 		)
+		m.WorkerExecutionService = engine
+		m.OperatorExecutionService = engine
 	}
 	return nil
 }
@@ -307,11 +306,9 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 		m.TesteeQueryService = assessmentApp.NewTesteeAssessmentQueryService(infra.assessmentRepo, infra.assessmentReader, nil)
 	}
-	m.SubmissionService = assessmentApp.NewAssessmentSubmissionCompatibilityService(m.IntakeService, m.TesteeQueryService)
-
 	m.OperatorQueryService = assessmentApp.NewAssessmentOperatorQueryService(infra.assessmentRepo, infra.assessmentReader)
 	m.OperatorRecoveryService = assessmentApp.NewAssessmentOperatorRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
-	m.ManagementService = assessmentApp.NewAssessmentManagementCompatibilityService(m.OperatorQueryService, m.OperatorRecoveryService)
+	m.WorkerResultReader = m.OperatorQueryService
 	m.ReportQueryService = normalized.ReportQueryService
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		infra.outcomeRepo,
@@ -320,7 +317,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		normalized.ScaleCatalog,
 	)
 
-	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, infra.waiterRegistry, m.ReportQueryService)
+	m.WaitService = assessmentApp.NewWaitService(m.WorkerResultReader, infra.waiterRegistry, m.ReportQueryService)
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
 		m.OperatorQueryService,
 		normalized.TesteeAccessChecker,

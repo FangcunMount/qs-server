@@ -14,7 +14,7 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 	}
 	deps.OperatorRecoveryService = m.OperatorRecoveryService
 	deps.ReportWaitJourney = m.ReportWaitJourney
-	deps.EvaluationService = m.EvaluationService
+	deps.OperatorExecutionService = m.OperatorExecutionService
 	deps.ProtectedQueryService = m.ProtectedQueryService
 	deps.RunQueryService = m.RunQueryService
 	return deps
@@ -22,10 +22,10 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 
 // ExportTesteeScaleAnalysisService composes actor-facing analysis from evaluation query ports.
 func (m *Module) ExportTesteeScaleAnalysisService() testeeApp.ScaleAnalysisQueryService {
-	if m == nil || m.ManagementService == nil || m.ScoreQueryService == nil {
+	if m == nil || m.OperatorQueryService == nil || m.ScoreQueryService == nil {
 		return nil
 	}
-	return testeeApp.NewScaleAnalysisQueryService(m.ManagementService, m.ScoreQueryService)
+	return testeeApp.NewScaleAnalysisQueryService(m.OperatorQueryService, m.ScoreQueryService)
 }
 
 // ExportRESTEventStatusOutbox exposes the assessment outbox status reader for platform event status.

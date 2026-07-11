@@ -9,16 +9,16 @@ import (
 
 // waitService 等待测评报告服务
 type waitService struct {
-	managementService AssessmentManagementService
-	registry          evaluationwaiter.Registry
-	reportQuery       ReportQueryService
+	assessmentReader AssessmentResultReader
+	registry         evaluationwaiter.Registry
+	reportQuery      ReportQueryService
 }
 
 // NewWaitService 创建等待测评报告服务实例
-func NewWaitService(managementService AssessmentManagementService, registry evaluationwaiter.Registry, reportQuery ...ReportQueryService) AssessmentWaitService {
+func NewWaitService(assessmentReader AssessmentResultReader, registry evaluationwaiter.Registry, reportQuery ...ReportQueryService) AssessmentWaitService {
 	service := &waitService{
-		managementService: managementService,
-		registry:          registry,
+		assessmentReader: assessmentReader,
+		registry:         registry,
 	}
 	if len(reportQuery) > 0 {
 		service.reportQuery = reportQuery[0]
@@ -79,10 +79,10 @@ func (s *waitService) waitForReportWithRegistry(ctx context.Context, assessmentI
 
 // loadTerminalAssessmentSummary 加载终端测评总结
 func (s *waitService) loadTerminalAssessmentSummary(ctx context.Context, assessmentID uint64) (evaluationwaiter.StatusSummary, bool) {
-	if s.managementService == nil {
+	if s.assessmentReader == nil {
 		return evaluationwaiter.StatusSummary{}, false
 	}
-	result, err := s.managementService.GetByID(ctx, assessmentID)
+	result, err := s.assessmentReader.GetByID(ctx, assessmentID)
 	if err != nil || result == nil {
 		return evaluationwaiter.StatusSummary{}, false
 	}

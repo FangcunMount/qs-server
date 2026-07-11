@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type stubAssessmentManagementService struct {
+type stubAssessmentQueryService struct {
 	lastGetByID  uint64
 	lastRetryID  uint64
 	lastRetryOrg int64
@@ -27,17 +27,17 @@ type stubAssessmentManagementService struct {
 	retryErr      error
 }
 
-func (s *stubAssessmentManagementService) GetByID(_ context.Context, id uint64) (*assessmentapp.AssessmentResult, error) {
+func (s *stubAssessmentQueryService) GetByID(_ context.Context, id uint64) (*assessmentapp.AssessmentResult, error) {
 	s.lastGetByID = id
 	return s.getByIDResult, s.getByIDErr
 }
 
-func (s *stubAssessmentManagementService) List(_ context.Context, dto assessmentapp.ListAssessmentsDTO) (*assessmentapp.AssessmentListResult, error) {
+func (s *stubAssessmentQueryService) List(_ context.Context, dto assessmentapp.ListAssessmentsDTO) (*assessmentapp.AssessmentListResult, error) {
 	s.lastListDTO = dto
 	return s.listResult, s.listErr
 }
 
-func (s *stubAssessmentManagementService) Retry(_ context.Context, orgID int64, assessmentID uint64) (*assessmentapp.AssessmentResult, error) {
+func (s *stubAssessmentQueryService) Retry(_ context.Context, orgID int64, assessmentID uint64) (*assessmentapp.AssessmentResult, error) {
 	s.lastRetryOrg = orgID
 	s.lastRetryID = assessmentID
 	return s.retryResult, s.retryErr
@@ -85,7 +85,7 @@ func newProtectedHandlerTestContext(method, target string) (*gin.Context, *httpt
 func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	management := &stubAssessmentManagementService{
+	assessmentQuery := &stubAssessmentQueryService{
 		getByIDResult: &assessmentapp.AssessmentResult{
 			ID:                301,
 			OrgID:             12,
@@ -96,11 +96,11 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 		},
 	}
 	access := &stubTesteeAccessService{}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, access)
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, access)
 	handler := NewEvaluationHandler(
-		management,
+		assessmentQuery,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, nil, accessQuery, nil, nil),
 		nil,
 	)
 
@@ -112,8 +112,8 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if management.lastGetByID != 301 {
-		t.Fatalf("lastGetByID = %d, want 301", management.lastGetByID)
+	if assessmentQuery.lastGetByID != 301 {
+		t.Fatalf("lastGetByID = %d, want 301", assessmentQuery.lastGetByID)
 	}
 	if access.lastValidateOrgID != 12 || access.lastValidateUserID != 34 || access.lastValidateTesteeID != 4001 {
 		t.Fatalf("unexpected access validation call: %+v", access)
@@ -145,7 +145,7 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 
 	totalScore := 18.5
 	riskLevel := "medium"
-	management := &stubAssessmentManagementService{
+	assessmentQuery := &stubAssessmentQueryService{
 		getByIDResult: &assessmentapp.AssessmentResult{
 			ID:         302,
 			OrgID:      12,
@@ -155,12 +155,12 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 			RiskLevel:  &riskLevel,
 		},
 	}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{})
-	waitService := assessmentapp.NewWaitService(management, nil)
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
+	waitService := assessmentapp.NewWaitService(assessmentQuery, nil)
 	handler := NewEvaluationHandler(
-		management,
+		assessmentQuery,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, nil, accessQuery, nil, nil),
 		reportwaitjourney.NewService(accessQuery, waitService),
 	)
 
@@ -198,7 +198,7 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	management := &stubAssessmentManagementService{
+	assessmentQuery := &stubAssessmentQueryService{
 		getByIDResult: &assessmentapp.AssessmentResult{
 			ID:       303,
 			OrgID:    12,
@@ -206,12 +206,12 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 			Status:   "submitted",
 		},
 	}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{})
-	waitService := assessmentapp.NewWaitService(management, nil)
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
+	waitService := assessmentapp.NewWaitService(assessmentQuery, nil)
 	handler := NewEvaluationHandler(
-		management,
+		assessmentQuery,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, nil, accessQuery, nil, nil),
 		reportwaitjourney.NewService(accessQuery, waitService),
 	)
 

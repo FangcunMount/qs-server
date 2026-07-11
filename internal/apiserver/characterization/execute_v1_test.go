@@ -145,7 +145,7 @@ func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
-	svc := evaluationexecute.NewService(
+	svc := evaluationexecute.NewEngine(
 		repo,
 		input,
 		evaluationexecute.WithEvaluatorRegistry(registry),

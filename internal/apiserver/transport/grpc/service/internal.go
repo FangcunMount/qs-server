@@ -35,8 +35,8 @@ type InternalService struct {
 	pb.UnimplementedInternalServiceServer
 	answerSheetScoringService  answerSheetApp.AnswerSheetScoringService
 	intakeService              assessmentApp.AnswerSheetAssessmentIntakeService
-	managementService          assessmentApp.AssessmentManagementService
-	executeService             execute.Service
+	assessmentResultReader     assessmentApp.AssessmentResultReader
+	workerExecutionService     execute.WorkerExecutionService
 	outcomeReportService       interpretationApp.OutcomeReportService
 	runQueryService            runqueryApp.Service
 	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
@@ -69,8 +69,8 @@ type operatorBootstrapRoleSyncer interface {
 func NewInternalService(
 	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
 	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
-	managementService assessmentApp.AssessmentManagementService,
-	executeService execute.Service,
+	assessmentResultReader assessmentApp.AssessmentResultReader,
+	workerExecutionService execute.WorkerExecutionService,
 	outcomeReportService interpretationApp.OutcomeReportService,
 	runQueryService runqueryApp.Service,
 	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
@@ -90,8 +90,8 @@ func NewInternalService(
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
 		intakeService:                      intakeService,
-		managementService:                  managementService,
-		executeService:                     executeService,
+		assessmentResultReader:             assessmentResultReader,
+		workerExecutionService:             workerExecutionService,
 		outcomeReportService:               outcomeReportService,
 		runQueryService:                    runQueryService,
 		assessmentBindingResolver:          assessmentBindingResolver,

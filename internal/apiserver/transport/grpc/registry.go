@@ -76,14 +76,14 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	IntakeService        assessmentApp.AnswerSheetAssessmentIntakeService
-	TesteeQueryService   assessmentApp.TesteeAssessmentQueryService
-	ManagementService    assessmentApp.AssessmentManagementService
-	ScoreQueryService    assessmentApp.ScoreQueryService
-	AssessmentReader     evaluationreadmodel.AssessmentReader
-	EvaluationService    execute.Service
-	RunQueryService      runqueryApp.Service
-	ReportStatusReporter *reportstatus.Reporter
+	IntakeService          assessmentApp.AnswerSheetAssessmentIntakeService
+	TesteeQueryService     assessmentApp.TesteeAssessmentQueryService
+	WorkerResultReader     assessmentApp.AssessmentResultReader
+	ScoreQueryService      assessmentApp.ScoreQueryService
+	AssessmentReader       evaluationreadmodel.AssessmentReader
+	WorkerExecutionService execute.WorkerExecutionService
+	RunQueryService        runqueryApp.Service
+	ReportStatusReporter   *reportstatus.Reporter
 }
 
 type InterpretationDeps struct {
@@ -233,7 +233,7 @@ func (r *Registry) registerAssessmentModelCatalogService() error {
 }
 
 func (r *Registry) registerInternalService() error {
-	if r.deps.Evaluation.IntakeService == nil || r.deps.Evaluation.ManagementService == nil || r.deps.Evaluation.EvaluationService == nil {
+	if r.deps.Evaluation.IntakeService == nil || r.deps.Evaluation.WorkerResultReader == nil || r.deps.Evaluation.WorkerExecutionService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
 		return nil
 	}
@@ -260,8 +260,8 @@ func (r *Registry) registerInternalService() error {
 	internalService := service.NewInternalService(
 		r.deps.Survey.AnswerSheetScoringService,
 		r.deps.Evaluation.IntakeService,
-		r.deps.Evaluation.ManagementService,
-		r.deps.Evaluation.EvaluationService,
+		r.deps.Evaluation.WorkerResultReader,
+		r.deps.Evaluation.WorkerExecutionService,
 		r.deps.Interpretation.OutcomeReportService,
 		r.deps.Evaluation.RunQueryService,
 		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),

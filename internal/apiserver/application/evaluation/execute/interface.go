@@ -17,17 +17,28 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// Service 评估引擎服务接口
-// 行为者：评估引擎 (Evaluation Engine / qs-worker)
-// 职责：执行一次通用测评编排
-// 变更来源：测评执行流程、失败收口、结果写入边界
-// 说明：此服务由 qs-worker 调用，消费 AssessmentSubmittedEvent
-type Service interface {
+// WorkerExecutionService 服务于 Worker 的一次评估执行。
+//
+// Worker 只根据 evaluation.requested 调用该入口，不能直接发起后台批量执行。
+type WorkerExecutionService interface {
 	// Evaluate 执行评估
 	Evaluate(ctx context.Context, assessmentID uint64) error
+}
 
+// OperatorExecutionService 服务于后台操作者受控的批量执行。
+//
+// 失败 Assessment 的常规恢复仍应通过 AssessmentOperatorRecoveryService
+// 重新发布 evaluation.requested；该入口仅保留既有的受控批量运维能力。
+type OperatorExecutionService interface {
 	// EvaluateBatch 批量评估
 	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
+}
+
+// Engine combines the role-specific execution capabilities for concrete
+// assembly. Transports must depend on a narrow role port.
+type Engine interface {
+	WorkerExecutionService
+	OperatorExecutionService
 }
 
 // Evaluator 执行某一类评估模型的评估。

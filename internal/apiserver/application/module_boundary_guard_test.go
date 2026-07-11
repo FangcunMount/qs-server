@@ -142,9 +142,7 @@ func TestEvaluationRoleCompatibilityDebtDoesNotSpread(t *testing.T) {
 	}
 }
 
-// C-facing queries and answer-sheet orchestration must use the narrow actor
-// ports. The former combined submission port remains only as a compatibility
-// facade outside transport wiring.
+// C-facing queries and answer-sheet orchestration must use narrow actor ports.
 func TestEvaluationTransportDoesNotUseCombinedSubmissionPort(t *testing.T) {
 	t.Parallel()
 
@@ -152,6 +150,20 @@ func TestEvaluationTransportDoesNotUseCombinedSubmissionPort(t *testing.T) {
 	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/transport/grpc/service"}, []string{"AssessmentSubmissionService"})
 	if len(got) != 0 {
 		t.Fatalf("gRPC transport must use actor-specific Assessment ports, found combined port in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestAssessmentApplicationDoesNotRetainCombinedFacades(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{
+		"internal/apiserver/application/evaluation/assessment/interface.go",
+		"internal/apiserver/application/evaluation/assessment/submission_service.go",
+		"internal/apiserver/application/evaluation/assessment/management_service.go",
+	}, []string{"AssessmentSubmissionService", "AssessmentManagementService"})
+	if len(got) != 0 {
+		t.Fatalf("Assessment application must expose role-specific ports only, found combined facade in:\n%s", strings.Join(got, "\n"))
 	}
 }
 

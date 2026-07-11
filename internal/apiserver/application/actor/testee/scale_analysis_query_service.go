@@ -12,17 +12,17 @@ import (
 )
 
 type scaleAnalysisQueryService struct {
-	assessmentManagement assessmentApp.AssessmentManagementService
-	scoreQuery           assessmentApp.ScoreQueryService
+	assessmentQuery assessmentApp.AssessmentOperatorQueryService
+	scoreQuery      assessmentApp.ScoreQueryService
 }
 
 func NewScaleAnalysisQueryService(
-	assessmentManagement assessmentApp.AssessmentManagementService,
+	assessmentQuery assessmentApp.AssessmentOperatorQueryService,
 	scoreQuery assessmentApp.ScoreQueryService,
 ) ScaleAnalysisQueryService {
 	return &scaleAnalysisQueryService{
-		assessmentManagement: assessmentManagement,
-		scoreQuery:           scoreQuery,
+		assessmentQuery: assessmentQuery,
+		scoreQuery:      scoreQuery,
 	}
 }
 
@@ -31,12 +31,12 @@ func (s *scaleAnalysisQueryService) GetScaleAnalysis(ctx context.Context, dto Sc
 	if err != nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64")
 	}
-	if s.assessmentManagement == nil {
+	if s.assessmentQuery == nil {
 		return &ScaleAnalysisQueryResult{TesteeID: dto.TesteeID, Scales: []ScaleTrendQueryResult{}}, nil
 	}
 
 	testeeID := dto.TesteeID
-	assessmentList, err := s.assessmentManagement.List(ctx, assessmentApp.ListAssessmentsDTO{
+	assessmentList, err := s.assessmentQuery.List(ctx, assessmentApp.ListAssessmentsDTO{
 		OrgID:    orgScope,
 		Page:     1,
 		PageSize: 1000,

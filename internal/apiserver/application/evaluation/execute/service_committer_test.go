@@ -45,7 +45,7 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	}
 	runRepo := &stubRunRepo{}
 	committer := &evaluationCommitterStub{}
-	svc := NewService(
+	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
@@ -85,7 +85,7 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 		t.Fatal(err)
 	}
 	committer := &evaluationCommitterStub{}
-	svc := NewService(
+	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
@@ -111,7 +111,7 @@ func TestEvaluateRejectsSuccessfulPathWithoutEvaluationCommitter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := NewService(
+	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),

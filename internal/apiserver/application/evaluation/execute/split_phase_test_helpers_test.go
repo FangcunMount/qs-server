@@ -69,14 +69,14 @@ func newSplitPhaseTestService(
 	repo assessment.Repository,
 	input evaluationinput.Resolver,
 	capture *splitPhaseCapture,
-	opts ...ServiceOption,
-) Service {
-	base := []ServiceOption{
+	opts ...EngineOption,
+) Engine {
+	base := []EngineOption{
 		WithEvaluationCommitter(&recordingEvaluationCommitter{capture: capture}),
 		WithRunRepository(&stubRunRepo{}),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	}
-	return NewService(repo, input, append(base, opts...)...)
+	return NewEngine(repo, input, append(base, opts...)...)
 }
 
 func splitPhaseAssessment(t *testing.T) *assessment.Assessment {

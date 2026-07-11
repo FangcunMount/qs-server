@@ -14,6 +14,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -34,6 +35,12 @@ import (
 )
 
 type routerClinicianQueryStub struct{}
+
+type routerOperatorExecutionStub struct{}
+
+func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, int64, []uint64) (*execute.BatchResult, error) {
+	return &execute.BatchResult{}, nil
+}
 
 func (*routerClinicianQueryStub) GetByID(context.Context, uint64) (*clinicianApp.ClinicianResult, error) {
 	return nil, nil
@@ -323,14 +330,14 @@ func newRouterTestContainer() *container.Container {
 	operatorQuery := assessmentApp.NewAssessmentOperatorQueryService(nil, nil)
 	operatorRecovery := assessmentApp.NewAssessmentOperatorRecoveryService(nil, nil, nil)
 	evaluationModule := &evalmod.Module{
-		OperatorQueryService:    operatorQuery,
-		OperatorRecoveryService: operatorRecovery,
-		ManagementService:       assessmentApp.NewAssessmentManagementCompatibilityService(operatorQuery, operatorRecovery),
-		ReportQueryService:      interpretationApp.NewReportQueryService(nil),
-		ScoreQueryService:       assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
+		OperatorQueryService:     operatorQuery,
+		OperatorRecoveryService:  operatorRecovery,
+		OperatorExecutionService: &routerOperatorExecutionStub{},
+		ReportQueryService:       interpretationApp.NewReportQueryService(nil),
+		ScoreQueryService:        assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
 	}
 	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.OperatorQueryService, nil)
-	evaluationModule.WaitService = assessmentApp.NewWaitService(evaluationModule.ManagementService, nil, evaluationModule.ReportQueryService)
+	evaluationModule.WaitService = assessmentApp.NewWaitService(evaluationModule.OperatorQueryService, nil, evaluationModule.ReportQueryService)
 	evaluationModule.ReportWaitJourney = reportwaitjourney.NewService(evaluationModule.AccessQueryService, evaluationModule.WaitService)
 	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		evaluationModule.OperatorQueryService,

@@ -13,12 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-// managementService 是拆分前 AssessmentManagementService 的兼容门面。
-type managementService struct {
-	query    AssessmentOperatorQueryService
-	recovery AssessmentOperatorRecoveryService
-}
-
 // assessmentOperatorQueryService 服务于后台操作者已授权的 Assessment 查询。
 type assessmentOperatorQueryService struct {
 	repo   assessment.Repository
@@ -51,39 +45,6 @@ func NewAssessmentOperatorRecoveryService(
 		txRunner:    txRunner,
 		eventStager: eventStager,
 	}
-}
-
-// NewAssessmentManagementCompatibilityService preserves the former combined
-// management port for callers that have not migrated to operator-specific use cases.
-func NewAssessmentManagementCompatibilityService(
-	query AssessmentOperatorQueryService,
-	recovery AssessmentOperatorRecoveryService,
-) AssessmentManagementService {
-	return &managementService{query: query, recovery: recovery}
-}
-
-// NewManagementService creates the legacy combined management facade.
-func NewManagementService(
-	repo assessment.Repository,
-	reader evaluationreadmodel.AssessmentReader,
-	txRunner apptransaction.Runner,
-	eventStager EventStager,
-) AssessmentManagementService {
-	query := NewAssessmentOperatorQueryService(repo, reader)
-	recovery := NewAssessmentOperatorRecoveryService(repo, txRunner, eventStager)
-	return NewAssessmentManagementCompatibilityService(query, recovery)
-}
-
-func (s *managementService) GetByID(ctx context.Context, id uint64) (*AssessmentResult, error) {
-	return s.query.GetByID(ctx, id)
-}
-
-func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error) {
-	return s.query.List(ctx, dto)
-}
-
-func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
-	return s.recovery.Retry(ctx, orgID, assessmentID)
 }
 
 // GetByID 根据ID获取测评详情

@@ -105,6 +105,34 @@ func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
 	}
 }
 
+func TestEvaluationRESTTransportUsesOnlyOperatorExecutionPort(t *testing.T) {
+	t.Parallel()
+
+	routerData, err := os.ReadFile("router.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	routerSource := string(routerData)
+	if !strings.Contains(routerSource, "OperatorExecutionService") {
+		t.Fatal("REST evaluation dependencies must expose the operator execution port")
+	}
+	if strings.Contains(routerSource, "WorkerExecutionService") {
+		t.Fatal("REST evaluation dependencies must not expose the Worker execution port")
+	}
+
+	handlerData, err := os.ReadFile(filepath.Join("handler", "evaluation.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handlerSource := string(handlerData)
+	if !strings.Contains(handlerSource, "operatorExecutionService.EvaluateBatch(") {
+		t.Fatal("batch evaluation must call the operator execution port")
+	}
+	if strings.Contains(handlerSource, "WorkerExecutionService") {
+		t.Fatal("REST evaluation handler must not depend on the Worker execution port")
+	}
+}
+
 func TestEvaluationRESTTransportDoesNotContainStaleV2SourceFiles(t *testing.T) {
 	t.Parallel()
 

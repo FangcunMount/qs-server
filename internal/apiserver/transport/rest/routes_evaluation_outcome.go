@@ -12,7 +12,7 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 	}
 	evalHandler := handler.NewEvaluationHandler(
 		nil,
-		r.deps.Evaluation.EvaluationService,
+		nil,
 		r.deps.Evaluation.ProtectedQueryService,
 		nil,
 	)

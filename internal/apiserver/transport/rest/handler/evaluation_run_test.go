@@ -42,10 +42,10 @@ func (s *stubRunQueryService) ListRetryableFailed(_ context.Context, orgID int64
 func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	management := &stubAssessmentManagementService{
+	assessmentQuery := &stubAssessmentQueryService{
 		getByIDResult: &assessmentapp.AssessmentResult{ID: 301, OrgID: 12, TesteeID: 4001},
 	}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{})
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
 	runQuery := &stubRunQueryService{
 		listResult: &runquery.RunListResult{
 			Items: []*runquery.RunResult{{
@@ -58,9 +58,9 @@ func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 		},
 	}
 	handler := NewEvaluationHandler(
-		management,
+		assessmentQuery,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, runQuery),
+		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, nil, accessQuery, nil, runQuery),
 		nil,
 	)
 

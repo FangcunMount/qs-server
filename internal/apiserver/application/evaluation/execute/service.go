@@ -48,17 +48,17 @@ type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
-// ServiceOption 服务选项
-type ServiceOption func(*service)
+// EngineOption configures the concrete Evaluation engine.
+type EngineOption func(*service)
 
-func WithPostCommitReadyIndexer(indexer *appEventing.PostCommitReadyIndexer) ServiceOption {
+func WithPostCommitReadyIndexer(indexer *appEventing.PostCommitReadyIndexer) EngineOption {
 	return func(s *service) {
 		s.readyIndexer = indexer
 	}
 }
 
 // WithTransactionalOutbox 配置事务和事件暂存器
-func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventStager) ServiceOption {
+func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventStager) EngineOption {
 	return func(s *service) {
 		s.txRunner = txRunner
 		s.eventStager = eventStager
@@ -66,7 +66,7 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 }
 
 // WithEvaluatorRegistry 配置评估器注册表
-func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
+func WithEvaluatorRegistry(registry EvaluatorRegistry) EngineOption {
 	return func(s *service) {
 		s.evaluators = registry
 		s.refreshRuntimeResolver()
@@ -74,7 +74,7 @@ func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 }
 
 // WithRuntimeDescriptorRegistry 配置描述符优先的评估路由。
-func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ServiceOption {
+func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) EngineOption {
 	return func(s *service) {
 		s.descriptorRegistry = registry
 		s.refreshRuntimeResolver()
@@ -82,7 +82,7 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 }
 
 // WithFamilyEvaluators 配置描述符优先的家族分发。
-func WithFamilyEvaluators(family map[modelcatalog.AlgorithmFamily]Evaluator) ServiceOption {
+func WithFamilyEvaluators(family map[modelcatalog.AlgorithmFamily]Evaluator) EngineOption {
 	return func(s *service) {
 		s.familyEvaluators = family
 		s.refreshRuntimeResolver()
@@ -96,32 +96,33 @@ func (s *service) refreshRuntimeResolver() {
 	s.runtimeResolver = NewRuntimeResolver(s.descriptorRegistry, s.evaluators, s.familyEvaluators)
 }
 
-func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
+func WithReportStatusReporter(reporter *reportstatus.Reporter) EngineOption {
 	return func(s *service) {
 		s.reportStatus = reporter
 	}
 }
 
 // WithRunRepository 配置评估执行 持久化。
-func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
+func WithRunRepository(repo evaluationrun.Repository) EngineOption {
 	return func(s *service) {
 		s.runRepo = repo
 	}
 }
 
 // WithEvaluationCommitter configures the canonical Evaluation success boundary.
-func WithEvaluationCommitter(committer outcomecommit.Committer) ServiceOption {
+func WithEvaluationCommitter(committer outcomecommit.Committer) EngineOption {
 	return func(s *service) {
 		s.evaluationCommitter = committer
 	}
 }
 
-// NewService 创建评估引擎服务实例。生产装配必须配置 EvaluationCommitter。
-func NewService(
+// NewEngine creates the Evaluation engine. Production assembly must configure
+// an EvaluationCommitter.
+func NewEngine(
 	assessmentRepo assessment.Repository,
 	inputResolver evaluationinput.Resolver,
-	opts ...ServiceOption,
-) Service {
+	opts ...EngineOption,
+) Engine {
 	svc := &service{
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
