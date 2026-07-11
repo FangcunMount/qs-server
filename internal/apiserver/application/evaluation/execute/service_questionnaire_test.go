@@ -283,7 +283,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	}}
 	capture := &splitPhaseCapture{}
 	var executionInput ExecutionInput
-	registry, err := NewEvaluatorRegistry(evaluatorStub{
+	evaluator := evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			executionInput = input
@@ -306,11 +306,8 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			execution.Level = &domainoutcome.ResultLevel{Code: level, Label: "ok"}
 			return execution, nil
 		},
-	})
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	svc := newSplitPhaseTestService(aRepo, input, capture, WithEvaluatorRegistry(registry))
+	svc := newSplitPhaseTestService(aRepo, input, capture, withTestEvaluator(evaluator))
 
 	if err := svc.Evaluate(context.Background(), 101); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
@@ -318,7 +315,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if capture.CommitCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).TotalScore != 7 {
+	if capture.CommitCalls != 1 || capture.Outcome.Execution == nil || capture.Outcome.Execution.Primary == nil || capture.Outcome.Execution.Primary.Value != 7 {
 		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
@@ -372,7 +369,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-FAKE", Version: "1.0.0"},
 	}}
 	capture := &splitPhaseCapture{}
-	registry, err := NewEvaluatorRegistry(evaluatorStub{
+	evaluator := evaluatorStub{
 		key: evaluation.ExecutionIdentityMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			modelRef := *input.Assessment.EvaluationModelRef()
@@ -391,16 +388,13 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 			}
 			return execution, nil
 		},
-	})
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	svc := newSplitPhaseTestService(aRepo, input, capture, WithEvaluatorRegistry(registry))
+	svc := newSplitPhaseTestService(aRepo, input, capture, withTestEvaluator(evaluator))
 
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if capture.CommitCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
+	if capture.CommitCalls != 1 || capture.Outcome.Execution == nil || capture.Outcome.Execution.ModelRef.Kind() != modelcatalog.KindTypology {
 		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
@@ -441,16 +435,13 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	capture := &splitPhaseCapture{}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
-	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
-	if registryErr != nil {
-		t.Fatalf("NewEvaluatorRegistry returned error: %v", registryErr)
-	}
+	evaluator := evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault}
 	svc := newSplitPhaseTestService(
 		aRepo,
 		input,
 		capture,
 		WithTransactionalOutbox(txRunner, stager),
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 	)
 
 	err := svc.Evaluate(context.Background(), 102)

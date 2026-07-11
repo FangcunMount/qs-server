@@ -52,3 +52,38 @@ func TestRestoreUsesOnlyPersistedOutcomeAndRestoresTypedDetail(t *testing.T) {
 		t.Fatalf("restored report input = %#v", got.Input)
 	}
 }
+
+func TestRestoreExecutionConvertsLegacyScaleDetailIntoCanonicalDimensions(t *testing.T) {
+	payload := json.RawMessage(`{
+		"ModelRef":{"kind":"scale","code":"SDS","version":"1.0.0"},
+		"Detail":{"Kind":"scale","Payload":[{
+			"FactorCode":"total","FactorName":"总分","RawScore":42,
+			"RiskLevel":"medium","Conclusion":"legacy prose","Suggestion":"legacy prose",
+			"IsTotalScore":true
+		}]}
+	}`)
+	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
+		ID: meta.FromUint64(10), OrgID: 11, AssessmentID: meta.FromUint64(8), TesteeID: 9, RunID: "8:1",
+		Model:   domainoutcome.ModelIdentity{Kind: modelcatalog.KindScale, Code: "SDS", Version: "1.0.0"},
+		Runtime: domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Payload: payload, EvaluatedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	execution, err := RestoreExecution(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(execution.Dimensions) != 1 {
+		t.Fatalf("dimensions = %#v, want one canonical factor", execution.Dimensions)
+	}
+	dimension := execution.Dimensions[0]
+	if dimension.Code != "total" || dimension.Score == nil || dimension.Score.Value != 42 || dimension.Role != "total" {
+		t.Fatalf("dimension = %#v", dimension)
+	}
+	if execution.Detail.Payload != nil {
+		t.Fatalf("legacy detail payload escaped persistence boundary: %#v", execution.Detail.Payload)
+	}
+}

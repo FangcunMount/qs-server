@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -18,6 +20,49 @@ type countingEvaluator struct {
 	key     evaluation.ExecutionIdentity
 	calls   int
 	outcome *domainoutcome.Execution
+}
+
+type evaluatorStub struct {
+	key     evaluation.ExecutionIdentity
+	execute func(context.Context, ExecutionInput) (*domainoutcome.Execution, error)
+}
+
+func (e evaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
+func (e evaluatorStub) Key() evaluation.ExecutionIdentity               { return e.key }
+func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
+	if e.execute != nil {
+		return e.execute(ctx, input)
+	}
+	return domainoutcome.NewExecution(domainoutcome.ModelRef{}, domainoutcome.Summary{}, domainoutcome.Detail{}), nil
+}
+
+type testEvaluator interface {
+	ExecutionIdentity() evaluation.ExecutionIdentity
+	Execute(context.Context, ExecutionInput) (*domainoutcome.Execution, error)
+}
+
+type evaluatorDescriptorExecutor struct{ evaluator testEvaluator }
+
+func (e evaluatorDescriptorExecutor) Execute(ctx context.Context, _ evalpipeline.RuntimeDescriptor, input ExecutionInput) (*domainoutcome.Execution, error) {
+	return e.evaluator.Execute(ctx, input)
+}
+
+func withTestEvaluator(evaluator testEvaluator) EngineOption {
+	return func(s *service) {
+		identity := evaluator.ExecutionIdentity()
+		family, ok := modelcatalog.AlgorithmFamilyFromIdentity(identity.Kind, identity.SubKind, identity.Algorithm)
+		if !ok {
+			panic("test evaluator has unsupported execution identity: " + identity.String())
+		}
+		registry := evalpipeline.NewRuntimeDescriptorRegistry()
+		if err := registry.Register(evalpipeline.RuntimeDescriptor{
+			Key: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: family}, AlgorithmFamily: family,
+		}); err != nil {
+			panic(err)
+		}
+		s.descriptorRegistry = registry
+		s.descriptorExecutor = evaluatorDescriptorExecutor{evaluator: evaluator}
+	}
 }
 
 func (e *countingEvaluator) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }

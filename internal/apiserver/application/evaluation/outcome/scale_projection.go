@@ -24,15 +24,6 @@ func ScaleScoreProjectionFromExecution(assessmentID assessment.ID, execution *do
 }
 
 func scaleFactorScores(execution *domainoutcome.Execution) []assessment.ScaleFactorScore {
-	if details, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok && len(details) > 0 {
-		result := make([]assessment.ScaleFactorScore, 0, len(details))
-		for _, detail := range details {
-			result = append(result, assessment.NewScaleFactorScore(
-				detail.FactorCode, detail.FactorName, detail.RawScore, detail.RiskLevel, detail.IsTotalScore,
-			))
-		}
-		return result
-	}
 	result := make([]assessment.ScaleFactorScore, 0, len(execution.Dimensions))
 	for _, dimension := range execution.Dimensions {
 		if dimension.Score == nil {

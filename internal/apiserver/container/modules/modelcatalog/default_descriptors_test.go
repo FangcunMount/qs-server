@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
@@ -60,19 +60,7 @@ func TestDefaultTypologyRegistryResolvesBuiltInModules(t *testing.T) {
 func TestMaterializeRegistryKeyParity(t *testing.T) {
 	t.Parallel()
 
-	registry, err := DefaultTypologyRegistry()
-	if err != nil {
-		t.Fatalf("DefaultTypologyRegistry() error = %v", err)
-	}
 	descs := DefaultEvaluationDescriptors()
-	wiringDeps := evaluation.WiringDeps{
-		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry: registry,
-	}
-	evaluators, err := evaluation.MaterializeEvaluators(descs, wiringDeps)
-	if err != nil {
-		t.Fatalf("MaterializeEvaluators: %v", err)
-	}
 	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
@@ -88,7 +76,7 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MaterializeInputProviders: %v", err)
 	}
-	if err := evaluation.AssertExecutionPathParity(descs, evaluators, providers); err != nil {
+	if err := evaluation.AssertExecutionPathParity(descs, providers); err != nil {
 		t.Fatalf("AssertExecutionPathParity: %v", err)
 	}
 	for i, desc := range descs {
@@ -100,36 +88,24 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	}
 }
 
-func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t *testing.T) {
+func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(t *testing.T) {
 	t.Parallel()
 
-	registry, err := DefaultTypologyRegistry()
+	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
-		t.Fatalf("DefaultTypologyRegistry() error = %v", err)
-	}
-	descs := DefaultEvaluationDescriptors()
-	wiringDeps := evaluation.WiringDeps{
-		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry: registry,
-	}
-	evaluators, err := evaluation.MaterializeEvaluators(descs, wiringDeps)
-	if err != nil {
-		t.Fatalf("MaterializeEvaluators: %v", err)
-	}
-	evaluatorRegistry, err := evaluationexecute.NewEvaluatorRegistry(evaluators...)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
+		t.Fatalf("DefaultRuntimeDescriptorRegistry() error = %v", err)
 	}
 	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
-		got, err := evaluatorRegistry.Resolve(legacyKey)
+		got, err := registry.Resolve(evalpipeline.ModelRoute{Kind: legacyKey.Kind, SubKind: legacyKey.SubKind, Algorithm: legacyKey.Algorithm})
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
 		}
-		if got.Key() != evaldomain.ExecutionIdentityPersonalityTypology {
-			t.Fatalf("resolved executor key = %s, want configured typology", got.Key())
+		if got.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorClassification {
+			t.Fatalf("resolved family = %s, want factor_classification", got.AlgorithmFamily)
 		}
 	}
 
+	descs := DefaultEvaluationDescriptors()
 	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)

@@ -69,9 +69,3 @@ type RuntimeDescriptor struct {
 	Calculator       Calculator
 	OutcomeAssembler OutcomeAssembler
 }
-
-// EvaluationPipeline 执行一个评估 用于 已发布模型快照。
-type EvaluationPipeline interface {
-	Supports(route ModelRoute) bool
-	Execute(ctx context.Context, route ModelRoute) (any, error)
-}

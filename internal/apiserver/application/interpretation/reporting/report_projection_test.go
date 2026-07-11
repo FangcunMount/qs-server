@@ -23,17 +23,14 @@ func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testin
 		"1.0.0",
 		"MBTI",
 	)
-	o := evaloutcome.NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
-		ModelRef: modelRef,
-		Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
-		Detail: assessment.EvaluationDetail{
-			Kind: assessment.EvaluationModelKindPersonality,
-			Payload: typologylegacy.MBTIResultDetail{
-				TypeCode:     "INTJ",
-				MatchPercent: 40,
-			},
-		},
-	})
+	o := evaloutcome.Outcome{Execution: domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(modelRef),
+		domainoutcome.Summary{PrimaryLabel: "INTJ"},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: typologylegacy.MBTIResultDetail{
+			TypeCode:     "INTJ",
+			MatchPercent: 40,
+		}},
+	)}
 	o.Execution.Primary = &domainoutcome.ScoreValue{
 		Kind:  domainoutcome.ScoreKindMatchPercent,
 		Value: 40,

@@ -211,10 +211,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			ScaleScorer:      ruleengine.NewScaleFactorScorer(),
 			TypologyRegistry: normalized.TypologyRegistry,
 		}
-		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
-		}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
 				ScaleScorer:          evalruntime.MaterializeFactorScoringPipelineComponents(wiringDeps),
@@ -222,10 +218,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 				TaskPerformance:      evalruntime.MaterializeTaskPerformancePipelineComponents(wiringDeps),
 				FactorClassification: evalruntime.MaterializeFactorClassificationPipelineComponents(wiringDeps),
 			})
-		}
-		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
 		scoreProjector := outcomescoring.NewAssessmentScoreProjector(infra.scoreRepo)
 		evaluationCommitter := outcomecommit.NewCommitter(
@@ -242,9 +234,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			normalized.InputResolver,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
-			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
-			execute.WithFamilyEvaluators(familyEvaluators),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithEvaluationCommitter(evaluationCommitter),

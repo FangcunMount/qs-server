@@ -7,6 +7,7 @@ import (
 	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	domainstatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	drivermysql "github.com/go-sql-driver/mysql"
@@ -28,7 +29,6 @@ func NewRunRepository(db *gorm.DB) evaluationrun.Repository {
 
 var (
 	_ evaluationrun.Repository = (*Repository)(nil)
-	_ evalrun.CheckpointSeam   = (*Repository)(nil)
 )
 
 func (r *Repository) Claim(ctx context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
@@ -258,71 +258,6 @@ func (r *Repository) ListRetryableFailed(ctx context.Context, params evaluationr
 	}, nil
 }
 
-func (r *Repository) Begin(scope evalrun.CheckpointScope, resourceID string, attemptNo int) (bool, error) {
-	if r == nil || r.db == nil {
-		return false, fmt.Errorf("runtime checkpoint repository is not configured")
-	}
-	if resourceID == "" {
-		return false, nil
-	}
-	now := time.Now()
-	po := &RuntimeCheckpointPO{
-		Scope:      string(scope),
-		ResourceID: resourceID,
-		AttemptNo:  uint(attemptNo),
-		Status:     evalrun.StatusRunning.String(),
-		StartedAt:  now,
-	}
-	if scope == evalrun.CheckpointScopeEvaluationRun {
-		assessmentID, err := parseAssessmentIDFromRunID(resourceID, attemptNo)
-		if err == nil {
-			po.AssessmentID = &assessmentID
-		}
-	}
-	if err := r.db.Create(po).Error; err == nil {
-		return true, nil
-	}
-	var existing RuntimeCheckpointPO
-	if err := r.db.
-		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL", po.Scope, po.ResourceID, po.AttemptNo).
-		First(&existing).Error; err != nil {
-		return false, err
-	}
-	return false, nil
-}
-
-func (r *Repository) Complete(
-	scope evalrun.CheckpointScope,
-	resourceID string,
-	attemptNo int,
-	status string,
-	retryable bool,
-	errCode, errMsg string,
-) error {
-	if r == nil || r.db == nil {
-		return fmt.Errorf("runtime checkpoint repository is not configured")
-	}
-	if resourceID == "" {
-		return nil
-	}
-	updates := map[string]interface{}{
-		"status":    status,
-		"retryable": retryable,
-	}
-	now := time.Now()
-	updates["finished_at"] = now
-	if errCode != "" {
-		updates["error_code"] = errCode
-	}
-	if errMsg != "" {
-		updates["error_message"] = errMsg
-	}
-	return r.db.Model(&RuntimeCheckpointPO{}).
-		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
-			string(scope), resourceID, attemptNo).
-		Updates(updates).Error
-}
-
 func (r *Repository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error) {
 	if r == nil || r.db == nil {
 		return "", fmt.Errorf("runtime checkpoint repository is not configured")
@@ -337,7 +272,7 @@ func (r *Repository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, e
 		ResourceID: eventID,
 		AttemptNo:  1,
 		EventType:  &eventTypeCopy,
-		Status:     evalrun.UnifiedStatusForAnalytics(evalrun.AnalyticsProjectorCheckpointStatusProcessing),
+		Status:     analyticsStatusToCheckpoint(domainstatistics.AnalyticsProjectorCheckpointStatusProcessing),
 		StartedAt:  now,
 	}
 	if err := r.db.WithContext(ctx).Create(po).Error; err == nil {
@@ -350,7 +285,7 @@ func (r *Repository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, e
 		First(&existing).Error; err != nil {
 		return "", err
 	}
-	return evalrun.AnalyticsStatusFromUnified(existing.Status), nil
+	return analyticsStatusFromCheckpoint(existing.Status), nil
 }
 
 func (r *Repository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error {
@@ -360,7 +295,7 @@ func (r *Repository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context,
 	if eventID == "" {
 		return nil
 	}
-	unified := evalrun.UnifiedStatusForAnalytics(status)
+	unified := analyticsStatusToCheckpoint(status)
 	updates := map[string]interface{}{
 		"status":      unified,
 		"finished_at": time.Now(),
@@ -370,6 +305,32 @@ func (r *Repository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context,
 		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
 			scopeAnalyticsProjector, eventID, 1).
 		Updates(updates).Error
+}
+
+func analyticsStatusToCheckpoint(status string) string {
+	switch status {
+	case domainstatistics.AnalyticsProjectorCheckpointStatusProcessing:
+		return evalrun.StatusRunning.String()
+	case domainstatistics.AnalyticsProjectorCheckpointStatusCompleted:
+		return evalrun.StatusSucceeded.String()
+	case domainstatistics.AnalyticsProjectorCheckpointStatusPending:
+		return evalrun.StatusPending.String()
+	default:
+		return status
+	}
+}
+
+func analyticsStatusFromCheckpoint(status string) string {
+	switch evalrun.Status(status) {
+	case evalrun.StatusRunning:
+		return domainstatistics.AnalyticsProjectorCheckpointStatusProcessing
+	case evalrun.StatusSucceeded:
+		return domainstatistics.AnalyticsProjectorCheckpointStatusCompleted
+	case evalrun.StatusPending:
+		return domainstatistics.AnalyticsProjectorCheckpointStatusPending
+	default:
+		return status
+	}
 }
 
 func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
@@ -439,15 +400,6 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 		run.Failure = &failure
 	}
 	return run
-}
-
-func parseAssessmentIDFromRunID(resourceID string, _ int) (uint64, error) {
-	var assessmentID uint64
-	var attempt int
-	if _, err := fmt.Sscanf(resourceID, "%d:%d", &assessmentID, &attempt); err != nil {
-		return 0, fmt.Errorf("parse run id %q: %w", resourceID, err)
-	}
-	return assessmentID, nil
 }
 
 func derefUint64(v *uint64) uint64 {

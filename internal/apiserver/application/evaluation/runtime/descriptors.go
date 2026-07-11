@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DescriptorProjector 映射执行路径 到 旧版 evaluator 描述符 用于 装配。
+// DescriptorProjector maps execution paths to published model descriptors.
 type DescriptorProjector func(path modelcatalog.ExecutionPath) []evaldomain.ModelDescriptor
 
 var runtimeMaterializationOrder = materializationOrder()
@@ -34,7 +34,7 @@ func ExecutionPathsFromRegistry(registry *evalpipeline.RuntimeDescriptorRegistry
 	return paths, nil
 }
 
-// EvaluationDescriptorsFromRegistry 投影已注册 执行路径 为 evaluator 描述符。
+// EvaluationDescriptorsFromRegistry projects registered paths to model descriptors.
 func EvaluationDescriptorsFromRegistry(
 	registry *evalpipeline.RuntimeDescriptorRegistry,
 	project DescriptorProjector,

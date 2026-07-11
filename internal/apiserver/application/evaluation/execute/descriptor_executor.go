@@ -6,7 +6,6 @@ import (
 
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type descriptorDrivenExecutor struct{}
@@ -39,17 +38,4 @@ func (descriptorDrivenExecutor) Execute(
 		return outcome, nil
 	}
 	return nil, fmt.Errorf("descriptor outcome assembler returned invalid type %T", assembled)
-}
-
-func descriptorExecutorsFromFamilyEvaluators(
-	familyEvaluators map[modelcatalog.AlgorithmFamily]Evaluator,
-) map[modelcatalog.AlgorithmFamily]DescriptorExecutor {
-	if len(familyEvaluators) == 0 {
-		return nil
-	}
-	out := make(map[modelcatalog.AlgorithmFamily]DescriptorExecutor, len(familyEvaluators))
-	for family := range familyEvaluators {
-		out[family] = descriptorDrivenExecutor{}
-	}
-	return out
 }

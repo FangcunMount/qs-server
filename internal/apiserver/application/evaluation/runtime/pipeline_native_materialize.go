@@ -5,7 +5,14 @@ import (
 	mechanismscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	mechanismtask "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance"
 	mechanismtypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	portruleengine "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
+
+// WiringDeps groups dependencies used to attach native descriptor pipelines.
+type WiringDeps struct {
+	ScaleScorer      portruleengine.ScaleFactorScorer
+	TypologyRegistry mechanismtypology.ModuleRegistry
+}
 
 // MaterializeFactorScoringPipelineComponents builds native factor_scoring pipeline triple from wiring deps.
 func MaterializeFactorScoringPipelineComponents(deps WiringDeps) mechanismscoring.PipelineComponents {

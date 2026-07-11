@@ -3,10 +3,10 @@ package characterization_test
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
@@ -32,14 +32,11 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 	}
 
 	a := submittedMBTIAssessment(t)
-	modelRef := *a.EvaluationModelRef()
-	result := assessment.NewModelEvaluationResult(
-		modelRef,
-		assessment.ResultSummary{PrimaryLabel: detail.TypeCode, Tags: []string{detail.TypeName}},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
-	)
-
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		a, nil,
+		domainoutcome.Summary{PrimaryLabel: detail.TypeCode, Tags: []string{detail.TypeName}},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
+	))
 
 	if report.RiskLevel() != domainreport.RiskLevelNone {
 		t.Fatalf("RiskLevel = %s, want none", report.RiskLevel())

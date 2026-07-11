@@ -2,7 +2,7 @@
 // 负责调度一次测评执行，由 qs-worker 消费 AssessmentSubmittedEvent 后调用。
 //
 // 设计说明：
-// execute 只承担通用编排：加载 Assessment、解析输入快照、按 EvaluatorKey 选择执行器、
+// execute 只承担通用编排：加载 Assessment、解析输入快照、解析 RuntimeDescriptor、
 // 将评分事实可靠提交为 EvaluationOutcome，并统一收口失败；
 // 具体评分算法由 scale / personality typology 等机制实现。
 package execute
@@ -10,7 +10,6 @@ package execute
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
@@ -39,20 +38,6 @@ type OperatorExecutionService interface {
 type Engine interface {
 	WorkerExecutionService
 	OperatorExecutionService
-}
-
-// Evaluator 执行某一类评估模型的评估。
-type Evaluator interface {
-	ExecutionIdentity() evaluation.ExecutionIdentity
-	// Key 是deprecated; 使用 Execution身份()。
-	Key() evaluation.ExecutionIdentity
-	// Execute 执行评估模型并返回 canonical 结果。
-	Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error)
-}
-
-// EvaluatorRegistry 评估模型评估器注册表。
-type EvaluatorRegistry interface {
-	Resolve(key evaluation.ExecutionIdentity) (Evaluator, error)
 }
 
 // DescriptorExecutor 执行 RuntimeDescriptor 已解析后的评估路径。

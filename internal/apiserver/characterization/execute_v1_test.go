@@ -12,41 +12,8 @@ import (
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
-
-func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
-	t.Helper()
-	configured, err := factorclassification.NewConfiguredTypologyExecutor()
-	if err != nil {
-		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
-	}
-	registry, err := evaluationexecute.NewEvaluatorRegistry(
-		factorscoring.NewExecutor(nil),
-		factornorm.NewExecutor(nil),
-		taskperformance.NewExecutor(nil),
-		configured,
-	)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
-	return registry
-}
-
-func newV1FamilyEvaluators(t *testing.T) map[modelcatalog.AlgorithmFamily]evaluationexecute.Evaluator {
-	t.Helper()
-	configured, err := factorclassification.NewConfiguredTypologyExecutor()
-	if err != nil {
-		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
-	}
-	return map[modelcatalog.AlgorithmFamily]evaluationexecute.Evaluator{
-		modelcatalog.AlgorithmFamilyFactorScoring:        factorscoring.NewExecutor(nil),
-		modelcatalog.AlgorithmFamilyFactorClassification: configured,
-		modelcatalog.AlgorithmFamilyFactorNorm:           factornorm.NewExecutor(nil),
-		modelcatalog.AlgorithmFamilyTaskPerformance:      taskperformance.NewExecutor(nil),
-	}
-}
 
 func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescriptorRegistry {
 	t.Helper()
@@ -63,7 +30,7 @@ func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescript
 	return registry
 }
 
-// V1 contract: execute service resolves EvaluatorKey and dispatches scale evaluator;
+// V1 contract: execute service resolves a scale RuntimeDescriptor;
 // writer receives total=5 risk=low result.
 func TestV1ExecuteServiceDispatchesScaleByEvaluatorKey(t *testing.T) {
 	a := submittedScaleAssessment(t)
@@ -133,26 +100,20 @@ func TestV1ExecuteServiceDispatchesSBTIByLegacyKind(t *testing.T) {
 	}
 }
 
-// V1 contract: evaluator registry rejects unknown v2 keys.
-func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
+// V1 contract: descriptor registry rejects an unknown runtime route.
+func TestV1ExecuteServiceRejectsUnknownRuntimeDescriptor(t *testing.T) {
 	a := submittedMBTIAssessment(t)
 	repo := &charAssessmentRepo{assessment: a}
 	input := &charInputResolver{snapshot: mbtiInputSnapshot()}
 
-	registry, err := evaluationexecute.NewEvaluatorRegistry(
-		factorscoring.NewExecutor(nil),
-	)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	svc := evaluationexecute.NewEngine(
 		repo,
 		input,
-		evaluationexecute.WithEvaluatorRegistry(registry),
+		evaluationexecute.WithRuntimeDescriptorRegistry(evalpipeline.NewRuntimeDescriptorRegistry()),
 		evaluationexecute.WithRunRepository(&charRunRepo{}),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if err == nil {
 		t.Fatal("Evaluate error = nil, want unsupported model key")
 	}

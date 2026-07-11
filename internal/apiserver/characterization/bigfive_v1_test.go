@@ -3,9 +3,9 @@ package characterization_test
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
@@ -28,13 +28,11 @@ func TestV1BigFivePipelinePreservesTraitScoresAndReportFields(t *testing.T) {
 	}
 
 	a := submittedBigFiveAssessment(t)
-	result := assessment.NewModelEvaluationResult(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: detail.Traits[0].Code},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
-	)
-
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		a, nil,
+		domainoutcome.Summary{PrimaryLabel: detail.Traits[0].Code},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
+	))
 
 	if report.RiskLevel() != domainreport.RiskLevelNone {
 		t.Fatalf("RiskLevel = %s, want none", report.RiskLevel())

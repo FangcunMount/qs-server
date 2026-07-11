@@ -17,7 +17,6 @@ import (
 )
 
 func TestExecutorImplementsEvaluatorContract(t *testing.T) {
-	var _ evaluationexecute.Evaluator = (*Executor)(nil)
 }
 
 func TestExecutorKeys(t *testing.T) {

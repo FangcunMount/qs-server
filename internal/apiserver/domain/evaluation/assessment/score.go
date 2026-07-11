@@ -38,33 +38,6 @@ func ReconstructScaleScoreProjection(
 	}
 }
 
-// ScaleScoreProjectionFromEvaluationResult 投影旧版 评估 结果 为 scale storage。
-//
-// Deprecated: 仅作为表征边界保留；持久化应使用 ScaleScoreProjectionFromOutcome。
-func ScaleScoreProjectionFromEvaluationResult(assessmentID ID, result *EvaluationResult) *ScaleScoreProjection {
-	if result == nil {
-		return nil
-	}
-
-	factorScores := make([]ScaleFactorScore, 0, len(result.FactorScores))
-	for _, fs := range result.FactorScores {
-		factorScores = append(factorScores, NewScaleFactorScore(
-			fs.FactorCode,
-			fs.FactorName,
-			fs.RawScore,
-			fs.RiskLevel,
-			fs.IsTotalScore,
-		))
-	}
-
-	return NewScaleScoreProjection(
-		assessmentID,
-		result.TotalScore,
-		result.RiskLevel,
-		factorScores,
-	)
-}
-
 func (s *ScaleScoreProjection) AssessmentID() ID {
 	return s.assessmentID
 }

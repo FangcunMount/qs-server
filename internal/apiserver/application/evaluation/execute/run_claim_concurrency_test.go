@@ -35,16 +35,12 @@ func TestEvaluateConcurrentWorkersExecuteEvaluatorOnce(t *testing.T) {
 	a := splitPhaseAssessment(t)
 	repo := &stubRunRepo{}
 	evaluator := &blockingEvaluator{entered: make(chan struct{}), release: make(chan struct{})}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatal(err)
-	}
 	capture := &splitPhaseCapture{}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		capture,
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(repo),
 		WithRunLease(time.Minute),
 	)

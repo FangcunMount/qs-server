@@ -17,7 +17,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -37,9 +36,8 @@ type service struct {
 	eventStager  EventStager
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
-	evaluators          EvaluatorRegistry
 	descriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
-	familyEvaluators    map[modelcatalog.AlgorithmFamily]Evaluator
+	descriptorExecutor  DescriptorExecutor
 	runtimeResolver     *RuntimeResolver
 	runRepo             evaluationrun.Repository
 	runLease            time.Duration
@@ -69,35 +67,19 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 	}
 }
 
-// WithEvaluatorRegistry 配置评估器注册表
-func WithEvaluatorRegistry(registry EvaluatorRegistry) EngineOption {
-	return func(s *service) {
-		s.evaluators = registry
-		s.refreshRuntimeResolver()
-	}
-}
-
-// WithRuntimeDescriptorRegistry 配置描述符优先的评估路由。
+// WithRuntimeDescriptorRegistry configures the sole production runtime route.
 func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) EngineOption {
 	return func(s *service) {
 		s.descriptorRegistry = registry
-		s.refreshRuntimeResolver()
 	}
 }
 
-// WithFamilyEvaluators 配置描述符优先的家族分发。
-func WithFamilyEvaluators(family map[modelcatalog.AlgorithmFamily]Evaluator) EngineOption {
+// WithDescriptorExecutor replaces descriptor execution. Production uses the
+// native descriptor pipeline; the option is kept as a narrow testing seam.
+func WithDescriptorExecutor(executor DescriptorExecutor) EngineOption {
 	return func(s *service) {
-		s.familyEvaluators = family
-		s.refreshRuntimeResolver()
+		s.descriptorExecutor = executor
 	}
-}
-
-func (s *service) refreshRuntimeResolver() {
-	if s.evaluators == nil {
-		return
-	}
-	s.runtimeResolver = NewRuntimeResolver(s.descriptorRegistry, s.evaluators, s.familyEvaluators)
 }
 
 func WithReportStatusReporter(reporter *reportstatus.Reporter) EngineOption {
@@ -139,15 +121,16 @@ func NewEngine(
 	opts ...EngineOption,
 ) Engine {
 	svc := &service{
-		assessmentRepo: assessmentRepo,
-		inputResolver:  inputResolver,
-		evaluators:     newEmptyEvaluatorRegistry(),
-		runLease:       defaultEvaluationRunLease,
+		assessmentRepo:     assessmentRepo,
+		inputResolver:      inputResolver,
+		descriptorExecutor: descriptorDrivenExecutor{},
+		runLease:           defaultEvaluationRunLease,
 	}
 
 	for _, opt := range opts {
 		opt(svc)
 	}
+	svc.runtimeResolver = NewRuntimeResolver(svc.descriptorRegistry, svc.descriptorExecutor)
 
 	return svc
 }
@@ -242,7 +225,6 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"evaluation_run_id", evaluationRun.RunID.String(),
 		"model_key", resolved.ExecutionIdentity.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
-		"runtime_descriptor_primary", resolved.UsedDescriptor,
 		"model_code", evaluationModelCode(a, input),
 	)
 

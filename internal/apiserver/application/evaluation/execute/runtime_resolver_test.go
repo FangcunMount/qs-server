@@ -43,13 +43,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
-	if err != nil {
-		t.Fatal(err)
-	}
-	resolver := NewRuntimeResolver(registry, evaluatorRegistry, map[modelcatalog.AlgorithmFamily]Evaluator{
-		modelcatalog.AlgorithmFamilyFactorScoring: runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault},
-	})
+	resolver := NewRuntimeResolver(registry, descriptorDrivenExecutor{})
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -65,22 +59,15 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	if outcome == nil {
 		t.Fatal("outcome is nil")
 	}
-	if !resolved.UsedDescriptor {
-		t.Fatal("expected descriptor-primary path")
-	}
 	if resolved.Descriptor.ExecutionPath != modelcatalog.ExecutionPathScaleDescriptor {
 		t.Fatalf("path=%s", resolved.Descriptor.ExecutionPath)
 	}
 }
 
-func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
+func TestRuntimeResolverRejectsMissingDescriptorRegistry(t *testing.T) {
 	t.Parallel()
 
-	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
-	if err != nil {
-		t.Fatal(err)
-	}
-	resolver := NewRuntimeResolver(nil, evaluatorRegistry, nil)
+	resolver := NewRuntimeResolver(nil, descriptorDrivenExecutor{})
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -89,26 +76,15 @@ func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
 			Code:      "PHQ9",
 		},
 	}
-	_, resolved, err := resolver.Execute(context.Background(), nil, input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved.UsedDescriptor {
-		t.Fatal("expected legacy fallback without descriptor registry")
-	}
-	if resolved.ExecutionIdentity != evaluation.ExecutionIdentityScaleDefault {
-		t.Fatalf("key=%s", resolved.ExecutionIdentity)
+	if _, _, err := resolver.Execute(context.Background(), nil, input); err == nil {
+		t.Fatal("Execute error = nil, want missing descriptor registry error")
 	}
 }
 
 func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(t *testing.T) {
 	t.Parallel()
 
-	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
-	if err != nil {
-		t.Fatal(err)
-	}
-	resolver := NewRuntimeResolver(evalpipeline.NewRuntimeDescriptorRegistry(), evaluatorRegistry, nil)
+	resolver := NewRuntimeResolver(evalpipeline.NewRuntimeDescriptorRegistry(), descriptorDrivenExecutor{})
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -117,7 +93,7 @@ func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(
 			Code:      "PHQ9",
 		},
 	}
-	_, _, err = resolver.Execute(context.Background(), nil, input)
+	_, _, err := resolver.Execute(context.Background(), nil, input)
 	if err == nil {
 		t.Fatal("Execute error = nil, want descriptor resolve error when registry is configured")
 	}

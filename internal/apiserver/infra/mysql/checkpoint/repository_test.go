@@ -67,17 +67,3 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 		t.Fatalf("round-trip claim = token:%q lease:%v", roundTrip.ClaimToken, roundTrip.LeaseExpiresAt)
 	}
 }
-
-func TestAnalyticsStatusMappingRoundTrip(t *testing.T) {
-	t.Parallel()
-	for _, legacy := range []string{
-		evalrun.AnalyticsProjectorCheckpointStatusProcessing,
-		evalrun.AnalyticsProjectorCheckpointStatusCompleted,
-		evalrun.AnalyticsProjectorCheckpointStatusPending,
-	} {
-		unified := evalrun.UnifiedStatusForAnalytics(legacy)
-		if got := evalrun.AnalyticsStatusFromUnified(unified); got != legacy {
-			t.Fatalf("legacy %s -> unified %s -> %s", legacy, unified, got)
-		}
-	}
-}

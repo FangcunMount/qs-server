@@ -12,8 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// reportReadModel is a migration facade. New immutable artifacts win; legacy
-// lifecycle-bearing documents supply only the missing compatibility rows.
+// reportReadModel reads current artifacts and immutable historical archives.
 type reportReadModel struct {
 	legacy    *legacyReportReadModel
 	artifacts base.BaseRepository
@@ -21,12 +20,11 @@ type reportReadModel struct {
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
-	return NewReportReadModelWithLegacyFallback(db, true, opts...)
+	return NewReportReadModelWithLegacyFallback(db, false, opts...)
 }
 
 // NewReportReadModelWithLegacyFallback keeps cutover explicit: production
-// starts new-first with legacy fallback, then reconciliation can switch the
-// same read model to artifact-only without changing query call sites.
+// Deprecated: only use true while diagnosing a failed archive migration.
 func NewReportReadModelWithLegacyFallback(db *mongo.Database, legacyFallback bool, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
 	var legacy *legacyReportReadModel
 	if legacyFallback {

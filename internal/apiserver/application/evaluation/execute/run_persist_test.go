@@ -118,20 +118,16 @@ func TestEvaluateReturnsRunPersistenceErrorBeforeExecuting(t *testing.T) {
 	persistErr := errors.New("run save failed")
 	a := splitPhaseAssessment(t)
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	capture := &splitPhaseCapture{}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		capture,
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(&stubRunRepo{saveErr: persistErr}),
 	)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want run persistence error", err)
 	}
@@ -149,21 +145,17 @@ func TestEvaluateReturnsCurrentRunPersistenceErrorBeforeExecuting(t *testing.T) 
 	persistErr := errors.New("current run id save failed")
 	a := splitPhaseAssessment(t)
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	capture := &splitPhaseCapture{}
 	repo := &fakeAssessmentRepo{assessment: a, saveErr: persistErr}
 	svc := newSplitPhaseTestService(
 		repo,
 		stubInputResolver{},
 		capture,
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(&stubRunRepo{}),
 	)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want current run persistence error", err)
 	}
@@ -180,25 +172,22 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 
 	executeErr := errors.New("calculator failed")
 	a := splitPhaseAssessment(t)
-	registry, err := NewEvaluatorRegistry(evaluatorStub{
+	evaluator := evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
 		execute: func(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 			return nil, executeErr
 		},
-	})
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
 	runRepo := &stubRunRepo{}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	).(*service)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, executeErr) {
 		t.Fatalf("Evaluate error = %v, want original execution error", err)
 	}
@@ -216,25 +205,22 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	executeErr := errors.New("calculator failed")
 	persistErr := errors.New("failed run save failed")
 	a := splitPhaseAssessment(t)
-	registry, err := NewEvaluatorRegistry(evaluatorStub{
+	evaluator := evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
 		execute: func(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 			return nil, executeErr
 		},
-	})
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
 	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	).(*service)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want failed run persistence error", err)
 	}

@@ -32,6 +32,14 @@ type v1SplitPhaseConfig struct {
 	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
 }
 
+func canonicalOutcome(a *assessment.Assessment, input *evaluationinput.InputSnapshot, summary domainoutcome.Summary, detail domainoutcome.Detail) evaloutcome.Outcome {
+	execution := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef()), summary, detail)
+	if summary.Score != nil {
+		execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: *summary.Score}
+	}
+	return evaloutcome.Outcome{Assessment: a, Input: input, Execution: execution}
+}
+
 // buildV1SplitPhaseExecuteService mirrors container/modules/evaluation/assemble.go split-phase wiring.
 // When repos are provided, the first repo is shared with the caller (cross-module harness).
 func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos ...*charAssessmentRepo) (*charSplitPhaseService, *charSplitPhaseReportSaver) {
@@ -56,12 +64,9 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	}
 
 	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
-	familyEvaluators := newV1FamilyEvaluators(t)
 
 	opts := []evaluationexecute.EngineOption{
-		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
-		evaluationexecute.WithFamilyEvaluators(familyEvaluators),
 		evaluationexecute.WithEvaluationCommitter(committer),
 		evaluationexecute.WithRunRepository(&charRunRepo{}),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(ctx context.Context, events ...event.DomainEvent) error {
@@ -249,9 +254,7 @@ func newV1RecordingExecuteService(
 	core := evaluationexecute.NewEngine(
 		&charAssessmentRepo{assessment: a},
 		input,
-		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(wireV1RuntimeDescriptorRegistry(t)),
-		evaluationexecute.WithFamilyEvaluators(newV1FamilyEvaluators(t)),
 		evaluationexecute.WithEvaluationCommitter(recording),
 		evaluationexecute.WithRunRepository(&charRunRepo{}),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),

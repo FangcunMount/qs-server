@@ -136,7 +136,7 @@ func restoreTypedDetail(record *domainoutcome.Record, execution *domainoutcome.E
 	case modelcatalog.DecisionKindTraitProfile:
 		target = &outcometypology.TraitProfileDetail{}
 	default:
-		target = &[]assessment.FactorScoreResult{}
+		target = &[]legacyFactorScoreWire{}
 	}
 	if err := json.Unmarshal(wire.Detail.Payload, target); err != nil {
 		return fmt.Errorf("decode evaluation outcome detail %s: %w", record.ID(), err)
@@ -146,8 +146,41 @@ func restoreTypedDetail(record *domainoutcome.Record, execution *domainoutcome.E
 		execution.Detail.Payload = *typed
 	case *outcometypology.TraitProfileDetail:
 		execution.Detail.Payload = *typed
-	case *[]assessment.FactorScoreResult:
-		execution.Detail.Payload = *typed
+	case *[]legacyFactorScoreWire:
+		// Schema v1 scale rows stored factor scores in Detail.Payload. Convert
+		// that historical wire shape immediately into canonical dimensions so
+		// no legacy scoring model escapes the persistence boundary.
+		if len(execution.Dimensions) == 0 {
+			execution.Dimensions = make([]domainoutcome.DimensionResult, 0, len(*typed))
+			for _, factor := range *typed {
+				dimension := domainoutcome.DimensionResult{
+					Code: factor.FactorCode, Name: factor.FactorName,
+					Kind:  domainoutcome.DimensionKindFactor,
+					Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: factor.RawScore},
+				}
+				if factor.IsTotalScore {
+					dimension.Role = "total"
+				}
+				if factor.RiskLevel != "" {
+					dimension.Level = &domainoutcome.ResultLevel{Code: factor.RiskLevel, Label: factor.RiskLevel}
+				}
+				execution.Dimensions = append(execution.Dimensions, dimension)
+			}
+		}
+		execution.Detail.Payload = nil
 	}
 	return nil
+}
+
+// legacyFactorScoreWire is a persistence-only decoder for schema v1 Outcome
+// payloads. Conclusion and Suggestion are intentionally ignored: they are
+// report prose, not Evaluation facts.
+type legacyFactorScoreWire struct {
+	FactorCode   string
+	FactorName   string
+	RawScore     float64
+	RiskLevel    string
+	Conclusion   string
+	Suggestion   string
+	IsTotalScore bool
 }

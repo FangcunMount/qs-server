@@ -45,16 +45,12 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	a := splitPhaseAssessment(t)
 	execution := executionForAssessment(a, "ok")
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatal(err)
-	}
 	runRepo := &stubRunRepo{}
 	committer := &evaluationCommitterStub{}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 		WithEvaluationCommitter(committer),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
@@ -82,15 +78,11 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 		t.Fatal(err)
 	}
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatal(err)
-	}
 	committer := &evaluationCommitterStub{}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(&stubRunRepo{}),
 		WithEvaluationCommitter(committer),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
@@ -109,19 +101,15 @@ func TestEvaluateRejectsSuccessfulPathWithoutEvaluationCommitter(t *testing.T) {
 
 	a := splitPhaseAssessment(t)
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatal(err)
-	}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(&stubRunRepo{}),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if err == nil {
 		t.Fatalf("Evaluate error = %v, want missing EvaluationCommitter", err)
 	}
@@ -138,23 +126,19 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 	a.ClearEvents()
 	execution := executionForAssessment(a, "ok")
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatal(err)
-	}
 	assessmentRepo := &fakeAssessmentRepo{assessment: a}
 	runRepo := &stubRunRepo{}
 	stager := &engineRecordingEventStager{}
 	svc := NewEngine(
 		assessmentRepo,
 		stubInputResolver{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 		WithEvaluationCommitter(failingEvaluationCommitter{err: commitErr}),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, stager),
 	).(*service)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, commitErr) {
 		t.Fatalf("Evaluate error = %v, want %v", err, commitErr)
 	}

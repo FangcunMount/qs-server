@@ -18,8 +18,6 @@ type Executor struct {
 	evaluator *calcscoring.Evaluator
 }
 
-var _ evaluationexecute.Evaluator = (*Executor)(nil)
-
 // NewExecutor 创建因子计分 评估 executor。
 func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return NewExecutorWithDeps(

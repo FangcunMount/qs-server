@@ -29,7 +29,7 @@ func (r *Repository) LoadGovernanceSnapshot(ctx context.Context) (GovernanceSnap
 	if snapshot.AnalyticsProjectorProcessing, err = r.countScopeStatus(
 		ctx,
 		scopeAnalyticsProjector,
-		evalrun.UnifiedStatusForAnalytics(evalrun.AnalyticsProjectorCheckpointStatusProcessing),
+		evalrun.StatusRunning.String(),
 	); err != nil {
 		return GovernanceSnapshot{}, err
 	}

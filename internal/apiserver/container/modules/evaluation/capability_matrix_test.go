@@ -3,57 +3,31 @@ package evaluation_test
 import (
 	"testing"
 
-	modelcatalogmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	modelcatalogwire "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 )
 
-func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
+func TestEvaluationModuleRegistersOnlyDeclaredDescriptorFamilies(t *testing.T) {
 	t.Parallel()
 
 	descs := modelcatalogwire.DefaultEvaluationDescriptors()
-	registry, err := modelcatalogwire.DefaultTypologyRegistry()
+	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
-		t.Fatalf("DefaultTypologyRegistry() error = %v", err)
+		t.Fatalf("DefaultRuntimeDescriptorRegistry() error = %v", err)
 	}
-
-	evaluators, err := modelcatalogmod.MaterializeEvaluators(descs, modelcatalogmod.WiringDeps{
-		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry: registry,
-	})
-	if err != nil {
-		t.Fatalf("MaterializeEvaluators: %v", err)
+	if registry.Len() != len(descs) {
+		t.Fatalf("runtime descriptor count = %d, want %d", registry.Len(), len(descs))
 	}
-
-	if len(evaluators) != len(descs) {
-		t.Fatalf("evaluator count = %d, want %d", len(evaluators), len(descs))
-	}
-
-	keys := make(map[evaldomain.ExecutionIdentity]bool, len(evaluators))
-	for _, evaluator := range evaluators {
-		keys[evaluator.Key()] = true
-	}
-	if !keys[evaldomain.ExecutionIdentityScaleDefault] {
-		t.Fatal("scale evaluator not materialized")
-	}
-	if !keys[evaldomain.ExecutionIdentityPersonalityTypology] {
-		t.Fatal("configured typology evaluator not materialized")
-	}
-	if !keys[evaldomain.ExecutionIdentityBehavioralRatingDefault] {
-		t.Fatal("behavioral_rating evaluator not materialized")
-	}
-	if !keys[evaldomain.ExecutionIdentityCognitiveDefault] {
-		t.Fatal("cognitive evaluator not materialized")
-	}
-	for _, forbidden := range []domain.Kind{
-		domain.Kind("custom"),
-	} {
-		for key := range keys {
-			if key.Kind == forbidden {
-				t.Fatalf("unexpected evaluator for %q: %#v", forbidden, key)
-			}
+	for _, kind := range domain.RuntimeExecutableKinds() {
+		capability, ok := domain.FamilyCapabilityByKind(kind)
+		family, familyOK := evalpipeline.AlgorithmFamilyFromModelKind(evalpipeline.ModelKind(kind))
+		if !ok || !capability.RuntimeExecutable || !familyOK || !registry.HasAlgorithmFamily(family) {
+			t.Fatalf("runtime descriptor missing for kind %s", kind)
 		}
+	}
+	if registry.HasAlgorithmFamily(domain.AlgorithmFamily("custom")) {
+		t.Fatal("custom runtime descriptor must not be registered")
 	}
 }

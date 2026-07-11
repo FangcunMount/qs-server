@@ -6,6 +6,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -24,8 +25,7 @@ func TestGenericEventAssemblerStagesCanonicalOutcomeWireTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)
 	}
-	outcome := evaloutcome.NewOutcomeFromLegacyResult(a, nil, assessment.NewEvaluationResult(12, assessment.RiskLevelMedium, "medium", "follow", nil).
-		WithModelRef(*a.EvaluationModelRef()))
+	outcome := scaleEventOutcome(a)
 	rpt := domainreport.NewInterpretReport(
 		domainreport.ID(a.ID()),
 		"抑郁自评",
@@ -61,8 +61,7 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)
 	}
-	outcome := evaloutcome.NewOutcomeFromLegacyResult(a, nil, assessment.NewEvaluationResult(12, assessment.RiskLevelMedium, "medium", "follow", nil).
-		WithModelRef(*a.EvaluationModelRef()))
+	outcome := scaleEventOutcome(a)
 	rpt := domainreport.NewInterpretReport(
 		domainreport.ID(a.ID()),
 		"抑郁自评",
@@ -83,6 +82,18 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 	if events[0].EventType() != eventcatalog.InterpretationReportGenerated {
 		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.InterpretationReportGenerated)
 	}
+}
+
+func scaleEventOutcome(a *assessment.Assessment) evaloutcome.Outcome {
+	score := 12.0
+	execution := domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef()),
+		domainoutcome.Summary{PrimaryLabel: "medium", Score: &score},
+		domainoutcome.Detail{Kind: a.EvaluationModelRef().Kind()},
+	)
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: score}
+	execution.Level = &domainoutcome.ResultLevel{Code: string(assessment.RiskLevelMedium), Label: "medium"}
+	return evaloutcome.Outcome{Assessment: a, Execution: execution}
 }
 
 func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {

@@ -845,11 +845,6 @@ func TestApplicationEvaluationPrefersCanonicalExecutionOverLegacyResult(t *testi
 		"NewEvaluationResult(",
 		"NewModelEvaluationResult(",
 	}
-	allowedRelPrefixes := []string{
-		"internal/apiserver/characterization/",
-		"internal/apiserver/application/evaluation/registry/mechanisms/scoring/outcome_mapper.go",
-		"internal/apiserver/application/evaluation/outcome/legacy.go",
-	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -859,11 +854,6 @@ func TestApplicationEvaluationPrefersCanonicalExecutionOverLegacyResult(t *testi
 			return nil
 		}
 		rel := filepath.ToSlash(mustRel(t, root, path))
-		for _, prefix := range allowedRelPrefixes {
-			if strings.HasPrefix(rel, prefix) {
-				return nil
-			}
-		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -907,13 +897,10 @@ func TestApplicationEvaluationExecuteDoesNotExposeFlatKindRouting(t *testing.T) 
 	}
 }
 
-func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
+func TestApplicationEvaluationDoesNotExposeLegacyResultAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
-	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -922,21 +909,59 @@ func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		if _, ok := allowedRelFiles[rel]; ok {
-			return nil
-		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), "LegacyResult()") {
-			t.Fatalf("%s contains LegacyResult(); legacy projection must stay in boundary files only", rel)
+		text := string(data)
+		if strings.Contains(text, "func LegacyResult(") || strings.Contains(text, "func NewOutcomeFromLegacyResult(") {
+			t.Fatalf("%s exposes a legacy EvaluationResult adapter", filepath.ToSlash(mustRel(t, root, path)))
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEvaluationProductionRuntimeIsDescriptorOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := []string{
+		"EvaluatorRegistry",
+		"WithEvaluatorRegistry",
+		"WithFamilyEvaluators",
+		"MaterializeEvaluators",
+		"MaterializeFamilyEvaluators",
+		"familyEvaluators",
+		"resolveEvaluator",
+	}
+	for _, scanRoot := range []string{
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation"),
+		filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation"),
+	} {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, token := range forbidden {
+				if strings.Contains(string(data), token) {
+					t.Fatalf("%s contains %q; production Evaluation must execute through RuntimeDescriptor only", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

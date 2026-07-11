@@ -32,16 +32,12 @@ func TestEvaluatePersistsTraceIDFromContext(t *testing.T) {
 
 	a := splitPhaseAssessment(t)
 	evaluator := scaleEvaluatorForAssessment(a)
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	runRepo := &stubRunRepo{}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		modelInputResolver{model: &evaluationinput.ModelSnapshot{Code: "SCALE-1", Version: "1.0.0"}},
 		&splitPhaseCapture{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 	)
 
@@ -62,16 +58,12 @@ func TestEvaluatePersistsInputSnapshotRefBeforeExecuting(t *testing.T) {
 
 	a := splitPhaseAssessment(t)
 	evaluator := scaleEvaluatorForAssessment(a)
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	runRepo := &stubRunRepo{}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		modelInputResolver{model: &evaluationinput.ModelSnapshot{Code: "SCALE-1", Version: "1.0.0"}},
 		&splitPhaseCapture{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 	)
 
@@ -98,20 +90,16 @@ func TestEvaluateReturnsInputSnapshotPersistenceErrorBeforeExecuting(t *testing.
 	persistErr := errors.New("input snapshot ref save failed")
 	a := splitPhaseAssessment(t)
 	evaluator := scaleEvaluatorForAssessment(a)
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
 	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		modelInputResolver{model: &evaluationinput.ModelSnapshot{Code: "SCALE-1", Version: "1.0.0"}},
 		&splitPhaseCapture{},
-		WithEvaluatorRegistry(registry),
+		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
 	)
 
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	err := svc.Evaluate(context.Background(), a.ID().Uint64())
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want input snapshot persistence error", err)
 	}

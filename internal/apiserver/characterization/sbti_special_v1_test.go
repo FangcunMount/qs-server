@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -38,13 +38,10 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want hidden trigger", detail.SpecialTrigger)
 	}
 
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
 		submittedSBTIAssessment(t), nil,
-		assessment.NewModelEvaluationResult(
-			*submittedSBTIAssessment(t).EvaluationModelRef(),
-			assessment.ResultSummary{PrimaryLabel: detail.TypeCode},
-			assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
-		),
+		domainoutcome.Summary{PrimaryLabel: detail.TypeCode},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))
 	extra := report.ModelExtra()
 	if extra == nil || !extra.IsSpecial || extra.SpecialTrigger != "hidden:drink_gate_q2_answer=2" {
@@ -85,13 +82,10 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want fallback trigger", detail.SpecialTrigger)
 	}
 
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
 		submittedSBTIAssessment(t), nil,
-		assessment.NewModelEvaluationResult(
-			*submittedSBTIAssessment(t).EvaluationModelRef(),
-			assessment.ResultSummary{PrimaryLabel: detail.TypeCode},
-			assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
-		),
+		domainoutcome.Summary{PrimaryLabel: detail.TypeCode},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))
 	extra := report.ModelExtra()
 	if extra == nil || !extra.IsSpecial || extra.SpecialTrigger != "fallback:best_match<60%" {

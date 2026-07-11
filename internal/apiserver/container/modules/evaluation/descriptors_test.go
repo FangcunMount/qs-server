@@ -4,29 +4,24 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evalmodule "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func TestAssertExecutionPathParityRejectsMismatchedEvaluatorPath(t *testing.T) {
+func TestAssertExecutionPathParityRejectsMismatchedProviderPath(t *testing.T) {
 	descs := []evaldomain.ModelDescriptor{
 		{Kind: evaldomain.ModelKindScale},
 	}
-	evaluators := []execute.Evaluator{
-		parityStubEvaluator{path: modelcatalog.ExecutionPathTypologyDescriptor},
-	}
 	providers := []evaluationinputInfra.ModelInputProvider{
-		parityStubInputProvider{path: modelcatalog.ExecutionPathScaleDescriptor},
+		parityStubInputProvider{path: modelcatalog.ExecutionPathTypologyDescriptor},
 	}
 
-	err := evalmodule.AssertExecutionPathParity(descs, evaluators, providers)
+	err := evalmodule.AssertExecutionPathParity(descs, providers)
 	if err == nil {
-		t.Fatal("expected parity error for mismatched evaluator execution path")
+		t.Fatal("expected parity error for mismatched provider execution path")
 	}
 }
 
@@ -34,28 +29,10 @@ func TestAssertExecutionPathParityRejectsCountMismatch(t *testing.T) {
 	descs := []evaldomain.ModelDescriptor{
 		{Kind: evaldomain.ModelKindScale},
 	}
-	err := evalmodule.AssertExecutionPathParity(descs, nil, nil)
+	err := evalmodule.AssertExecutionPathParity(descs, nil)
 	if err == nil {
 		t.Fatal("expected parity error for descriptor count mismatch")
 	}
-}
-
-type parityStubEvaluator struct {
-	path modelcatalog.ExecutionPath
-}
-
-func (s parityStubEvaluator) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityScaleDefault
-}
-
-func (s parityStubEvaluator) ExecutionPath() modelcatalog.ExecutionPath { return s.path }
-
-func (parityStubEvaluator) Execute(context.Context, execute.ExecutionInput) (*domainoutcome.Execution, error) {
-	return nil, nil
-}
-
-func (s parityStubEvaluator) Key() evaldomain.ExecutionIdentity {
-	return s.ExecutionIdentity()
 }
 
 type parityStubInputProvider struct {

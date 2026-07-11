@@ -9,7 +9,6 @@ import (
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 )
 
 // Kind landing contract: every RuntimeExecutable capability must materialize evaluator/builder/provider.
@@ -17,19 +16,6 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	registry, err := DefaultTypologyRegistry()
-	if err != nil {
-		t.Fatalf("DefaultTypologyRegistry: %v", err)
-	}
-	wiringDeps := evaluationmod.WiringDeps{
-		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry: registry,
-	}
-
-	evaluators, err := evaluationmod.MaterializeEvaluators(descs, wiringDeps)
-	if err != nil {
-		t.Fatalf("MaterializeEvaluators: %v", err)
-	}
 	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
@@ -48,7 +34,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MaterializeInputProviders: %v", err)
 	}
-	if err := evaluationmod.AssertExecutionPathParity(descs, evaluators, providers); err != nil {
+	if err := evaluationmod.AssertExecutionPathParity(descs, providers); err != nil {
 		t.Fatalf("AssertExecutionPathParity: %v", err)
 	}
 
