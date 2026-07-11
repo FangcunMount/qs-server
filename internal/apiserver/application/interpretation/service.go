@@ -14,11 +14,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// Service 生成并持久化解释报告s 从 计分结果。
-type Service interface {
-	GenerateAndPersist(ctx context.Context, outcome evaloutcome.Outcome) error
-}
-
 type ReportStateStore interface {
 	SaveState(ctx context.Context, report *domainreport.InterpretReport, testeeID testee.ID) error
 	FindByID(ctx context.Context, id domainreport.ID) (*domainreport.InterpretReport, error)
@@ -126,20 +121,4 @@ func (s *outcomeReportService) persistFailure(ctx context.Context, rpt *domainre
 		return errors.Join(cause, fmt.Errorf("persist report failure: %w", err))
 	}
 	return cause
-}
-
-type service struct {
-	writer interpretationreporting.Writer
-}
-
-// NewService 创建interpretation orchestrator 基于 report writer。
-func NewService(writer interpretationreporting.Writer) Service {
-	return &service{writer: writer}
-}
-
-func (s *service) GenerateAndPersist(ctx context.Context, outcome evaloutcome.Outcome) error {
-	if s == nil || s.writer == nil {
-		return interpretationreporting.ErrWriterNotConfigured()
-	}
-	return s.writer.Write(ctx, outcome)
 }

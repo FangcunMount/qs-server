@@ -618,6 +618,8 @@ type Algorithm = identity.Algorithm
 |------|------|
 | R113 | 新增 `application/evaluation/consistency`：`Scan` 检测 report 已出站但 MySQL status 未 interpreted、计分产物已落库但 status 仍 submitted；`RepairInterpretedFinalization` 幂等重放 reporting 末步（`ApplyOutcome` + assessment Save）；checkpoint 物理合表见 R115 |
 
+> Batch 4 已取消 R113 中的 report→Assessment 补偿路径：`RepairInterpretedFinalization` 和 `ApplyOutcome` 已删除，consistency reconciler 仅保留 Evaluation evaluated 终态修复。
+
 ## Round 114：四机制 Audience / ReportProfile 生产注册（R114）
 
 | 轮次 | 内容 |
@@ -641,6 +643,8 @@ type Algorithm = identity.Algorithm
 | 轮次 | 内容 |
 |------|------|
 | R117 | `application/evaluation/consistency` 接入 container/governance/scheduler；暴露 repair scan 指标与治理动作；生产可触发 `RepairInterpretedFinalization` |
+
+> Batch 4 后 R117 的生产闭环仍保留，但只处理 Evaluation 终态不一致，不再推进 legacy `interpreted`。
 
 ## Round 118：内部 deprecated alias 清理（R118）
 

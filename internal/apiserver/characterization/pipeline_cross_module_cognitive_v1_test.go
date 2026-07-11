@@ -29,8 +29,8 @@ func TestV1CrossModuleSyncCognitiveSurveySubmitWorkerToInterpretedReport(t *test
 	h.submitAssessment(t, ctx)
 	h.runSubmittedWorker(t, ctx)
 
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected cognitive report to be saved")

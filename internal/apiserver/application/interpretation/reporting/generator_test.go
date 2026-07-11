@@ -4,15 +4,70 @@ import (
 	"context"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+type generatorScaleBuilder struct{ report *domainreport.InterpretReport }
+
+func (b generatorScaleBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+func (b generatorScaleBuilder) Key() evaluation.ExecutionIdentity { return b.ExecutionIdentity() }
+func (generatorScaleBuilder) ReportType() domainreport.ReportType {
+	return domainreport.ReportTypeStandard
+}
+func (generatorScaleBuilder) MechanismKey() MechanismReportBuilderKey {
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainreport.ReportTypeStandard,
+	}
+}
+func (b generatorScaleBuilder) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
+	return b.report, nil
+}
+
 func TestGeneratorEmitsReportEventsWithoutAssessmentInterpreted(t *testing.T) {
-	order := make([]string, 0)
-	a := submittedScaleAssessment(t)
-	outcome := scaleOutcomeForWriterTest(a)
-	builders, err := NewReportBuilderRegistry(scaleReportBuilderStub(&order, domainreport.NewInterpretReport(domainreport.ID(a.ID()), "Scale", "S-1", 7, domainreport.RiskLevelLow, "ok", nil, nil, nil), nil))
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(9)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7)),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(0, meta.NewCode("S-1"), "1.0.0", "Scale")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatal(err)
+	}
+	execution := assessment.NewAssessmentOutcome(
+		*a.EvaluationModelRef(),
+		assessment.ResultSummary{PrimaryLabel: "ok"},
+		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	)
+	execution.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 7}
+	if err := a.ApplyScoringOutcome(execution); err != nil {
+		t.Fatal(err)
+	}
+	outcome := evaloutcome.Outcome{
+		Assessment: a,
+		Execution:  execution,
+		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+			DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		},
+	}
+	builders, err := NewReportBuilderRegistry(generatorScaleBuilder{report: domainreport.NewInterpretReport(domainreport.ID(a.ID()), "Scale", "S-1", 7, domainreport.RiskLevelLow, "ok", nil, nil, nil)})
 	if err != nil {
 		t.Fatal(err)
 	}

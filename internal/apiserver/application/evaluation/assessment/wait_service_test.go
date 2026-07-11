@@ -1,8 +1,24 @@
 package assessment
 
 import (
+	"context"
 	"testing"
+	"time"
 )
+
+func TestWaitServiceProjectsGeneratedReportAsTerminalInterpreted(t *testing.T) {
+	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 7, Status: "evaluated"}}
+	reports := &protectedReportQueryStub{report: &ReportResult{AssessmentID: 7, CreatedAt: time.Unix(123, 0)}}
+	service := NewWaitService(management, nil, reports).(*waitService)
+
+	summary, done := service.loadTerminalAssessmentSummary(context.Background(), 7)
+	if !done || summary.Status != "interpreted" {
+		t.Fatalf("summary=%#v done=%v", summary, done)
+	}
+	if management.getByIDResult.Status != "evaluated" {
+		t.Fatalf("canonical assessment mutated to %s", management.getByIDResult.Status)
+	}
+}
 
 func TestAssessmentStatusSummary(t *testing.T) {
 	score := 12.5

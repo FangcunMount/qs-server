@@ -91,6 +91,32 @@ func TestReportingPackageOwnsEventStaging(t *testing.T) {
 	}
 }
 
+func TestInterpretationCannotMutateAssessmentLifecycle(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	interpretationDir := filepath.Join(root, "internal", "apiserver", "application", "interpretation")
+	forbidden := []string{".ApplyOutcome(", ".MarkAsFailed(", "assessment.Repository"}
+	err := filepath.WalkDir(interpretationDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for _, token := range forbidden {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("Interpretation lifecycle boundary violation in %s: %s", path, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

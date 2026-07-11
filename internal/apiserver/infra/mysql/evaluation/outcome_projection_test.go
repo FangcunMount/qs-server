@@ -32,8 +32,8 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 		Label:    "high",
 		Severity: "high",
 	}
-	if err := a.ApplyOutcome(outcome); err != nil {
-		t.Fatalf("ApplyOutcome returned error: %v", err)
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
@@ -119,8 +119,8 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 		Label:    "INTJ",
 		Severity: "none",
 	}
-	if err := a.ApplyOutcome(outcome); err != nil {
-		t.Fatalf("ApplyOutcome returned error: %v", err)
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)

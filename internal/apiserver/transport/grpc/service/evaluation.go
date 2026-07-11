@@ -476,7 +476,7 @@ func normalizeGRPCAssessmentStatuses(raw string) []string {
 	case "pending":
 		return []string{"pending", "submitted"}
 	case "done":
-		return []string{"interpreted"}
+		return []string{"evaluated", "interpreted"}
 	default:
 		return []string{raw}
 	}

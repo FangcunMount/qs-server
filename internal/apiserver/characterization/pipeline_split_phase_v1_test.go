@@ -28,8 +28,8 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !reportSaver.saved {
 		t.Fatal("expected report to be saved in interpretation phase")
@@ -57,8 +57,8 @@ func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !reportSaver.saved {
 		t.Fatal("expected report to be saved in interpretation phase")
@@ -108,8 +108,8 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	if err := svc.GenerateReport(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("GenerateReport: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status after GenerateReport = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status after GenerateReport = %s, want evaluated", a.Status())
 	}
 	if !reportSaver.saved {
 		t.Fatal("expected report to be saved after GenerateReport")

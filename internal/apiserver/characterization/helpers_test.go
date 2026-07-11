@@ -9,7 +9,6 @@ import (
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 
-	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -56,18 +55,10 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
-		repo,
-		scoreProjectors,
-		reportBuilders,
-		reportSaver,
-		&charNoopCompletionNotifier{},
-		nil,
-	)
+	reportGenerator, err := interpretationreporting.NewGenerator(reportBuilders)
 	if err != nil {
-		t.Fatalf("NewInterpretationWriter: %v", err)
+		t.Fatalf("NewGenerator: %v", err)
 	}
-	interpretationService := interpretationapp.NewService(interpretationWriter)
 
 	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
 	familyEvaluators := newV1FamilyEvaluators(t)
@@ -91,11 +82,17 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		opts...,
 	)
 	return &charSplitPhaseService{
-		Service:        core,
-		interpretation: interpretationService,
-		capture:        scoringWriter,
-		snapshotStore:  cfg.SnapshotStore,
-		inlineLegacy:   !cfg.Async,
+		Service:       core,
+		capture:       scoringWriter,
+		snapshotStore: cfg.SnapshotStore,
+		inlineLegacy:  !cfg.Async,
+		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
+			generation, err := reportGenerator.Generate(ctx, outcome)
+			if err != nil {
+				return err
+			}
+			return reportSaver.SaveReportDurably(ctx, generation.Report, outcome.TesteeID(), generation.Events)
+		},
 	}, reportSaver
 }
 
@@ -111,10 +108,10 @@ func (w *charCapturingScoringWriter) Write(ctx context.Context, outcome evaloutc
 
 type charSplitPhaseService struct {
 	evaluationexecute.Service
-	interpretation interpretationapp.Service
 	capture        *charCapturingScoringWriter
 	snapshotStore  outcomescoring.SnapshotStore
 	inlineLegacy   bool
+	generateReport func(context.Context, evaloutcome.Outcome) error
 }
 
 func (s *charSplitPhaseService) Evaluate(ctx context.Context, assessmentID uint64) error {
@@ -128,7 +125,10 @@ func (s *charSplitPhaseService) Evaluate(ctx context.Context, assessmentID uint6
 }
 
 func (s *charSplitPhaseService) GenerateReport(ctx context.Context, assessmentID uint64) error {
-	if err := s.interpretation.GenerateAndPersist(ctx, s.capture.outcome); err != nil {
+	if s.generateReport == nil {
+		return nil
+	}
+	if err := s.generateReport(ctx, s.capture.outcome); err != nil {
 		return err
 	}
 	if s.snapshotStore != nil {
@@ -216,10 +216,12 @@ func newV1RecordingExecuteService(
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
 	return &charSplitPhaseService{
-		Service:        core,
-		interpretation: &charRecordingInterpretation{cap: capture},
-		capture:        recording,
-		inlineLegacy:   true,
+		Service:      core,
+		capture:      recording,
+		inlineLegacy: true,
+		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
+			return (&charRecordingInterpretation{cap: capture}).GenerateAndPersist(ctx, outcome)
+		},
 	}, capture
 }
 
@@ -242,10 +244,6 @@ func (s *charSplitPhaseReportSaver) SaveReportDurably(_ context.Context, _ *doma
 	}
 	return nil
 }
-
-type charNoopCompletionNotifier struct{}
-
-func (*charNoopCompletionNotifier) NotifyCompletion(context.Context, evaloutcome.Outcome) {}
 
 type charTxRunner struct{}
 

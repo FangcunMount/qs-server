@@ -8,10 +8,8 @@ import (
 
 type (
 	ReportBuilder                     = interpretationregistry.ReportBuilder
-	Writer                            = interpretationwriter.Writer
 	ScoreProjector                    = interpretationprojection.ScoreProjector
 	ScoreProjectorRegistry            = interpretationprojection.ScoreProjectorRegistry
-	CompletionNotifier                = interpretationwriter.CompletionNotifier
 	Generation                        = interpretationwriter.Generation
 	Generator                         = interpretationwriter.Generator
 	MechanismReportBuilderKey         = interpretationregistry.MechanismReportBuilderKey
@@ -41,17 +39,12 @@ var (
 	MechanismReportBuilderKeyFromOutcome              = interpretationregistry.MechanismReportBuilderKeyFromOutcome
 	ReportRoutingContextFromOutcome                   = interpretationregistry.ReportRoutingContextFromOutcome
 	OutcomeReportType                                 = interpretationregistry.OutcomeReportType
-	NewInterpretationWriter                           = interpretationwriter.NewInterpretationWriter
-	NewWriter                                         = interpretationwriter.NewWriter
-	NewWriterWithEventAssemblers                      = interpretationwriter.NewWriterWithEventAssemblers
 	NewTransactionalReportDurableSaver                = interpretationwriter.NewTransactionalReportDurableSaver
-	NewWaiterCompletionNotifier                       = interpretationwriter.NewWaiterCompletionNotifier
 	NewGenerator                                      = interpretationwriter.NewGenerator
 	ExecutionPathForMechanismFamily                   = interpretationwriter.ExecutionPathForMechanismFamily
 	ExecutionPathForReportBuilder                     = interpretationwriter.ExecutionPathForReportBuilder
 	ExecutionPathForScoreProjector                    = interpretationwriter.ExecutionPathForScoreProjector
 	ResolveOutcomeKey                                 = interpretationwriter.ResolveOutcomeKey
-	ErrWriterNotConfigured                            = interpretationwriter.ErrWriterNotConfigured
 	NewScoreProjectorRegistry                         = interpretationprojection.NewScoreProjectorRegistry
 	NewEventAssemblerRegistry                         = interpretationprojection.NewEventAssemblerRegistry
 	NewMechanismCanonicalEventAssembler               = interpretationprojection.NewMechanismCanonicalEventAssembler

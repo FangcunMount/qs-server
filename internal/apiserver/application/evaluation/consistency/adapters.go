@@ -7,22 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-// ReportReaderExistenceChecker adapts ReportReader to ReportExistenceChecker.
-type ReportReaderExistenceChecker struct {
-	Reader evaluationreadmodel.ReportReader
-}
-
-func (c ReportReaderExistenceChecker) ReportExists(ctx context.Context, assessmentID uint64) (bool, error) {
-	if c.Reader == nil {
-		return false, nil
-	}
-	row, err := c.Reader.GetReportByAssessmentID(ctx, assessmentID)
-	if err != nil {
-		return false, err
-	}
-	return row != nil, nil
-}
-
 // CompositeScoringArtifactChecker checks snapshot store and score read model.
 type CompositeScoringArtifactChecker struct {
 	SnapshotStore outcomescoring.SnapshotStore

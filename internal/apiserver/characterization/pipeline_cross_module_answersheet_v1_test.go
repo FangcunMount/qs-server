@@ -26,8 +26,8 @@ func TestV1CrossModuleAnswerSheetSubmittedWorkerToInterpretedReport(t *testing.T
 
 	h.runSubmittedWorker(t, ctx)
 
-	if !h.assessment.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", h.assessment.Status())
+	if !h.assessment.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", h.assessment.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected report to be saved after full answersheet pipeline")
@@ -67,8 +67,8 @@ func TestV1CrossModuleAsyncAnswerSheetSubmittedWorkerEvaluatedToReport(t *testin
 
 	h.runEvaluatedWorker(t, ctx)
 
-	if !h.assessment.Status().IsInterpreted() {
-		t.Fatalf("assessment status after evaluated worker = %s, want interpreted", h.assessment.Status())
+	if !h.assessment.Status().IsEvaluated() {
+		t.Fatalf("assessment status after evaluated worker = %s, want evaluated", h.assessment.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected report to be saved after evaluated worker")

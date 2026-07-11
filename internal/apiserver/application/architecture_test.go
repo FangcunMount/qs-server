@@ -1023,7 +1023,7 @@ func TestApplicationEvaluationDoesNotCallApplyEvaluation(t *testing.T) {
 			return err
 		}
 		if strings.Contains(string(data), ".ApplyEvaluation(") {
-			t.Fatalf("%s calls ApplyEvaluation; application must use ApplyOutcome via writer", filepath.ToSlash(mustRel(t, root, path)))
+			t.Fatalf("%s calls ApplyEvaluation; Evaluation must use ApplyScoringOutcome", filepath.ToSlash(mustRel(t, root, path)))
 		}
 		return nil
 	})

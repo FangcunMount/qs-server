@@ -38,14 +38,6 @@ func (r *memoryAssessmentRepo) Delete(context.Context, assessment.ID) error {
 	return nil
 }
 
-type stubReportChecker struct {
-	exists bool
-}
-
-func (s stubReportChecker) ReportExists(context.Context, uint64) (bool, error) {
-	return s.exists, nil
-}
-
 type stubArtifactChecker struct {
 	exists bool
 }
@@ -74,28 +66,12 @@ func submittedAssessmentForConsistency(t *testing.T, id uint64) *assessment.Asse
 	return a
 }
 
-func TestScanDetectsReportWithoutInterpretedStatus(t *testing.T) {
-	t.Parallel()
-
-	a := submittedAssessmentForConsistency(t, 7001)
-	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{exists: true}, stubArtifactChecker{}, nil, repo)
-
-	mismatches, err := reconciler.Scan(context.Background(), []uint64{a.ID().Uint64()})
-	if err != nil {
-		t.Fatalf("Scan: %v", err)
-	}
-	if len(mismatches) != 1 || mismatches[0].Kind != consistency.MismatchReportWithoutInterpretedStatus {
-		t.Fatalf("mismatches = %#v, want report_without_interpreted_status", mismatches)
-	}
-}
-
 func TestScanDetectsScoringArtifactWithoutEvaluatedStatus(t *testing.T) {
 	t.Parallel()
 
 	a := submittedAssessmentForConsistency(t, 7002)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{}, stubArtifactChecker{exists: true}, nil, repo)
+	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, nil, repo)
 
 	mismatches, err := reconciler.Scan(context.Background(), []uint64{a.ID().Uint64()})
 	if err != nil {
@@ -103,53 +79,6 @@ func TestScanDetectsScoringArtifactWithoutEvaluatedStatus(t *testing.T) {
 	}
 	if len(mismatches) != 1 || mismatches[0].Kind != consistency.MismatchScoringArtifactWithoutEvaluatedStatus {
 		t.Fatalf("mismatches = %#v, want scoring_artifact_without_evaluated_status", mismatches)
-	}
-}
-
-func TestRepairInterpretedFinalizationIsIdempotent(t *testing.T) {
-	t.Parallel()
-
-	a := submittedAssessmentForConsistency(t, 7003)
-	if err := a.ApplyScoringOutcome(assessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: "ok"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	)); err != nil {
-		t.Fatal(err)
-	}
-	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
-	execution := assessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: "ok"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	)
-	if err := snapshotStore.Save(context.Background(), a.ID().Uint64(), execution); err != nil {
-		t.Fatal(err)
-	}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{exists: true}, stubArtifactChecker{}, snapshotStore, repo)
-
-	if err := reconciler.RepairInterpretedFinalization(context.Background(), a.ID().Uint64()); err != nil {
-		t.Fatalf("RepairInterpretedFinalization first: %v", err)
-	}
-	if !repo.byID[a.ID().Uint64()].Status().IsInterpreted() {
-		t.Fatalf("status after repair = %s, want interpreted", repo.byID[a.ID().Uint64()].Status())
-	}
-	if err := reconciler.RepairInterpretedFinalization(context.Background(), a.ID().Uint64()); err != nil {
-		t.Fatalf("RepairInterpretedFinalization second: %v", err)
-	}
-}
-
-func TestRepairInterpretedFinalizationRequiresSnapshot(t *testing.T) {
-	t.Parallel()
-
-	a := submittedAssessmentForConsistency(t, 7004)
-	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{exists: true}, stubArtifactChecker{}, outcomescoring.NewMemorySnapshotStore(), repo)
-
-	err := reconciler.RepairInterpretedFinalization(context.Background(), a.ID().Uint64())
-	if err == nil {
-		t.Fatal("RepairInterpretedFinalization error = nil, want missing snapshot")
 	}
 }
 
@@ -167,7 +96,7 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 	if err := snapshotStore.Save(context.Background(), a.ID().Uint64(), execution); err != nil {
 		t.Fatal(err)
 	}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{}, stubArtifactChecker{exists: true}, snapshotStore, repo)
+	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, snapshotStore, repo)
 
 	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("RepairEvaluatedFinalization first: %v", err)
@@ -185,7 +114,7 @@ func TestRepairEvaluatedFinalizationRequiresSnapshot(t *testing.T) {
 
 	a := submittedAssessmentForConsistency(t, 7006)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubReportChecker{}, stubArtifactChecker{exists: true}, outcomescoring.NewMemorySnapshotStore(), repo)
+	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, outcomescoring.NewMemorySnapshotStore(), repo)
 
 	err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64())
 	if err == nil {

@@ -13,9 +13,9 @@ import (
 // 代表"一次具体的测评行为"，是 assessment 子域的核心聚合根
 // 核心职责：
 // 1. 记录测评元数据（谁做的、用什么问卷/解释模型、来源于哪个业务场景）
-// 2. 管理测评生命周期（创建 → 提交 → 评估 → 完成/失败）
+// 2. 管理测评生命周期（创建 → 提交 → evaluated/failed）
 // 3. 记录评估结果摘要（总分、风险等级等兼容字段）
-// 4. 发布领域事件（AssessmentSubmittedEvent、AssessmentInterpretedOutcomeEvent）
+// 4. 发布 Evaluation 领域事件（AssessmentSubmittedEvent、AssessmentEvaluatedEvent、AssessmentFailedEvent）
 type Assessment struct {
 	// === 核心标识 ===
 	id    ID
@@ -282,48 +282,11 @@ func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.I
 	))
 }
 
-// ApplyOutcome 应用 canonical 评估结果。
-// 前置条件：submitted 或 evaluated 状态可以应用完整解读结果，且必须绑定了解释模型。
-func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
-	if !a.status.CanApplyInterpretation() {
-		return NewInvalidStatusError("apply evaluation", a.status)
-	}
-	if !a.HasEvaluationModel() {
-		return ErrNoEvaluationModel
-	}
-	if outcome == nil {
-		return ErrInvalidArgument
-	}
-	modelRef := outcome.ModelRef
-	if modelRef.IsEmpty() {
-		modelRef = *a.modelRef
-		outcome.ModelRef = modelRef
-	} else if !a.modelRef.SameIdentity(modelRef) {
-		return ErrEvaluationModelMismatch
-	}
-
-	now := time.Now()
-	if outcome.Primary != nil {
-		score := outcome.Primary.Value
-		a.totalScore = &score
-	}
-	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
-		risk := RiskLevel(outcome.Level.Code)
-		a.riskLevel = &risk
-	}
-	summary := outcome.Summary
-	a.summary = &summary
-	a.status = StatusInterpreted
-	a.interpretedAt = &now
-
-	return nil
-}
-
 // MarkAsFailed 标记评估失败
-// 前置条件：submitted、evaluated 或 interpreted 状态可以标记失败
+// 前置条件：仅 submitted 状态可以标记 Evaluation 失败。
 // 后置条件：状态变为 failed，记录失败原因，发布 AssessmentFailedEvent
 func (a *Assessment) MarkAsFailed(reason string) error {
-	if !a.status.IsSubmitted() && !a.status.IsEvaluated() && !a.status.IsInterpreted() {
+	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("mark as failed", a.status)
 	}
 	if reason == "" {

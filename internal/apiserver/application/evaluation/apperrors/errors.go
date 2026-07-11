@@ -69,6 +69,10 @@ func InterpretReportNotFound(err error, format string, args ...interface{}) erro
 	return cberrors.WrapC(err, errorCode.ErrInterpretReportNotFound, format, args...)
 }
 
+func IsInterpretReportNotFound(err error) bool {
+	return cberrors.IsCode(err, errorCode.ErrInterpretReportNotFound)
+}
+
 func InterpretReportGenerationFailed(err error, format string, args ...interface{}) error {
 	return cberrors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, format, args...)
 }

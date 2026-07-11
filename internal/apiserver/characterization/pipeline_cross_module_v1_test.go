@@ -28,8 +28,8 @@ func TestV1CrossModuleSyncScaleSurveySubmitWorkerToInterpretedReport(t *testing.
 
 	h.runSubmittedWorker(t, ctx)
 
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected report to be saved after worker-driven evaluation")
@@ -66,8 +66,8 @@ func TestV1CrossModuleAsyncScaleSurveySubmitWorkerEvaluatedToReport(t *testing.T
 
 	h.runEvaluatedWorker(t, ctx)
 
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status after evaluated worker = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status after evaluated worker = %s, want evaluated", a.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected report to be saved after evaluated worker")
@@ -96,8 +96,8 @@ func TestV1CrossModuleSyncMBTISurveySubmitWorkerToInterpretedReport(t *testing.T
 	h.submitAssessment(t, ctx)
 	h.runSubmittedWorker(t, ctx)
 
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !h.reportSaver.saved {
 		t.Fatal("expected MBTI report to be saved")

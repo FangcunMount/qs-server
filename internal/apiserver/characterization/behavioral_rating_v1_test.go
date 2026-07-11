@@ -29,8 +29,8 @@ func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
 	if err := svc.Evaluate(ctx, a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("assessment status = %s, want interpreted", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 	if !reportSaver.saved {
 		t.Fatal("expected behavioral_rating report to be saved")

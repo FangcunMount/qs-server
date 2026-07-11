@@ -61,7 +61,7 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 	}
 }
 
-func TestDomainAssessmentDoesNotDefineApplyEvaluation(t *testing.T) {
+func TestDomainAssessmentDoesNotDefineInterpretationTransitions(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -77,8 +77,10 @@ func TestDomainAssessmentDoesNotDefineApplyEvaluation(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), "func (a *Assessment) ApplyEvaluation(") {
-			t.Fatalf("%s defines ApplyEvaluation; use ApplyOutcome instead", path)
+		for _, token := range []string{"func (a *Assessment) ApplyEvaluation(", "func (a *Assessment) ApplyOutcome("} {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s defines Interpretation-owned transition %s", path, token)
+			}
 		}
 		return nil
 	})

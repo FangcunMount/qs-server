@@ -11,14 +11,19 @@ import (
 type waitService struct {
 	managementService AssessmentManagementService
 	registry          evaluationwaiter.Registry
+	reportQuery       ReportQueryService
 }
 
 // NewWaitService 创建等待测评报告服务实例
-func NewWaitService(managementService AssessmentManagementService, registry evaluationwaiter.Registry) AssessmentWaitService {
-	return &waitService{
+func NewWaitService(managementService AssessmentManagementService, registry evaluationwaiter.Registry, reportQuery ...ReportQueryService) AssessmentWaitService {
+	service := &waitService{
 		managementService: managementService,
 		registry:          registry,
 	}
+	if len(reportQuery) > 0 {
+		service.reportQuery = reportQuery[0]
+	}
+	return service
 }
 
 // WaitReport 等待测评报告
@@ -81,7 +86,22 @@ func (s *waitService) loadTerminalAssessmentSummary(ctx context.Context, assessm
 	if err != nil || result == nil {
 		return evaluationwaiter.StatusSummary{}, false
 	}
+	if result.Status == "evaluated" && s.reportQuery != nil {
+		if report, reportErr := s.reportQuery.GetByAssessmentID(ctx, assessmentID); reportErr == nil && report != nil {
+			result = cloneAsLegacyInterpreted(result, report.CreatedAt)
+		}
+	}
 	return assessmentStatusSummary(result)
+}
+
+func cloneAsLegacyInterpreted(result *AssessmentResult, interpretedAt time.Time) *AssessmentResult {
+	if result == nil {
+		return nil
+	}
+	projected := *result
+	projected.Status = "interpreted"
+	projected.InterpretedAt = &interpretedAt
+	return &projected
 }
 
 // assessmentStatusSummary 测评总结

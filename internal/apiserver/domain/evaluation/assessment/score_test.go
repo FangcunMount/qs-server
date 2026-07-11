@@ -72,7 +72,7 @@ func TestScaleScoreProjectionFromOutcomeRejectsNonScaleOutcome(t *testing.T) {
 	}
 }
 
-func TestApplyOutcomeDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
+func TestApplyScoringOutcomeDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 	modelRef := NewEvaluationModelRefWithIdentity(
 		EvaluationModelKindPersonality,
 		modelcatalog.SubKindTypology,
@@ -106,8 +106,8 @@ func TestApplyOutcomeDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 	outcome.Level = &OutcomeResultLevel{Code: "INTJ", Label: "建筑师", Severity: "none"}
 	outcome.Profile = &ProfileResult{Kind: ProfileKindPersonalityType, Code: "INTJ", Name: "建筑师"}
 
-	if err := a.ApplyOutcome(outcome); err != nil {
-		t.Fatalf("ApplyOutcome: %v", err)
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatalf("ApplyScoringOutcome: %v", err)
 	}
 	if a.RiskLevel() != nil {
 		t.Fatalf("risk level = %v, want nil for typology type code", *a.RiskLevel())

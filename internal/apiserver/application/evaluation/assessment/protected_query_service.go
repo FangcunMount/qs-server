@@ -48,7 +48,7 @@ func (s *protectedQueryService) GetAssessment(ctx context.Context, scope Protect
 	if err != nil {
 		return nil, err
 	}
-	return assessmentCtx.Assessment, nil
+	return s.projectLegacyInterpreted(ctx, assessmentCtx.Assessment)
 }
 
 // ListAssessments 查询测评列表
@@ -70,7 +70,40 @@ func (s *protectedQueryService) ListAssessments(ctx context.Context, scope Prote
 	if err != nil {
 		return nil, err
 	}
-	return s.managementService.List(ctx, scopedDTO)
+	result, err := s.managementService.List(ctx, scopedDTO)
+	if err != nil || result == nil {
+		return result, err
+	}
+	for index, item := range result.Items {
+		projected, projectErr := s.projectLegacyInterpreted(ctx, item)
+		if projectErr != nil {
+			return nil, projectErr
+		}
+		result.Items[index] = projected
+	}
+	return result, nil
+}
+
+// projectLegacyInterpreted derives the legacy journey status without mutating Assessment.
+func (s *protectedQueryService) projectLegacyInterpreted(ctx context.Context, result *AssessmentResult) (*AssessmentResult, error) {
+	if result == nil || result.Status != "evaluated" || s.reportQueryService == nil {
+		return result, nil
+	}
+	report, err := s.reportQueryService.GetByAssessmentID(ctx, result.ID)
+	if err != nil {
+		if evalerrors.IsInterpretReportNotFound(err) {
+			return result, nil
+		}
+		return nil, err
+	}
+	if report == nil {
+		return result, nil
+	}
+	projected := *result
+	projected.Status = "interpreted"
+	interpretedAt := report.CreatedAt
+	projected.InterpretedAt = &interpretedAt
+	return &projected, nil
 }
 
 // GetAssessmentOutcome 获取 结果 测评投影。

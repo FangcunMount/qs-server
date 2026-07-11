@@ -329,7 +329,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		normalized.ScaleCatalog,
 	)
 
-	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, infra.waiterRegistry)
+	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, infra.waiterRegistry, m.ReportQueryService)
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
 		m.ManagementService,
 		normalized.TesteeAccessChecker,
@@ -370,7 +370,6 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 
 	reconciler := consistencyApp.NewReconciler(
 		infra.assessmentRepo,
-		consistencyApp.ReportReaderExistenceChecker{Reader: normalized.ReportReader},
 		consistencyApp.CompositeScoringArtifactChecker{
 			SnapshotStore: snapshotStore,
 			ScoreReader:   infra.scoreReader,

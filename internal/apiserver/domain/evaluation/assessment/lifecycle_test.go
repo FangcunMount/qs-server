@@ -119,7 +119,7 @@ func (s *creatorModelValidatorStub) ValidateEvaluationModel(_ context.Context, m
 	return s.err
 }
 
-func TestApplyOutcomeDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) {
+func TestEvaluatedAssessmentIsTerminalAndRejectsFailureRewrite(t *testing.T) {
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1003),
@@ -138,43 +138,24 @@ func TestApplyOutcomeDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) 
 	}
 	a.ClearEvents()
 
-	result := NewEvaluationResult(
-		18.5,
-		RiskLevelHigh,
-		"high risk",
-		"follow up",
-		nil,
+	outcome := NewAssessmentOutcome(
+		*a.EvaluationModelRef(),
+		ResultSummary{PrimaryLabel: "high risk"},
+		EvaluationDetail{Kind: EvaluationModelKindScale},
 	)
-	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
-		t.Fatalf("ApplyOutcome returned error: %v", err)
+	outcome.Primary = &OutcomeScoreValue{Kind: OutcomeScoreKindRawTotal, Value: 18.5}
+	outcome.Level = &OutcomeResultLevel{Code: string(RiskLevelHigh), Label: "high risk"}
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("expected interpreted status, got %s", a.Status())
+	if !a.Status().IsEvaluated() || !a.Status().IsTerminal() {
+		t.Fatalf("expected terminal evaluated status, got %s", a.Status())
 	}
-	if len(a.Events()) != 0 {
-		t.Fatalf("expected apply evaluation to not emit events, got %d", len(a.Events()))
+	if err := a.MarkAsFailed("report save failed"); err == nil {
+		t.Fatal("MarkAsFailed from evaluated must be rejected")
 	}
-
-	if err := a.MarkAsFailed("report save failed"); err != nil {
-		t.Fatalf("MarkAsFailed after interpretation returned error: %v", err)
-	}
-	if !a.Status().IsFailed() {
-		t.Fatalf("expected failed status after failover, got %s", a.Status())
-	}
-	if a.InterpretedAt() != nil {
-		t.Fatalf("expected interpreted_at to be cleared after failover")
-	}
-	if a.TotalScore() != nil {
-		t.Fatalf("expected total_score to be cleared after failover")
-	}
-	if a.RiskLevel() != nil {
-		t.Fatalf("expected risk_level to be cleared after failover")
-	}
-	if len(a.Events()) != 1 {
-		t.Fatalf("expected one failed event after failover, got %d", len(a.Events()))
-	}
-	if a.Events()[0].EventType() != EventTypeFailed {
-		t.Fatalf("expected failed event after failover, got %s", a.Events()[0].EventType())
+	if !a.Status().IsEvaluated() || a.TotalScore() == nil || *a.TotalScore() != 18.5 {
+		t.Fatalf("report failure rewrote evaluation facts: status=%s score=%v", a.Status(), a.TotalScore())
 	}
 }
 
@@ -209,14 +190,11 @@ func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
 	}
 	a.ClearEvents()
 
-	if err := a.MarkAsFailed("report generation failed"); err != nil {
-		t.Fatalf("MarkAsFailed from evaluated returned error: %v", err)
+	if err := a.MarkAsFailed("report generation failed"); err == nil {
+		t.Fatal("MarkAsFailed from evaluated must be rejected")
 	}
-	if !a.Status().IsFailed() {
-		t.Fatalf("expected failed status, got %s", a.Status())
-	}
-	if len(a.Events()) != 1 || a.Events()[0].EventType() != EventTypeFailed {
-		t.Fatalf("expected failed event, got %#v", a.Events())
+	if !a.Status().IsEvaluated() || len(a.Events()) != 0 {
+		t.Fatalf("evaluated facts changed: status=%s events=%#v", a.Status(), a.Events())
 	}
 }
 
@@ -255,7 +233,7 @@ func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
 	}
 }
 
-func TestApplyOutcomeValidatesEvaluationModelRef(t *testing.T) {
+func TestApplyScoringOutcomeValidatesEvaluationModelRef(t *testing.T) {
 	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := NewAssessment(
 		1,
@@ -277,18 +255,18 @@ func TestApplyOutcomeValidatesEvaluationModelRef(t *testing.T) {
 		Kind:    EvaluationModelKindPersonality,
 		Payload: "INTJ",
 	})
-	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
-		t.Fatalf("ApplyOutcome returned error: %v", err)
+	if err := a.ApplyScoringOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
+		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
 	}
-	if !a.Status().IsInterpreted() {
-		t.Fatalf("expected interpreted status, got %s", a.Status())
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("expected evaluated status, got %s", a.Status())
 	}
 	if result.Detail.Kind != EvaluationModelKindPersonality {
 		t.Fatalf("result detail kind = %s, want mbti", result.Detail.Kind)
 	}
 }
 
-func TestApplyOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
+func TestApplyScoringOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1006),
@@ -307,7 +285,7 @@ func TestApplyOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
 
 	result := NewEvaluationResult(0, RiskLevelNone, "", "", nil).
 		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS"))
-	if err := a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != ErrEvaluationModelMismatch {
-		t.Fatalf("ApplyOutcome error = %v, want ErrEvaluationModelMismatch", err)
+	if err := a.ApplyScoringOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != ErrEvaluationModelMismatch {
+		t.Fatalf("ApplyScoringOutcome error = %v, want ErrEvaluationModelMismatch", err)
 	}
 }

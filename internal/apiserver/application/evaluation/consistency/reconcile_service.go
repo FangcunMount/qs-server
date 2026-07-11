@@ -28,7 +28,7 @@ func NewReconcileService(reconciler *Reconciler, reader evaluationreadmodel.Asse
 	}
 }
 
-// ReconcileOnce lists pre-interpreted assessments, scans for drift, and repairs mismatches.
+// ReconcileOnce scans submitted assessments for incomplete Evaluation finalization.
 func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, error) {
 	if s == nil || s.reconciler == nil {
 		return 0, fmt.Errorf("evaluation consistency reconcile service is not configured")
@@ -43,7 +43,6 @@ func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, e
 	rows, _, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
 		Statuses: []string{
 			assessment.StatusSubmitted.String(),
-			assessment.StatusEvaluated.String(),
 		},
 	}, evaluationreadmodel.PageRequest{Page: 1, PageSize: limit})
 	if err != nil {
@@ -71,8 +70,6 @@ func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, e
 
 		var repairErr error
 		switch mismatch.Kind {
-		case MismatchReportWithoutInterpretedStatus:
-			repairErr = s.reconciler.RepairInterpretedFinalization(ctx, mismatch.AssessmentID)
 		case MismatchScoringArtifactWithoutEvaluatedStatus:
 			repairErr = s.reconciler.RepairEvaluatedFinalization(ctx, mismatch.AssessmentID)
 		default:

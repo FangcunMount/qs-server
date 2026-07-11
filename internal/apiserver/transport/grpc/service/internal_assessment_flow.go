@@ -219,7 +219,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 		)
 		resp := &pb.EvaluateAssessmentResponse{
 			Success: true,
-			Status:  "interpreted",
+			Status:  "evaluated",
 			Message: "评估完成，但获取结果失败",
 		}
 		applyLatestRunAuditMetadata(ctx, s.runQueryService, req.AssessmentId, func(traceID, inputSnapshotRef string) {
@@ -312,15 +312,17 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 
 func assessmentResultStatus(result *assessmentApp.AssessmentResult) string {
 	if result == nil {
-		return "interpreted"
+		return "evaluated"
 	}
 	switch result.Status {
 	case string(assessmentDomain.StatusEvaluated):
 		return "evaluated"
 	case string(assessmentDomain.StatusFailed):
 		return "failed"
-	default:
+	case string(assessmentDomain.StatusInterpreted):
 		return "interpreted"
+	default:
+		return result.Status
 	}
 }
 

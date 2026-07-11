@@ -38,7 +38,7 @@
 | 报告重试 | 读取持久化的 EvaluationOutcome，不重新执行 Calculation |
 | 兼容状态 | API 可暂时把 `Assessment=evaluated && Report=generated` 投影为 legacy `interpreted` |
 
-Batch 3 完成后，生产 Evaluation Service 已不再暴露 `GenerateReport` / `GenerateReportFromOutcome`，也不再装配 Interpretation Service。Worker 消费 `assessment.evaluated` 后使用 `outcome_id` 直接调用 Interpretation Outcome 用例。`reporting.Writer` 中剩余的 legacy Assessment 推进债务留待后续批次清理。
+Batch 4 完成后，`Assessment.ApplyOutcome` 和旧 `reporting.Writer` 已删除；Interpretation 不再获得 Assessment Repository，也不保存或改写 Assessment。`evaluated` 是 Evaluation 的成功终态，Report 失败只改变 Report 状态机。
 
 ## 提交边界决策（已锁定，待实现）
 
@@ -75,6 +75,7 @@ Batch 1–3 已消除这两处生产主路差距：score projection 由 Evaluati
 | Batch 1：EvaluationOutcome 可靠提交 | 已完成 | Outcome、Run、score projection、Assessment evaluated 与 `assessment.evaluated` 在 EvaluationCommitter 收口 |
 | Batch 2：Report 独立状态机 | 已完成 | Report 独立维护 `pending / generating / generated / failed`、failure reason、attempt 和 outcome ID；重试只读 EvaluationOutcome |
 | Batch 3：切换异步编排 | 已完成 | Worker 以 outcome ID 直调 Interpretation；Evaluation Service 无 GenerateReport；生产 inline report 分支删除；Preview 保留独立内存组合 |
+| Batch 4：切断状态越界 | 已完成 | Interpretation 无 Assessment 写权；删除 `ApplyOutcome`；`evaluated` 后禁止 `MarkAsFailed`；legacy `interpreted` 由 Assessment+Report 查询投影派生；consistency 仅修复 Evaluation 终态 |
 
 ## 三模块差异承载
 

@@ -3,11 +3,46 @@ package assessment
 import (
 	"context"
 	"testing"
+	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
+
+func TestProtectedQueryProjectsGeneratedReportAsLegacyInterpreted(t *testing.T) {
+	generatedAt := time.Unix(123, 0)
+	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 901, OrgID: 12, TesteeID: 401, Status: "evaluated"}}
+	reports := &protectedReportQueryStub{report: &ReportResult{AssessmentID: 901, CreatedAt: generatedAt}}
+	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
+	svc := NewProtectedQueryService(management, reports, nil, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
+
+	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "interpreted" || result.InterpretedAt == nil || !result.InterpretedAt.Equal(generatedAt) {
+		t.Fatalf("legacy projection = %#v", result)
+	}
+	if management.getByIDResult.Status != "evaluated" || management.getByIDResult.InterpretedAt != nil {
+		t.Fatalf("query projection mutated canonical assessment = %#v", management.getByIDResult)
+	}
+}
+
+func TestProtectedQueryKeepsEvaluatedWhenReportIsAbsent(t *testing.T) {
+	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 902, OrgID: 12, TesteeID: 402, Status: "evaluated"}}
+	reports := &protectedReportQueryStub{getErr: cberrors.WithCode(errorCode.ErrInterpretReportNotFound, "report not found")}
+	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
+	svc := NewProtectedQueryService(management, reports, nil, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
+
+	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "evaluated" || result.InterpretedAt != nil {
+		t.Fatalf("assessment without report = %#v", result)
+	}
+}
 
 func TestProtectedQueryServiceListAssessmentsAdminKeepsWideScopeAndDefaults(t *testing.T) {
 	management := &protectedManagementStub{}
@@ -305,12 +340,16 @@ type protectedReportQueryStub struct {
 	lastListDTO         ListReportsDTO
 	getErr              error
 	listErr             error
+	report              *ReportResult
 }
 
 func (s *protectedReportQueryStub) GetByAssessmentID(_ context.Context, assessmentID uint64) (*ReportResult, error) {
 	s.lastGetAssessmentID = assessmentID
 	if s.getErr != nil {
 		return nil, s.getErr
+	}
+	if s.report != nil {
+		return s.report, nil
 	}
 	return &ReportResult{AssessmentID: assessmentID}, nil
 }
