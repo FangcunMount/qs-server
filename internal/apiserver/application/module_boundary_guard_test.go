@@ -22,6 +22,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 		{
 			name: "evaluation_to_interpretation",
 			scanRoots: []string{
+				"internal/apiserver/domain/evaluation",
 				"internal/apiserver/application/evaluation",
 				"internal/apiserver/container/modules/evaluation",
 			},

@@ -1,5 +1,3 @@
-//go:build refactor_target
-
 package assessment
 
 import (
@@ -9,8 +7,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// These tests describe the accepted Evaluation lifecycle target. They remain
-// behind refactor_target until the production state machine is migrated.
+// These tests protect the accepted Evaluation lifecycle target during the
+// remaining domain refactor batches.
 func TestTargetEvaluatedAssessmentIsSuccessfulTerminalState(t *testing.T) {
 	t.Run("status is terminal", func(t *testing.T) {
 		a := targetEvaluatedAssessment(t)

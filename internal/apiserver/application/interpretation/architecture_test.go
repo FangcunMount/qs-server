@@ -117,6 +117,33 @@ func TestInterpretationCannotMutateAssessmentLifecycle(t *testing.T) {
 	}
 }
 
+func TestOutcomeReportServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "service.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "s.outcomes.FindByID") {
+		t.Fatal("report retry must read the durable EvaluationOutcome by id")
+	}
+	for _, forbidden := range []string{
+		"application/evaluation/execute",
+		".Evaluate(",
+		"assessment.Repository",
+		"evaluationrun.Repository",
+		"ScoreRepository",
+		"ScoreProjector",
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("OutcomeReportService must not re-evaluate or write Evaluation facts: %s", forbidden)
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
