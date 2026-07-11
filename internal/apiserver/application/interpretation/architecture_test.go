@@ -143,6 +143,57 @@ func TestOutcomeReportServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T
 	}
 }
 
+// Keep the Batch I0 boundary guard broader than the outcome use case itself.
+// Interpretation may read Evaluation facts through adapters during the
+// transition, but it must never acquire Evaluation write ports or commands.
+func TestInterpretationProductionCodeDoesNotAcquireEvaluationWriteCapabilities(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	paths := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
+		filepath.Join(root, "internal", "apiserver", "application", "interpretation"),
+		filepath.Join(root, "internal", "apiserver", "container", "modules", "interpretation"),
+		filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation"),
+	}
+	forbidden := []string{
+		"assessment.Repository",
+		"evaluationrun.Repository",
+		"ScoreRepository",
+		"ScoreProjector",
+		"application/evaluation/execute",
+		"application/evaluation/runquery",
+		"domain/evaluation/run",
+		"port/evaluationrun",
+		"infra/mongo/evaluation",
+		".ApplyOutcome(",
+		".ApplyScoringOutcome(",
+		".ApplyScoringProjection(",
+		".MarkAsFailed(",
+	}
+
+	for _, dir := range paths {
+		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
+			}
+			data, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			for _, token := range forbidden {
+				if strings.Contains(string(data), token) {
+					t.Fatalf("Interpretation acquired Evaluation write capability in %s: %s", path, token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

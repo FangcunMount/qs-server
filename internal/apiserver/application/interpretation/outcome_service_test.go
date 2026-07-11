@@ -67,6 +67,16 @@ func (g *failThenGenerate) Generate(_ context.Context, outcome evaloutcome.Outco
 	return interpretationreporting.Generation{Report: domainreport.NewInterpretReport(domainreport.ID(outcome.AssessmentID()), "Scale", "S-1", 12, domainreport.RiskLevelLow, "ok", nil, nil, nil)}, nil
 }
 
+type alwaysGenerate struct{ calls int }
+
+func (g *alwaysGenerate) Generate(_ context.Context, outcome evaloutcome.Outcome) (interpretationreporting.Generation, error) {
+	g.calls++
+	if outcome.Assessment == nil || !outcome.Assessment.Status().IsEvaluated() {
+		return interpretationreporting.Generation{}, errors.New("outcome context missing")
+	}
+	return interpretationreporting.Generation{Report: domainreport.NewInterpretReport(domainreport.ID(outcome.AssessmentID()), "Scale", "S-1", 12, domainreport.RiskLevelLow, "ok", nil, nil, nil)}, nil
+}
+
 type durableReportSaverStub struct {
 	calls      int
 	testeeID   testee.ID
@@ -118,6 +128,37 @@ func TestOutcomeReportRetryReadsPersistedOutcomeAndAdvancesIndependentAttempt(t 
 		if states.statuses[i] != want {
 			t.Fatalf("statuses = %#v", states.statuses)
 		}
+	}
+}
+
+// This characterizes the public idempotency behavior that the three-object
+// model must retain: once an artifact has been generated, duplicate delivery
+// returns it without rebuilding or staging a second terminal event.
+func TestOutcomeReportDuplicateDeliveryReturnsGeneratedArtifactWithoutRebuilding(t *testing.T) {
+	record := reportOutcomeRecord(t)
+	outcomes := &outcomeRepoForReport{record: record}
+	states := &reportStateStoreStub{}
+	generator := &alwaysGenerate{}
+	saver := &durableReportSaverStub{stateStore: states}
+	svc := NewOutcomeReportService(outcomes, states, generator, saver)
+
+	first, err := svc.GenerateByOutcomeID(context.Background(), record.ID())
+	if err != nil {
+		t.Fatalf("first generation: %v", err)
+	}
+	second, err := svc.GenerateByOutcomeID(context.Background(), record.ID())
+	if err != nil {
+		t.Fatalf("duplicate generation: %v", err)
+	}
+
+	if first != second || second.Status() != domainreport.ReportStatusGenerated {
+		t.Fatalf("duplicate delivery returned unexpected artifact: first=%p second=%p status=%s", first, second, second.Status())
+	}
+	if generator.calls != 1 || saver.calls != 1 {
+		t.Fatalf("duplicate delivery rebuilt report: generator=%d saver=%d", generator.calls, saver.calls)
+	}
+	if outcomes.reads != 2 {
+		t.Fatalf("outcome reads = %d, want one read per delivery", outcomes.reads)
 	}
 }
 

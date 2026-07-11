@@ -111,6 +111,20 @@ func TestBuildReportReadModelQueryExactRiskOverridesHighRiskOnly(t *testing.T) {
 	}
 }
 
+// Legacy reports predate the explicit lifecycle field. Keep their read
+// compatibility until Batch I8 switches the query path to Generation -> Report.
+func TestGeneratedReportConditionsIncludeLegacyGeneratedDocuments(t *testing.T) {
+	got := generatedReportConditions()
+	want := bson.A{
+		bson.M{"status": "generated"},
+		bson.M{"status": bson.M{"$exists": false}},
+		bson.M{"status": ""},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("generated report conditions = %#v, want %#v", got, want)
+	}
+}
+
 func TestBuildReportReadModelFindOptionsDocumentsPageAndSortContract(t *testing.T) {
 	opts := buildReportReadModelFindOptions(evaluationreadmodel.PageRequest{Page: 3, PageSize: 20})
 

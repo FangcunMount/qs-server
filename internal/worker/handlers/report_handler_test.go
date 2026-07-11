@@ -55,6 +55,25 @@ func TestHandleInterpretationReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.
 	}
 }
 
+// A failed report is an auditable Interpretation fact, not a command to run
+// Interpretation again. Retrying is owned by delivery/retry policy or an
+// explicit command, never by the failed-event consumer.
+func TestHandleInterpretationReportFailedDoesNotTriggerReportGeneration(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := &Dependencies{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient: client,
+	}
+	handler := handleInterpretationReportFailed(deps)
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if client.generateReportCalls != 0 {
+		t.Fatalf("failed report event retriggered report generation: calls=%d", client.generateReportCalls)
+	}
+}
+
 func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode string) []byte {
 	t.Helper()
 
@@ -80,6 +99,33 @@ func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode st
 			"primary_score": map[string]any{"kind": "raw_total", "value": 42.0},
 			"level":         map[string]any{"code": levelCode, "label": levelCode, "severity": severity},
 			"generated_at":  now,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	return payload
+}
+
+func mustBuildReportFailedPayload(t *testing.T) []byte {
+	t.Helper()
+
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	payload, err := json.Marshal(map[string]any{
+		"id":            "evt-report-failed",
+		"eventType":     eventcatalog.InterpretationReportFailed,
+		"occurredAt":    now,
+		"aggregateType": "Report",
+		"aggregateID":   "report-1",
+		"data": map[string]any{
+			"org_id":        18,
+			"report_id":     "report-1",
+			"assessment_id": "123",
+			"outcome_id":    "9001",
+			"testee_id":     99,
+			"attempt":       2,
+			"reason":        "template unavailable",
+			"failed_at":     now,
 		},
 	})
 	if err != nil {
