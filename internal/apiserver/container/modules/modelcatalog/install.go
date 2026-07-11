@@ -7,14 +7,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
-// InstallHost extends the shared compose seam with assessment-model bindings.
+// InstallHost 扩展共享的容器组合接缝与模型目录绑定
 type InstallHost interface {
 	compose.Host
 	EnsureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, error)
 	SetAssessmentModelModule(*Module)
 }
 
-// InstallFrom wires and registers the assessment-model module using composition-root host inputs.
+// InstallFrom 使用容器组合根的输入连接和注册模型目录模块
 func InstallFrom(host InstallHost) error {
 	infra, err := host.EnsureSurveyRuntimeInfra()
 	if err != nil {

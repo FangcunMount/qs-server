@@ -77,7 +77,7 @@ func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint6
 func filterScaleAnalysisRows(items []evaluationreadmodel.AssessmentRow) []evaluationreadmodel.AssessmentRow {
 	filtered := make([]evaluationreadmodel.AssessmentRow, 0, len(items))
 	for _, item := range items {
-		if assessment.Status(item.Status) != assessment.StatusInterpreted || item.MedicalScaleID == nil {
+		if assessment.Status(item.Status) != assessment.StatusInterpreted || item.EvaluationModelKind == nil || *item.EvaluationModelKind != "scale" || item.EvaluationModelCode == nil {
 			continue
 		}
 		filtered = append(filtered, item)
@@ -86,7 +86,7 @@ func filterScaleAnalysisRows(items []evaluationreadmodel.AssessmentRow) []evalua
 }
 
 func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []evaluationreadmodel.AssessmentRow) []ScaleTrendAnalysis {
-	scaleMap := make(map[uint64]*ScaleTrendAnalysis)
+	scaleMap := make(map[string]*ScaleTrendAnalysis)
 	for _, item := range items {
 		scaleTrend := ensureScaleTrendAnalysis(scaleMap, item)
 		scaleTrend.Tests = append(scaleTrend.Tests, s.buildScaleTestRecord(ctx, item))
@@ -94,22 +94,18 @@ func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []eval
 	return finalizeScaleTrendAnalyses(scaleMap)
 }
 
-func ensureScaleTrendAnalysis(scaleMap map[uint64]*ScaleTrendAnalysis, item evaluationreadmodel.AssessmentRow) *ScaleTrendAnalysis {
-	scaleID := uint64(0)
-	if item.MedicalScaleID != nil {
-		scaleID = *item.MedicalScaleID
-	}
-	if existing, ok := scaleMap[scaleID]; ok {
+func ensureScaleTrendAnalysis(scaleMap map[string]*ScaleTrendAnalysis, item evaluationreadmodel.AssessmentRow) *ScaleTrendAnalysis {
+	scaleCode := derefString(item.EvaluationModelCode)
+	if existing, ok := scaleMap[scaleCode]; ok {
 		return existing
 	}
 
 	scaleTrend := &ScaleTrendAnalysis{
-		ScaleID:   scaleID,
-		ScaleCode: derefString(item.MedicalScaleCode),
-		ScaleName: derefString(item.MedicalScaleName),
+		ScaleCode: scaleCode,
+		ScaleName: derefString(item.EvaluationModelTitle),
 		Tests:     make([]TestRecordData, 0),
 	}
-	scaleMap[scaleID] = scaleTrend
+	scaleMap[scaleCode] = scaleTrend
 	return scaleTrend
 }
 
@@ -166,7 +162,7 @@ func (s *statisticsService) appendScaleFactorScores(ctx context.Context, item ev
 	}
 }
 
-func finalizeScaleTrendAnalyses(scaleMap map[uint64]*ScaleTrendAnalysis) []ScaleTrendAnalysis {
+func finalizeScaleTrendAnalyses(scaleMap map[string]*ScaleTrendAnalysis) []ScaleTrendAnalysis {
 	scales := make([]ScaleTrendAnalysis, 0, len(scaleMap))
 	for _, scaleTrend := range scaleMap {
 		sort.Slice(scaleTrend.Tests, func(i, j int) bool {
@@ -361,8 +357,8 @@ func expandPeriodicWindow(startDate, endDate, submittedAt *time.Time) (*time.Tim
 
 func periodicScaleName(items []evaluationreadmodel.AssessmentRow) string {
 	for _, item := range items {
-		if item.MedicalScaleName != nil {
-			return *item.MedicalScaleName
+		if item.EvaluationModelTitle != nil {
+			return *item.EvaluationModelTitle
 		}
 	}
 	return ""

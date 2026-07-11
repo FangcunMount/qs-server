@@ -106,13 +106,7 @@ func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*p
 }
 
 func normalizeModelRef(ref port.InputRef) port.ModelRef {
-	if !ref.ModelRef.IsEmpty() {
-		return ref.ModelRef
-	}
-	if ref.MedicalScaleCode != "" {
-		return port.ModelRef{Kind: port.EvaluationModelKindScale, Code: ref.MedicalScaleCode}
-	}
-	return port.ModelRef{}
+	return ref.ModelRef
 }
 
 func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
@@ -207,7 +201,7 @@ func (ScaleModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
 }
 
 func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	medicalScale, err := p.scaleCatalog.GetScaleByRef(ctx, ref.ModelRef)
+	scale, err := p.scaleCatalog.GetScaleByRef(ctx, ref.ModelRef)
 	if err != nil {
 		return nil, err
 	}
@@ -220,11 +214,10 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 		return nil, err
 	}
 
-	payload := port.ScaleModelPayload{Scale: medicalScale}
+	payload := port.ScaleModelPayload{Scale: scale}
 	return &port.InputSnapshot{
-		Model:         port.NewScaleModelSnapshot(medicalScale),
+		Model:         port.NewScaleModelSnapshot(scale),
 		ModelPayload:  payload,
-		MedicalScale:  medicalScale,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}, nil

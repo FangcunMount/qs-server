@@ -66,7 +66,7 @@ type InternalServiceClient interface {
 	GenerateQuestionnaireQRCode(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
 	HandleQuestionnairePublishedPostActions(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
-	// 场景：worker 处理 scale.changed(published) 事件后调用
+	// 场景：worker 处理 assessment_model.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
 	HandleScalePublishedPostActions(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
@@ -245,7 +245,7 @@ type InternalServiceServer interface {
 	GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
 	HandleQuestionnairePublishedPostActions(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
-	// 场景：worker 处理 scale.changed(published) 事件后调用
+	// 场景：worker 处理 assessment_model.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
 	HandleScalePublishedPostActions(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)

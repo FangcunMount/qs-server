@@ -26,11 +26,6 @@ type AssessmentPO struct {
 	QuestionnaireCode    string `gorm:"column:questionnaire_code;size:100;not null"`
 	QuestionnaireVersion string `gorm:"column:questionnaire_version;size:50;not null"`
 
-	// 量表引用（可选）
-	MedicalScaleID   *uint64 `gorm:"column:medical_scale_id"`
-	MedicalScaleCode *string `gorm:"column:medical_scale_code;size:100"`
-	MedicalScaleName *string `gorm:"column:medical_scale_name;size:255"`
-
 	// 通用解释模型引用（可选）
 	EvaluationModelKind      *string `gorm:"column:evaluation_model_kind;size:50;index:idx_evaluation_model"`
 	EvaluationModelSubKind   *string `gorm:"column:evaluation_model_sub_kind;size:50"`
@@ -99,10 +94,6 @@ type AssessmentScorePO struct {
 
 	// 受试者（冗余，用于趋势分析查询）
 	TesteeID uint64 `gorm:"column:testee_id;not null"`
-
-	// 量表引用（冗余，用于趋势分析查询）
-	MedicalScaleID   uint64 `gorm:"column:medical_scale_id;not null"`
-	MedicalScaleCode string `gorm:"column:medical_scale_code;size:100;not null"`
 
 	// 因子信息
 	FactorCode   string `gorm:"column:factor_code;size:100;not null"`

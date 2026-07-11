@@ -257,17 +257,23 @@ func (c *Container) ProfileLinkService() *iam.ProfileLinkService {
 }
 
 func (c *Container) PublishedModelTitleResolver() modelcatalogApp.PublishedModelTitleResolver {
-	if c == nil || c.AssessmentModelModule == nil {
+	lister := c.PublishedModelLister()
+	if lister == nil {
 		return nil
 	}
-	return c.AssessmentModelModule.TitleResolver
+	return modelcatalogApp.NewPublishedModelTitleResolver(lister)
 }
 
 func (c *Container) PublishedModelLister() rulesetport.PublishedModelLister {
-	if c == nil || c.AssessmentModelModule == nil {
+	if c == nil {
 		return nil
 	}
-	return c.AssessmentModelModule.PublishedLister
+	catalog, err := c.ensurePublishedModelCatalog()
+	if err != nil {
+		return nil
+	}
+	lister, _ := catalog.(rulesetport.PublishedModelLister)
+	return lister
 }
 
 func (c *Container) TesteeQuery() testeeApp.TesteeQueryService {

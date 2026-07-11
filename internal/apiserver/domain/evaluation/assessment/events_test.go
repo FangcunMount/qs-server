@@ -29,7 +29,6 @@ func TestNewAssessmentSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 		NewQuestionnaireRefByCode(meta.NewCode("QNR-1"), "1.0.0"),
 		NewAnswerSheetRef(meta.FromUint64(2001)),
 		&modelRef,
-		nil,
 		time.Now(),
 	)
 	data := evt.Payload()

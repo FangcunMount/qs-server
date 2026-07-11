@@ -269,7 +269,7 @@ answersheet.submitted
 - Outbox 负责业务数据库与消息出站之间的一致性。
 - Worker 消费不承诺 exactly-once，业务侧必须幂等。
 - `configs/events.yaml` 是事件类型、topic、delivery class 和 handler 的契约入口。
-- `scale.changed` / `questionnaire.changed` 是模型/问卷资产变化事件，不等于某次 Assessment 的执行完成。
+- `assessment_model.changed` / `questionnaire.changed` 是模型/问卷资产变化事件，不等于某次 Assessment 的执行完成。
 - `assessment.interpreted` 表示解读完成且 outcome 已投影；`report.generated` 表示报告已持久化。
 
 ---

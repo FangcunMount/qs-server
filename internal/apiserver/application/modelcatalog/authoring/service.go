@@ -14,15 +14,16 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// Service is the DefinitionV2-first authoring use case.
+// Service 是 DefinitionV2 先行的评估模型定义编辑用例
 type Service struct {
 	ModelRepo  modelcatalogport.ModelRepository
-	Authorizer modelcatalog.Authorizer
-	Registry   appdefinition.Registry
-	Codes      codes.CodesService
-	Now        func() time.Time
+	Authorizer modelcatalog.Authorizer // 授权器
+	Registry   appdefinition.Registry  // 注册表
+	Codes      codes.CodesService      // 代码服务
+	Now        func() time.Time        // 当前时间
 }
 
+// GetDefinition 获取评估模型定义
 func (s Service) GetDefinition(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*domain.Definition, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
@@ -34,6 +35,7 @@ func (s Service) GetDefinition(ctx context.Context, actor modelcatalog.ActorCont
 	return model.DefinitionV2, nil
 }
 
+// SaveDefinition 保存评估模型定义
 func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorContext, modelCode string, value *domain.Definition) (*domain.Definition, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
@@ -64,6 +66,7 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 	return model.DefinitionV2, nil
 }
 
+// ValidateDefinition 验证评估模型定义
 func (s Service) ValidateDefinition(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.ValidationResult, error) {
 	value, err := s.GetDefinition(ctx, actor, modelCode)
 	if err != nil {
@@ -77,6 +80,7 @@ func (s Service) ValidateDefinition(ctx context.Context, actor modelcatalog.Acto
 	return modelcatalog.NewValidationResult(result), nil
 }
 
+// ApplyCodes 应用代码
 func (s Service) ApplyCodes(ctx context.Context, actor modelcatalog.ActorContext, input modelcatalog.ApplyCodesDTO) ([]string, error) {
 	if _, err := s.loadAndAuthorize(ctx, actor, input.Code); err != nil {
 		return nil, err
@@ -91,6 +95,7 @@ func (s Service) ApplyCodes(ctx context.Context, actor modelcatalog.ActorContext
 	return s.Codes.Apply(ctx, kind, input.Count, prefix, map[string]interface{}{"assessment_model_code": input.Code, "target": input.Target})
 }
 
+// PreviewReport 预览报告
 func (s Service) PreviewReport(ctx context.Context, actor modelcatalog.ActorContext, modelCode string, input json.RawMessage) (*modelcatalog.PreviewReportResult, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
@@ -112,6 +117,7 @@ func (s Service) PreviewReport(ctx context.Context, actor modelcatalog.ActorCont
 	return out, nil
 }
 
+// loadAndAuthorize 加载和授权评估模型
 func (s Service) loadAndAuthorize(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*domain.AssessmentModel, error) {
 	if modelCode == "" {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "model code is required")
@@ -129,6 +135,7 @@ func (s Service) loadAndAuthorize(ctx context.Context, actor modelcatalog.ActorC
 	return model, nil
 }
 
+// now 获取当前时间
 func (s Service) now() time.Time {
 	if s.Now != nil {
 		return s.Now().UTC()
@@ -136,6 +143,7 @@ func (s Service) now() time.Time {
 	return time.Now().UTC()
 }
 
+// codeKindAndPrefix 获取代码类型和前缀
 func codeKindAndPrefix(target string) (string, string) {
 	switch target {
 	case "dimension":

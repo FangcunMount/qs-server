@@ -5,8 +5,7 @@ import (
 	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
-// ValidateSharedFactorPayloadForPublish validates the behavioral/cognitive
-// wire payload before publication and maps adapter issues to application output.
+// ValidateSharedFactorPayloadForPublish 验证行为/认知线缆负载发布前的验证，并将适配器问题映射为应用输出
 func ValidateSharedFactorPayloadForPublish(data []byte) []domain.DomainValidationIssue {
 	issues, err := sharedpayload.ValidateDefinitionBodyJSONForPublish(data)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 )
 
-// ExportEvaluationCatalog builds descriptors and typology registry owned by assessmentmodel.
+// ExportEvaluationCatalog 构建模型目录的描述符和模型算法注册表
 func ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
 	typologyRegistry, err := evalregistry.DefaultTypologyRegistry()
 	if err != nil {
@@ -23,7 +23,7 @@ func ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
 	}, nil
 }
 
-// ExportEvaluationCatalog exposes the default evaluation catalog from the aggregate module.
+// ExportEvaluationCatalog 暴露模型目录的默认评估目录
 func (m *Module) ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
 	if m == nil {
 		return compose.EvaluationCatalog{}, nil

@@ -28,7 +28,7 @@ const (
 	FootprintAssessmentCreated           = "footprint.assessment_created"
 	FootprintReportGenerated             = "footprint.report_generated"
 
-	ScaleChanged = "scale.changed"
+	AssessmentModelChanged = "assessment_model.changed"
 
 	TaskOpened    = "task.opened"
 	TaskCompleted = "task.completed"
@@ -54,7 +54,7 @@ func EventTypes() []string {
 		FootprintAnswerSheetSubmitted,
 		FootprintAssessmentCreated,
 		FootprintReportGenerated,
-		ScaleChanged,
+		AssessmentModelChanged,
 		TaskOpened,
 		TaskCompleted,
 		TaskExpired,

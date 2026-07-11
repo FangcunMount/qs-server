@@ -17,15 +17,14 @@ func TestScaleAnalysisQueryGroupsAndSortsInterpretedAssessments(t *testing.T) {
 	risk := "high"
 	scaleA := "scale-a"
 	scaleB := "scale-b"
-	scaleAID := uint64(101)
-	scaleBID := uint64(102)
 	scaleAName := "Scale A"
 	scaleBName := "Scale B"
+	scaleKind := "scale"
 	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
 		items: []*assessmentApp.AssessmentResult{
-			{ID: 3, Status: "interpreted", MedicalScaleID: &scaleBID, MedicalScaleCode: &scaleB, MedicalScaleName: &scaleBName, InterpretedAt: &interpretedLate, SubmittedAt: &submittedAt, TotalScore: &score, RiskLevel: &risk},
-			{ID: 9, Status: "submitted", MedicalScaleID: &scaleAID, MedicalScaleCode: &scaleA, MedicalScaleName: &scaleAName, InterpretedAt: &interpretedEarly},
-			{ID: 4, Status: "interpreted", MedicalScaleID: &scaleAID, MedicalScaleCode: &scaleA, MedicalScaleName: &scaleAName, InterpretedAt: &interpretedEarly},
+			{ID: 3, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleB, ModelTitle: &scaleBName, InterpretedAt: &interpretedLate, SubmittedAt: &submittedAt, TotalScore: &score, RiskLevel: &risk},
+			{ID: 9, Status: "submitted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, InterpretedAt: &interpretedEarly},
+			{ID: 4, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, InterpretedAt: &interpretedEarly},
 			{ID: 5, Status: "interpreted"},
 		},
 	}
@@ -74,10 +73,11 @@ func TestScaleAnalysisQuerySortsTestsByDateAndFallsBackOnScoreError(t *testing.T
 	older := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 	newer := time.Date(2026, 4, 2, 10, 0, 0, 0, time.UTC)
 	scaleCode := "scale-a"
+	scaleKind := "scale"
 	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
 		items: []*assessmentApp.AssessmentResult{
-			{ID: 2, Status: "interpreted", MedicalScaleCode: &scaleCode, SubmittedAt: &newer},
-			{ID: 1, Status: "interpreted", MedicalScaleCode: &scaleCode, SubmittedAt: &older},
+			{ID: 2, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &newer},
+			{ID: 1, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &older},
 		},
 	}
 	scoreQuery := &scaleAnalysisScoreQueryStub{

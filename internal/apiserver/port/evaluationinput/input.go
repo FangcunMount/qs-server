@@ -61,17 +61,14 @@ func (r ModelRef) IsEmpty() bool {
 type InputRef struct {
 	AssessmentID         uint64
 	ModelRef             ModelRef
-	MedicalScaleCode     string
 	AnswerSheetID        uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 }
 
 type InputSnapshot struct {
-	Model        *ModelSnapshot
-	ModelPayload ModelPayload
-	// Deprecated: use ScalePayload(input) instead.
-	MedicalScale  *scalesnapshot.ScaleSnapshot
+	Model         *ModelSnapshot
+	ModelPayload  ModelPayload
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
 	NormSubject   *NormSubjectSnapshot
@@ -150,9 +147,6 @@ func ScalePayload(input *InputSnapshot) (*scalesnapshot.ScaleSnapshot, bool) {
 		if payload, ok := input.Model.Payload.(ScaleModelPayload); ok && payload.Scale != nil {
 			return payload.Scale, true
 		}
-	}
-	if input.MedicalScale != nil {
-		return input.MedicalScale, true
 	}
 	return nil, false
 }

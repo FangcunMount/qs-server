@@ -40,32 +40,6 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 		),
 	}
 
-	if dto.MedicalScaleID != nil {
-		scaleCode := ""
-		if dto.MedicalScaleCode != nil {
-			scaleCode = *dto.MedicalScaleCode
-		}
-		scaleName := ""
-		if dto.MedicalScaleName != nil {
-			scaleName = *dto.MedicalScaleName
-		}
-		scaleVersion := ""
-		if dto.ScaleVersion != nil {
-			scaleVersion = *dto.ScaleVersion
-		}
-		scaleRef := domainAssessment.NewMedicalScaleRefWithVersion(
-			meta.FromUint64(*dto.MedicalScaleID),
-			meta.NewCode(scaleCode),
-			scaleName,
-			scaleVersion,
-		)
-		req.MedicalScaleRef = &scaleRef
-		if req.ModelRef == nil {
-			modelRef := scaleRef.ToEvaluationModelRef()
-			req.ModelRef = &modelRef
-		}
-	}
-
 	if dto.ModelCode != nil {
 		kind := domainAssessment.EvaluationModelKind(strings.TrimSpace(valueOrEmpty(dto.ModelKind)))
 		if kind == "" {

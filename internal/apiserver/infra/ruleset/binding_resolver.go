@@ -3,8 +3,6 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	aminfrac "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -40,20 +38,5 @@ func (r *CatalogBindingResolver) ResolveAssessmentBinding(
 	if err != nil || !ok || ref.IsEmpty() {
 		return port.AssessmentBinding{}, ok, err
 	}
-	if ref.Kind != domain.KindScale {
-		return port.AssessmentBinding{Ref: ref}, true, nil
-	}
-	snapshot, err := r.catalog.GetPublishedModelByRef(ctx, ref)
-	if err != nil {
-		return port.AssessmentBinding{}, false, err
-	}
-	scale, err := aminfrac.DecodeScaleFromPublished(snapshot)
-	if err != nil {
-		return port.AssessmentBinding{}, false, err
-	}
-	version := scale.ScaleVersion
-	if version == "" {
-		version = ref.Version
-	}
-	return port.ScaleAssessmentBinding(ref, scale.ID, scale.Code, scale.Title, version), true, nil
+	return port.AssessmentBinding{Ref: ref}, true, nil
 }

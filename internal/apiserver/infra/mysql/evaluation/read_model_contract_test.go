@@ -14,7 +14,6 @@ import (
 )
 
 func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
-	scaleID := uint64(3001)
 	scaleCode := "SDS"
 	scaleName := "抑郁自评"
 	modelKind := "scale"
@@ -31,9 +30,6 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 		TesteeID:               2001,
 		QuestionnaireCode:      "Q-SDS",
 		QuestionnaireVersion:   "1.0.0",
-		MedicalScaleID:         &scaleID,
-		MedicalScaleCode:       &scaleCode,
-		MedicalScaleName:       &scaleName,
 		EvaluationModelKind:    &modelKind,
 		EvaluationModelCode:    &scaleCode,
 		EvaluationModelVersion: &modelVersion,
@@ -56,9 +52,6 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 	if row.QuestionnaireCode != "Q-SDS" || row.QuestionnaireVersion != "1.0.0" {
 		t.Fatalf("unexpected questionnaire fields: %#v", row)
 	}
-	if row.MedicalScaleID == nil || *row.MedicalScaleID != scaleID || row.MedicalScaleCode == nil || *row.MedicalScaleCode != scaleCode {
-		t.Fatalf("unexpected scale fields: %#v", row)
-	}
 	if row.EvaluationModelKind == nil || *row.EvaluationModelKind != modelKind ||
 		row.EvaluationModelCode == nil || *row.EvaluationModelCode != scaleCode ||
 		row.EvaluationModelVersion == nil || *row.EvaluationModelVersion != modelVersion ||
@@ -74,36 +67,28 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 }
 
 func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(t *testing.T) {
-	scaleID := uint64(3001)
 	rows := scorePOsToReadRow([]*AssessmentScorePO{
 		{
-			AssessmentID:     101,
-			MedicalScaleID:   scaleID,
-			MedicalScaleCode: "SDS",
-			FactorCode:       "total",
-			FactorName:       "总分",
-			IsTotalScore:     true,
-			RawScore:         88,
-			RiskLevel:        "high",
-			Conclusion:       "high risk",
-			Suggestion:       "follow",
+			AssessmentID: 101,
+			FactorCode:   "total",
+			FactorName:   "总分",
+			IsTotalScore: true,
+			RawScore:     88,
+			RiskLevel:    "high",
+			Conclusion:   "high risk",
+			Suggestion:   "follow",
 		},
 		{
-			AssessmentID:     101,
-			MedicalScaleID:   scaleID,
-			MedicalScaleCode: "SDS",
-			FactorCode:       "sleep",
-			FactorName:       "睡眠",
-			RawScore:         12,
-			RiskLevel:        "medium",
+			AssessmentID: 101,
+			FactorCode:   "sleep",
+			FactorName:   "睡眠",
+			RawScore:     12,
+			RiskLevel:    "medium",
 		},
 	})
 
 	if rows.AssessmentID != 101 || rows.TotalScore != 88 || rows.RiskLevel != "high" {
 		t.Fatalf("unexpected summary row: %#v", rows)
-	}
-	if rows.MedicalScaleID == nil || *rows.MedicalScaleID != scaleID || rows.MedicalScaleCode == nil || *rows.MedicalScaleCode != "SDS" {
-		t.Fatalf("unexpected scale metadata: %#v", rows)
 	}
 	if len(rows.FactorScores) != 2 || rows.FactorScores[0].FactorCode != "total" || rows.FactorScores[1].FactorCode != "sleep" {
 		t.Fatalf("unexpected factor rows: %#v", rows.FactorScores)
@@ -114,16 +99,13 @@ func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(
 }
 
 func TestScorePOsToReadRowUsesSingleNonTotalFactorForTrendRows(t *testing.T) {
-	scaleID := uint64(3001)
 	row := scorePOsToReadRow([]*AssessmentScorePO{
 		{
-			AssessmentID:     102,
-			MedicalScaleID:   scaleID,
-			MedicalScaleCode: "SDS",
-			FactorCode:       "sleep",
-			FactorName:       "睡眠",
-			RawScore:         12,
-			RiskLevel:        "medium",
+			AssessmentID: 102,
+			FactorCode:   "sleep",
+			FactorName:   "睡眠",
+			RawScore:     12,
+			RiskLevel:    "medium",
 		},
 	})
 
@@ -176,7 +158,7 @@ func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) 
 		"testee_id = ?",
 		"testee_id IN",
 		"status IN",
-		"medical_scale_code = ?",
+		"evaluation_model_kind = ? AND evaluation_model_code = ?",
 		"risk_level = ?",
 		"created_at >= ?",
 		"created_at < ?",

@@ -27,7 +27,7 @@ func scaleInputSnapshot() *evaluationinput.InputSnapshot {
 			Version: "1.0.0",
 			Title:   "Scale",
 		},
-		MedicalScale: &scalesnapshot.ScaleSnapshot{
+		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			Title:                "Scale",
 			ScaleVersion:         "1.0.0",
@@ -57,7 +57,7 @@ func scaleInputSnapshot() *evaluationinput.InputSnapshot {
 					},
 				},
 			},
-		},
+		}},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
@@ -72,7 +72,6 @@ func scaleInputSnapshot() *evaluationinput.InputSnapshot {
 
 func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
-	scaleRef := assessment.NewMedicalScaleRef(meta.FromUint64(9001), meta.NewCode("S-001"), "Scale")
 	modelRef := assessment.NewEvaluationModelRefByCode(
 		assessment.EvaluationModelKindScale,
 		meta.NewCode("S-001"),
@@ -86,7 +85,6 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(6001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7001)),
-		assessment.WithMedicalScale(scaleRef),
 		assessment.WithEvaluationModel(modelRef),
 	)
 	if err != nil {
@@ -101,7 +99,6 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 
 func draftScaleAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
-	scaleRef := assessment.NewMedicalScaleRef(meta.FromUint64(9001), meta.NewCode("S-001"), "Scale")
 	modelRef := assessment.NewEvaluationModelRefByCode(
 		assessment.EvaluationModelKindScale,
 		meta.NewCode("S-001"),
@@ -115,7 +112,6 @@ func draftScaleAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(6001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7001)),
-		assessment.WithMedicalScale(scaleRef),
 		assessment.WithEvaluationModel(modelRef),
 	)
 	if err != nil {

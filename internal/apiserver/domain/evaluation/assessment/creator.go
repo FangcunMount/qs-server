@@ -41,8 +41,7 @@ type CreateAssessmentRequest struct {
 	Origin Origin
 
 	// 可选字段
-	ModelRef        *EvaluationModelRef
-	MedicalScaleRef *MedicalScaleRef
+	ModelRef *EvaluationModelRef
 }
 
 // NewCreateAssessmentRequest 创建请求构造函数
@@ -60,14 +59,6 @@ func NewCreateAssessmentRequest(
 		AnswerSheetRef:   answerSheetRef,
 		Origin:           origin,
 	}
-}
-
-// WithMedicalScale 设置关联量表
-func (r CreateAssessmentRequest) WithMedicalScale(ref MedicalScaleRef) CreateAssessmentRequest {
-	r.MedicalScaleRef = &ref
-	modelRef := ref.ToEvaluationModelRef()
-	r.ModelRef = &modelRef
-	return r
 }
 
 // WithEvaluationModel 设置解释模型引用。
@@ -105,50 +96,9 @@ type AnswerSheetValidator interface {
 	BelongsToQuestionnaire(ctx context.Context, answerSheetRef AnswerSheetRef, questionnaireRef QuestionnaireRef) (bool, error)
 }
 
-// ScaleValidator 量表验证器接口
-// 用于验证量表是否存在且与问卷关联
-type ScaleValidator interface {
-	// Exists 检查量表是否存在
-	Exists(ctx context.Context, ref MedicalScaleRef) (bool, error)
-
-	// IsLinkedToQuestionnaire 检查量表是否与问卷关联
-	IsLinkedToQuestionnaire(ctx context.Context, scaleRef MedicalScaleRef, questionnaireRef QuestionnaireRef) (bool, error)
-}
-
 // EvaluationModelValidator 解释模型验证器接口。
 type EvaluationModelValidator interface {
 	ValidateEvaluationModel(ctx context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error
-}
-
-type scaleEvaluationModelValidator struct {
-	scaleValidator ScaleValidator
-}
-
-// NewScaleEvaluationModelValidator 将旧 ScaleValidator 适配为通用解释模型验证器。
-func NewScaleEvaluationModelValidator(v ScaleValidator) EvaluationModelValidator {
-	return scaleEvaluationModelValidator{scaleValidator: v}
-}
-
-func (v scaleEvaluationModelValidator) ValidateEvaluationModel(ctx context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error {
-	if v.scaleValidator == nil || modelRef.IsEmpty() || !modelRef.IsScale() {
-		return nil
-	}
-	scaleRef := NewMedicalScaleRefWithVersion(modelRef.ID(), modelRef.Code(), modelRef.Title(), modelRef.Version())
-	exists, err := v.scaleValidator.Exists(ctx, scaleRef)
-	if err != nil {
-		return fmt.Errorf("failed to validate evaluation model: %w", err)
-	}
-	if !exists {
-		return ErrScaleNotFound
-	}
-	linked, err := v.scaleValidator.IsLinkedToQuestionnaire(ctx, scaleRef, questionnaireRef)
-	if err != nil {
-		return fmt.Errorf("failed to check evaluation model-questionnaire link: %w", err)
-	}
-	if !linked {
-		return ErrScaleNotLinked
-	}
-	return nil
 }
 
 // ==================== 默认AssessmentCreator 默认实现 ====================
@@ -160,7 +110,6 @@ type DefaultAssessmentCreator struct {
 	questionnaireValidator QuestionnaireValidator
 	answerSheetValidator   AnswerSheetValidator
 	modelValidator         EvaluationModelValidator
-	scaleValidator         ScaleValidator
 }
 
 // AssessmentCreatorOption 创建器配置选项
@@ -194,16 +143,6 @@ func WithEvaluationModelValidator(v EvaluationModelValidator) AssessmentCreatorO
 	}
 }
 
-// WithScaleValidator 设置量表验证器
-func WithScaleValidator(v ScaleValidator) AssessmentCreatorOption {
-	return func(c *DefaultAssessmentCreator) {
-		c.scaleValidator = v
-		if c.modelValidator == nil {
-			c.modelValidator = NewScaleEvaluationModelValidator(v)
-		}
-	}
-}
-
 // New默认AssessmentCreator 创建默认测评创建服务
 func NewDefaultAssessmentCreator(opts ...AssessmentCreatorOption) *DefaultAssessmentCreator {
 	c := &DefaultAssessmentCreator{}
@@ -232,9 +171,6 @@ func (c *DefaultAssessmentCreator) Create(
 	opts := make([]AssessmentOption, 0)
 	if req.ModelRef != nil {
 		opts = append(opts, WithEvaluationModel(*req.ModelRef))
-	}
-	if req.MedicalScaleRef != nil {
-		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
 	}
 
 	assessment, err := NewAssessment(
@@ -313,25 +249,6 @@ func (c *DefaultAssessmentCreator) validate(
 		}
 	}
 
-	// 5. 验证量表（兼容旧调用方未传 ModelRef 的情况）
-	if req.ModelRef == nil && req.MedicalScaleRef != nil && c.scaleValidator != nil {
-		exists, err := c.scaleValidator.Exists(ctx, *req.MedicalScaleRef)
-		if err != nil {
-			return fmt.Errorf("failed to validate medical scale: %w", err)
-		}
-		if !exists {
-			return ErrScaleNotFound
-		}
-
-		linked, err := c.scaleValidator.IsLinkedToQuestionnaire(ctx, *req.MedicalScaleRef, req.QuestionnaireRef)
-		if err != nil {
-			return fmt.Errorf("failed to check scale-questionnaire link: %w", err)
-		}
-		if !linked {
-			return ErrScaleNotLinked
-		}
-	}
-
 	return nil
 }
 
@@ -371,9 +288,6 @@ func (c *SimpleAssessmentCreator) Create(
 	opts := make([]AssessmentOption, 0)
 	if req.ModelRef != nil {
 		opts = append(opts, WithEvaluationModel(*req.ModelRef))
-	}
-	if req.MedicalScaleRef != nil {
-		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
 	}
 
 	// 2. 创建 pending 测评

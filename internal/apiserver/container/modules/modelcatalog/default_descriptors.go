@@ -5,27 +5,27 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
-// DefaultTypologyModules returns built-in typology algorithm aliases.
+// DefaultTypologyModules 返回内置的模型算法别名
 func DefaultTypologyModules() []evalregistry.TypologyModule {
 	return evalregistry.DefaultTypologyModules()
 }
 
-// DefaultTypologyRegistry builds the typology runtime registry for evaluation wiring.
+// DefaultTypologyRegistry 构建模型目录的运行时注册表
 func DefaultTypologyRegistry() (evalregistry.TypologyRegistry, error) {
 	return evalregistry.DefaultTypologyRegistry()
 }
 
-// TypologyRegistryWith builds a typology module registry with injectable adapter registries.
+// TypologyRegistryWith 构建模型目录的模块注册表
 func TypologyRegistryWith(opts evalregistry.TypologyRuntimeOptions) (evalregistry.TypologyRegistry, error) {
 	return evalregistry.TypologyRegistryWith(opts)
 }
 
-// DefaultTypologyDescriptors projects the configured typology descriptor for evaluation wiring.
+// DefaultTypologyDescriptors 配置模型目录的描述符
 func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 	return evalregistry.DefaultTypologyDescriptors()
 }
 
-// DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
+// DefaultEvaluationDescriptors 返回所有能力支持的执行路径的运行时描述符
 func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
 	return evalregistry.DefaultEvaluationDescriptors()
 }

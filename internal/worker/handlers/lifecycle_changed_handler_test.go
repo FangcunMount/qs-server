@@ -33,23 +33,23 @@ func TestQuestionnaireChangedHandler_PublishedGeneratesQRCode(t *testing.T) {
 	}
 }
 
-func TestScaleChangedHandler_NonPublishedSkipsQRCode(t *testing.T) {
+func TestAssessmentModelChangedHandler_NonPublishedSkipsQRCode(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := &Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		InternalClient: client,
 	}
 
-	payload := mustBuildLifecycleChangedPayload(t, "scale.changed", "MedicalScale", "12", map[string]any{
-		"scale_id":   12,
+	payload := mustBuildLifecycleChangedPayload(t, "assessment_model.changed", "AssessmentModel", "SDS", map[string]any{
+		"kind":       "scale",
 		"code":       "SDS",
 		"version":    "",
-		"name":       "SDS",
+		"title":      "SDS",
 		"action":     "updated",
 		"changed_at": time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC),
 	})
 
-	if err := handleScaleChanged(deps)(context.Background(), "scale.changed", payload); err != nil {
+	if err := handleAssessmentModelChanged(deps)(context.Background(), "assessment_model.changed", payload); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -58,23 +58,23 @@ func TestScaleChangedHandler_NonPublishedSkipsQRCode(t *testing.T) {
 	}
 }
 
-func TestScaleChangedHandler_PublishedInvokesPostActions(t *testing.T) {
+func TestAssessmentModelChangedHandler_PublishedScaleInvokesPostActions(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := &Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		InternalClient: client,
 	}
 
-	payload := mustBuildLifecycleChangedPayload(t, "scale.changed", "MedicalScale", "12", map[string]any{
-		"scale_id":   12,
+	payload := mustBuildLifecycleChangedPayload(t, "assessment_model.changed", "AssessmentModel", "SDS", map[string]any{
+		"kind":       "scale",
 		"code":       "SDS",
 		"version":    "1.0.0",
-		"name":       "SDS",
+		"title":      "SDS",
 		"action":     "published",
 		"changed_at": time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC),
 	})
 
-	if err := handleScaleChanged(deps)(context.Background(), "scale.changed", payload); err != nil {
+	if err := handleAssessmentModelChanged(deps)(context.Background(), "assessment_model.changed", payload); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -83,9 +83,9 @@ func TestScaleChangedHandler_PublishedInvokesPostActions(t *testing.T) {
 	}
 }
 
-func TestScaleChangedHandler_RejectsMalformedPayload(t *testing.T) {
+func TestAssessmentModelChangedHandler_RejectsMalformedPayload(t *testing.T) {
 	deps := &Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	err := handleScaleChanged(deps)(context.Background(), "scale.changed", []byte("{"))
+	err := handleAssessmentModelChanged(deps)(context.Background(), "assessment_model.changed", []byte("{"))
 	if err == nil {
 		t.Fatal("expected malformed payload to be rejected")
 	}

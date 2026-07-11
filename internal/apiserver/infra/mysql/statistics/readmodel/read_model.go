@@ -397,11 +397,11 @@ func (m *readModel) GetDimensionAnalysisSummary(ctx context.Context, orgID int64
 		SELECT COUNT(*) AS count
 		FROM (
 			SELECT DISTINCT
-				CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END AS content_type,
-				COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) AS content_code
+				CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END AS content_type,
+				COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) AS content_code
 			FROM assessment
 			WHERE org_id = ? AND deleted_at IS NULL
-			  AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
+			  AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
 		) content`, orgID).Scan(&contentRow).Error; err != nil {
 		return summary, err
 	}

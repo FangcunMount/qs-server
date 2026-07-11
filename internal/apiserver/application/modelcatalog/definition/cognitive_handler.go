@@ -9,16 +9,17 @@ import (
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
-// CognitiveDefinitionHandler owns cognitive DefinitionV2 validation and its
-// published payload projection.
+// CognitiveDefinitionHandler 拥有认知 DefinitionV2 验证及其发布的负载投影
 type CognitiveDefinitionHandler struct {
-	NormRepo port.NormRepository
+	NormRepo port.NormRepository // 规范存储库
 }
 
+// Supports 支持特定评估模型身份
 func (CognitiveDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindCognitive
 }
 
+// ValidateForPublish 验证发布
 func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
@@ -34,6 +35,7 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 	return issues
 }
 
+// BuildSnapshotPayload 构建评估模型快照负载
 func (CognitiveDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
 	if model == nil || model.DefinitionV2 == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("cognitive definition_v2 is required")

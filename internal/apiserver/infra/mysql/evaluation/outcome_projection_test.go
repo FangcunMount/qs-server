@@ -123,7 +123,7 @@ func newSubmittedScaleAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(2003)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(5002)),
-		assessment.WithMedicalScale(assessment.NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("SDS"), "抑郁自评")),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SDS"), "", "抑郁自评")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)

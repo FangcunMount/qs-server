@@ -74,17 +74,13 @@ func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) Model
 			algorithm = string(mappedAlgorithm)
 		}
 	}
-	if kind == "" && row.MedicalScaleCode != nil {
-		kind = string(modelcatalog.KindScale)
-		algorithm = string(modelcatalog.AlgorithmScaleDefault)
-	}
 	return EnrichModelIdentityResult(ModelIdentityResult{
 		Kind:      kind,
 		SubKind:   subKind,
 		Algorithm: algorithm,
-		Code:      firstNonEmpty(derefString(row.EvaluationModelCode), derefString(row.MedicalScaleCode)),
+		Code:      derefString(row.EvaluationModelCode),
 		Version:   derefString(row.EvaluationModelVersion),
-		Title:     firstNonEmpty(derefString(row.EvaluationModelTitle), derefString(row.MedicalScaleName)),
+		Title:     derefString(row.EvaluationModelTitle),
 	}, "")
 }
 

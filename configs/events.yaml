@@ -36,13 +36,13 @@ events:
     description: "问卷生命周期变化"
     handler: questionnaire_changed_handler
 
-  scale.changed:
+  assessment_model.changed:
     topic: questionnaire-lifecycle
     delivery: best_effort
-    aggregate: MedicalScale
-    domain: scale
-    description: "量表生命周期变化"
-    handler: scale_changed_handler
+    aggregate: AssessmentModel
+    domain: modelcatalog
+    description: "测评模型生命周期变化"
+    handler: assessment_model_changed_handler
 
   answersheet.submitted:
     topic: assessment-lifecycle

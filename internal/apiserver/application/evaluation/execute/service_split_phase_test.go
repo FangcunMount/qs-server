@@ -173,7 +173,7 @@ func splitPhaseAssessment(t *testing.T) *domainAssessment.Assessment {
 		domainAssessment.NewAnswerSheetRef(meta.FromUint64(8001)),
 		domainAssessment.NewAdhocOrigin(),
 		domainAssessment.WithID(domainAssessment.NewID(7001)),
-		domainAssessment.WithMedicalScale(domainAssessment.NewMedicalScaleRef(meta.FromUint64(6001), meta.NewCode("SCALE-1"), "scale")),
+		domainAssessment.WithEvaluationModel(domainAssessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SCALE-1"), "", "scale")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)

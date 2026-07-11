@@ -37,10 +37,7 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 	}
 
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
-			8, "SCL-001", "Scale", "1.0.0",
-		),
+		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0", Title: "Scale"}},
 	})
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
@@ -48,11 +45,8 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 	if dto.OriginType != "adhoc" {
 		t.Fatalf("expected adhoc origin type, got %q", dto.OriginType)
 	}
-	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
-		t.Fatalf("expected medical scale id 8, got %#v", dto.MedicalScaleID)
-	}
-	if dto.MedicalScaleCode == nil || *dto.MedicalScaleCode != "SCL-001" {
-		t.Fatalf("expected medical scale code SCL-001, got %#v", dto.MedicalScaleCode)
+	if dto.ModelKind == nil || *dto.ModelKind != "scale" || dto.ModelCode == nil || *dto.ModelCode != "SCL-001" {
+		t.Fatalf("expected canonical scale model binding, got %#v", dto)
 	}
 }
 
@@ -191,19 +185,13 @@ func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
 		AnswersheetId:        202,
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
-			8, "SCL-001", "Scale", "1.0.0",
-		),
+		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0", Title: "Scale"}},
 	})
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-	if dto.ModelCode != nil {
-		t.Fatalf("ModelCode = %#v, want nil for scale binding", dto.ModelCode)
-	}
-	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
-		t.Fatalf("MedicalScaleID = %#v, want 8", dto.MedicalScaleID)
+	if dto.ModelKind == nil || *dto.ModelKind != "scale" || dto.ModelCode == nil || *dto.ModelCode != "SCL-001" {
+		t.Fatalf("canonical scale binding = %#v", dto)
 	}
 }
 
@@ -245,7 +233,7 @@ func TestBuildCreateAssessmentDTOSkipsBindingWhenUnresolved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-	if dto.ModelCode != nil || dto.MedicalScaleID != nil {
+	if dto.ModelCode != nil {
 		t.Fatalf("dto = %#v, want no model binding", dto)
 	}
 }
@@ -259,19 +247,13 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 		AnswersheetId:        202,
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: rulesetport.ScaleAssessmentBinding(
-			rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0"},
-			8, "SCL-001", "Scale", "1.0.0",
-		),
+		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0", Title: "Scale"}},
 	})
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-	if dto.ModelCode != nil {
-		t.Fatalf("ModelCode = %#v, want nil when scale is bound", dto.ModelCode)
-	}
-	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
-		t.Fatalf("MedicalScaleID = %#v, want 8", dto.MedicalScaleID)
+	if dto.ModelCode == nil || *dto.ModelCode != "SCL-001" {
+		t.Fatalf("ModelCode = %#v, want SCL-001", dto.ModelCode)
 	}
 }
 

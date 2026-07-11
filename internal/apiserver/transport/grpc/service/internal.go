@@ -196,42 +196,34 @@ func applyAssessmentBinding(
 	if !ok {
 		return nil
 	}
-	switch binding.Ref.Kind {
-	case domainruleset.KindScale:
-		dto.MedicalScaleID = binding.MedicalScaleID
-		dto.MedicalScaleCode = binding.MedicalScaleCode
-		dto.MedicalScaleName = binding.MedicalScaleName
-		dto.ScaleVersion = binding.ScaleVersion
-	default:
-		mappedKind, subKind, algorithm, ok := domainruleset.LegacyKindMapping(binding.Ref.Kind)
-		if !ok {
-			mappedKind = binding.Ref.Kind
-		}
-		if binding.Ref.SubKind != "" {
-			subKind = binding.Ref.SubKind
-		}
-		if binding.Ref.Algorithm != "" {
-			algorithm = binding.Ref.Algorithm
-		}
-		kind := mappedKind.String()
-		dto.ModelKind = &kind
-		if subKind != "" {
-			subKindStr := subKind.String()
-			dto.ModelSubKind = &subKindStr
-		}
-		if algorithm != "" {
-			algorithmStr := algorithm.String()
-			dto.ModelAlgorithm = &algorithmStr
-		}
-		dto.ModelCode = &binding.Ref.Code
-		dto.ModelVersion = &binding.Ref.Version
-		dto.ModelTitle = &binding.Ref.Title
+	mappedKind, subKind, algorithm, ok := domainruleset.LegacyKindMapping(binding.Ref.Kind)
+	if !ok {
+		mappedKind = binding.Ref.Kind
 	}
+	if binding.Ref.SubKind != "" {
+		subKind = binding.Ref.SubKind
+	}
+	if binding.Ref.Algorithm != "" {
+		algorithm = binding.Ref.Algorithm
+	}
+	kind := mappedKind.String()
+	dto.ModelKind = &kind
+	if subKind != "" {
+		subKindStr := subKind.String()
+		dto.ModelSubKind = &subKindStr
+	}
+	if algorithm != "" {
+		algorithmStr := algorithm.String()
+		dto.ModelAlgorithm = &algorithmStr
+	}
+	dto.ModelCode = &binding.Ref.Code
+	dto.ModelVersion = &binding.Ref.Version
+	dto.ModelTitle = &binding.Ref.Title
 	return nil
 }
 
 func shouldAutoSubmitAssessment(dto assessmentApp.CreateAssessmentDTO) bool {
-	return dto.MedicalScaleID != nil || dto.ModelCode != nil
+	return dto.ModelCode != nil
 }
 
 func (s *InternalService) applyMatchedTaskOrigin(
@@ -540,7 +532,7 @@ func (s *InternalService) generateQuestionnaireQRCode(
 }
 
 // GenerateScaleQRCode 生成量表小程序码
-// 场景：worker 处理 scale.changed(published) 事件后调用
+// 场景：worker 处理 assessment_model.changed(published) 事件后调用
 func (s *InternalService) GenerateScaleQRCode(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,

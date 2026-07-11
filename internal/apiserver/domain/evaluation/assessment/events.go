@@ -37,7 +37,6 @@ func NewAssessmentSubmittedEvent(
 	questionnaireRef QuestionnaireRef,
 	answerSheetRef AnswerSheetRef,
 	modelRef *EvaluationModelRef,
-	medicalScaleRef *MedicalScaleRef,
 	submittedAt time.Time,
 ) AssessmentSubmittedEvent {
 	in := evaldomainevent.SubmittedInput{
@@ -59,15 +58,6 @@ func NewAssessmentSubmittedEvent(
 		}
 		in.ModelCode = modelRef.Code().String()
 		in.ModelVersion = modelRef.Version()
-	}
-	if medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
-		in.ScaleCode = string(medicalScaleRef.Code())
-		in.ScaleVersion = medicalScaleRef.Version()
-		if in.ModelKind == "" {
-			in.ModelKind = EvaluationModelKindScale.String()
-			in.ModelCode = in.ScaleCode
-			in.ModelVersion = in.ScaleVersion
-		}
 	}
 	return evaldomainevent.NewSubmittedEvent(in)
 }

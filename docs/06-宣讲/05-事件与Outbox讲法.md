@@ -360,7 +360,7 @@ report.generated
 
 ```text
 report.changed
-scale.changed
+assessment_model.changed
 mbti-model.published
 mbti-model.archived
 ```
@@ -519,7 +519,7 @@ durable_outbox
 
 ```text
 questionnaire.changed
-scale.changed
+assessment_model.changed
 report.changed
 mbti-model.published
 ```
@@ -810,7 +810,7 @@ domain event
 
 ```text
 report.changed
-scale.changed
+assessment_model.changed
 mbti-model.published
 ```
 

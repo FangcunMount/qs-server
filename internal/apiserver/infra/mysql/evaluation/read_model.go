@@ -228,7 +228,7 @@ func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.A
 		query = query.Where("status IN ?", filter.Statuses)
 	}
 	if filter.ScaleCode != "" {
-		query = query.Where("medical_scale_code = ?", filter.ScaleCode)
+		query = query.Where("evaluation_model_kind = ? AND evaluation_model_code = ?", "scale", filter.ScaleCode)
 	}
 	if filter.ModelKind != "" {
 		query = query.Where("evaluation_model_kind = ?", filter.ModelKind)
@@ -346,9 +346,6 @@ func assessmentPOToReadRow(po *AssessmentPO) evaluationreadmodel.AssessmentRow {
 		QuestionnaireCode:        po.QuestionnaireCode,
 		QuestionnaireVersion:     po.QuestionnaireVersion,
 		AnswerSheetID:            po.AnswerSheetID,
-		MedicalScaleID:           po.MedicalScaleID,
-		MedicalScaleCode:         po.MedicalScaleCode,
-		MedicalScaleName:         po.MedicalScaleName,
 		EvaluationModelKind:      po.EvaluationModelKind,
 		EvaluationModelSubKind:   po.EvaluationModelSubKind,
 		EvaluationModelAlgorithm: po.EvaluationModelAlgorithm,
@@ -448,8 +445,6 @@ func scorePOsToReadRow(pos []*AssessmentScorePO) evaluationreadmodel.ScoreRow {
 	}
 	first := pos[0]
 	row.AssessmentID = first.AssessmentID
-	row.MedicalScaleID = &first.MedicalScaleID
-	row.MedicalScaleCode = &first.MedicalScaleCode
 	row.RiskLevel = first.RiskLevel
 	row.TotalScore = first.RawScore
 	row.FactorScores = make([]evaluationreadmodel.ScoreFactorRow, 0, len(pos))

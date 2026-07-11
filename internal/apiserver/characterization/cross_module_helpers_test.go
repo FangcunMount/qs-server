@@ -334,7 +334,6 @@ func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,
-		MedicalScaleCode:     &scaleCode,
 		ModelKind:            &modelKind,
 		ModelCode:            &scaleCode,
 		ModelVersion:         &scaleVersion,
@@ -353,7 +352,7 @@ func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
 	}
 
 	autoSubmitted := false
-	if dto.MedicalScaleCode != nil || dto.ModelCode != nil {
+	if dto.ModelCode != nil {
 		if _, err := b.submitSvc.Submit(ctx, result.ID); err != nil {
 			return &pb.CreateAssessmentFromAnswerSheetResponse{
 				Success: false,

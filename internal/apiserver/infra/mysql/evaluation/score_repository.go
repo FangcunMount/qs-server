@@ -35,18 +35,10 @@ func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentD
 		return nil
 	}
 
-	// 获取辅助信息
 	testeeID := assessmentDomain.TesteeID().Uint64()
-	var scaleID uint64
-	var scaleCode string
-
-	if scaleRef := assessmentDomain.MedicalScaleRef(); scaleRef != nil {
-		scaleID = scaleRef.ID().Uint64()
-		scaleCode = scaleRef.Code().String()
-	}
 
 	// 转换为 PO 列表
-	pos := r.mapper.ToPOs(score, testeeID, scaleID, scaleCode)
+	pos := r.mapper.ToPOs(score, testeeID)
 	if len(pos) == 0 {
 		return nil
 	}

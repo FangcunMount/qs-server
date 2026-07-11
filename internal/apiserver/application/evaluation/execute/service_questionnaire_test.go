@@ -73,7 +73,6 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 			testee.NewID(202),
 			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "0.9.0"),
 			domainAssessment.NewAnswerSheetRef(meta.FromUint64(303)),
-			ptr(domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")),
 			domainAssessment.NewAdhocOrigin(),
 			domainAssessment.StatusSubmitted,
 			nil,
@@ -82,6 +81,7 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 			nil,
 			nil,
 			nil,
+			scaleModelRef(),
 		),
 	}
 
@@ -195,7 +195,6 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 		testee.NewID(202),
 		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "0.9.0"),
 		domainAssessment.NewAnswerSheetRef(meta.FromUint64(303)),
-		ptr(domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")),
 		domainAssessment.NewAdhocOrigin(),
 		domainAssessment.StatusSubmitted,
 		nil,
@@ -204,6 +203,7 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 		nil,
 		nil,
 		nil,
+		scaleModelRef(),
 	)
 }
 
@@ -244,7 +244,6 @@ func ptr[T any](v T) *T {
 }
 
 func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
-	scaleRef := domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
 			meta.FromUint64(101),
@@ -252,7 +251,6 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			testee.NewID(202),
 			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
 			domainAssessment.NewAnswerSheetRef(meta.FromUint64(303)),
-			&scaleRef,
 			domainAssessment.NewAdhocOrigin(),
 			domainAssessment.StatusSubmitted,
 			nil,
@@ -261,6 +259,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			scaleModelRef(),
 		),
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
@@ -269,7 +268,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			Code:  "S-001",
 			Title: "Scale",
 		},
-		MedicalScale:  &scalesnapshot.ScaleSnapshot{Code: "S-001", Title: "Scale"},
+		ModelPayload:  evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "S-001", Title: "Scale"}},
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
 	}}
@@ -318,6 +317,11 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	}
 }
 
+func scaleModelRef() *domainAssessment.EvaluationModelRef {
+	ref := domainAssessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("S-001"), "1.0.0", "Scale")
+	return &ref
+}
+
 func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
 		domainAssessment.EvaluationModelKindPersonality,
@@ -335,7 +339,6 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 			testee.NewID(202),
 			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-FAKE"), "1.0.0"),
 			domainAssessment.NewAnswerSheetRef(meta.FromUint64(305)),
-			nil,
 			domainAssessment.NewAdhocOrigin(),
 			domainAssessment.StatusSubmitted,
 			nil,
@@ -405,7 +408,6 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 			testee.NewID(202),
 			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-MBTI"), "1.0.0"),
 			domainAssessment.NewAnswerSheetRef(meta.FromUint64(304)),
-			nil,
 			domainAssessment.NewAdhocOrigin(),
 			domainAssessment.StatusSubmitted,
 			nil,

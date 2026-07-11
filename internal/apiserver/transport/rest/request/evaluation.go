@@ -8,9 +8,12 @@ type CreateAssessmentRequest struct {
 	QuestionnaireCode    string  `json:"questionnaire_code" valid:"required"`    // 问卷编码（唯一标识）
 	QuestionnaireVersion string  `json:"questionnaire_version" valid:"required"` // 问卷版本
 	AnswerSheetID        uint64  `json:"answer_sheet_id" valid:"required"`       // 答卷ID
-	MedicalScaleID       *uint64 `json:"medical_scale_id"`                       // 量表ID（可选）
-	MedicalScaleCode     *string `json:"medical_scale_code"`                     // 量表编码（可选）
-	MedicalScaleName     *string `json:"medical_scale_name"`                     // 量表名称（可选）
+	ModelKind            *string `json:"model_kind"`                             // 解释模型类型（可选）
+	ModelSubKind         *string `json:"model_sub_kind"`                         // 解释模型子类型（可选）
+	ModelAlgorithm       *string `json:"model_algorithm"`                        // 解释模型算法（可选）
+	ModelCode            *string `json:"model_code"`                             // 解释模型编码（可选）
+	ModelVersion         *string `json:"model_version"`                          // 解释模型版本（可选）
+	ModelTitle           *string `json:"model_title"`                            // 解释模型标题（可选）
 	OriginType           string  `json:"origin_type" valid:"required"`           // 来源类型：adhoc/plan
 	OriginID             *string `json:"origin_id"`                              // 来源ID（可选）
 }

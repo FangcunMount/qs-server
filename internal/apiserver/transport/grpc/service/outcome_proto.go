@@ -69,13 +69,14 @@ func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *asse
 	if result == nil {
 		return nil
 	}
-	model := assessmentApp.EnrichModelIdentityResult(assessmentApp.ModelIdentityResult{Kind: "scale", Algorithm: "scale_default"}, "")
-	if result.MedicalScaleCode != nil {
-		model.Code = *result.MedicalScaleCode
-	}
-	if result.MedicalScaleName != nil {
-		model.Title = *result.MedicalScaleName
-	}
+	model := assessmentApp.EnrichModelIdentityResult(assessmentApp.ModelIdentityResult{
+		Kind:      derefString(result.ModelKind),
+		SubKind:   derefString(result.ModelSubKind),
+		Algorithm: derefString(result.ModelAlgorithm),
+		Code:      derefString(result.ModelCode),
+		Version:   derefString(result.ModelVersion),
+		Title:     derefString(result.ModelTitle),
+	}, "")
 	var primary *assessmentApp.ScoreValueResult
 	if result.TotalScore != nil {
 		primary = &assessmentApp.ScoreValueResult{Kind: domainreport.ScoreKindRawTotal, Value: *result.TotalScore}
@@ -243,6 +244,13 @@ func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResul
 func derefFloat64(v *float64) float64 {
 	if v == nil {
 		return 0
+	}
+	return *v
+}
+
+func derefString(v *string) string {
+	if v == nil {
+		return ""
 	}
 	return *v
 }

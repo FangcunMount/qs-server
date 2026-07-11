@@ -19,7 +19,7 @@ func TestGenericEventAssemblerStagesCanonicalOutcomeWireTypes(t *testing.T) {
 		assessment.NewAnswerSheetRef(meta.FromUint64(5001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(101)),
-		assessment.WithMedicalScale(assessment.NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("SDS"), "抑郁自评")),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SDS"), "", "抑郁自评")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)
@@ -70,7 +70,7 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 		assessment.NewAnswerSheetRef(meta.FromUint64(5001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(101)),
-		assessment.WithMedicalScale(assessment.NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("SDS"), "抑郁自评")),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SDS"), "", "抑郁自评")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)

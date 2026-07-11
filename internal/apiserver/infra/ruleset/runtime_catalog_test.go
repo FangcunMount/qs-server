@@ -14,6 +14,17 @@ type runtimeStubStore struct {
 	byRef           *port.PublishedModel
 }
 
+func (s runtimeStubStore) FindPublishedModelByCode(_ context.Context, _ domain.Kind, _ string) (*port.PublishedModel, error) {
+	if s.byRef != nil {
+		return s.byRef, nil
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (s runtimeStubStore) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
+	return nil, 0, nil
+}
+
 func (s runtimeStubStore) GetPublishedModelByRef(_ context.Context, ref port.Ref) (*port.PublishedModel, error) {
 	if s.byRef != nil {
 		return s.byRef, nil

@@ -59,7 +59,7 @@ func scaleDefaultInterpretInputSnapshot() *evaluationinput.InputSnapshot {
 			Version: "1.0.0",
 			Title:   "Scale",
 		},
-		MedicalScale: &scalesnapshot.ScaleSnapshot{
+		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			Title:                "Scale",
 			ScaleVersion:         "1.0.0",
@@ -81,7 +81,7 @@ func scaleDefaultInterpretInputSnapshot() *evaluationinput.InputSnapshot {
 					ScoringStrategy: "sum",
 				},
 			},
-		},
+		}},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",

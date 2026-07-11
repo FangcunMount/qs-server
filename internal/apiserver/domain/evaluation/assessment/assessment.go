@@ -25,7 +25,6 @@ type Assessment struct {
 	questionnaireRef QuestionnaireRef // 问卷引用
 	answerSheetRef   AnswerSheetRef   // 答卷引用
 	modelRef         *EvaluationModelRef
-	medicalScaleRef  *MedicalScaleRef // 兼容旧 Scale 查询与事件字段（可选：纯问卷模式为 nil）
 
 	// === 业务来源 ===
 	origin Origin
@@ -99,15 +98,6 @@ func NewAssessment(
 	return a, nil
 }
 
-// WithMedicalScale 设置关联的量表
-func WithMedicalScale(scaleRef MedicalScaleRef) AssessmentOption {
-	return func(a *Assessment) {
-		a.medicalScaleRef = &scaleRef
-		modelRef := scaleRef.ToEvaluationModelRef()
-		a.modelRef = &modelRef
-	}
-}
-
 // WithEvaluationModel 设置本次测评要使用的解释模型。
 func WithEvaluationModel(modelRef EvaluationModelRef) AssessmentOption {
 	return func(a *Assessment) {
@@ -115,10 +105,6 @@ func WithEvaluationModel(modelRef EvaluationModelRef) AssessmentOption {
 			return
 		}
 		a.modelRef = &modelRef
-		if modelRef.IsScale() && a.medicalScaleRef == nil {
-			scaleRef := NewMedicalScaleRefWithVersion(modelRef.ID(), modelRef.Code(), modelRef.Title(), modelRef.Version())
-			a.medicalScaleRef = &scaleRef
-		}
 	}
 }
 
@@ -184,7 +170,6 @@ func Reconstruct(
 	testeeID testee.ID,
 	questionnaireRef QuestionnaireRef,
 	answerSheetRef AnswerSheetRef,
-	medicalScaleRef *MedicalScaleRef,
 	origin Origin,
 	status Status,
 	totalScore *float64,
@@ -199,13 +184,6 @@ func Reconstruct(
 	if len(modelRefs) > 0 {
 		modelRef = modelRefs[0]
 	}
-	if modelRef == nil && medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
-		ref := medicalScaleRef.ToEvaluationModelRef()
-		modelRef = &ref
-	}
-	if modelRef != nil && modelRef.IsScale() && medicalScaleRef != nil && medicalScaleRef.version == "" {
-		medicalScaleRef.version = modelRef.Version()
-	}
 	var summary *ResultSummary
 	if totalScore != nil || riskLevel != nil {
 		summary = summaryFromLegacyResult(totalScore, riskLevel)
@@ -217,7 +195,6 @@ func Reconstruct(
 		questionnaireRef: questionnaireRef,
 		answerSheetRef:   answerSheetRef,
 		modelRef:         modelRef,
-		medicalScaleRef:  medicalScaleRef,
 		origin:           origin,
 		status:           status,
 		totalScore:       totalScore,
@@ -253,7 +230,6 @@ func (a *Assessment) Submit() error {
 		a.questionnaireRef,
 		a.answerSheetRef,
 		a.modelRef,
-		a.medicalScaleRef,
 		now,
 	))
 
@@ -393,7 +369,6 @@ func (a *Assessment) RetryFromFailed() error {
 		a.questionnaireRef,
 		a.answerSheetRef,
 		a.modelRef,
-		a.medicalScaleRef,
 		now,
 	))
 
@@ -453,19 +428,9 @@ func (a *Assessment) AnswerSheetRef() AnswerSheetRef {
 	return a.answerSheetRef
 }
 
-// MedicalScaleRef 获取量表引用
-func (a *Assessment) MedicalScaleRef() *MedicalScaleRef {
-	return a.medicalScaleRef
-}
-
 // EvaluationModelRef 获取解释模型引用。
 func (a *Assessment) EvaluationModelRef() *EvaluationModelRef {
 	return a.modelRef
-}
-
-// HasMedicalScale 是否绑定了量表
-func (a *Assessment) HasMedicalScale() bool {
-	return a.medicalScaleRef != nil && !a.medicalScaleRef.IsEmpty()
 }
 
 // HasEvaluationModel 是否绑定了解释模型。

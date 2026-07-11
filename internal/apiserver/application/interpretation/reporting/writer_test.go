@@ -443,7 +443,7 @@ func TestNewWriterReturnsEventAssemblerRegistryError(t *testing.T) {
 
 func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
-	scaleRef := assessment.NewMedicalScaleRef(meta.FromUint64(9001), meta.NewCode("S-001"), "Scale")
+	modelRef := assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("S-001"), "1.0.0", "Scale")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(8001),
@@ -451,7 +451,7 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(6001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7001)),
-		assessment.WithMedicalScale(scaleRef),
+		assessment.WithEvaluationModel(modelRef),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
@@ -467,10 +467,10 @@ func scaleOutcomeForWriterTest(a *assessment.Assessment) evaloutcome.Outcome {
 	result := assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "ok", "keep", nil).
 		WithModelRef(*a.EvaluationModelRef())
 	return evaloutcome.NewOutcomeFromLegacyResult(a, &evaluationinput.InputSnapshot{
-		MedicalScale: &scalesnapshot.ScaleSnapshot{
+		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			Title:                "Scale",
 			QuestionnaireVersion: "1.0.0",
-		},
+		}},
 	}, result)
 }

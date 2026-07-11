@@ -70,7 +70,7 @@ func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterSnapshotAndProjector(t *te
 		assessment.NewAnswerSheetRef(meta.FromUint64(8001)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7001)),
-		assessment.WithMedicalScale(assessment.NewMedicalScaleRef(meta.FromUint64(6001), meta.NewCode("SCALE-1"), "scale")),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SCALE-1"), "", "scale")),
 	)
 	if err != nil {
 		t.Fatal(err)

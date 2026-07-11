@@ -9,8 +9,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// SnapshotBuildResult carries only the family-specific pieces needed to
-// materialize an AssessmentSnapshot.
+// SnapshotBuildResult 只包含评估模型快照所需的家庭特定部分
 type SnapshotBuildResult struct {
 	Kind          domain.Kind
 	SubKind       domain.SubKind
@@ -18,47 +17,47 @@ type SnapshotBuildResult struct {
 	PayloadFormat string
 	DecisionKind  domain.DecisionKind
 	Payload       []byte
-	// Version optionally overrides the default draft revision version string.
-	Version string
+	Version       string
 }
 
-// Handler owns family-specific definition validation and publication shaping.
-//
-// Family handlers validate canonical DefinitionV2 when supplied; legacy wire
-// import belongs at the owning API adapter boundary.
+// Handler 拥有家庭特定的定义验证和发布塑造
+// Family handlers 验证规范的 DefinitionV2 时提供；遗留的导入属于所属的 API 适配器边界。
 type Handler interface {
+	// Supports 支持特定评估模型身份
 	Supports(identity domain.Identity) bool
+	// ValidateForPublish 验证发布
 	ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue
+	// BuildSnapshotPayload 构建评估模型快照负载
 	BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error)
 }
 
-// PreviewResult is the strategy-owned representation of a definition report
-// preview. The authoring use case owns its transport projection.
+// PreviewResult 是策略拥有的定义报告预览表示
 type PreviewResult struct {
-	OutcomeCode    string
-	OutcomeTitle   string
-	ScoreDetail    map[string]float64
-	ReportSections []PreviewSection
-	RawReport      *report.InterpretReport
+	OutcomeCode    string                  // 结果代码
+	OutcomeTitle   string                  // 结果标题
+	ScoreDetail    map[string]float64      // 分数详情
+	ReportSections []PreviewSection        // 报告部分
+	RawReport      *report.InterpretReport // 原始报告
 }
 
+// PreviewSection 是报告预览的策略部分
 type PreviewSection struct {
-	Title   string
-	Content string
-	Kind    string
+	Title   string // 标题
+	Content string // 内容
+	Kind    string // 类型
 }
 
-// PreviewHandler is implemented only by definition strategies that support
-// report preview. It keeps family-specific execution shaping inside Registry.
+// PreviewHandler 仅由支持报告预览的定义策略实现
 type PreviewHandler interface {
 	PreviewReport(context.Context, *domain.AssessmentModel, json.RawMessage) (*PreviewResult, error)
 }
 
-// Registry resolves family handlers by model identity.
+// Registry 通过模型身份解析家庭处理程序
 type Registry struct {
 	handlers []Handler
 }
 
+// NewRegistry 创建注册表
 func NewRegistry(handlers ...Handler) Registry {
 	copied := make([]Handler, 0, len(handlers))
 	for _, handler := range handlers {
@@ -69,6 +68,7 @@ func NewRegistry(handlers ...Handler) Registry {
 	return Registry{handlers: copied}
 }
 
+// Resolve 解析家庭处理程序
 func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
 	for _, handler := range r.handlers {
 		if handler.Supports(identity) {
@@ -78,6 +78,7 @@ func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
 	return nil, false
 }
 
+// MustResolve 必须解析家庭处理程序
 func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
 	handler, ok := r.Resolve(identity)
 	if ok {
@@ -86,6 +87,7 @@ func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
 	return nil, fmt.Errorf("unsupported assessment model identity %s/%s/%s", identity.Kind, identity.SubKind, identity.Algorithm)
 }
 
+// PreviewReport 预览报告
 func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentModel, input json.RawMessage) (*PreviewResult, error) {
 	if model == nil {
 		return nil, fmt.Errorf("assessment model is nil")
@@ -101,12 +103,12 @@ func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentMod
 	return preview.PreviewReport(ctx, model, input)
 }
 
-// ValidationError keeps structured validation issues visible across
-// application orchestration boundaries.
+// ValidationError 保持结构化验证问题可见于应用编排边界
 type ValidationError struct {
-	Issues []domain.DomainValidationIssue
+	Issues []domain.DomainValidationIssue // 问题
 }
 
+// NewValidationError 创建验证错误
 func NewValidationError(issues []domain.DomainValidationIssue) error {
 	if len(issues) == 0 {
 		return nil
@@ -114,6 +116,7 @@ func NewValidationError(issues []domain.DomainValidationIssue) error {
 	return &ValidationError{Issues: append([]domain.DomainValidationIssue(nil), issues...)}
 }
 
+// Error 返回验证错误信息
 func (e *ValidationError) Error() string {
 	if e == nil || len(e.Issues) == 0 {
 		return "validation failed"

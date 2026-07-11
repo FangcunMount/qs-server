@@ -172,7 +172,7 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 		)
 		return nil, status.Errorf(codes.Internal, "解析解释模型绑定失败: %v", err)
 	}
-	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, dto.MedicalScaleCode, &dto)
+	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, dto.ModelCode, &dto)
 
 	if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
 		return response, nil

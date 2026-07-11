@@ -10,40 +10,38 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
-// ActorContext is the transport-neutral security context for model-catalog
-// application commands. REST and gRPC adapters construct it from their own
-// authentication mechanisms before invoking a use case.
+// ActorContext 是评估模型目录应用命令的传输中性安全上下文
 type ActorContext struct {
-	Principal securityplane.Principal
-	Scope     securityplane.OrgScope
+	Principal securityplane.Principal // 主体
+	Scope     securityplane.OrgScope  // 范围
 }
 
-// Action identifies one model-catalog use-case permission boundary.
+// Action 标识评估模型目录应用用例权限边界
 type Action string
 
 const (
-	ActionManageCatalog    Action = "manage_catalog"
-	ActionEditDefinition   Action = "edit_definition"
-	ActionPublishCatalog   Action = "publish_catalog"
-	ActionReadCatalog      Action = "read_catalog"
-	ActionResolvePublished Action = "resolve_published"
+	ActionManageCatalog    Action = "manage_catalog"    // 管理评估模型目录
+	ActionEditDefinition   Action = "edit_definition"   // 编辑评估模型定义
+	ActionPublishCatalog   Action = "publish_catalog"   // 发布评估模型
+	ActionReadCatalog      Action = "read_catalog"      // 读取评估模型
+	ActionResolvePublished Action = "resolve_published" // 解析已发布评估模型
 )
 
-// Resource identifies the model targeted by an application command.
+// Resource 标识应用命令的目标模型
 type Resource struct {
-	Code string
-	Kind domain.Kind
+	Code string      // 评估模型代码
+	Kind domain.Kind // 评估模型类型
 }
 
-// Authorizer keeps permission decisions at the application boundary.
+// Authorizer 保持应用边界内的权限决策
 type Authorizer interface {
 	Authorize(ctx context.Context, actor ActorContext, action Action, resource Resource) error
 }
 
-// SnapshotAuthorizer evaluates the IAM snapshot injected into context by a
-// transport adapter. It deliberately does not depend on Gin or JWT details.
+// SnapshotAuthorizer 评估IAM快照注入上下文的传输适配器
 type SnapshotAuthorizer struct{}
 
+// Authorize 授权模型目录应用用例
 func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, action Action, _ Resource) error {
 	if actor.Principal.Kind == securityplane.PrincipalKindUnknown {
 		return errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
@@ -64,6 +62,7 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	return nil
 }
 
+// isTrustedServiceActor 是否为受信任的服务演员
 func isTrustedServiceActor(actor ActorContext) bool {
 	if actor.Principal.Kind != securityplane.PrincipalKindService {
 		return false
@@ -72,6 +71,7 @@ func isTrustedServiceActor(actor ActorContext) bool {
 		actor.Principal.Source == securityplane.PrincipalSourceMTLS
 }
 
+// capabilityForAction 根据动作获取能力
 func capabilityForAction(action Action) appauthz.Capability {
 	switch action {
 	case ActionManageCatalog:

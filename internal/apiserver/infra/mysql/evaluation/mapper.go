@@ -35,15 +35,6 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 		po.ID = domain.ID()
 	}
 
-	// 量表引用（可选）
-	if scaleRef := domain.MedicalScaleRef(); scaleRef != nil {
-		scaleID := scaleRef.ID().Uint64()
-		scaleCode := scaleRef.Code().String()
-		scaleName := scaleRef.Name()
-		po.MedicalScaleID = &scaleID
-		po.MedicalScaleCode = &scaleCode
-		po.MedicalScaleName = &scaleName
-	}
 	if modelRef := domain.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
 		modelKind := modelRef.Kind().String()
 		modelCode := modelRef.Code().String()
@@ -53,15 +44,6 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 		po.EvaluationModelCode = &modelCode
 		po.EvaluationModelVersion = &modelVersion
 		po.EvaluationModelTitle = &modelTitle
-
-		if modelRef.IsScale() && po.MedicalScaleCode == nil {
-			scaleID := modelRef.ID().Uint64()
-			scaleCode := modelCode
-			scaleName := modelTitle
-			po.MedicalScaleID = &scaleID
-			po.MedicalScaleCode = &scaleCode
-			po.MedicalScaleName = &scaleName
-		}
 	}
 
 	// 来源ID（可选）
@@ -111,20 +93,6 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 	// 构建来源信息
 	origin := assessment.ReconstructOrigin(assessment.OriginType(po.OriginType), po.OriginID)
 
-	// 构建量表引用（可选）
-	var scaleRef *assessment.MedicalScaleRef
-	if po.MedicalScaleID != nil && po.MedicalScaleCode != nil {
-		name := ""
-		if po.MedicalScaleName != nil {
-			name = *po.MedicalScaleName
-		}
-		ref := assessment.NewMedicalScaleRef(
-			mustMetaIDFromUint64("assessment.medical_scale_id", *po.MedicalScaleID),
-			meta.NewCode(*po.MedicalScaleCode),
-			name,
-		)
-		scaleRef = &ref
-	}
 	var modelRef *assessment.EvaluationModelRef
 	if po.EvaluationModelKind != nil && po.EvaluationModelCode != nil {
 		version := ""
@@ -135,15 +103,11 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		if po.EvaluationModelTitle != nil {
 			title = *po.EvaluationModelTitle
 		}
-		var id meta.ID
-		if po.MedicalScaleID != nil && assessment.EvaluationModelKind(*po.EvaluationModelKind) == assessment.EvaluationModelKindScale {
-			id = mustMetaIDFromUint64("assessment.medical_scale_id", *po.MedicalScaleID)
-		}
 		ref := assessment.NewEvaluationModelRefWithIdentity(
 			assessment.EvaluationModelKind(*po.EvaluationModelKind),
 			subKindFromPO(po),
 			algorithmFromPO(po),
-			id,
+			meta.ID(0),
 			meta.NewCode(*po.EvaluationModelCode),
 			version,
 			title,
@@ -165,7 +129,6 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		mustTesteeIDFromUint64("assessment.testee_id", po.TesteeID),
 		questionnaireRef,
 		answerSheetRef,
-		scaleRef,
 		origin,
 		assessment.Status(po.Status),
 		po.TotalScore,
@@ -216,7 +179,7 @@ func NewScoreMapper() *ScoreMapper {
 }
 
 // ToPOs 将领域对象转换为持久化对象列表（一个 AssessmentScore 对应多个 PO）
-func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID uint64, scaleID uint64, scaleCode string) []*AssessmentScorePO {
+func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID uint64) []*AssessmentScorePO {
 	if domain == nil {
 		return nil
 	}
@@ -226,17 +189,15 @@ func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID ui
 
 	for _, fs := range factorScores {
 		po := &AssessmentScorePO{
-			AssessmentID:     domain.AssessmentID().Uint64(),
-			TesteeID:         testeeID,
-			MedicalScaleID:   scaleID,
-			MedicalScaleCode: scaleCode,
-			FactorCode:       fs.FactorCode().String(),
-			FactorName:       fs.FactorName(),
-			IsTotalScore:     fs.IsTotalScore(),
-			RawScore:         fs.RawScore(),
-			RiskLevel:        string(fs.RiskLevel()),
-			Conclusion:       "", // 解读内容由 InterpretReport 管理
-			Suggestion:       "", // 建议内容由 InterpretReport 管理
+			AssessmentID: domain.AssessmentID().Uint64(),
+			TesteeID:     testeeID,
+			FactorCode:   fs.FactorCode().String(),
+			FactorName:   fs.FactorName(),
+			IsTotalScore: fs.IsTotalScore(),
+			RawScore:     fs.RawScore(),
+			RiskLevel:    string(fs.RiskLevel()),
+			Conclusion:   "", // 解读内容由 InterpretReport 管理
+			Suggestion:   "", // 建议内容由 InterpretReport 管理
 		}
 		pos = append(pos, po)
 	}

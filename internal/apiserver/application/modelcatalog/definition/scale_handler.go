@@ -9,14 +9,16 @@ import (
 	scalepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// ScaleDefinitionHandler owns the scale-specific wire projection and publish
-// validation. DefinitionV2 is its only authoring input.
+// ScaleDefinitionHandler 拥有规模特定的线缆投影和发布验证
+// DefinitionV2 是其唯一的创作输入。
 type ScaleDefinitionHandler struct{}
 
+// Supports 支持特定评估模型身份
 func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindScale
 }
 
+// ValidateForPublish 验证发布
 func (ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{
@@ -27,6 +29,7 @@ func (ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *dom
 	return append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
 }
 
+// BuildSnapshotPayload 构建评估模型快照负载
 func (ScaleDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
 	if model == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("scale assessment model is nil")

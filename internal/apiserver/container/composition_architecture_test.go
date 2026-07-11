@@ -68,6 +68,24 @@ func TestAPIServerCompositionSettersAreNotUsed(t *testing.T) {
 	})
 }
 
+func TestRuntimeCacheUsesSharedPublishedModelResolver(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "runtime_cache.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "ensurePublishedModelCatalog()") {
+		t.Fatal("runtime cache warmup must use the shared published model catalog")
+	}
+	if strings.Contains(text, "AssessmentModelModule.PublishedLister") {
+		t.Fatal("runtime cache warmup must not bypass PublishedModelResolver through the modelcatalog module")
+	}
+}
+
 func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	t.Parallel()
 

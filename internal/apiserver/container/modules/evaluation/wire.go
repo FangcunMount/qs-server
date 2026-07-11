@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -71,19 +72,35 @@ type WireResult struct {
 
 // EnsurePublishedModelCatalog builds the shared published-model catalog used by evaluation and gRPC export.
 func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Catalog, error) {
-	if in.Existing != nil {
-		return in.Existing, nil
+	catalog := in.Existing
+	if catalog == nil {
+		if in.MongoDB == nil {
+			return nil, fmt.Errorf("mongo database is nil")
+		}
+		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
+		created, err := rulesetInfra.NewRuntimePublishedCatalog(in.MongoDB, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
+			Redis:    in.StaticRedisClient,
+			Builder:  in.StaticCacheBuilder,
+			Policy:   in.PublishedModelPolicy,
+			Observer: in.Observer,
+		})
+		if err != nil {
+			return nil, err
+		}
+		catalog = created
 	}
-	if in.MongoDB == nil {
-		return nil, fmt.Errorf("mongo database is nil")
+	if trusted, ok := catalog.(*assessmentModelApp.TrustedRuntimeCatalog); ok {
+		return trusted, nil
 	}
-	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
-	return rulesetInfra.NewRuntimePublishedCatalog(in.MongoDB, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
-		Redis:    in.StaticRedisClient,
-		Builder:  in.StaticCacheBuilder,
-		Policy:   in.PublishedModelPolicy,
-		Observer: in.Observer,
-	})
+	reader, ok := catalog.(rulesetport.PublishedModelReader)
+	if !ok {
+		return nil, fmt.Errorf("runtime published model catalog must implement PublishedModelReader")
+	}
+	lister, ok := catalog.(rulesetport.PublishedModelLister)
+	if !ok {
+		return nil, fmt.Errorf("runtime published model catalog must implement PublishedModelLister")
+	}
+	return assessmentModelApp.NewTrustedRuntimeCatalog(reader, lister), nil
 }
 
 // PublishedModelCatalogInput collects dependencies for published-model catalog construction.

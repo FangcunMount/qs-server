@@ -10607,16 +10607,28 @@
                 "interpreted_at": {
                     "type": "string"
                 },
-                "medical_scale_code": {
-                    "description": "量表编码",
+                "model_algorithm": {
+                    "description": "解释模型算法",
                     "type": "string"
                 },
-                "medical_scale_id": {
-                    "description": "量表ID",
+                "model_code": {
+                    "description": "解释模型编码",
                     "type": "string"
                 },
-                "medical_scale_name": {
-                    "description": "量表名称",
+                "model_kind": {
+                    "description": "解释模型类型",
+                    "type": "string"
+                },
+                "model_sub_kind": {
+                    "description": "解释模型子类型",
+                    "type": "string"
+                },
+                "model_title": {
+                    "description": "解释模型标题",
+                    "type": "string"
+                },
+                "model_version": {
+                    "description": "解释模型版本",
                     "type": "string"
                 },
                 "org_id": {

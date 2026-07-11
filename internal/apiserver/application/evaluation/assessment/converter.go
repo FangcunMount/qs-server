@@ -31,14 +31,19 @@ func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 		Status:               a.Status().String(),
 	}
 
-	// 量表引用（可选）
-	if scaleRef := a.MedicalScaleRef(); scaleRef != nil {
-		scaleID := scaleRef.ID().Uint64()
-		scaleCode := scaleRef.Code().String()
-		scaleName := scaleRef.Name()
-		result.MedicalScaleID = &scaleID
-		result.MedicalScaleCode = &scaleCode
-		result.MedicalScaleName = &scaleName
+	if modelRef := a.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
+		kind := modelRef.Kind().String()
+		subKind := string(modelRef.SubKind())
+		algorithm := string(modelRef.Algorithm())
+		code := modelRef.Code().String()
+		version := modelRef.Version()
+		title := modelRef.Title()
+		result.ModelKind = &kind
+		result.ModelSubKind = &subKind
+		result.ModelAlgorithm = &algorithm
+		result.ModelCode = &code
+		result.ModelVersion = &version
+		result.ModelTitle = &title
 	}
 
 	// 来源ID（可选）
@@ -86,9 +91,12 @@ func assessmentRowToResult(row evaluationreadmodel.AssessmentRow) (*AssessmentRe
 		QuestionnaireCode:    row.QuestionnaireCode,
 		QuestionnaireVersion: row.QuestionnaireVersion,
 		AnswerSheetID:        row.AnswerSheetID,
-		MedicalScaleID:       row.MedicalScaleID,
-		MedicalScaleCode:     row.MedicalScaleCode,
-		MedicalScaleName:     row.MedicalScaleName,
+		ModelKind:            row.EvaluationModelKind,
+		ModelSubKind:         row.EvaluationModelSubKind,
+		ModelAlgorithm:       row.EvaluationModelAlgorithm,
+		ModelCode:            row.EvaluationModelCode,
+		ModelVersion:         row.EvaluationModelVersion,
+		ModelTitle:           row.EvaluationModelTitle,
 		OriginType:           row.OriginType,
 		OriginID:             row.OriginID,
 		Status:               row.Status,

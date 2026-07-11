@@ -71,7 +71,6 @@ func TestToAssessmentResultRejectsNegativeOrgID(t *testing.T) {
 		testee.NewID(2001),
 		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
 		domainAssessment.NewAnswerSheetRef(meta.FromUint64(3001)),
-		nil,
 		domainAssessment.NewAdhocOrigin(),
 		domainAssessment.StatusPending,
 		nil,

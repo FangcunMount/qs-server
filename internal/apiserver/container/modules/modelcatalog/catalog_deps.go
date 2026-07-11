@@ -7,15 +7,13 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// TypologyCacheSignalNotifier is the best-effort lifecycle side effect for
-// the typology catalog projection. It is infrastructure wiring, not a family
-// application service.
+// TypologyCacheSignalNotifier 模型目录的缓存信号通知器
 type TypologyCacheSignalNotifier interface {
+	// NotifyTypologyModelCacheChanged 通知模型目录的缓存发生变化
 	NotifyTypologyModelCacheChanged(context.Context, string, string)
 }
 
-// CatalogDeps holds the infrastructure collaborators shared by the five
-// actor-oriented assessment-model use cases and their definition strategies.
+// CatalogDeps 包含模型目录的依赖
 type CatalogDeps struct {
 	PublishedLister     port.PublishedModelLister
 	ModelRepo           port.ModelRepository

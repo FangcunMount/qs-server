@@ -16,17 +16,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// TypologyDefinitionHandler owns typology DefinitionV2 validation, payload
-// projection and draft report preview.
+// TypologyDefinitionHandler 拥有人格类型 DefinitionV2 验证、负载投影和草稿报告预览
 type TypologyDefinitionHandler struct {
-	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
-	ReportPreviewer    modelpreview.ReportPreviewer
+	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService // 问卷查询服务
+	ReportPreviewer    modelpreview.ReportPreviewer               // 报告预览器
 }
 
+// Supports 支持特定评估模型身份
 func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindTypology
 }
 
+// ValidateForPublish 验证发布
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
@@ -50,6 +51,7 @@ func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model
 	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{})...)
 }
 
+// BuildSnapshotPayload 构建评估模型快照负载
 func (TypologyDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
 	if model == nil || model.DefinitionV2 == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("typology definition_v2 is required")
@@ -76,6 +78,7 @@ func (TypologyDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *
 	return SnapshotBuildResult{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: model.Algorithm, PayloadFormat: domain.PayloadFormatPersonalityTypologyV1, DecisionKind: decisionKind, Payload: encoded}, nil
 }
 
+// PreviewReport 预览报告
 func (h TypologyDefinitionHandler) PreviewReport(ctx context.Context, model *domain.AssessmentModel, raw json.RawMessage) (*PreviewResult, error) {
 	if model == nil {
 		return nil, previewInvalid("模型不能为空")
@@ -119,6 +122,7 @@ func (h TypologyDefinitionHandler) PreviewReport(ctx context.Context, model *dom
 	return previewResultFromReport(result), nil
 }
 
+// questionnaireSnapshotForPublish 获取问卷快照
 func (h TypologyDefinitionHandler) questionnaireSnapshotForPublish(ctx context.Context, codeValue, version string) (modeltypology.QuestionnaireSnapshot, []domain.DomainValidationIssue) {
 	if codeValue == "" || version == "" {
 		return modeltypology.QuestionnaireSnapshot{}, nil
@@ -136,6 +140,7 @@ func (h TypologyDefinitionHandler) questionnaireSnapshotForPublish(ctx context.C
 	return questionnaireSnapshotFromResult(questionnaire), nil
 }
 
+// previewQuestionnaire 预览问卷
 func (h TypologyDefinitionHandler) previewQuestionnaire(ctx context.Context, model *domain.AssessmentModel) (*questionnaireapp.QuestionnaireResult, error) {
 	if model.Binding.QuestionnaireCode == "" || model.Binding.QuestionnaireVersion == "" {
 		return nil, previewInvalid("模型未绑定问卷版本")
@@ -153,16 +158,19 @@ func (h TypologyDefinitionHandler) previewQuestionnaire(ctx context.Context, mod
 	return questionnaire, nil
 }
 
+// typologyPreviewAnswer 人格类型预览答案
 type typologyPreviewAnswer struct {
 	QuestionCode string   `json:"question_code"`
 	Value        any      `json:"value,omitempty"`
 	Score        *float64 `json:"score,omitempty"`
 }
 
+// typologyPreviewInput 人格类型预览输入
 type typologyPreviewInput struct {
 	Answers []typologyPreviewAnswer `json:"answers"`
 }
 
+// decodeTypologyPreviewInput 解码人格类型预览输入
 func decodeTypologyPreviewInput(raw json.RawMessage) (typologyPreviewInput, error) {
 	if len(raw) == 0 {
 		return typologyPreviewInput{}, previewInvalid("预览答卷 payload 不能为空")
@@ -178,6 +186,7 @@ func decodeTypologyPreviewInput(raw json.RawMessage) (typologyPreviewInput, erro
 	return typologyPreviewInput{Answers: answers}, nil
 }
 
+// validateTypologyPreviewAnswers 验证人格类型预览答案
 func validateTypologyPreviewAnswers(answers []typologyPreviewAnswer, questionnaire *questionnaireapp.QuestionnaireResult) []domain.DomainValidationIssue {
 	options := make(map[string]map[string]struct{}, len(questionnaire.Questions))
 	for _, question := range questionnaire.Questions {
@@ -218,6 +227,7 @@ func validateTypologyPreviewAnswers(answers []typologyPreviewAnswer, questionnai
 	return issues
 }
 
+// typologyPreviewExecutionInput 人格类型预览执行输入
 func typologyPreviewExecutionInput(model *domain.AssessmentModel, questionnaire *questionnaireapp.QuestionnaireResult, payload *modeltypology.Payload, answers []typologyPreviewAnswer) *evaluationinput.InputSnapshot {
 	answerSnapshots := make([]evaluationinput.AnswerSnapshot, 0, len(answers))
 	for _, answer := range answers {
@@ -242,6 +252,7 @@ func typologyPreviewExecutionInput(model *domain.AssessmentModel, questionnaire 
 	}
 }
 
+// questionnaireSnapshotFromResult 从问卷结果创建问卷快照
 func questionnaireSnapshotFromResult(questionnaire *questionnaireapp.QuestionnaireResult) modeltypology.QuestionnaireSnapshot {
 	if questionnaire == nil {
 		return modeltypology.QuestionnaireSnapshot{}
@@ -257,6 +268,7 @@ func questionnaireSnapshotFromResult(questionnaire *questionnaireapp.Questionnai
 	return snapshot
 }
 
+// previewResultFromReport 从报告结果创建报告预览结果
 func previewResultFromReport(result *modelpreview.Result) *PreviewResult {
 	if result == nil {
 		return &PreviewResult{}
@@ -269,6 +281,7 @@ func previewResultFromReport(result *modelpreview.Result) *PreviewResult {
 	return out
 }
 
+// previewSectionsFromReport 从报告结果创建报告预览部分
 func previewSectionsFromReport(reportValue *domainreport.InterpretReport) []PreviewSection {
 	if reportValue == nil {
 		return nil
@@ -293,10 +306,12 @@ func previewSectionsFromReport(reportValue *domainreport.InterpretReport) []Prev
 	return sections
 }
 
+// modelRevisionVersion 获取模型修订版本
 func modelRevisionVersion(model *domain.AssessmentModel) string {
 	return fmt.Sprintf("v%d", model.Revision())
 }
 
+// previewInvalid 创建预览无效错误
 func previewInvalid(format string, args ...any) error {
 	return errors.WithCode(code.ErrInvalidArgument, format, args...)
 }

@@ -78,14 +78,14 @@ func (r *StatisticsRepository) loadAssessmentNames(ctx context.Context, orgID in
 	}
 	var assessments []evaluationInfra.AssessmentPO
 	if err := r.WithContext(ctx).
-		Select("id, medical_scale_name").
+		Select("id, evaluation_model_title").
 		Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, assessmentIDs).
 		Find(&assessments).Error; err != nil {
 		return nil, err
 	}
 	for _, item := range assessments {
-		if item.MedicalScaleName != nil && strings.TrimSpace(*item.MedicalScaleName) != "" {
-			assessmentNames[item.ID.Uint64()] = strings.TrimSpace(*item.MedicalScaleName)
+		if item.EvaluationModelTitle != nil && strings.TrimSpace(*item.EvaluationModelTitle) != "" {
+			assessmentNames[item.ID.Uint64()] = strings.TrimSpace(*item.EvaluationModelTitle)
 		}
 	}
 	return assessmentNames, nil

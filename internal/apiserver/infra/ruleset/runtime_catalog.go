@@ -15,6 +15,7 @@ import (
 
 type runtimePublishedStore interface {
 	port.PublishedModelReader
+	port.PublishedModelLister
 }
 
 // RuntimePublishedCatalog reads only published_assessment_models v2 at runtime.
@@ -25,6 +26,7 @@ type RuntimePublishedCatalog struct {
 var (
 	_ port.Catalog              = (*RuntimePublishedCatalog)(nil)
 	_ port.PublishedModelReader = (*RuntimePublishedCatalog)(nil)
+	_ port.PublishedModelLister = (*RuntimePublishedCatalog)(nil)
 )
 
 // NewRuntimePublishedCatalog builds the production runtime catalog backed by v2 published snapshots.
@@ -85,4 +87,18 @@ func (c *RuntimePublishedCatalog) FindPublishedModelByQuestionnaire(
 		return nil, domain.ErrNotFound
 	}
 	return c.store.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}
+
+func (c *RuntimePublishedCatalog) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	return c.store.FindPublishedModelByCode(ctx, kind, code)
+}
+
+func (c *RuntimePublishedCatalog) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
+	if c == nil || c.store == nil {
+		return nil, 0, domain.ErrNotFound
+	}
+	return c.store.ListPublishedModels(ctx, filter)
 }

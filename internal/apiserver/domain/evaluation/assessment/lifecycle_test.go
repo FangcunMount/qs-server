@@ -127,7 +127,7 @@ func TestApplyOutcomeDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) 
 		NewAnswerSheetRef(meta.FromUint64(2003)),
 		NewAdhocOrigin(),
 		WithID(NewID(5002)),
-		WithMedicalScale(NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("s-code"), "scale")),
+		WithEvaluationModel(NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("s-code"), "", "scale")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
@@ -186,7 +186,7 @@ func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
 		NewAnswerSheetRef(meta.FromUint64(2004)),
 		NewAdhocOrigin(),
 		WithID(NewID(5003)),
-		WithMedicalScale(NewMedicalScaleRef(meta.FromUint64(3002), meta.NewCode("s-code"), "scale")),
+		WithEvaluationModel(NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("s-code"), "", "scale")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
@@ -220,8 +220,8 @@ func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
 	}
 }
 
-func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
-	scaleRef := NewMedicalScaleRefWithVersion(meta.FromUint64(3001), meta.NewCode("s-code"), "scale title", "2.1.0")
+func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
+	model := NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("s-code"), "2.1.0", "scale title")
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1004),
@@ -229,7 +229,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 		NewAnswerSheetRef(meta.FromUint64(2004)),
 		NewAdhocOrigin(),
 		WithID(NewID(5003)),
-		WithMedicalScale(scaleRef),
+		WithEvaluationModel(model),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
@@ -238,7 +238,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 	modelRef := a.EvaluationModelRef()
 	if modelRef == nil {
 		t.Fatal("expected evaluation model ref")
-	} else if modelRef.Kind() != EvaluationModelKindScale || modelRef.Code() != scaleRef.Code() || modelRef.Title() != scaleRef.Name() || modelRef.Version() != "2.1.0" {
+	} else if modelRef.Kind() != EvaluationModelKindScale || modelRef.Code() != model.Code() || modelRef.Title() != model.Title() || modelRef.Version() != "2.1.0" {
 		t.Fatalf("unexpected model ref: %#v", modelRef)
 	}
 
@@ -250,7 +250,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 		t.Fatalf("event type = %T, want AssessmentSubmittedEvent", a.Events()[0])
 	}
 	data := event.Payload()
-	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ModelVersion != "2.1.0" || data.ScaleCode != "s-code" || data.ScaleVersion != "2.1.0" {
+	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ModelVersion != "2.1.0" || data.ScaleCode != "" || data.ScaleVersion != "" {
 		t.Fatalf("unexpected submitted event data: %#v", data)
 	}
 }

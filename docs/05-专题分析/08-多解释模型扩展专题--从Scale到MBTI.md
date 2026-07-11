@@ -608,7 +608,7 @@ report.generated
 这类事件表达模型规则或目录变化：
 
 ```text
-scale.changed
+assessment_model.changed
 report.changed
 mbti-model.published
 mbti-model.archived

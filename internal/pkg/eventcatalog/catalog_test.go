@@ -107,7 +107,7 @@ func TestCatalogDeliveryClass(t *testing.T) {
 		durable   bool
 	}{
 		{QuestionnaireChanged, DeliveryClassBestEffort, false},
-		{ScaleChanged, DeliveryClassBestEffort, false},
+		{AssessmentModelChanged, DeliveryClassBestEffort, false},
 		{TaskOpened, DeliveryClassBestEffort, false},
 		{TaskCompleted, DeliveryClassBestEffort, false},
 		{TaskExpired, DeliveryClassBestEffort, false},

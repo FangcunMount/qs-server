@@ -51,9 +51,6 @@ type AssessmentRow struct {
 	QuestionnaireCode        string
 	QuestionnaireVersion     string
 	AnswerSheetID            uint64
-	MedicalScaleID           *uint64
-	MedicalScaleCode         *string
-	MedicalScaleName         *string
 	EvaluationModelKind      *string
 	EvaluationModelSubKind   *string
 	EvaluationModelAlgorithm *string
@@ -127,12 +124,10 @@ type ScoreFactorRow struct {
 }
 
 type ScoreRow struct {
-	AssessmentID     uint64
-	TotalScore       float64
-	RiskLevel        string
-	FactorScores     []ScoreFactorRow
-	MedicalScaleID   *uint64
-	MedicalScaleCode *string
+	AssessmentID uint64
+	TotalScore   float64
+	RiskLevel    string
+	FactorScores []ScoreFactorRow
 }
 
 type FactorTrendFilter struct {

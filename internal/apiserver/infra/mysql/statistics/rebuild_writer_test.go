@@ -6,8 +6,8 @@ import (
 )
 
 func TestContentDailyInsertSQLGroupsByExpressions(t *testing.T) {
-	contentTypeExpr := "CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END"
-	contentCodeExpr := "COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code)"
+	contentTypeExpr := "CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END"
+	contentCodeExpr := "COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code)"
 	originTypeExpr := "COALESCE(origin_type, '')"
 
 	for _, column := range []string{"created_at", "interpreted_at", "submitted_at", "failed_at"} {

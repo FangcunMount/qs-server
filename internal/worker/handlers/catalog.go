@@ -27,8 +27,8 @@ func NewRegistry() *Registry {
 		"report_generated_handler": func(deps *Dependencies) HandlerFunc {
 			return handleReportGenerated(deps)
 		},
-		"scale_changed_handler": func(deps *Dependencies) HandlerFunc {
-			return handleScaleChanged(deps)
+		"assessment_model_changed_handler": func(deps *Dependencies) HandlerFunc {
+			return handleAssessmentModelChanged(deps)
 		},
 		"task_opened_handler": func(deps *Dependencies) HandlerFunc {
 			return handleTaskOpened(deps)

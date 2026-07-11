@@ -20,6 +20,14 @@ func (s resolverReaderStub) FindPublishedModelByQuestionnaire(context.Context, s
 	return s.model, nil
 }
 
+func (s resolverReaderStub) FindPublishedModelByCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return s.model, nil
+}
+
+func (s resolverReaderStub) ListPublishedModels(context.Context, modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error) {
+	return []*modelcatalogport.PublishedModel{s.model}, 1, nil
+}
+
 type resolverAuthorizerStub struct{}
 
 func (resolverAuthorizerStub) Authorize(context.Context, ActorContext, Action, Resource) error {
@@ -32,5 +40,14 @@ func TestPublishedResolverRequiresDefinitionV2(t *testing.T) {
 	_, err := resolver.ResolveByRef(context.Background(), ActorContext{Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService}}, modelcatalogport.Ref{Kind: domain.KindScale, Code: "S", Version: "v1"})
 	if err == nil {
 		t.Fatal("ResolveByRef() error = nil, want missing definition_v2")
+	}
+}
+
+func TestTrustedRuntimeCatalogRejectsPublishedModelWithoutDefinitionV2(t *testing.T) {
+	t.Parallel()
+	catalog := NewTrustedRuntimeCatalog(resolverReaderStub{model: &modelcatalogport.PublishedModel{Code: "S"}}, resolverReaderStub{model: &modelcatalogport.PublishedModel{Code: "S"}})
+	_, err := catalog.GetPublishedModelByRef(context.Background(), modelcatalogport.Ref{Kind: domain.KindScale, Code: "S", Version: "v1"})
+	if err == nil {
+		t.Fatal("GetPublishedModelByRef() error = nil, want missing definition_v2")
 	}
 }

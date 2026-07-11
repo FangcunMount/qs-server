@@ -31,9 +31,6 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 		binding.Ref.Algorithm != domain.AlgorithmSBTI {
 		t.Fatalf("ref = %#v, want personality/typology/sbti", binding.Ref)
 	}
-	if binding.MedicalScaleID != nil {
-		t.Fatalf("MedicalScaleID = %#v, want nil", binding.MedicalScaleID)
-	}
 }
 
 func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {

@@ -125,10 +125,10 @@ func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, asses
 		return nil
 	}
 	row, err := s.assessmentReader.GetAssessment(ctx, assessmentID)
-	if err != nil || row == nil || row.MedicalScaleCode == nil {
+	if err != nil || row == nil || row.EvaluationModelKind == nil || *row.EvaluationModelKind != "scale" || row.EvaluationModelCode == nil {
 		return nil
 	}
-	medicalScale, err := s.scaleCatalog.GetScale(ctx, *row.MedicalScaleCode)
+	medicalScale, err := s.scaleCatalog.GetScale(ctx, *row.EvaluationModelCode)
 	if err != nil {
 		return nil
 	}

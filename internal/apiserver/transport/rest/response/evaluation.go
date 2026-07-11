@@ -17,9 +17,12 @@ type AssessmentResponse struct {
 	QuestionnaireCode    string   `json:"questionnaire_code"`          // 问卷编码（唯一标识）
 	QuestionnaireVersion string   `json:"questionnaire_version"`       // 问卷版本
 	AnswerSheetID        string   `json:"answer_sheet_id"`             // 答卷ID
-	MedicalScaleID       *string  `json:"medical_scale_id"`            // 量表ID
-	MedicalScaleCode     *string  `json:"medical_scale_code"`          // 量表编码
-	MedicalScaleName     *string  `json:"medical_scale_name"`          // 量表名称
+	ModelKind            *string  `json:"model_kind"`                  // 解释模型类型
+	ModelSubKind         *string  `json:"model_sub_kind"`              // 解释模型子类型
+	ModelAlgorithm       *string  `json:"model_algorithm"`             // 解释模型算法
+	ModelCode            *string  `json:"model_code"`                  // 解释模型编码
+	ModelVersion         *string  `json:"model_version"`               // 解释模型版本
+	ModelTitle           *string  `json:"model_title"`                 // 解释模型标题
 	OriginType           string   `json:"origin_type"`                 // 来源类型
 	OriginTypeLabel      string   `json:"origin_type_label,omitempty"` // 来源类型中文
 	OriginID             *string  `json:"origin_id"`                   // 来源ID
@@ -178,12 +181,6 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 	testeeIDStr := fmt.Sprintf("%d", result.TesteeID)
 	answerSheetIDStr := fmt.Sprintf("%d", result.AnswerSheetID)
 
-	var medicalScaleIDStr *string
-	if result.MedicalScaleID != nil {
-		s := fmt.Sprintf("%d", *result.MedicalScaleID)
-		medicalScaleIDStr = &s
-	}
-
 	resp := &AssessmentResponse{
 		ID:                   idStr,
 		OrgID:                orgIDStr,
@@ -191,9 +188,12 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        answerSheetIDStr,
-		MedicalScaleID:       medicalScaleIDStr,
-		MedicalScaleCode:     result.MedicalScaleCode,
-		MedicalScaleName:     result.MedicalScaleName,
+		ModelKind:            result.ModelKind,
+		ModelSubKind:         result.ModelSubKind,
+		ModelAlgorithm:       result.ModelAlgorithm,
+		ModelCode:            result.ModelCode,
+		ModelVersion:         result.ModelVersion,
+		ModelTitle:           result.ModelTitle,
 		OriginType:           result.OriginType,
 		OriginTypeLabel:      LabelForAssessmentOriginType(result.OriginType),
 		OriginID:             result.OriginID,

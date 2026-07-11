@@ -7,8 +7,8 @@ import (
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// Module is the assessment-model composition root for actor-oriented catalog
-// management, definition authoring, publication and query use cases.
+// Module 模型目录的组合根
+// 包含模型目录的管理、定义、发布和查询用例
 type Module struct {
 	HotRank         *HotRank
 	ModelRepo       modelcatalogport.ModelRepository
@@ -20,19 +20,24 @@ type Module struct {
 	TitleResolver   assessmentModelApp.PublishedModelTitleResolver
 }
 
-// Deps groups infrastructure collaborators for the unified assessment catalog.
+// Deps 包含模型目录的基础设施依赖
 type Deps struct {
 	HotRank   HotRankDeps
 	Lifecycle LifecycleDeps
 	Catalog   CatalogDeps
 }
 
-// New assembles the five assessment-model application use cases.
+// New 组合模型目录的应用用例
 func New(deps Deps) (*Module, error) {
+	// 定义注册表
 	registry := definitionRegistry(deps)
+	// 问卷绑定策略
 	bindings := questionnaireBindingPolicies(deps)
+	// 生命周期效果
 	effects := lifecycleEffects(deps)
 	hotRank := NewHotRank(deps.HotRank)
+
+	// 管理服务
 	management := &assessmentModelApp.AssessmentCatalogManagementService{
 		ModelRepo:       deps.Catalog.ModelRepo,
 		Published:       deps.Catalog.PublishedRepo,
@@ -40,11 +45,13 @@ func New(deps Deps) (*Module, error) {
 		BindingPolicies: bindings,
 		Effects:         effects,
 	}
+	// 定义服务
 	authoring := &appauthoring.Service{
 		ModelRepo:  deps.Catalog.ModelRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		Registry:   registry,
 	}
+	// 发布服务
 	publication := &assessmentModelApp.AssessmentPublicationService{
 		ModelRepo:  deps.Catalog.ModelRepo,
 		Published:  deps.Catalog.PublishedRepo,
@@ -53,12 +60,14 @@ func New(deps Deps) (*Module, error) {
 		Bindings:   bindings,
 		Effects:    effects,
 	}
+	// 查询服务
 	query := assessmentModelApp.NewCatalogQueryService(assessmentModelApp.CatalogQueryDependencies{
 		Models:     deps.Catalog.ModelRepo,
 		Published:  deps.Catalog.PublishedLister,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		HotRank:    hotRank.ReadModel,
 	})
+	// 组合模块
 	return &Module{
 		HotRank:         hotRank,
 		ModelRepo:       deps.Catalog.ModelRepo,
@@ -71,7 +80,7 @@ func New(deps Deps) (*Module, error) {
 	}, nil
 }
 
-// Cleanup releases module resources.
+// Cleanup 释放模块资源
 func (m *Module) Cleanup() error {
 	if m == nil {
 		return nil
@@ -84,7 +93,7 @@ func (m *Module) Cleanup() error {
 	return nil
 }
 
-// CheckHealth verifies module health.
+// CheckHealth 验证模块健康
 func (m *Module) CheckHealth() error {
 	if m == nil {
 		return nil
@@ -97,7 +106,7 @@ func (m *Module) CheckHealth() error {
 	return nil
 }
 
-// ModuleInfo returns aggregate module metadata.
+// ModuleInfo 返回模块元数据
 func (m *Module) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
 		Name:        string(Name),

@@ -6,13 +6,9 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// AssessmentBinding 建测评时从问卷解析出的测评模型绑定（含 scale legacy 字段）。
+// AssessmentBinding 建测评时从问卷解析出的不可变测评模型绑定。
 type AssessmentBinding struct {
-	Ref              Ref
-	MedicalScaleID   *uint64
-	MedicalScaleCode *string
-	MedicalScaleName *string
-	ScaleVersion     *string
+	Ref Ref
 }
 
 // AssessmentBindingResolver 统一解析问卷 -> 测评模型绑定。
@@ -21,15 +17,6 @@ type AssessmentBindingResolver interface {
 	ResolveAssessmentBinding(ctx context.Context, questionnaireCode, questionnaireVersion string) (AssessmentBinding, bool, error)
 }
 
-func ScaleAssessmentBinding(ref Ref, scaleID uint64, code, title, version string) AssessmentBinding {
-	return AssessmentBinding{
-		Ref:              ref,
-		MedicalScaleID:   &scaleID,
-		MedicalScaleCode: &code,
-		MedicalScaleName: &title,
-		ScaleVersion:     &version,
-	}
-}
 func (b AssessmentBinding) ModelKind() domain.Kind {
 	return b.Ref.Kind
 }

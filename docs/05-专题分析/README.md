@@ -533,7 +533,7 @@ qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统
 | `assessment.submitted` | `assessment.created` / `assessment.completed` |
 | `assessment.interpreted` | `interpretation.completed` |
 | `CalculateAnswerSheetScore` | `Provider.Evaluate` / `CompleteAssessment` |
-| ScaleChangedEvent 自动重算历史 | 规则变化只触发缓存失效 / 读模型刷新，历史重算需 ReEvaluationJob |
+| `assessment_model.changed` 自动重算历史 | 规则变化只触发缓存失效 / 读模型刷新，历史重算需 ReEvaluationJob |
 
 ---
 

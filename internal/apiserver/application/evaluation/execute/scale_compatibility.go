@@ -9,14 +9,9 @@ import (
 // inputRefFromAssessment 从评估数据中获取评估输入引用
 func inputRefFromAssessment(a *assessment.Assessment, assessmentID uint64) evaluationinput.InputRef {
 	modelRef := modelRefFromAssessment(a)
-	legacyScaleCode := ""
-	if modelRef.IsEmpty() {
-		legacyScaleCode = legacyScaleCodeFromAssessment(a)
-	}
 	return evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
 		ModelRef:             modelRef,
-		MedicalScaleCode:     legacyScaleCode,
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
@@ -37,14 +32,6 @@ func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
 		Version:   ref.Version(),
 		Title:     ref.Title(),
 	}
-}
-
-// legacyScaleCodeFromAssessment 从评估数据中获取量表代码
-func legacyScaleCodeFromAssessment(a *assessment.Assessment) string {
-	if a == nil || a.MedicalScaleRef() == nil {
-		return ""
-	}
-	return a.MedicalScaleRef().Code().String()
 }
 
 // mapScaleInputResolveError 映射量表输入解析错误

@@ -5,9 +5,9 @@ import (
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 )
 
-// definitionRegistry is the sole composition point for family-specific
-// DefinitionV2 strategies. Command services must receive this registry rather
-// than constructing family-local registries.
+// definitionRegistry 模型目录的定义注册表
+// 是模型目录的唯一组合点，用于组合模型目录的定义
+// 命令服务必须接收这个注册表，而不是构造家族本地注册表
 func definitionRegistry(deps Deps) appdefinition.Registry {
 	return appdefinition.NewRegistry(
 		appdefinition.ScaleDefinitionHandler{},

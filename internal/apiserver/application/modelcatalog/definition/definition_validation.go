@@ -8,8 +8,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// ValidateDefinitionV2 translates target-domain validation errors to the
-// application validation contract without consulting external repositories.
+// ValidateDefinitionV2 将目标域验证错误转换为应用验证合同，无需咨询外部存储库
 func ValidateDefinitionV2(value *modeldefinition.Definition) []domain.DomainValidationIssue {
 	if value == nil {
 		return []domain.DomainValidationIssue{{
@@ -25,7 +24,7 @@ func ValidateDefinitionV2(value *modeldefinition.Definition) []domain.DomainVali
 	return issues
 }
 
-// ValidateDefinitionV2ForPublish validates DefinitionV2 and verifies external norm references.
+// ValidateDefinitionV2ForPublish 验证 DefinitionV2 并验证外部常模引用
 func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.Definition, norms port.NormRepository) []domain.DomainValidationIssue {
 	issues := ValidateDefinitionV2(value)
 	if value == nil {

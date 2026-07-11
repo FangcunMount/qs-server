@@ -38,7 +38,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			Version: "1.0.0",
 			Title:   "Scale",
 		},
-		MedicalScale: &scalesnapshot.ScaleSnapshot{
+		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
@@ -56,7 +56,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
@@ -137,7 +137,7 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	)
 	_ = a.Submit()
 	snapshot := &evaluationinput.InputSnapshot{
-		MedicalScale: &scalesnapshot.ScaleSnapshot{
+		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
@@ -154,7 +154,7 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",

@@ -3,7 +3,6 @@ package testee
 import (
 	"context"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -62,36 +61,29 @@ func (s *scaleAnalysisQueryService) GetScaleAnalysis(ctx context.Context, dto Sc
 }
 
 func isScaleAnalysisAssessment(assessment *assessmentApp.AssessmentResult) bool {
-	return assessment != nil && assessment.Status == "interpreted" && assessment.MedicalScaleCode != nil
+	return assessment != nil && assessment.Status == "interpreted" && assessment.ModelKind != nil && *assessment.ModelKind == "scale" && assessment.ModelCode != nil
 }
 
 func ensureScaleAnalysisTrend(scaleMap map[string]*ScaleTrendQueryResult, assessment *assessmentApp.AssessmentResult) *ScaleTrendQueryResult {
-	scaleCode := *assessment.MedicalScaleCode
+	scaleCode := *assessment.ModelCode
 	if existing, ok := scaleMap[scaleCode]; ok {
 		return existing
 	}
 	scaleTrend := &ScaleTrendQueryResult{
-		ScaleID:   scaleAnalysisScaleID(assessment),
+		ScaleID:   scaleCode,
 		ScaleCode: scaleCode,
-		ScaleName: scaleAnalysisScaleName(assessment),
+		ScaleName: valueOrEmpty(assessment.ModelTitle),
 		Tests:     []ScaleTestQueryResult{},
 	}
 	scaleMap[scaleCode] = scaleTrend
 	return scaleTrend
 }
 
-func scaleAnalysisScaleID(assessment *assessmentApp.AssessmentResult) string {
-	if assessment.MedicalScaleID == nil {
+func valueOrEmpty(value *string) string {
+	if value == nil {
 		return ""
 	}
-	return strconv.FormatUint(*assessment.MedicalScaleID, 10)
-}
-
-func scaleAnalysisScaleName(assessment *assessmentApp.AssessmentResult) string {
-	if assessment.MedicalScaleName == nil {
-		return ""
-	}
-	return *assessment.MedicalScaleName
+	return *value
 }
 
 func (s *scaleAnalysisQueryService) buildScaleAnalysisTest(ctx context.Context, assessment *assessmentApp.AssessmentResult) ScaleTestQueryResult {

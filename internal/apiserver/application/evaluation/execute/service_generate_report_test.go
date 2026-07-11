@@ -63,7 +63,7 @@ func TestGenerateReportUsesStoredScoringSnapshotWithoutReExecute(t *testing.T) {
 		domainAssessment.NewAnswerSheetRef(meta.FromUint64(2001)),
 		domainAssessment.NewAdhocOrigin(),
 		domainAssessment.WithID(domainAssessment.NewID(5001)),
-		domainAssessment.WithMedicalScale(domainAssessment.NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("SCALE-1"), "scale")),
+		domainAssessment.WithEvaluationModel(domainAssessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SCALE-1"), "", "scale")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)

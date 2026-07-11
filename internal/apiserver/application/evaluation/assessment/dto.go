@@ -12,10 +12,6 @@ type CreateAssessmentDTO struct {
 	QuestionnaireCode    string  // 问卷编码（唯一标识）
 	QuestionnaireVersion string  // 问卷版本
 	AnswerSheetID        uint64  // 答卷ID
-	MedicalScaleID       *uint64 // 量表ID（可选，纯问卷模式为空）
-	MedicalScaleCode     *string // 量表编码（可选）
-	MedicalScaleName     *string // 量表名称（可选）
-	ScaleVersion         *string // 量表解释模型版本（可选）
 	ModelKind            *string // 通用解释模型类型（可选）
 	ModelSubKind         *string // v2 子形态（typology 等）
 	ModelAlgorithm       *string // v2 算法（mbti/sbti/scale_默认 等）
@@ -77,9 +73,12 @@ type AssessmentResult struct {
 	QuestionnaireCode    string     // 问卷编码（唯一标识）
 	QuestionnaireVersion string     // 问卷版本
 	AnswerSheetID        uint64     // 答卷ID
-	MedicalScaleID       *uint64    // 量表ID
-	MedicalScaleCode     *string    // 量表编码
-	MedicalScaleName     *string    // 量表名称
+	ModelKind            *string    // 解释模型类型
+	ModelSubKind         *string    // 解释模型子类型
+	ModelAlgorithm       *string    // 解释模型算法
+	ModelCode            *string    // 解释模型编码
+	ModelVersion         *string    // 解释模型版本
+	ModelTitle           *string    // 解释模型标题
 	OriginType           string     // 来源类型
 	OriginID             *string    // 来源ID
 	Status               string     // 状态

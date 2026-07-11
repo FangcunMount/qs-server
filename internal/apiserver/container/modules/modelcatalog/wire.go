@@ -18,7 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// WireInput carries composition-root inputs for assessment-model installation.
+// WireInput 包含容器组合根的输入
 type WireInput struct {
 	MongoDB                *mongo.Database
 	MongoLimiter           backpressure.Acquirer
@@ -35,7 +35,7 @@ type WireInput struct {
 	CacheObserver          *observability.ComponentObserver
 }
 
-// Wire builds and bootstraps the assessment-model module from composition inputs.
+// Wire 构建和启动模型目录模块
 func Wire(in WireInput) (*Module, error) {
 	return Bootstrap(BootstrapInput{
 		HotRank:   buildHotRankDeps(in),
@@ -44,10 +44,12 @@ func Wire(in WireInput) (*Module, error) {
 	})
 }
 
+// buildHotRankDeps 构建热门排名依赖
 func buildHotRankDeps(in WireInput) HotRankDeps {
 	return HotRankDeps{RedisClient: in.RankRedisClient, KeyBuilder: in.RankCacheBuilder}
 }
 
+// buildLifecycleDeps 构建生命周期依赖
 func buildLifecycleDeps(in WireInput) LifecycleDeps {
 	deps := LifecycleDeps{
 		EventPublisher:         in.EventPublisher,
@@ -60,11 +62,13 @@ func buildLifecycleDeps(in WireInput) LifecycleDeps {
 	return deps
 }
 
+// catalogCacheWireConfig 模型目录缓存配置
 type catalogCacheWireConfig struct {
 	rulesetInfra.PublishedModelCacheConfig
 	Notifier TypologyCacheSignalNotifier
 }
 
+// catalogCacheConfig 构建模型目录缓存配置
 func catalogCacheConfig(in WireInput) catalogCacheWireConfig {
 	var notifier TypologyCacheSignalNotifier
 	if n, ok := in.CacheSignalNotifier.(TypologyCacheSignalNotifier); ok {
@@ -81,6 +85,7 @@ func catalogCacheConfig(in WireInput) catalogCacheWireConfig {
 	}
 }
 
+// buildCatalogDeps 构建模型目录依赖
 func buildCatalogDeps(
 	mongoDB *mongo.Database,
 	mongoLimiter backpressure.Acquirer,

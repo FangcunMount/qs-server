@@ -17,7 +17,7 @@ type QRCodeService interface {
 	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
 
 	// GenerateScaleQRCode 生成量表小程序码
-	// 场景：worker 处理 scale.changed(published) 事件后调用
+	// 场景：worker 处理 assessment_model.changed(published) 事件后调用
 	// 流程：
 	//   1. 构建 scene 参数（包含量表编码）
 	//   2. 调用基础设施层生成小程序码
