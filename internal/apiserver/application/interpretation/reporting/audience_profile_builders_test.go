@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -31,8 +32,8 @@ func (stubBroadBuilder) MechanismKey() registry.MechanismReportBuilderKey {
 		ReportType:      domainreport.ReportTypeStandard,
 	}
 }
-func (stubBroadBuilder) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
-	return domainreport.NewInterpretReport(1, "scale", "phq9", 10, domainreport.RiskLevelNone, "ok", nil, nil, &domainreport.ModelExtra{}), nil
+func (stubBroadBuilder) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
+	return report.NewDraft(report.Content{Model: report.ModelIdentity{Title: "scale", Code: "phq9"}, PrimaryScore: report.NewRawTotalScore(10, nil), Level: domainreport.LevelFromRisk(domainreport.RiskLevelNone), Conclusion: "ok", ModelExtra: &domainreport.ModelExtra{}}), nil
 }
 
 func TestExpandAudienceProfileBuildersRegistersAudienceAndProfileKeys(t *testing.T) {
@@ -57,11 +58,11 @@ func TestExpandAudienceProfileBuildersRegistersAudienceAndProfileKeys(t *testing
 	if err != nil {
 		t.Fatalf("clinician resolve: %v", err)
 	}
-	rpt, err := builder.Build(context.Background(), evaloutcome.Outcome{})
+	draft, err := builder.Build(context.Background(), interpinput.InterpretationInput{})
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if rpt.ModelExtra() != nil {
+	if draft.Content().ModelExtra != nil {
 		t.Fatal("clinician builder should hide model_extra")
 	}
 

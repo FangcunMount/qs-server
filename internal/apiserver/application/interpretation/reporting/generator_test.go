@@ -11,11 +11,13 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type generatorScaleBuilder struct{ report *domainreport.InterpretReport }
+type generatorScaleBuilder struct{ draft *report.Draft }
 
 func (b generatorScaleBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
 	return evaluation.ExecutionIdentityScaleDefault
@@ -31,8 +33,8 @@ func (generatorScaleBuilder) MechanismKey() MechanismReportBuilderKey {
 		ReportType:      domainreport.ReportTypeStandard,
 	}
 }
-func (b generatorScaleBuilder) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
-	return b.report, nil
+func (b generatorScaleBuilder) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
+	return b.draft, nil
 }
 
 func TestGeneratorEmitsInterpretationReportEvents(t *testing.T) {
@@ -67,7 +69,7 @@ func TestGeneratorEmitsInterpretationReportEvents(t *testing.T) {
 			DecisionKind:    modelcatalog.DecisionKindScoreRange,
 		},
 	}
-	builders, err := NewReportBuilderRegistry(generatorScaleBuilder{report: domainreport.NewInterpretReport(domainreport.ID(a.ID()), "Scale", "S-1", 7, domainreport.RiskLevelLow, "ok", nil, nil, nil)})
+	builders, err := NewReportBuilderRegistry(generatorScaleBuilder{draft: report.NewDraft(report.Content{Model: report.ModelIdentity{Title: "Scale", Code: "S-1"}, PrimaryScore: report.NewRawTotalScore(7, nil), Level: domainreport.LevelFromRisk(domainreport.RiskLevelLow), Conclusion: "ok"})})
 	if err != nil {
 		t.Fatal(err)
 	}

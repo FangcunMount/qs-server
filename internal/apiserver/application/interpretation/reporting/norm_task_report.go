@@ -2,11 +2,12 @@ package reporting
 
 import (
 	"context"
+	"fmt"
 
-	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
 type NormProfileReportBuilder struct {
@@ -29,11 +30,11 @@ func (NormProfileReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b NormProfileReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b NormProfileReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.scoring.composer == nil {
-		return nil, evalerrors.ModuleNotConfigured("norm_profile report builder is not configured")
+		return nil, fmt.Errorf("norm_profile report builder is not configured")
 	}
-	return b.scoring.Build(ctx, outcome)
+	return b.scoring.Build(ctx, input)
 }
 
 type TaskPerformanceReportBuilder struct {
@@ -56,9 +57,9 @@ func (TaskPerformanceReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b TaskPerformanceReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b TaskPerformanceReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.scoring.composer == nil {
-		return nil, evalerrors.ModuleNotConfigured("task_performance report builder is not configured")
+		return nil, fmt.Errorf("task_performance report builder is not configured")
 	}
-	return b.scoring.Build(ctx, outcome)
+	return b.scoring.Build(ctx, input)
 }

@@ -2,18 +2,17 @@ package reporting
 
 import (
 	"context"
+	"fmt"
 
-	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
+// FactorScoringReportBuilder only consumes Interpretation facts. Conversion
+// from EvaluationOutcome and its model snapshots happens before this boundary.
 type FactorScoringReportBuilder struct {
 	composer domainReport.ReportBuilder
 }
@@ -26,156 +25,43 @@ func (b FactorScoringReportBuilder) ExecutionIdentity() evaluation.ExecutionIden
 	return evaluation.ExecutionIdentityScaleDefault
 }
 
-func (b FactorScoringReportBuilder) Key() evaluation.ExecutionIdentity {
-	return b.ExecutionIdentity()
-}
+func (b FactorScoringReportBuilder) Key() evaluation.ExecutionIdentity { return b.ExecutionIdentity() }
 
 func (FactorScoringReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b FactorScoringReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b FactorScoringReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.composer == nil {
-		return nil, evalerrors.ModuleNotConfigured("factor_scoring report builder is not configured")
+		return nil, fmt.Errorf("factor_scoring report builder is not configured")
+	}
+	if input.FactorScoring == nil {
+		return nil, fmt.Errorf("factor_scoring interpretation facts are required")
 	}
 	_ = ctx
-	rpt, err := reportscore.BuildFactorScoringReport(b.composer, factorScoringReportInputFromOutcome(outcome))
+	rpt, err := reportscore.BuildFactorScoringReport(b.composer, reportscore.FactorScoringReportInput{
+		AssessmentID: report.ID(input.Association.AssessmentID),
+		Scale:        input.FactorScoring.Model,
+		TotalScore:   primaryValue(input),
+		RiskLevel:    riskLevel(input),
+		FactorScores: input.FactorScoring.Factors,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return AttachReportOutcomeSummary(outcome, rpt), nil
+	return DraftFromLegacyReport(input, rpt), nil
 }
 
-func factorScoringReportInputFromOutcome(outcome evaloutcome.Outcome) reportscore.FactorScoringReportInput {
-	input := reportscore.FactorScoringReportInput{}
-	if outcome.Assessment != nil {
-		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
+func primaryValue(input interpinput.InterpretationInput) float64 {
+	if input.Result.Primary == nil {
+		return 0
 	}
-	input.Scale = scaleReportModelFromOutcome(outcome)
-	if execution := outcome.Execution; execution != nil {
-		if execution.Primary != nil {
-			input.TotalScore = execution.Primary.Value
-		}
-		if execution.Level != nil {
-			input.RiskLevel = domainReport.RiskLevel(execution.Level.Code)
-		}
-		if outcomeDimensionsPreferredForReporting(execution.Dimensions) {
-			input.FactorScores = scaleDimensionReportScores(execution.Dimensions, input.Scale)
-		} else if scores, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok && len(scores) > 0 {
-			input.FactorScores = scaleFactorReportScores(scores)
-		} else if len(execution.Dimensions) > 0 {
-			input.FactorScores = scaleDimensionReportScores(execution.Dimensions, input.Scale)
-		}
-	}
-	return input
+	return input.Result.Primary.Value
 }
 
-func outcomeDimensionsPreferredForReporting(dimensions []domainoutcome.DimensionResult) bool {
-	for _, dim := range dimensions {
-		if dim.Role != "" || dim.ParentCode != "" || dim.HierarchyLevel > 0 || dim.SortOrder > 0 {
-			return true
-		}
+func riskLevel(input interpinput.InterpretationInput) report.RiskLevel {
+	if input.Result.Level == nil || !domainReport.IsRiskLevelCode(input.Result.Level.Code) {
+		return report.RiskLevelNone
 	}
-	return false
-}
-
-func scaleDimensionReportScores(dimensions []domainoutcome.DimensionResult, model *reportscore.ReportModel) []reportscore.FactorReportScore {
-	totalFactors := scaleTotalFactorCodes(model)
-	scores := make([]reportscore.FactorReportScore, 0, len(dimensions))
-	for _, dim := range dimensions {
-		if dim.Score == nil {
-			continue
-		}
-		risk := domainReport.RiskLevelNone
-		if dim.Level != nil && domainReport.IsRiskLevelCode(dim.Level.Code) {
-			risk = domainReport.RiskLevel(dim.Level.Code)
-		}
-		scores = append(scores, reportscore.FactorReportScore{
-			FactorCode:     dim.Code,
-			FactorName:     dim.Name,
-			RawScore:       dim.Score.Value,
-			RiskLevel:      risk,
-			IsTotalScore:   totalFactors[dim.Code] || dim.Role == "total",
-			Role:           dim.Role,
-			ParentCode:     dim.ParentCode,
-			HierarchyLevel: dim.HierarchyLevel,
-			SortOrder:      dim.SortOrder,
-		})
-	}
-	return scores
-}
-
-func scaleTotalFactorCodes(model *reportscore.ReportModel) map[string]bool {
-	if model == nil {
-		return nil
-	}
-	codes := make(map[string]bool, len(model.Factors))
-	for _, factor := range model.Factors {
-		if factor.IsTotalScore {
-			codes[factor.Code] = true
-		}
-	}
-	return codes
-}
-
-func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []reportscore.FactorReportScore {
-	scores := make([]reportscore.FactorReportScore, 0, len(factorScores))
-	for _, fs := range factorScores {
-		scores = append(scores, reportscore.FactorReportScore{
-			FactorCode:   string(fs.FactorCode),
-			FactorName:   fs.FactorName,
-			RawScore:     fs.RawScore,
-			RiskLevel:    domainReport.RiskLevel(fs.RiskLevel),
-			Conclusion:   fs.Conclusion,
-			Suggestion:   fs.Suggestion,
-			IsTotalScore: fs.IsTotalScore,
-		})
-	}
-	return scores
-}
-
-func scaleReportModelFromOutcome(outcome evaloutcome.Outcome) *reportscore.ReportModel {
-	if outcome.Input == nil {
-		return nil
-	}
-	snapshot, _ := evaluationinput.ScalePayload(outcome.Input)
-	return scaleReportModelFromSnapshot(snapshot)
-}
-
-func scaleReportModelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) *reportscore.ReportModel {
-	if snapshot == nil {
-		return nil
-	}
-	factors := make([]reportscore.FactorReportModel, 0, len(snapshot.Factors))
-	for _, factor := range snapshot.Factors {
-		factors = append(factors, reportscore.FactorReportModel{
-			Code:           factor.Code,
-			Title:          factor.Title,
-			MaxScore:       factor.MaxScore,
-			IsTotalScore:   factor.IsTotalScore,
-			InterpretRules: scaleFactorInterpretRules(factor.InterpretRules),
-		})
-	}
-	return &reportscore.ReportModel{
-		Code:    snapshot.Code,
-		Title:   snapshot.Title,
-		Factors: factors,
-	}
-}
-
-func scaleFactorInterpretRules(rules []scalesnapshot.InterpretRuleSnapshot) []reportscore.FactorInterpretRule {
-	if len(rules) == 0 {
-		return nil
-	}
-	converted := make([]reportscore.FactorInterpretRule, 0, len(rules))
-	for _, rule := range rules {
-		converted = append(converted, reportscore.FactorInterpretRule{
-			Min:        rule.Min,
-			Max:        rule.Max,
-			RiskLevel:  rule.RiskLevel,
-			Conclusion: rule.Conclusion,
-			Suggestion: rule.Suggestion,
-		})
-	}
-	return converted
+	return report.RiskLevel(input.Result.Level.Code)
 }

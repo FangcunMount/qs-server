@@ -38,11 +38,7 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
-	report, err := interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
+	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 
 	if report.TotalScore() != 5 || report.RiskLevel() != domainreport.RiskLevelLow {
 		t.Fatalf("report summary = score:%v risk:%s", report.TotalScore(), report.RiskLevel())

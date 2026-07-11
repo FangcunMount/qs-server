@@ -3,11 +3,12 @@ package reporting
 import (
 	"context"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
 const (
@@ -102,8 +103,8 @@ func (b keyedReportBuilder) ReportType() domainReport.ReportType { return b.dele
 func (b keyedReportBuilder) MechanismKey() registry.MechanismReportBuilderKey {
 	return b.key
 }
-func (b keyedReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	return b.delegate.Build(ctx, outcome)
+func (b keyedReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
+	return b.delegate.Build(ctx, input)
 }
 
 type visibilityPolicyReportBuilder struct {
@@ -122,36 +123,24 @@ func newVisibilityPolicyReportBuilder(
 	}
 }
 
-func (b visibilityPolicyReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	rpt, err := b.delegate.Build(ctx, outcome)
+func (b visibilityPolicyReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
+	draft, err := b.delegate.Build(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	return filterReportByVisibility(rpt, b.visibility), nil
+	return filterDraftByVisibility(draft, b.visibility), nil
 }
 
-func filterReportByVisibility(rpt *domainReport.InterpretReport, visibility policy.VisibilityPolicy) *domainReport.InterpretReport {
-	if rpt == nil {
+func filterDraftByVisibility(draft *report.Draft, visibility policy.VisibilityPolicy) *report.Draft {
+	if draft == nil {
 		return nil
 	}
-	dimensions := rpt.Dimensions()
-	suggestions := rpt.Suggestions()
-	modelExtra := rpt.ModelExtra()
+	content := draft.Content()
 	if !visibility.IsVisible(reportSectionSuggestions) {
-		suggestions = nil
+		content.Suggestions = nil
 	}
 	if !visibility.IsVisible(reportSectionModelExtra) {
-		modelExtra = nil
+		content.ModelExtra = nil
 	}
-	return domainReport.NewInterpretReport(
-		rpt.ID(),
-		rpt.ModelName(),
-		rpt.ModelCode(),
-		rpt.TotalScore(),
-		rpt.RiskLevel(),
-		rpt.Conclusion(),
-		dimensions,
-		suggestions,
-		modelExtra,
-	)
+	return report.NewDraft(content)
 }

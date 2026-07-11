@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -23,7 +24,7 @@ func (b registryReportBuilderStub) ReportType() domainReport.ReportType {
 func (b registryReportBuilderStub) Key() evaluation.ExecutionIdentity {
 	return b.ExecutionIdentity()
 }
-func (b registryReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b registryReportBuilderStub) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
 	return nil, nil
 }
 func (b registryReportBuilderStub) MechanismKey() MechanismReportBuilderKey {

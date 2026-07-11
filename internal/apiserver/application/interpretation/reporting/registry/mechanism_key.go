@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -89,6 +90,16 @@ func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIden
 // MechanismReportBuilderKeyFromOutcome 推导机制 路由 键 从 scored 结果。
 func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (MechanismReportBuilderKey, bool) {
 	ctx, ok := ReportRoutingContextFromOutcome(outcome)
+	if !ok {
+		return MechanismReportBuilderKey{}, false
+	}
+	return ctx.MechanismKey()
+}
+
+// MechanismReportBuilderKeyFromInput resolves a mechanism route from
+// Interpretation-owned input without falling back to Evaluation aggregates.
+func MechanismReportBuilderKeyFromInput(input interpinput.InterpretationInput) (MechanismReportBuilderKey, bool) {
+	ctx, ok := ReportRoutingContextFromInput(input)
 	if !ok {
 		return MechanismReportBuilderKey{}, false
 	}

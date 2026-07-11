@@ -33,7 +33,9 @@ var (
 	MechanismReportBuilderKeyFromRuntimeDescriptorKey = interpretationregistry.MechanismReportBuilderKeyFromRuntimeDescriptorKey
 	MechanismReportBuilderKeyFromExecutionIdentity    = interpretationregistry.MechanismReportBuilderKeyFromExecutionIdentity
 	MechanismReportBuilderKeyFromOutcome              = interpretationregistry.MechanismReportBuilderKeyFromOutcome
+	MechanismReportBuilderKeyFromInput                = interpretationregistry.MechanismReportBuilderKeyFromInput
 	ReportRoutingContextFromOutcome                   = interpretationregistry.ReportRoutingContextFromOutcome
+	ReportRoutingContextFromInput                     = interpretationregistry.ReportRoutingContextFromInput
 	OutcomeReportType                                 = interpretationregistry.OutcomeReportType
 	NewTransactionalReportDurableSaver                = interpretationwriter.NewTransactionalReportDurableSaver
 	NewGenerator                                      = interpretationwriter.NewGenerator

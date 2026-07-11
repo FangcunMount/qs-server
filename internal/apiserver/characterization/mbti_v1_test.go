@@ -1,7 +1,6 @@
 package characterization_test
 
 import (
-	"context"
 	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
@@ -40,10 +39,7 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 	)
 
-	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
 
 	if report.RiskLevel() != domainreport.RiskLevelNone {
 		t.Fatalf("RiskLevel = %s, want none", report.RiskLevel())

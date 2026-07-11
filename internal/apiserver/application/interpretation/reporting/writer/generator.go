@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/projection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -31,7 +32,11 @@ func (g *reportGenerator) Generate(ctx context.Context, outcome evaloutcome.Outc
 	if !outcome.Assessment.Status().CanGenerateReport() {
 		return Generation{}, assessment.NewInvalidStatusError("generate report", outcome.Assessment.Status())
 	}
-	mechanismKey, ok := registry.MechanismReportBuilderKeyFromOutcome(outcome)
+	input, err := interpretationinput.FromLegacyOutcome(outcome)
+	if err != nil {
+		return Generation{}, err
+	}
+	mechanismKey, ok := registry.MechanismReportBuilderKeyFromInput(input)
 	if !ok {
 		return Generation{}, fmt.Errorf("unsupported mechanism report builder key for outcome")
 	}
@@ -42,10 +47,11 @@ func (g *reportGenerator) Generate(ctx context.Context, outcome evaloutcome.Outc
 	if err != nil {
 		return Generation{}, err
 	}
-	rpt, err := builder.Build(ctx, outcome)
+	draft, err := builder.Build(ctx, input)
 	if err != nil {
 		return Generation{}, err
 	}
+	rpt := legacyReportFromDraft(input, draft)
 	assembler := g.assemblers.ResolveByMechanism(mechanismKey)
 	events := assembler.BuildSuccessEvents(outcome, rpt)
 	return Generation{Report: rpt, Events: events}, nil

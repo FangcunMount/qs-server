@@ -23,11 +23,7 @@ func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	report, err := interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
+	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if report.Model().Kind != "scale" || report.Model().Algorithm != "scale_default" {
 		t.Fatalf("model = %#v", report.Model())
 	}

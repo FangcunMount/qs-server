@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -44,7 +45,7 @@ func (b namedMechanismBuilder) MechanismKey() reporting.MechanismReportBuilderKe
 	return b.key
 }
 
-func (b namedMechanismBuilder) Build(context.Context, evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b namedMechanismBuilder) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
 	return nil, nil
 }
 

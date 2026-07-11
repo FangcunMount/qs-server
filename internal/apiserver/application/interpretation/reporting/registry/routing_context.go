@@ -4,6 +4,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -17,6 +18,34 @@ type ReportRoutingContext struct {
 	ProductChannel  modelcatalog.ProductChannel
 	Audience        policy.Audience
 	ReportProfile   policy.ReportProfile
+}
+
+// ReportRoutingContextFromInput derives routing solely from the frozen
+// Interpretation input. Unlike the legacy Outcome variant it never inspects
+// Assessment compatibility data.
+func ReportRoutingContextFromInput(input interpinput.InterpretationInput) (ReportRoutingContext, bool) {
+	ctx := ReportRoutingContext{
+		AlgorithmFamily: input.Runtime.AlgorithmFamily,
+		DecisionKind:    input.Runtime.DecisionKind,
+		ReportType:      input.Report.ReportType,
+		Algorithm:       input.Report.Algorithm,
+		ProductChannel:  input.Report.ProductChannel,
+		Audience:        input.Report.Audience,
+		ReportProfile:   input.Report.ReportProfile,
+	}
+	if ctx.ReportType == "" {
+		ctx.ReportType = domainReport.ReportTypeStandard
+	}
+	if ctx.DecisionKind == "" {
+		ctx.DecisionKind = defaultDecisionKindForFamily(ctx.AlgorithmFamily)
+	}
+	if ctx.ReportProfile == "" {
+		ctx.ReportProfile = policy.ReportProfileForDecisionKind(ctx.DecisionKind)
+	}
+	if ctx.AlgorithmFamily == "" || ctx.DecisionKind == "" {
+		return ReportRoutingContext{}, false
+	}
+	return ctx, true
 }
 
 // ReportRoutingContextFromOutcome 从评估结果推导报告路由上下文。

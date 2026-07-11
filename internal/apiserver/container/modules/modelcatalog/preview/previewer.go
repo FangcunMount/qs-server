@@ -13,6 +13,8 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -51,7 +53,7 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	report, err := reportBuilder.Build(ctx, evaloutcome.Outcome{
+	input, err := interpretationinput.FromLegacyOutcome(evaloutcome.Outcome{
 		Assessment: submitted,
 		Input:      req.Input,
 		Execution:  outcome,
@@ -59,6 +61,11 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
+	draft, err := reportBuilder.Build(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	report := interpretationreporting.LegacyReportFromDraft(input, draft)
 	result := &modelpreview.Result{
 		Scores: scoresFromOutcome(outcome),
 		Report: report,

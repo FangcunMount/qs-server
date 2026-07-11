@@ -50,14 +50,11 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 				t.Fatalf("detail = %#v, want INTJ@40", detail)
 			}
 
-			report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
+			report := buildLegacyReport(t, reportBuilder, evaloutcome.Outcome{
 				Assessment: assessmentEntity,
 				Input:      snapshot,
 				Execution:  outcome,
 			})
-			if err != nil {
-				t.Fatalf("Build report: %v", err)
-			}
 			if report.Conclusion() == "" {
 				t.Fatal("expected non-empty report conclusion")
 			}

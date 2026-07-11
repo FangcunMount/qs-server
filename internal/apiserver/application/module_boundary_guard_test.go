@@ -9,7 +9,8 @@ import (
 )
 
 // This allowlist freezes the current Evaluation/Interpretation boundary debt.
-// Refactoring batches must shrink it; new importer files are rejected.
+// Refactoring batches must shrink it. The sole designated input adapter may
+// read legacy Evaluation data while Builder implementations may not.
 func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T) {
 	t.Parallel()
 
@@ -47,6 +48,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
 			allowedImporters: []string{
+				"internal/apiserver/application/interpretation/input/legacy_outcome_adapter.go",
 				"internal/apiserver/application/interpretation/reporting/audience_profile_builders.go",
 				"internal/apiserver/application/interpretation/reporting/factor_scoring_report.go",
 				"internal/apiserver/application/interpretation/reporting/materialize/materialize.go",

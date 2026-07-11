@@ -8,6 +8,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -168,15 +169,19 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
+	interpretationInput, err := interpretationinput.FromLegacyOutcome(evaloutcome.Outcome{
 		Assessment: frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm),
 		Input:      input,
 		Execution:  outcome,
 	})
 	if err != nil {
+		t.Fatalf("adapt interpretation input: %v", err)
+	}
+	draft, err := reportBuilder.Build(context.Background(), interpretationInput)
+	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}
-	if report == nil {
+	if draft == nil {
 		t.Fatal("report is nil")
 	}
 }

@@ -38,7 +38,7 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want hidden trigger", detail.SpecialTrigger)
 	}
 
-	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),
@@ -46,9 +46,6 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 			assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 		),
 	))
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
 	extra := report.ModelExtra()
 	if extra == nil || !extra.IsSpecial || extra.SpecialTrigger != "hidden:drink_gate_q2_answer=2" {
 		t.Fatalf("ModelExtra = %#v, want special DRUNK", extra)
@@ -88,7 +85,7 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want fallback trigger", detail.SpecialTrigger)
 	}
 
-	report, err := mustConfiguredReportBuilder(t).Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
+	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),
@@ -96,9 +93,6 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 			assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 		),
 	))
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
 	extra := report.ModelExtra()
 	if extra == nil || !extra.IsSpecial || extra.SpecialTrigger != "fallback:best_match<60%" {
 		t.Fatalf("ModelExtra = %#v, want special HHHH fallback", extra)

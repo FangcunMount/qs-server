@@ -62,14 +62,11 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 		t.Fatalf("MatchPercent = %.2f, want 40", detail.MatchPercent)
 	}
 
-	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
+	report := buildLegacyReport(t, reportBuilder, evaloutcome.Outcome{
 		Assessment: assessment,
 		Input:      snapshot,
 		Execution:  outcome,
 	})
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
 	if report.Conclusion() == "" {
 		t.Fatal("expected non-empty report conclusion")
 	}
