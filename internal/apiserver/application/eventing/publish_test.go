@@ -52,7 +52,7 @@ func (f *fakePublisher) PublishAll(ctx context.Context, events []event.DomainEve
 func TestPublishCollectedEvents_NilPublisherDoesNotClear(t *testing.T) {
 	collector := &fakeCollector{
 		events: []event.DomainEvent{
-			event.New("assessment.submitted", "Assessment", "1", struct{}{}),
+			event.New("evaluation.requested", "Evaluation", "1", struct{}{}),
 		},
 	}
 	missingCalled := false
@@ -73,13 +73,13 @@ func TestPublishCollectedEvents_FailureDoesNotStopAndClearsAtEnd(t *testing.T) {
 	firstErr := errors.New("boom")
 	publisher := &fakePublisher{
 		failAt: map[string]error{
-			"assessment.submitted": firstErr,
+			"evaluation.requested": firstErr,
 		},
 	}
 	collector := &fakeCollector{
 		events: []event.DomainEvent{
-			event.New("assessment.submitted", "Assessment", "1", struct{}{}),
-			event.New("report.generated", "Report", "2", struct{}{}),
+			event.New("evaluation.requested", "Evaluation", "1", struct{}{}),
+			event.New("interpretation.report.generated", "Report", "2", struct{}{}),
 		},
 	}
 
@@ -91,7 +91,7 @@ func TestPublishCollectedEvents_FailureDoesNotStopAndClearsAtEnd(t *testing.T) {
 	if len(publisher.published) != 2 {
 		t.Fatalf("expected 2 publish attempts, got %d", len(publisher.published))
 	}
-	if len(failures) != 1 || failures[0] != "assessment.submitted:boom" {
+	if len(failures) != 1 || failures[0] != "evaluation.requested:boom" {
 		t.Fatalf("unexpected failures: %#v", failures)
 	}
 	if !collector.cleared {

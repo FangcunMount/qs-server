@@ -13,26 +13,33 @@ import (
 )
 
 const (
-	EventTypeSubmitted   = evaldomainevent.TypeSubmitted
-	EventTypeEvaluated   = evaldomainevent.TypeEvaluated
-	EventTypeInterpreted = evaldomainevent.TypeInterpreted
-	EventTypeFailed      = evaldomainevent.TypeFailed
+	EventTypeRequested        = evaldomainevent.TypeRequested
+	EventTypeOutcomeCommitted = evaldomainevent.TypeOutcomeCommitted
+	EventTypeFailed           = evaldomainevent.TypeFailed
+	// Deprecated identifiers resolve to the new wire contract.
+	EventTypeSubmitted = EventTypeRequested
+	EventTypeEvaluated = EventTypeOutcomeCommitted
 )
 
 const AggregateType = evaldomainevent.AggregateType
 
 type DomainEvent = evaldomainevent.DomainEvent
 
-type AssessmentSubmittedData = eventpayload.AssessmentSubmittedData
-type AssessmentFailedData = eventpayload.AssessmentFailedData
-type AssessmentEvaluatedData = eventpayload.AssessmentEvaluatedData
+type EvaluationRequestedData = eventpayload.EvaluationRequestedData
+type EvaluationFailedData = eventpayload.EvaluationFailedData
+type EvaluationOutcomeCommittedData = eventpayload.EvaluationOutcomeCommittedData
 
-type AssessmentSubmittedEvent = event.Event[AssessmentSubmittedData]
-type AssessmentFailedEvent = event.Event[AssessmentFailedData]
-type AssessmentEvaluatedEvent = event.Event[AssessmentEvaluatedData]
+type EvaluationRequestedEvent = event.Event[EvaluationRequestedData]
+type EvaluationFailedEvent = event.Event[EvaluationFailedData]
+type EvaluationOutcomeCommittedEvent = event.Event[EvaluationOutcomeCommittedData]
 
-// NewAssessmentSubmittedEvent 创建测评已提交事件
-func NewAssessmentSubmittedEvent(
+// Deprecated type aliases keep tests and internal fixtures source-compatible
+// while publishing only the new event types.
+type AssessmentSubmittedEvent = EvaluationRequestedEvent
+type AssessmentEvaluatedEvent = EvaluationOutcomeCommittedEvent
+type AssessmentFailedEvent = EvaluationFailedEvent
+
+func NewEvaluationRequestedEvent(
 	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
@@ -40,15 +47,15 @@ func NewAssessmentSubmittedEvent(
 	answerSheetRef AnswerSheetRef,
 	modelRef *EvaluationModelRef,
 	submittedAt time.Time,
-) AssessmentSubmittedEvent {
-	in := evaldomainevent.SubmittedInput{
+) EvaluationRequestedEvent {
+	in := evaldomainevent.RequestedInput{
 		OrgID:             orgID,
 		AssessmentID:      int64(assessmentID),
 		TesteeID:          testeeID.Uint64(),
 		QuestionnaireCode: string(questionnaireRef.Code()),
 		QuestionnaireVer:  questionnaireRef.Version(),
 		AnswerSheetID:     strconv.FormatInt(int64(answerSheetRef.ID()), 10),
-		SubmittedAt:       submittedAt,
+		RequestedAt:       submittedAt,
 	}
 	if modelRef != nil && !modelRef.IsEmpty() {
 		in.ModelKind = modelRef.Kind().String()
@@ -61,30 +68,28 @@ func NewAssessmentSubmittedEvent(
 		in.ModelCode = modelRef.Code().String()
 		in.ModelVersion = modelRef.Version()
 	}
-	return evaldomainevent.NewSubmittedEvent(in)
+	return evaldomainevent.NewRequestedEvent(in)
 }
 
-// NewAssessmentFailedEvent 创建测评失败事件
-func NewAssessmentFailedEvent(
+func NewEvaluationFailedEvent(
 	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
 	reason string,
 	failedAt time.Time,
-) AssessmentFailedEvent {
+) EvaluationFailedEvent {
 	return evaldomainevent.NewFailedEvent(orgID, int64(assessmentID), testeeID.Uint64(), reason, failedAt)
 }
 
-// NewAssessmentEvaluatedEvent 创建测评已计分事件
-func NewAssessmentEvaluatedEvent(
+func NewEvaluationOutcomeCommittedEvent(
 	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
 	outcomeID meta.ID,
 	evaluationRunID evalrun.ID,
 	evaluatedAt time.Time,
-) AssessmentEvaluatedEvent {
-	return evaldomainevent.NewEvaluatedEvent(
+) EvaluationOutcomeCommittedEvent {
+	return evaldomainevent.NewOutcomeCommittedEvent(
 		orgID,
 		int64(assessmentID),
 		testeeID.Uint64(),

@@ -33,14 +33,12 @@ const (
 
 var unfinishedStatuses = []string{statusPending, statusPublishing, statusFailed}
 
-var legacyEventTypes = []string{
-	eventcatalog.AssessmentInterpretedWireV2,
-	eventcatalog.ReportGeneratedWireV2,
-}
+var legacyEventTypes []string
 
 var outcomeEventTypes = []string{
-	eventcatalog.AssessmentInterpreted,
-	eventcatalog.ReportGenerated,
+	eventcatalog.EvaluationOutcomeCommitted,
+	eventcatalog.InterpretationReportGenerated,
+	eventcatalog.InterpretationReportFailed,
 }
 
 type config struct {

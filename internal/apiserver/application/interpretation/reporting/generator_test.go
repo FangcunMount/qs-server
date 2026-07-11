@@ -34,7 +34,7 @@ func (b generatorScaleBuilder) Build(context.Context, evaloutcome.Outcome) (*dom
 	return b.report, nil
 }
 
-func TestGeneratorEmitsReportEventsWithoutAssessmentInterpreted(t *testing.T) {
+func TestGeneratorEmitsInterpretationReportEvents(t *testing.T) {
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(8),
@@ -79,12 +79,7 @@ func TestGeneratorEmitsReportEventsWithoutAssessmentInterpreted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, evt := range generation.Events {
-		if evt.EventType() == assessment.EventTypeInterpretedOutcome {
-			t.Fatalf("independent report generation emitted %s", evt.EventType())
-		}
-	}
 	if len(generation.Events) != 2 {
-		t.Fatalf("report events = %d, want report.generated + footprint", len(generation.Events))
+		t.Fatalf("report events = %d, want interpretation.report.generated + footprint", len(generation.Events))
 	}
 }

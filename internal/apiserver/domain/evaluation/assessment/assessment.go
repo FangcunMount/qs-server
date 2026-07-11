@@ -15,7 +15,7 @@ import (
 // 1. 记录测评元数据（谁做的、用什么问卷/解释模型、来源于哪个业务场景）
 // 2. 管理测评生命周期（创建 → 提交 → evaluated/failed）
 // 3. 记录评估结果摘要（总分、风险等级等兼容字段）
-// 4. 发布 Evaluation 领域事件（AssessmentSubmittedEvent、AssessmentEvaluatedEvent、AssessmentFailedEvent）
+// 4. 发布 Evaluation 领域事件（requested、outcome committed、failed）
 type Assessment struct {
 	// === 核心标识 ===
 	id    ID
@@ -213,7 +213,7 @@ func Reconstruct(
 
 // Submit 提交答卷
 // 前置条件：只有 pending 状态可以提交
-// 后置条件：状态变为 submitted，发布 AssessmentSubmittedEvent
+// 后置条件：状态变为 submitted，发布 evaluation.requested
 func (a *Assessment) Submit() error {
 	if !a.status.IsPending() {
 		return NewInvalidStatusError("submit", a.status)
@@ -224,7 +224,7 @@ func (a *Assessment) Submit() error {
 	a.submittedAt = &now
 
 	// 发布领域事件
-	a.addEvent(NewAssessmentSubmittedEvent(
+	a.addEvent(NewEvaluationRequestedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,
@@ -274,7 +274,7 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 // StageEvaluatedEvent records the durable outcome and run references that
 // Interpretation must consume after scoring completes.
 func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
-	a.addEvent(NewAssessmentEvaluatedEvent(
+	a.addEvent(NewEvaluationOutcomeCommittedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,
@@ -286,7 +286,7 @@ func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.I
 
 // MarkAsFailed 标记评估失败
 // 前置条件：仅 submitted 状态可以标记 Evaluation 失败。
-// 后置条件：状态变为 failed，记录失败原因，发布 AssessmentFailedEvent
+// 后置条件：状态变为 failed，记录失败原因，发布 evaluation.failed
 func (a *Assessment) MarkAsFailed(reason string) error {
 	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("mark as failed", a.status)
@@ -305,7 +305,7 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 	a.summary = nil
 
 	// 发布领域事件
-	a.addEvent(NewAssessmentFailedEvent(
+	a.addEvent(NewEvaluationFailedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,
@@ -318,7 +318,7 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 
 // RetryFromFailed 从失败状态重试
 // 前置条件：只有 failed 状态可以重试
-// 后置条件：状态变为 submitted，清除失败信息，发布 AssessmentSubmittedEvent
+// 后置条件：状态变为 submitted，清除失败信息，发布 evaluation.requested
 func (a *Assessment) RetryFromFailed() error {
 	if !a.status.IsFailed() {
 		return NewInvalidStatusError("retry from failed", a.status)
@@ -331,7 +331,7 @@ func (a *Assessment) RetryFromFailed() error {
 	a.failureReason = nil
 
 	// 发布领域事件（重新触发评估流程）
-	a.addEvent(NewAssessmentSubmittedEvent(
+	a.addEvent(NewEvaluationRequestedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,

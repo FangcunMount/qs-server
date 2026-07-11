@@ -73,15 +73,15 @@ func TestMetricEvidenceReaderBuildsEventQueries(t *testing.T) {
 	reader.EventOutboxPendingBacklog(context.Background(), "mysql", "5m", now)
 	reader.EventOutboxPendingOldestAge(context.Background(), "mysql", "5m", now)
 	reader.EventOutboxStatusScrapeFailure(context.Background(), "mysql", "5m", now)
-	reader.EventTypePendingBacklog(context.Background(), "mysql", "assessment.submitted", "5m", now)
-	reader.EventTypePendingOldestAge(context.Background(), "mysql", "assessment.submitted", "5m", now)
+	reader.EventTypePendingBacklog(context.Background(), "mysql", "evaluation.requested", "5m", now)
+	reader.EventTypePendingOldestAge(context.Background(), "mysql", "evaluation.requested", "5m", now)
 
 	want := []string{
 		`sum(qs_event_outbox_backlog{status="pending",store="mysql"})`,
 		`sum(qs_event_outbox_oldest_age_seconds{status="pending",store="mysql"})`,
 		`sum(increase(qs_event_outbox_status_scrape_total{outcome="failure",store="mysql"}[5m]))`,
-		`sum(qs_event_outbox_backlog_by_type{event_type="assessment.submitted",status="pending",store="mysql"})`,
-		`sum(qs_event_outbox_oldest_age_by_type_seconds{event_type="assessment.submitted",status="pending",store="mysql"})`,
+		`sum(qs_event_outbox_backlog_by_type{event_type="evaluation.requested",status="pending",store="mysql"})`,
+		`sum(qs_event_outbox_oldest_age_by_type_seconds{event_type="evaluation.requested",status="pending",store="mysql"})`,
 	}
 	if len(metrics.specs) != len(want) {
 		t.Fatalf("metric specs = %#v, want %d specs", metrics.specs, len(want))

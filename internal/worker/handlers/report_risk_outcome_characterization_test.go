@@ -31,8 +31,8 @@ func TestOutcomeReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 				Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 				InternalClient: client,
 			}
-			handler := handleReportGenerated(deps)
-			if err := handler(context.Background(), eventcatalog.ReportGeneratedOutcome, mustBuildReportGeneratedOutcomePayload(t, tc.severity, tc.levelCode)); err != nil {
+			handler := handleInterpretationReportGenerated(deps)
+			if err := handler(context.Background(), eventcatalog.InterpretationReportGenerated, mustBuildReportGeneratedOutcomePayload(t, tc.severity, tc.levelCode)); err != nil {
 				t.Fatalf("handler: %v", err)
 			}
 			req := client.syncAssessmentAttentionRequest

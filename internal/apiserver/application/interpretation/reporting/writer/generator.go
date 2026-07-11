@@ -48,14 +48,7 @@ func (g *reportGenerator) Generate(ctx context.Context, outcome evaloutcome.Outc
 	}
 	assembler := g.assemblers.ResolveByMechanism(mechanismKey)
 	events := assembler.BuildSuccessEvents(outcome, rpt)
-	filtered := events[:0]
-	for _, evt := range events {
-		if evt == nil || evt.EventType() == assessment.EventTypeInterpretedOutcome {
-			continue
-		}
-		filtered = append(filtered, evt)
-	}
-	return Generation{Report: rpt, Events: filtered}, nil
+	return Generation{Report: rpt, Events: events}, nil
 }
 
 // ResolveOutcomeKey 解析评估器键 从 结果。

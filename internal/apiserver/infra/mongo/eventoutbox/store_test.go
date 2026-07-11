@@ -146,15 +146,16 @@ func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 	}
 	wantPriority := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AssessmentSubmitted,
+		eventcatalog.EvaluationRequested,
 	}
 	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
 	wantP1 := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AssessmentSubmitted,
-		eventcatalog.AssessmentFailed,
-		eventcatalog.ReportGenerated,
-		eventcatalog.AssessmentInterpreted,
+		eventcatalog.EvaluationRequested,
+		eventcatalog.EvaluationOutcomeCommitted,
+		eventcatalog.EvaluationFailed,
+		eventcatalog.InterpretationReportGenerated,
+		eventcatalog.InterpretationReportFailed,
 	}
 	assertEventTypeOperator(t, queries[1].filter, "$in", wantP1)
 	if _, ok := queries[2].filter["event_type"]; ok {

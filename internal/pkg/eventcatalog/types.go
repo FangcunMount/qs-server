@@ -6,18 +6,23 @@ const (
 
 	AnswerSheetSubmitted = "answersheet.submitted"
 
-	AssessmentSubmitted          = "assessment.submitted"
-	AssessmentEvaluated          = "assessment.evaluated"
-	AssessmentInterpreted        = "assessment.interpreted"
-	AssessmentInterpretedOutcome = AssessmentInterpreted
-	AssessmentFailed             = "assessment.failed"
+	EvaluationRequested        = "evaluation.requested"
+	EvaluationOutcomeCommitted = "evaluation.outcome.committed"
+	EvaluationFailed           = "evaluation.failed"
 
-	ReportGenerated        = "report.generated"
-	ReportGeneratedOutcome = ReportGenerated
+	InterpretationReportGenerated = "interpretation.report.generated"
+	InterpretationReportFailed    = "interpretation.report.failed"
 
-	// DeprecatedWire names for draining pre-canonical outbox backlog.
-	AssessmentInterpretedWireV2 = "assessment.interpreted.v2"
-	ReportGeneratedWireV2       = "report.generated.v2"
+	// Deprecated identifiers retained only while repository-wide tests and
+	// operational fixtures migrate. They resolve to the new event contract and
+	// do not preserve any old wire event names.
+	AssessmentSubmitted          = EvaluationRequested
+	AssessmentEvaluated          = EvaluationOutcomeCommitted
+	AssessmentInterpreted        = InterpretationReportGenerated
+	AssessmentInterpretedOutcome = InterpretationReportGenerated
+	AssessmentFailed             = EvaluationFailed
+	ReportGenerated              = InterpretationReportGenerated
+	ReportGeneratedOutcome       = InterpretationReportGenerated
 
 	FootprintEntryOpened                 = "footprint.entry_opened"
 	FootprintIntakeConfirmed             = "footprint.intake_confirmed"
@@ -41,11 +46,11 @@ func EventTypes() []string {
 	return []string{
 		QuestionnaireChanged,
 		AnswerSheetSubmitted,
-		AssessmentSubmitted,
-		AssessmentEvaluated,
-		AssessmentInterpreted,
-		AssessmentFailed,
-		ReportGenerated,
+		EvaluationRequested,
+		EvaluationOutcomeCommitted,
+		EvaluationFailed,
+		InterpretationReportGenerated,
+		InterpretationReportFailed,
 		FootprintEntryOpened,
 		FootprintIntakeConfirmed,
 		FootprintTesteeProfileCreated,

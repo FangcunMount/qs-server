@@ -100,8 +100,8 @@ func TestAssessmentFailedAndRetryLifecycleEvents(t *testing.T) {
 	if len(a.Events()) != 1 {
 		t.Fatalf("expected one submitted event after retry, got %d", len(a.Events()))
 	}
-	if a.Events()[0].EventType() != EventTypeSubmitted {
-		t.Fatalf("expected submitted event after retry, got %s", a.Events()[0].EventType())
+	if a.Events()[0].EventType() != EventTypeRequested {
+		t.Fatalf("expected requested event after retry, got %s", a.Events()[0].EventType())
 	}
 }
 
@@ -223,9 +223,9 @@ func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
 	if err := a.Submit(); err != nil {
 		t.Fatalf("Submit returned error: %v", err)
 	}
-	event, ok := a.Events()[0].(AssessmentSubmittedEvent)
+	event, ok := a.Events()[0].(EvaluationRequestedEvent)
 	if !ok {
-		t.Fatalf("event type = %T, want AssessmentSubmittedEvent", a.Events()[0])
+		t.Fatalf("event type = %T, want EvaluationRequestedEvent", a.Events()[0])
 	}
 	data := event.Payload()
 	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ModelVersion != "2.1.0" || data.ScaleCode != "" || data.ScaleVersion != "" {

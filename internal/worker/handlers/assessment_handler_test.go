@@ -3,52 +3,35 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
-func TestEvaluationRunRetryHintReferencesRuntimeCheckpoint(t *testing.T) {
-	if !strings.Contains(evaluationRunRetryHint, "runtime_checkpoint") {
-		t.Fatalf("hint = %q", evaluationRunRetryHint)
-	}
-	if !strings.Contains(evaluationRunRetryHint, "scope=evaluation_run") {
-		t.Fatalf("hint = %q", evaluationRunRetryHint)
-	}
-}
-
-func TestHandleAssessmentSubmittedFailsWhenInternalClientMissing(t *testing.T) {
-	deps := newAnswerSheetHandlerTestDeps(nil, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err == nil {
+func TestHandleEvaluationRequestedFailsWhenInternalClientMissing(t *testing.T) {
+	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(nil, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 42)); err == nil {
 		t.Fatal("expected error when internal client is missing")
 	}
 }
 
-func TestHandleAssessmentEvaluatedFailsWhenInternalClientMissing(t *testing.T) {
-	deps := newAnswerSheetHandlerTestDeps(nil, nil)
-	handler := handleAssessmentEvaluated(deps)
-
-	err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, 42))
-	if err == nil {
-		t.Fatal("expected error when internal client is missing")
+func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
+	client := &assessmentEvaluateClient{resp: &pb.EvaluateAssessmentResponse{Success: true, Status: "evaluated"}}
+	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 42)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if client.evaluateCalls != 1 {
+		t.Fatalf("evaluate calls = %d, want 1", client.evaluateCalls)
 	}
 }
 
-func TestHandleAssessmentEvaluatedCallsGenerateReport(t *testing.T) {
-	client := &assessmentGenerateReportClient{
-		resp: &pb.GenerateReportFromAssessmentResponse{Success: true, Status: "interpreted"},
-	}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentEvaluated(deps)
-
-	if err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, 42)); err != nil {
+func TestHandleEvaluationOutcomeCommittedCallsGenerateReport(t *testing.T) {
+	client := &assessmentGenerateReportClient{resp: &pb.GenerateReportFromAssessmentResponse{Success: true, Status: "generated"}}
+	handler := handleEvaluationOutcomeCommitted(newAnswerSheetHandlerTestDeps(client, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 42)); err != nil {
 		t.Fatalf("handler: %v", err)
 	}
 	if client.generateReportCalls != 1 {
@@ -56,150 +39,10 @@ func TestHandleAssessmentEvaluatedCallsGenerateReport(t *testing.T) {
 	}
 }
 
-func TestHandleAssessmentEvaluatedRejectsNegativeAssessmentID(t *testing.T) {
-	client := &fakeWorkerInternalClient{}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentEvaluated(deps)
-
-	err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, -1))
-	if err == nil {
+func TestHandleEvaluationFailedRejectsNegativeAssessmentID(t *testing.T) {
+	handler := handleEvaluationFailed(newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationFailed, mustBuildEvaluationFailedPayload(t, -2)); err == nil {
 		t.Fatal("expected negative assessment id to be rejected")
-	}
-}
-
-type assessmentGenerateReportClient struct {
-	fakeWorkerInternalClient
-	resp                *pb.GenerateReportFromAssessmentResponse
-	err                 error
-	generateReportCalls int
-}
-
-func (c *assessmentGenerateReportClient) GenerateReportFromOutcome(
-	_ context.Context,
-	_ string,
-) (*pb.GenerateReportFromAssessmentResponse, error) {
-	c.generateReportCalls++
-	return c.resp, c.err
-}
-
-func mustBuildAssessmentEvaluatedPayload(t *testing.T, assessmentID int64) []byte {
-	t.Helper()
-
-	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
-	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-assessment-evaluated",
-		"eventType":     "assessment.evaluated",
-		"occurredAt":    now,
-		"aggregateType": "Assessment",
-		"aggregateID":   "agg-evaluated",
-		"data": map[string]any{
-			"org_id":            18,
-			"assessment_id":     assessmentID,
-			"testee_id":         99,
-			"outcome_id":        "9001",
-			"evaluation_run_id": "2001:1",
-			"evaluated_at":      now,
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-	return payload
-}
-
-func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {
-	client := &fakeWorkerInternalClient{}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, -1))
-	if err == nil {
-		t.Fatal("expected negative assessment id to be rejected")
-	}
-}
-
-func TestHandleAssessmentSubmittedAcksWhenEvaluationAlreadyProcessed(t *testing.T) {
-	client := &assessmentEvaluateClient{
-		resp: &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "already_interpreted",
-			Message: "assessment already processed",
-		},
-	}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err != nil {
-		t.Fatalf("expected duplicate evaluation to ack without error, got %v", err)
-	}
-	if client.evaluateCalls != 1 {
-		t.Fatalf("evaluate calls = %d, want 1", client.evaluateCalls)
-	}
-}
-
-func TestHandleAssessmentSubmittedRetriesOnRetryableCalculationFailure(t *testing.T) {
-	client := &assessmentEvaluateClient{
-		resp: &pb.EvaluateAssessmentResponse{
-			Success:     false,
-			Status:      "failed",
-			Message:     "calculation failed",
-			Retryable:   true,
-			RunId:       "42:1",
-			FailureKind: "calculation",
-		},
-	}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err == nil {
-		t.Fatal("expected retryable calculation failure to nack")
-	}
-}
-
-func TestHandleAssessmentSubmittedAcksWhenEvaluationFailed(t *testing.T) {
-	client := &assessmentEvaluateClient{
-		resp: &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "failed",
-			Message: "evaluation failed",
-		},
-	}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err != nil {
-		t.Fatalf("expected terminal evaluation failure to ack, got %v", err)
-	}
-}
-
-func TestHandleAssessmentSubmittedRetriesOnUnsuccessfulResponse(t *testing.T) {
-	client := &assessmentEvaluateClient{
-		resp: &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "skipped",
-			Message: "temporary unavailable",
-		},
-	}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err == nil {
-		t.Fatal("expected retryable evaluation error")
-	}
-}
-
-func TestHandleAssessmentSubmittedRetriesOnNilResponse(t *testing.T) {
-	client := &assessmentEvaluateClient{resp: nil}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentSubmitted(deps)
-
-	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
-	if err == nil {
-		t.Fatal("expected error for nil evaluate response")
 	}
 }
 
@@ -210,122 +53,62 @@ type assessmentEvaluateClient struct {
 	evaluateCalls int
 }
 
-func (c *assessmentEvaluateClient) EvaluateAssessment(
-	_ context.Context,
-	_ uint64,
-) (*pb.EvaluateAssessmentResponse, error) {
+func (c *assessmentEvaluateClient) EvaluateAssessment(context.Context, uint64) (*pb.EvaluateAssessmentResponse, error) {
 	c.evaluateCalls++
 	return c.resp, c.err
 }
 
-func TestHandleAssessmentFailedRejectsNegativeAssessmentID(t *testing.T) {
-	client := &fakeWorkerInternalClient{}
-	deps := newAnswerSheetHandlerTestDeps(client, nil)
-	handler := handleAssessmentFailed(deps)
-
-	err := handler(context.Background(), "assessment.failed", mustBuildAssessmentFailedPayload(t, -2))
-	if err == nil {
-		t.Fatal("expected negative assessment id to be rejected")
-	}
+type assessmentGenerateReportClient struct {
+	fakeWorkerInternalClient
+	resp                *pb.GenerateReportFromAssessmentResponse
+	err                 error
+	generateReportCalls int
 }
 
-func mustBuildAssessmentSubmittedPayload(t *testing.T, assessmentID int64) []byte {
-	t.Helper()
+func (c *assessmentGenerateReportClient) GenerateReportFromOutcome(context.Context, string) (*pb.GenerateReportFromAssessmentResponse, error) {
+	c.generateReportCalls++
+	return c.resp, c.err
+}
 
+func mustBuildEvaluationRequestedPayload(t *testing.T, assessmentID int64) []byte {
+	t.Helper()
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-assessment-submitted",
-		"eventType":     "assessment.submitted",
-		"occurredAt":    now,
-		"aggregateType": "Assessment",
-		"aggregateID":   "agg-1",
+		"id": "evt-evaluation-requested", "eventType": eventcatalog.EvaluationRequested, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
 		"data": map[string]any{
-			"org_id":                18,
-			"assessment_id":         assessmentID,
-			"testee_id":             99,
-			"questionnaire_code":    "QNR-001",
-			"questionnaire_version": "1.0.0",
-			"answersheet_id":        "456",
-			"scale_code":            "scale-1",
-			"submitted_at":          now,
+			"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "questionnaire_code": "QNR-001", "questionnaire_version": "1.0.0", "answersheet_id": "456", "model_code": "model-1", "requested_at": now,
 		},
 	})
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+		t.Fatal(err)
 	}
 	return payload
 }
 
-func TestAssessmentInterpretedOutcomeHelpers(t *testing.T) {
-	level := &eventoutcome.ResultLevel{Code: "severe", Severity: "high"}
-	score := &eventoutcome.ScoreValue{Value: 18.5}
-	if got := assessmentLevelCode(level); got != "severe" {
-		t.Fatalf("level code = %q, want severe", got)
-	}
-	if got := assessmentLevelSeverity(level); got != "high" {
-		t.Fatalf("severity = %q, want high", got)
-	}
-	if got := assessmentPrimaryScoreValue(score); got != 18.5 {
-		t.Fatalf("score = %v, want 18.5", got)
-	}
-	if got := assessmentPrimaryScoreValue(nil); got != 0 {
-		t.Fatalf("nil score = %v, want 0", got)
-	}
-}
-
-func TestHandleAssessmentInterpretedOutcomeAcksHighSeverityPayload(t *testing.T) {
-	deps := newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, nil)
-	handler := handleAssessmentInterpreted(deps)
-	if err := handler(context.Background(), eventcatalog.AssessmentInterpreted, mustBuildAssessmentInterpretedOutcomePayload(t)); err != nil {
-		t.Fatalf("handler: %v", err)
-	}
-}
-
-func mustBuildAssessmentInterpretedOutcomePayload(t *testing.T) []byte {
+func mustBuildEvaluationOutcomeCommittedPayload(t *testing.T, assessmentID int64) []byte {
 	t.Helper()
-
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-assessment-interpreted-v2",
-		"eventType":     eventcatalog.AssessmentInterpreted,
-		"occurredAt":    now,
-		"aggregateType": "Assessment",
-		"aggregateID":   "agg-3",
+		"id": "evt-evaluation-outcome-committed", "eventType": eventcatalog.EvaluationOutcomeCommitted, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
 		"data": map[string]any{
-			"org_id":         18,
-			"assessment_id":  42,
-			"testee_id":      99,
-			"level":          map[string]any{"code": "severe", "label": "severe", "severity": "high"},
-			"primary_score":  map[string]any{"kind": "raw_total", "value": 18.5},
-			"interpreted_at": now,
+			"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "outcome_id": "9001", "evaluation_run_id": "42:1", "committed_at": now,
 		},
 	})
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+		t.Fatal(err)
 	}
 	return payload
 }
 
-func mustBuildAssessmentFailedPayload(t *testing.T, assessmentID int64) []byte {
+func mustBuildEvaluationFailedPayload(t *testing.T, assessmentID int64) []byte {
 	t.Helper()
-
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-assessment-failed",
-		"eventType":     "assessment.failed",
-		"occurredAt":    now,
-		"aggregateType": "Assessment",
-		"aggregateID":   "agg-2",
-		"data": map[string]any{
-			"org_id":        18,
-			"assessment_id": assessmentID,
-			"testee_id":     99,
-			"reason":        "boom",
-			"failed_at":     now,
-		},
+		"id": "evt-evaluation-failed", "eventType": eventcatalog.EvaluationFailed, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
+		"data": map[string]any{"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "reason": "boom", "failed_at": now},
 	})
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+		t.Fatal(err)
 	}
 	return payload
 }

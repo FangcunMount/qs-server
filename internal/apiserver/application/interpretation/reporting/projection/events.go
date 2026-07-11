@@ -130,7 +130,7 @@ func (GenericEventAssembler) BuildSuccessEvents(outcome evaloutcome.Outcome, rpt
 		return nil
 	}
 	now := time.Now()
-	events := []event.DomainEvent{buildInterpretedOutcomeEvent(outcome, rpt, now)}
+	events := make([]event.DomainEvent, 0, 2)
 	if generated := buildReportGeneratedOutcomeEvent(outcome, rpt, now); generated != nil {
 		events = append(events, generated)
 	}

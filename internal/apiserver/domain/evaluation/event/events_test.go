@@ -7,10 +7,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestNewSubmittedEventIncludesModelIdentityFields(t *testing.T) {
+func TestNewRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	t.Parallel()
 
-	evt := NewSubmittedEvent(SubmittedInput{
+	evt := NewRequestedEvent(RequestedInput{
 		OrgID:             1,
 		AssessmentID:      42,
 		TesteeID:          1001,
@@ -22,7 +22,7 @@ func TestNewSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 		ModelAlgorithm:    string(modelcatalog.AlgorithmMBTI),
 		ModelCode:         "MBTI-16P",
 		ModelVersion:      "2.0.1",
-		SubmittedAt:       time.Now(),
+		RequestedAt:       time.Now(),
 	})
 	data := evt.Payload()
 	if data.ModelSubKind != string(modelcatalog.SubKindTypology) {
@@ -33,10 +33,10 @@ func TestNewSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 	}
 }
 
-func TestNewEvaluatedEventIncludesDurableOutcomeAndRunReferences(t *testing.T) {
+func TestNewOutcomeCommittedEventIncludesDurableOutcomeAndRunReferences(t *testing.T) {
 	t.Parallel()
 
-	evt := NewEvaluatedEvent(1, 42, 1001, "9001", "42:1", time.Unix(100, 0))
+	evt := NewOutcomeCommittedEvent(1, 42, 1001, "9001", "42:1", time.Unix(100, 0))
 	data := evt.Payload()
 	if data.OutcomeID != "9001" || data.EvaluationRunID != "42:1" {
 		t.Fatalf("evaluated references = outcome:%q run:%q", data.OutcomeID, data.EvaluationRunID)

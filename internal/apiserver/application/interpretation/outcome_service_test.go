@@ -14,6 +14,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -68,13 +69,19 @@ func (g *failThenGenerate) Generate(_ context.Context, outcome evaloutcome.Outco
 }
 
 type durableReportSaverStub struct {
-	calls    int
-	testeeID testee.ID
+	calls      int
+	testeeID   testee.ID
+	events     [][]event.DomainEvent
+	stateStore *reportStateStoreStub
 }
 
-func (s *durableReportSaverStub) SaveReportDurably(_ context.Context, _ *domainreport.InterpretReport, testeeID testee.ID, _ []event.DomainEvent) error {
+func (s *durableReportSaverStub) SaveReportDurably(_ context.Context, rpt *domainreport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
 	s.calls++
 	s.testeeID = testeeID
+	s.events = append(s.events, append([]event.DomainEvent(nil), events...))
+	if s.stateStore != nil {
+		return s.stateStore.SaveState(context.Background(), rpt, testeeID)
+	}
 	return nil
 }
 
@@ -83,7 +90,7 @@ func TestOutcomeReportRetryReadsPersistedOutcomeAndAdvancesIndependentAttempt(t 
 	outcomes := &outcomeRepoForReport{record: record}
 	states := &reportStateStoreStub{}
 	generator := &failThenGenerate{}
-	saver := &durableReportSaverStub{}
+	saver := &durableReportSaverStub{stateStore: states}
 	svc := NewOutcomeReportService(outcomes, states, generator, saver)
 
 	failed, err := svc.GenerateByOutcomeID(context.Background(), record.ID())
@@ -101,8 +108,11 @@ func TestOutcomeReportRetryReadsPersistedOutcomeAndAdvancesIndependentAttempt(t 
 	if generated.Status() != domainreport.ReportStatusGenerated || generated.Attempt() != 2 || generated.OutcomeID() != record.ID() {
 		t.Fatalf("generated report = %#v", generated)
 	}
-	if outcomes.reads != 2 || generator.calls != 2 || saver.calls != 1 || saver.testeeID.Uint64() != record.TesteeID() {
+	if outcomes.reads != 2 || generator.calls != 2 || saver.calls != 2 || saver.testeeID.Uint64() != record.TesteeID() {
 		t.Fatalf("reads=%d generator=%d saver=%d testee=%d", outcomes.reads, generator.calls, saver.calls, saver.testeeID.Uint64())
+	}
+	if len(saver.events) != 2 || len(saver.events[0]) != 1 || saver.events[0][0].EventType() != eventcatalog.InterpretationReportFailed {
+		t.Fatalf("failure outbox event = %#v", saver.events)
 	}
 	wantStatuses := []domainreport.ReportStatus{domainreport.ReportStatusPending, domainreport.ReportStatusGenerating, domainreport.ReportStatusFailed, domainreport.ReportStatusGenerating}
 	for i, want := range wantStatuses {

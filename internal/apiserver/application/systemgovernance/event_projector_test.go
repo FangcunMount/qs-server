@@ -30,7 +30,7 @@ func TestEventDrainProjectionBuildsRowsSummaryAndScopedMetrics(t *testing.T) {
 		{
 			Store: "mysql",
 			Buckets: []outboxport.EventTypeStatusBucket{
-				{EventType: "assessment.submitted", Status: "pending", Count: 9, OldestCreatedAt: &oldest},
+				{EventType: "evaluation.requested", Status: "pending", Count: 9, OldestCreatedAt: &oldest},
 			},
 		},
 	}, "5m", now)
@@ -41,7 +41,7 @@ func TestEventDrainProjectionBuildsRowsSummaryAndScopedMetrics(t *testing.T) {
 	if len(projection.OutboxRows) != 1 || projection.OutboxRows[0].Severity != SeverityCritical {
 		t.Fatalf("outbox rows = %#v, want one critical row", projection.OutboxRows)
 	}
-	if len(projection.EventTypeRows) != 1 || projection.EventTypeRows[0].EventType != "assessment.submitted" {
+	if len(projection.EventTypeRows) != 1 || projection.EventTypeRows[0].EventType != "evaluation.requested" {
 		t.Fatalf("event type rows = %#v, want assessment.submitted row", projection.EventTypeRows)
 	}
 	if len(projection.Signals) < 2 {
@@ -52,7 +52,7 @@ func TestEventDrainProjectionBuildsRowsSummaryAndScopedMetrics(t *testing.T) {
 		if strings.Contains(spec.Query, `store="mysql"`) && strings.Contains(spec.Query, `status="pending"`) {
 			sawStoreScoped = true
 		}
-		if strings.Contains(spec.Query, `event_type="assessment.submitted"`) {
+		if strings.Contains(spec.Query, `event_type="evaluation.requested"`) {
 			sawTypeScoped = true
 		}
 	}

@@ -112,30 +112,30 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			"AnswerSheetSubmitted",
 			"NewAnswerSheetSubmittedEvent",
 		},
-		eventcatalog.AssessmentSubmitted: {
-			eventcatalog.AssessmentSubmitted,
-			"AssessmentSubmitted",
-			"NewAssessmentSubmittedEvent",
+		eventcatalog.EvaluationRequested: {
+			eventcatalog.EvaluationRequested,
+			"EvaluationRequested",
+			"NewEvaluationRequestedEvent",
 		},
-		eventcatalog.AssessmentEvaluated: {
-			eventcatalog.AssessmentEvaluated,
-			"AssessmentEvaluated",
-			"NewAssessmentEvaluatedEvent",
+		eventcatalog.EvaluationOutcomeCommitted: {
+			eventcatalog.EvaluationOutcomeCommitted,
+			"EvaluationOutcomeCommitted",
+			"NewEvaluationOutcomeCommittedEvent",
 		},
-		eventcatalog.AssessmentInterpreted: {
-			eventcatalog.AssessmentInterpreted,
-			"AssessmentInterpretedOutcome",
-			"NewAssessmentInterpretedOutcomeEvent",
+		eventcatalog.EvaluationFailed: {
+			eventcatalog.EvaluationFailed,
+			"EvaluationFailed",
+			"NewEvaluationFailedEvent",
 		},
-		eventcatalog.AssessmentFailed: {
-			eventcatalog.AssessmentFailed,
-			"AssessmentFailed",
-			"NewAssessmentFailedEvent",
-		},
-		eventcatalog.ReportGenerated: {
-			eventcatalog.ReportGenerated,
+		eventcatalog.InterpretationReportGenerated: {
+			eventcatalog.InterpretationReportGenerated,
 			"ReportGeneratedOutcome",
-			"NewReportGeneratedOutcomeEvent",
+			"NewInterpretationReportGeneratedEvent",
+		},
+		eventcatalog.InterpretationReportFailed: {
+			eventcatalog.InterpretationReportFailed,
+			"ReportFailedOutcome",
+			"NewInterpretationReportFailedEvent",
 		},
 		eventcatalog.FootprintEntryOpened: {
 			eventcatalog.FootprintEntryOpened,

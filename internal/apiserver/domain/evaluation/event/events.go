@@ -13,46 +13,39 @@ import (
 // 从 eventcatalog 包导入，保持事件类型的单一来源
 
 const (
-	// TypeSubmitted 测评已提交
-	TypeSubmitted = eventcatalog.AssessmentSubmitted
-	// TypeEvaluated 测评已计分
-	TypeEvaluated = eventcatalog.AssessmentEvaluated
-	// TypeInterpreted 测评已解读（结果投影见 events_outcome.go）
-	TypeInterpreted = eventcatalog.AssessmentInterpreted
-	// TypeFailed 测评失败
-	TypeFailed = eventcatalog.AssessmentFailed
+	TypeRequested        = eventcatalog.EvaluationRequested
+	TypeOutcomeCommitted = eventcatalog.EvaluationOutcomeCommitted
+	TypeFailed           = eventcatalog.EvaluationFailed
+	// Deprecated identifiers resolve to the new wire contract.
+	TypeSubmitted = TypeRequested
+	TypeEvaluated = TypeOutcomeCommitted
 )
 
 // AggregateType 聚合根类型
-const AggregateType = "Assessment"
+const AggregateType = "Evaluation"
 
 // DomainEvent 重新导出共享内核的 DomainEvent 接口
 type DomainEvent = event.DomainEvent
 
 // ==================== 事件 Payload 定义 ====================
 
-// SubmittedData 测评已提交事件数据
-type SubmittedData = eventpayload.AssessmentSubmittedData
+type RequestedData = eventpayload.EvaluationRequestedData
 
-// FailedData 测评失败事件数据
-type FailedData = eventpayload.AssessmentFailedData
+type FailedData = eventpayload.EvaluationFailedData
 
-// EvaluatedData 测评已计分事件数据
-type EvaluatedData = eventpayload.AssessmentEvaluatedData
+type OutcomeCommittedData = eventpayload.EvaluationOutcomeCommittedData
 
 // ==================== 事件类型别名 ====================
 
-// SubmittedEvent 测评已提交事件
-type SubmittedEvent = event.Event[SubmittedData]
+type RequestedEvent = event.Event[RequestedData]
 
 // FailedEvent 测评失败事件
 type FailedEvent = event.Event[FailedData]
 
-// EvaluatedEvent 测评已计分事件
-type EvaluatedEvent = event.Event[EvaluatedData]
+type OutcomeCommittedEvent = event.Event[OutcomeCommittedData]
 
-// SubmittedInput 构造 submitted 事件所需字段。
-type SubmittedInput struct {
+// RequestedInput constructs an evaluation requested event.
+type RequestedInput struct {
 	OrgID             int64
 	AssessmentID      int64
 	TesteeID          uint64
@@ -66,19 +59,18 @@ type SubmittedInput struct {
 	ModelVersion      string
 	ScaleCode         string
 	ScaleVersion      string
-	SubmittedAt       time.Time
+	RequestedAt       time.Time
 }
 
-// NewSubmittedEvent 创建测评已提交事件
-func NewSubmittedEvent(in SubmittedInput) SubmittedEvent {
-	data := SubmittedData{
+func NewRequestedEvent(in RequestedInput) RequestedEvent {
+	data := RequestedData{
 		OrgID:             in.OrgID,
 		AssessmentID:      in.AssessmentID,
 		TesteeID:          in.TesteeID,
 		QuestionnaireCode: in.QuestionnaireCode,
 		QuestionnaireVer:  in.QuestionnaireVer,
 		AnswerSheetID:     in.AnswerSheetID,
-		SubmittedAt:       in.SubmittedAt,
+		RequestedAt:       in.RequestedAt,
 		ModelKind:         in.ModelKind,
 		ModelSubKind:      in.ModelSubKind,
 		ModelAlgorithm:    in.ModelAlgorithm,
@@ -87,7 +79,7 @@ func NewSubmittedEvent(in SubmittedInput) SubmittedEvent {
 		ScaleCode:         in.ScaleCode,
 		ScaleVersion:      in.ScaleVersion,
 	}
-	return event.New(TypeSubmitted, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
+	return event.New(TypeRequested, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
 }
 
 // NewFailedEvent 创建测评失败事件
@@ -109,23 +101,22 @@ func NewFailedEvent(
 	)
 }
 
-// NewEvaluatedEvent 创建测评已计分事件
-func NewEvaluatedEvent(
+func NewOutcomeCommittedEvent(
 	orgID int64,
 	assessmentID int64,
 	testeeID uint64,
 	outcomeID string,
 	evaluationRunID string,
-	evaluatedAt time.Time,
-) EvaluatedEvent {
-	return event.New(TypeEvaluated, AggregateType, strconv.FormatInt(assessmentID, 10),
-		EvaluatedData{
+	committedAt time.Time,
+) OutcomeCommittedEvent {
+	return event.New(TypeOutcomeCommitted, AggregateType, strconv.FormatInt(assessmentID, 10),
+		OutcomeCommittedData{
 			OrgID:           orgID,
 			AssessmentID:    assessmentID,
 			TesteeID:        testeeID,
 			OutcomeID:       outcomeID,
 			EvaluationRunID: evaluationRunID,
-			EvaluatedAt:     evaluatedAt,
+			CommittedAt:     committedAt,
 		},
 	)
 }

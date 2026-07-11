@@ -6,17 +6,14 @@ func NewRegistry() *Registry {
 		"answersheet_submitted_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAnswerSheetSubmitted(deps)
 		},
-		"assessment_submitted_handler": func(deps *Dependencies) HandlerFunc {
-			return handleAssessmentSubmitted(deps)
+		"evaluation_requested_handler": func(deps *Dependencies) HandlerFunc {
+			return handleEvaluationRequested(deps)
 		},
-		"assessment_evaluated_handler": func(deps *Dependencies) HandlerFunc {
-			return handleAssessmentEvaluated(deps)
+		"evaluation_outcome_committed_handler": func(deps *Dependencies) HandlerFunc {
+			return handleEvaluationOutcomeCommitted(deps)
 		},
-		"assessment_interpreted_handler": func(deps *Dependencies) HandlerFunc {
-			return handleAssessmentInterpreted(deps)
-		},
-		"assessment_failed_handler": func(deps *Dependencies) HandlerFunc {
-			return handleAssessmentFailed(deps)
+		"evaluation_failed_handler": func(deps *Dependencies) HandlerFunc {
+			return handleEvaluationFailed(deps)
 		},
 		"behavior_projector_handler": func(deps *Dependencies) HandlerFunc {
 			return handleBehaviorProjector(deps)
@@ -24,8 +21,11 @@ func NewRegistry() *Registry {
 		"questionnaire_changed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleQuestionnaireChanged(deps)
 		},
-		"report_generated_handler": func(deps *Dependencies) HandlerFunc {
-			return handleReportGenerated(deps)
+		"interpretation_report_generated_handler": func(deps *Dependencies) HandlerFunc {
+			return handleInterpretationReportGenerated(deps)
+		},
+		"interpretation_report_failed_handler": func(deps *Dependencies) HandlerFunc {
+			return handleInterpretationReportFailed(deps)
 		},
 		"assessment_model_changed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAssessmentModelChanged(deps)

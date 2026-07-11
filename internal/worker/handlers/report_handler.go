@@ -9,9 +9,30 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
-func handleReportGenerated(deps *Dependencies) HandlerFunc {
+func handleInterpretationReportGenerated(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleReportGeneratedOutcome(ctx, deps, payload)
+	}
+}
+
+func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
+	return func(_ context.Context, _ string, payload []byte) error {
+		var data eventoutcome.ReportFailedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse interpretation report failed event: %w", err)
+		}
+		deps.Logger.Warn("interpretation report failed",
+			slog.String("event_id", env.ID),
+			slog.String("report_id", data.ReportID),
+			slog.String("assessment_id", data.AssessmentID),
+			slog.String("outcome_id", data.OutcomeID),
+			slog.Uint64("testee_id", data.TesteeID),
+			slog.Uint64("attempt", uint64(data.Attempt)),
+			slog.String("reason", data.Reason),
+			slog.Time("failed_at", data.FailedAt),
+		)
+		return nil
 	}
 }
 

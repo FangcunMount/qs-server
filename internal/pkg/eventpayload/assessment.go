@@ -2,8 +2,8 @@ package eventpayload
 
 import "time"
 
-// AssessmentSubmittedData is the assessment submitted event body.
-type AssessmentSubmittedData struct {
+// EvaluationRequestedData is the event body for an assessment ready to evaluate.
+type EvaluationRequestedData struct {
 	OrgID             int64     `json:"org_id"`
 	AssessmentID      int64     `json:"assessment_id"`
 	TesteeID          uint64    `json:"testee_id"`
@@ -17,16 +17,16 @@ type AssessmentSubmittedData struct {
 	ModelVersion      string    `json:"model_version,omitempty"`
 	ScaleCode         string    `json:"scale_code,omitempty"`
 	ScaleVersion      string    `json:"scale_version,omitempty"`
-	SubmittedAt       time.Time `json:"submitted_at"`
+	RequestedAt       time.Time `json:"requested_at"`
 }
 
 // NeedsEvaluation reports whether the assessment should be evaluated.
-func (d AssessmentSubmittedData) NeedsEvaluation() bool {
+func (d EvaluationRequestedData) NeedsEvaluation() bool {
 	return d.ModelCode != "" || d.ScaleCode != ""
 }
 
-// AssessmentFailedData is the assessment failed event body.
-type AssessmentFailedData struct {
+// EvaluationFailedData is the evaluation failed event body.
+type EvaluationFailedData struct {
 	OrgID        int64     `json:"org_id"`
 	AssessmentID int64     `json:"assessment_id"`
 	TesteeID     uint64    `json:"testee_id"`
@@ -34,12 +34,12 @@ type AssessmentFailedData struct {
 	FailedAt     time.Time `json:"failed_at"`
 }
 
-// AssessmentEvaluatedData is emitted after scoring completes and before report generation.
-type AssessmentEvaluatedData struct {
+// EvaluationOutcomeCommittedData is emitted after Evaluation facts commit.
+type EvaluationOutcomeCommittedData struct {
 	OrgID           int64     `json:"org_id"`
 	AssessmentID    int64     `json:"assessment_id"`
 	TesteeID        uint64    `json:"testee_id"`
 	OutcomeID       string    `json:"outcome_id"`
 	EvaluationRunID string    `json:"evaluation_run_id"`
-	EvaluatedAt     time.Time `json:"evaluated_at"`
+	CommittedAt     time.Time `json:"committed_at"`
 }

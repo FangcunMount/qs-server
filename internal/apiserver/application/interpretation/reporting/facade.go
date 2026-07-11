@@ -50,4 +50,5 @@ var (
 	NewMechanismCanonicalEventAssembler               = interpretationprojection.NewMechanismCanonicalEventAssembler
 	DefaultMechanismEventAssemblers                   = interpretationprojection.DefaultMechanismEventAssemblers
 	AttachReportOutcomeSummary                        = interpretationprojection.AttachReportOutcomeSummary
+	BuildReportFailedEvent                            = interpretationprojection.BuildReportFailedEvent
 )

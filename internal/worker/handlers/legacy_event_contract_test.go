@@ -6,12 +6,14 @@ import (
 	"testing"
 )
 
-func TestInterpretedAndReportHandlersDoNotUseLegacyPayloadTypes(t *testing.T) {
+func TestEvaluationAndInterpretationHandlersDoNotUseRetiredPayloadTypes(t *testing.T) {
 	t.Parallel()
 
 	forbidden := []string{
-		"eventpayload.AssessmentInterpretedData",
-		"eventpayload.ReportGeneratedData",
+		"AssessmentInterpretedPayload",
+		"AssessmentSubmittedData",
+		"AssessmentEvaluatedData",
+		"AssessmentFailedData",
 	}
 	for _, path := range []string{"assessment_handler.go", "report_handler.go"} {
 		data, err := os.ReadFile(path)

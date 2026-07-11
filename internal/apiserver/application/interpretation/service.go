@@ -12,6 +12,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type ReportStateStore interface {
@@ -102,22 +103,24 @@ func (s *outcomeReportService) generate(ctx context.Context, record *domainoutco
 
 	generation, generationErr := s.generator.Generate(ctx, outcome)
 	if generationErr != nil {
-		return rpt, s.persistFailure(ctx, rpt, outcome.TesteeID(), generationErr)
+		return rpt, s.persistFailure(ctx, rpt, outcome, generationErr)
 	}
 	if err := rpt.CompleteFrom(generation.Report, s.now()); err != nil {
-		return rpt, s.persistFailure(ctx, rpt, outcome.TesteeID(), err)
+		return rpt, s.persistFailure(ctx, rpt, outcome, err)
 	}
 	if err := s.durableSaver.SaveReportDurably(ctx, rpt, outcome.TesteeID(), generation.Events); err != nil {
-		return rpt, s.persistFailure(ctx, rpt, outcome.TesteeID(), err)
+		return rpt, s.persistFailure(ctx, rpt, outcome, err)
 	}
 	return rpt, nil
 }
 
-func (s *outcomeReportService) persistFailure(ctx context.Context, rpt *domainreport.InterpretReport, testeeID testee.ID, cause error) error {
-	if err := rpt.Fail(cause.Error(), s.now()); err != nil {
+func (s *outcomeReportService) persistFailure(ctx context.Context, rpt *domainreport.InterpretReport, outcome evaloutcome.Outcome, cause error) error {
+	failedAt := s.now()
+	if err := rpt.Fail(cause.Error(), failedAt); err != nil {
 		return errors.Join(cause, err)
 	}
-	if err := s.reports.SaveState(ctx, rpt, testeeID); err != nil {
+	events := []event.DomainEvent{interpretationreporting.BuildReportFailedEvent(outcome, rpt, failedAt)}
+	if err := s.durableSaver.SaveReportDurably(ctx, rpt, outcome.TesteeID(), events); err != nil {
 		return errors.Join(cause, fmt.Errorf("persist report failure: %w", err))
 	}
 	return cause

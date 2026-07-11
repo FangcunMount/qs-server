@@ -122,8 +122,8 @@ func buildCharCrossModuleHarnessCore(
 	}
 	registry := workerhandlers.NewRegistry()
 	h.answersheetHandler, _ = registry.Create("answersheet_submitted_handler", deps)
-	h.submittedHandler, _ = registry.Create("assessment_submitted_handler", deps)
-	h.evaluatedHandler, _ = registry.Create("assessment_evaluated_handler", deps)
+	h.submittedHandler, _ = registry.Create("evaluation_requested_handler", deps)
+	h.evaluatedHandler, _ = registry.Create("evaluation_outcome_committed_handler", deps)
 	return h
 }
 
@@ -161,18 +161,18 @@ func (h *charCrossModuleHarness) runAnswerSheetSubmittedWorker(t *testing.T, ctx
 
 func (h *charCrossModuleHarness) runSubmittedWorker(t *testing.T, ctx context.Context) {
 	t.Helper()
-	payload := encodeFirstStagedEvent(t, *h.submitStaged, eventcatalog.AssessmentSubmitted)
-	if err := h.submittedHandler(ctx, eventcatalog.AssessmentSubmitted, payload); err != nil {
-		t.Fatalf("assessment_submitted_handler: %v", err)
+	payload := encodeFirstStagedEvent(t, *h.submitStaged, eventcatalog.EvaluationRequested)
+	if err := h.submittedHandler(ctx, eventcatalog.EvaluationRequested, payload); err != nil {
+		t.Fatalf("evaluation_requested_handler: %v", err)
 	}
 	h.syncAssessmentFromRepo()
 }
 
 func (h *charCrossModuleHarness) runEvaluatedWorker(t *testing.T, ctx context.Context) {
 	t.Helper()
-	payload := encodeFirstStagedEvent(t, h.evaluateStaged, eventcatalog.AssessmentEvaluated)
-	if err := h.evaluatedHandler(ctx, eventcatalog.AssessmentEvaluated, payload); err != nil {
-		t.Fatalf("assessment_evaluated_handler: %v", err)
+	payload := encodeFirstStagedEvent(t, h.evaluateStaged, eventcatalog.EvaluationOutcomeCommitted)
+	if err := h.evaluatedHandler(ctx, eventcatalog.EvaluationOutcomeCommitted, payload); err != nil {
+		t.Fatalf("evaluation_outcome_committed_handler: %v", err)
 	}
 	h.syncAssessmentFromRepo()
 }

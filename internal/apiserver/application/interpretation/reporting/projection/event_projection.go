@@ -5,7 +5,6 @@ import (
 	"time"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
@@ -66,22 +65,6 @@ func eventLevelFrom(level *domainreport.ResultLevel) *eventoutcome.ResultLevel {
 	}
 }
 
-func buildInterpretedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
-	if outcome.Assessment == nil {
-		return nil
-	}
-	model, primary, level := eventOutcomeFromReport(rpt, outcome)
-	return assessment.NewAssessmentInterpretedOutcomeEvent(
-		outcome.Assessment.OrgID(),
-		outcome.Assessment.ID(),
-		outcome.Assessment.TesteeID(),
-		model,
-		primary,
-		level,
-		at,
-	)
-}
-
 func buildReportGeneratedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil || rpt == nil {
 		return nil
@@ -89,13 +72,35 @@ func buildReportGeneratedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainre
 	model, primary, level := eventOutcomeFromReport(rpt, outcome)
 	assessmentID := outcome.Assessment.ID().Uint64()
 	reportID := rpt.ID().Uint64()
-	return domainreport.NewReportGeneratedOutcomeEvent(
+	return domainreport.NewInterpretationReportGeneratedEvent(
+		outcome.Assessment.OrgID(),
 		strconv.FormatUint(reportID, 10),
 		strconv.FormatUint(assessmentID, 10),
+		rpt.OutcomeID().String(),
 		outcome.Assessment.TesteeID().Uint64(),
+		rpt.Attempt(),
 		model,
 		primary,
 		level,
+		at,
+	)
+}
+
+// BuildReportFailedEvent creates the durable external fact for one failed
+// Interpretation attempt. It deliberately consumes Evaluation only as input;
+// it does not mutate Assessment, EvaluationRun, or EvaluationOutcome.
+func BuildReportFailedEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+	if outcome.Assessment == nil || rpt == nil {
+		return nil
+	}
+	return domainreport.NewInterpretationReportFailedEvent(
+		outcome.Assessment.OrgID(),
+		rpt.ID().String(),
+		outcome.Assessment.ID().String(),
+		rpt.OutcomeID().String(),
+		outcome.Assessment.TesteeID().Uint64(),
+		rpt.Attempt(),
+		rpt.FailureReason(),
 		at,
 	)
 }

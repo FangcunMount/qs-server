@@ -5,14 +5,15 @@ import "github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 // P0 核心报告链路事件，优先 claim。
 var P0 = []string{
 	eventcatalog.AnswerSheetSubmitted,
-	eventcatalog.AssessmentSubmitted,
+	eventcatalog.EvaluationRequested,
 }
 
 // P1 报告链路后续事件。
 var P1 = []string{
-	eventcatalog.AssessmentFailed,
-	eventcatalog.ReportGenerated,
-	eventcatalog.AssessmentInterpreted,
+	eventcatalog.EvaluationOutcomeCommitted,
+	eventcatalog.EvaluationFailed,
+	eventcatalog.InterpretationReportGenerated,
+	eventcatalog.InterpretationReportFailed,
 }
 
 // P2 行为足迹类事件（可靠但不应抢占核心链路）。

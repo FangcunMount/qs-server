@@ -17,11 +17,11 @@ const (
 )
 
 // immediateDispatchEventTypes 走 post-commit immediate 旁路。
-// answersheet.submitted：Mongo 主链路；assessment.submitted：MySQL assessment outbox（Mongo immediate 查不到则 noop）。
+// answersheet.submitted：Mongo 主链路；evaluation.requested：MySQL assessment outbox（Mongo immediate 查不到则 noop）。
 var immediateDispatchEventTypes = map[string]struct{}{
 	eventcatalog.AnswerSheetSubmitted: {},
-	eventcatalog.AssessmentSubmitted:  {},
-	eventcatalog.AssessmentEvaluated:  {},
+	eventcatalog.EvaluationRequested:        {},
+	eventcatalog.EvaluationOutcomeCommitted: {},
 }
 
 // ImmediateDispatcher best-effort 发布 暂存的 outbox 事件 事务提交后立即。

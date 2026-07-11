@@ -40,25 +40,11 @@ func TestGenericEventAssemblerStagesCanonicalOutcomeWireTypes(t *testing.T) {
 	rpt = AttachReportOutcomeSummary(outcome, rpt)
 
 	events := (GenericEventAssembler{}).BuildSuccessEvents(outcome, rpt)
-	if len(events) != 3 {
-		t.Fatalf("events = %d, want 3", len(events))
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2", len(events))
 	}
-
-	deprecatedWire := map[string]struct{}{
-		eventcatalog.AssessmentInterpretedWireV2: {},
-		eventcatalog.ReportGeneratedWireV2:       {},
-	}
-	for i, evt := range events {
-		eventType := evt.EventType()
-		if _, isDeprecated := deprecatedWire[eventType]; isDeprecated {
-			t.Fatalf("event[%d] type = %s; writer must stage canonical wire types", i, eventType)
-		}
-	}
-	if events[0].EventType() != eventcatalog.AssessmentInterpreted {
-		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.AssessmentInterpreted)
-	}
-	if events[1].EventType() != eventcatalog.ReportGenerated {
-		t.Fatalf("second event = %s, want %s", events[1].EventType(), eventcatalog.ReportGenerated)
+	if events[0].EventType() != eventcatalog.InterpretationReportGenerated {
+		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.InterpretationReportGenerated)
 	}
 }
 
@@ -91,14 +77,11 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 	rpt = AttachReportOutcomeSummary(outcome, rpt)
 
 	events := (ScaleEventAssembler{}).BuildSuccessEvents(outcome, rpt)
-	if len(events) != 3 {
-		t.Fatalf("events = %d, want 3", len(events))
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2", len(events))
 	}
-	if events[0].EventType() != eventcatalog.AssessmentInterpreted {
-		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.AssessmentInterpreted)
-	}
-	if events[1].EventType() != eventcatalog.ReportGenerated {
-		t.Fatalf("second event = %s, want %s", events[1].EventType(), eventcatalog.ReportGenerated)
+	if events[0].EventType() != eventcatalog.InterpretationReportGenerated {
+		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.InterpretationReportGenerated)
 	}
 }
 

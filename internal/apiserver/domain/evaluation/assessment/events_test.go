@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestNewAssessmentSubmittedEventIncludesModelIdentityFields(t *testing.T) {
+func TestNewEvaluationRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	t.Parallel()
 
 	modelRef := NewEvaluationModelRefWithIdentity(
@@ -22,7 +22,7 @@ func TestNewAssessmentSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 		"2.0.1",
 		"MBTI",
 	)
-	evt := NewAssessmentSubmittedEvent(
+	evt := NewEvaluationRequestedEvent(
 		1,
 		NewID(42),
 		testee.NewID(1001),
@@ -38,7 +38,7 @@ func TestNewAssessmentSubmittedEventIncludesModelIdentityFields(t *testing.T) {
 	if data.ModelAlgorithm != string(modelcatalog.AlgorithmMBTI) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
 	}
-	if evt.EventType() != evaldomainevent.TypeSubmitted {
+	if evt.EventType() != evaldomainevent.TypeRequested {
 		t.Fatalf("event type = %q", evt.EventType())
 	}
 }

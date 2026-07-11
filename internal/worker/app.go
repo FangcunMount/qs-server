@@ -14,8 +14,9 @@ background tasks such as assessment evaluation, notification sending, and statis
 It supports multiple event types:
 - questionnaire.changed / assessment_model.changed: Trigger QR code generation on publish
 - answersheet.submitted: Triggers scoring and assessment creation
-- assessment.submitted: Triggers evaluation workflow
-- assessment.interpreted / assessment.failed / report.generated: Handle evaluation outcome projections
+- evaluation.requested: Triggers evaluation workflow
+- evaluation.outcome.committed: Triggers interpretation report generation
+- evaluation.failed / interpretation.report.generated / interpretation.report.failed: Handle outcome projections
 - task.opened / task.completed / task.expired / task.canceled: Handle task notifications`
 
 // NewApp 创建 Worker App

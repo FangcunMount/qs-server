@@ -162,7 +162,6 @@ func TestWorkerOutcomeHandlersUseSharedEventOutcomeContract(t *testing.T) {
 	root := repoRoot(t)
 	want := "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	files := []string{
-		filepath.Join(root, "internal", "worker", "handlers", "assessment_handler.go"),
 		filepath.Join(root, "internal", "worker", "handlers", "report_handler.go"),
 		filepath.Join(root, "internal", "worker", "handlers", "risk_attention.go"),
 	}

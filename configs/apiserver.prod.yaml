@@ -369,7 +369,7 @@ outbox_relay:
     interval: "500ms"             # 对齐 Mongo 主链路 tick: 500ms (生产环境建议调高)
     batch_size: 200               # 每轮最多 claim 的 assessment outbox 事件数: 200 (生产环境建议调高)
     publish_workers: 24           # MySQL outbox 并发 publish: 24 (生产环境建议调高)
-    immediate_max_concurrent: 24  # assessment.submitted immediate 旁路
+    immediate_max_concurrent: 24  # evaluation.requested immediate 旁路
 
 statistics_sync:                # 统计数据同步任务配置
   enable: true                  # 启用统计数据同步任务: true

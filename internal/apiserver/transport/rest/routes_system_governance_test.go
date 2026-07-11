@@ -121,7 +121,7 @@ func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
 			}},
 			TypeRows: []systemgov.EventTypeRow{{
 				Store:        "mysql",
-				EventType:    "assessment.submitted",
+				EventType:    "evaluation.requested",
 				PendingCount: 9,
 				Severity:     systemgov.SeverityWarning,
 			}},
@@ -164,7 +164,7 @@ func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
 	if len(payload.Data.OutboxRows) != 1 || payload.Data.OutboxRows[0].Name != "mysql" {
 		t.Fatalf("outbox_rows = %+v, want mysql row", payload.Data.OutboxRows)
 	}
-	if len(payload.Data.EventTypeRows) != 1 || payload.Data.EventTypeRows[0].EventType != "assessment.submitted" {
+	if len(payload.Data.EventTypeRows) != 1 || payload.Data.EventTypeRows[0].EventType != "evaluation.requested" {
 		t.Fatalf("event_type_rows = %+v, want assessment.submitted row", payload.Data.EventTypeRows)
 	}
 }

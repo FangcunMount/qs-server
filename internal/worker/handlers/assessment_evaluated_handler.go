@@ -9,15 +9,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
+func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		var data eventpayload.AssessmentEvaluatedData
+		var data eventpayload.EvaluationOutcomeCommittedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
-			return fmt.Errorf("failed to parse assessment evaluated event: %w", err)
+			return fmt.Errorf("failed to parse evaluation outcome committed event: %w", err)
 		}
 
-		deps.Logger.Debug("assessment evaluated detail",
+		deps.Logger.Debug("evaluation outcome committed detail",
 			"event_id", env.ID,
 			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
@@ -31,10 +31,10 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 		}
 
 		if _, err := safeconv.Int64ToUint64(data.AssessmentID); err != nil {
-			return fmt.Errorf("invalid assessment id in evaluated event: %w", err)
+			return fmt.Errorf("invalid assessment id in evaluation outcome committed event: %w", err)
 		}
 		if data.OutcomeID == "" {
-			return fmt.Errorf("outcome id is required in evaluated event for assessment %d", data.AssessmentID)
+			return fmt.Errorf("outcome id is required in evaluation outcome committed event for assessment %d", data.AssessmentID)
 		}
 
 		resp, err := deps.InternalClient.GenerateReportFromOutcome(ctx, data.OutcomeID)

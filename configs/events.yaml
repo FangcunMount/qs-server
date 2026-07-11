@@ -52,45 +52,45 @@ events:
     description: "答卷已提交"
     handler: answersheet_submitted_handler
 
-  assessment.submitted:
+  evaluation.requested:
     topic: assessment-lifecycle
     delivery: durable_outbox
-    aggregate: Assessment
-    domain: evaluation/assessment
-    description: "测评已提交"
-    handler: assessment_submitted_handler
+    aggregate: Evaluation
+    domain: evaluation
+    description: "Evaluation 已请求执行"
+    handler: evaluation_requested_handler
 
-  assessment.evaluated:
+  evaluation.outcome.committed:
     topic: assessment-lifecycle
     delivery: durable_outbox
-    aggregate: Assessment
-    domain: evaluation/assessment
-    description: "测评计分完成，等待报告生成"
-    handler: assessment_evaluated_handler
+    aggregate: Evaluation
+    domain: evaluation
+    description: "评分事实已可靠提交，等待报告生成"
+    handler: evaluation_outcome_committed_handler
 
-  assessment.interpreted:
+  evaluation.failed:
     topic: assessment-lifecycle
     delivery: durable_outbox
-    aggregate: Assessment
-    domain: evaluation/assessment
-    description: "测评已解读（outcome 投影：model/primary_score/level）"
-    handler: assessment_interpreted_handler
+    aggregate: Evaluation
+    domain: evaluation
+    description: "Evaluation 执行失败"
+    handler: evaluation_failed_handler
 
-  assessment.failed:
-    topic: assessment-lifecycle
-    delivery: durable_outbox
-    aggregate: Assessment
-    domain: evaluation/assessment
-    description: "测评失败"
-    handler: assessment_failed_handler
-
-  report.generated:
+  interpretation.report.generated:
     topic: assessment-lifecycle
     delivery: durable_outbox
     aggregate: Report
-    domain: evaluation/report
+    domain: interpretation/report
     description: "报告已生成（outcome 投影：model/primary_score/level）"
-    handler: report_generated_handler
+    handler: interpretation_report_generated_handler
+
+  interpretation.report.failed:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: Report
+    domain: interpretation/report
+    description: "报告生成尝试失败"
+    handler: interpretation_report_failed_handler
 
   footprint.entry_opened:
     topic: analytics-behavior
