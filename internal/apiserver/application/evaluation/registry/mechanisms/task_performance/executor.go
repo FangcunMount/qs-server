@@ -77,8 +77,6 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 					continue
 				}
 				dimension.Level = &domainoutcome.ResultLevel{Code: item.Level, Label: item.Title}
-				dimension.Description = item.Summary
-				dimension.Suggestion = item.Description
 				break
 			}
 		}

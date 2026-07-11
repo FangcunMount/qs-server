@@ -10,7 +10,6 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -124,9 +123,11 @@ func TestOutcomeReportRetryReadsPersistedOutcomeAndAdvancesIndependentAttempt(t 
 
 func reportOutcomeRecord(t *testing.T) *domainoutcome.Record {
 	t.Helper()
-	modelRef := assessment.NewScaleEvaluationModelRef(0, meta.NewCode("S-1"), "1.0.0", "Scale")
-	execution := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{PrimaryLabel: "low"}, assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale})
-	execution.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 12}
+	execution := domainoutcome.NewExecution(
+		domainoutcome.ModelRef{ModelKind: modelcatalog.KindScale, ModelCode: "S-1", ModelVersion: "1.0.0", ModelTitle: "Scale"},
+		domainoutcome.Summary{PrimaryLabel: "low"}, domainoutcome.Detail{Kind: modelcatalog.KindScale},
+	)
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 12}
 	payload, err := json.Marshal(execution)
 	if err != nil {
 		t.Fatal(err)

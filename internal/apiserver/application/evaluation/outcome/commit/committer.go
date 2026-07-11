@@ -78,7 +78,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	// execution service's atomic failure finalizer.
 	runToCommit := *request.Run
 	outcomeToCommit := request.Outcome
-	assessmentToCommit, err := request.Outcome.Assessment.PrepareScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution), request.EvaluatedAt)
+	assessmentToCommit, err := request.Outcome.Assessment.PrepareScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution), request.EvaluatedAt)
 	if err != nil {
 		return nil, evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
 	}

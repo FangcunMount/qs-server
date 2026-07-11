@@ -5,10 +5,11 @@ import (
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
-type outcomeAdapterFunc func(assessment.EvaluationModelRef, outcometypology.ScoringResult) (*assessment.AssessmentOutcome, error)
+type outcomeAdapterFunc func(assessment.EvaluationModelRef, outcometypology.ScoringResult) (*domainoutcome.Execution, error)
 
 // OutcomeAdapterRegistry 解析测评结果 assemblers 按 detail adapter 键。
 type OutcomeAdapterRegistry struct {
@@ -44,7 +45,7 @@ func (r OutcomeAdapterRegistry) Assemble(
 	key modeltypology.DetailAdapterKey,
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	if key == "" {
 		return nil, fmt.Errorf("detail adapter key is required")
 	}

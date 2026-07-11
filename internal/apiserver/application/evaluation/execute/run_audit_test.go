@@ -22,12 +22,8 @@ func (r modelInputResolver) Resolve(_ context.Context, _ evaluationinput.InputRe
 
 func scaleEvaluatorForAssessment(a *domainAssessment.Assessment) *countingEvaluator {
 	return &countingEvaluator{
-		key: evaluation.ExecutionIdentityScaleDefault,
-		outcome: domainAssessment.NewAssessmentOutcome(
-			*a.EvaluationModelRef(),
-			domainAssessment.ResultSummary{PrimaryLabel: "ok"},
-			domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
-		),
+		key:     evaluation.ExecutionIdentityScaleDefault,
+		outcome: executionForAssessment(a, "ok"),
 	}
 }
 

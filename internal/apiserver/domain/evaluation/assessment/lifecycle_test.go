@@ -138,15 +138,12 @@ func TestEvaluatedAssessmentIsTerminalAndRejectsFailureRewrite(t *testing.T) {
 	}
 	a.ClearEvents()
 
-	outcome := NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		ResultSummary{PrimaryLabel: "high risk"},
-		EvaluationDetail{Kind: EvaluationModelKindScale},
-	)
-	outcome.Primary = &OutcomeScoreValue{Kind: OutcomeScoreKindRawTotal, Value: 18.5}
-	outcome.Level = &OutcomeResultLevel{Code: string(RiskLevelHigh), Label: "high risk"}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
-		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	score := 18.5
+	if err := a.ApplyScoringProjection(ScoringProjection{
+		ModelRef: *a.EvaluationModelRef(), Summary: ResultSummary{PrimaryLabel: "high risk"},
+		Score: &score, Level: string(RiskLevelHigh),
+	}); err != nil {
+		t.Fatalf("ApplyScoringProjection returned error: %v", err)
 	}
 	if !a.Status().IsEvaluated() || !a.Status().IsTerminal() {
 		t.Fatalf("expected terminal evaluated status, got %s", a.Status())
@@ -176,14 +173,9 @@ func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	modelRef := *a.EvaluationModelRef()
-	outcome := NewAssessmentOutcome(
-		modelRef,
-		ResultSummary{PrimaryLabel: "scored"},
-		EvaluationDetail{Kind: EvaluationModelKindScale},
-	)
-	outcome.Primary = &OutcomeScoreValue{Kind: OutcomeScoreKindRawTotal, Value: 12}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
-		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	score := 12.0
+	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "scored"}, Score: &score}); err != nil {
+		t.Fatalf("ApplyScoringProjection returned error: %v", err)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("expected evaluated status, got %s", a.Status())
@@ -233,7 +225,7 @@ func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
 	}
 }
 
-func TestApplyScoringOutcomeValidatesEvaluationModelRef(t *testing.T) {
+func TestApplyScoringProjectionValidatesEvaluationModelRef(t *testing.T) {
 	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := NewAssessment(
 		1,
@@ -251,22 +243,15 @@ func TestApplyScoringOutcomeValidatesEvaluationModelRef(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 
-	result := NewModelEvaluationResult(modelRef, ResultSummary{PrimaryLabel: "INTJ"}, EvaluationDetail{
-		Kind:    EvaluationModelKindPersonality,
-		Payload: "INTJ",
-	})
-	if err := a.ApplyScoringOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != nil {
-		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "INTJ"}}); err != nil {
+		t.Fatalf("ApplyScoringProjection returned error: %v", err)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("expected evaluated status, got %s", a.Status())
 	}
-	if result.Detail.Kind != EvaluationModelKindPersonality {
-		t.Fatalf("result detail kind = %s, want mbti", result.Detail.Kind)
-	}
 }
 
-func TestApplyScoringOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
+func TestApplyScoringProjectionRejectsMismatchedEvaluationModelRef(t *testing.T) {
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1006),
@@ -283,9 +268,8 @@ func TestApplyScoringOutcomeRejectsMismatchedEvaluationModelRef(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 
-	result := NewEvaluationResult(0, RiskLevelNone, "", "", nil).
-		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS"))
-	if err := a.ApplyScoringOutcome(AssessmentOutcomeFromEvaluationResult(result)); err != ErrEvaluationModelMismatch {
-		t.Fatalf("ApplyScoringOutcome error = %v, want ErrEvaluationModelMismatch", err)
+	projection := ScoringProjection{ModelRef: NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS")}
+	if err := a.ApplyScoringProjection(projection); err != ErrEvaluationModelMismatch {
+		t.Fatalf("ApplyScoringProjection error = %v, want ErrEvaluationModelMismatch", err)
 	}
 }

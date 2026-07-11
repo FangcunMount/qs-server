@@ -6,7 +6,6 @@ import (
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -136,7 +135,7 @@ func (s *scoreQueryService) scoreFromOutcome(ctx context.Context, assessmentID u
 	if err != nil {
 		return nil, err
 	}
-	projection := domainassessment.ScaleScoreProjectionFromOutcome(record.AssessmentID(), evaloutcome.AssessmentOutcomeFromExecution(execution))
+	projection := evaloutcome.ScaleScoreProjectionFromExecution(record.AssessmentID(), execution)
 	if projection == nil {
 		return nil, fmt.Errorf("evaluation outcome does not project scale scores")
 	}

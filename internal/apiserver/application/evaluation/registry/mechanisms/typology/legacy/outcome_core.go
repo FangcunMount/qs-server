@@ -1,64 +1,61 @@
 package legacy
 
 import (
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 // AssemblePersonalityTypeOutcome builds assessment outcome from mechanism-neutral detail.
-func AssemblePersonalityTypeOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.PersonalityTypeDetail) *assessment.AssessmentOutcome {
+func AssemblePersonalityTypeOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.PersonalityTypeDetail) *domainoutcome.Execution {
 	score := detail.MatchPercent
 	if score == 0 && detail.Similarity > 0 {
 		score = detail.Similarity * 100
 	}
-	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
+	outcome := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(modelRef), domainoutcome.Summary{
 		PrimaryLabel: detail.TypeCode,
 		Score:        scorePtr(score),
 		Tags:         []string{detail.TypeName, detail.OneLiner},
-	}, assessment.EvaluationDetail{
-		Kind:    assessment.EvaluationModelKindPersonality,
+	}, domainoutcome.Detail{
+		Kind:    modelRef.Kind(),
 		Payload: detail,
 	})
-	outcome.Primary = &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKindMatchPercent,
+	outcome.Primary = &domainoutcome.ScoreValue{
+		Kind:  domainoutcome.ScoreKindMatchPercent,
 		Value: score,
 		Label: detail.TypeCode,
 	}
-	outcome.Level = &assessment.OutcomeResultLevel{
+	outcome.Level = &domainoutcome.ResultLevel{
 		Code:     detail.TypeCode,
 		Label:    detail.TypeName,
 		Severity: "none",
 	}
-	outcome.Profile = &assessment.ProfileResult{
-		Kind:        assessment.ProfileKindPersonalityType,
-		Code:        detail.TypeCode,
-		Name:        detail.TypeName,
-		Summary:     detail.OneLiner,
-		Strengths:   append([]string(nil), detail.Strengths...),
-		Weaknesses:  append([]string(nil), detail.Weaknesses...),
-		Suggestions: append([]string(nil), detail.Suggestions...),
+	outcome.Profile = &domainoutcome.ProfileResult{
+		Kind: domainoutcome.ProfileKindPersonalityType,
+		Code: detail.TypeCode,
+		Name: detail.TypeName,
 	}
 	return outcome
 }
 
 // AssembleTraitProfileOutcome builds assessment outcome from mechanism-neutral trait profile.
-func AssembleTraitProfileOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.TraitProfileDetail) *assessment.AssessmentOutcome {
+func AssembleTraitProfileOutcome(modelRef assessment.EvaluationModelRef, detail outcometypology.TraitProfileDetail) *domainoutcome.Execution {
 	primaryLabel := "trait_profile"
 	if len(detail.Traits) > 0 {
 		primaryLabel = detail.Traits[0].Code
 	}
-	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
+	outcome := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(modelRef), domainoutcome.Summary{
 		PrimaryLabel: primaryLabel,
-	}, assessment.EvaluationDetail{
-		Kind:    assessment.EvaluationModelKindPersonality,
+	}, domainoutcome.Detail{
+		Kind:    modelRef.Kind(),
 		Payload: detail,
 	})
 	if len(detail.Traits) > 0 {
-		outcome.Profile = &assessment.ProfileResult{
-			Kind:    assessment.ProfileKindPersonalityTrait,
-			Code:    detail.Traits[0].Code,
-			Name:    detail.Traits[0].Name,
-			Summary: detail.Traits[0].Name,
+		outcome.Profile = &domainoutcome.ProfileResult{
+			Kind: domainoutcome.ProfileKindPersonalityTrait,
+			Code: detail.Traits[0].Code,
+			Name: detail.Traits[0].Name,
 		}
 	}
 	return outcome

@@ -3,13 +3,14 @@ package legacy
 import (
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 // AssemblePersonalityTypeFromMBTI converts legacy MBTI detail payload to assessment outcome.
 func AssemblePersonalityTypeFromMBTI(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	detail, err := MBTIResultDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
@@ -21,7 +22,7 @@ func AssemblePersonalityTypeFromMBTI(
 func AssemblePersonalityTypeFromSBTI(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	detail, err := SBTIResultDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func AssemblePersonalityTypeFromSBTI(
 func AssembleTraitProfileFromBigFive(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	detail, err := BigFiveResultDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err

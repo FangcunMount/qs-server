@@ -2,10 +2,10 @@ package calculationadapter
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
-func scoreValueFromOutcome(score *assessment.OutcomeScoreValue) *calculation.ScoreValue {
+func scoreValueFromOutcome(score *domainoutcome.ScoreValue) *calculation.ScoreValue {
 	if score == nil {
 		return nil
 	}
@@ -17,19 +17,19 @@ func scoreValueFromOutcome(score *assessment.OutcomeScoreValue) *calculation.Sco
 	}
 }
 
-func scoreValueToOutcome(score *calculation.ScoreValue) *assessment.OutcomeScoreValue {
+func scoreValueToOutcome(score *calculation.ScoreValue) *domainoutcome.ScoreValue {
 	if score == nil {
 		return nil
 	}
-	return &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKind(score.Kind),
+	return &domainoutcome.ScoreValue{
+		Kind:  domainoutcome.ScoreKind(score.Kind),
 		Value: score.Value,
 		Label: score.Label,
 		Max:   score.Max,
 	}
 }
 
-func levelFromOutcome(level *assessment.OutcomeResultLevel) *calculation.ResultLevel {
+func levelFromOutcome(level *domainoutcome.ResultLevel) *calculation.ResultLevel {
 	if level == nil {
 		return nil
 	}
@@ -40,11 +40,11 @@ func levelFromOutcome(level *assessment.OutcomeResultLevel) *calculation.ResultL
 	}
 }
 
-func levelToOutcome(level *calculation.ResultLevel) *assessment.OutcomeResultLevel {
+func levelToOutcome(level *calculation.ResultLevel) *domainoutcome.ResultLevel {
 	if level == nil {
 		return nil
 	}
-	return &assessment.OutcomeResultLevel{
+	return &domainoutcome.ResultLevel{
 		Code:     level.Code,
 		Label:    level.Label,
 		Severity: level.Severity,

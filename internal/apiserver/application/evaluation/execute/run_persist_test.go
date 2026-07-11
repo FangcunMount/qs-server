@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 )
@@ -142,7 +142,7 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 	a := splitPhaseAssessment(t)
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
-		execute: func(context.Context, ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
+		execute: func(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 			return nil, executeErr
 		},
 	})
@@ -178,7 +178,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	a := splitPhaseAssessment(t)
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
-		execute: func(context.Context, ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
+		execute: func(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 			return nil, executeErr
 		},
 	})

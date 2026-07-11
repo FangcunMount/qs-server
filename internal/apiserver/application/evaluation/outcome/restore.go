@@ -21,7 +21,7 @@ func Restore(record *domainoutcome.Record) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	modelRef := AssessmentOutcomeFromExecution(execution).ModelRef
+	modelRef := AssessmentModelRefFromExecution(execution.ModelRef)
 	a := assessment.Reconstruct(
 		record.AssessmentID(),
 		record.OrgID(),

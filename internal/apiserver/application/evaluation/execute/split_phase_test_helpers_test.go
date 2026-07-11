@@ -17,7 +17,7 @@ import (
 type countingEvaluator struct {
 	key     evaluation.ExecutionIdentity
 	calls   int
-	outcome *assessment.AssessmentOutcome
+	outcome *domainoutcome.Execution
 }
 
 func (e *countingEvaluator) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
@@ -25,13 +25,12 @@ func (e *countingEvaluator) Key() evaluation.ExecutionIdentity               { r
 func (e *countingEvaluator) Execute(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 	e.calls++
 	if e.outcome != nil {
-		return evaloutcome.ExecutionFromAssessmentOutcome(e.outcome), nil
+		return e.outcome, nil
 	}
-	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(
-		assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("SCALE-1"), "1.0.0", "scale"),
-		assessment.ResultSummary{PrimaryLabel: "recomputed"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	)), nil
+	return domainoutcome.NewExecution(
+		domainoutcome.ModelRef{ModelKind: "scale", ModelCode: "SCALE-1", ModelVersion: "1.0.0", ModelTitle: "scale"},
+		domainoutcome.Summary{PrimaryLabel: "recomputed"}, domainoutcome.Detail{Kind: "scale"},
+	), nil
 }
 
 type stubInputResolver struct{}
@@ -53,7 +52,7 @@ func (c *recordingEvaluationCommitter) Commit(_ context.Context, request outcome
 	c.capture.CommitCalls++
 	c.capture.Outcome = request.Outcome
 	if request.Outcome.Assessment != nil && request.Outcome.Execution != nil {
-		if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+		if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
 			return nil, err
 		}
 	}
@@ -97,6 +96,14 @@ func splitPhaseAssessment(t *testing.T) *assessment.Assessment {
 		t.Fatalf("Submit: %v", err)
 	}
 	return a
+}
+
+func executionForAssessment(a *assessment.Assessment, label string) *domainoutcome.Execution {
+	modelRef := domainoutcome.ModelRef{}
+	if a != nil && a.EvaluationModelRef() != nil {
+		modelRef = evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef())
+	}
+	return domainoutcome.NewExecution(modelRef, domainoutcome.Summary{PrimaryLabel: label}, domainoutcome.Detail{Kind: modelRef.Kind()})
 }
 
 var _ outcomecommit.Committer = (*recordingEvaluationCommitter)(nil)

@@ -54,14 +54,9 @@ func targetEvaluatedAssessment(t *testing.T) *Assessment {
 	if err := a.Submit(); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
-	outcome := NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		ResultSummary{PrimaryLabel: "evaluated"},
-		EvaluationDetail{Kind: EvaluationModelKindScale},
-	)
-	outcome.Primary = &OutcomeScoreValue{Kind: OutcomeScoreKindRawTotal, Value: 12}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
-		t.Fatalf("ApplyScoringOutcome: %v", err)
+	score := 12.0
+	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: *a.EvaluationModelRef(), Summary: ResultSummary{PrimaryLabel: "evaluated"}, Score: &score}); err != nil {
+		t.Fatalf("ApplyScoringProjection: %v", err)
 	}
 	return a
 }

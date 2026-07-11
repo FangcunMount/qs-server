@@ -105,14 +105,10 @@ const (
 )
 
 type ProfileResult struct {
-	Kind        ProfileKind
-	Code        string
-	Name        string
-	Summary     string
-	Traits      []string
-	Strengths   []string
-	Weaknesses  []string
-	Suggestions []string
+	Kind   ProfileKind
+	Code   string
+	Name   string
+	Traits []string
 }
 
 type DimensionResult struct {
@@ -126,8 +122,6 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
-	Description    string
-	Suggestion     string
 }
 
 type ValidityResult struct {

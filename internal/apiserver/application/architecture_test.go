@@ -837,7 +837,7 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 	}
 }
 
-func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testing.T) {
+func TestApplicationEvaluationPrefersCanonicalExecutionOverLegacyResult(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -871,7 +871,7 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 		text := string(data)
 		for _, token := range forbiddenTokens {
 			if strings.Contains(text, token) {
-				t.Fatalf("%s contains %q; application evaluation write paths must use AssessmentOutcome as the primary model", rel, token)
+				t.Fatalf("%s contains %q; application evaluation write paths must use canonical Execution", rel, token)
 			}
 		}
 		return nil
@@ -940,69 +940,35 @@ func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
 	}
 }
 
-func TestApplicationEvaluationToEvaluationResultIsBoundaryOnly(t *testing.T) {
+func TestApplicationEvaluationDoesNotReintroduceAssessmentOutcomeAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
-	}
-	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
-	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+	for _, scanRoot := range []string{
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation"),
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "assessment"),
+	} {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, forbidden := range []string{"type AssessmentOutcome struct", "NewAssessmentOutcome(", "ExecutionFromAssessmentOutcome(", "AssessmentOutcomeFromExecution("} {
+				if strings.Contains(string(data), forbidden) {
+					t.Fatalf("%s contains %s; canonical Execution must not round-trip through AssessmentOutcome", filepath.ToSlash(mustRel(t, root, path)), forbidden)
+				}
+			}
 			return nil
-		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		if _, ok := allowedRelFiles[rel]; ok {
-			return nil
-		}
-		data, err := os.ReadFile(path)
+		})
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
-		if strings.Contains(string(data), "ToEvaluationResult()") {
-			t.Fatalf("%s contains ToEvaluationResult(); legacy projection must stay in boundary files only", rel)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestApplicationEvaluationAssessmentOutcomeFromEvaluationResultIsBoundaryOnly(t *testing.T) {
-	t.Parallel()
-
-	root := repoRoot(t)
-	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
-	}
-	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
-	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		if _, ok := allowedRelFiles[rel]; ok {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if strings.Contains(string(data), "AssessmentOutcomeFromEvaluationResult(") {
-			t.Fatalf("%s contains AssessmentOutcomeFromEvaluationResult(); adapter must stay in boundary files only", rel)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -1023,12 +989,32 @@ func TestApplicationEvaluationDoesNotCallApplyEvaluation(t *testing.T) {
 			return err
 		}
 		if strings.Contains(string(data), ".ApplyEvaluation(") {
-			t.Fatalf("%s calls ApplyEvaluation; Evaluation must use ApplyScoringOutcome", filepath.ToSlash(mustRel(t, root, path)))
+			t.Fatalf("%s calls ApplyEvaluation; Evaluation must use the minimal scoring projection", filepath.ToSlash(mustRel(t, root, path)))
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEvaluationReconcilerRestoresCanonicalExecution(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "consistency", "reconciler.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "RestoreExecution(record)") {
+		t.Fatal("evaluation reconciler must restore the canonical Execution fact")
+	}
+	for _, forbidden := range []string{"json.Unmarshal", "AssessmentOutcome"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("evaluation reconciler contains %q; it must not decode an Assessment-owned outcome", forbidden)
+		}
 	}
 }
 

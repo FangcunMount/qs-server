@@ -5,6 +5,7 @@ import (
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -24,12 +25,12 @@ func NewOutcomeAssemblerWithRegistry(registry OutcomeAdapterRegistry) OutcomeAss
 	return OutcomeAssembler{registry: registry}
 }
 
-// Assemble 转换计分结果 为 AssessmentOutcome。
+// Assemble converts a scoring result to canonical Execution.
 func (a OutcomeAssembler) Assemble(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
 	mapping modeltypology.OutcomeMappingSpec,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	adapterKey := mapping.ResolvedDetailAdapterKey(decisionKindFromResult(result))
 	return a.registry.Assemble(adapterKey, modelRef, result)
 }
@@ -44,23 +45,23 @@ func decisionKindFromResult(result outcometypology.ScoringResult) modelcatalog.D
 func assembleGenericTraitProfileOutcome(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	detail, err := outcometypology.TraitProfileDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromTraitProfile(modelRef, detail), nil
+	return executionFromTraitProfile(modelRef, detail), nil
 }
 
 func assembleGenericPersonalityTypeOutcome(
 	modelRef assessment.EvaluationModelRef,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	detail, err := outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromPersonalityType(modelRef, detail), nil
+	return executionFromPersonalityType(modelRef, detail), nil
 }
 
 // AssembleFromPayload 推导mapping 从 载荷 和 assembles 结果。
@@ -68,7 +69,7 @@ func (a OutcomeAssembler) AssembleFromPayload(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,
 	result outcometypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is required")
 	}

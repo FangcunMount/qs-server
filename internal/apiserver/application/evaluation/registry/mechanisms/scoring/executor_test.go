@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -79,9 +79,8 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 	if result.ModelRef.Kind() != assessment.EvaluationModelKindScale || result.ModelRef.Code().String() != "S-001" {
 		t.Fatalf("unexpected model ref: %#v", result.ModelRef)
 	}
-	legacy := evaloutcome.AssessmentOutcomeFromExecution(result).ToEvaluationResult()
-	if legacy.TotalScore != 7 || legacy.RiskLevel != assessment.RiskLevelLow {
-		t.Fatalf("result summary = score %.1f risk %s, want 7/low", legacy.TotalScore, legacy.RiskLevel)
+	if result.Primary == nil || result.Primary.Value != 7 || result.Level == nil || result.Level.Code != string(assessment.RiskLevelLow) {
+		t.Fatalf("result summary = primary %#v level %#v, want 7/low", result.Primary, result.Level)
 	}
 }
 
@@ -184,7 +183,7 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	if !validator.called {
 		t.Fatal("expected validator to be called")
 	}
-	if result.Primary == nil || string(result.Primary.Kind) != string(assessment.OutcomeScoreKindRawTotal) || result.Primary.Value != 1 {
+	if result.Primary == nil || result.Primary.Kind != domainoutcome.ScoreKindRawTotal || result.Primary.Value != 1 {
 		t.Fatalf("primary = %#v, want raw_total 1", result.Primary)
 	}
 	if result.Level == nil || result.Level.Code != string(assessment.RiskLevelLow) {

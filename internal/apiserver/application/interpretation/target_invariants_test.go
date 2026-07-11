@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -81,14 +84,12 @@ func evaluatedAssessmentForReport(t *testing.T) *assessment.Assessment {
 	if err := a.Submit(); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
-	execution := assessment.NewAssessmentOutcome(
-		model,
-		assessment.ResultSummary{PrimaryLabel: "low"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	execution := domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(model), domainoutcome.Summary{PrimaryLabel: "low"}, domainoutcome.Detail{Kind: modelcatalog.KindScale},
 	)
-	execution.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 12}
-	if err := a.ApplyScoringOutcome(execution); err != nil {
-		t.Fatalf("ApplyScoringOutcome: %v", err)
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 12}
+	if err := a.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(execution)); err != nil {
+		t.Fatalf("ApplyScoringProjection: %v", err)
 	}
 	return a
 }

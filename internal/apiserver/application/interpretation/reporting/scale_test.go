@@ -5,33 +5,33 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 	t.Parallel()
 
 	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
-		Execution: evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
-			Primary: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 10},
-			Level:   &assessment.OutcomeResultLevel{Code: string(assessment.RiskLevelMedium)},
-			Dimensions: []assessment.DimensionResult{
+		Execution: &domainoutcome.Execution{
+			Primary: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 10},
+			Level:   &domainoutcome.ResultLevel{Code: string(assessment.RiskLevelMedium)},
+			Dimensions: []domainoutcome.DimensionResult{
 				{
 					Code: "gec", Name: "GEC", Role: "index", HierarchyLevel: 1,
-					Score:       &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 10},
-					Level:       &assessment.OutcomeResultLevel{Code: string(assessment.RiskLevelMedium)},
-					Description: "overall",
+					Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 10},
+					Level: &domainoutcome.ResultLevel{Code: string(assessment.RiskLevelMedium)},
 				},
 				{
 					Code: "bri", Name: "BRI", Role: "index", ParentCode: "gec", HierarchyLevel: 2,
-					Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 10},
+					Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 10},
 				},
 			},
-			Detail: assessment.EvaluationDetail{
+			Detail: domainoutcome.Detail{
 				Payload: []assessment.FactorScoreResult{
 					{FactorCode: assessment.NewFactorCode("legacy"), RawScore: 1},
 				},
 			},
-		}),
+		},
 	})
 
 	if len(input.FactorScores) != 2 {
@@ -46,11 +46,11 @@ func TestScaleReportInputUsesFlatFactorScoresWithoutHierarchy(t *testing.T) {
 	t.Parallel()
 
 	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
-		Execution: evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
-			Dimensions: []assessment.DimensionResult{
-				{Code: "total", Name: "总分", Score: &assessment.OutcomeScoreValue{Value: 5}},
+		Execution: &domainoutcome.Execution{
+			Dimensions: []domainoutcome.DimensionResult{
+				{Code: "total", Name: "总分", Score: &domainoutcome.ScoreValue{Value: 5}},
 			},
-			Detail: assessment.EvaluationDetail{
+			Detail: domainoutcome.Detail{
 				Payload: []assessment.FactorScoreResult{
 					{
 						FactorCode: assessment.NewFactorCode("total"), FactorName: "总分",
@@ -58,7 +58,7 @@ func TestScaleReportInputUsesFlatFactorScoresWithoutHierarchy(t *testing.T) {
 					},
 				},
 			},
-		}),
+		},
 	})
 
 	if len(input.FactorScores) != 1 || !input.FactorScores[0].IsTotalScore {

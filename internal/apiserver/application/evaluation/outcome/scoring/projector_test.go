@@ -44,13 +44,14 @@ func TestAssessmentScoreProjectorPersistsOutcomeDerivedProjectionInEvaluation(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	outcome := assessment.NewAssessmentOutcome(*a.EvaluationModelRef(), assessment.ResultSummary{}, assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale})
-	outcome.Dimensions = []assessment.DimensionResult{{
+	execution := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef()), domainoutcome.Summary{}, domainoutcome.Detail{Kind: assessment.EvaluationModelKindScale})
+	execution.Dimensions = []domainoutcome.DimensionResult{{
 		Code:  "total",
 		Name:  "总分",
-		Kind:  assessment.DimensionKindFactor,
-		Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 18},
-		Level: &assessment.OutcomeResultLevel{Code: "high"},
+		Kind:  domainoutcome.DimensionKindFactor,
+		Role:  "total",
+		Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 18},
+		Level: &domainoutcome.ResultLevel{Code: "high"},
 	}}
 	repo := &evaluationScoreRepoStub{}
 	projector := outcomescoring.NewAssessmentScoreProjector(repo)
@@ -68,7 +69,7 @@ func TestAssessmentScoreProjectorPersistsOutcomeDerivedProjectionInEvaluation(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := projector.Project(context.Background(), record, evaloutcome.Outcome{Assessment: a, Execution: evaloutcome.ExecutionFromAssessmentOutcome(outcome)}); err != nil {
+	if err := projector.Project(context.Background(), record, evaloutcome.Outcome{Assessment: a, Execution: execution}); err != nil {
 		t.Fatal(err)
 	}
 	if repo.assessment != a || repo.outcomeID != record.ID() || repo.score == nil || len(repo.score.FactorScores()) != 1 {

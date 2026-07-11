@@ -8,7 +8,7 @@ import (
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -94,7 +94,7 @@ func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
 	if result.Summary.PrimaryLabel != "O" {
 		t.Fatalf("PrimaryLabel = %q, want O", result.Summary.PrimaryLabel)
 	}
-	if result.Profile == nil || string(result.Profile.Kind) != string(assessment.ProfileKindPersonalityTrait) {
+	if result.Profile == nil || result.Profile.Kind != domainoutcome.ProfileKindPersonalityTrait {
 		t.Fatalf("profile = %#v, want personality_trait", result.Profile)
 	}
 }

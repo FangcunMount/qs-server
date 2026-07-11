@@ -18,9 +18,6 @@ func TestApplyAbilityConclusionsProjectsMatchingRawScoreRange(t *testing.T) {
 	if got.Dimensions[0].Level == nil || got.Dimensions[0].Level.Code != "high" {
 		t.Fatalf("level = %#v", got.Dimensions[0].Level)
 	}
-	if got.Dimensions[0].Description != "能力较强" || got.Dimensions[0].Suggestion != "继续保持" {
-		t.Fatalf("dimension = %#v", got.Dimensions[0])
-	}
 }
 
 func TestApplyAbilityConclusionsLeavesUnconfiguredScoreBasisUntouched(t *testing.T) {

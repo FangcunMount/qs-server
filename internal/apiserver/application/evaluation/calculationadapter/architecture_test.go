@@ -62,6 +62,30 @@ func TestMechanismExecutorsImportCalculationAdapter(t *testing.T) {
 	}
 }
 
+func TestCalculationAdapterUsesCanonicalExecutionWithoutAssessmentOutcomeBridge(t *testing.T) {
+	t.Parallel()
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, forbidden := range []string{"domain/evaluation/assessment", "AssessmentOutcomeFromExecution", "ExecutionFromAssessmentOutcome"} {
+			if strings.Contains(text, forbidden) {
+				t.Fatalf("%s contains %q; calculation adapter must translate Execution directly", entry.Name(), forbidden)
+			}
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

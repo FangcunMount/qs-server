@@ -2,6 +2,7 @@ package outcome
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -41,5 +42,15 @@ func TestExecutionIsEvaluatorResultAndRecordIsDurableFact(t *testing.T) {
 	}
 	if restored.ModelRef.Code() != model.Code() || restored.Summary.PrimaryLabel != execution.Summary.PrimaryLabel {
 		t.Fatalf("restored execution = %#v, want %#v", restored, execution)
+	}
+}
+
+func TestExecutionCarriesScoringFactsWithoutReportProseFields(t *testing.T) {
+	for _, target := range []reflect.Type{reflect.TypeOf(ProfileResult{}), reflect.TypeOf(DimensionResult{})} {
+		for _, field := range []string{"Description", "Suggestion", "Suggestions", "Summary", "Strengths", "Weaknesses"} {
+			if _, ok := target.FieldByName(field); ok {
+				t.Fatalf("%s retains report prose field %s", target.Name(), field)
+			}
+		}
 	}
 }

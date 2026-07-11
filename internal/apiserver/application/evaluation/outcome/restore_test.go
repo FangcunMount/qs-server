@@ -6,7 +6,6 @@ import (
 	"time"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -16,10 +15,10 @@ import (
 
 func TestRestoreUsesOnlyPersistedOutcomeAndRestoresTypedDetail(t *testing.T) {
 	detail := outcometypology.PersonalityTypeDetail{TypeCode: "INTJ", TypeName: "Architect"}
-	execution := assessment.NewAssessmentOutcome(
-		assessment.NewEvaluationModelRefWithIdentity(assessment.EvaluationModelKindTypology, modelcatalog.SubKindTypology, modelcatalog.AlgorithmMBTI, 0, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI"),
-		assessment.ResultSummary{PrimaryLabel: "INTJ"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindTypology, Payload: detail},
+	execution := domainoutcome.NewExecution(
+		domainoutcome.ModelRef{ModelKind: modelcatalog.KindTypology, ModelSubKind: modelcatalog.SubKindTypology, ModelAlgorithm: modelcatalog.AlgorithmMBTI, ModelCode: "MBTI-16P", ModelVersion: "1.0.0", ModelTitle: "MBTI"},
+		domainoutcome.Summary{PrimaryLabel: "INTJ"},
+		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	)
 	payload, err := json.Marshal(execution)
 	if err != nil {

@@ -2,10 +2,10 @@ package consistency
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
@@ -137,11 +137,11 @@ func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessment
 	if record == nil {
 		return fmt.Errorf("assessment %d has no evaluation outcome for evaluated finalization", assessmentID)
 	}
-	var execution assessment.AssessmentOutcome
-	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
-		return fmt.Errorf("decode evaluation outcome for assessment %d: %w", assessmentID, err)
+	execution, err := evaloutcome.RestoreExecution(record)
+	if err != nil {
+		return err
 	}
-	if err := a.ApplyScoringOutcomeAt(&execution, record.EvaluatedAt()); err != nil {
+	if err := a.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(execution), record.EvaluatedAt()); err != nil {
 		return err
 	}
 	return r.assessmentSaver.Save(ctx, a)

@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -284,26 +285,26 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	var executionInput ExecutionInput
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.ExecutionIdentityScaleDefault,
-		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
+		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			executionInput = input
 			modelRef := *input.Assessment.EvaluationModelRef()
 			score := 7.0
 			level := string(domainAssessment.RiskLevelLow)
-			outcome := domainAssessment.NewAssessmentOutcome(
-				modelRef,
-				domainAssessment.ResultSummary{
+			execution := domainoutcome.NewExecution(
+				evaloutcome.ModelRefFromAssessment(modelRef),
+				domainoutcome.Summary{
 					PrimaryLabel: "ok",
 					Score:        &score,
 					Level:        &level,
 				},
-				domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
+				domainoutcome.Detail{Kind: modelRef.Kind()},
 			)
-			outcome.Primary = &domainAssessment.OutcomeScoreValue{
-				Kind:  domainAssessment.OutcomeScoreKindRawTotal,
+			execution.Primary = &domainoutcome.ScoreValue{
+				Kind:  domainoutcome.ScoreKindRawTotal,
 				Value: score,
 			}
-			outcome.Level = &domainAssessment.OutcomeResultLevel{Code: level, Label: "ok"}
-			return outcome, nil
+			execution.Level = &domainoutcome.ResultLevel{Code: level, Label: "ok"}
+			return execution, nil
 		},
 	})
 	if err != nil {
@@ -373,22 +374,22 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	capture := &splitPhaseCapture{}
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.ExecutionIdentityMBTI,
-		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
+		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			modelRef := *input.Assessment.EvaluationModelRef()
-			outcome := domainAssessment.NewAssessmentOutcome(
-				modelRef,
-				domainAssessment.ResultSummary{PrimaryLabel: "INTJ"},
-				domainAssessment.EvaluationDetail{
-					Kind:    domainAssessment.EvaluationModelKindPersonality,
+			execution := domainoutcome.NewExecution(
+				evaloutcome.ModelRefFromAssessment(modelRef),
+				domainoutcome.Summary{PrimaryLabel: "INTJ"},
+				domainoutcome.Detail{
+					Kind:    modelRef.Kind(),
 					Payload: "INTJ",
 				},
 			)
-			outcome.Level = &domainAssessment.OutcomeResultLevel{
+			execution.Level = &domainoutcome.ResultLevel{
 				Code:     "INTJ",
 				Label:    "INTJ",
 				Severity: "none",
 			}
-			return outcome, nil
+			return execution, nil
 		},
 	})
 	if err != nil {

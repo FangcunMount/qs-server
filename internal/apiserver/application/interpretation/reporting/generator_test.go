@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -50,18 +51,17 @@ func TestGeneratorEmitsInterpretationReportEvents(t *testing.T) {
 	if err := a.Submit(); err != nil {
 		t.Fatal(err)
 	}
-	execution := assessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: "ok"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	execution := domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef()),
+		domainoutcome.Summary{PrimaryLabel: "ok"}, domainoutcome.Detail{Kind: modelcatalog.KindScale},
 	)
-	execution.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 7}
-	if err := a.ApplyScoringOutcome(execution); err != nil {
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 7}
+	if err := a.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(execution)); err != nil {
 		t.Fatal(err)
 	}
 	outcome := evaloutcome.Outcome{
 		Assessment: a,
-		Execution:  evaloutcome.ExecutionFromAssessmentOutcome(execution),
+		Execution:  execution,
 		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
 			DecisionKind:    modelcatalog.DecisionKindScoreRange,

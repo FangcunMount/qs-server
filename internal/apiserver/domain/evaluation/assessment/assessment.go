@@ -237,55 +237,53 @@ func (a *Assessment) Submit() error {
 	return nil
 }
 
-// ApplyScoringOutcome 应用计分结果并将状态迁移为 evaluated。
-func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
-	return a.ApplyScoringOutcomeAt(outcome, time.Now())
+// ApplyScoringProjection applies the minimal scoring projection and advances
+// the Assessment to evaluated.
+func (a *Assessment) ApplyScoringProjection(projection ScoringProjection) error {
+	return a.ApplyScoringProjectionAt(projection, time.Now())
 }
 
-// ApplyScoringOutcomeAt 应用计分结果，并使用可靠提交边界提供的统一完成时间。
-func (a *Assessment) ApplyScoringOutcomeAt(outcome *AssessmentOutcome, evaluatedAt time.Time) error {
+// ApplyScoringProjectionAt applies a scoring projection using the reliable
+// commit boundary's canonical completion timestamp.
+func (a *Assessment) ApplyScoringProjectionAt(projection ScoringProjection, evaluatedAt time.Time) error {
 	if !a.status.CanApplyScoring() {
 		return NewInvalidStatusError("apply scoring", a.status)
 	}
 	if !a.HasEvaluationModel() {
 		return ErrNoEvaluationModel
 	}
-	if outcome == nil {
-		return ErrInvalidArgument
-	}
 	if evaluatedAt.IsZero() {
 		return ErrInvalidArgument
 	}
-	modelRef := outcome.ModelRef
+	modelRef := projection.ModelRef
 	if modelRef.IsEmpty() {
 		modelRef = *a.modelRef
-		outcome.ModelRef = modelRef
 	} else if !a.modelRef.SameIdentity(modelRef) {
 		return ErrEvaluationModelMismatch
 	}
-	if outcome.Primary != nil {
-		score := outcome.Primary.Value
+	if projection.Score != nil {
+		score := *projection.Score
 		a.totalScore = &score
 	}
-	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
-		risk := RiskLevel(outcome.Level.Code)
+	if IsRiskLevelCode(projection.Level) {
+		risk := RiskLevel(projection.Level)
 		a.riskLevel = &risk
 	}
-	summary := outcome.Summary
+	summary := projection.Summary
 	a.summary = &summary
 	a.status = StatusEvaluated
 	a.evaluatedAt = &evaluatedAt
 	return nil
 }
 
-// PrepareScoringOutcome 在独立副本上准备 evaluated 终态。
+// PrepareScoringProjection prepares evaluated state on an isolated copy.
 // 可靠提交器可在事务成功后发布该副本，事务失败时原聚合保持不变。
-func (a *Assessment) PrepareScoringOutcome(outcome *AssessmentOutcome, evaluatedAt time.Time) (*Assessment, error) {
+func (a *Assessment) PrepareScoringProjection(projection ScoringProjection, evaluatedAt time.Time) (*Assessment, error) {
 	clone := a.clone()
 	if clone == nil {
 		return nil, ErrInvalidArgument
 	}
-	if err := clone.ApplyScoringOutcomeAt(outcome, evaluatedAt); err != nil {
+	if err := clone.ApplyScoringProjectionAt(projection, evaluatedAt); err != nil {
 		return nil, err
 	}
 	return clone, nil

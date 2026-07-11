@@ -1,9 +1,7 @@
 package calculationadapter
 
 import (
-	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
@@ -11,85 +9,55 @@ import (
 // canonical in-memory Evaluation result.
 func ExecutionFromScoringInterpretation(
 	result *scoring.Result,
-	modelRef assessment.EvaluationModelRef,
+	modelRef domainoutcome.ModelRef,
 ) *domainoutcome.Execution {
 	if result == nil {
 		return nil
 	}
-	factorScores := factorScoreResultsFromInterpretation(result)
 	level := string(result.RiskLevel)
 	summaryScore := result.TotalScore
-	legacy := assessment.NewAssessmentOutcome(
+	execution := domainoutcome.NewExecution(
 		modelRef,
-		assessment.ResultSummary{
+		domainoutcome.Summary{
 			PrimaryLabel: level,
 			Score:        &summaryScore,
 			Level:        &level,
 		},
-		assessment.EvaluationDetail{
-			Kind:    assessment.EvaluationModelKindScale,
-			Payload: factorScores,
-		},
+		domainoutcome.Detail{Kind: modelRef.Kind()},
 	)
-	legacy.Primary = &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKindRawTotal,
+	execution.Primary = &domainoutcome.ScoreValue{
+		Kind:  domainoutcome.ScoreKindRawTotal,
 		Value: result.TotalScore,
 	}
 	if result.RiskLevel != "" {
-		legacy.Level = &assessment.OutcomeResultLevel{
+		execution.Level = &domainoutcome.ResultLevel{
 			Code:  string(result.RiskLevel),
 			Label: string(result.RiskLevel),
 		}
 	}
-	legacy.Dimensions = assessmentDimensionResultsFromFactorScores(factorScores)
-	return evaluationoutcome.ExecutionFromAssessmentOutcome(legacy)
+	execution.Dimensions = dimensionResultsFromScoring(result)
+	return execution
 }
 
-// AssessmentOutcomeFromScoringInterpretation remains for compatibility with
-// callers that have not yet moved to the Execution name.
-//
-// Deprecated: use ExecutionFromScoringInterpretation.
-func AssessmentOutcomeFromScoringInterpretation(
-	result *scoring.Result,
-	modelRef assessment.EvaluationModelRef,
-) *domainoutcome.Execution {
-	return ExecutionFromScoringInterpretation(result, modelRef)
-}
-
-func factorScoreResultsFromInterpretation(result *scoring.Result) []assessment.FactorScoreResult {
-	factorScores := make([]assessment.FactorScoreResult, 0, len(result.FactorScores))
-	for _, fs := range result.FactorScores {
-		factorScores = append(factorScores, assessment.NewFactorScoreResult(
-			assessment.NewFactorCode(fs.FactorCode),
-			fs.FactorName,
-			fs.RawScore,
-			assessment.RiskLevel(fs.RiskLevel),
-			"",
-			"",
-			fs.IsTotalScore,
-		))
-	}
-	return factorScores
-}
-
-func assessmentDimensionResultsFromFactorScores(scores []assessment.FactorScoreResult) []assessment.DimensionResult {
-	results := make([]assessment.DimensionResult, 0, len(scores))
-	for _, score := range scores {
-		dim := assessment.DimensionResult{
-			Code: score.FactorCode.String(),
+func dimensionResultsFromScoring(result *scoring.Result) []domainoutcome.DimensionResult {
+	dimensions := make([]domainoutcome.DimensionResult, 0, len(result.FactorScores))
+	for _, score := range result.FactorScores {
+		dim := domainoutcome.DimensionResult{
+			Code: score.FactorCode,
 			Name: score.FactorName,
-			Kind: assessment.DimensionKindFactor,
-			Score: &assessment.OutcomeScoreValue{
-				Kind:  assessment.OutcomeScoreKindRawTotal,
+			Kind: domainoutcome.DimensionKindFactor,
+			Score: &domainoutcome.ScoreValue{
+				Kind:  domainoutcome.ScoreKindRawTotal,
 				Value: score.RawScore,
 			},
-			Description: score.Conclusion,
-			Suggestion:  score.Suggestion,
+		}
+		if score.IsTotalScore {
+			dim.Role = "total"
 		}
 		if score.RiskLevel != "" {
-			dim.Level = &assessment.OutcomeResultLevel{Code: string(score.RiskLevel)}
+			dim.Level = &domainoutcome.ResultLevel{Code: string(score.RiskLevel)}
 		}
-		results = append(results, dim)
+		dimensions = append(dimensions, dim)
 	}
-	return results
+	return dimensions
 }

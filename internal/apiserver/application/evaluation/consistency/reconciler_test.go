@@ -102,10 +102,9 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 
 	a := submittedAssessmentForConsistency(t, 7005)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	execution := assessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: "ok"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	execution := domainoutcome.NewExecution(
+		domainoutcome.ModelRef{ModelKind: modelcatalog.KindScale, ModelCode: "SCALE-1"},
+		domainoutcome.Summary{PrimaryLabel: "ok"}, domainoutcome.Detail{Kind: modelcatalog.KindScale},
 	)
 	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true}, outcomeRecordForConsistency(t, a, execution), repo)
 
@@ -136,7 +135,7 @@ func TestRepairEvaluatedFinalizationRequiresOutcome(t *testing.T) {
 	}
 }
 
-func outcomeRecordForConsistency(t *testing.T, a *assessment.Assessment, execution *assessment.AssessmentOutcome) stubOutcomeRepo {
+func outcomeRecordForConsistency(t *testing.T, a *assessment.Assessment, execution *domainoutcome.Execution) stubOutcomeRepo {
 	t.Helper()
 	payload, err := json.Marshal(execution)
 	if err != nil {

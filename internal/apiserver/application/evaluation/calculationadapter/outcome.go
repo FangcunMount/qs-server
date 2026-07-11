@@ -1,85 +1,69 @@
 package calculationadapter
 
 import (
-	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
-// CalcResultFromOutcome translates 测评结果 为 计算结果。
-func CalcResultFromOutcome(outcome *domainoutcome.Execution) *calculation.Result {
-	return calcResultFromAssessmentOutcome(evaluationoutcome.AssessmentOutcomeFromExecution(outcome))
-}
-
-func calcResultFromAssessmentOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
-	if outcome == nil {
+// CalcResultFromOutcome translates canonical Execution directly to calculation.Result.
+func CalcResultFromOutcome(execution *domainoutcome.Execution) *calculation.Result {
+	if execution == nil {
 		return nil
 	}
 	result := &calculation.Result{
-		PrimaryLabel: outcome.Summary.PrimaryLabel,
-		Dimensions:   make([]calculation.DimensionResult, 0, len(outcome.Dimensions)),
+		PrimaryLabel: execution.Summary.PrimaryLabel,
+		Primary:      scoreValueFromOutcome(execution.Primary),
+		Level:        levelFromOutcome(execution.Level),
+		Dimensions:   make([]calculation.DimensionResult, 0, len(execution.Dimensions)),
 	}
-	if outcome.Primary != nil {
-		result.Primary = scoreValueFromOutcome(outcome.Primary)
-	}
-	if outcome.Level != nil {
-		result.Level = levelFromOutcome(outcome.Level)
-	}
-	for _, dim := range outcome.Dimensions {
-		result.Dimensions = append(result.Dimensions, dimensionResultFromOutcome(dim))
+	for _, dimension := range execution.Dimensions {
+		result.Dimensions = append(result.Dimensions, dimensionResultFromOutcome(dimension))
 	}
 	return result
 }
 
-// MergeCalcResultIntoOutcome merges 计算结果 back 为 测评结果。
-func MergeCalcResultIntoOutcome(outcome *domainoutcome.Execution, result *calculation.Result) *domainoutcome.Execution {
-	return evaluationoutcome.ExecutionFromAssessmentOutcome(mergeCalcResultIntoAssessmentOutcome(evaluationoutcome.AssessmentOutcomeFromExecution(outcome), result))
-}
-
-func mergeCalcResultIntoAssessmentOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
-	if outcome == nil || result == nil {
-		return outcome
+// MergeCalcResultIntoOutcome merges calculation facts directly into Execution.
+func MergeCalcResultIntoOutcome(execution *domainoutcome.Execution, result *calculation.Result) *domainoutcome.Execution {
+	if execution == nil || result == nil {
+		return execution
 	}
 	if result.Primary != nil {
-		outcome.Primary = scoreValueToOutcome(result.Primary)
+		execution.Primary = scoreValueToOutcome(result.Primary)
 	}
 	if result.Level != nil {
-		outcome.Level = levelToOutcome(result.Level)
+		execution.Level = levelToOutcome(result.Level)
 	}
 	if result.PrimaryLabel != "" {
-		outcome.Summary.PrimaryLabel = result.PrimaryLabel
-		if (outcome.Summary.Level == nil || *outcome.Summary.Level == "") && result.Level != nil {
+		execution.Summary.PrimaryLabel = result.PrimaryLabel
+		if (execution.Summary.Level == nil || *execution.Summary.Level == "") && result.Level != nil && result.Level.Code != "" {
 			level := result.Level.Code
-			if level != "" {
-				outcome.Summary.Level = &level
-			}
+			execution.Summary.Level = &level
 		}
 	}
-	outcome.Dimensions = mergeDimensionResults(outcome.Dimensions, result.Dimensions)
-	return outcome
+	execution.Dimensions = mergeDimensionResults(execution.Dimensions, result.Dimensions)
+	return execution
 }
 
-func mergeDimensionResults(existing []assessment.DimensionResult, calculated []calculation.DimensionResult) []assessment.DimensionResult {
+func mergeDimensionResults(existing []domainoutcome.DimensionResult, calculated []calculation.DimensionResult) []domainoutcome.DimensionResult {
 	if len(calculated) == 0 {
 		return existing
 	}
 	byCode := make(map[string]int, len(existing))
-	for i := range existing {
-		byCode[existing[i].Code] = i
+	for index := range existing {
+		byCode[existing[index].Code] = index
 	}
-	for _, dim := range calculated {
-		if pos, ok := byCode[dim.Code]; ok {
-			existing[pos] = mergeDimensionResult(existing[pos], dim)
+	for _, dimension := range calculated {
+		if position, ok := byCode[dimension.Code]; ok {
+			existing[position] = mergeDimensionResult(existing[position], dimension)
 			continue
 		}
-		existing = append(existing, dimensionResultToOutcome(dim))
-		byCode[dim.Code] = len(existing) - 1
+		existing = append(existing, dimensionResultToOutcome(dimension))
+		byCode[dimension.Code] = len(existing) - 1
 	}
 	return existing
 }
 
-func mergeDimensionResult(existing assessment.DimensionResult, calculated calculation.DimensionResult) assessment.DimensionResult {
+func mergeDimensionResult(existing domainoutcome.DimensionResult, calculated calculation.DimensionResult) domainoutcome.DimensionResult {
 	merged := dimensionResultToOutcome(calculated)
 	if existing.Name != "" {
 		merged.Name = existing.Name
@@ -93,60 +77,28 @@ func mergeDimensionResult(existing assessment.DimensionResult, calculated calcul
 	return merged
 }
 
-func dimensionResultFromOutcome(dim assessment.DimensionResult) calculation.DimensionResult {
-	out := calculation.DimensionResult{
-		Code:           dim.Code,
-		Name:           dim.Name,
-		Kind:           CalculationKindFromAssessment(dim.Kind),
-		Role:           dim.Role,
-		ParentCode:     dim.ParentCode,
-		HierarchyLevel: dim.HierarchyLevel,
-		SortOrder:      dim.SortOrder,
-		Description:    dim.Description,
-		Suggestion:     dim.Suggestion,
+func dimensionResultFromOutcome(dimension domainoutcome.DimensionResult) calculation.DimensionResult {
+	result := calculation.DimensionResult{
+		Code: dimension.Code, Name: dimension.Name, Kind: CalculationKindFromOutcome(dimension.Kind),
+		Role: dimension.Role, ParentCode: dimension.ParentCode,
+		HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder,
+		Score: scoreValueFromOutcome(dimension.Score), Level: levelFromOutcome(dimension.Level),
 	}
-	if dim.Score != nil {
-		out.Score = scoreValueFromOutcome(dim.Score)
+	for _, score := range dimension.DerivedScores {
+		result.DerivedScores = append(result.DerivedScores, *scoreValueFromOutcome(&score))
 	}
-	if len(dim.DerivedScores) > 0 {
-		out.DerivedScores = make([]calculation.ScoreValue, 0, len(dim.DerivedScores))
-		for _, score := range dim.DerivedScores {
-			if converted := scoreValueFromOutcome(&score); converted != nil {
-				out.DerivedScores = append(out.DerivedScores, *converted)
-			}
-		}
-	}
-	if dim.Level != nil {
-		out.Level = levelFromOutcome(dim.Level)
-	}
-	return out
+	return result
 }
 
-func dimensionResultToOutcome(dim calculation.DimensionResult) assessment.DimensionResult {
-	out := assessment.DimensionResult{
-		Code:           dim.Code,
-		Name:           dim.Name,
-		Kind:           AssessmentKindFromCalculation(dim.Kind),
-		Role:           dim.Role,
-		ParentCode:     dim.ParentCode,
-		HierarchyLevel: dim.HierarchyLevel,
-		SortOrder:      dim.SortOrder,
-		Description:    dim.Description,
-		Suggestion:     dim.Suggestion,
+func dimensionResultToOutcome(dimension calculation.DimensionResult) domainoutcome.DimensionResult {
+	result := domainoutcome.DimensionResult{
+		Code: dimension.Code, Name: dimension.Name, Kind: OutcomeKindFromCalculation(dimension.Kind),
+		Role: dimension.Role, ParentCode: dimension.ParentCode,
+		HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder,
+		Score: scoreValueToOutcome(dimension.Score), Level: levelToOutcome(dimension.Level),
 	}
-	if dim.Score != nil {
-		out.Score = scoreValueToOutcome(dim.Score)
+	for _, score := range dimension.DerivedScores {
+		result.DerivedScores = append(result.DerivedScores, *scoreValueToOutcome(&score))
 	}
-	if len(dim.DerivedScores) > 0 {
-		out.DerivedScores = make([]assessment.OutcomeScoreValue, 0, len(dim.DerivedScores))
-		for _, score := range dim.DerivedScores {
-			if converted := scoreValueToOutcome(&score); converted != nil {
-				out.DerivedScores = append(out.DerivedScores, *converted)
-			}
-		}
-	}
-	if dim.Level != nil {
-		out.Level = levelToOutcome(dim.Level)
-	}
-	return out
+	return result
 }

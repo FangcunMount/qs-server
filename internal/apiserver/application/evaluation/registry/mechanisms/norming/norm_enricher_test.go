@@ -3,10 +3,8 @@ package norming_test
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
@@ -15,12 +13,12 @@ import (
 func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	t.Parallel()
 
-	outcome := evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
-		Dimensions: []assessment.DimensionResult{{
+	outcome := &domainoutcome.Execution{
+		Dimensions: []domainoutcome.DimensionResult{{
 			Code:  "gec",
-			Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 5},
+			Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 5},
 		}},
-	})
+	}
 	snapshot := &behavioralsnapshot.Snapshot{
 		Norming: &behavioralsnapshot.NormingProfile{
 			PrimaryDimensionCode: "gec",
@@ -52,8 +50,8 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	if got := derivedScore(dim.DerivedScores, domainoutcome.ScoreKindPercentile); got != 90 {
 		t.Fatalf("percentile = %v, want 90", got)
 	}
-	if dim.Level == nil || dim.Level.Code != "elevated" || dim.Description != "升高" {
-		t.Fatalf("level = %#v description = %q", dim.Level, dim.Description)
+	if dim.Level == nil || dim.Level.Code != "elevated" {
+		t.Fatalf("level = %#v", dim.Level)
 	}
 	if enriched.Level == nil || enriched.Level.Code != "elevated" {
 		t.Fatalf("outcome level = %#v", enriched.Level)

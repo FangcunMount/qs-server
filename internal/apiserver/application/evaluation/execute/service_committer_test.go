@@ -30,7 +30,7 @@ func (c failingEvaluationCommitter) Commit(context.Context, outcomecommit.Reques
 func (s *evaluationCommitterStub) Commit(_ context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
 	s.calls++
 	s.request = request
-	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+	if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
 		return nil, err
 	}
 	if err := request.Run.Succeed(time.Unix(200, 0)); err != nil {
@@ -43,11 +43,7 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
-	execution := domainAssessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		domainAssessment.ResultSummary{PrimaryLabel: "ok"},
-		domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
-	)
+	execution := executionForAssessment(a, "ok")
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
 	registry, err := NewEvaluatorRegistry(evaluator)
 	if err != nil {
@@ -81,12 +77,8 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
-	execution := domainAssessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		domainAssessment.ResultSummary{PrimaryLabel: "ok"},
-		domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
-	)
-	if err := a.ApplyScoringOutcome(execution); err != nil {
+	execution := executionForAssessment(a, "ok")
+	if err := a.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(execution)); err != nil {
 		t.Fatal(err)
 	}
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
@@ -144,11 +136,7 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 	commitErr := errors.New("evaluation commit failed")
 	a := splitPhaseAssessment(t)
 	a.ClearEvents()
-	execution := domainAssessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		domainAssessment.ResultSummary{PrimaryLabel: "ok"},
-		domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
-	)
+	execution := executionForAssessment(a, "ok")
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
 	registry, err := NewEvaluatorRegistry(evaluator)
 	if err != nil {

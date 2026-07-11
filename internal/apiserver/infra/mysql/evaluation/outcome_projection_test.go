@@ -13,31 +13,22 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 	a := newSubmittedScaleAssessment(t)
 	score := 18.5
 	level := string(assessment.RiskLevelHigh)
-	outcome := assessment.NewAssessmentOutcome(
-		assessment.EvaluationModelRef{},
-		assessment.ResultSummary{
+	projection := assessment.ScoringProjection{
+		Summary: assessment.ResultSummary{
 			PrimaryLabel: "high",
 			Score:        &score,
 			Level:        &level,
 		},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	)
-	outcome.Primary = &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKindRawTotal,
-		Value: score,
+		Score: &score,
+		Level: level,
 	}
-	outcome.Level = &assessment.OutcomeResultLevel{
-		Code:     "high",
-		Label:    "high",
-		Severity: "high",
-	}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
-		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	if err := a.ApplyScoringProjection(projection); err != nil {
+		t.Fatalf("ApplyScoringProjection returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindRawTotal) {
-		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, assessment.OutcomeScoreKindRawTotal)
+	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != "raw_total" {
+		t.Fatalf("primary score kind = %v, want raw_total", po.PrimaryScoreKind)
 	}
 	if po.PrimaryScoreValue == nil || *po.PrimaryScoreValue != 18.5 {
 		t.Fatalf("primary score value = %v, want 18.5", po.PrimaryScoreValue)
@@ -57,19 +48,15 @@ func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
 	t.Parallel()
 
 	a := newSubmittedScaleAssessment(t)
-	outcome := assessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		assessment.ResultSummary{PrimaryLabel: "high"},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	)
-	outcome.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 18.5}
-	outcome.Level = &assessment.OutcomeResultLevel{Code: "high", Label: "高风险", Severity: "high"}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
+	score := 18.5
+	if err := a.ApplyScoringProjection(assessment.ScoringProjection{
+		ModelRef: *a.EvaluationModelRef(), Summary: assessment.ResultSummary{PrimaryLabel: "high"}, Score: &score, Level: "high",
+	}); err != nil {
 		t.Fatal(err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.Status != "evaluated" || po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindRawTotal) {
+	if po.Status != "evaluated" || po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != "raw_total" {
 		t.Fatalf("evaluated projection status=%s primary_kind=%v", po.Status, po.PrimaryScoreKind)
 	}
 	if po.PrimaryScoreValue == nil || *po.PrimaryScoreValue != 18.5 || po.LevelCode == nil || *po.LevelCode != "high" || po.Severity == nil || *po.Severity != "high" {
@@ -103,28 +90,15 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	score := 92.0
-	outcome := assessment.NewAssessmentOutcome(
-		modelRef,
-		assessment.ResultSummary{PrimaryLabel: "INTJ", Score: &score},
-		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality},
-	)
-	outcome.Primary = &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKindMatchPercent,
-		Value: score,
-		Label: "INTJ",
-	}
-	outcome.Level = &assessment.OutcomeResultLevel{
-		Code:     "INTJ",
-		Label:    "INTJ",
-		Severity: "none",
-	}
-	if err := a.ApplyScoringOutcome(outcome); err != nil {
-		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	if err := a.ApplyScoringProjection(assessment.ScoringProjection{
+		ModelRef: modelRef, Summary: assessment.ResultSummary{PrimaryLabel: "INTJ", Score: &score}, Score: &score, Level: "INTJ",
+	}); err != nil {
+		t.Fatalf("ApplyScoringProjection returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindMatchPercent) {
-		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, assessment.OutcomeScoreKindMatchPercent)
+	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != "match_percent" {
+		t.Fatalf("primary score kind = %v, want match_percent", po.PrimaryScoreKind)
 	}
 	if po.LevelCode == nil || *po.LevelCode != "INTJ" {
 		t.Fatalf("level code = %v, want INTJ", po.LevelCode)

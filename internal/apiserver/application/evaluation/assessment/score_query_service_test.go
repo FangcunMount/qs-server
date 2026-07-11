@@ -71,18 +71,17 @@ func TestHighRiskFactorsRemainEmptyWhenOutcomeDoesNotExist(t *testing.T) {
 func scoreOutcomeRecord(t *testing.T) *domainoutcome.Record {
 	t.Helper()
 	model := domainassessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("S-1"), "1.0.0", "scale")
-	legacy := domainassessment.NewAssessmentOutcome(
-		model,
-		domainassessment.ResultSummary{PrimaryLabel: "high"},
-		domainassessment.EvaluationDetail{Kind: domainassessment.EvaluationModelKindScale},
+	execution := domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(model),
+		domainoutcome.Summary{PrimaryLabel: "high"},
+		domainoutcome.Detail{Kind: domainassessment.EvaluationModelKindScale},
 	)
-	legacy.Primary = &domainassessment.OutcomeScoreValue{Kind: domainassessment.OutcomeScoreKindRawTotal, Value: 18}
-	legacy.Level = &domainassessment.OutcomeResultLevel{Code: "severe"}
-	legacy.Dimensions = []domainassessment.DimensionResult{
-		{Code: "total", Name: "总分", Kind: domainassessment.DimensionKindFactor, Score: &domainassessment.OutcomeScoreValue{Kind: domainassessment.OutcomeScoreKindRawTotal, Value: 18}, Level: &domainassessment.OutcomeResultLevel{Code: "severe"}},
-		{Code: "sleep", Name: "睡眠", Kind: domainassessment.DimensionKindFactor, Score: &domainassessment.OutcomeScoreValue{Kind: domainassessment.OutcomeScoreKindRawTotal, Value: 9}, Level: &domainassessment.OutcomeResultLevel{Code: "high"}},
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 18}
+	execution.Level = &domainoutcome.ResultLevel{Code: "severe"}
+	execution.Dimensions = []domainoutcome.DimensionResult{
+		{Code: "total", Name: "总分", Kind: domainoutcome.DimensionKindFactor, Role: "total", Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 18}, Level: &domainoutcome.ResultLevel{Code: "severe"}},
+		{Code: "sleep", Name: "睡眠", Kind: domainoutcome.DimensionKindFactor, Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 9}, Level: &domainoutcome.ResultLevel{Code: "high"}},
 	}
-	execution := evaloutcome.ExecutionFromAssessmentOutcome(legacy)
 	payload, err := json.Marshal(execution)
 	if err != nil {
 		t.Fatal(err)

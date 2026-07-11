@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -39,9 +37,6 @@ func (descriptorDrivenExecutor) Execute(
 	}
 	if outcome, ok := assembled.(*domainoutcome.Execution); ok && outcome != nil {
 		return outcome, nil
-	}
-	if legacy, ok := assembled.(*assessment.AssessmentOutcome); ok && legacy != nil {
-		return evaluationoutcome.ExecutionFromAssessmentOutcome(legacy), nil
 	}
 	return nil, fmt.Errorf("descriptor outcome assembler returned invalid type %T", assembled)
 }

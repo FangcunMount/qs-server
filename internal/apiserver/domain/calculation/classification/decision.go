@@ -42,7 +42,7 @@ type LevelRule struct {
 	HighMin float64
 }
 
-// OutcomeCandidate 是选中 personality 结果 在之前 mapping 到 AssessmentOutcome。
+// OutcomeCandidate is the selected personality result before mapping to Execution.
 type OutcomeCandidate struct {
 	Code        string
 	Label       string

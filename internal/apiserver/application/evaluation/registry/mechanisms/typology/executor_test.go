@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -59,13 +60,13 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome == nil || outcome.Primary == nil {
 		t.Fatal("outcome primary is required")
 	}
-	if string(outcome.Primary.Kind) != string(assessment.OutcomeScoreKindMatchPercent) {
-		t.Fatalf("primary kind = %s, want %s", outcome.Primary.Kind, assessment.OutcomeScoreKindMatchPercent)
+	if outcome.Primary.Kind != domainoutcome.ScoreKindMatchPercent {
+		t.Fatalf("primary kind = %s, want %s", outcome.Primary.Kind, domainoutcome.ScoreKindMatchPercent)
 	}
 	if outcome.Level == nil || outcome.Level.Code != "INTJ" {
 		t.Fatalf("level = %#v, want INTJ type code", outcome.Level)
 	}
-	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityType) {
+	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || outcome.Profile.Kind != domainoutcome.ProfileKindPersonalityType {
 		t.Fatalf("profile = %#v, want INTJ personality_type", outcome.Profile)
 	}
 }
@@ -106,7 +107,7 @@ func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome.Level == nil || outcome.Level.Code != "HIGH" {
 		t.Fatalf("level = %#v, want HIGH type code", outcome.Level)
 	}
-	if outcome.Profile == nil || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityType) {
+	if outcome.Profile == nil || outcome.Profile.Kind != domainoutcome.ProfileKindPersonalityType {
 		t.Fatalf("profile = %#v, want personality_type", outcome.Profile)
 	}
 }
@@ -133,7 +134,7 @@ func TestBigFiveExecutorFillsTraitProfile(t *testing.T) {
 	if outcome.Summary.PrimaryLabel != "O" {
 		t.Fatalf("PrimaryLabel = %q, want O", outcome.Summary.PrimaryLabel)
 	}
-	if outcome.Profile == nil || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityTrait) {
+	if outcome.Profile == nil || outcome.Profile.Kind != domainoutcome.ProfileKindPersonalityTrait {
 		t.Fatalf("profile = %#v, want personality_trait", outcome.Profile)
 	}
 }

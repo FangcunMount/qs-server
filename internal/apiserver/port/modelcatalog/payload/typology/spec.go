@@ -160,7 +160,7 @@ func (r SpecialRuleSpec) ResolvedOptionValues() []string {
 	return append([]string(nil), r.OptionValues...)
 }
 
-// OutcomeDetailKind 选择如何计分 detail 映射到 AssessmentOutcome。
+// OutcomeDetailKind selects how scoring detail maps to canonical Execution.
 type OutcomeDetailKind string
 
 const (
@@ -168,7 +168,7 @@ const (
 	OutcomeDetailTraitProfile    OutcomeDetailKind = "trait_profile"
 )
 
-// OutcomeMappingSpec 描述如何计分 detail 转成 AssessmentOutcome 字段。
+// OutcomeMappingSpec describes how scoring detail maps to Execution fields.
 type OutcomeMappingSpec struct {
 	DetailKind       OutcomeDetailKind `json:"detail_kind"`
 	DetailAdapterKey DetailAdapterKey  `json:"detail_adapter_key,omitempty"`

@@ -139,7 +139,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	record, err := c.Commit(context.Background(), Request{
 		Outcome: evaloutcome.Outcome{
 			Assessment:           a,
-			Execution:            evaloutcome.ExecutionFromAssessmentOutcome(execution),
+			Execution:            execution,
 			RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		},
 		Run:         &run,
@@ -244,7 +244,7 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 			_, err := c.Commit(context.Background(), Request{
 				Outcome: evaloutcome.Outcome{
 					Assessment:           a,
-					Execution:            evaloutcome.ExecutionFromAssessmentOutcome(execution),
+					Execution:            execution,
 					RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 				},
 				Run:         &run,
@@ -266,7 +266,7 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 	}
 }
 
-func commitTestOutcome(t *testing.T) (*assessment.Assessment, *assessment.AssessmentOutcome) {
+func commitTestOutcome(t *testing.T) (*assessment.Assessment, *domainoutcome.Execution) {
 	t.Helper()
 	modelRef := assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SCALE-1"), "1.0.0", "scale")
 	a, err := assessment.NewAssessment(
@@ -285,10 +285,10 @@ func commitTestOutcome(t *testing.T) (*assessment.Assessment, *assessment.Assess
 		t.Fatal(err)
 	}
 	a.ClearEvents()
-	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{PrimaryLabel: "high"}, assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale})
-	outcome.Primary = &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 12}
-	outcome.Level = &assessment.OutcomeResultLevel{Code: "high", Label: "高风险", Severity: "high"}
-	return a, outcome
+	execution := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(modelRef), domainoutcome.Summary{PrimaryLabel: "high"}, domainoutcome.Detail{Kind: modelcatalog.KindScale})
+	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 12}
+	execution.Level = &domainoutcome.ResultLevel{Code: "high", Label: "高风险", Severity: "high"}
+	return a, execution
 }
 
 func requireCommitTx(ctx context.Context) {

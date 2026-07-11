@@ -3,10 +3,8 @@ package norming_test
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
@@ -16,12 +14,12 @@ import (
 func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 	t.Parallel()
 
-	outcome := evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
-		Dimensions: []assessment.DimensionResult{
+	outcome := &domainoutcome.Execution{
+		Dimensions: []domainoutcome.DimensionResult{
 			{Code: "inhibit", Score: score(4)},
 			{Code: "self_monitor", Score: score(6)},
 		},
-	})
+	}
 	snapshot := &behavioralsnapshot.Snapshot{
 		Factors: []behavioralsnapshot.FactorSnapshot{
 			{Code: "inhibit", Title: "Inhibit"},
@@ -80,8 +78,8 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 	t.Fatalf("gec derived = %#v, want t_score 65", gec.DerivedScores)
 }
 
-func score(value float64) *assessment.OutcomeScoreValue {
-	return &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: value}
+func score(value float64) *domainoutcome.ScoreValue {
+	return &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: value}
 }
 
 func dimensionScore(dimensions []domainoutcome.DimensionResult, code string) float64 {

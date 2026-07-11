@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -20,7 +19,7 @@ import (
 
 type evaluatorStub struct {
 	key     evaluation.ExecutionIdentity
-	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
+	execute func(context.Context, ExecutionInput) (*domainoutcome.Execution, error)
 }
 
 func (e evaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity {
@@ -33,14 +32,9 @@ func (e evaluatorStub) Key() evaluation.ExecutionIdentity {
 
 func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 	if e.execute != nil {
-		legacy, err := e.execute(ctx, input)
-		return evaloutcome.ExecutionFromAssessmentOutcome(legacy), err
+		return e.execute(ctx, input)
 	}
-	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(
-		assessment.EvaluationModelRef{},
-		assessment.ResultSummary{},
-		assessment.EvaluationDetail{},
-	)), nil
+	return domainoutcome.NewExecution(domainoutcome.ModelRef{}, domainoutcome.Summary{}, domainoutcome.Detail{}), nil
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {

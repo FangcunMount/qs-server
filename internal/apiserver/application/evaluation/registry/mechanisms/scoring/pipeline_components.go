@@ -92,5 +92,5 @@ func (factorScoringOutcomeAssembler) Assemble(result any) (any, error) {
 	if !ok || pipelineResult.result == nil {
 		return nil, fmt.Errorf("factor_scoring outcome assembler received invalid type %T", result)
 	}
-	return ToAssessmentOutcome(pipelineResult.result, pipelineResult.assessment, pipelineResult.snapshot), nil
+	return ToExecution(pipelineResult.result, pipelineResult.assessment, pipelineResult.snapshot), nil
 }

@@ -101,7 +101,7 @@ func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request o
 	if request.Outcome.Assessment == nil || request.Outcome.Execution == nil {
 		return nil, nil
 	}
-	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+	if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
 		return nil, err
 	}
 	if request.Run != nil {

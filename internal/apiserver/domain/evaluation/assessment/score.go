@@ -1,7 +1,6 @@
 package assessment
 
-// ScaleScoreProjection 是旧量表兼容分数投影 stored in MySQL。
-// New 建模家族 应该 write AssessmentOutcome instead。
+// ScaleScoreProjection is the Evaluation-owned scale query projection stored in MySQL.
 type ScaleScoreProjection struct {
 	assessmentID ID
 	totalScore   float64
@@ -37,46 +36,6 @@ func ReconstructScaleScoreProjection(
 		riskLevel:    riskLevel,
 		factorScores: factorScores,
 	}
-}
-
-// ScaleScoreProjectionFromOutcome 投影规范 结果 为 scale storage。
-func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome) *ScaleScoreProjection {
-	if outcome == nil || !outcome.ModelRef.IsScale() {
-		return nil
-	}
-
-	var totalScore float64
-	var riskLevel RiskLevel
-	if outcome.Primary != nil {
-		totalScore = outcome.Primary.Value
-	}
-	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
-		riskLevel = RiskLevel(outcome.Level.Code)
-	}
-
-	factorScores := factorScoresForScaleProjection(outcome)
-	scaleFactors := make([]ScaleFactorScore, 0, len(factorScores))
-	for _, fs := range factorScores {
-		scaleFactors = append(scaleFactors, NewScaleFactorScore(
-			fs.FactorCode,
-			fs.FactorName,
-			fs.RawScore,
-			fs.RiskLevel,
-			fs.IsTotalScore,
-		))
-	}
-
-	return NewScaleScoreProjection(assessmentID, totalScore, riskLevel, scaleFactors)
-}
-
-func factorScoresForScaleProjection(outcome *AssessmentOutcome) []FactorScoreResult {
-	if scores, ok := outcome.Detail.Payload.([]FactorScoreResult); ok && len(scores) > 0 {
-		return scores
-	}
-	if len(outcome.Dimensions) > 0 {
-		return factorScoreResultsFromDimensions(outcome.Dimensions)
-	}
-	return nil
 }
 
 // ScaleScoreProjectionFromEvaluationResult 投影旧版 评估 结果 为 scale storage。

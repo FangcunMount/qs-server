@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -15,17 +13,16 @@ import (
 
 type runtimeEvaluatorStub struct {
 	key     evaluation.ExecutionIdentity
-	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
+	execute func(context.Context, ExecutionInput) (*domainoutcome.Execution, error)
 }
 
 func (e runtimeEvaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
 
 func (e runtimeEvaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 	if e.execute != nil {
-		legacy, err := e.execute(ctx, input)
-		return evaloutcome.ExecutionFromAssessmentOutcome(legacy), err
+		return e.execute(ctx, input)
 	}
-	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{})), nil
+	return domainoutcome.NewExecution(domainoutcome.ModelRef{}, domainoutcome.Summary{}, domainoutcome.Detail{}), nil
 }
 
 func (e runtimeEvaluatorStub) Key() evaluation.ExecutionIdentity {
@@ -141,5 +138,5 @@ func (runtimeStubCalculator) Calculate(context.Context, evalpipeline.Calculation
 type runtimeStubOutcomeAssembler struct{}
 
 func (runtimeStubOutcomeAssembler) Assemble(any) (any, error) {
-	return assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{}), nil
+	return domainoutcome.NewExecution(domainoutcome.ModelRef{}, domainoutcome.Summary{}, domainoutcome.Detail{}), nil
 }

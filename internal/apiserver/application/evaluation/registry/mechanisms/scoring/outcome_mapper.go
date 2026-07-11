@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -15,18 +16,7 @@ func ToExecution(
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,
 ) *domainoutcome.Execution {
-	return calculationadapter.ExecutionFromScoringInterpretation(result, scaleModelRef(a, snapshot))
-}
-
-// ToAssessmentOutcome remains as a source-compatible name during migration.
-//
-// Deprecated: use ToExecution.
-func ToAssessmentOutcome(
-	result *calcscoring.Result,
-	a *assessment.Assessment,
-	snapshot *evaluationinput.InputSnapshot,
-) *domainoutcome.Execution {
-	return ToExecution(result, a, snapshot)
+	return calculationadapter.ExecutionFromScoringInterpretation(result, evaloutcome.ModelRefFromAssessment(scaleModelRef(a, snapshot)))
 }
 
 func scaleModelRef(a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot) assessment.EvaluationModelRef {
