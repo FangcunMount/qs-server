@@ -67,3 +67,24 @@ func TestRestoreRunRejectsInconsistentTerminalFacts(t *testing.T) {
 		t.Fatalf("restore = run:%#v err:%v", restored, err)
 	}
 }
+
+func TestInterpretationRunLeaseExpiresAndIsClearedAtTerminalState(t *testing.T) {
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	r, err := NewPending(meta.FromUint64(1), meta.FromUint64(2), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaseExpiry := now.Add(time.Minute)
+	if err := r.StartWithLease(now, "trace", leaseExpiry); err != nil {
+		t.Fatal(err)
+	}
+	if !r.HasActiveLease(now.Add(30*time.Second)) || r.HasActiveLease(leaseExpiry) {
+		t.Fatalf("lease state = expires:%v", r.LeaseExpiresAt())
+	}
+	if err := r.Succeed(now.Add(40 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if r.LeaseExpiresAt() != nil || r.HasActiveLease(now.Add(45*time.Second)) {
+		t.Fatal("terminal run retained active lease")
+	}
+}

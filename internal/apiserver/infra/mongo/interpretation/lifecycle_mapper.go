@@ -52,13 +52,14 @@ func (m *LifecycleMapper) RunToPO(domain *interpretationrun.InterpretationRun) *
 		return nil
 	}
 	po := &InterpretationRunPO{
-		BaseDocument: base.BaseDocument{DomainID: domain.ID()},
-		GenerationID: domain.GenerationID().Uint64(),
-		Attempt:      domain.Attempt(),
-		Status:       string(domain.Status()),
-		TraceID:      domain.TraceID(),
-		StartedAt:    domain.StartedAt(),
-		FinishedAt:   domain.FinishedAt(),
+		BaseDocument:   base.BaseDocument{DomainID: domain.ID()},
+		GenerationID:   domain.GenerationID().Uint64(),
+		Attempt:        domain.Attempt(),
+		Status:         string(domain.Status()),
+		TraceID:        domain.TraceID(),
+		StartedAt:      domain.StartedAt(),
+		LeaseExpiresAt: domain.LeaseExpiresAt(),
+		FinishedAt:     domain.FinishedAt(),
 	}
 	if failure := domain.Failure(); failure != nil {
 		po.Failure = &InterpretationFailurePO{Kind: string(failure.Kind), Code: failure.Code, SafeMessage: failure.SafeMessage, Retryable: failure.Retryable}
@@ -75,14 +76,15 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 		failure = &interpretationrun.Failure{Kind: interpretationrun.FailureKind(po.Failure.Kind), Code: po.Failure.Code, SafeMessage: po.Failure.SafeMessage, Retryable: po.Failure.Retryable}
 	}
 	return interpretationrun.Restore(interpretationrun.RestoreInput{
-		ID:           po.DomainID,
-		GenerationID: meta.FromUint64(po.GenerationID),
-		Attempt:      po.Attempt,
-		Status:       interpretationrun.Status(po.Status),
-		Failure:      failure,
-		TraceID:      po.TraceID,
-		StartedAt:    po.StartedAt,
-		FinishedAt:   po.FinishedAt,
+		ID:             po.DomainID,
+		GenerationID:   meta.FromUint64(po.GenerationID),
+		Attempt:        po.Attempt,
+		Status:         interpretationrun.Status(po.Status),
+		Failure:        failure,
+		TraceID:        po.TraceID,
+		StartedAt:      po.StartedAt,
+		LeaseExpiresAt: po.LeaseExpiresAt,
+		FinishedAt:     po.FinishedAt,
 	})
 }
 

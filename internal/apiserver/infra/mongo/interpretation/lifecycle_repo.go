@@ -77,7 +77,7 @@ func (r *GenerationRepository) FindByKey(ctx context.Context, key generation.Key
 }
 
 func (r *GenerationRepository) Save(ctx context.Context, domain *generation.ReportGeneration, expectedVersion uint64) error {
-	if domain == nil || expectedVersion == 0 || domain.Version() != expectedVersion+1 {
+	if domain == nil || expectedVersion == 0 || domain.Version() <= expectedVersion {
 		return generation.ErrVersionConflict
 	}
 	po := r.mapper.GenerationToPO(domain)
@@ -194,7 +194,7 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
-	update := bson.M{"$set": bson.M{"status": po.Status, "failure": po.Failure, "trace_id": po.TraceID, "started_at": po.StartedAt, "finished_at": po.FinishedAt, "updated_at": time.Now()}}
+	update := bson.M{"$set": bson.M{"status": po.Status, "failure": po.Failure, "trace_id": po.TraceID, "started_at": po.StartedAt, "lease_expires_at": po.LeaseExpiresAt, "finished_at": po.FinishedAt, "updated_at": time.Now()}}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64()}, update)
 	if err != nil {
 		return fmt.Errorf("save interpretation run: %w", err)

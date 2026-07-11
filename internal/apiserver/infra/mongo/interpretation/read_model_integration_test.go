@@ -2,11 +2,14 @@ package interpretation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -239,5 +242,41 @@ func TestReportReadModelPrefersArtifactsAndFallsBackToLegacyAgainstMongo(t *test
 	rows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
 	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "artifact wins" {
 		t.Fatalf("new-first report list = %#v total=%d err=%v", rows, total, err)
+	}
+}
+
+func TestGenerationRepositoryRejectsStaleCASAgainstMongo(t *testing.T) {
+	db := openEvaluationMongoContractDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	repo, err := NewGenerationRepository(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	id := meta.FromUint64(uint64(time.Now().UnixNano() / int64(time.Millisecond)))
+	generationRecord, err := generation.New(id, generation.Key{
+		OutcomeID:       meta.FromUint64(id.Uint64() + 1),
+		ReportType:      policy.ReportTypeStandard,
+		TemplateVersion: policy.TemplateVersion("cas-v1"),
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, generationRecord); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.Collection((ReportGenerationPO{}).CollectionName()).DeleteOne(context.Background(), bson.M{"domain_id": id.Uint64()})
+	})
+	if err := generationRecord.Begin(meta.FromUint64(id.Uint64()+2), now.Add(time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Save(ctx, generationRecord, 1); err != nil {
+		t.Fatalf("first CAS save: %v", err)
+	}
+	if err := repo.Save(ctx, generationRecord, 1); !errors.Is(err, generation.ErrVersionConflict) {
+		t.Fatalf("stale CAS save = %v, want version conflict", err)
 	}
 }

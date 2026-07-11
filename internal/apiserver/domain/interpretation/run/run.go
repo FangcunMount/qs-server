@@ -62,14 +62,15 @@ func (f Failure) Validate() error {
 // InterpretationRun is one attempt under a ReportGeneration. It never owns
 // report content and it cannot modify Evaluation facts.
 type InterpretationRun struct {
-	id           ID
-	generationID meta.ID
-	attempt      int
-	status       Status
-	failure      *Failure
-	traceID      string
-	startedAt    *time.Time
-	finishedAt   *time.Time
+	id             ID
+	generationID   meta.ID
+	attempt        int
+	status         Status
+	failure        *Failure
+	traceID        string
+	startedAt      *time.Time
+	leaseExpiresAt *time.Time
+	finishedAt     *time.Time
 }
 
 func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, error) {
@@ -93,7 +94,7 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 	}
 	switch input.Status {
 	case StatusPending:
-		if input.StartedAt != nil || input.FinishedAt != nil || input.Failure != nil {
+		if input.StartedAt != nil || input.LeaseExpiresAt != nil || input.FinishedAt != nil || input.Failure != nil {
 			return nil, fmt.Errorf("pending interpretation run has execution facts")
 		}
 	case StatusRunning:
@@ -101,11 +102,11 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 			return nil, fmt.Errorf("running interpretation run facts are invalid")
 		}
 	case StatusSucceeded:
-		if input.StartedAt == nil || input.FinishedAt == nil || input.Failure != nil {
+		if input.StartedAt == nil || input.LeaseExpiresAt != nil || input.FinishedAt == nil || input.Failure != nil {
 			return nil, fmt.Errorf("succeeded interpretation run facts are invalid")
 		}
 	case StatusFailed:
-		if input.StartedAt == nil || input.FinishedAt == nil || input.Failure == nil {
+		if input.StartedAt == nil || input.LeaseExpiresAt != nil || input.FinishedAt == nil || input.Failure == nil {
 			return nil, fmt.Errorf("failed interpretation run facts are required")
 		}
 		if err := input.Failure.Validate(); err != nil {
@@ -116,13 +117,14 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 		return nil, fmt.Errorf("interpretation run finished at precedes started at")
 	}
 	r := &InterpretationRun{
-		id:           input.ID,
-		generationID: input.GenerationID,
-		attempt:      input.Attempt,
-		status:       input.Status,
-		traceID:      input.TraceID,
-		startedAt:    copyTimePtr(input.StartedAt),
-		finishedAt:   copyTimePtr(input.FinishedAt),
+		id:             input.ID,
+		generationID:   input.GenerationID,
+		attempt:        input.Attempt,
+		status:         input.Status,
+		traceID:        input.TraceID,
+		startedAt:      copyTimePtr(input.StartedAt),
+		leaseExpiresAt: copyTimePtr(input.LeaseExpiresAt),
+		finishedAt:     copyTimePtr(input.FinishedAt),
 	}
 	if input.Failure != nil {
 		failure := *input.Failure
@@ -132,14 +134,15 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 }
 
 type RestoreInput struct {
-	ID           ID
-	GenerationID meta.ID
-	Attempt      int
-	Status       Status
-	Failure      *Failure
-	TraceID      string
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
+	ID             ID
+	GenerationID   meta.ID
+	Attempt        int
+	Status         Status
+	Failure        *Failure
+	TraceID        string
+	StartedAt      *time.Time
+	LeaseExpiresAt *time.Time
+	FinishedAt     *time.Time
 }
 
 func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
@@ -153,6 +156,20 @@ func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
 }
 
 func (r *InterpretationRun) Start(at time.Time, traceID string) error {
+	return r.start(at, traceID, time.Time{})
+}
+
+// StartWithLease claims this Run for one worker attempt. A lease is required
+// by GenerationStarter so a crashed worker can be recovered without creating
+// concurrent attempts.
+func (r *InterpretationRun) StartWithLease(at time.Time, traceID string, leaseExpiresAt time.Time) error {
+	if leaseExpiresAt.IsZero() || !leaseExpiresAt.After(at) {
+		return fmt.Errorf("interpretation run lease expiry must follow start")
+	}
+	return r.start(at, traceID, leaseExpiresAt)
+}
+
+func (r *InterpretationRun) start(at time.Time, traceID string, leaseExpiresAt time.Time) error {
 	if r == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
@@ -165,6 +182,9 @@ func (r *InterpretationRun) Start(at time.Time, traceID string) error {
 	r.status = StatusRunning
 	r.traceID = traceID
 	r.startedAt = copyTime(at)
+	if !leaseExpiresAt.IsZero() {
+		r.leaseExpiresAt = copyTime(leaseExpiresAt)
+	}
 	return nil
 }
 
@@ -180,6 +200,7 @@ func (r *InterpretationRun) Succeed(at time.Time) error {
 	}
 	r.status = StatusSucceeded
 	r.failure = nil
+	r.leaseExpiresAt = nil
 	r.finishedAt = copyTime(at)
 	return nil
 }
@@ -199,6 +220,7 @@ func (r *InterpretationRun) Fail(at time.Time, failure Failure) error {
 	}
 	r.status = StatusFailed
 	r.failure = &failure
+	r.leaseExpiresAt = nil
 	r.finishedAt = copyTime(at)
 	return nil
 }
@@ -222,6 +244,12 @@ func (r *InterpretationRun) Failure() *Failure {
 func (r *InterpretationRun) TraceID() string { return r.traceID }
 
 func (r *InterpretationRun) StartedAt() *time.Time { return copyTimePtr(r.startedAt) }
+
+func (r *InterpretationRun) LeaseExpiresAt() *time.Time { return copyTimePtr(r.leaseExpiresAt) }
+
+func (r *InterpretationRun) HasActiveLease(at time.Time) bool {
+	return r != nil && r.status == StatusRunning && r.leaseExpiresAt != nil && r.leaseExpiresAt.After(at)
+}
 
 func (r *InterpretationRun) FinishedAt() *time.Time { return copyTimePtr(r.finishedAt) }
 
