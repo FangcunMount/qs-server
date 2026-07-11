@@ -112,7 +112,7 @@ func (r *reportReadModel) findArchive(ctx context.Context, filter bson.M, opts *
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	if !cursor.Next(ctx) {
 		return nil, cursor.Err()
 	}
@@ -129,7 +129,7 @@ func (r *reportReadModel) listArchives(ctx context.Context, filter evaluationrea
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	rows := make([]evaluationreadmodel.ReportRow, 0)
 	for cursor.Next(ctx) {
 		var po InterpretReportPO
