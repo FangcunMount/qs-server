@@ -1,73 +1,11 @@
 package interpretation
 
 import (
-	"context"
-
-	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-// legacyReportReadModel owns the original lifecycle-bearing collection only.
-// The public reader facade is implemented in artifact_read_model.go.
-type legacyReportReadModel struct {
-	base.BaseRepository
-}
-
-func newLegacyReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) *legacyReportReadModel {
-	return &legacyReportReadModel{
-		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName(), opts...),
-	}
-}
-
-func (r *legacyReportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*evaluationreadmodel.ReportRow, error) {
-	return r.getReport(ctx, bson.M{
-		"domain_id":  reportID,
-		"deleted_at": nil,
-		"$or":        generatedReportConditions(),
-	})
-}
-
-func (r *legacyReportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
-	return r.GetReportByID(ctx, assessmentID)
-}
-
-func (r *legacyReportReadModel) ListReports(
-	ctx context.Context,
-	filter evaluationreadmodel.ReportFilter,
-	page evaluationreadmodel.PageRequest,
-) ([]evaluationreadmodel.ReportRow, int64, error) {
-	query := buildReportReadModelQuery(filter)
-	total, err := r.CountDocuments(ctx, query)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	findOptions := buildReportReadModelFindOptions(page)
-	cursor, err := r.Find(ctx, query, findOptions)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-
-	rows := make([]evaluationreadmodel.ReportRow, 0)
-	for cursor.Next(ctx) {
-		var po InterpretReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, 0, err
-		}
-		rows = append(rows, reportPOToReadRow(&po))
-	}
-	if err := cursor.Err(); err != nil {
-		return nil, 0, err
-	}
-	return rows, total, nil
-}
 
 func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 	query := bson.M{"deleted_at": nil, "$or": generatedReportConditions()}
@@ -102,19 +40,6 @@ func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *opti
 		SetSkip(int64(page.Offset())).
 		SetLimit(int64(page.Limit())).
 		SetSort(bson.M{"created_at": -1})
-}
-
-func (r *legacyReportReadModel) getReport(ctx context.Context, filter bson.M) (*evaluationreadmodel.ReportRow, error) {
-	var po InterpretReportPO
-	err := r.FindOne(ctx, filter, &po)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, cberrors.WithCode(code.ErrInterpretReportNotFound, "report not found")
-		}
-		return nil, err
-	}
-	row := reportPOToReadRow(&po)
-	return &row, nil
 }
 
 func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {

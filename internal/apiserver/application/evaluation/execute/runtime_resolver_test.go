@@ -4,30 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
-
-type runtimeEvaluatorStub struct {
-	key     evaluation.ExecutionIdentity
-	execute func(context.Context, ExecutionInput) (*domainoutcome.Execution, error)
-}
-
-func (e runtimeEvaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
-
-func (e runtimeEvaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
-	if e.execute != nil {
-		return e.execute(ctx, input)
-	}
-	return domainoutcome.NewExecution(domainoutcome.ModelRef{}, domainoutcome.Summary{}, domainoutcome.Detail{}), nil
-}
-
-func (e runtimeEvaluatorStub) Key() evaluation.ExecutionIdentity {
-	return e.ExecutionIdentity()
-}
 
 func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	t.Parallel()
