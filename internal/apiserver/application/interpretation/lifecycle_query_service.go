@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
@@ -22,6 +21,12 @@ type LifecycleQueryService interface {
 	ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error)
 }
 
+// OutcomeCorrelationPort resolves AssessmentID -> OutcomeID without importing
+// Evaluation domain types into this package.
+type OutcomeCorrelationPort interface {
+	FindOutcomeIDByAssessmentID(ctx context.Context, assessmentID meta.ID) (meta.ID, error)
+}
+
 type GenerationResult struct {
 	Generation *domaingeneration.ReportGeneration
 	LatestRun  *interpretationrun.InterpretationRun
@@ -29,14 +34,14 @@ type GenerationResult struct {
 }
 
 type lifecycleQueryService struct {
-	outcomes    domainoutcome.Repository
+	outcomes    OutcomeCorrelationPort
 	generations domaingeneration.Repository
 	runs        interpretationrun.Repository
 	artifacts   domainreport.ArtifactRepository
 }
 
 func NewLifecycleQueryService(
-	outcomes domainoutcome.Repository,
+	outcomes OutcomeCorrelationPort,
 	generations domaingeneration.Repository,
 	runs interpretationrun.Repository,
 	artifacts domainreport.ArtifactRepository,
@@ -79,11 +84,11 @@ func (s *lifecycleQueryService) FindLifecycleByAssessmentID(ctx context.Context,
 	if assessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment id is required")
 	}
-	outcome, err := s.outcomes.FindByAssessmentID(ctx, assessmentID)
+	outcomeID, err := s.outcomes.FindOutcomeIDByAssessmentID(ctx, assessmentID)
 	if err != nil {
 		return nil, err
 	}
-	return s.FindGenerationsByOutcomeID(ctx, outcome.ID())
+	return s.FindGenerationsByOutcomeID(ctx, outcomeID)
 }
 
 func (s *lifecycleQueryService) ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {

@@ -1,6 +1,8 @@
 package interpretation
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	redis "github.com/redis/go-redis/v9"
@@ -26,6 +28,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 )
 
@@ -128,8 +131,33 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
 	}
 	m.outcomeService = interpretationapp.NewOutcomeReportService(repo, m.generationExecutor)
-	m.LifecycleQueryService = interpretationapp.NewLifecycleQueryService(repo, m.generationRepo, m.runRepo, m.artifactRepo)
+	m.LifecycleQueryService = interpretationapp.NewLifecycleQueryService(
+		outcomeCorrelationAdapter{repo: repo},
+		m.generationRepo,
+		m.runRepo,
+		m.artifactRepo,
+	)
 	return nil
+}
+
+// outcomeCorrelationAdapter keeps Evaluation outcome types inside the
+// composition root so application/interpretation does not import them.
+type outcomeCorrelationAdapter struct {
+	repo domainoutcome.Repository
+}
+
+func (a outcomeCorrelationAdapter) FindOutcomeIDByAssessmentID(ctx context.Context, assessmentID meta.ID) (meta.ID, error) {
+	if a.repo == nil {
+		return meta.ZeroID, fmt.Errorf("evaluation outcome repository is not configured")
+	}
+	record, err := a.repo.FindByAssessmentID(ctx, assessmentID)
+	if err != nil {
+		return meta.ZeroID, err
+	}
+	if record == nil {
+		return meta.ZeroID, fmt.Errorf("evaluation outcome not found for assessment %d", assessmentID.Uint64())
+	}
+	return record.ID(), nil
 }
 
 func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {

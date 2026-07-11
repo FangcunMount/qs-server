@@ -7,64 +7,9 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
-
-func eventOutcomeFromReport(rpt *domainreport.InterpretReport, outcome evaloutcome.Outcome) (
-	eventoutcome.ModelIdentity,
-	*eventoutcome.ScoreValue,
-	*eventoutcome.ResultLevel,
-) {
-	model := modelIdentityFromOutcome(outcome)
-	primary := primaryScoreFromOutcome(outcome)
-	level := levelFromOutcome(outcome)
-	if rpt != nil {
-		if m := rpt.Model(); !m.IsEmpty() {
-			model = m
-		}
-		if score := rpt.PrimaryScore(); score != nil {
-			primary = score
-		}
-		if lv := rpt.Level(); lv != nil {
-			level = lv
-		}
-	}
-	return eventModelFrom(model),
-		eventScoreFrom(primary),
-		eventLevelFrom(level)
-}
-
-func eventModelFrom(model domainreport.ModelIdentity) eventoutcome.ModelIdentity {
-	wire := domainreport.EventModelIdentityFrom(model)
-	return eventoutcome.ModelIdentity(wire)
-}
-
-func eventScoreFrom(score *domainreport.ScoreValue) *eventoutcome.ScoreValue {
-	wire := domainreport.EventScoreValueFrom(score)
-	if wire == nil {
-		return nil
-	}
-	return &eventoutcome.ScoreValue{
-		Kind:  wire.Kind,
-		Value: wire.Value,
-		Label: wire.Label,
-		Max:   wire.Max,
-	}
-}
-
-func eventLevelFrom(level *domainreport.ResultLevel) *eventoutcome.ResultLevel {
-	wire := domainreport.EventResultLevelFrom(level)
-	if wire == nil {
-		return nil
-	}
-	return &eventoutcome.ResultLevel{
-		Code:     wire.Code,
-		Label:    wire.Label,
-		Severity: wire.Severity,
-	}
-}
 
 func buildReportGeneratedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil || rpt == nil {
