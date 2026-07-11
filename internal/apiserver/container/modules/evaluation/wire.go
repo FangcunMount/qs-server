@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
@@ -61,7 +60,6 @@ type WireInput struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	ReportPorts                                 compose.ReportIntegrationPorts
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
@@ -203,7 +201,6 @@ func Wire(in WireInput) (WireResult, error) {
 		ModelDescriptors:                            modelDescriptors,
 		TypologyRegistry:                            in.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
-		ReportQueryService:                          in.ReportPorts.QueryService,
 		PublishedModelReader:                        publishedModelReader,
 	})
 	if err != nil {

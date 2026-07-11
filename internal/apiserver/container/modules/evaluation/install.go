@@ -7,9 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
-// ReportIntegrationPorts carries report-side integration ports without importing the report module.
-type ReportIntegrationPorts = compose.ReportIntegrationPorts
-
 // InstallHost extends the shared compose seam with evaluation module bindings.
 type InstallHost interface {
 	compose.Host
@@ -53,7 +50,6 @@ func InstallFrom(host InstallHost) error {
 		ModelDescriptors:                            catalog.Descriptors,
 		TypologyRegistry:                            catalog.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
-		ReportPorts:                                 host.ReportIntegrationPorts(),
 	})
 	if err != nil {
 		return err

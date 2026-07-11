@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -37,8 +36,8 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != domainreport.ScoreKindRawTotal {
-		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, domainreport.ScoreKindRawTotal)
+	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindRawTotal) {
+		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, assessment.OutcomeScoreKindRawTotal)
 	}
 	if po.PrimaryScoreValue == nil || *po.PrimaryScoreValue != 18.5 {
 		t.Fatalf("primary score value = %v, want 18.5", po.PrimaryScoreValue)
@@ -70,7 +69,7 @@ func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.Status != "evaluated" || po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != domainreport.ScoreKindRawTotal {
+	if po.Status != "evaluated" || po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindRawTotal) {
 		t.Fatalf("evaluated projection status=%s primary_kind=%v", po.Status, po.PrimaryScoreKind)
 	}
 	if po.PrimaryScoreValue == nil || *po.PrimaryScoreValue != 18.5 || po.LevelCode == nil || *po.LevelCode != "high" || po.Severity == nil || *po.Severity != "high" {
@@ -124,8 +123,8 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
-	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != domainreport.ScoreKindMatchPercent {
-		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, domainreport.ScoreKindMatchPercent)
+	if po.PrimaryScoreKind == nil || *po.PrimaryScoreKind != string(assessment.OutcomeScoreKindMatchPercent) {
+		t.Fatalf("primary score kind = %v, want %s", po.PrimaryScoreKind, assessment.OutcomeScoreKindMatchPercent)
 	}
 	if po.LevelCode == nil || *po.LevelCode != "INTJ" {
 		t.Fatalf("level code = %v, want INTJ", po.LevelCode)

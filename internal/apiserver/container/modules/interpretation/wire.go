@@ -1,7 +1,6 @@
 package interpretation
 
 import (
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -27,19 +26,4 @@ func Wire(in WireInput) (*Module, error) {
 		ModelDescriptors: in.ModelDescriptors,
 		OpsHandle:        in.OpsHandle,
 	})
-}
-
-// Ports exposes report integration ports for downstream modules.
-type Ports struct {
-	QueryService assessmentApp.ReportQueryService
-}
-
-// ExportPorts projects report module ports for evaluation wiring.
-func ExportPorts(module *Module) Ports {
-	if module == nil {
-		return Ports{}
-	}
-	return Ports{
-		QueryService: module.QueryService,
-	}
 }

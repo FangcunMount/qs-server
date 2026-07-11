@@ -10,6 +10,8 @@ import (
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -23,6 +25,7 @@ type EvaluationHandler struct {
 	operatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
 	operatorExecutionService execute.OperatorExecutionService
 	protectedQueryService    assessmentApp.AssessmentProtectedQueryService
+	reportQueryJourney       reportqueryjourney.Service
 	reportWaitJourney        reportwaitjourney.Service
 }
 
@@ -31,6 +34,7 @@ func NewEvaluationHandler(
 	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
 	operatorExecutionService execute.OperatorExecutionService,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
+	reportQueryJourney reportqueryjourney.Service,
 	reportWaitJourney reportwaitjourney.Service,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
@@ -38,6 +42,7 @@ func NewEvaluationHandler(
 		operatorRecoveryService:  operatorRecoveryService,
 		operatorExecutionService: operatorExecutionService,
 		protectedQueryService:    protectedQueryService,
+		reportQueryJourney:       reportQueryJourney,
 		reportWaitJourney:        reportWaitJourney,
 	}
 }
@@ -70,6 +75,13 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 	if err != nil {
 		h.Error(c, err)
 		return
+	}
+	if h.reportQueryJourney != nil {
+		result, err = h.reportQueryJourney.ProjectAssessment(c.Request.Context(), result)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
 	}
 
 	h.Success(c, response.NewAssessmentResponse(result))
@@ -165,6 +177,13 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	if err != nil {
 		h.Error(c, err)
 		return
+	}
+	if h.reportQueryJourney != nil {
+		result, err = h.reportQueryJourney.ProjectAssessmentList(c.Request.Context(), result)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
 	}
 
 	h.Success(c, response.NewAssessmentListResponse(result))
@@ -281,7 +300,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 		return
 	}
 
-	result, err := h.protectedQueryService.GetReport(c.Request.Context(), scope, id)
+	result, err := h.reportQueryJourney.GetReport(c.Request.Context(), reportQueryScope(scope), id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -314,13 +333,13 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 		return
 	}
 
-	dto := assessmentApp.ListReportsDTO{
+	dto := interpretationApp.ListReportsDTO{
 		TesteeID: req.TesteeID,
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
 
-	result, err := h.protectedQueryService.ListReports(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
+	result, err := h.reportQueryJourney.ListReports(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, dto)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -460,6 +479,10 @@ func protectedScope(orgID, operatorUserID int64) assessmentApp.ProtectedQuerySco
 		OrgID:          orgID,
 		OperatorUserID: operatorUserID,
 	}
+}
+
+func reportQueryScope(scope assessmentApp.ProtectedQueryScope) reportqueryjourney.Scope {
+	return reportqueryjourney.Scope{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}
 }
 
 func parseWaitReportTimeout(raw string) time.Duration {

@@ -12,7 +12,6 @@ import (
 // protectedQueryService 受保护的查询服务
 type protectedQueryService struct {
 	operatorQueryService AssessmentOperatorQueryService
-	reportQueryService   ReportQueryService
 	scoreQueryService    ScoreQueryService
 	accessQueryService   AssessmentAccessQueryService
 	assessmentReader     evaluationreadmodel.AssessmentReader
@@ -22,7 +21,6 @@ type protectedQueryService struct {
 // NewProtectedQueryService 创建受保护的查询服务实例
 func NewProtectedQueryService(
 	operatorQueryService AssessmentOperatorQueryService,
-	reportQueryService ReportQueryService,
 	scoreQueryService ScoreQueryService,
 	accessQueryService AssessmentAccessQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
@@ -30,7 +28,6 @@ func NewProtectedQueryService(
 ) AssessmentProtectedQueryService {
 	return &protectedQueryService{
 		operatorQueryService: operatorQueryService,
-		reportQueryService:   reportQueryService,
 		scoreQueryService:    scoreQueryService,
 		accessQueryService:   accessQueryService,
 		assessmentReader:     assessmentReader,
@@ -44,7 +41,7 @@ func (s *protectedQueryService) GetAssessment(ctx context.Context, scope Protect
 	if err != nil {
 		return nil, err
 	}
-	return s.projectLegacyInterpreted(ctx, assessmentCtx.Assessment)
+	return assessmentCtx.Assessment, nil
 }
 
 // ListAssessments 查询测评列表
@@ -66,40 +63,7 @@ func (s *protectedQueryService) ListAssessments(ctx context.Context, scope Prote
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.operatorQueryService.List(ctx, scopedDTO)
-	if err != nil || result == nil {
-		return result, err
-	}
-	for index, item := range result.Items {
-		projected, projectErr := s.projectLegacyInterpreted(ctx, item)
-		if projectErr != nil {
-			return nil, projectErr
-		}
-		result.Items[index] = projected
-	}
-	return result, nil
-}
-
-// projectLegacyInterpreted derives the legacy journey status without mutating Assessment.
-func (s *protectedQueryService) projectLegacyInterpreted(ctx context.Context, result *AssessmentResult) (*AssessmentResult, error) {
-	if result == nil || result.Status != "evaluated" || s.reportQueryService == nil {
-		return result, nil
-	}
-	report, err := s.reportQueryService.GetByAssessmentID(ctx, result.ID)
-	if err != nil {
-		if evalerrors.IsInterpretReportNotFound(err) {
-			return result, nil
-		}
-		return nil, err
-	}
-	if report == nil {
-		return result, nil
-	}
-	projected := *result
-	projected.Status = "interpreted"
-	interpretedAt := report.CreatedAt
-	projected.InterpretedAt = &interpretedAt
-	return &projected, nil
+	return s.operatorQueryService.List(ctx, scopedDTO)
 }
 
 // GetAssessmentOutcome 获取 结果 测评投影。
@@ -209,64 +173,6 @@ func (s *protectedQueryService) GetFactorTrend(ctx context.Context, scope Protec
 	return s.scoreQueryService.GetFactorTrend(ctx, scopedDTO)
 }
 
-// GetReport 获取测评报告
-func (s *protectedQueryService) GetReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportResult, error) {
-	if s.reportQueryService == nil {
-		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
-	}
-	assessmentCtx, err := s.loadAccessibleAssessment(ctx, scope, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	return s.reportQueryService.GetByAssessmentID(ctx, assessmentCtx.AssessmentID)
-}
-
-// GetReportOutcome 获取 结果 测评报告。
-func (s *protectedQueryService) GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error) {
-	if s.reportQueryService == nil {
-		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
-	}
-	assessmentCtx, err := s.loadAccessibleAssessment(ctx, scope, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	return s.reportQueryService.GetOutcomeByAssessmentID(ctx, assessmentCtx.AssessmentID)
-}
-
-// ListReports 查询测评报告列表
-func (s *protectedQueryService) ListReports(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportListResult, error) {
-	if s.reportQueryService == nil {
-		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
-	}
-	dto = normalizeReportListQuery(dto)
-	accessService, err := s.requireAccessService()
-	if err != nil {
-		return nil, err
-	}
-	scopedDTO, err := accessService.ScopeListReports(ctx, scope.OrgID, scope.OperatorUserID, dto)
-	if err != nil {
-		return nil, err
-	}
-	return s.reportQueryService.ListByTesteeID(ctx, scopedDTO)
-}
-
-// ListReportsOutcome 查询 结果 测评报告列表。
-func (s *protectedQueryService) ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
-	if s.reportQueryService == nil {
-		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
-	}
-	dto = normalizeReportListQuery(dto)
-	accessService, err := s.requireAccessService()
-	if err != nil {
-		return nil, err
-	}
-	scopedDTO, err := accessService.ScopeListReports(ctx, scope.OrgID, scope.OperatorUserID, dto)
-	if err != nil {
-		return nil, err
-	}
-	return s.reportQueryService.ListOutcomeByTesteeID(ctx, scopedDTO)
-}
-
 // ListAssessmentRuns 列出评估执行 用于 一个accessible assessment。
 func (s *protectedQueryService) ListAssessmentRuns(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64, limit int) (*AssessmentRunListResult, error) {
 	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
@@ -364,19 +270,6 @@ func (s *protectedQueryService) requireAccessService() (AssessmentAccessQuerySer
 // 场景：受保护的查询服务规范化测评列表查询
 // 说明：规范化测评列表查询，确保页码和页大小有效
 func normalizeAssessmentListQuery(dto ListAssessmentsDTO) ListAssessmentsDTO {
-	if dto.Page <= 0 {
-		dto.Page = 1
-	}
-	if dto.PageSize <= 0 {
-		dto.PageSize = 10
-	}
-	return dto
-}
-
-// normalizeReportListQuery 规范化测评报告列表查询
-// 场景：受保护的查询服务规范化测评报告列表查询
-// 说明：规范化测评报告列表查询，确保页码和页大小有效
-func normalizeReportListQuery(dto ListReportsDTO) ListReportsDTO {
 	if dto.Page <= 0 {
 		dto.Page = 1
 	}

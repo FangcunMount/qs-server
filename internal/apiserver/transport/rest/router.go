@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -54,6 +55,7 @@ type Deps struct {
 	AssessmentModel AssessmentModelDeps
 	Actor           ActorDeps
 	Evaluation      EvaluationDeps
+	Interpretation  InterpretationDeps
 	Plan            PlanDeps
 	Statistics      StatisticsDeps
 	Workbench       WorkbenchDeps
@@ -106,8 +108,12 @@ type EvaluationDeps struct {
 	OperatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
 	OperatorExecutionService execute.OperatorExecutionService
 	ProtectedQueryService    assessmentApp.AssessmentProtectedQueryService
-	ReportWaitJourney        reportwaitjourney.Service
 	RunQueryService          runqueryApp.Service
+}
+
+type InterpretationDeps struct {
+	ReportQueryJourney reportqueryjourney.Service
+	ReportWaitJourney  reportwaitjourney.Service
 }
 
 type PlanDeps struct {

@@ -2,7 +2,6 @@ package assessment
 
 import (
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
@@ -45,50 +44,6 @@ func TestAssessmentRowToOutcomeResultUsesOutcomeColumns(t *testing.T) {
 		t.Fatalf("unexpected primary score: %#v", result.PrimaryScore)
 	}
 	if result.Level == nil || result.Level.Code != levelCode || result.Level.Severity != severity {
-		t.Fatalf("unexpected level: %#v", result.Level)
-	}
-}
-
-func TestReportRowToOutcomeResultPrefersExplicitModelProjection(t *testing.T) {
-	row := evaluationreadmodel.ReportRow{
-		AssessmentID: 202,
-		Model: evaluationreadmodel.ModelIdentityRow{
-			Kind:            "typology",
-			SubKind:         "typology",
-			Algorithm:       "mbti",
-			Code:            "MBTI-16P",
-			Title:           "MBTI",
-			ProductChannel:  "behavior_ability",
-			AlgorithmFamily: "typology",
-		},
-		PrimaryScore: &evaluationreadmodel.ScoreValueRow{
-			Kind:  "match_percent",
-			Value: 88,
-			Label: "88%",
-		},
-		Level: &evaluationreadmodel.ResultLevelRow{
-			Code:     "INTJ",
-			Label:    "INTJ",
-			Severity: "none",
-		},
-		Conclusion: "建筑师",
-		CreatedAt:  time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-	}
-
-	result := reportRowToOutcomeResult(row)
-	if result.Model.Kind != "typology" || result.Model.SubKind != "typology" {
-		t.Fatalf("unexpected model: %#v", result.Model)
-	}
-	if result.Model.ProductChannel != "behavior_ability" {
-		t.Fatalf("product_channel = %q, want behavior_ability", result.Model.ProductChannel)
-	}
-	if result.Model.AlgorithmFamily == "" {
-		t.Fatal("expected derived algorithm_family")
-	}
-	if result.PrimaryScore == nil || result.PrimaryScore.Kind != "match_percent" {
-		t.Fatalf("unexpected primary score: %#v", result.PrimaryScore)
-	}
-	if result.Level == nil || result.Level.Code != "INTJ" {
 		t.Fatalf("unexpected level: %#v", result.Level)
 	}
 }

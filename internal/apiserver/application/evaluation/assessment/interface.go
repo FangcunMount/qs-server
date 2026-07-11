@@ -2,8 +2,6 @@ package assessment
 
 import (
 	"context"
-
-	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
 // ============= 按行为者组织的应用服务接口（Driving Ports）=============
@@ -14,8 +12,7 @@ import (
 // 行为者识别：
 // 1. 答题者 (Testee) - C端用户，创建和提交测评
 // 2. 管理员 (Staff/Admin) - B端用户，查看、管理测评记录
-// 3. 评估引擎 (Evaluation Engine) - 异步消费事件，执行计算和解读
-// 4. 报告查询者 (Report Viewer) - 查看测评报告（答题者或管理员）
+// 3. 评估引擎 (Evaluation Engine) - 异步消费事件，执行评分计算
 
 // ==================== 答卷编排服务 ====================
 
@@ -61,10 +58,6 @@ type AssessmentOperatorRecoveryService interface {
 	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
 }
 
-type AssessmentWaitService interface {
-	WaitReport(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary
-}
-
 // TesteeAccessScope 描述 evaluation 查询用例看到的 testee 可见范围。
 type TesteeAccessScope struct {
 	IsAdmin     bool
@@ -84,12 +77,19 @@ type AccessibleAssessmentContext struct {
 	Assessment   *AssessmentResult
 }
 
+// TesteeListAccessScope describes a caller's resolved testee list visibility.
+type TesteeListAccessScope struct {
+	TesteeID              uint64
+	AccessibleTesteeIDs   []uint64
+	RestrictToAccessScope bool
+}
+
 // AssessmentAccessQueryService 收口 evaluation REST 查询所需的访问控制编排。
 type AssessmentAccessQueryService interface {
 	LoadAccessibleAssessment(ctx context.Context, orgID int64, operatorUserID int64, assessmentID uint64) (*AccessibleAssessmentContext, error)
 	ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error
 	ScopeListAssessments(ctx context.Context, orgID int64, operatorUserID int64, dto ListAssessmentsDTO) (ListAssessmentsDTO, error)
-	ScopeListReports(ctx context.Context, orgID int64, operatorUserID int64, dto ListReportsDTO) (ListReportsDTO, error)
+	ScopeTesteeList(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) (TesteeListAccessScope, error)
 	ScopeFactorTrend(ctx context.Context, orgID int64, operatorUserID int64, dto GetFactorTrendDTO) (GetFactorTrendDTO, error)
 }
 
@@ -108,10 +108,6 @@ type AssessmentProtectedQueryService interface {
 	GetScores(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ScoreResult, error)
 	GetHighRiskFactors(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*HighRiskFactorsResult, error)
 	GetFactorTrend(ctx context.Context, scope ProtectedQueryScope, dto GetFactorTrendDTO) (*FactorTrendResult, error)
-	GetReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportResult, error)
-	ListReports(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportListResult, error)
-	GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error)
-	ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error)
 	ListAssessmentRuns(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64, limit int) (*AssessmentRunListResult, error)
 	GetLatestAssessmentRun(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentRunResult, error)
 }
@@ -122,32 +118,13 @@ type AssessmentProtectedQueryService interface {
 // 请使用: github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute
 //
 // 行为者：评估引擎 (Evaluation Engine / qs-worker)
-// 职责：执行计分、解读、生成报告
+// 职责：执行计分并可靠提交 Outcome 事实
 // 变更来源：评估算法和流程变化
-
-// ==================== 报告服务 ====================
-
-// ReportQueryService 报告查询服务
-// 行为者：报告查询者（答题者或管理员）
-// 职责：查询和获取测评报告
-// 变更来源：报告展示需求变化
-type ReportQueryService interface {
-	// GetByAssessmentID 根据测评ID获取报告
-	// 场景：用户查看测评报告详情
-	GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportResult, error)
-
-	// GetByTesteeID 获取受试者的报告列表
-	// 场景：用户查看自己的所有报告
-	ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error)
-
-	GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportOutcomeResult, error)
-	ListOutcomeByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error)
-}
 
 // ==================== 得分查询服务 ====================
 
 // ScoreQueryService 得分查询服务
-// 行为者：报告查询者、数据分析系统
+// 行为者：评分事实查询者、数据分析系统
 // 职责：查询因子得分、趋势分析
 // 变更来源：数据分析需求变化
 type ScoreQueryService interface {

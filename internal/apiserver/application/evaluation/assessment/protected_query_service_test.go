@@ -3,52 +3,16 @@ package assessment
 import (
 	"context"
 	"testing"
-	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
-
-func TestProtectedQueryProjectsGeneratedReportAsLegacyInterpreted(t *testing.T) {
-	generatedAt := time.Unix(123, 0)
-	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 901, OrgID: 12, TesteeID: 401, Status: "evaluated"}}
-	reports := &protectedReportQueryStub{report: &ReportResult{AssessmentID: 901, CreatedAt: generatedAt}}
-	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
-	svc := NewProtectedQueryService(management, reports, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
-
-	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Status != "interpreted" || result.InterpretedAt == nil || !result.InterpretedAt.Equal(generatedAt) {
-		t.Fatalf("legacy projection = %#v", result)
-	}
-	if management.getByIDResult.Status != "evaluated" || management.getByIDResult.InterpretedAt != nil {
-		t.Fatalf("query projection mutated canonical assessment = %#v", management.getByIDResult)
-	}
-}
-
-func TestProtectedQueryKeepsEvaluatedWhenReportIsAbsent(t *testing.T) {
-	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 902, OrgID: 12, TesteeID: 402, Status: "evaluated"}}
-	reports := &protectedReportQueryStub{getErr: cberrors.WithCode(errorCode.ErrInterpretReportNotFound, "report not found")}
-	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
-	svc := NewProtectedQueryService(management, reports, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
-
-	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Status != "evaluated" || result.InterpretedAt != nil {
-		t.Fatalf("assessment without report = %#v", result)
-	}
-}
 
 func TestProtectedQueryServiceListAssessmentsAdminKeepsWideScopeAndDefaults(t *testing.T) {
 	management := &protectedManagementStub{}
 	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
 	svc := NewProtectedQueryService(
 		management,
-		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
@@ -84,7 +48,6 @@ func TestProtectedQueryServiceListAssessmentsClinicianScopeRestrictsToAccessible
 	svc := NewProtectedQueryService(
 		management,
 		nil,
-		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
 		nil,
@@ -114,7 +77,6 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 		svc := NewProtectedQueryService(
 			management,
 			nil,
-			nil,
 			NewAssessmentAccessQueryService(management, checker),
 			nil,
 			nil,
@@ -127,34 +89,11 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 		assertValidatedOnly(t, checker, testeeID)
 	})
 
-	t.Run("list reports", func(t *testing.T) {
-		reportQuery := &protectedReportQueryStub{}
-		checker := &protectedAccessCheckerStub{}
-		svc := NewProtectedQueryService(
-			&protectedManagementStub{},
-			reportQuery,
-			nil,
-			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
-			nil,
-			nil,
-		)
-
-		_, err := svc.ListReports(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListReportsDTO{TesteeID: 102})
-		if err != nil {
-			t.Fatalf("ListReports returned error: %v", err)
-		}
-		assertValidatedOnly(t, checker, 102)
-		if reportQuery.lastListDTO.TesteeID != 102 || reportQuery.lastListDTO.RestrictToAccessScope {
-			t.Fatalf("report list dto = %#v, want direct testee query without scope restriction", reportQuery.lastListDTO)
-		}
-	})
-
 	t.Run("factor trend", func(t *testing.T) {
 		scoreQuery := &protectedScoreQueryStub{}
 		checker := &protectedAccessCheckerStub{}
 		svc := NewProtectedQueryService(
 			&protectedManagementStub{},
-			nil,
 			scoreQuery,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
 			nil,
@@ -178,7 +117,6 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 	svc := NewProtectedQueryService(
 		management,
 		nil,
-		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
 		nil,
@@ -198,16 +136,12 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 }
 
 func TestProtectedQueryServiceMissingDependenciesReturnModuleNotConfigured(t *testing.T) {
-	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil).
+	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil).
 		ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil).
 		GetScores(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
-	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
-
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
-		GetReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 }
 
@@ -269,49 +203,6 @@ func (s *protectedManagementStub) Retry(context.Context, int64, uint64) (*Assess
 		return nil, s.retryErr
 	}
 	return s.retryResult, nil
-}
-
-type protectedReportQueryStub struct {
-	lastGetAssessmentID uint64
-	lastListDTO         ListReportsDTO
-	getErr              error
-	listErr             error
-	report              *ReportResult
-}
-
-func (s *protectedReportQueryStub) GetByAssessmentID(_ context.Context, assessmentID uint64) (*ReportResult, error) {
-	s.lastGetAssessmentID = assessmentID
-	if s.getErr != nil {
-		return nil, s.getErr
-	}
-	if s.report != nil {
-		return s.report, nil
-	}
-	return &ReportResult{AssessmentID: assessmentID}, nil
-}
-
-func (s *protectedReportQueryStub) ListByTesteeID(_ context.Context, dto ListReportsDTO) (*ReportListResult, error) {
-	s.lastListDTO = dto
-	if s.listErr != nil {
-		return nil, s.listErr
-	}
-	return &ReportListResult{Items: []*ReportResult{}, Page: dto.Page, PageSize: dto.PageSize}, nil
-}
-
-func (s *protectedReportQueryStub) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*ReportOutcomeResult, error) {
-	s.lastGetAssessmentID = assessmentID
-	if s.getErr != nil {
-		return nil, s.getErr
-	}
-	return &ReportOutcomeResult{AssessmentID: assessmentID}, nil
-}
-
-func (s *protectedReportQueryStub) ListOutcomeByTesteeID(_ context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
-	s.lastListDTO = dto
-	if s.listErr != nil {
-		return nil, s.listErr
-	}
-	return &ReportOutcomeListResult{Items: []*ReportOutcomeResult{}, Page: dto.Page, PageSize: dto.PageSize}, nil
 }
 
 type protectedScoreQueryStub struct {
@@ -405,19 +296,5 @@ func TestNormalizeAssessmentListQueryDefaultsPageAndSize(t *testing.T) {
 	got = normalizeAssessmentListQuery(ListAssessmentsDTO{Page: 2, PageSize: 20})
 	if got.Page != 2 || got.PageSize != 20 {
 		t.Fatalf("normalizeAssessmentListQuery() = %#v, want page=2 pageSize=20", got)
-	}
-}
-
-func TestNormalizeReportListQueryDefaultsPageAndSize(t *testing.T) {
-	t.Parallel()
-
-	got := normalizeReportListQuery(ListReportsDTO{})
-	if got.Page != 1 || got.PageSize != 10 {
-		t.Fatalf("normalizeReportListQuery() = %#v, want page=1 pageSize=10", got)
-	}
-
-	got = normalizeReportListQuery(ListReportsDTO{Page: 3, PageSize: 15})
-	if got.Page != 3 || got.PageSize != 15 {
-		t.Fatalf("normalizeReportListQuery() = %#v, want page=3 pageSize=15", got)
 	}
 }

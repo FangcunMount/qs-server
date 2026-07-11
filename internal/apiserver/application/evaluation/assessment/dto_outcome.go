@@ -57,25 +57,3 @@ type AssessmentOutcomeListResult struct {
 	PageSize   int                        `json:"page_size"`
 	TotalPages int                        `json:"total_pages"`
 }
-
-// ReportOutcomeResult 暴露report 事实 使用 结果 summary。
-type ReportOutcomeResult struct {
-	AssessmentID uint64              `json:"assessment_id"`
-	Model        ModelIdentityResult `json:"model"`
-	PrimaryScore *ScoreValueResult   `json:"primary_score,omitempty"`
-	Level        *ResultLevelResult  `json:"level,omitempty"`
-	Conclusion   string              `json:"conclusion"`
-	Dimensions   []DimensionResult   `json:"dimensions"`
-	Suggestions  []SuggestionDTO     `json:"suggestions"`
-	ModelExtra   *ModelExtraResult   `json:"model_extra,omitempty"`
-	CreatedAt    time.Time           `json:"created_at"`
-}
-
-// ReportOutcomeListResult 是paginated 结果 report list。
-type ReportOutcomeListResult struct {
-	Items      []*ReportOutcomeResult `json:"items"`
-	Total      int                    `json:"total"`
-	Page       int                    `json:"page"`
-	PageSize   int                    `json:"page_size"`
-	TotalPages int                    `json:"total_pages"`
-}

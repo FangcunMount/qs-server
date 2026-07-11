@@ -8,6 +8,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,7 +35,7 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *tes
 
 func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *testing.T) {
 	reportSvc := &fakeReportQueryService{
-		report: &assessmentApp.ReportOutcomeResult{AssessmentID: 42},
+		report: &interpretationApp.ReportOutcomeResult{AssessmentID: 42},
 	}
 	svc := &EvaluationService{
 		testeeQueryService: &fakeTesteeAssessmentQueryService{
@@ -65,7 +66,7 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *
 
 func TestEvaluationServiceGetAssessmentReportWithoutTesteeUsesLegacyPath(t *testing.T) {
 	reportSvc := &fakeReportQueryService{
-		legacyReport: &assessmentApp.ReportResult{AssessmentID: 99},
+		legacyReport: &interpretationApp.ReportResult{AssessmentID: 99},
 	}
 	svc := &EvaluationService{
 		reportQueryService: reportSvc,
@@ -102,12 +103,12 @@ type fakeReportQueryService struct {
 	calls        int
 	legacyCalls  int
 	assessmentID uint64
-	report       *assessmentApp.ReportOutcomeResult
-	legacyReport *assessmentApp.ReportResult
+	report       *interpretationApp.ReportOutcomeResult
+	legacyReport *interpretationApp.ReportResult
 	err          error
 }
 
-func (s *fakeReportQueryService) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*assessmentApp.ReportOutcomeResult, error) {
+func (s *fakeReportQueryService) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*interpretationApp.ReportOutcomeResult, error) {
 	s.calls++
 	s.assessmentID = assessmentID
 	if s.err != nil {
@@ -116,15 +117,15 @@ func (s *fakeReportQueryService) GetOutcomeByAssessmentID(_ context.Context, ass
 	return s.report, nil
 }
 
-func (s *fakeReportQueryService) GetByAssessmentID(context.Context, uint64) (*assessmentApp.ReportResult, error) {
+func (s *fakeReportQueryService) GetByAssessmentID(context.Context, uint64) (*interpretationApp.ReportResult, error) {
 	s.legacyCalls++
 	return s.legacyReport, nil
 }
 
-func (s *fakeReportQueryService) ListByTesteeID(context.Context, assessmentApp.ListReportsDTO) (*assessmentApp.ReportListResult, error) {
+func (s *fakeReportQueryService) ListByTesteeID(context.Context, interpretationApp.ListReportsDTO) (*interpretationApp.ReportListResult, error) {
 	panic("unexpected ListByTesteeID call")
 }
 
-func (s *fakeReportQueryService) ListOutcomeByTesteeID(context.Context, assessmentApp.ListReportsDTO) (*assessmentApp.ReportOutcomeListResult, error) {
+func (s *fakeReportQueryService) ListOutcomeByTesteeID(context.Context, interpretationApp.ListReportsDTO) (*interpretationApp.ReportOutcomeListResult, error) {
 	panic("unexpected ListOutcomeByTesteeID call")
 }

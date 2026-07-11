@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestComposeReportPortsExposeOnlyQueryCapabilityToEvaluation(t *testing.T) {
+func TestComposeDoesNotExposeInterpretationReportQueryToEvaluation(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -18,12 +18,9 @@ func TestComposeReportPortsExposeOnlyQueryCapabilityToEvaluation(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "assessmentApp.ReportQueryService") {
-		t.Fatal("compose report ports must expose the Interpretation-owned report query service")
-	}
-	for _, forbidden := range []string{"evaluationreadmodel.ReportReader", "ReportBuilderRegistry", "ReportDurableSaver", "ReportStateStore"} {
+	for _, forbidden := range []string{"ReportIntegrationPorts", "ReportQueryService", "evaluationreadmodel.ReportReader", "ReportBuilderRegistry", "ReportDurableSaver", "ReportStateStore"} {
 		if strings.Contains(text, forbidden) {
-			t.Fatalf("compose report ports must not leak Interpretation write capability %q", forbidden)
+			t.Fatalf("compose ports must not leak Interpretation report capability %q into Evaluation", forbidden)
 		}
 	}
 }

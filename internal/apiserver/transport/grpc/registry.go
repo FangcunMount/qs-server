@@ -88,7 +88,7 @@ type EvaluationDeps struct {
 
 type InterpretationDeps struct {
 	OutcomeReportService interpretationApp.OutcomeReportService
-	ReportQueryService   assessmentApp.ReportQueryService
+	ReportQueryService   interpretationApp.ReportQueryService
 }
 
 type AssessmentModelCatalogDeps struct {

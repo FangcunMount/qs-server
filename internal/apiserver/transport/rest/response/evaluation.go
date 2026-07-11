@@ -5,6 +5,7 @@ import (
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 )
 
 // ============= Assessment 相关响应 =============
@@ -132,7 +133,7 @@ type DimensionItem struct {
 	Suggestion     string   `json:"suggestion,omitempty"`       // 维度建议
 }
 
-func newDimensionItem(d assessment.DimensionResult) *DimensionItem {
+func newDimensionItem(d interpretation.DimensionResult) *DimensionItem {
 	return &DimensionItem{
 		FactorCode:     d.FactorCode,
 		FactorName:     d.FactorName,
@@ -338,7 +339,7 @@ func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighR
 }
 
 // NewReportResponse 从应用层 Result 创建报告响应
-func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
+func NewReportResponse(result *interpretation.ReportResult) *ReportResponse {
 	if result == nil {
 		return nil
 	}
@@ -362,7 +363,7 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 	}
 }
 
-func toSuggestionItems(items []assessment.SuggestionDTO) []SuggestionItem {
+func toSuggestionItems(items []interpretation.SuggestionDTO) []SuggestionItem {
 	if len(items) == 0 {
 		return nil
 	}
@@ -378,7 +379,7 @@ func toSuggestionItems(items []assessment.SuggestionDTO) []SuggestionItem {
 }
 
 // NewReportListResponse 从应用层 Result 创建报告列表响应
-func NewReportListResponse(result *assessment.ReportListResult) *ReportListResponse {
+func NewReportListResponse(result *interpretation.ReportListResult) *ReportListResponse {
 	if result == nil {
 		return nil
 	}

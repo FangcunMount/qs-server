@@ -26,6 +26,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"internal/apiserver/domain/evaluation",
 				"internal/apiserver/application/evaluation",
 				"internal/apiserver/container/modules/evaluation",
+				"internal/apiserver/infra/mysql/evaluation",
 			},
 			forbiddenPrefixes: []string{
 				"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation",
@@ -46,7 +47,6 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
 			allowedImporters: []string{
-				"internal/apiserver/application/interpretation/report_query_service.go",
 				"internal/apiserver/application/interpretation/reporting/audience_profile_builders.go",
 				"internal/apiserver/application/interpretation/reporting/factor_scoring_report.go",
 				"internal/apiserver/application/interpretation/reporting/materialize/materialize.go",
@@ -107,16 +107,10 @@ func TestEvaluationRoleCompatibilityDebtDoesNotSpread(t *testing.T) {
 			scanRoots: []string{
 				"internal/apiserver/application/evaluation",
 				"internal/apiserver/container/modules/evaluation",
+				"internal/apiserver/infra/mysql/evaluation",
 			},
-			tokens: []string{"ReportReader", "ReportQueryService", "WaitReport"},
-			want: []string{
-				"internal/apiserver/application/evaluation/assessment/interface.go",
-				"internal/apiserver/application/evaluation/assessment/protected_query_service.go",
-				"internal/apiserver/application/evaluation/assessment/wait_service.go",
-				"internal/apiserver/container/modules/evaluation/assemble.go",
-				"internal/apiserver/container/modules/evaluation/bootstrap.go",
-				"internal/apiserver/container/modules/evaluation/wire.go",
-			},
+			tokens: []string{"ReportReader", "ReportQueryService", "WaitReport", "ReportResult", "ListReportsDTO"},
+			want:   []string{},
 		},
 		{
 			name:      "operator_batch_execution_in_worker_service",
@@ -180,8 +174,7 @@ func TestEvaluationRESTTransportDoesNotUseCombinedManagementPort(t *testing.T) {
 }
 
 // Interpretation owns construction of the report-query use case. Evaluation
-// may consume its port for existing protected-query compatibility, but must
-// not recreate a report reader or query implementation.
+// must neither construct nor consume that capability.
 func TestEvaluationDoesNotConstructReportQueryService(t *testing.T) {
 	t.Parallel()
 

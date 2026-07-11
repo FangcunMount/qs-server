@@ -105,33 +105,34 @@ func (s *assessmentAccessQueryService) ScopeFactorTrend(
 	return dto, nil
 }
 
-func (s *assessmentAccessQueryService) ScopeListReports(
+func (s *assessmentAccessQueryService) ScopeTesteeList(
 	ctx context.Context,
 	orgID int64,
 	operatorUserID int64,
-	dto ListReportsDTO,
-) (ListReportsDTO, error) {
+	testeeID uint64,
+) (TesteeListAccessScope, error) {
+	result := TesteeListAccessScope{TesteeID: testeeID}
 	if s.checker == nil {
-		return dto, evalerrors.ModuleNotConfigured("testee access checker is not configured")
+		return result, evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
-	if dto.TesteeID != 0 {
-		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, dto.TesteeID); err != nil {
-			return dto, err
+	if testeeID != 0 {
+		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
+			return result, err
 		}
-		return dto, nil
+		return result, nil
 	}
 	scope, err := s.checker.ResolveAccessScope(ctx, orgID, operatorUserID)
 	if err != nil {
-		return dto, err
+		return result, err
 	}
 	if scope != nil && scope.IsAdmin {
-		return dto, evalerrors.Bind("受试者ID不能为空")
+		return result, evalerrors.Bind("受试者ID不能为空")
 	}
 	allowedTesteeIDs, err := s.checker.ListAccessibleTesteeIDs(ctx, orgID, operatorUserID)
 	if err != nil {
-		return dto, err
+		return result, err
 	}
-	dto.AccessibleTesteeIDs = allowedTesteeIDs
-	dto.RestrictToAccessScope = true
-	return dto, nil
+	result.AccessibleTesteeIDs = allowedTesteeIDs
+	result.RestrictToAccessScope = true
+	return result, nil
 }

@@ -50,7 +50,6 @@ type BootstrapInput struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	ReportQueryService                          assessment.ReportQueryService
 	PublishedModelReader                        rulesetport.PublishedModelReader
 }
 

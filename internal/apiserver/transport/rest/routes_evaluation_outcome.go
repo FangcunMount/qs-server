@@ -7,13 +7,15 @@ import (
 
 // registerEvaluationOutcomeProtectedRoutes 注册评估模块 outcome 受保护路由。
 func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup) {
-	if r.deps.Evaluation.ProtectedQueryService == nil {
+	if r.deps.Evaluation.ProtectedQueryService == nil ||
+		r.deps.Interpretation.ReportQueryJourney == nil {
 		return
 	}
 	evalHandler := handler.NewEvaluationHandler(
 		nil,
 		nil,
 		r.deps.Evaluation.ProtectedQueryService,
+		r.deps.Interpretation.ReportQueryJourney,
 		nil,
 	)
 

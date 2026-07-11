@@ -71,5 +71,4 @@ type Host interface {
 
 	SurveyPorts() SurveyPorts
 	ActorPorts() ActorPorts
-	ReportIntegrationPorts() ReportIntegrationPorts
 }

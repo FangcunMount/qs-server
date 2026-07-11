@@ -16,7 +16,6 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -24,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	interpretationmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -333,15 +333,12 @@ func newRouterTestContainer() *container.Container {
 		OperatorQueryService:     operatorQuery,
 		OperatorRecoveryService:  operatorRecovery,
 		OperatorExecutionService: &routerOperatorExecutionStub{},
-		ReportQueryService:       interpretationApp.NewReportQueryService(nil),
 		ScoreQueryService:        assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
+		WorkerResultReader:       operatorQuery,
 	}
 	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.OperatorQueryService, nil)
-	evaluationModule.WaitService = assessmentApp.NewWaitService(evaluationModule.OperatorQueryService, nil, evaluationModule.ReportQueryService)
-	evaluationModule.ReportWaitJourney = reportwaitjourney.NewService(evaluationModule.AccessQueryService, evaluationModule.WaitService)
 	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		evaluationModule.OperatorQueryService,
-		evaluationModule.ReportQueryService,
 		evaluationModule.ScoreQueryService,
 		evaluationModule.AccessQueryService,
 		nil,
@@ -355,6 +352,9 @@ func newRouterTestContainer() *container.Container {
 			AssessmentEntryService: &routerAssessmentEntryServiceStub{},
 		},
 		EvaluationModule: evaluationModule,
+		ReportModule: &interpretationmod.Module{
+			QueryService: interpretationApp.NewReportQueryService(nil),
+		},
 		PlanModule: &planmod.Module{
 			CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
 			QueryService:   planApp.NewQueryService(nil, nil, nil),

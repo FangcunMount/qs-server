@@ -2,7 +2,7 @@ package evaluation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -30,7 +30,7 @@ func applyPrimaryScoreFields(po *AssessmentPO, a *assessment.Assessment) {
 	if summary := a.ResultSummary(); summary != nil && summary.Score != nil {
 		label := summary.PrimaryLabel
 		if ref := a.EvaluationModelRef(); ref != nil && ref.Kind() == assessment.EvaluationModelKindPersonality {
-			po.PrimaryScoreKind = strPtr(domainreport.ScoreKindMatchPercent)
+			po.PrimaryScoreKind = strPtr(string(domainoutcome.ScoreKindMatchPercent))
 			po.PrimaryScoreValue = summary.Score
 			if label != "" {
 				po.PrimaryScoreLabel = strPtr(label)
@@ -39,25 +39,35 @@ func applyPrimaryScoreFields(po *AssessmentPO, a *assessment.Assessment) {
 		}
 	}
 	if total := a.TotalScore(); total != nil {
-		po.PrimaryScoreKind = strPtr(domainreport.ScoreKindRawTotal)
+		po.PrimaryScoreKind = strPtr(string(domainoutcome.ScoreKindRawTotal))
 		po.PrimaryScoreValue = total
 	}
 }
 
 func applyLevelFields(po *AssessmentPO, a *assessment.Assessment) {
 	if risk := a.RiskLevel(); risk != nil && *risk != "" && *risk != assessment.RiskLevelNone {
-		level := domainreport.LevelFromRisk(domainreport.RiskLevel(*risk))
-		if level != nil {
-			po.LevelCode = strPtr(level.Code)
-			po.LevelLabel = strPtr(level.Label)
-			po.Severity = strPtr(level.Severity)
-		}
+		po.LevelCode = strPtr(string(*risk))
+		po.LevelLabel = strPtr(string(*risk))
+		po.Severity = strPtr(evaluationRiskSeverity(*risk))
 		return
 	}
 	if summary := a.ResultSummary(); summary != nil && summary.PrimaryLabel != "" {
 		po.LevelCode = strPtr(summary.PrimaryLabel)
 		po.LevelLabel = strPtr(summary.PrimaryLabel)
 		po.Severity = strPtr("none")
+	}
+}
+
+func evaluationRiskSeverity(risk assessment.RiskLevel) string {
+	switch risk {
+	case assessment.RiskLevelSevere, assessment.RiskLevelHigh:
+		return "high"
+	case assessment.RiskLevelMedium:
+		return "medium"
+	case assessment.RiskLevelLow:
+		return "low"
+	default:
+		return "none"
 	}
 }
 

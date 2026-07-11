@@ -1,15 +1,12 @@
 package evaluation
 
 import (
-	"context"
-
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
@@ -19,7 +16,6 @@ import (
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -36,7 +32,6 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -64,10 +59,7 @@ type Module struct {
 	OperatorQueryService    assessmentApp.AssessmentOperatorQueryService
 	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
 	WorkerResultReader      assessmentApp.AssessmentResultReader
-	ReportQueryService      assessmentApp.ReportQueryService
 	ScoreQueryService       assessmentApp.ScoreQueryService
-	WaitService             assessmentApp.AssessmentWaitService
-	ReportWaitJourney       reportwaitjourney.Service
 	AccessQueryService      assessmentApp.AssessmentAccessQueryService
 	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
 	RunQueryService         runqueryApp.Service
@@ -111,7 +103,6 @@ type Deps struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	ReportQueryService                          assessmentApp.ReportQueryService
 	PublishedModelReader                        rulesetport.PublishedModelReader
 }
 
@@ -152,7 +143,6 @@ type evaluationInfra struct {
 	scoreProjectionReader        evaluationreadmodel.ScoreProjectionReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
 	txRunner                     apptransaction.Runner
-	waiterRegistry               *waiter.WaiterRegistry
 	assessmentOutboxRelay        appEventing.OutboxRelay
 	assessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 	assessmentImmediate          *appEventing.ImmediateDispatcher
@@ -206,9 +196,6 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 		Reader: assessmentOutboxStore,
 	}
 
-	if normalized.InputResolver != nil {
-		infra.waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
-	}
 	return infra, nil
 }
 
@@ -309,7 +296,6 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	m.OperatorQueryService = assessmentApp.NewAssessmentOperatorQueryService(infra.assessmentRepo, infra.assessmentReader)
 	m.OperatorRecoveryService = assessmentApp.NewAssessmentOperatorRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
 	m.WorkerResultReader = m.OperatorQueryService
-	m.ReportQueryService = normalized.ReportQueryService
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		infra.outcomeRepo,
 		infra.scoreProjectionReader,
@@ -317,16 +303,13 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		normalized.ScaleCatalog,
 	)
 
-	m.WaitService = assessmentApp.NewWaitService(m.WorkerResultReader, infra.waiterRegistry, m.ReportQueryService)
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
 		m.OperatorQueryService,
 		normalized.TesteeAccessChecker,
 	)
-	m.ReportWaitJourney = reportwaitjourney.NewService(m.AccessQueryService, m.WaitService)
 	m.RunQueryService = runqueryApp.NewService(infra.runRepo)
 	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		m.OperatorQueryService,
-		m.ReportQueryService,
 		m.ScoreQueryService,
 		m.AccessQueryService,
 		infra.assessmentReader,
@@ -366,9 +349,6 @@ func normalizeDeps(deps Deps) (Deps, error) {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when input resolver is configured")
 		}
 	}
-	if deps.ReportQueryService == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report query service is required")
-	}
 	return deps, nil
 }
 
@@ -387,6 +367,6 @@ func (m *Module) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
 		Name:        string(Name),
 		Version:     "1.0.0",
-		Description: "评估模块（测评、得分、报告）",
+		Description: "评估模块（测评、执行与得分事实）",
 	}
 }

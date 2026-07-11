@@ -44,30 +44,6 @@ func assessmentRowsToOutcomeResults(rows []evaluationreadmodel.AssessmentRow) ([
 	return results, nil
 }
 
-func reportRowToOutcomeResult(row evaluationreadmodel.ReportRow) *ReportOutcomeResult {
-	base := reportRowToResult(row)
-	if base == nil {
-		return nil
-	}
-	return &ReportOutcomeResult{
-		AssessmentID: base.AssessmentID,
-		Model:        modelIdentityFromReportRow(row),
-		PrimaryScore: primaryScoreFromReportRow(row),
-		Level:        levelFromReportRow(row),
-		Conclusion:   base.Conclusion,
-		Dimensions:   base.Dimensions,
-		Suggestions:  base.Suggestions,
-		ModelExtra:   base.ModelExtra,
-		CreatedAt:    base.CreatedAt,
-	}
-}
-
-// ReportRowToOutcomeResult preserves the current outcome-report projection
-// shape while Interpretation owns report-query execution.
-func ReportRowToOutcomeResult(row evaluationreadmodel.ReportRow) *ReportOutcomeResult {
-	return reportRowToOutcomeResult(row)
-}
-
 func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) ModelIdentityResult {
 	kind := derefString(row.EvaluationModelKind)
 	subKind := derefString(row.EvaluationModelSubKind)
@@ -88,26 +64,6 @@ func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) Model
 		Code:      derefString(row.EvaluationModelCode),
 		Version:   derefString(row.EvaluationModelVersion),
 		Title:     derefString(row.EvaluationModelTitle),
-	}, "")
-}
-
-func modelIdentityFromReportRow(row evaluationreadmodel.ReportRow) ModelIdentityResult {
-	if row.Model.Kind != "" || row.Model.Code != "" {
-		return EnrichModelIdentityResult(ModelIdentityResult{
-			Kind:            row.Model.Kind,
-			SubKind:         row.Model.SubKind,
-			Algorithm:       row.Model.Algorithm,
-			Code:            row.Model.Code,
-			Version:         row.Model.Version,
-			Title:           row.Model.Title,
-			ProductChannel:  row.Model.ProductChannel,
-			AlgorithmFamily: row.Model.AlgorithmFamily,
-		}, row.Model.ProductChannel)
-	}
-	return EnrichModelIdentityResult(ModelIdentityResult{
-		Kind:  string(modelcatalog.KindScale),
-		Code:  row.ModelCode,
-		Title: row.ModelName,
 	}, "")
 }
 
@@ -139,40 +95,6 @@ func levelFromAssessmentRow(row evaluationreadmodel.AssessmentRow) *ResultLevelR
 	}
 	if row.RiskLevel != nil && *row.RiskLevel != "" {
 		return legacyRiskLevelResult(*row.RiskLevel)
-	}
-	return nil
-}
-
-func primaryScoreFromReportRow(row evaluationreadmodel.ReportRow) *ScoreValueResult {
-	if row.PrimaryScore != nil {
-		return &ScoreValueResult{
-			Kind:  row.PrimaryScore.Kind,
-			Value: row.PrimaryScore.Value,
-			Label: row.PrimaryScore.Label,
-			Max:   row.PrimaryScore.Max,
-		}
-	}
-	if row.TotalScore != 0 || row.RiskLevel != "" {
-		return &ScoreValueResult{Kind: string(domainoutcome.ScoreKindRawTotal), Value: row.TotalScore}
-	}
-	return nil
-}
-
-func levelFromReportRow(row evaluationreadmodel.ReportRow) *ResultLevelResult {
-	if row.Level != nil {
-		return &ResultLevelResult{
-			Code:     row.Level.Code,
-			Label:    row.Level.Label,
-			Severity: row.Level.Severity,
-		}
-	}
-	if row.RiskLevel != "" {
-		if level := legacyRiskLevelResult(row.RiskLevel); level != nil {
-			return level
-		}
-	}
-	if row.ModelExtra != nil && row.ModelExtra.TypeCode != "" {
-		return &ResultLevelResult{Code: row.ModelExtra.TypeCode, Label: row.ModelExtra.TypeCode, Severity: "none"}
 	}
 	return nil
 }

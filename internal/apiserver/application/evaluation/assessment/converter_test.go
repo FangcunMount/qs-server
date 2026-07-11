@@ -12,28 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestReportRowToResultMapsModelNameAndCode(t *testing.T) {
-	createdAt := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
-	got := reportRowToResult(evaluationreadmodel.ReportRow{
-		AssessmentID: 7001,
-		ModelName:    "抑郁自评量表",
-		ModelCode:    "SDS",
-		TotalScore:   72,
-		RiskLevel:    "medium",
-		Conclusion:   "中度",
-		CreatedAt:    createdAt,
-	})
-	if got == nil {
-		t.Fatal("expected report result")
-	}
-	if got.ModelName != "抑郁自评量表" || got.ModelCode != "SDS" {
-		t.Fatalf("model fields = (%q, %q), want (抑郁自评量表, SDS)", got.ModelName, got.ModelCode)
-	}
-	if !got.CreatedAt.Equal(createdAt) {
-		t.Fatalf("createdAt = %v, want %v", got.CreatedAt, createdAt)
-	}
-}
-
 func TestToAssessmentResultMapsEvaluatedAt(t *testing.T) {
 	evaluatedAt := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
 	a := domainAssessment.Reconstruct(

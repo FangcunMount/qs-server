@@ -11,14 +11,16 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 	if r.deps.Evaluation.OperatorRecoveryService == nil ||
 		r.deps.Evaluation.OperatorExecutionService == nil ||
 		r.deps.Evaluation.ProtectedQueryService == nil ||
-		r.deps.Evaluation.ReportWaitJourney == nil {
+		r.deps.Interpretation.ReportQueryJourney == nil ||
+		r.deps.Interpretation.ReportWaitJourney == nil {
 		return
 	}
 	evalHandler := handler.NewEvaluationHandler(
 		r.deps.Evaluation.OperatorRecoveryService,
 		r.deps.Evaluation.OperatorExecutionService,
 		r.deps.Evaluation.ProtectedQueryService,
-		r.deps.Evaluation.ReportWaitJourney,
+		r.deps.Interpretation.ReportQueryJourney,
+		r.deps.Interpretation.ReportWaitJourney,
 	)
 
 	evaluations := apiV1.Group("/evaluations")

@@ -11,6 +11,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -21,7 +22,7 @@ type EvaluationService struct {
 	pb.UnimplementedEvaluationServiceServer
 	intakeService      assessmentApp.AnswerSheetAssessmentIntakeService
 	testeeQueryService assessmentApp.TesteeAssessmentQueryService
-	reportQueryService assessmentApp.ReportQueryService
+	reportQueryService interpretationApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
 	assessmentReader   evaluationreadmodel.AssessmentReader
 }
@@ -30,7 +31,7 @@ type EvaluationService struct {
 func NewEvaluationService(
 	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
 	testeeQueryService assessmentApp.TesteeAssessmentQueryService,
-	reportQueryService assessmentApp.ReportQueryService,
+	reportQueryService interpretationApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 ) *EvaluationService {
@@ -396,7 +397,7 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 		pageSize = 10
 	}
 
-	dto := assessmentApp.ListReportsDTO{
+	dto := interpretationApp.ListReportsDTO{
 		TesteeID: req.TesteeId,
 		Page:     page,
 		PageSize: pageSize,
@@ -484,7 +485,7 @@ func normalizeGRPCAssessmentStatuses(raw string) []string {
 // ==================== 转换函数 ====================
 
 // toProtoReport 转换为 proto 报告
-func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
+func toProtoReport(result *interpretationApp.ReportResult) *pb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
@@ -522,7 +523,7 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 	}
 }
 
-func toProtoModelExtra(extra *assessmentApp.ModelExtraResult) *pb.ModelExtra {
+func toProtoModelExtra(extra *interpretationApp.ModelExtraResult) *pb.ModelExtra {
 	if extra == nil {
 		return nil
 	}
@@ -548,7 +549,7 @@ func toProtoModelExtra(extra *assessmentApp.ModelExtraResult) *pb.ModelExtra {
 }
 
 // toProtoSuggestions 转换为 proto 建议列表
-func toProtoSuggestions(dtos []assessmentApp.SuggestionDTO) []*pb.Suggestion {
+func toProtoSuggestions(dtos []interpretationApp.SuggestionDTO) []*pb.Suggestion {
 	if len(dtos) == 0 {
 		return nil
 	}

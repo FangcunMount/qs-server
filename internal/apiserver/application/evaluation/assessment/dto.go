@@ -46,15 +46,6 @@ type ListAssessmentsDTO struct {
 	RestrictToAccessScope bool     // 是否按可访问范围过滤
 }
 
-// ListReportsDTO 查询报告列表 DTO
-type ListReportsDTO struct {
-	TesteeID              uint64   // 受试者ID
-	Page                  int      // 页码
-	PageSize              int      // 每页数量
-	AccessibleTesteeIDs   []uint64 // 可访问的受试者范围（可选）
-	RestrictToAccessScope bool     // 是否按可访问范围过滤
-}
-
 // GetFactorTrendDTO 获取因子趋势 DTO
 type GetFactorTrendDTO struct {
 	TesteeID   uint64 // 受试者ID
@@ -98,72 +89,6 @@ type AssessmentListResult struct {
 	Page       int                 // 当前页
 	PageSize   int                 // 每页数量
 	TotalPages int                 // 总页数
-}
-
-// ReportResult 报告结果
-type ReportResult struct {
-	AssessmentID uint64            // 测评ID
-	ModelName    string            // 解释模型名称
-	ModelCode    string            // 解释模型编码
-	TotalScore   float64           // 总分
-	RiskLevel    string            // 风险等级
-	Conclusion   string            // 总结论
-	Dimensions   []DimensionResult // 维度解读列表
-	Suggestions  []SuggestionDTO   // 建议列表
-	CreatedAt    time.Time         // 创建时间
-	ModelExtra   *ModelExtraResult // 解释模型扩展（SBTI 等）
-}
-
-// ModelExtraResult 解释模型扩展结果
-type ModelExtraResult struct {
-	Kind           string             `json:"kind,omitempty"`
-	TypeCode       string             `json:"type_code,omitempty"`
-	TypeName       string             `json:"type_name,omitempty"`
-	OneLiner       string             `json:"one_liner,omitempty"`
-	ImageURL       string             `json:"image_url,omitempty"`
-	MatchPercent   float64            `json:"match_percent,omitempty"`
-	IsSpecial      bool               `json:"is_special,omitempty"`
-	SpecialTrigger string             `json:"special_trigger,omitempty"`
-	Commentary     string             `json:"commentary,omitempty"`
-	Rarity         *ModelRarityResult `json:"rarity,omitempty"`
-}
-
-// ModelRarityResult 理论稀有度
-type ModelRarityResult struct {
-	Percent float64 `json:"percent,omitempty"`
-	Label   string  `json:"label,omitempty"`
-	OneInX  int     `json:"one_in_x,omitempty"`
-}
-
-// DimensionResult 维度解读结果
-type DimensionResult struct {
-	FactorCode     string   // 因子编码
-	FactorName     string   // 因子名称
-	RawScore       float64  // 原始分
-	MaxScore       *float64 // 最大分
-	RiskLevel      string   // 风险等级
-	Role           string   `json:"role,omitempty"`
-	ParentCode     string   `json:"parent_code,omitempty"`
-	HierarchyLevel int      `json:"hierarchy_level,omitempty"`
-	SortOrder      int      `json:"sort_order,omitempty"`
-	Description    string   // 解读描述
-	Suggestion     string   // 维度建议
-}
-
-// SuggestionDTO 结构化建议
-type SuggestionDTO struct {
-	Category   string  // 建议分类
-	Content    string  // 文本
-	FactorCode *string // 关联因子编码（可选）
-}
-
-// ReportListResult 报告列表结果
-type ReportListResult struct {
-	Items      []*ReportResult // 报告列表
-	Total      int             // 总数
-	Page       int             // 当前页
-	PageSize   int             // 每页数量
-	TotalPages int             // 总页数
 }
 
 // ScoreResult 得分结果

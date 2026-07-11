@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
@@ -55,7 +54,7 @@ func TestReportQueryServiceListsRestrictedAccessibleTesteeScope(t *testing.T) {
 		total: 1,
 	}
 
-	result, err := NewReportQueryService(reader).ListByTesteeID(context.Background(), assessmentApp.ListReportsDTO{
+	result, err := NewReportQueryService(reader).ListByTesteeID(context.Background(), ListReportsDTO{
 		Page:                  0,
 		PageSize:              0,
 		AccessibleTesteeIDs:   []uint64{7, 8},

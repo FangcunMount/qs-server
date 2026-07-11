@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 )
 
 // ModelIdentityResponse is the outcome published-model reference on REST responses.
@@ -161,7 +162,7 @@ func NewAssessmentOutcomeListResponse(result *assessment.AssessmentOutcomeListRe
 }
 
 // NewReportOutcomeResponse maps application outcome report result to REST response.
-func NewReportOutcomeResponse(result *assessment.ReportOutcomeResult) *ReportOutcomeResponse {
+func NewReportOutcomeResponse(result *interpretation.ReportOutcomeResult) *ReportOutcomeResponse {
 	if result == nil {
 		return nil
 	}
@@ -175,9 +176,9 @@ func NewReportOutcomeResponse(result *assessment.ReportOutcomeResult) *ReportOut
 	}
 	return &ReportOutcomeResponse{
 		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
-		Model:        newModelIdentityResponse(result.Model),
-		PrimaryScore: newScoreValueResponse(result.PrimaryScore),
-		Level:        newResultLevelResponse(result.Level),
+		Model:        newReportModelIdentityResponse(result.Model),
+		PrimaryScore: newReportScoreValueResponse(result.PrimaryScore),
+		Level:        newReportResultLevelResponse(result.Level),
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  toSuggestionItems(result.Suggestions),
@@ -187,7 +188,7 @@ func NewReportOutcomeResponse(result *assessment.ReportOutcomeResult) *ReportOut
 }
 
 // NewReportOutcomeListResponse maps application outcome report list to REST response.
-func NewReportOutcomeListResponse(result *assessment.ReportOutcomeListResult) *ReportOutcomeListResponse {
+func NewReportOutcomeListResponse(result *interpretation.ReportOutcomeListResult) *ReportOutcomeListResponse {
 	if result == nil {
 		return nil
 	}
@@ -240,7 +241,29 @@ func newResultLevelResponse(level *assessment.ResultLevelResult) *ResultLevelRes
 	}
 }
 
-func newModelExtraResponse(extra *assessment.ModelExtraResult) *ModelExtraResponse {
+func newReportModelIdentityResponse(model interpretation.ModelIdentityResult) ModelIdentityResponse {
+	return ModelIdentityResponse{
+		Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
+		Code: model.Code, Version: model.Version, Title: model.Title,
+		ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily,
+	}
+}
+
+func newReportScoreValueResponse(score *interpretation.ScoreValueResult) *ScoreValueResponse {
+	if score == nil {
+		return nil
+	}
+	return &ScoreValueResponse{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max}
+}
+
+func newReportResultLevelResponse(level *interpretation.ResultLevelResult) *ResultLevelResponse {
+	if level == nil {
+		return nil
+	}
+	return &ResultLevelResponse{Code: level.Code, Label: level.Label, Severity: level.Severity}
+}
+
+func newModelExtraResponse(extra *interpretation.ModelExtraResult) *ModelExtraResponse {
 	if extra == nil {
 		return nil
 	}

@@ -60,7 +60,8 @@ func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 	handler := NewEvaluationHandler(
 		assessmentQuery,
 		nil,
-		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, nil, accessQuery, nil, runQuery),
+		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, runQuery),
+		nil,
 		nil,
 	)
 

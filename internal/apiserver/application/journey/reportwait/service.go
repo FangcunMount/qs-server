@@ -3,6 +3,7 @@ package reportwait
 
 import (
 	"context"
+	"time"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
@@ -21,10 +22,12 @@ type AssessmentAccess interface {
 	LoadAccessibleAssessment(ctx context.Context, orgID int64, operatorUserID int64, assessmentID uint64) (*assessmentApp.AccessibleAssessmentContext, error)
 }
 
-// CompletionWaiter resolves a terminal report-completion summary or waits until
-// the supplied context ends.
-type CompletionWaiter interface {
-	WaitReport(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary
+type AssessmentReader interface {
+	GetByID(ctx context.Context, assessmentID uint64) (*assessmentApp.AssessmentResult, error)
+}
+
+type LegacyProjection interface {
+	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error)
 }
 
 // Service is the neutral journey use case for an authorized report wait.
@@ -33,19 +36,72 @@ type Service interface {
 }
 
 type service struct {
-	access AssessmentAccess
-	waiter CompletionWaiter
+	access     AssessmentAccess
+	reader     AssessmentReader
+	projection LegacyProjection
 }
 
-func NewService(access AssessmentAccess, waiter CompletionWaiter) Service {
-	return &service{access: access, waiter: waiter}
+func NewService(access AssessmentAccess, reader AssessmentReader, projection LegacyProjection) Service {
+	return &service{access: access, reader: reader, projection: projection}
 }
 
 func (s *service) Wait(ctx context.Context, scope Scope) (evaluationwaiter.StatusSummary, error) {
 	if _, err := s.access.LoadAccessibleAssessment(ctx, scope.OrgID, scope.OperatorUserID, scope.AssessmentID); err != nil {
 		return evaluationwaiter.StatusSummary{}, err
 	}
-	return s.waiter.WaitReport(ctx, scope.AssessmentID), nil
+	if summary, done := s.loadTerminalSummary(ctx, scope.AssessmentID); done {
+		return summary, nil
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return pendingSummary(), nil
+		case <-ticker.C:
+			if summary, done := s.loadTerminalSummary(ctx, scope.AssessmentID); done {
+				return summary, nil
+			}
+		}
+	}
+}
+
+func (s *service) loadTerminalSummary(ctx context.Context, assessmentID uint64) (evaluationwaiter.StatusSummary, bool) {
+	if s.reader == nil {
+		return evaluationwaiter.StatusSummary{}, false
+	}
+	result, err := s.reader.GetByID(ctx, assessmentID)
+	if err != nil || result == nil {
+		return evaluationwaiter.StatusSummary{}, false
+	}
+	if s.projection != nil {
+		result, err = s.projection.ProjectAssessment(ctx, result)
+		if err != nil || result == nil {
+			return evaluationwaiter.StatusSummary{}, false
+		}
+	}
+	if result.Status != "interpreted" && result.Status != "failed" {
+		return evaluationwaiter.StatusSummary{}, false
+	}
+	return statusSummary(result), true
+}
+
+func statusSummary(result *assessmentApp.AssessmentResult) evaluationwaiter.StatusSummary {
+	var totalScore *float64
+	if result.TotalScore != nil {
+		value := *result.TotalScore
+		totalScore = &value
+	}
+	var riskLevel *string
+	if result.RiskLevel != nil {
+		value := *result.RiskLevel
+		riskLevel = &value
+	}
+	return evaluationwaiter.StatusSummary{Status: result.Status, TotalScore: totalScore, RiskLevel: riskLevel, UpdatedAt: time.Now().Unix()}
+}
+
+func pendingSummary() evaluationwaiter.StatusSummary {
+	return evaluationwaiter.StatusSummary{Status: "pending", UpdatedAt: time.Now().Unix()}
 }
 
 var _ Service = (*service)(nil)

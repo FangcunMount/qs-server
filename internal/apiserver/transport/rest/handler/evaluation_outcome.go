@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 )
@@ -94,7 +96,7 @@ func (h *EvaluationHandler) GetReportOutcome(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.protectedQueryService.GetReportOutcome(c.Request.Context(), scope, id)
+	result, err := h.reportQueryJourney.GetReportOutcome(c.Request.Context(), reportQueryScope(scope), id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -124,12 +126,12 @@ func (h *EvaluationHandler) ListReportsOutcome(c *gin.Context) {
 		h.BadRequestResponse(c, "请求参数无效", err)
 		return
 	}
-	dto := assessmentApp.ListReportsDTO{
+	dto := interpretationApp.ListReportsDTO{
 		TesteeID: req.TesteeID,
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
-	result, err := h.protectedQueryService.ListReportsOutcome(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
+	result, err := h.reportQueryJourney.ListReportsOutcome(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, dto)
 	if err != nil {
 		h.Error(c, err)
 		return

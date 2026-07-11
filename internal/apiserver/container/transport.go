@@ -7,6 +7,8 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -67,6 +69,15 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		if c.ActorModule != nil {
 			deps.Actor.TesteeScaleAnalysisService = c.EvaluationModule.ExportTesteeScaleAnalysisService()
 		}
+	}
+	if c.EvaluationModule != nil && c.ReportModule != nil {
+		reportQuery := reportqueryjourney.NewService(c.EvaluationModule.AccessQueryService, c.ReportModule.QueryService)
+		deps.Interpretation.ReportQueryJourney = reportQuery
+		deps.Interpretation.ReportWaitJourney = reportwaitjourney.NewService(
+			c.EvaluationModule.AccessQueryService,
+			c.EvaluationModule.WorkerResultReader,
+			reportQuery,
+		)
 	}
 	if c.PlanModule != nil {
 		var testeeAccess actorAccessApp.TesteeAccessService

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
 type accessStub struct {
@@ -22,45 +22,76 @@ func (s *accessStub) LoadAccessibleAssessment(_ context.Context, orgID int64, op
 	return &assessmentApp.AccessibleAssessmentContext{AssessmentID: assessmentID}, nil
 }
 
-type waiterStub struct {
-	called       bool
-	assessmentID uint64
-	summary      evaluationwaiter.StatusSummary
+type assessmentReaderStub struct {
+	called bool
+	result *assessmentApp.AssessmentResult
 }
 
-func (s *waiterStub) WaitReport(_ context.Context, assessmentID uint64) evaluationwaiter.StatusSummary {
+func (s *assessmentReaderStub) GetByID(_ context.Context, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
 	s.called = true
-	s.assessmentID = assessmentID
-	return s.summary
+	if s.result != nil && s.result.ID != assessmentID {
+		return nil, errors.New("unexpected assessment")
+	}
+	return s.result, nil
+}
+
+type projectionStub struct {
+	called bool
+	at     time.Time
+}
+
+func (s *projectionStub) ProjectAssessment(_ context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error) {
+	s.called = true
+	projected := *result
+	projected.Status = "interpreted"
+	projected.InterpretedAt = &s.at
+	return &projected, nil
 }
 
 func TestWaitValidatesAccessBeforeDelegatingToCompletionWaiter(t *testing.T) {
 	access := &accessStub{}
-	waiter := &waiterStub{summary: evaluationwaiter.StatusSummary{Status: "interpreted", UpdatedAt: 123}}
+	reader := &assessmentReaderStub{result: &assessmentApp.AssessmentResult{ID: 56, Status: "evaluated"}}
+	projection := &projectionStub{at: time.Unix(123, 0)}
 
-	summary, err := NewService(access, waiter).Wait(context.Background(), Scope{OrgID: 12, OperatorUserID: 34, AssessmentID: 56})
+	summary, err := NewService(access, reader, projection).Wait(context.Background(), Scope{OrgID: 12, OperatorUserID: 34, AssessmentID: 56})
 	if err != nil {
 		t.Fatalf("Wait() error = %v", err)
 	}
 	if access.lastScope != (Scope{OrgID: 12, OperatorUserID: 34, AssessmentID: 56}) {
 		t.Fatalf("access scope = %#v", access.lastScope)
 	}
-	if !waiter.called || waiter.assessmentID != 56 || summary.Status != "interpreted" {
-		t.Fatalf("waiter/summary = %#v / %#v", waiter, summary)
+	if !reader.called || !projection.called || summary.Status != "interpreted" {
+		t.Fatalf("reader/projection/summary = %#v / %#v / %#v", reader, projection, summary)
 	}
 }
 
 func TestWaitDoesNotRegisterWhenAssessmentIsInaccessible(t *testing.T) {
 	access := &accessStub{err: errors.New("forbidden")}
-	waiter := &waiterStub{}
+	reader := &assessmentReaderStub{}
 
-	if _, err := NewService(access, waiter).Wait(context.Background(), Scope{AssessmentID: 56}); err == nil {
+	if _, err := NewService(access, reader, &projectionStub{}).Wait(context.Background(), Scope{AssessmentID: 56}); err == nil {
 		t.Fatal("Wait() error = nil, want access error")
 	}
-	if waiter.called {
-		t.Fatal("completion waiter must not be called before access succeeds")
+	if reader.called {
+		t.Fatal("assessment reader must not be called before access succeeds")
 	}
 }
 
 var _ AssessmentAccess = (*accessStub)(nil)
-var _ CompletionWaiter = (*waiterStub)(nil)
+var _ AssessmentReader = (*assessmentReaderStub)(nil)
+var _ LegacyProjection = (*projectionStub)(nil)
+
+func TestWaitReturnsPendingWhenContextEndsBeforeReportExists(t *testing.T) {
+	access := &accessStub{}
+	reader := &assessmentReaderStub{result: &assessmentApp.AssessmentResult{ID: 56, Status: "evaluated"}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	summary, err := NewService(access, reader, nil).Wait(ctx, Scope{AssessmentID: 56})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Status != "pending" || summary.UpdatedAt <= 0 {
+		t.Fatalf("summary = %#v, want pending", summary)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -205,15 +206,15 @@ func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcome
 	return summary
 }
 
-func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResult) *evaluationpb.AssessmentReport {
+func toProtoAssessmentReportFromOutcome(result *interpretationApp.ReportOutcomeResult) *evaluationpb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
 	report := &evaluationpb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
-		Model:        toEvaluationProtoModelIdentity(result.Model),
-		PrimaryScore: toEvaluationProtoScoreValue(result.PrimaryScore),
-		Level:        toEvaluationProtoResultLevel(result.Level),
+		Model:        toReportProtoModelIdentity(result.Model),
+		PrimaryScore: toReportProtoScoreValue(result.PrimaryScore),
+		Level:        toReportProtoResultLevel(result.Level),
 		Conclusion:   result.Conclusion,
 		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
@@ -239,6 +240,28 @@ func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResul
 		report.ModelExtra = toProtoModelExtra(result.ModelExtra)
 	}
 	return report
+}
+
+func toReportProtoModelIdentity(model interpretationApp.ModelIdentityResult) *evaluationpb.ModelIdentity {
+	return &evaluationpb.ModelIdentity{
+		Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
+		Code: model.Code, Version: model.Version, Title: model.Title,
+		ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily,
+	}
+}
+
+func toReportProtoScoreValue(score *interpretationApp.ScoreValueResult) *evaluationpb.ScoreValue {
+	if score == nil {
+		return nil
+	}
+	return &evaluationpb.ScoreValue{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max}
+}
+
+func toReportProtoResultLevel(level *interpretationApp.ResultLevelResult) *evaluationpb.ResultLevel {
+	if level == nil {
+		return nil
+	}
+	return &evaluationpb.ResultLevel{Code: level.Code, Label: level.Label, Severity: level.Severity}
 }
 
 func derefFloat64(v *float64) float64 {

@@ -172,13 +172,6 @@ func (c *Container) ActorPorts() compose.ActorPorts {
 	return ports
 }
 
-func (c *Container) ReportIntegrationPorts() compose.ReportIntegrationPorts {
-	ports := reportmod.ExportPorts(c.ReportModule)
-	return compose.ReportIntegrationPorts{
-		QueryService: ports.QueryService,
-	}
-}
-
 func (c *Container) SetSurveyModule(module *surveymod.Module) {
 	c.SurveyModule = module
 }

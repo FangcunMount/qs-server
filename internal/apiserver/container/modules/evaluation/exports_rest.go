@@ -13,7 +13,6 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 		return deps
 	}
 	deps.OperatorRecoveryService = m.OperatorRecoveryService
-	deps.ReportWaitJourney = m.ReportWaitJourney
 	deps.OperatorExecutionService = m.OperatorExecutionService
 	deps.ProtectedQueryService = m.ProtectedQueryService
 	deps.RunQueryService = m.RunQueryService
