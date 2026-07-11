@@ -19,7 +19,7 @@ const (
 // immediateDispatchEventTypes 走 post-commit immediate 旁路。
 // answersheet.submitted：Mongo 主链路；evaluation.requested：MySQL assessment outbox（Mongo immediate 查不到则 noop）。
 var immediateDispatchEventTypes = map[string]struct{}{
-	eventcatalog.AnswerSheetSubmitted: {},
+	eventcatalog.AnswerSheetSubmitted:       {},
 	eventcatalog.EvaluationRequested:        {},
 	eventcatalog.EvaluationOutcomeCommitted: {},
 }

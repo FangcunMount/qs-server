@@ -1,59 +1,8 @@
 package assessment
 
 import (
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
-
-// toReportResult 将领域模型转换为 ReportResult
-func toReportResult(r *report.InterpretReport) *ReportResult {
-	if r == nil {
-		return nil
-	}
-
-	dimensions := make([]DimensionResult, len(r.Dimensions()))
-	for i, d := range r.Dimensions() {
-		dimensions[i] = dimensionResultFromInterpret(d)
-	}
-
-	return &ReportResult{
-		AssessmentID: r.ID().Uint64(),
-		ModelName:    r.ModelName(),
-		ModelCode:    r.ModelCode(),
-		TotalScore:   r.TotalScore(),
-		RiskLevel:    string(r.RiskLevel()),
-		Conclusion:   r.Conclusion(),
-		Dimensions:   dimensions,
-		Suggestions:  toSuggestionDTOs(r.Suggestions()),
-		CreatedAt:    r.CreatedAt(),
-		ModelExtra:   toModelExtraResult(r.ModelExtra()),
-	}
-}
-
-func toModelExtraResult(extra *report.ModelExtra) *ModelExtraResult {
-	if extra == nil || extra.IsEmpty() {
-		return nil
-	}
-	result := &ModelExtraResult{
-		Kind:           extra.Kind,
-		TypeCode:       extra.TypeCode,
-		TypeName:       extra.TypeName,
-		OneLiner:       extra.OneLiner,
-		ImageURL:       extra.ImageURL,
-		MatchPercent:   extra.MatchPercent,
-		IsSpecial:      extra.IsSpecial,
-		SpecialTrigger: extra.SpecialTrigger,
-		Commentary:     extra.Commentary,
-	}
-	if extra.Rarity != nil {
-		result.Rarity = &ModelRarityResult{
-			Percent: extra.Rarity.Percent,
-			Label:   extra.Rarity.Label,
-			OneInX:  extra.Rarity.OneInX,
-		}
-	}
-	return result
-}
 
 func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
 	dimensions := make([]DimensionResult, 0, len(row.Dimensions))
@@ -107,22 +56,6 @@ func reportModelExtraRowToResult(row *evaluationreadmodel.ReportModelExtraRow) *
 	return result
 }
 
-func dimensionResultFromInterpret(d report.DimensionInterpret) DimensionResult {
-	return DimensionResult{
-		FactorCode:     d.Code().String(),
-		FactorName:     d.Name(),
-		RawScore:       d.RawScore(),
-		MaxScore:       d.MaxScore(),
-		RiskLevel:      d.Severity(),
-		Role:           d.Role(),
-		ParentCode:     d.ParentCode(),
-		HierarchyLevel: d.HierarchyLevel(),
-		SortOrder:      d.SortOrder(),
-		Description:    d.Description(),
-		Suggestion:     d.Suggestion(),
-	}
-}
-
 func dimensionResultFromReadRow(d evaluationreadmodel.ReportDimensionRow) DimensionResult {
 	return DimensionResult{
 		FactorCode:     d.FactorCode,
@@ -137,24 +70,4 @@ func dimensionResultFromReadRow(d evaluationreadmodel.ReportDimensionRow) Dimens
 		Description:    d.Description,
 		Suggestion:     d.Suggestion,
 	}
-}
-
-func toSuggestionDTOs(items []report.Suggestion) []SuggestionDTO {
-	if len(items) == 0 {
-		return nil
-	}
-	result := make([]SuggestionDTO, len(items))
-	for i, s := range items {
-		var fc *string
-		if s.FactorCode != nil {
-			code := s.FactorCode.String()
-			fc = &code
-		}
-		result[i] = SuggestionDTO{
-			Category:   string(s.Category),
-			Content:    s.Content,
-			FactorCode: fc,
-		}
-	}
-	return result
 }

@@ -1,8 +1,10 @@
-// Package preview implements model-目录 report-预览 port on the。
-// 评估 side: it builds 合成 submitted assessment, runs 类型学。
-// executor, builds 解释报告 和 投影 结果. This。
-// 保留model-目录 free of 评估/interpretation 实现。
-// details while 评估 module 负责 "如何report 是 produced"。
+// Package preview implements the model-catalog report-preview port at the
+// container composition edge.
+//
+// Preview is an explicitly in-process composition for an unpublished model: it
+// evaluates synthetic submitted facts and renders a transient interpretation
+// report. It is not Evaluation production orchestration, so it belongs at the
+// container composition edge rather than inside any business module.
 package preview
 
 import (
@@ -19,16 +21,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// Previewer implements modelpreview.ReportPreviewer。
+// Previewer implements modelpreview.ReportPreviewer.
 type Previewer struct{}
 
-// NewPreviewer 构建report 预览er。
+// NewPreviewer builds a report previewer.
 func NewPreviewer() *Previewer { return &Previewer{} }
 
 var _ modelpreview.ReportPreviewer = (*Previewer)(nil)
 
-// PreviewReport 运行类型学 executor 和 报告构建器 针对 合成。
-// assessment 事实 和 投影 预览 结果。
+// PreviewReport runs the typology executor and report builder against a
+// synthetic submitted assessment, then projects the transient result.
 func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request) (*modelpreview.Result, error) {
 	submitted, err := buildSubmittedAssessment(req)
 	if err != nil {

@@ -1,8 +1,8 @@
 package modelcatalog
 
 import (
-	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog/preview"
 )
 
 // definitionRegistry 模型目录的定义注册表

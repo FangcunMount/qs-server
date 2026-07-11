@@ -70,3 +70,15 @@ func TestDateRawBeforeUsesYYYYMMDDLexicographicOrder(t *testing.T) {
 		t.Fatal("same date must not be before itself")
 	}
 }
+
+func TestBuildScopeInsertSQLUsesEvaluatedTimestamp(t *testing.T) {
+	query, _ := buildScopeInsertSQL(config{orgID: 1})
+	if strings.Contains(query, "interpreted_at") {
+		t.Fatalf("seeddata rewrite uses retired assessment timestamp: %s", query)
+	}
+	for _, token := range []string{"old_evaluated_at", "new_evaluated_at", "a.evaluated_at"} {
+		if !strings.Contains(query, token) {
+			t.Fatalf("seeddata rewrite must contain %q: %s", token, query)
+		}
+	}
+}

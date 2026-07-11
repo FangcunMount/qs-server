@@ -93,6 +93,35 @@ func TestReportRowToOutcomeResultPrefersExplicitModelProjection(t *testing.T) {
 	}
 }
 
+func TestLegacyRiskLevelResultPreservesScoreFactProjection(t *testing.T) {
+	tests := []struct {
+		code     string
+		severity string
+		wantNil  bool
+	}{
+		{code: "severe", severity: "high"},
+		{code: "high", severity: "high"},
+		{code: "medium", severity: "medium"},
+		{code: "low", severity: "low"},
+		{code: "none", severity: "none"},
+		{code: "INTJ", wantNil: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.code, func(t *testing.T) {
+			got := legacyRiskLevelResult(tt.code)
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("legacyRiskLevelResult(%q) = %#v, want nil", tt.code, got)
+				}
+				return
+			}
+			if got == nil || got.Code != tt.code || got.Label != tt.code || got.Severity != tt.severity {
+				t.Fatalf("legacyRiskLevelResult(%q) = %#v", tt.code, got)
+			}
+		})
+	}
+}
+
 func strPtr(v string) *string {
 	return &v
 }

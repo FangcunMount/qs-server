@@ -84,7 +84,7 @@ type scopeSummary struct {
 type fieldChangeSummary struct {
 	AssessmentCreatedAt   int64
 	AssessmentSubmittedAt int64
-	AssessmentInterpreted int64
+	AssessmentEvaluated   int64
 	AssessmentFailedAt    int64
 	AssessmentUpdatedAt   int64
 	TaskOpenAt            int64
@@ -180,8 +180,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("load field change summary: %v", err)
 	}
-	log.Printf("fields on collapsed date: assessment.created_at=%d submitted_at=%d interpreted_at=%d failed_at=%d updated_at=%d task.open_at=%d task.completed_at=%d task.expire_at=%d task.updated_at=%d",
-		fieldSummary.AssessmentCreatedAt, fieldSummary.AssessmentSubmittedAt, fieldSummary.AssessmentInterpreted, fieldSummary.AssessmentFailedAt, fieldSummary.AssessmentUpdatedAt,
+	log.Printf("fields on collapsed date: assessment.created_at=%d submitted_at=%d evaluated_at=%d failed_at=%d updated_at=%d task.open_at=%d task.completed_at=%d task.expire_at=%d task.updated_at=%d",
+		fieldSummary.AssessmentCreatedAt, fieldSummary.AssessmentSubmittedAt, fieldSummary.AssessmentEvaluated, fieldSummary.AssessmentFailedAt, fieldSummary.AssessmentUpdatedAt,
 		fieldSummary.TaskOpenAt, fieldSummary.TaskCompletedAt, fieldSummary.TaskExpireAt, fieldSummary.TaskUpdatedAt)
 
 	dailyRows, err := loadDailySummaries(ctx, conn)
@@ -309,8 +309,8 @@ CREATE TEMPORARY TABLE seeddata_assessment_time_rewrite_scope (
   new_assessment_updated_at DATETIME(3) NULL,
   old_submitted_at DATETIME(3) NULL,
   new_submitted_at DATETIME(3) NULL,
-  old_interpreted_at DATETIME(3) NULL,
-  new_interpreted_at DATETIME(3) NULL,
+  old_evaluated_at DATETIME(3) NULL,
+  new_evaluated_at DATETIME(3) NULL,
   old_failed_at DATETIME(3) NULL,
   new_failed_at DATETIME(3) NULL,
   old_task_open_at DATETIME(3) NULL,
@@ -353,7 +353,7 @@ WHERE a.deleted_at IS NULL
     DATE(a.created_at) = @seed_rewrite_collapsed_date
     OR (a.updated_at IS NOT NULL AND DATE(a.updated_at) = @seed_rewrite_collapsed_date)
     OR (a.submitted_at IS NOT NULL AND DATE(a.submitted_at) = @seed_rewrite_collapsed_date)
-    OR (a.interpreted_at IS NOT NULL AND DATE(a.interpreted_at) = @seed_rewrite_collapsed_date)
+    OR (a.evaluated_at IS NOT NULL AND DATE(a.evaluated_at) = @seed_rewrite_collapsed_date)
     OR (a.failed_at IS NOT NULL AND DATE(a.failed_at) = @seed_rewrite_collapsed_date)
     OR (t.updated_at IS NOT NULL AND DATE(t.updated_at) = @seed_rewrite_collapsed_date)
     OR (t.completed_at IS NOT NULL AND DATE(t.completed_at) = @seed_rewrite_collapsed_date)`
@@ -393,7 +393,7 @@ INSERT INTO seeddata_assessment_time_rewrite_scope (
   old_assessment_created_at, new_assessment_created_at,
   old_assessment_updated_at, new_assessment_updated_at,
   old_submitted_at, new_submitted_at,
-  old_interpreted_at, new_interpreted_at,
+  old_evaluated_at, new_evaluated_at,
   old_failed_at, new_failed_at,
   old_task_open_at, new_task_open_at,
   old_task_completed_at, new_task_completed_at,
@@ -414,8 +414,8 @@ SELECT
   CASE WHEN a.updated_at IS NOT NULL AND DATE(a.updated_at) = @seed_rewrite_collapsed_date THEN TIMESTAMP(DATE(t.planned_at), TIME(a.updated_at)) ELSE a.updated_at END,
   a.submitted_at,
   CASE WHEN a.submitted_at IS NOT NULL AND DATE(a.submitted_at) = @seed_rewrite_collapsed_date THEN TIMESTAMP(DATE(t.planned_at), TIME(a.submitted_at)) ELSE a.submitted_at END,
-  a.interpreted_at,
-  CASE WHEN a.interpreted_at IS NOT NULL AND DATE(a.interpreted_at) = @seed_rewrite_collapsed_date THEN TIMESTAMP(DATE(t.planned_at), TIME(a.interpreted_at)) ELSE a.interpreted_at END,
+  a.evaluated_at,
+  CASE WHEN a.evaluated_at IS NOT NULL AND DATE(a.evaluated_at) = @seed_rewrite_collapsed_date THEN TIMESTAMP(DATE(t.planned_at), TIME(a.evaluated_at)) ELSE a.evaluated_at END,
   a.failed_at,
   CASE WHEN a.failed_at IS NOT NULL AND DATE(a.failed_at) = @seed_rewrite_collapsed_date THEN TIMESTAMP(DATE(t.planned_at), TIME(a.failed_at)) ELSE a.failed_at END,
   t.open_at,
@@ -466,7 +466,7 @@ func loadFieldChangeSummary(ctx context.Context, conn *sql.Conn, collapsedDate s
 SELECT
   COALESCE(SUM(CASE WHEN DATE(old_assessment_created_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
   COALESCE(SUM(CASE WHEN old_submitted_at IS NOT NULL AND DATE(old_submitted_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
-  COALESCE(SUM(CASE WHEN old_interpreted_at IS NOT NULL AND DATE(old_interpreted_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
+  COALESCE(SUM(CASE WHEN old_evaluated_at IS NOT NULL AND DATE(old_evaluated_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
   COALESCE(SUM(CASE WHEN old_failed_at IS NOT NULL AND DATE(old_failed_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
   COALESCE(SUM(CASE WHEN old_assessment_updated_at IS NOT NULL AND DATE(old_assessment_updated_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
   COALESCE(SUM(CASE WHEN old_task_open_at IS NOT NULL AND DATE(old_task_open_at) = CAST(? AS DATE) THEN 1 ELSE 0 END), 0),
@@ -478,7 +478,7 @@ FROM seeddata_assessment_time_rewrite_scope`,
 	).Scan(
 		&item.AssessmentCreatedAt,
 		&item.AssessmentSubmittedAt,
-		&item.AssessmentInterpreted,
+		&item.AssessmentEvaluated,
 		&item.AssessmentFailedAt,
 		&item.AssessmentUpdatedAt,
 		&item.TaskOpenAt,
@@ -528,7 +528,7 @@ SELECT
   assessment_id, task_id, org_id, plan_id, testee_id, CAST(target_date AS CHAR),
   old_assessment_created_at, new_assessment_created_at,
   old_submitted_at, new_submitted_at,
-  old_interpreted_at, new_interpreted_at,
+  old_evaluated_at, new_evaluated_at,
   old_task_open_at, new_task_open_at,
   old_task_completed_at, new_task_completed_at
 FROM seeddata_assessment_time_rewrite_scope
@@ -575,7 +575,7 @@ LIMIT ?`, limit)
 
 func printPreviewRows(rows []previewRow) {
 	for _, row := range rows {
-		log.Printf("preview assessment_id=%d task_id=%d org_id=%d plan_id=%d testee_id=%d target_date=%s created:%s=>%s submitted:%s=>%s interpreted:%s=>%s task_open:%s=>%s task_completed:%s=>%s",
+		log.Printf("preview assessment_id=%d task_id=%d org_id=%d plan_id=%d testee_id=%d target_date=%s created:%s=>%s submitted:%s=>%s evaluated:%s=>%s task_open:%s=>%s task_completed:%s=>%s",
 			row.AssessmentID, row.TaskID, row.OrgID, row.PlanID, row.TesteeID, row.TargetDate,
 			formatNullTime(row.OldCreatedAt), formatNullTime(row.NewCreatedAt),
 			formatNullTime(row.OldSubmitted), formatNullTime(row.NewSubmitted),
@@ -645,7 +645,7 @@ SET
   a.created_at = s.new_assessment_created_at,
   a.updated_at = s.new_assessment_updated_at,
   a.submitted_at = s.new_submitted_at,
-  a.interpreted_at = s.new_interpreted_at,
+  a.evaluated_at = s.new_evaluated_at,
   a.failed_at = s.new_failed_at
 WHERE a.deleted_at IS NULL`); err != nil {
 		return nil, err
@@ -708,7 +708,7 @@ SET
       AND a.deleted_at IS NULL
   ),
   te.last_assessment_at = (
-    SELECT MAX(COALESCE(a.interpreted_at, a.submitted_at, a.created_at))
+    SELECT MAX(COALESCE(a.evaluated_at, a.submitted_at, a.created_at))
     FROM assessment a
     WHERE a.org_id = te.org_id
       AND a.testee_id = te.id
@@ -721,7 +721,7 @@ SET
       AND a2.testee_id = te.id
       AND a2.deleted_at IS NULL
       AND a2.risk_level IS NOT NULL
-    ORDER BY COALESCE(a2.interpreted_at, a2.submitted_at, a2.created_at) DESC, a2.id DESC
+    ORDER BY COALESCE(a2.evaluated_at, a2.submitted_at, a2.created_at) DESC, a2.id DESC
     LIMIT 1
   )
 WHERE te.deleted_at IS NULL`); err != nil {

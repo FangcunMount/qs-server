@@ -1,7 +1,8 @@
 package assessment
 
 import (
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
@@ -115,7 +116,7 @@ func primaryScoreFromAssessmentRow(row evaluationreadmodel.AssessmentRow) *Score
 	}
 	if row.TotalScore != nil {
 		return &ScoreValueResult{
-			Kind:  domainreport.ScoreKindRawTotal,
+			Kind:  string(domainoutcome.ScoreKindRawTotal),
 			Value: *row.TotalScore,
 		}
 	}
@@ -131,10 +132,7 @@ func levelFromAssessmentRow(row evaluationreadmodel.AssessmentRow) *ResultLevelR
 		}
 	}
 	if row.RiskLevel != nil && *row.RiskLevel != "" {
-		level := domainreport.LevelFromRisk(domainreport.RiskLevel(*row.RiskLevel))
-		if level != nil {
-			return &ResultLevelResult{Code: level.Code, Label: level.Label, Severity: level.Severity}
-		}
+		return legacyRiskLevelResult(*row.RiskLevel)
 	}
 	return nil
 }
@@ -149,7 +147,7 @@ func primaryScoreFromReportRow(row evaluationreadmodel.ReportRow) *ScoreValueRes
 		}
 	}
 	if row.TotalScore != 0 || row.RiskLevel != "" {
-		return &ScoreValueResult{Kind: domainreport.ScoreKindRawTotal, Value: row.TotalScore}
+		return &ScoreValueResult{Kind: string(domainoutcome.ScoreKindRawTotal), Value: row.TotalScore}
 	}
 	return nil
 }
@@ -162,16 +160,33 @@ func levelFromReportRow(row evaluationreadmodel.ReportRow) *ResultLevelResult {
 			Severity: row.Level.Severity,
 		}
 	}
-	if row.RiskLevel != "" && domainreport.IsRiskLevelCode(row.RiskLevel) {
-		level := domainreport.LevelFromRisk(domainreport.RiskLevel(row.RiskLevel))
-		if level != nil {
-			return &ResultLevelResult{Code: level.Code, Label: level.Label, Severity: level.Severity}
+	if row.RiskLevel != "" {
+		if level := legacyRiskLevelResult(row.RiskLevel); level != nil {
+			return level
 		}
 	}
 	if row.ModelExtra != nil && row.ModelExtra.TypeCode != "" {
 		return &ResultLevelResult{Code: row.ModelExtra.TypeCode, Label: row.ModelExtra.TypeCode, Severity: "none"}
 	}
 	return nil
+}
+
+// legacyRiskLevelResult keeps the legacy risk-level read-model projection in
+// Evaluation. It is a score-fact compatibility mapping, not a report rule.
+func legacyRiskLevelResult(code string) *ResultLevelResult {
+	if !domainassessment.IsRiskLevelCode(code) {
+		return nil
+	}
+	severity := "none"
+	switch domainassessment.RiskLevel(code) {
+	case domainassessment.RiskLevelSevere, domainassessment.RiskLevelHigh:
+		severity = "high"
+	case domainassessment.RiskLevelMedium:
+		severity = "medium"
+	case domainassessment.RiskLevelLow:
+		severity = "low"
+	}
+	return &ResultLevelResult{Code: code, Label: code, Severity: severity}
 }
 
 func derefString(v *string) string {

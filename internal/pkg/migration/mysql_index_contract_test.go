@@ -92,6 +92,28 @@ func TestOptimizeHighRiskLatestQueueIndexMigrationContract(t *testing.T) {
 	requireSQLContains(t, down, "AND index_name = 'idx_assessment_workbench_latest_id_risk_by_testee'")
 }
 
+func TestEvaluationCompatibilityRetirementMigrationContract(t *testing.T) {
+	retire := readMySQLMigration(t, "000044_retire_assessment_interpreted_and_score_copy_fields.up.sql")
+	for _, token := range []string{
+		"ADD COLUMN `evaluated_at`",
+		"SET `status` = 'evaluated'",
+		"DROP COLUMN `interpreted_at`",
+		"DROP COLUMN `conclusion`",
+		"DROP COLUMN `suggestion`",
+	} {
+		requireSQLContains(t, retire, token)
+	}
+
+	linkOutcome := readMySQLMigration(t, "000045_link_assessment_score_to_evaluation_outcome.up.sql")
+	for _, token := range []string{
+		"ADD COLUMN `evaluation_outcome_id`",
+		"ADD KEY `idx_assessment_score_outcome`",
+		"INNER JOIN `evaluation_outcome` AS outcome",
+	} {
+		requireSQLContains(t, linkOutcome, token)
+	}
+}
+
 func readMySQLMigration(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("migrations", "mysql", name))

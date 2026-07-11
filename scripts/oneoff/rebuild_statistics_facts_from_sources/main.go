@@ -481,7 +481,7 @@ SELECT
   base.answer_sheet_id,
   base.created_at,
   COALESCE(base.submitted_at, task.task_completed_at, base.created_at) AS submit_at,
-  COALESCE(base.interpreted_at, CASE WHEN base.status = 'interpreted' THEN score.score_created_at ELSE NULL END) AS report_at,
+  base.evaluated_at AS report_at,
   CASE
     WHEN base.failed_at IS NOT NULL THEN base.failed_at
     WHEN base.status = 'failed' THEN base.updated_at
@@ -495,12 +495,6 @@ LEFT JOIN (
   WHERE deleted_at IS NULL AND completed_at IS NOT NULL
   GROUP BY assessment_id
 ) task ON task.assessment_id = base.id
-LEFT JOIN (
-  SELECT assessment_id, MIN(created_at) AS score_created_at
-  FROM assessment_score
-  WHERE deleted_at IS NULL
-  GROUP BY assessment_id
-) score ON score.assessment_id = base.id
 WHERE ` + where, args
 }
 

@@ -362,7 +362,7 @@ go run scripts/oneoff/cleanup_deleted_assessment_orphans.go \
 
 执行 `--apply` 后会按候选范围改写：
 
-- `assessment.created_at` / `updated_at` / `submitted_at` / `interpreted_at` / `failed_at`
+- `assessment.created_at` / `updated_at` / `submitted_at` / `evaluated_at` / `failed_at`
 - `assessment_task.completed_at` / `updated_at`
 - 默认同时改写 `assessment_task.open_at`，可用 `--rewrite-task-open-at=false` 关闭。
 - 可选改写 `assessment_task.expire_at`，默认关闭。

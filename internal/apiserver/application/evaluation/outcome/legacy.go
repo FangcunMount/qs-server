@@ -23,7 +23,7 @@ func NewOutcomeFromLegacyResult(
 	outcome := Outcome{
 		Assessment: a,
 		Input:      input,
-		Execution:  ExecutionFromAssessmentOutcome(assessment.AssessmentOutcomeFromEvaluationResult(result)),
+		Execution:  ExecutionFromAssessmentOutcome(assessment.AssessmentOutcomeFromEvaluationResult(result)), //nolint:staticcheck // legacy boundary adapter for tests/compatibility callers
 	}
 	if route, ok := ModelRouteFromInput(input); ok {
 		if key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(route); err == nil {

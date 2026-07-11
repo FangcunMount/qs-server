@@ -292,7 +292,7 @@ FROM (
     AND (
       created_at >= ? AND created_at < ?
       OR submitted_at >= ? AND submitted_at < ?
-      OR interpreted_at >= ? AND interpreted_at < ?
+      OR evaluated_at >= ? AND evaluated_at < ?
       OR failed_at >= ? AND failed_at < ?
     )
   UNION
@@ -368,7 +368,7 @@ WHERE org_id = ? AND deleted_at IS NULL
   AND (
     created_at >= ? AND created_at < ?
     OR submitted_at >= ? AND submitted_at < ?
-    OR interpreted_at >= ? AND interpreted_at < ?
+    OR evaluated_at >= ? AND evaluated_at < ?
     OR failed_at >= ? AND failed_at < ?
   )
 ORDER BY questionnaire_code`

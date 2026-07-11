@@ -31,11 +31,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation",
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation",
 			},
-			allowedImporters: []string{
-				"internal/apiserver/application/evaluation/assessment/converter_outcome.go",
-				"internal/apiserver/application/evaluation/assessment/report_mapper.go",
-				"internal/apiserver/application/evaluation/preview/previewer.go",
-			},
+			allowedImporters: []string{},
 		},
 		{
 			name: "interpretation_to_evaluation",
