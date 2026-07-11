@@ -32,6 +32,7 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 
 | 脚本 | 用途 | 主要写入对象 |
 | ---- | ---- | ------------ |
+| `dedupe_interpret_reports_domain/` | 清理 `interpret_reports` 未删除重复 `domain_id`，解除 `uk_report_domain_deleted` 建索引阻塞 | Mongo `interpret_reports`（软删除重复行） |
 | `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
 | `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/reports/outbox |
 | `rewrite_seeddata_assessment_times/main.go` | 将 seeddata plan task 测评从错误集中日期改回任务计划日期 | MySQL `assessment` / `assessment_task` / `assessment_score` / `testee` |
@@ -58,6 +59,33 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `audit_published_model_payload_formats/` | legacy payload_format 审计 |
 | `audit_personality_kind_values/` / `migrate_personality_kind_values/` | `personality` → `typology` kind 迁移 |
 | `migrate_modelcatalog_definition_v2/` | DefinitionV2 + norm 行回填 |
+
+## dedupe_interpret_reports_domain
+
+### 做什么
+
+清理 `interpret_reports` 中 `deleted_at=null` 且同一 `domain_id` 多条文档的冲突，解除启动时 `uk_report_domain_deleted` 建索引失败。
+
+- 默认 dry-run：只打印 KEEP / DROP
+- `--apply`：软删除 DROP 行（`deleted_at` 错开毫秒，避免唯一键再次冲突）
+- `--ensure-index`：清理后创建唯一索引（有残留重复时需配合 `--apply`）
+
+保留策略：优先 `status=generated`，再比 `generated_at` / `updated_at` / `created_at` / `_id`。
+
+### 如何调用
+
+```bash
+export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?authSource=admin&directConnection=true'
+
+# 1) dry-run
+go run ./scripts/oneoff/dedupe_interpret_reports_domain/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs
+
+# 2) apply + 建索引
+go run ./scripts/oneoff/dedupe_interpret_reports_domain/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs \
+  --apply --ensure-index
+```
 
 ## observe_outbox_by_event_type
 
