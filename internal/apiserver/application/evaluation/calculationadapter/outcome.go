@@ -1,12 +1,18 @@
 package calculationadapter
 
 import (
+	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 // CalcResultFromOutcome translates 测评结果 为 计算结果。
-func CalcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
+func CalcResultFromOutcome(outcome *domainoutcome.Execution) *calculation.Result {
+	return calcResultFromAssessmentOutcome(evaluationoutcome.AssessmentOutcomeFromExecution(outcome))
+}
+
+func calcResultFromAssessmentOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
 	if outcome == nil {
 		return nil
 	}
@@ -27,7 +33,11 @@ func CalcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.R
 }
 
 // MergeCalcResultIntoOutcome merges 计算结果 back 为 测评结果。
-func MergeCalcResultIntoOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
+func MergeCalcResultIntoOutcome(outcome *domainoutcome.Execution, result *calculation.Result) *domainoutcome.Execution {
+	return evaluationoutcome.ExecutionFromAssessmentOutcome(mergeCalcResultIntoAssessmentOutcome(evaluationoutcome.AssessmentOutcomeFromExecution(outcome), result))
+}
+
+func mergeCalcResultIntoAssessmentOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
 	if outcome == nil || result == nil {
 		return outcome
 	}

@@ -61,7 +61,7 @@ func TestGeneratorEmitsInterpretationReportEvents(t *testing.T) {
 	}
 	outcome := evaloutcome.Outcome{
 		Assessment: a,
-		Execution:  execution,
+		Execution:  evaloutcome.ExecutionFromAssessmentOutcome(execution),
 		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
 			DecisionKind:    modelcatalog.DecisionKindScoreRange,

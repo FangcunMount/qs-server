@@ -73,7 +73,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	if request.EvaluatedAt.IsZero() {
 		request.EvaluatedAt = time.Now()
 	}
-	if err := request.Outcome.Assessment.ApplyScoringOutcome(request.Outcome.Execution); err != nil {
+	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
 		return nil, evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
 	}
 	payload, err := json.Marshal(request.Outcome.Execution)

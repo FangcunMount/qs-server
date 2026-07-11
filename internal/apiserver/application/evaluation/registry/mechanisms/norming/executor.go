@@ -7,7 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -37,7 +37,7 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathBehavioralRatingDescriptor
 }
 
-func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*domainoutcome.Execution, error) {
 	if e == nil || e.scoring == nil {
 		return nil, fmt.Errorf("factor_norm evaluation executor is not configured")
 	}

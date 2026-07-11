@@ -25,7 +25,7 @@ func (p *assessmentScoreProjector) Project(ctx context.Context, outcome evaloutc
 	if p == nil || p.repo == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
-	projection := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), outcome.Execution)
+	projection := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
 	if projection == nil {
 		return nil
 	}

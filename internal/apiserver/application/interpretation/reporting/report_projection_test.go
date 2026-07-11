@@ -7,6 +7,7 @@ import (
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -33,12 +34,12 @@ func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testin
 			},
 		},
 	})
-	o.Execution.Primary = &assessment.OutcomeScoreValue{
-		Kind:  assessment.OutcomeScoreKindMatchPercent,
+	o.Execution.Primary = &domainoutcome.ScoreValue{
+		Kind:  domainoutcome.ScoreKindMatchPercent,
 		Value: 40,
 		Label: "INTJ",
 	}
-	o.Execution.Level = &assessment.OutcomeResultLevel{
+	o.Execution.Level = &domainoutcome.ResultLevel{
 		Code:     "INTJ",
 		Label:    "INTJ",
 		Severity: "none",

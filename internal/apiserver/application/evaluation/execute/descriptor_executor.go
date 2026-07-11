@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -15,7 +17,7 @@ func (descriptorDrivenExecutor) Execute(
 	ctx context.Context,
 	desc evalpipeline.RuntimeDescriptor,
 	input ExecutionInput,
-) (*assessment.AssessmentOutcome, error) {
+) (*domainoutcome.Execution, error) {
 	if desc.InputAssembler == nil || desc.Calculator == nil || desc.OutcomeAssembler == nil {
 		return nil, fmt.Errorf("descriptor pipeline is incomplete for family %s", desc.AlgorithmFamily)
 	}
@@ -35,11 +37,13 @@ func (descriptorDrivenExecutor) Execute(
 	if err != nil {
 		return nil, err
 	}
-	outcome, ok := assembled.(*assessment.AssessmentOutcome)
-	if !ok || outcome == nil {
-		return nil, fmt.Errorf("descriptor outcome assembler returned invalid type %T", assembled)
+	if outcome, ok := assembled.(*domainoutcome.Execution); ok && outcome != nil {
+		return outcome, nil
 	}
-	return outcome, nil
+	if legacy, ok := assembled.(*assessment.AssessmentOutcome); ok && legacy != nil {
+		return evaluationoutcome.ExecutionFromAssessmentOutcome(legacy), nil
+	}
+	return nil, fmt.Errorf("descriptor outcome assembler returned invalid type %T", assembled)
 }
 
 func descriptorExecutorsFromFamilyEvaluators(

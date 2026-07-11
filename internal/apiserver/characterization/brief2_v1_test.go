@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 func TestV1Brief2ExecuteAppliesNormTScore(t *testing.T) {
@@ -25,10 +25,10 @@ func TestV1Brief2ExecuteAppliesNormTScore(t *testing.T) {
 		t.Fatal("expected assessment outcome with dimensions")
 	}
 	dim := result.Dimensions[0]
-	if got := charDerivedScore(dim.DerivedScores, assessment.OutcomeScoreKindTScore); got != 65 {
+	if got := charDerivedScore(dim.DerivedScores, domainoutcome.ScoreKindTScore); got != 65 {
 		t.Fatalf("t_score = %v, want 65", got)
 	}
-	if got := charDerivedScore(dim.DerivedScores, assessment.OutcomeScoreKindPercentile); got != 90 {
+	if got := charDerivedScore(dim.DerivedScores, domainoutcome.ScoreKindPercentile); got != 90 {
 		t.Fatalf("percentile = %v, want 90", got)
 	}
 	if dim.Level == nil || dim.Level.Code != "elevated" {
@@ -36,7 +36,7 @@ func TestV1Brief2ExecuteAppliesNormTScore(t *testing.T) {
 	}
 }
 
-func charDerivedScore(scores []assessment.OutcomeScoreValue, kind assessment.OutcomeScoreKind) float64 {
+func charDerivedScore(scores []domainoutcome.ScoreValue, kind domainoutcome.ScoreKind) float64 {
 	for _, score := range scores {
 		if score.Kind == kind {
 			return score.Value

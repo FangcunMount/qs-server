@@ -40,7 +40,7 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 	if w.assessmentRepo == nil {
 		return evalerrors.ModuleNotConfigured("assessment repository is not configured")
 	}
-	if err := outcome.Assessment.ApplyScoringOutcome(outcome.Execution); err != nil {
+	if err := outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution)); err != nil {
 		return evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
 	}
 	if w.scoreProjectors != nil {
@@ -83,10 +83,10 @@ func ensureScoringOutcome(outcome evaloutcome.Outcome) error {
 		return assessment.ErrNoEvaluationModel
 	}
 	if outcome.Execution.ModelRef.IsEmpty() {
-		outcome.Execution.ModelRef = *modelRef
+		outcome.Execution.ModelRef = evaloutcome.ModelRefFromAssessment(*modelRef)
 		return nil
 	}
-	if !modelRef.SameIdentity(outcome.Execution.ModelRef) {
+	if !modelRef.SameIdentity(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution).ModelRef) {
 		return assessment.ErrEvaluationModelMismatch
 	}
 	return nil

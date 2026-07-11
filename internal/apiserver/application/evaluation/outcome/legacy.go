@@ -11,7 +11,7 @@ func LegacyResult(o Outcome) *assessment.EvaluationResult {
 	if o.Execution == nil {
 		return nil
 	}
-	return o.Execution.ToEvaluationResult()
+	return AssessmentOutcomeFromExecution(o.Execution).ToEvaluationResult()
 }
 
 // NewOutcomeFromLegacyResult 适配旧版 评估 结果 用于 tests 和 兼容性 callers。
@@ -23,7 +23,7 @@ func NewOutcomeFromLegacyResult(
 	outcome := Outcome{
 		Assessment: a,
 		Input:      input,
-		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result), //nolint:staticcheck // 单一表征边界适配器
+		Execution:  ExecutionFromAssessmentOutcome(assessment.AssessmentOutcomeFromEvaluationResult(result)),
 	}
 	if route, ok := ModelRouteFromInput(input); ok {
 		if key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(route); err == nil {

@@ -42,7 +42,7 @@ func (w *phaseRecordingScoringWriter) Write(_ context.Context, outcome evaloutco
 	if outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
-	return outcome.Assessment.ApplyScoringOutcome(outcome.Execution)
+	return outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
 }
 
 func TestEvaluateLegacyWriterCommitsScoringWithoutInlineInterpretation(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -96,7 +97,7 @@ func buildSubmittedAssessment(req modelpreview.Request) (*assessment.Assessment,
 	return a, nil
 }
 
-func outcomeIdentity(outcome *assessment.AssessmentOutcome) (string, string) {
+func outcomeIdentity(outcome *domainoutcome.Execution) (string, string) {
 	if outcome == nil {
 		return "", ""
 	}
@@ -109,7 +110,7 @@ func outcomeIdentity(outcome *assessment.AssessmentOutcome) (string, string) {
 	return "", ""
 }
 
-func scoresFromOutcome(outcome *assessment.AssessmentOutcome) map[string]float64 {
+func scoresFromOutcome(outcome *domainoutcome.Execution) map[string]float64 {
 	if outcome == nil {
 		return nil
 	}

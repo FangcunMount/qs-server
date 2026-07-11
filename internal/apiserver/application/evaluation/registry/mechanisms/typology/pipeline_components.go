@@ -6,7 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -66,7 +66,7 @@ func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.Calcul
 type typologyPipelineOutcomeAssembler struct{}
 
 func (typologyPipelineOutcomeAssembler) Assemble(result any) (any, error) {
-	outcome, ok := result.(*assessment.AssessmentOutcome)
+	outcome, ok := result.(*domainoutcome.Execution)
 	if !ok || outcome == nil {
 		return nil, fmt.Errorf("factor_classification outcome assembler received invalid type %T", result)
 	}

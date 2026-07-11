@@ -51,7 +51,7 @@ func TestAssessmentScoreProjectorOwnsScoreFactProjectionInEvaluation(t *testing.
 	repo := &evaluationScoreRepoStub{}
 	projector := outcomescoring.NewAssessmentScoreProjector(repo)
 
-	if err := projector.Project(context.Background(), evaloutcome.Outcome{Assessment: a, Execution: outcome}); err != nil {
+	if err := projector.Project(context.Background(), evaloutcome.Outcome{Assessment: a, Execution: evaloutcome.ExecutionFromAssessmentOutcome(outcome)}); err != nil {
 		t.Fatal(err)
 	}
 	if repo.assessment != a || repo.score == nil || len(repo.score.FactorScores()) != 1 {

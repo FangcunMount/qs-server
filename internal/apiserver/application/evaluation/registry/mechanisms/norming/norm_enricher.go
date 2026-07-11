@@ -4,17 +4,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 // ApplyNormProjection 应用常模/T 分 tables 基于 原始 scale 计分。
 func ApplyNormProjection(
-	outcome *assessment.AssessmentOutcome,
+	outcome *domainoutcome.Execution,
 	snapshot *behavioralsnapshot.Snapshot,
 	subject calcnorm.Subject,
-) *assessment.AssessmentOutcome {
+) *domainoutcome.Execution {
 	if outcome == nil || snapshot == nil {
 		return outcome
 	}

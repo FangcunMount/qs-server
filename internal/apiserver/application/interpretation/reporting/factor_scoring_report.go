@@ -7,6 +7,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -33,7 +34,7 @@ func (p FactorScoringScoreProjector) Project(ctx context.Context, outcome evalou
 	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
-	score := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), outcome.Execution)
+	score := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
 	if err := p.scoreRepo.SaveScoresWithContext(ctx, outcome.Assessment, score); err != nil {
 		return evalerrors.Database(err, "保存测评得分失败")
 	}
@@ -96,7 +97,7 @@ func factorScoringReportInputFromOutcome(outcome evaloutcome.Outcome) reportscor
 	return input
 }
 
-func outcomeDimensionsPreferredForReporting(dimensions []assessment.DimensionResult) bool {
+func outcomeDimensionsPreferredForReporting(dimensions []domainoutcome.DimensionResult) bool {
 	for _, dim := range dimensions {
 		if dim.Role != "" || dim.ParentCode != "" || dim.HierarchyLevel > 0 || dim.SortOrder > 0 {
 			return true
@@ -105,7 +106,7 @@ func outcomeDimensionsPreferredForReporting(dimensions []assessment.DimensionRes
 	return false
 }
 
-func scaleDimensionReportScores(dimensions []assessment.DimensionResult, model *reportscore.ReportModel) []reportscore.FactorReportScore {
+func scaleDimensionReportScores(dimensions []domainoutcome.DimensionResult, model *reportscore.ReportModel) []reportscore.FactorReportScore {
 	totalFactors := scaleTotalFactorCodes(model)
 	scores := make([]reportscore.FactorReportScore, 0, len(dimensions))
 	for _, dim := range dimensions {

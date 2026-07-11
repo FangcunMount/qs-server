@@ -7,6 +7,7 @@ import (
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,16 +20,16 @@ type countingEvaluator struct {
 
 func (e *countingEvaluator) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
 func (e *countingEvaluator) Key() evaluation.ExecutionIdentity               { return e.key }
-func (e *countingEvaluator) Execute(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e *countingEvaluator) Execute(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
 	e.calls++
 	if e.outcome != nil {
-		return e.outcome, nil
+		return evaloutcome.ExecutionFromAssessmentOutcome(e.outcome), nil
 	}
-	return assessment.NewAssessmentOutcome(
+	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(
 		assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("SCALE-1"), "1.0.0", "scale"),
 		assessment.ResultSummary{PrimaryLabel: "recomputed"},
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
-	), nil
+	)), nil
 }
 
 type stubInputResolver struct{}
@@ -50,7 +51,7 @@ func (w *recordingSplitPhaseScoringWriter) Write(_ context.Context, outcome eval
 	w.capture.ScoringCalls++
 	w.capture.Outcome = outcome
 	if outcome.Assessment != nil && outcome.Execution != nil {
-		return outcome.Assessment.ApplyScoringOutcome(outcome.Execution)
+		return outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
 	}
 	return nil
 }

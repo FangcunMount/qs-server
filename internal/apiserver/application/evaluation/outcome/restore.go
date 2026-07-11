@@ -11,7 +11,6 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Restore reconstructs the interpretation input exclusively from the durable
@@ -21,24 +20,19 @@ func Restore(record *domainoutcome.Record) (Outcome, error) {
 	if record == nil {
 		return Outcome{}, fmt.Errorf("evaluation outcome is required")
 	}
-	var execution assessment.AssessmentOutcome
+	var execution domainoutcome.Execution
 	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
 		return Outcome{}, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
 	}
 	model := record.Model()
-	execution.ModelRef = assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKind(model.Kind),
-		model.SubKind,
-		model.Algorithm,
-		meta.ZeroID,
-		meta.NewCode(model.Code),
-		model.Version,
-		model.Title,
-	)
+	execution.ModelRef = domainoutcome.ModelRef{
+		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
+		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
+	}
 	if err := restoreTypedDetail(record, &execution); err != nil {
 		return Outcome{}, err
 	}
-	modelRef := execution.ModelRef
+	modelRef := AssessmentOutcomeFromExecution(&execution).ModelRef
 	a := assessment.Reconstruct(
 		record.AssessmentID(),
 		record.OrgID(),
@@ -112,7 +106,7 @@ func restoreReportInput(record *domainoutcome.Record) (*evaluationinput.InputSna
 	return &evaluationinput.InputSnapshot{Model: snapshot, ModelPayload: payload}, nil
 }
 
-func restoreTypedDetail(record *domainoutcome.Record, execution *assessment.AssessmentOutcome) error {
+func restoreTypedDetail(record *domainoutcome.Record, execution *domainoutcome.Execution) error {
 	var wire struct {
 		Detail struct {
 			Payload json.RawMessage

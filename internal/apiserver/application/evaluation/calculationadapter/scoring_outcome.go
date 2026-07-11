@@ -1,22 +1,25 @@
 package calculationadapter
 
 import (
+	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
-// AssessmentOutcomeFromScoringInterpretation maps factor-scoring output to a canonical assessment outcome.
-func AssessmentOutcomeFromScoringInterpretation(
+// ExecutionFromScoringInterpretation maps factor-scoring output to the
+// canonical in-memory Evaluation result.
+func ExecutionFromScoringInterpretation(
 	result *scoring.Result,
 	modelRef assessment.EvaluationModelRef,
-) *assessment.AssessmentOutcome {
+) *domainoutcome.Execution {
 	if result == nil {
 		return nil
 	}
 	factorScores := factorScoreResultsFromInterpretation(result)
 	level := string(result.RiskLevel)
 	summaryScore := result.TotalScore
-	outcome := assessment.NewAssessmentOutcome(
+	legacy := assessment.NewAssessmentOutcome(
 		modelRef,
 		assessment.ResultSummary{
 			PrimaryLabel: level,
@@ -28,18 +31,29 @@ func AssessmentOutcomeFromScoringInterpretation(
 			Payload: factorScores,
 		},
 	)
-	outcome.Primary = &assessment.OutcomeScoreValue{
+	legacy.Primary = &assessment.OutcomeScoreValue{
 		Kind:  assessment.OutcomeScoreKindRawTotal,
 		Value: result.TotalScore,
 	}
 	if result.RiskLevel != "" {
-		outcome.Level = &assessment.OutcomeResultLevel{
+		legacy.Level = &assessment.OutcomeResultLevel{
 			Code:  string(result.RiskLevel),
 			Label: string(result.RiskLevel),
 		}
 	}
-	outcome.Dimensions = assessmentDimensionResultsFromFactorScores(factorScores)
-	return outcome
+	legacy.Dimensions = assessmentDimensionResultsFromFactorScores(factorScores)
+	return evaluationoutcome.ExecutionFromAssessmentOutcome(legacy)
+}
+
+// AssessmentOutcomeFromScoringInterpretation remains for compatibility with
+// callers that have not yet moved to the Execution name.
+//
+// Deprecated: use ExecutionFromScoringInterpretation.
+func AssessmentOutcomeFromScoringInterpretation(
+	result *scoring.Result,
+	modelRef assessment.EvaluationModelRef,
+) *domainoutcome.Execution {
+	return ExecutionFromScoringInterpretation(result, modelRef)
 }
 
 func factorScoreResultsFromInterpretation(result *scoring.Result) []assessment.FactorScoreResult {

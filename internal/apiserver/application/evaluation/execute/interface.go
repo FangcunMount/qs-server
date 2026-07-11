@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -35,7 +36,7 @@ type Evaluator interface {
 	// Key 是deprecated; 使用 Execution身份()。
 	Key() evaluation.ExecutionIdentity
 	// Execute 执行评估模型并返回 canonical 结果。
-	Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error)
+	Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error)
 }
 
 // EvaluatorRegistry 评估模型评估器注册表。
@@ -45,7 +46,7 @@ type EvaluatorRegistry interface {
 
 // DescriptorExecutor 执行 RuntimeDescriptor 已解析后的评估路径。
 type DescriptorExecutor interface {
-	Execute(ctx context.Context, descriptor evalpipeline.RuntimeDescriptor, input ExecutionInput) (*assessment.AssessmentOutcome, error)
+	Execute(ctx context.Context, descriptor evalpipeline.RuntimeDescriptor, input ExecutionInput) (*domainoutcome.Execution, error)
 }
 
 // ExecutionInput 执行输入

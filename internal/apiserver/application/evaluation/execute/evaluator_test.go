@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -29,15 +31,16 @@ func (e evaluatorStub) Key() evaluation.ExecutionIdentity {
 	return e.ExecutionIdentity()
 }
 
-func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 	if e.execute != nil {
-		return e.execute(ctx, input)
+		legacy, err := e.execute(ctx, input)
+		return evaloutcome.ExecutionFromAssessmentOutcome(legacy), err
 	}
-	return assessment.NewAssessmentOutcome(
+	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(
 		assessment.EvaluationModelRef{},
 		assessment.ResultSummary{},
 		assessment.EvaluationDetail{},
-	), nil
+	)), nil
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {

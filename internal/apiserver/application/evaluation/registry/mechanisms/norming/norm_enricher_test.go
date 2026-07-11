@@ -3,9 +3,11 @@ package norming_test
 import (
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
@@ -13,12 +15,12 @@ import (
 func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	t.Parallel()
 
-	outcome := &assessment.AssessmentOutcome{
+	outcome := evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
 		Dimensions: []assessment.DimensionResult{{
 			Code:  "gec",
 			Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 5},
 		}},
-	}
+	})
 	snapshot := &behavioralsnapshot.Snapshot{
 		Norming: &behavioralsnapshot.NormingProfile{
 			PrimaryDimensionCode: "gec",
@@ -44,10 +46,10 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 		t.Fatalf("dimensions = %#v", enriched.Dimensions)
 	}
 	dim := enriched.Dimensions[0]
-	if got := derivedScore(dim.DerivedScores, assessment.OutcomeScoreKindTScore); got != 65 {
+	if got := derivedScore(dim.DerivedScores, domainoutcome.ScoreKindTScore); got != 65 {
 		t.Fatalf("t_score = %v, want 65", got)
 	}
-	if got := derivedScore(dim.DerivedScores, assessment.OutcomeScoreKindPercentile); got != 90 {
+	if got := derivedScore(dim.DerivedScores, domainoutcome.ScoreKindPercentile); got != 90 {
 		t.Fatalf("percentile = %v, want 90", got)
 	}
 	if dim.Level == nil || dim.Level.Code != "elevated" || dim.Description != "升高" {
@@ -69,7 +71,7 @@ func TestNormSubjectFromInput(t *testing.T) {
 	}
 }
 
-func derivedScore(scores []assessment.OutcomeScoreValue, kind assessment.OutcomeScoreKind) float64 {
+func derivedScore(scores []domainoutcome.ScoreValue, kind domainoutcome.ScoreKind) float64 {
 	for _, score := range scores {
 		if score.Kind == kind {
 			return score.Value

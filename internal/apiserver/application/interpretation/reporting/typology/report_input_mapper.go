@@ -5,7 +5,7 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -29,14 +29,14 @@ func typologyModelCode(outcome evaloutcome.Outcome) string {
 	return ""
 }
 
-func typologyTotalScore(execution *assessment.AssessmentOutcome) float64 {
+func typologyTotalScore(execution *domainoutcome.Execution) float64 {
 	if execution == nil || execution.Primary == nil {
 		return 0
 	}
 	return execution.Primary.Value
 }
 
-func typologyRiskLevel(execution *assessment.AssessmentOutcome) domainReport.RiskLevel {
+func typologyRiskLevel(execution *domainoutcome.Execution) domainReport.RiskLevel {
 	if execution == nil || execution.Level == nil {
 		return domainReport.RiskLevelNone
 	}

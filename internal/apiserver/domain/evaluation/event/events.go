@@ -13,12 +13,13 @@ import (
 // 从 eventcatalog 包导入，保持事件类型的单一来源
 
 const (
-	TypeRequested        = eventcatalog.EvaluationRequested
-	TypeOutcomeCommitted = eventcatalog.EvaluationOutcomeCommitted
-	TypeFailed           = eventcatalog.EvaluationFailed
-	// Deprecated identifiers resolve to the new wire contract.
-	TypeSubmitted = TypeRequested
-	TypeEvaluated = TypeOutcomeCommitted
+	TypeRequested        = eventcatalog.EvaluationRequested        // 测评请求事件
+	TypeOutcomeCommitted = eventcatalog.EvaluationOutcomeCommitted // 测评结果提交事件
+	TypeFailed           = eventcatalog.EvaluationFailed           // 测评失败事件
+
+	// Deprecated identifiers resolve to the new wire contract. 已弃用，保留是为了兼容旧版本
+	TypeSubmitted = TypeRequested        // 测评提交事件
+	TypeEvaluated = TypeOutcomeCommitted // 测评评估事件
 )
 
 // AggregateType 聚合根类型
@@ -44,7 +45,7 @@ type FailedEvent = event.Event[FailedData]
 
 type OutcomeCommittedEvent = event.Event[OutcomeCommittedData]
 
-// RequestedInput constructs an evaluation requested event.
+// RequestedInput 测评请求输入
 type RequestedInput struct {
 	OrgID             int64
 	AssessmentID      int64
@@ -62,6 +63,7 @@ type RequestedInput struct {
 	RequestedAt       time.Time
 }
 
+// NewRequestedEvent 创建测评请求事件
 func NewRequestedEvent(in RequestedInput) RequestedEvent {
 	data := RequestedData{
 		OrgID:             in.OrgID,
@@ -101,6 +103,7 @@ func NewFailedEvent(
 	)
 }
 
+// NewOutcomeCommittedEvent 创建测评结果提交事件
 func NewOutcomeCommittedEvent(
 	orgID int64,
 	assessmentID int64,

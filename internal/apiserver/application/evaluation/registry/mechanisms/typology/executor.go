@@ -6,7 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -71,7 +71,7 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathTypologyDescriptor
 }
 
-func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*domainoutcome.Execution, error) {
 	if e == nil || e.runner == nil {
 		return nil, fmt.Errorf("personality typology evaluator is not configured")
 	}

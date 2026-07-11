@@ -3,16 +3,17 @@ package projection
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
-		return modelIdentityFromRef(outcome.Execution.ModelRef)
+		return modelIdentityFromExecutionRef(outcome.Execution.ModelRef)
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
-		return modelIdentityFromRef(*outcome.Assessment.EvaluationModelRef())
+		return modelIdentityFromAssessmentRef(*outcome.Assessment.EvaluationModelRef())
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
 		kind := binding.Kind(outcome.Input.Model.Kind)
@@ -30,7 +31,17 @@ func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIde
 	return domainreport.ModelIdentity{}
 }
 
-func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelIdentity {
+func modelIdentityFromExecutionRef(ref domainoutcome.ModelRef) domainreport.ModelIdentity {
+	id := ref.ExecutionIdentity()
+	return domainreport.ModelIdentity{
+		Kind: string(id.Kind), SubKind: string(id.SubKind), Algorithm: string(id.Algorithm),
+		Code: ref.Code().String(), Version: ref.Version(), Title: ref.Title(),
+		ProductChannel:  binding.ProductChannelForIdentity(id.Kind, ""),
+		AlgorithmFamily: binding.AlgorithmFamilyStringFromIdentity(id.Kind, id.SubKind, id.Algorithm),
+	}
+}
+
+func modelIdentityFromAssessmentRef(ref assessment.EvaluationModelRef) domainreport.ModelIdentity {
 	id := ref.ExecutionIdentity()
 	kind := id.Kind
 	return domainreport.ModelIdentity{
@@ -58,14 +69,14 @@ func primaryScoreFromOutcome(outcome evaloutcome.Outcome) *domainreport.ScoreVal
 	return nil
 }
 
-func reportScoreFromOutcomeValue(score *assessment.OutcomeScoreValue) *domainreport.ScoreValue {
+func reportScoreFromOutcomeValue(score *domainoutcome.ScoreValue) *domainreport.ScoreValue {
 	if score == nil {
 		return nil
 	}
 	switch score.Kind {
-	case assessment.OutcomeScoreKindMatchPercent:
+	case domainoutcome.ScoreKindMatchPercent:
 		return domainreport.NewMatchPercentScore(score.Value, score.Label)
-	case assessment.OutcomeScoreKindRawTotal:
+	case domainoutcome.ScoreKindRawTotal:
 		return domainreport.NewRawTotalScore(score.Value, score.Max)
 	default:
 		if score.Label != "" {
@@ -99,7 +110,7 @@ func levelFromOutcome(outcome evaloutcome.Outcome) *domainreport.ResultLevel {
 	return domainreport.LevelFromRisk(domainreport.RiskLevelNone)
 }
 
-func reportLevelFromOutcomeLevel(level *assessment.OutcomeResultLevel) *domainreport.ResultLevel {
+func reportLevelFromOutcomeLevel(level *domainoutcome.ResultLevel) *domainreport.ResultLevel {
 	if level == nil {
 		return nil
 	}

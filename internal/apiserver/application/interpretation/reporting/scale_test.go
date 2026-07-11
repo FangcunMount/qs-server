@@ -11,7 +11,7 @@ func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 	t.Parallel()
 
 	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
-		Execution: &assessment.AssessmentOutcome{
+		Execution: evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
 			Primary: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 10},
 			Level:   &assessment.OutcomeResultLevel{Code: string(assessment.RiskLevelMedium)},
 			Dimensions: []assessment.DimensionResult{
@@ -31,7 +31,7 @@ func TestScaleReportInputPrefersOutcomeDimensionsWithHierarchy(t *testing.T) {
 					{FactorCode: assessment.NewFactorCode("legacy"), RawScore: 1},
 				},
 			},
-		},
+		}),
 	})
 
 	if len(input.FactorScores) != 2 {
@@ -46,7 +46,7 @@ func TestScaleReportInputUsesFlatFactorScoresWithoutHierarchy(t *testing.T) {
 	t.Parallel()
 
 	input := factorScoringReportInputFromOutcome(evaloutcome.Outcome{
-		Execution: &assessment.AssessmentOutcome{
+		Execution: evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
 			Dimensions: []assessment.DimensionResult{
 				{Code: "total", Name: "总分", Score: &assessment.OutcomeScoreValue{Value: 5}},
 			},
@@ -58,7 +58,7 @@ func TestScaleReportInputUsesFlatFactorScoresWithoutHierarchy(t *testing.T) {
 					},
 				},
 			},
-		},
+		}),
 	})
 
 	if len(input.FactorScores) != 1 || !input.FactorScores[0].IsTotalScore {

@@ -129,7 +129,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	record, err := c.Commit(context.Background(), Request{
 		Outcome: evaloutcome.Outcome{
 			Assessment:           a,
-			Execution:            execution,
+			Execution:            evaloutcome.ExecutionFromAssessmentOutcome(execution),
 			RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		},
 		Run:         &run,

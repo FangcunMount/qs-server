@@ -7,7 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -38,7 +38,7 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathCognitiveDescriptor
 }
 
-func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*domainoutcome.Execution, error) {
 	if e == nil || e.scoring == nil {
 		return nil, fmt.Errorf("task_performance evaluation executor is not configured")
 	}
@@ -59,7 +59,7 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 
 // ApplyAbilityConclusions projects optional DefinitionV2 ability ranges onto
 // calculated cognitive factor results. No configured rule means no change.
-func ApplyAbilityConclusions(outcome *assessment.AssessmentOutcome, rules []conclusion.AbilityConclusion) *assessment.AssessmentOutcome {
+func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusion.AbilityConclusion) *domainoutcome.Execution {
 	if outcome == nil || len(rules) == 0 {
 		return outcome
 	}
@@ -76,7 +76,7 @@ func ApplyAbilityConclusions(outcome *assessment.AssessmentOutcome, rules []conc
 				if dimension.Score.Value < item.MinScore || dimension.Score.Value > item.MaxScore {
 					continue
 				}
-				dimension.Level = &assessment.OutcomeResultLevel{Code: item.Level, Label: item.Title}
+				dimension.Level = &domainoutcome.ResultLevel{Code: item.Level, Label: item.Title}
 				dimension.Description = item.Summary
 				dimension.Suggestion = item.Description
 				break

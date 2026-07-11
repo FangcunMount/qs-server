@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evalmodule "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -50,7 +50,7 @@ func (s parityStubEvaluator) ExecutionIdentity() evaldomain.ExecutionIdentity {
 
 func (s parityStubEvaluator) ExecutionPath() modelcatalog.ExecutionPath { return s.path }
 
-func (parityStubEvaluator) Execute(context.Context, execute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (parityStubEvaluator) Execute(context.Context, execute.ExecutionInput) (*domainoutcome.Execution, error) {
 	return nil, nil
 }
 

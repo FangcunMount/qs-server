@@ -1,6 +1,6 @@
 // Package evaluation 评估应用服务
 //
-// 负责测评执行、结果写入与查询编排。写路径以 AssessmentOutcome + EvaluatorKey 为主线：
+// 负责测评执行、结果写入与查询编排。写路径以 Outcome.Execution + EvaluatorKey 为主线：
 // execute 按 EvaluatorKey 路由到各模型家族 Executor；interpretation/reporting.Writer 以 Outcome.Execution 为权威，
 // legacy EvaluationResult 投影仅保留在 结果/legacy 边界（characterization 适配）。
 //

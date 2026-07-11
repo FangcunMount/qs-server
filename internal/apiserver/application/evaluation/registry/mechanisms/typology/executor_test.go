@@ -59,13 +59,13 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome == nil || outcome.Primary == nil {
 		t.Fatal("outcome primary is required")
 	}
-	if outcome.Primary.Kind != assessment.OutcomeScoreKindMatchPercent {
+	if string(outcome.Primary.Kind) != string(assessment.OutcomeScoreKindMatchPercent) {
 		t.Fatalf("primary kind = %s, want %s", outcome.Primary.Kind, assessment.OutcomeScoreKindMatchPercent)
 	}
 	if outcome.Level == nil || outcome.Level.Code != "INTJ" {
 		t.Fatalf("level = %#v, want INTJ type code", outcome.Level)
 	}
-	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
+	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityType) {
 		t.Fatalf("profile = %#v, want INTJ personality_type", outcome.Profile)
 	}
 }
@@ -106,7 +106,7 @@ func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome.Level == nil || outcome.Level.Code != "HIGH" {
 		t.Fatalf("level = %#v, want HIGH type code", outcome.Level)
 	}
-	if outcome.Profile == nil || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
+	if outcome.Profile == nil || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityType) {
 		t.Fatalf("profile = %#v, want personality_type", outcome.Profile)
 	}
 }
@@ -133,7 +133,7 @@ func TestBigFiveExecutorFillsTraitProfile(t *testing.T) {
 	if outcome.Summary.PrimaryLabel != "O" {
 		t.Fatalf("PrimaryLabel = %q, want O", outcome.Summary.PrimaryLabel)
 	}
-	if outcome.Profile == nil || outcome.Profile.Kind != assessment.ProfileKindPersonalityTrait {
+	if outcome.Profile == nil || string(outcome.Profile.Kind) != string(assessment.ProfileKindPersonalityTrait) {
 		t.Fatalf("profile = %#v, want personality_trait", outcome.Profile)
 	}
 }

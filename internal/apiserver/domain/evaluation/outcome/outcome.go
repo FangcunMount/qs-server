@@ -30,7 +30,7 @@ type RuntimeIdentity struct {
 }
 
 // Record is the canonical, immutable output of one successful EvaluationRun.
-// Payload keeps the versioned AssessmentOutcome JSON without forcing storage
+// Payload keeps the versioned Execution JSON without forcing storage
 // adapters to understand mechanism-specific detail DTOs.
 type Record struct {
 	id               ID

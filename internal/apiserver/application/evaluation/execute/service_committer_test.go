@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -19,7 +20,7 @@ type evaluationCommitterStub struct {
 func (s *evaluationCommitterStub) Commit(_ context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
 	s.calls++
 	s.request = request
-	if err := request.Outcome.Assessment.ApplyScoringOutcome(request.Outcome.Execution); err != nil {
+	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
 		return nil, err
 	}
 	request.Run.Succeed(time.Unix(200, 0))

@@ -6,7 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -47,7 +47,7 @@ type taskPerformanceCalculator struct {
 }
 
 type taskPerformancePipelineResult struct {
-	outcome *assessment.AssessmentOutcome
+	outcome *domainoutcome.Execution
 }
 
 func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {

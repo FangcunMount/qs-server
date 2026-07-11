@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -18,11 +20,12 @@ type runtimeEvaluatorStub struct {
 
 func (e runtimeEvaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
 
-func (e runtimeEvaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e runtimeEvaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 	if e.execute != nil {
-		return e.execute(ctx, input)
+		legacy, err := e.execute(ctx, input)
+		return evaloutcome.ExecutionFromAssessmentOutcome(legacy), err
 	}
-	return assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{}), nil
+	return evaloutcome.ExecutionFromAssessmentOutcome(assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{})), nil
 }
 
 func (e runtimeEvaluatorStub) Key() evaluation.ExecutionIdentity {

@@ -7,7 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -54,7 +54,7 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathScaleDescriptor
 }
 
-func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*domainoutcome.Execution, error) {
 	if e == nil || e.evaluator == nil {
 		return nil, fmt.Errorf("factor_scoring evaluation executor is not configured")
 	}
@@ -69,7 +69,7 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if err != nil {
 		return nil, err
 	}
-	return ToAssessmentOutcome(result, input.Assessment, input.Input), nil
+	return ToExecution(result, input.Assessment, input.Input), nil
 }
 
 type scoringRegistry struct {

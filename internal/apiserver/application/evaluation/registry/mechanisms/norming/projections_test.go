@@ -3,9 +3,11 @@ package norming_test
 import (
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
@@ -14,12 +16,12 @@ import (
 func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 	t.Parallel()
 
-	outcome := &assessment.AssessmentOutcome{
+	outcome := evaloutcome.ExecutionFromAssessmentOutcome(&assessment.AssessmentOutcome{
 		Dimensions: []assessment.DimensionResult{
 			{Code: "inhibit", Score: score(4)},
 			{Code: "self_monitor", Score: score(6)},
 		},
-	}
+	})
 	snapshot := &behavioralsnapshot.Snapshot{
 		Factors: []behavioralsnapshot.FactorSnapshot{
 			{Code: "inhibit", Title: "Inhibit"},
@@ -71,7 +73,7 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 		t.Fatalf("bri hierarchy = %#v, want parent gec", bri)
 	}
 	for _, derived := range gec.DerivedScores {
-		if derived.Kind == assessment.OutcomeScoreKindTScore && derived.Value == 65 {
+		if derived.Kind == domainoutcome.ScoreKindTScore && derived.Value == 65 {
 			return
 		}
 	}
@@ -82,7 +84,7 @@ func score(value float64) *assessment.OutcomeScoreValue {
 	return &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: value}
 }
 
-func dimensionScore(dimensions []assessment.DimensionResult, code string) float64 {
+func dimensionScore(dimensions []domainoutcome.DimensionResult, code string) float64 {
 	dim := findDimension(dimensions, code)
 	if dim == nil || dim.Score == nil {
 		return 0
@@ -90,7 +92,7 @@ func dimensionScore(dimensions []assessment.DimensionResult, code string) float6
 	return dim.Score.Value
 }
 
-func findDimension(dimensions []assessment.DimensionResult, code string) *assessment.DimensionResult {
+func findDimension(dimensions []domainoutcome.DimensionResult, code string) *domainoutcome.DimensionResult {
 	for i := range dimensions {
 		if dimensions[i].Code == code {
 			return &dimensions[i]

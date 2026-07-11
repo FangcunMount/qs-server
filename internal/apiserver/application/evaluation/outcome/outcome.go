@@ -3,6 +3,7 @@ package outcome
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -11,7 +12,7 @@ import (
 type Outcome struct {
 	Assessment           *assessment.Assessment
 	Input                *evaluationinput.InputSnapshot
-	Execution            *assessment.AssessmentOutcome
+	Execution            *domainoutcome.Execution
 	RuntimeDescriptorKey evalpipeline.RuntimeDescriptorKey
 }
 

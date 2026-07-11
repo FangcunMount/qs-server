@@ -92,7 +92,7 @@ func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterProjector(t *testing.T) {
 
 	err = writer.Write(context.Background(), evaloutcome.Outcome{
 		Assessment: a,
-		Execution:  execution,
+		Execution:  evaloutcome.ExecutionFromAssessmentOutcome(execution),
 	})
 	if err == nil {
 		t.Fatal("Write error = nil, want assessment save error")

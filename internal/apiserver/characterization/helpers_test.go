@@ -187,7 +187,7 @@ type charRecordingScoring struct{}
 
 func (charRecordingScoring) Write(_ context.Context, outcome evaloutcome.Outcome) error {
 	if outcome.Assessment != nil && outcome.Execution != nil {
-		return outcome.Assessment.ApplyScoringOutcome(outcome.Execution)
+		return outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
 	}
 	return nil
 }

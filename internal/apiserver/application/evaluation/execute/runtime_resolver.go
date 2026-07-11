@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -80,7 +81,7 @@ func (r *RuntimeResolver) Execute(
 	ctx context.Context,
 	a *assessment.Assessment,
 	input *evaluationinput.InputSnapshot,
-) (*assessment.AssessmentOutcome, ResolvedExecution, error) {
+) (*domainoutcome.Execution, ResolvedExecution, error) {
 	resolved, err := r.ResolveExecution(a, input)
 	if err != nil {
 		return nil, ResolvedExecution{}, err

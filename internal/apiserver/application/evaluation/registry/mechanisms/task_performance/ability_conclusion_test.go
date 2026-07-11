@@ -3,13 +3,13 @@ package task_performance
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 )
 
 func TestApplyAbilityConclusionsProjectsMatchingRawScoreRange(t *testing.T) {
-	outcome := &assessment.AssessmentOutcome{Dimensions: []assessment.DimensionResult{{
-		Code: "total", Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 42},
+	outcome := &domainoutcome.Execution{Dimensions: []domainoutcome.DimensionResult{{
+		Code: "total", Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 42},
 	}}}
 	got := ApplyAbilityConclusions(outcome, []conclusion.AbilityConclusion{{
 		FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw,
@@ -24,8 +24,8 @@ func TestApplyAbilityConclusionsProjectsMatchingRawScoreRange(t *testing.T) {
 }
 
 func TestApplyAbilityConclusionsLeavesUnconfiguredScoreBasisUntouched(t *testing.T) {
-	outcome := &assessment.AssessmentOutcome{Dimensions: []assessment.DimensionResult{{
-		Code: "total", Score: &assessment.OutcomeScoreValue{Kind: assessment.OutcomeScoreKindRawTotal, Value: 42},
+	outcome := &domainoutcome.Execution{Dimensions: []domainoutcome.DimensionResult{{
+		Code: "total", Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 42},
 	}}}
 	got := ApplyAbilityConclusions(outcome, []conclusion.AbilityConclusion{{
 		FactorCode: "total", ScoreBasis: conclusion.ScoreBasisTScore,
