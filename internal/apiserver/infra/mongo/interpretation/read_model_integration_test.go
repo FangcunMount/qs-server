@@ -176,3 +176,68 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 		t.Fatalf("unexpected report row: %#v", reportRow)
 	}
 }
+
+func TestReportReadModelPrefersArtifactsAndFallsBackToLegacyAgainstMongo(t *testing.T) {
+	db := openEvaluationMongoContractDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
+	testeeID := baseID + 1000
+	now := time.Now().UTC().Truncate(time.Second)
+	legacyCollection := db.Collection((&InterpretReportPO{}).CollectionName())
+	artifactCollection := db.Collection((InterpretReportArtifactPO{}).CollectionName())
+	legacyIDs := []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()}
+	artifactID := primitive.NewObjectID()
+
+	legacyDocs := []interface{}{
+		InterpretReportPO{
+			BaseDocument: base.BaseDocument{ID: legacyIDs[0], DomainID: meta.FromUint64(baseID + 1), CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute)},
+			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "legacy duplicate", TotalScore: 1,
+		},
+		InterpretReportPO{
+			BaseDocument: base.BaseDocument{ID: legacyIDs[1], DomainID: meta.FromUint64(baseID + 2), CreatedAt: now.Add(-time.Minute), UpdatedAt: now.Add(-time.Minute)},
+			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "legacy only", TotalScore: 2,
+		},
+	}
+	if _, err := legacyCollection.InsertMany(ctx, legacyDocs); err != nil {
+		t.Fatalf("insert legacy reports: %v", err)
+	}
+	artifact := InterpretReportArtifactPO{
+		BaseDocument:        base.BaseDocument{ID: artifactID, DomainID: meta.FromUint64(baseID + 101), CreatedAt: now, UpdatedAt: now},
+		GenerationID:        baseID + 201,
+		OutcomeID:           baseID + 301,
+		InterpretationRunID: baseID + 401,
+		ReportType:          "standard",
+		TemplateVersion:     "v1",
+		GeneratedAt:         now,
+		AssessmentID:        baseID + 1,
+		TesteeID:            testeeID,
+		ScaleCode:           "SDS",
+		Conclusion:          "artifact wins",
+		TotalScore:          42,
+	}
+	if _, err := artifactCollection.InsertOne(ctx, artifact); err != nil {
+		t.Fatalf("insert artifact: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_, _ = legacyCollection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": legacyIDs}})
+		_, _ = artifactCollection.DeleteOne(cleanupCtx, bson.M{"_id": artifactID})
+	})
+
+	reader := NewReportReadModel(db)
+	newRow, err := reader.GetReportByAssessmentID(ctx, baseID+1)
+	if err != nil || newRow.Conclusion != "artifact wins" || newRow.TotalScore != 42 {
+		t.Fatalf("new-first report = %#v err=%v", newRow, err)
+	}
+	legacyRow, err := reader.GetReportByID(ctx, baseID+2)
+	if err != nil || legacyRow.Conclusion != "legacy only" {
+		t.Fatalf("legacy fallback report = %#v err=%v", legacyRow, err)
+	}
+	rows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
+	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "artifact wins" {
+		t.Fatalf("new-first report list = %#v total=%d err=%v", rows, total, err)
+	}
+}

@@ -20,7 +20,7 @@ func (m *LifecycleMapper) GenerationToPO(domain *generation.ReportGeneration) *R
 		return nil
 	}
 	return &ReportGenerationPO{
-		BaseDocument: base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
+		BaseDocument:    base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
 		OutcomeID:       domain.Key().OutcomeID.Uint64(),
 		ReportType:      domain.Key().ReportType.String(),
 		TemplateVersion: domain.Key().TemplateVersion.String(),
@@ -116,10 +116,19 @@ func (m *LifecycleMapper) ArtifactToPO(domain *domainreport.Artifact) *Interpret
 	if content.PrimaryScore != nil {
 		po.TotalScore = content.PrimaryScore.Value
 	}
-	if content.Level != nil && domainreport.IsRiskLevelCode(content.Level.Code) {
+	if content.Level != nil && isArtifactRiskLevelCode(content.Level.Code) {
 		po.RiskLevel = content.Level.Code
 	}
 	return po
+}
+
+func isArtifactRiskLevelCode(code string) bool {
+	switch code {
+	case "none", "low", "medium", "high", "severe":
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *LifecycleMapper) ArtifactToDomain(po *InterpretReportArtifactPO) (*domainreport.Artifact, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -125,6 +126,9 @@ func (r *RunRepository) Create(ctx context.Context, domain *interpretationrun.In
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
+	now := time.Now()
+	po.CreatedAt = now
+	po.UpdatedAt = now
 	if _, err := r.InsertOne(ctx, po); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("create interpretation run: %w", interpretationrun.ErrAlreadyExists)
@@ -146,13 +150,20 @@ func (r *RunRepository) FindByID(ctx context.Context, id interpretationrun.ID) (
 }
 
 func (r *RunRepository) FindLatestByGenerationID(ctx context.Context, generationID interpretationrun.ID) (*interpretationrun.InterpretationRun, error) {
-	var po InterpretationRunPO
-	err := r.Collection().FindOne(ctx, bson.M{"generation_id": generationID.Uint64()}, options.FindOne().SetSort(bson.D{{Key: "attempt", Value: -1}})).Decode(&po)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, interpretationrun.ErrNotFound
-	}
+	cursor, err := r.Find(ctx, bson.M{"generation_id": generationID.Uint64()}, options.Find().SetSort(bson.D{{Key: "attempt", Value: -1}}).SetLimit(1))
 	if err != nil {
 		return nil, fmt.Errorf("find latest interpretation run: %w", err)
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	if !cursor.Next(ctx) {
+		if err := cursor.Err(); err != nil {
+			return nil, fmt.Errorf("find latest interpretation run: %w", err)
+		}
+		return nil, interpretationrun.ErrNotFound
+	}
+	var po InterpretationRunPO
+	if err := cursor.Decode(&po); err != nil {
+		return nil, fmt.Errorf("decode latest interpretation run: %w", err)
 	}
 	return r.mapper.RunToDomain(&po)
 }
@@ -183,7 +194,7 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
-	update := bson.M{"$set": bson.M{"status": po.Status, "failure": po.Failure, "trace_id": po.TraceID, "started_at": po.StartedAt, "finished_at": po.FinishedAt}}
+	update := bson.M{"$set": bson.M{"status": po.Status, "failure": po.Failure, "trace_id": po.TraceID, "started_at": po.StartedAt, "finished_at": po.FinishedAt, "updated_at": time.Now()}}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64()}, update)
 	if err != nil {
 		return fmt.Errorf("save interpretation run: %w", err)
