@@ -19,7 +19,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -46,7 +45,6 @@ type BootstrapInput struct {
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         assessment.TesteeAccessChecker
 	OpsHandle                                   *cacheplane.Handle
-	ReportStatusConfig                          reportstatus.Config
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry

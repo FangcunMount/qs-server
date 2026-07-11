@@ -1,11 +1,11 @@
 package projection
 
 import (
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	assessment "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationassessment"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIdentity {

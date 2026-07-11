@@ -6,6 +6,7 @@ import (
 	"time"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	reportqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
@@ -27,7 +28,7 @@ type AssessmentReader interface {
 }
 
 type LegacyProjection interface {
-	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error)
+	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*reportqueryApp.AssessmentProjection, error)
 }
 
 // Service is the neutral journey use case for an authorized report wait.
@@ -75,18 +76,22 @@ func (s *service) loadTerminalSummary(ctx context.Context, assessmentID uint64) 
 		return evaluationwaiter.StatusSummary{}, false
 	}
 	if s.projection != nil {
-		result, err = s.projection.ProjectAssessment(ctx, result)
-		if err != nil || result == nil {
+		projected, projectErr := s.projection.ProjectAssessment(ctx, result)
+		if projectErr != nil || projected == nil || projected.Assessment == nil {
 			return evaluationwaiter.StatusSummary{}, false
 		}
+		if projected.Status != "interpreted" && projected.Status != "failed" {
+			return evaluationwaiter.StatusSummary{}, false
+		}
+		return statusSummary(projected.Assessment, projected.Status), true
 	}
 	if result.Status != "interpreted" && result.Status != "failed" {
 		return evaluationwaiter.StatusSummary{}, false
 	}
-	return statusSummary(result), true
+	return statusSummary(result, result.Status), true
 }
 
-func statusSummary(result *assessmentApp.AssessmentResult) evaluationwaiter.StatusSummary {
+func statusSummary(result *assessmentApp.AssessmentResult, status string) evaluationwaiter.StatusSummary {
 	var totalScore *float64
 	if result.TotalScore != nil {
 		value := *result.TotalScore
@@ -97,7 +102,7 @@ func statusSummary(result *assessmentApp.AssessmentResult) evaluationwaiter.Stat
 		value := *result.RiskLevel
 		riskLevel = &value
 	}
-	return evaluationwaiter.StatusSummary{Status: result.Status, TotalScore: totalScore, RiskLevel: riskLevel, UpdatedAt: time.Now().Unix()}
+	return evaluationwaiter.StatusSummary{Status: status, TotalScore: totalScore, RiskLevel: riskLevel, UpdatedAt: time.Now().Unix()}
 }
 
 func pendingSummary() evaluationwaiter.StatusSummary {

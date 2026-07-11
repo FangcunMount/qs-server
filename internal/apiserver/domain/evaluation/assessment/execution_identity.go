@@ -9,12 +9,10 @@ import (
 func (r EvaluationModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	if r.algorithm != "" {
 		kind := modelcatalog.Kind(r.kind)
-		if r.subKind != "" {
-			id := evaldomain.ExecutionIdentity{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
-			return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
+		if kind == modelcatalog.KindBehavioralRating {
+			return evaldomain.ExecutionIdentityBehavioralRatingDefault
 		}
-		id := evaldomain.ExecutionIdentity{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
-		return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
+		return evaldomain.ExecutionIdentity{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
 	}
 	if id, ok := evaldomain.ExecutionIdentityFromLegacyKind(modelcatalog.Kind(r.kind)); ok {
 		return id

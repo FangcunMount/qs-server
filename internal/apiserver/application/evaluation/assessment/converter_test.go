@@ -37,9 +37,6 @@ func TestToAssessmentResultMapsEvaluatedAt(t *testing.T) {
 	if got.EvaluatedAt == nil || !got.EvaluatedAt.Equal(evaluatedAt) {
 		t.Fatalf("EvaluatedAt = %#v, want %v", got.EvaluatedAt, evaluatedAt)
 	}
-	if got.InterpretedAt != nil {
-		t.Fatalf("InterpretedAt = %#v, want nil", got.InterpretedAt)
-	}
 }
 
 func TestAssessmentRowToResultMapsEvaluatedAt(t *testing.T) {
@@ -60,9 +57,6 @@ func TestAssessmentRowToResultMapsEvaluatedAt(t *testing.T) {
 	}
 	if got.EvaluatedAt == nil || !got.EvaluatedAt.Equal(evaluatedAt) {
 		t.Fatalf("EvaluatedAt = %#v, want %v", got.EvaluatedAt, evaluatedAt)
-	}
-	if got.InterpretedAt != nil {
-		t.Fatalf("InterpretedAt = %#v, want nil", got.InterpretedAt)
 	}
 }
 

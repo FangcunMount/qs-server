@@ -45,8 +45,8 @@ func TestEvaluatePersistsTraceIDFromContext(t *testing.T) {
 	if err := svc.Evaluate(ctx, a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if len(runRepo.saved) < 2 {
-		t.Fatalf("saved runs = %d, want at least running and succeeded", len(runRepo.saved))
+	if len(runRepo.saved) != 1 {
+		t.Fatalf("saved runs = %d, want input snapshot update", len(runRepo.saved))
 	}
 	if got := runRepo.saved[0].TraceID; got != "trace-abc-123" {
 		t.Fatalf("first saved trace_id = %q, want trace-abc-123", got)
@@ -73,14 +73,11 @@ func TestEvaluatePersistsInputSnapshotRefBeforeExecuting(t *testing.T) {
 	if evaluator.calls != 1 {
 		t.Fatalf("evaluator calls = %d, want 1", evaluator.calls)
 	}
-	if len(runRepo.saved) < 2 {
-		t.Fatalf("saved runs = %d, want at least 2", len(runRepo.saved))
+	if len(runRepo.saved) != 1 {
+		t.Fatalf("saved runs = %d, want one input snapshot update", len(runRepo.saved))
 	}
-	if got := runRepo.saved[0].InputSnapshotRef; got != "" {
-		t.Fatalf("first saved input_snapshot_ref = %q, want empty before resolve", got)
-	}
-	if got := runRepo.saved[1].InputSnapshotRef; got != "model:SCALE-1@1.0.0" {
-		t.Fatalf("second saved input_snapshot_ref = %q, want model:SCALE-1@1.0.0", got)
+	if got := runRepo.saved[0].InputSnapshotRef; got != "model:SCALE-1@1.0.0" {
+		t.Fatalf("saved input_snapshot_ref = %q, want model:SCALE-1@1.0.0", got)
 	}
 }
 
@@ -90,7 +87,7 @@ func TestEvaluateReturnsInputSnapshotPersistenceErrorBeforeExecuting(t *testing.
 	persistErr := errors.New("input snapshot ref save failed")
 	a := splitPhaseAssessment(t)
 	evaluator := scaleEvaluatorForAssessment(a)
-	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
+	runRepo := &stubRunRepo{saveErrs: []error{persistErr}}
 	svc := newSplitPhaseTestService(
 		&fakeAssessmentRepo{assessment: a},
 		modelInputResolver{model: &evaluationinput.ModelSnapshot{Code: "SCALE-1", Version: "1.0.0"}},
@@ -106,8 +103,8 @@ func TestEvaluateReturnsInputSnapshotPersistenceErrorBeforeExecuting(t *testing.
 	if evaluator.calls != 0 {
 		t.Fatalf("evaluator calls = %d, want 0 after input snapshot persist failure", evaluator.calls)
 	}
-	if len(runRepo.saved) != 2 {
-		t.Fatalf("saved runs = %d, want initial running and failed input snapshot persist", len(runRepo.saved))
+	if len(runRepo.saved) != 1 {
+		t.Fatalf("saved runs = %d, want failed input snapshot update", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].InputSnapshotRef; got != "model:SCALE-1@1.0.0" {
 		t.Fatalf("last saved input_snapshot_ref = %q", got)

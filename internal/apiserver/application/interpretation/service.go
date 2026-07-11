@@ -6,7 +6,7 @@ import (
 
 	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

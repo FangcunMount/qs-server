@@ -397,7 +397,7 @@ type Algorithm = identity.Algorithm
 | 子轨 | 动作 |
 |------|------|
 | R24-A | `RuntimeResolver` descriptor-primary 走族级 `familyEvaluators`；`runtime_descriptor_primary: true` |
-| R24-B | `evaluation_run` 表 + `assessment.current_run_id`；Execute Start/Success/Fail 落库 |
+| R24-B | 历史实现：`evaluation_run` 表 + `assessment.current_run_id`；后续 Batch E5 已删除 Assessment 指针，改为 Run claim/CAS/lease |
 | R24-C | typology `MechanismKeys()` 按 `DecisionKind` 注册；`resolveEvaluatorKey` 无 typology 分支扩展 |
 
 **刻意保留（R25+）**：删除 `EvaluatorKey`、Run REST、worker 重试编排、Statistics 投影统一。

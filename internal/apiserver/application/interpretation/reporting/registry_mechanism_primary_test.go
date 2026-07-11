@@ -3,11 +3,11 @@ package reporting
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
@@ -70,7 +70,7 @@ func TestResolveLegacyTypologyStillWorksAfterMechanismPrimary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	for _, legacyKey := range evaluation.PersonalityTypologyLegacyIdentities() {
+	for _, legacyKey := range legacyTypologyIdentities() {
 		builder, err := registry.Resolve(legacyKey, domainReport.ReportTypeStandard)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -175,7 +176,7 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(evaldomain.ExecutionIdentityMBTI); err == nil {
+	if _, err := registry.Resolve(evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI)); err == nil {
 		t.Fatal("expected unknown provider key error")
 	}
 }
@@ -187,7 +188,8 @@ func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *tes
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
+	for _, algorithm := range []modelcatalog.Algorithm{modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI, modelcatalog.AlgorithmBigFive} {
+		legacyKey := evaldomain.PersonalityTypologyIdentity(algorithm)
 		provider, err := registry.Resolve(legacyKey)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)

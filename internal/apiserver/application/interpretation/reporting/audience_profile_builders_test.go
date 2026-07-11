@@ -6,12 +6,12 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type stubBroadBuilder struct{}

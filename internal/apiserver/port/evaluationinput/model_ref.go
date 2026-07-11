@@ -13,7 +13,10 @@ func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 			SubKind:   modelcatalog.SubKind(r.SubKind),
 			Algorithm: modelcatalog.Algorithm(r.Algorithm),
 		}
-		return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
+		if id.Kind == modelcatalog.KindBehavioralRating {
+			return evaldomain.ExecutionIdentityBehavioralRatingDefault
+		}
+		return id
 	}
 	if id, ok := evaldomain.ExecutionIdentityFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
 		return id

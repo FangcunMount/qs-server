@@ -3,8 +3,8 @@ package input
 import (
 	"testing"
 
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 func TestFactorScoresPreferCanonicalDimensions(t *testing.T) {

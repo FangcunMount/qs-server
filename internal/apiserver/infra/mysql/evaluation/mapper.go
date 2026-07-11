@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -65,10 +64,6 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 	po.EvaluatedAt = domain.EvaluatedAt()
 	po.FailedAt = domain.FailedAt()
 	po.FailureReason = domain.FailureReason()
-	if runID := domain.CurrentRunID(); runID != "" {
-		currentRunID := runID.String()
-		po.CurrentRunID = &currentRunID
-	}
 
 	applyAssessmentOutcomeV2Fields(po, domain)
 
@@ -139,9 +134,6 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		po.FailureReason,
 		modelRef,
 	)
-	if po.CurrentRunID != nil && *po.CurrentRunID != "" {
-		a.SetCurrentRunID(evalrun.ID(*po.CurrentRunID))
-	}
 	return a
 }
 

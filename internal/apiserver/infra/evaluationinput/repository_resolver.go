@@ -161,13 +161,13 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.ExecutionIdentity) (
 	if provider, ok := r.items[key]; ok {
 		return provider, nil
 	}
-	if routed := evaldomain.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
-		if provider, ok := r.items[routed]; ok {
+	if key.Kind == modelcatalog.KindTypology && key.SubKind == modelcatalog.SubKindTypology {
+		if provider, ok := r.items[evaldomain.ExecutionIdentityPersonalityTypology]; ok {
 			return provider, nil
 		}
 	}
-	if routed := evaldomain.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
-		if provider, ok := r.items[routed]; ok {
+	if key.Kind == modelcatalog.KindBehavioralRating {
+		if provider, ok := r.items[evaldomain.ExecutionIdentityBehavioralRatingDefault]; ok {
 			return provider, nil
 		}
 	}

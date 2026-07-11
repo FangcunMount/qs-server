@@ -102,7 +102,6 @@ func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *asse
 		OriginID:             result.OriginID,
 		Status:               result.Status,
 		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
 		FailedAt:             result.FailedAt,
 		FailureReason:        result.FailureReason,
 	}
@@ -170,9 +169,6 @@ func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeR
 	if result.SubmittedAt != nil {
 		detail.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
 	}
-	if result.InterpretedAt != nil {
-		detail.InterpretedAt = result.InterpretedAt.Format("2006-01-02 15:04:05")
-	}
 	if result.FailedAt != nil {
 		detail.FailedAt = result.FailedAt.Format("2006-01-02 15:04:05")
 	}
@@ -199,9 +195,6 @@ func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcome
 	}
 	if result.SubmittedAt != nil {
 		summary.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
-	}
-	if result.InterpretedAt != nil {
-		summary.InterpretedAt = result.InterpretedAt.Format("2006-01-02 15:04:05")
 	}
 	return summary
 }

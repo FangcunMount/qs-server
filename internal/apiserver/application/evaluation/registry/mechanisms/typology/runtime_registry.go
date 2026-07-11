@@ -47,12 +47,11 @@ func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithm
 }
 
 func (r PersonalityRuntimeRegistry) runnerForIdentity(key evaluation.ExecutionIdentity) (algorithmRunner, error) {
-	switch evaluation.ResolvePersonalityTypologyExecutorIdentity(key) {
-	case evaluation.ExecutionIdentityPersonalityTypology:
+	if key == evaluation.ExecutionIdentityPersonalityTypology ||
+		(key.Kind == modelcatalog.KindTypology && key.SubKind == modelcatalog.SubKindTypology) {
 		return r.runnerForConfigured(), nil
-	default:
-		return algorithmRunner{}, fmt.Errorf("unsupported typology evaluator key: %s", key)
 	}
+	return algorithmRunner{}, fmt.Errorf("unsupported typology evaluator key: %s", key)
 }
 
 func (r PersonalityRuntimeRegistry) runnerForConfigured() algorithmRunner {

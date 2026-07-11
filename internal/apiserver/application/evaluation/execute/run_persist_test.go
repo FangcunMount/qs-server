@@ -139,34 +139,6 @@ func TestEvaluateReturnsRunPersistenceErrorBeforeExecuting(t *testing.T) {
 	}
 }
 
-func TestEvaluateReturnsCurrentRunPersistenceErrorBeforeExecuting(t *testing.T) {
-	t.Parallel()
-
-	persistErr := errors.New("current run id save failed")
-	a := splitPhaseAssessment(t)
-	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
-	capture := &splitPhaseCapture{}
-	repo := &fakeAssessmentRepo{assessment: a, saveErr: persistErr}
-	svc := newSplitPhaseTestService(
-		repo,
-		stubInputResolver{},
-		capture,
-		withTestEvaluator(evaluator),
-		WithRunRepository(&stubRunRepo{}),
-	)
-
-	err := svc.Evaluate(context.Background(), a.ID().Uint64())
-	if !errors.Is(err, persistErr) {
-		t.Fatalf("Evaluate error = %v, want current run persistence error", err)
-	}
-	if evaluator.calls != 0 {
-		t.Fatalf("evaluator calls = %d, want 0 after current run persist failure", evaluator.calls)
-	}
-	if !a.Status().IsSubmitted() {
-		t.Fatalf("assessment status = %s, want submitted when start transaction rolls back", a.Status())
-	}
-}
-
 func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T) {
 	t.Parallel()
 
@@ -191,8 +163,8 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 	if !errors.Is(err, executeErr) {
 		t.Fatalf("Evaluate error = %v, want original execution error", err)
 	}
-	if len(runRepo.saved) != 3 {
-		t.Fatalf("saved runs = %d, want running, input snapshot, and failed", len(runRepo.saved))
+	if len(runRepo.saved) != 2 {
+		t.Fatalf("saved runs = %d, want input snapshot and terminal failed run", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
@@ -211,7 +183,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 			return nil, executeErr
 		},
 	}
-	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
+	runRepo := &stubRunRepo{saveErrs: []error{nil, persistErr}}
 	svc := NewEngine(
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
@@ -224,8 +196,8 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Evaluate error = %v, want failed run persistence error", err)
 	}
-	if len(runRepo.saved) != 3 {
-		t.Fatalf("saved runs = %d, want running, input snapshot, and failed", len(runRepo.saved))
+	if len(runRepo.saved) != 2 {
+		t.Fatalf("saved runs = %d, want input snapshot and attempted failed run save", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
@@ -235,29 +207,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	}
 }
 
-func TestPersistStartedEvaluationRunReturnsCurrentRunSaveError(t *testing.T) {
-	t.Parallel()
-
-	persistErr := errors.New("assessment save failed")
-	a := splitPhaseAssessment(t)
-	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
-	if err := run.Start(time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	a.SetCurrentRunID(run.RunID)
-	svc := &service{
-		assessmentRepo: &fakeAssessmentRepo{assessment: a, saveErr: persistErr},
-		runRepo:        &stubRunRepo{},
-		txRunner:       &engineRecordingTxRunner{},
-	}
-
-	err := svc.persistStartedEvaluationRun(context.Background(), a, run)
-	if !errors.Is(err, persistErr) {
-		t.Fatalf("persistStartedEvaluationRun error = %v, want assessment save error", err)
-	}
-}
-
-func TestPersistStartedEvaluationRunPersistsRunAndCurrentReferenceInOneTransaction(t *testing.T) {
+func TestPersistClaimedEvaluationRunUpdatesOnlyRunRepository(t *testing.T) {
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
@@ -265,7 +215,6 @@ func TestPersistStartedEvaluationRunPersistsRunAndCurrentReferenceInOneTransacti
 	if err := run.Start(time.Unix(100, 0)); err != nil {
 		t.Fatal(err)
 	}
-	a.SetCurrentRunID(run.RunID)
 	repo := &fakeAssessmentRepo{assessment: a}
 	runRepo := &stubRunRepo{}
 	svc := &service{
@@ -274,11 +223,11 @@ func TestPersistStartedEvaluationRunPersistsRunAndCurrentReferenceInOneTransacti
 		txRunner:       &engineRecordingTxRunner{},
 	}
 
-	if err := svc.persistStartedEvaluationRun(context.Background(), a, run); err != nil {
+	if err := svc.persistClaimedEvaluationRun(context.Background(), run); err != nil {
 		t.Fatal(err)
 	}
-	if !repo.saveCtxHadTxMarker || !runRepo.saveCtxHadTxMarker {
-		t.Fatalf("start writes must share transaction context: assessment=%v run=%v", repo.saveCtxHadTxMarker, runRepo.saveCtxHadTxMarker)
+	if repo.saveCtxHadTxMarker || runRepo.saveCtxHadTxMarker {
+		t.Fatalf("run update must not write Assessment or require a transaction: assessment=%v run=%v", repo.saveCtxHadTxMarker, runRepo.saveCtxHadTxMarker)
 	}
 	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt.Status != evalrun.StatusRunning {
 		t.Fatalf("saved run = %#v, want one running run", runRepo.saved)

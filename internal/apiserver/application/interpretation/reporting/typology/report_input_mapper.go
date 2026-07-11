@@ -3,10 +3,10 @@ package typology
 import (
 	"fmt"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypology"
 )
 
 var (

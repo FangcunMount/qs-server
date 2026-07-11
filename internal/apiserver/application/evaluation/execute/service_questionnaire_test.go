@@ -370,7 +370,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}}
 	capture := &splitPhaseCapture{}
 	evaluator := evaluatorStub{
-		key: evaluation.ExecutionIdentityMBTI,
+		key: evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI),
 		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			modelRef := *input.Assessment.EvaluationModelRef()
 			execution := domainoutcome.NewExecution(
@@ -451,8 +451,8 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	if !aRepo.assessment.Status().IsFailed() {
 		t.Fatalf("assessment status = %s, want failed", aRepo.assessment.Status())
 	}
-	if aRepo.saveCalls != 3 || !txRunner.called {
-		t.Fatalf("run start, snapshot and terminal failure must persist through transactions: saveCalls=%d tx=%v", aRepo.saveCalls, txRunner.called)
+	if aRepo.saveCalls != 1 || !txRunner.called {
+		t.Fatalf("only terminal Assessment failure must persist transactionally: saveCalls=%d tx=%v", aRepo.saveCalls, txRunner.called)
 	}
 	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domainAssessment.EventTypeFailed {
 		t.Fatalf("staged event types = %#v, want assessment failed", stager.eventTypes)

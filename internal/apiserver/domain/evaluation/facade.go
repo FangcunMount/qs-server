@@ -17,25 +17,19 @@ const (
 
 var (
 	ExecutionIdentityScaleDefault            = evalpipeline.ExecutionIdentityScaleDefault
-	ExecutionIdentityMBTI                    = evalpipeline.ExecutionIdentityMBTI    //nolint:staticcheck // legacy compat re-export
-	ExecutionIdentitySBTI                    = evalpipeline.ExecutionIdentitySBTI    //nolint:staticcheck // legacy compat re-export
-	ExecutionIdentityBigFive                 = evalpipeline.ExecutionIdentityBigFive //nolint:staticcheck // legacy compat re-export
 	ExecutionIdentityPersonalityTypology     = evalpipeline.ExecutionIdentityPersonalityTypology
 	ExecutionIdentityBehavioralRatingDefault = evalpipeline.ExecutionIdentityBehavioralRatingDefault
 	ExecutionIdentityCognitiveDefault        = evalpipeline.ExecutionIdentityCognitiveDefault
 )
 
 var (
-	CognitiveModelDescriptor                   = evalpipeline.CognitiveModelDescriptor
-	BehavioralRatingModelDescriptor            = evalpipeline.BehavioralRatingModelDescriptor
-	ScaleModelDescriptor                       = evalpipeline.ScaleModelDescriptor
-	DefaultModelDescriptors                    = evalpipeline.DefaultModelDescriptors
-	TypologyAlgorithms                         = evalpipeline.TypologyAlgorithms
-	PersonalityTypologyIdentity                = evalpipeline.PersonalityTypologyIdentity
-	PersonalityTypologyLegacyIdentities        = evalpipeline.PersonalityTypologyLegacyIdentities
-	ResolvePersonalityTypologyExecutorIdentity = evalpipeline.ResolvePersonalityTypologyExecutorIdentity
-	ResolveBehavioralRatingExecutorIdentity    = evalpipeline.ResolveBehavioralRatingExecutorIdentity
-	ExecutionIdentityFromLegacyKind            = evalpipeline.ExecutionIdentityFromLegacyKind
-	ModelDescriptorFromIdentity                = evalpipeline.ModelDescriptorFromIdentity
-	ExecutionPathForDescriptor                 = evalpipeline.ExecutionPathForDescriptor
+	CognitiveModelDescriptor        = evalpipeline.CognitiveModelDescriptor
+	BehavioralRatingModelDescriptor = evalpipeline.BehavioralRatingModelDescriptor
+	ScaleModelDescriptor            = evalpipeline.ScaleModelDescriptor
+	DefaultModelDescriptors         = evalpipeline.DefaultModelDescriptors
+	TypologyAlgorithms              = evalpipeline.TypologyAlgorithms
+	PersonalityTypologyIdentity     = evalpipeline.PersonalityTypologyIdentity
+	ExecutionIdentityFromLegacyKind = evalpipeline.ExecutionIdentityFromLegacyKind
+	ModelDescriptorFromIdentity     = evalpipeline.ModelDescriptorFromIdentity
+	ExecutionPathForDescriptor      = evalpipeline.ExecutionPathForDescriptor
 )

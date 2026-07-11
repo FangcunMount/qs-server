@@ -15,6 +15,5 @@ func (m *Module) ExportGRPCDeps() grpctransport.EvaluationDeps {
 	deps.AssessmentReader = m.AssessmentReader
 	deps.WorkerExecutionService = m.WorkerExecutionService
 	deps.RunQueryService = m.RunQueryService
-	deps.ReportStatusReporter = m.ReportStatusReporter
 	return deps
 }

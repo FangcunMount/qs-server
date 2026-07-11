@@ -5,49 +5,10 @@ import (
 	"fmt"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
-
-// Restore reconstructs the interpretation input exclusively from the durable
-// EvaluationOutcome. The synthetic Assessment is read-only compatibility data
-// for existing report builders and must never be persisted by Interpretation.
-func Restore(record *domainoutcome.Record) (Outcome, error) {
-	execution, err := RestoreExecution(record)
-	if err != nil {
-		return Outcome{}, err
-	}
-	modelRef := AssessmentModelRefFromExecution(execution.ModelRef)
-	a := assessment.Reconstruct(
-		record.AssessmentID(),
-		record.OrgID(),
-		testee.NewID(record.TesteeID()),
-		assessment.QuestionnaireRef{},
-		assessment.AnswerSheetRef{},
-		assessment.NewAdhocOrigin(),
-		assessment.StatusEvaluated,
-		nil, nil, nil, nil, nil, nil,
-		&modelRef,
-	)
-	reportInput, err := RestoreReportInput(record)
-	if err != nil {
-		return Outcome{}, err
-	}
-	return Outcome{
-		Assessment: a,
-		Input:      reportInput,
-		Execution:  execution,
-		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{
-			AlgorithmFamily: record.Runtime().AlgorithmFamily,
-			DecisionKind:    record.Runtime().DecisionKind,
-			PayloadFormat:   record.Runtime().PayloadFormat,
-		},
-	}, nil
-}
 
 // RestoreExecution reconstructs only the immutable Evaluation execution fact.
 // It intentionally does not load report input or synthesize an Assessment, so

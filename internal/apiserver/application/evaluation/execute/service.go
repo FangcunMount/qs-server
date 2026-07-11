@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
@@ -19,7 +18,6 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"github.com/google/uuid"
 )
@@ -42,7 +40,6 @@ type service struct {
 	runRepo             evaluationrun.Repository
 	runLease            time.Duration
 	evaluationCommitter outcomecommit.Committer
-	reportStatus        *reportstatus.Reporter
 }
 
 // EventStager 事件暂存器
@@ -79,12 +76,6 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 func WithDescriptorExecutor(executor DescriptorExecutor) EngineOption {
 	return func(s *service) {
 		s.descriptorExecutor = executor
-	}
-}
-
-func WithReportStatusReporter(reporter *reportstatus.Reporter) EngineOption {
-	return func(s *service) {
-		s.reportStatus = reporter
 	}
 }
 
@@ -173,17 +164,6 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	evaluationRun := claim.Run
-	if a.CurrentRunID() != evaluationRun.RunID {
-		a.SetCurrentRunID(evaluationRun.RunID)
-		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
-			return err
-		}
-	}
-	if s.reportStatus != nil {
-		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
-		s.reportStatus.SetProcessing(ctx, assessmentID, answerSheetID, "scoring")
-	}
-
 	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
@@ -194,7 +174,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		if err := evaluationRun.AttachInputSnapshot(ref); err != nil {
 			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入快照无效: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()}, err)
 		}
-		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
+		if err := s.persistClaimedEvaluationRun(ctx, evaluationRun); err != nil {
 			return err
 		}
 	}
@@ -338,14 +318,6 @@ func evaluationModelCode(a *assessment.Assessment, input *evaluationinput.InputS
 	return ""
 }
 
-// EvaluateBatch 批量评估
-func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
-	return batchEvaluator{
-		loader:   s.assessmentLoader(),
-		evaluate: s.Evaluate,
-	}.EvaluateBatch(ctx, orgID, assessmentIDs)
-}
-
 // assessmentLoader 评估数据加载器
 func (s *service) assessmentLoader() assessmentLoader {
 	return assessmentLoader{repo: s.assessmentRepo}
@@ -358,7 +330,6 @@ func (s *service) failureFinalizer() evaluationFailureFinalizer {
 		runRepo:      s.runRepo,
 		txRunner:     s.txRunner,
 		eventStager:  s.eventStager,
-		reportStatus: s.reportStatus,
 		readyIndexer: s.readyIndexer,
 	}
 }

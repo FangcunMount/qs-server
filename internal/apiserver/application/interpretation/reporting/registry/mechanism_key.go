@@ -3,13 +3,13 @@ package registry
 import (
 	"fmt"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationroute"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 // MechanismReportBuilderKeyFromRuntimeDescriptorKey 映射运行时描述符 路由 到 报告构建器。

@@ -18,11 +18,12 @@ func InstallFrom(host InstallHost) error {
 		return err
 	}
 	module, err := Wire(WireInput{
-		MongoDB:          host.MongoDB(),
-		TopicResolver:    host.TopicResolver(),
-		MongoLimiter:     host.MongoLimiter(),
-		OpsHandle:        host.CacheHandle(cacheplane.FamilyOps),
-		ModelDescriptors: catalog.Descriptors,
+		MongoDB:            host.MongoDB(),
+		TopicResolver:      host.TopicResolver(),
+		MongoLimiter:       host.MongoLimiter(),
+		OpsHandle:          host.CacheHandle(cacheplane.FamilyOps),
+		ModelDescriptors:   catalog.Descriptors,
+		ReportStatusConfig: host.ReportStatusConfig(),
 	})
 	if err != nil {
 		return err

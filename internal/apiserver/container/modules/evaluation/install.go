@@ -41,7 +41,6 @@ func InstallFrom(host InstallHost) error {
 		AssessmentOutboxRelayImmediateMaxConcurrent: host.OutboxRelayAssessmentImmediateMaxConcurrent(),
 		TesteeAccessChecker:                         NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
 		OpsHandle:                                   host.CacheHandle(cacheplane.FamilyOps),
-		ReportStatusConfig:                          host.ReportStatusConfig(),
 		SurveyRuntimeInfra:                          host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:                       host.PublishedModelCatalog(),
 		StaticRedisClient:                           host.CacheClient(cacheplane.FamilyStatic),

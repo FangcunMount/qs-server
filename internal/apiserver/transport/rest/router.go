@@ -14,7 +14,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
@@ -106,7 +106,7 @@ type ActorDeps struct {
 
 type EvaluationDeps struct {
 	OperatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
-	OperatorExecutionService execute.OperatorExecutionService
+	OperatorExecutionService evaluationoperator.Service
 	ProtectedQueryService    assessmentApp.AssessmentProtectedQueryService
 	RunQueryService          runqueryApp.Service
 }

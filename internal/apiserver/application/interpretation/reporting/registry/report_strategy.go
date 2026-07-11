@@ -1,8 +1,8 @@
 package registry
 
 import (
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
 )
 
 // OutcomeReportType 选择report type 用于 评估 结果。

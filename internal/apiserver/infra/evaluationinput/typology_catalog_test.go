@@ -54,7 +54,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		}},
 		fakeQuestionnaireReader{},
 	)
-	if provider.ExecutionIdentity() != evaldomain.ExecutionIdentityMBTI {
+	if provider.ExecutionIdentity() != evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
 		t.Fatalf("key = %#v", provider.ExecutionIdentity())
 	}
 	snapshot, err := provider.ResolveInput(context.Background(), port.InputRef{AnswerSheetID: 1})

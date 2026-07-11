@@ -3,10 +3,27 @@ package reportquery
 
 import (
 	"context"
+	"time"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 )
+
+// AssessmentProjection is the Journey-owned legacy view composed from an
+// Evaluation Assessment and, when present, an Interpretation report.
+type AssessmentProjection struct {
+	Assessment    *assessmentApp.AssessmentResult
+	Status        string
+	InterpretedAt *time.Time
+}
+
+type AssessmentListProjection struct {
+	Items      []*AssessmentProjection
+	Total      int
+	Page       int
+	PageSize   int
+	TotalPages int
+}
 
 type Scope struct {
 	OrgID          int64
@@ -20,8 +37,8 @@ type AssessmentAccess interface {
 
 // Service owns cross-module report authorization and legacy journey projection.
 type Service interface {
-	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error)
-	ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*assessmentApp.AssessmentListResult, error)
+	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*AssessmentProjection, error)
+	ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error)
 	GetReport(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportResult, error)
 	GetReportOutcome(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportOutcomeResult, error)
 	ListReports(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (*interpretationApp.ReportListResult, error)
@@ -37,41 +54,49 @@ func NewService(access AssessmentAccess, reports interpretationApp.ReportQuerySe
 	return &service{access: access, reports: reports}
 }
 
-func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error) {
+func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*AssessmentProjection, error) {
+	projected := &AssessmentProjection{Assessment: result}
+	if result != nil {
+		projected.Status = result.Status
+	}
 	if result == nil || result.Status != "evaluated" || s.reports == nil {
-		return result, nil
+		return projected, nil
 	}
 	report, err := s.reports.GetByAssessmentID(ctx, result.ID)
 	if err != nil {
 		if interpretationApp.IsReportNotFound(err) {
-			return result, nil
+			return projected, nil
 		}
 		return nil, err
 	}
 	if report == nil {
-		return result, nil
+		return projected, nil
 	}
-	projected := *result
 	projected.Status = "interpreted"
 	interpretedAt := report.CreatedAt
 	projected.InterpretedAt = &interpretedAt
-	return &projected, nil
+	return projected, nil
 }
 
-func (s *service) ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*assessmentApp.AssessmentListResult, error) {
+func (s *service) ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error) {
 	if result == nil {
 		return nil, nil
 	}
-	projected := *result
-	projected.Items = append([]*assessmentApp.AssessmentResult(nil), result.Items...)
-	for index, item := range projected.Items {
+	projected := &AssessmentListProjection{
+		Items:      make([]*AssessmentProjection, 0, len(result.Items)),
+		Total:      result.Total,
+		Page:       result.Page,
+		PageSize:   result.PageSize,
+		TotalPages: result.TotalPages,
+	}
+	for _, item := range result.Items {
 		value, err := s.ProjectAssessment(ctx, item)
 		if err != nil {
 			return nil, err
 		}
-		projected.Items[index] = value
+		projected.Items = append(projected.Items, value)
 	}
-	return &projected, nil
+	return projected, nil
 }
 
 func (s *service) GetReport(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportResult, error) {

@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	reportquery "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 )
 
 // ============= Assessment 相关响应 =============
@@ -206,9 +207,6 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 	if result.SubmittedAt != nil {
 		resp.SubmittedAt = FormatDateTimePtr(result.SubmittedAt)
 	}
-	if result.InterpretedAt != nil {
-		resp.InterpretedAt = FormatDateTimePtr(result.InterpretedAt)
-	}
 	if result.FailedAt != nil {
 		resp.FailedAt = FormatDateTimePtr(result.FailedAt)
 	}
@@ -217,6 +215,24 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 	}
 	resp.FailureReason = result.FailureReason
 
+	return resp
+}
+
+// NewProjectedAssessmentResponse maps the Journey-owned legacy interpreted
+// projection while keeping Interpretation state out of Evaluation DTOs.
+func NewProjectedAssessmentResponse(result *reportquery.AssessmentProjection) *AssessmentResponse {
+	if result == nil {
+		return nil
+	}
+	resp := NewAssessmentResponse(result.Assessment)
+	if resp == nil {
+		return nil
+	}
+	resp.Status = result.Status
+	resp.StatusLabel = LabelForAssessmentStatus(result.Status)
+	if result.InterpretedAt != nil {
+		resp.InterpretedAt = FormatDateTimePtr(result.InterpretedAt)
+	}
 	return resp
 }
 
@@ -240,8 +256,22 @@ func NewAssessmentListResponse(result *assessment.AssessmentListResult) *Assessm
 	}
 }
 
+func NewProjectedAssessmentListResponse(result *reportquery.AssessmentListProjection) *AssessmentListResponse {
+	if result == nil {
+		return nil
+	}
+	items := make([]*AssessmentResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, NewProjectedAssessmentResponse(item))
+	}
+	return &AssessmentListResponse{
+		Items: items, Total: result.Total, Page: result.Page,
+		PageSize: result.PageSize, TotalPages: result.TotalPages,
+	}
+}
+
 // NewBatchEvaluationResponse 从应用层 Result 创建批量评估响应
-func NewBatchEvaluationResponse(result *execute.BatchResult) *BatchEvaluationResponse {
+func NewBatchEvaluationResponse(result *evaluationoperator.BatchResult) *BatchEvaluationResponse {
 	if result == nil {
 		return nil
 	}

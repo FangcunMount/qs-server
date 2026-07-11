@@ -14,7 +14,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -38,8 +38,8 @@ type routerClinicianQueryStub struct{}
 
 type routerOperatorExecutionStub struct{}
 
-func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, int64, []uint64) (*execute.BatchResult, error) {
-	return &execute.BatchResult{}, nil
+func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, int64, []uint64) (*evaluationoperator.BatchResult, error) {
+	return &evaluationoperator.BatchResult{}, nil
 }
 
 func (*routerClinicianQueryStub) GetByID(context.Context, uint64) (*clinicianApp.ClinicianResult, error) {

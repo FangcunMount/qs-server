@@ -16,20 +16,21 @@ import (
 	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
@@ -37,24 +38,26 @@ type Module struct {
 	QueryService          interpretationapp.ReportQueryService
 	LifecycleQueryService interpretationapp.LifecycleQueryService
 
-	reader             evaluationreadmodel.ReportReader
-	builderRegistry    interpretationreporting.ReportBuilderRegistry
-	generationExecutor interpretationgeneration.Executor
-	generationRepo     *mongoEval.GenerationRepository
-	runRepo            *mongoEval.RunRepository
-	artifactRepo       *mongoEval.ArtifactRepository
-	outcomeService     interpretationapp.OutcomeReportService
-	readyIndexer       *appEventing.PostCommitReadyIndexer
-	readyIndex         *outboxready.Index
+	reader               evaluationreadmodel.ReportReader
+	builderRegistry      interpretationreporting.ReportBuilderRegistry
+	generationExecutor   interpretationgeneration.Executor
+	generationRepo       *mongoEval.GenerationRepository
+	runRepo              *mongoEval.RunRepository
+	artifactRepo         *mongoEval.ArtifactRepository
+	outcomeService       interpretationapp.OutcomeReportService
+	readyIndexer         *appEventing.PostCommitReadyIndexer
+	readyIndex           *outboxready.Index
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 // Deps defines explicit constructor dependencies for the report module.
 type Deps struct {
-	MongoDB          *mongo.Database
-	TopicResolver    eventcatalog.TopicResolver
-	MongoLimiter     backpressure.Acquirer
-	ModelDescriptors []evaldomain.ModelDescriptor
-	OpsHandle        *cacheplane.Handle
+	MongoDB            *mongo.Database
+	TopicResolver      eventcatalog.TopicResolver
+	MongoLimiter       backpressure.Acquirer
+	ModelDescriptors   []evaldomain.ModelDescriptor
+	OpsHandle          *cacheplane.Handle
+	ReportStatusConfig reportstatus.Config
 }
 
 // New assembles the report module.
@@ -64,6 +67,11 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	module := &Module{}
+	reportStatusReporter, err := reportstatus.NewReporter(deps.OpsHandle, deps.ReportStatusConfig)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report status reporter: %v", err)
+	}
+	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.QueryService = interpretationapp.NewReportQueryService(module.reader)

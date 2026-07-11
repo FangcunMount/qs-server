@@ -83,12 +83,12 @@ type EvaluationDeps struct {
 	AssessmentReader       evaluationreadmodel.AssessmentReader
 	WorkerExecutionService execute.WorkerExecutionService
 	RunQueryService        runqueryApp.Service
-	ReportStatusReporter   *reportstatus.Reporter
 }
 
 type InterpretationDeps struct {
 	OutcomeReportService interpretationApp.OutcomeReportService
 	ReportQueryService   interpretationApp.ReportQueryService
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 type AssessmentModelCatalogDeps struct {
@@ -276,7 +276,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
-		r.deps.Evaluation.ReportStatusReporter,
+		r.deps.Interpretation.ReportStatusReporter,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

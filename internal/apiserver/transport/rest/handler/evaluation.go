@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
@@ -23,7 +23,7 @@ import (
 type EvaluationHandler struct {
 	*BaseHandler
 	operatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
-	operatorExecutionService execute.OperatorExecutionService
+	operatorExecutionService evaluationoperator.Service
 	protectedQueryService    assessmentApp.AssessmentProtectedQueryService
 	reportQueryJourney       reportqueryjourney.Service
 	reportWaitJourney        reportwaitjourney.Service
@@ -32,7 +32,7 @@ type EvaluationHandler struct {
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
 	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
-	operatorExecutionService execute.OperatorExecutionService,
+	operatorExecutionService evaluationoperator.Service,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
 	reportQueryJourney reportqueryjourney.Service,
 	reportWaitJourney reportwaitjourney.Service,
@@ -77,11 +77,14 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		return
 	}
 	if h.reportQueryJourney != nil {
-		result, err = h.reportQueryJourney.ProjectAssessment(c.Request.Context(), result)
+		projected, projectErr := h.reportQueryJourney.ProjectAssessment(c.Request.Context(), result)
+		err = projectErr
 		if err != nil {
 			h.Error(c, err)
 			return
 		}
+		h.Success(c, response.NewProjectedAssessmentResponse(projected))
+		return
 	}
 
 	h.Success(c, response.NewAssessmentResponse(result))
@@ -179,11 +182,14 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		return
 	}
 	if h.reportQueryJourney != nil {
-		result, err = h.reportQueryJourney.ProjectAssessmentList(c.Request.Context(), result)
+		projected, projectErr := h.reportQueryJourney.ProjectAssessmentList(c.Request.Context(), result)
+		err = projectErr
 		if err != nil {
 			h.Error(c, err)
 			return
 		}
+		h.Success(c, response.NewProjectedAssessmentListResponse(projected))
+		return
 	}
 
 	h.Success(c, response.NewAssessmentListResponse(result))

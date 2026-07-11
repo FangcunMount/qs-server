@@ -6,8 +6,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 func TestReportBuildersOwnEveryDefaultDescriptorPath(t *testing.T) {

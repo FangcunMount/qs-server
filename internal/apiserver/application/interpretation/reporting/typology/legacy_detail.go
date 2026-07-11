@@ -3,8 +3,8 @@ package typology
 import (
 	"fmt"
 
-	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypology"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypologylegacy"
 )
 
 // PersonalityTypeDetailForReport normalizes generic or legacy personality payloads for report building.

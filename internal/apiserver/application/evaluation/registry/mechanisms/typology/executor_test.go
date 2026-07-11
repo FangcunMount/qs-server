@@ -32,15 +32,15 @@ func TestExecutorKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
 	}
-	if got := mbtiExecutor.Key(); got != evaluation.ExecutionIdentityMBTI {
-		t.Fatalf("mbti key = %s, want %s", got, evaluation.ExecutionIdentityMBTI)
+	if got := mbtiExecutor.Key(); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
+		t.Fatalf("mbti key = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI))
 	}
 	sbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmSBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
 	}
-	if got := sbtiExecutor.Key(); got != evaluation.ExecutionIdentitySBTI {
-		t.Fatalf("sbti key = %s, want %s", got, evaluation.ExecutionIdentitySBTI)
+	if got := sbtiExecutor.Key(); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI) {
+		t.Fatalf("sbti key = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI))
 	}
 }
 

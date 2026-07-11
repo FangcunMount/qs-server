@@ -9,5 +9,6 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 	return grpctransport.InterpretationDeps{
 		OutcomeReportService: m.OutcomeService(),
 		ReportQueryService:   m.QueryService,
+		ReportStatusReporter: m.ReportStatusReporter,
 	}
 }

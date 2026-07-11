@@ -44,9 +44,6 @@ type Assessment struct {
 	// === 失败信息 ===
 	failureReason *string
 
-	// === 执行运行态（内存字段，暂不持久化） ===
-	currentRunID evalrun.ID
-
 	// === 领域事件（未持久化，提交后清空）===
 	events []DomainEvent
 }
@@ -377,22 +374,6 @@ func (a *Assessment) AssignID(id ID) {
 // OrgID 获取组织ID
 func (a *Assessment) OrgID() int64 {
 	return a.orgID
-}
-
-// CurrentRunID 返回in-memory 活跃 评估执行 identifier。
-func (a *Assessment) CurrentRunID() evalrun.ID {
-	if a == nil {
-		return ""
-	}
-	return a.currentRunID
-}
-
-// SetCurrentRunID 跟踪活跃 评估执行 in memory 仅。
-func (a *Assessment) SetCurrentRunID(runID evalrun.ID) {
-	if a == nil {
-		return
-	}
-	a.currentRunID = runID
 }
 
 // ==================== 关联实体查询方法 ====================

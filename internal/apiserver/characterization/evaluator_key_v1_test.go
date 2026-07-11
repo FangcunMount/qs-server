@@ -43,8 +43,8 @@ func TestV1ModelRefExecutionIdentityFromLegacyKind(t *testing.T) {
 		Algorithm: "mbti",
 		Code:      "MBTI_TEST",
 	}
-	if got := v2.ExecutionIdentity(); got != evaluation.ExecutionIdentityMBTI {
-		t.Fatalf("v2 ref got %s, want %s", got, evaluation.ExecutionIdentityMBTI)
+	if got := v2.ExecutionIdentity(); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
+		t.Fatalf("v2 ref got %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI))
 	}
 }
 

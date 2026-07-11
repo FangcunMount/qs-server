@@ -134,9 +134,6 @@ func NewAssessmentOutcomeResponse(result *assessment.AssessmentOutcomeResult) *A
 	if result.SubmittedAt != nil {
 		resp.SubmittedAt = FormatDateTimePtr(result.SubmittedAt)
 	}
-	if result.InterpretedAt != nil {
-		resp.InterpretedAt = FormatDateTimePtr(result.InterpretedAt)
-	}
 	if result.FailedAt != nil {
 		resp.FailedAt = FormatDateTimePtr(result.FailedAt)
 	}

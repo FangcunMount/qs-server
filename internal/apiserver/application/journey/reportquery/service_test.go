@@ -69,10 +69,10 @@ func TestProjectAssessmentMapsGeneratedReportWithoutMutatingEvaluationResult(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if projected == original || projected.Status != "interpreted" || projected.InterpretedAt == nil || !projected.InterpretedAt.Equal(createdAt) {
+	if projected.Assessment != original || projected.Status != "interpreted" || projected.InterpretedAt == nil || !projected.InterpretedAt.Equal(createdAt) {
 		t.Fatalf("projected = %#v, want copied interpreted projection", projected)
 	}
-	if original.Status != "evaluated" || original.InterpretedAt != nil {
+	if original.Status != "evaluated" {
 		t.Fatalf("original was mutated: %#v", original)
 	}
 }
@@ -85,7 +85,7 @@ func TestProjectAssessmentKeepsEvaluatedWhenReportDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if projected != original || projected.Status != "evaluated" {
+	if projected.Assessment != original || projected.Status != "evaluated" || projected.InterpretedAt != nil {
 		t.Fatalf("projected = %#v, want unchanged evaluated result", projected)
 	}
 }

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/projection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	assessment "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationassessment"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type reportGenerator struct {

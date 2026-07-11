@@ -52,37 +52,6 @@ func (id ExecutionIdentity) IsZero() bool {
 	return id.Kind == "" && id.SubKind == "" && id.Algorithm == ""
 }
 
-// IsPersonalityTypologyLegacyIdentity 报告是否 身份 是 内置 类型学算法 别名。
-func (id ExecutionIdentity) IsPersonalityTypologyLegacyIdentity() bool {
-	if id.Kind != modelcatalog.KindTypology || id.SubKind != modelcatalog.SubKindTypology {
-		return false
-	}
-	switch id.Algorithm {
-	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI, modelcatalog.AlgorithmBigFive:
-		return true
-	default:
-		return false
-	}
-}
-
-// ResolvePersonalityTypologyExecutorIdentity 映射旧版 类型学 身份 到 配置化运行时 身份。
-func ResolvePersonalityTypologyExecutorIdentity(id ExecutionIdentity) ExecutionIdentity {
-	if id == ExecutionIdentityPersonalityTypology || id.IsPersonalityTypologyLegacyIdentity() {
-		return ExecutionIdentityPersonalityTypology
-	}
-	return id
-}
-
-// ResolveBehavioralRatingExecutorIdentity 映射算法-特定 身份 到 配置化运行时 executor。
-func ResolveBehavioralRatingExecutorIdentity(id ExecutionIdentity) ExecutionIdentity {
-	switch id.Kind {
-	case modelcatalog.KindBehavioralRating:
-		return ExecutionIdentityBehavioralRatingDefault
-	default:
-		return id
-	}
-}
-
 func ExecutionIdentityFromLegacyKind(kind modelcatalog.Kind) (ExecutionIdentity, bool) {
 	mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(kind)
 	if !ok {

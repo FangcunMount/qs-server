@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
 	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )

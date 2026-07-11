@@ -38,18 +38,19 @@ func TestRestoreUsesOnlyPersistedOutcomeAndRestoresTypedDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Restore(record)
+	executionGot, err := RestoreExecution(record)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Assessment == nil || got.Assessment.ID().Uint64() != 7 || got.Assessment.TesteeID().Uint64() != 8 || !got.Assessment.Status().IsEvaluated() {
-		t.Fatalf("restored assessment context = %#v", got.Assessment)
+	if typed, ok := executionGot.Detail.Payload.(outcometypology.PersonalityTypeDetail); !ok || typed.TypeCode != "INTJ" {
+		t.Fatalf("restored detail = %#v (%T)", executionGot.Detail.Payload, executionGot.Detail.Payload)
 	}
-	if typed, ok := got.Execution.Detail.Payload.(outcometypology.PersonalityTypeDetail); !ok || typed.TypeCode != "INTJ" {
-		t.Fatalf("restored detail = %#v (%T)", got.Execution.Detail.Payload, got.Execution.Detail.Payload)
+	inputGot, err := RestoreReportInput(record)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if restored, ok := evaluationinput.TypologyPayload(got.Input); !ok || restored.Code != "MBTI-16P" {
-		t.Fatalf("restored report input = %#v", got.Input)
+	if restored, ok := evaluationinput.TypologyPayload(inputGot); !ok || restored.Code != "MBTI-16P" {
+		t.Fatalf("restored report input = %#v", inputGot)
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -16,7 +15,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 // loadedAssessment 加载的评估数据
@@ -156,7 +154,6 @@ type evaluationFailureFinalizer struct {
 	runRepo      evaluationrun.Repository
 	txRunner     apptransaction.Runner
 	eventStager  EventStager
-	reportStatus *reportstatus.Reporter
 	readyIndexer *appEventing.PostCommitReadyIndexer
 }
 
@@ -218,78 +215,5 @@ func (f evaluationFailureFinalizer) Finalize(
 	if f.readyIndexer != nil && len(eventsToStage) > 0 {
 		f.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, time.Now())
 	}
-	if f.reportStatus != nil {
-		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
-		f.reportStatus.SetFailed(ctx, assessmentID, answerSheetID, "evaluation_failed", reason)
-	}
 	return nil
-}
-
-// batchEvaluator 批量评估器
-type batchEvaluator struct {
-	loader   assessmentLoader
-	evaluate func(ctx context.Context, assessmentID uint64) error
-}
-
-// EvaluateBatch 批量评估
-func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
-	log := logger.L(ctx)
-	startTime := time.Now()
-
-	log.Infow("开始批量评估",
-		"action", "evaluate_batch",
-		"resource", "assessment",
-		"org_id", orgID,
-		"total_count", len(assessmentIDs),
-	)
-
-	if orgID == 0 {
-		return nil, evalerrors.InvalidArgument("机构ID不能为空")
-	}
-
-	// 确保评估数据属于当前机构
-	for _, id := range assessmentIDs {
-		if err := b.loader.EnsureAssessmentInOrg(ctx, orgID, id); err != nil {
-			log.Warnw("批量评估的机构范围校验失败",
-				"assessment_id", id,
-				"org_id", orgID,
-				"error", err.Error(),
-			)
-			return nil, err
-		}
-	}
-
-	// 批量评估
-	result := &BatchResult{
-		TotalCount:   len(assessmentIDs),
-		SuccessCount: 0,
-		FailedCount:  0,
-		FailedIDs:    make([]uint64, 0),
-	}
-
-	// 执行单次评估
-	for _, id := range assessmentIDs {
-		if err := b.evaluate(ctx, id); err != nil {
-			result.FailedCount++
-			result.FailedIDs = append(result.FailedIDs, id)
-			log.Warnw("单个评估失败",
-				"assessment_id", id,
-				"error", err.Error(),
-			)
-		} else {
-			result.SuccessCount++
-		}
-	}
-
-	log.Infow("批量评估完成",
-		"action", "evaluate_batch",
-		"resource", "assessment",
-		"result", "success",
-		"total_count", result.TotalCount,
-		"success_count", result.SuccessCount,
-		"failed_count", result.FailedCount,
-		"duration_ms", time.Since(startTime).Milliseconds(),
-	)
-
-	return result, nil
 }

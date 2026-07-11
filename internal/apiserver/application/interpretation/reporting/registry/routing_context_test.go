@@ -3,11 +3,11 @@ package registry_test
 import (
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
+	pipeline "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationroute"
 )
 
 func TestReportRoutingContextFromOutcomeSetsReportProfileFromDecisionKind(t *testing.T) {

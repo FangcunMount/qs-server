@@ -10,6 +10,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
@@ -45,7 +46,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -67,8 +67,7 @@ type Module struct {
 	AssessmentReader        evaluationreadmodel.AssessmentReader
 
 	WorkerExecutionService      execute.WorkerExecutionService
-	OperatorExecutionService    execute.OperatorExecutionService
-	ReportStatusReporter        *reportstatus.Reporter
+	OperatorExecutionService    evaluationoperator.Service
 	ConsistencyReconcileService consistencyApp.Service
 
 	OutboxReadyIndex              *outboxready.Index
@@ -99,7 +98,6 @@ type Deps struct {
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         assessmentApp.TesteeAccessChecker
 	OpsHandle                                   *cacheplane.Handle
-	ReportStatusConfig                          reportstatus.Config
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
@@ -201,12 +199,6 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) error {
 	if normalized.InputResolver != nil {
-		reportStatusReporter, err := reportstatus.NewReporter(normalized.OpsHandle, normalized.ReportStatusConfig)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report status reporter: %v", err)
-		}
-		m.ReportStatusReporter = reportStatusReporter
-
 		wiringDeps := WiringDeps{
 			ScaleScorer:      ruleengine.NewScaleFactorScorer(),
 			TypologyRegistry: normalized.TypologyRegistry,
@@ -236,11 +228,10 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithRunRepository(infra.runRepo),
-			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithEvaluationCommitter(evaluationCommitter),
 		)
 		m.WorkerExecutionService = engine
-		m.OperatorExecutionService = engine
+		m.OperatorExecutionService = evaluationoperator.NewService(infra.assessmentRepo, engine)
 	}
 	return nil
 }

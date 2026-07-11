@@ -26,7 +26,6 @@ func assessmentRowToOutcomeResult(row evaluationreadmodel.AssessmentRow) (*Asses
 		OriginID:             base.OriginID,
 		Status:               base.Status,
 		SubmittedAt:          base.SubmittedAt,
-		InterpretedAt:        base.InterpretedAt,
 		FailedAt:             base.FailedAt,
 		FailureReason:        base.FailureReason,
 	}, nil

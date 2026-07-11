@@ -22,7 +22,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -51,7 +50,6 @@ type WireInput struct {
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         assessment.TesteeAccessChecker
 	OpsHandle                                   *cacheplane.Handle
-	ReportStatusConfig                          reportstatus.Config
 	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog                       rulesetport.Catalog
 	StaticRedisClient                           redis.UniversalClient
@@ -197,7 +195,6 @@ func Wire(in WireInput) (WireResult, error) {
 		AssessmentOutboxRelayImmediateMaxConcurrent: in.AssessmentOutboxRelayImmediateMaxConcurrent,
 		TesteeAccessChecker:                         in.TesteeAccessChecker,
 		OpsHandle:                                   in.OpsHandle,
-		ReportStatusConfig:                          in.ReportStatusConfig,
 		ModelDescriptors:                            modelDescriptors,
 		TypologyRegistry:                            in.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,

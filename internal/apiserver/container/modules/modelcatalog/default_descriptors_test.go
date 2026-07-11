@@ -95,7 +95,7 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	if err != nil {
 		t.Fatalf("DefaultRuntimeDescriptorRegistry() error = %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
+	for _, legacyKey := range legacyTypologyIdentities() {
 		got, err := registry.Resolve(evalpipeline.ModelRoute{Kind: legacyKey.Kind, SubKind: legacyKey.SubKind, Algorithm: legacyKey.Algorithm})
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
@@ -114,7 +114,7 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
+	for _, legacyKey := range legacyTypologyIdentities() {
 		if _, err := reportRegistry.Resolve(legacyKey, report.ReportTypeStandard); err != nil {
 			t.Fatalf("Resolve report(%s): %v", legacyKey, err)
 		}
@@ -135,10 +135,18 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
+	for _, legacyKey := range legacyTypologyIdentities() {
 		if _, err := providerRegistry.Resolve(legacyKey); err != nil {
 			t.Fatalf("Resolve provider(%s): %v", legacyKey, err)
 		}
+	}
+}
+
+func legacyTypologyIdentities() []evaldomain.ExecutionIdentity {
+	return []evaldomain.ExecutionIdentity{
+		evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI),
+		evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI),
+		evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive),
 	}
 }
 

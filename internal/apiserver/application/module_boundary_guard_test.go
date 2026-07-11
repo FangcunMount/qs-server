@@ -8,9 +8,8 @@ import (
 	"testing"
 )
 
-// This allowlist freezes the current Evaluation/Interpretation boundary debt.
-// Refactoring batches must shrink it. The sole designated input adapter may
-// read legacy Evaluation data while Builder implementations may not.
+// Evaluation and Interpretation may depend on explicit composition ports, but
+// neither module may import the other module's implementation packages.
 func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T) {
 	t.Parallel()
 
@@ -47,36 +46,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation",
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
-			allowedImporters: []string{
-				"internal/apiserver/application/interpretation/input/legacy_outcome_adapter.go",
-				"internal/apiserver/application/interpretation/input/outcome_record_adapter.go",
-				"internal/apiserver/application/interpretation/reporting/audience_profile_builders.go",
-				"internal/apiserver/application/interpretation/reporting/factor_scoring_report.go",
-				"internal/apiserver/application/interpretation/reporting/materialize/materialize.go",
-				"internal/apiserver/application/interpretation/reporting/norm_task_report.go",
-				"internal/apiserver/application/interpretation/reporting/projection/event_projection.go",
-				"internal/apiserver/application/interpretation/reporting/projection/events.go",
-				"internal/apiserver/application/interpretation/reporting/projection/mechanism_events.go",
-				"internal/apiserver/application/interpretation/reporting/projection/report_projection.go",
-				"internal/apiserver/application/interpretation/reporting/registry/mechanism_key.go",
-				"internal/apiserver/application/interpretation/reporting/registry/registry.go",
-				"internal/apiserver/application/interpretation/reporting/registry/report_builder.go",
-				"internal/apiserver/application/interpretation/reporting/registry/report_strategy.go",
-				"internal/apiserver/application/interpretation/reporting/registry/routing_context.go",
-				"internal/apiserver/application/interpretation/reporting/typology/legacy_detail.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_builder.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_context.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_generic.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_generic_mechanism.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_input_mapper.go",
-				"internal/apiserver/application/interpretation/reporting/typology/report_registry.go",
-				"internal/apiserver/application/interpretation/reporting/writer/generator.go",
-				"internal/apiserver/application/interpretation/reporting/writer/types.go",
-				"internal/apiserver/application/interpretation/service.go",
-				"internal/apiserver/container/modules/interpretation/assemble.go",
-				"internal/apiserver/container/modules/interpretation/bootstrap.go",
-				"internal/apiserver/container/modules/interpretation/wire.go",
-			},
+			allowedImporters: []string{},
 		},
 	}
 
@@ -119,11 +89,7 @@ func TestEvaluationRoleCompatibilityDebtDoesNotSpread(t *testing.T) {
 			name:      "operator_batch_execution_in_worker_service",
 			scanRoots: []string{"internal/apiserver/application/evaluation/execute"},
 			tokens:    []string{"EvaluateBatch"},
-			want: []string{
-				"internal/apiserver/application/evaluation/execute/evaluation_workflows.go",
-				"internal/apiserver/application/evaluation/execute/interface.go",
-				"internal/apiserver/application/evaluation/execute/service.go",
-			},
+			want:      []string{},
 		},
 	}
 

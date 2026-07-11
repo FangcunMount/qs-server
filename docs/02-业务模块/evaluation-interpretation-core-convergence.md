@@ -208,3 +208,19 @@ PublishedModelSnapshot
 | 编排开关 | 删除 `EVALUATION_ASYNC_INTERPRETATION` 与单进程异步兼容开关；生产固定为 worker 分阶段编排 |
 | 分数投影瘦身 | `assessment_score` 删除 conclusion/suggestion 列、PO、读模型和 score API 字段 |
 | Assessment 收敛 | 历史 `interpreted` 数据迁移为 `evaluated`；`interpreted_at` 替换为 `evaluated_at`；查询层仍可按 Report 派生 legacy 状态 |
+
+## Batch E（E4–E7）
+
+| 批次 | 结果 |
+|------|------|
+| E4 跨模块契约 | Interpretation 改为依赖显式 Evaluation fact/runtime/route 端口；Evaluation 与 Interpretation 实现包双向 import 白名单清零；删除从 Outcome 伪造 Assessment 的 `Restore` 路径 |
+| E5 Assessment/Run 解耦 | 删除 Assessment `current_run_id` 及启动阶段 Assessment+Run 双写；Run claim 成为唯一执行归属路径 |
+| E6 应用角色收敛 | Report status 由 Interpretation/Worker 维护；Worker `execute.Engine` 只执行单次评分；后台同步批量用例迁入 `application/evaluation/operator` |
+| E7 兼容清债 | 删除 typology 历史 `ExecutionIdentity` 别名并统一 canonical 路由；跨模块与应用角色守卫白名单清零 |
+
+E7 的物理删除有两个明确的数据门禁：
+
+1. `evaluation/consistency` 只能在生产审计证明 Assessment/Outcome/Run 零漂移后删除。
+2. typology legacy payload/outcome adapter 只能在历史 Outcome 与已发布模型快照审计证明无存量依赖后删除。
+
+在审计完成前，两者均为只读/修复兼容路径，不允许新生产主路继续写入对它们的依赖。

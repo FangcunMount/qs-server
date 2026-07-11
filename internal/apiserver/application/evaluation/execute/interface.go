@@ -24,21 +24,8 @@ type WorkerExecutionService interface {
 	Evaluate(ctx context.Context, assessmentID uint64) error
 }
 
-// OperatorExecutionService 服务于后台操作者受控的批量执行。
-//
-// 失败 Assessment 的常规恢复仍应通过 AssessmentOperatorRecoveryService
-// 重新发布 evaluation.requested；该入口仅保留既有的受控批量运维能力。
-type OperatorExecutionService interface {
-	// EvaluateBatch 批量评估
-	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
-}
-
-// Engine combines the role-specific execution capabilities for concrete
-// assembly. Transports must depend on a narrow role port.
-type Engine interface {
-	WorkerExecutionService
-	OperatorExecutionService
-}
+// Engine is the Worker-facing concrete execution capability.
+type Engine interface{ WorkerExecutionService }
 
 // DescriptorExecutor 执行 RuntimeDescriptor 已解析后的评估路径。
 type DescriptorExecutor interface {
@@ -49,12 +36,4 @@ type DescriptorExecutor interface {
 type ExecutionInput struct {
 	Assessment *assessment.Assessment
 	Input      *evaluationinput.InputSnapshot
-}
-
-// BatchResult 批量评估结果
-type BatchResult struct {
-	TotalCount   int
-	SuccessCount int
-	FailedCount  int
-	FailedIDs    []uint64
 }

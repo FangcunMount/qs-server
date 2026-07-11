@@ -44,7 +44,6 @@ type AssessmentOutcomeResult struct {
 	OriginID             *string             `json:"origin_id,omitempty"`
 	Status               string              `json:"status"`
 	SubmittedAt          *time.Time          `json:"submitted_at,omitempty"`
-	InterpretedAt        *time.Time          `json:"interpreted_at,omitempty"`
 	FailedAt             *time.Time          `json:"failed_at,omitempty"`
 	FailureReason        *string             `json:"failure_reason,omitempty"`
 }

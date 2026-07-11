@@ -194,7 +194,7 @@ func TestInterpretationProductionCodeDoesNotAcquireEvaluationWriteCapabilities(t
 		"application/evaluation/execute",
 		"application/evaluation/runquery",
 		"domain/evaluation/run",
-		"port/evaluationrun",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun\"",
 		"infra/mongo/evaluation",
 		".ApplyOutcome(",
 		".ApplyScoringOutcome(",

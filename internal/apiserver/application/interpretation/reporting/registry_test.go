@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type registryReportBuilderStub struct {
@@ -59,7 +59,7 @@ func TestReportBuilderRegistryRejectsUnknownKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(evaluation.ExecutionIdentityMBTI, domainReport.ReportTypeStandard); err == nil {
+	if _, err := registry.Resolve(evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI), domainReport.ReportTypeStandard); err == nil {
 		t.Fatal("Resolve error = nil, want unsupported key")
 	}
 }
@@ -76,7 +76,7 @@ func TestReportBuilderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	for _, legacyKey := range evaluation.PersonalityTypologyLegacyIdentities() {
+	for _, legacyKey := range legacyTypologyIdentities() {
 		builder, err := registry.Resolve(legacyKey, domainReport.ReportTypeStandard)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
@@ -84,6 +84,14 @@ func TestReportBuilderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.
 		if builder.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 			t.Fatalf("builder key = %s, want configured typology", builder.Key())
 		}
+	}
+}
+
+func legacyTypologyIdentities() []evaluation.ExecutionIdentity {
+	return []evaluation.ExecutionIdentity{
+		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI),
+		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI),
+		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive),
 	}
 }
 

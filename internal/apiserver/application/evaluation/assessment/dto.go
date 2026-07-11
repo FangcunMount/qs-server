@@ -77,7 +77,6 @@ type AssessmentResult struct {
 	RiskLevel            *string    // 风险等级
 	SubmittedAt          *time.Time // 提交时间
 	EvaluatedAt          *time.Time // 评分完成时间
-	InterpretedAt        *time.Time // 解读时间
 	FailedAt             *time.Time // 失败时间
 	FailureReason        *string    // 失败原因
 }

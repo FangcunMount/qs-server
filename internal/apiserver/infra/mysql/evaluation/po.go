@@ -62,7 +62,6 @@ type AssessmentPO struct {
 	EvaluatedAt   *time.Time `gorm:"column:evaluated_at"`
 	FailedAt      *time.Time `gorm:"column:failed_at"`
 	FailureReason *string    `gorm:"column:failure_reason;size:500"`
-	CurrentRunID  *string    `gorm:"column:current_run_id;size:100;index:idx_assessment_current_run_id"`
 }
 
 // TableName 指定表名

@@ -34,7 +34,7 @@ func TestResolveExecutionIdentityPrefersInputAlgorithmWhenAssessmentMissingIt(t 
 			Code: "BIG5_IPIP_50", Version: "1.0.0", Algorithm: modelcatalog.AlgorithmBigFive, Status: "published",
 		}),
 	}
-	if got := resolveExecutionIdentity(a, input); got != evaluation.ExecutionIdentityBigFive {
-		t.Fatalf("resolveExecutionIdentity() = %s, want %s", got, evaluation.ExecutionIdentityBigFive)
+	if got := resolveExecutionIdentity(a, input); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive) {
+		t.Fatalf("resolveExecutionIdentity() = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive))
 	}
 }

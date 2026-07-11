@@ -1,8 +1,8 @@
 package typology
 
 import (
-	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypology"
 )
 
 func genericPersonalityTypeMechanismDetail(detail outcometypology.PersonalityTypeDetail) reporttypology.PersonalityTypeReportDetail {

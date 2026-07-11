@@ -90,6 +90,9 @@ func handleEvaluationFailed(deps *Dependencies) HandlerFunc {
 		if err != nil {
 			return fmt.Errorf("invalid assessment id in evaluation failed event: %w", err)
 		}
+		if deps.ReportStatusReporter != nil {
+			deps.ReportStatusReporter.SetFailed(ctx, reportstatus.AssessmentKey(assessmentID), "", "evaluation_failed", data.Reason)
+		}
 		if _, err := deps.InternalClient.ProjectBehaviorEvent(ctx, &pb.ProjectBehaviorEventRequest{
 			EventId:       env.ID,
 			EventType:     eventType,

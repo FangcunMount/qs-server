@@ -124,8 +124,8 @@ func TestV1TypologyLegacyMBTIExecutorMatchesConfiguredOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor: %v", err)
 	}
-	if legacy.Key() != evaluation.ExecutionIdentityMBTI {
-		t.Fatalf("legacy key = %s, want %s", legacy.Key(), evaluation.ExecutionIdentityMBTI)
+	if legacy.Key() != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
+		t.Fatalf("legacy key = %s, want %s", legacy.Key(), evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI))
 	}
 	configuredResult, err := configured.Execute(context.Background(), input)
 	if err != nil {

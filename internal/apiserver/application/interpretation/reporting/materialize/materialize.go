@@ -5,9 +5,9 @@ import (
 
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type factory func(domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error)

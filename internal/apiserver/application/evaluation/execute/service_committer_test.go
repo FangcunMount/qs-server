@@ -145,8 +145,8 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 	if !a.Status().IsFailed() {
 		t.Fatalf("assessment status = %s, want failed", a.Status())
 	}
-	if len(runRepo.saved) != 3 {
-		t.Fatalf("saved runs = %d, want running, input snapshot, and failed", len(runRepo.saved))
+	if len(runRepo.saved) != 2 {
+		t.Fatalf("saved runs = %d, want input snapshot and terminal failed run", len(runRepo.saved))
 	}
 	failedRun := runRepo.saved[len(runRepo.saved)-1]
 	if failedRun.Attempt.Status != evalrun.StatusFailed || !failedRun.Retryable() || failedRun.Failure == nil || failedRun.Failure.Kind != evalrun.FailureKindInternal {

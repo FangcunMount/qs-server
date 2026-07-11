@@ -7,6 +7,7 @@ import (
 	"time"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	reportqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 )
 
 type accessStub struct {
@@ -40,12 +41,9 @@ type projectionStub struct {
 	at     time.Time
 }
 
-func (s *projectionStub) ProjectAssessment(_ context.Context, result *assessmentApp.AssessmentResult) (*assessmentApp.AssessmentResult, error) {
+func (s *projectionStub) ProjectAssessment(_ context.Context, result *assessmentApp.AssessmentResult) (*reportqueryApp.AssessmentProjection, error) {
 	s.called = true
-	projected := *result
-	projected.Status = "interpreted"
-	projected.InterpretedAt = &s.at
-	return &projected, nil
+	return &reportqueryApp.AssessmentProjection{Assessment: result, Status: "interpreted", InterpretedAt: &s.at}, nil
 }
 
 func TestWaitValidatesAccessBeforeDelegatingToCompletionWaiter(t *testing.T) {
