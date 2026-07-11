@@ -12,9 +12,9 @@ Evaluation 负责“一次测评如何执行”：
 - `EvaluationRun`：一次执行尝试和运行状态。
 - `EvaluationResult`：结构化执行结果。
 - 计分、因子计算、等级判定。
-- canonical EvaluationOutcome 与 `assessment_score` 等评估事实。
+- canonical `EvaluationOutcome` 与 `assessment_score` 等评估事实。
 - 执行状态机、失败、重试、幂等。
-- `assessment.submitted`、`assessment.evaluated`、`assessment.failed` 等执行事件。
+- `evaluation.requested`、`evaluation.outcome.committed`、`evaluation.failed` 等执行事件。
 
 ---
 
@@ -28,7 +28,7 @@ Evaluation 负责“一次测评如何执行”：
 
 一句话：**Evaluation 只生成可信、可持久化的结构化测评结果，不生成最终解释报告，也不以报告是否成功来改写评估事实。**
 
-已确认的目标边界：`Assessment` 归属 Evaluation，成功终态是 `evaluated`。面向客户端的 `interpreted / completed` 是 Assessment 与 Report 的组合投影，不是 Assessment 聚合状态。当前代码仍保留 `StatusInterpreted` 兼容路径，属于待迁移实现。
+已确认的边界：`Assessment` 归属 Evaluation，成功终态是 `evaluated`。面向客户端的 `interpreted / completed` 是 Assessment 与 Report 的组合投影，不是 Assessment 聚合状态。
 
 `EvaluationRun.succeeded` 表示 EvaluationOutcome 已可靠提交，不包含 Report 生成；生产目标态不保留 Evaluation 内联生成 Report 的同步模式。
 
@@ -54,6 +54,7 @@ Evaluation 负责“一次测评如何执行”：
 | Assessment 与 EvaluationRun 双状态机 | [05-状态机与失败重试.md](./05-状态机与失败重试.md) |
 | 幂等和一致性 | [06-幂等与一致性设计.md](./06-幂等与一致性设计.md) |
 | 接口、事件和存储 | [07-接口事件与存储.md](./07-接口事件与存储.md) |
+| 设计终局与重构判据 | [08-设计终局.md](./08-设计终局.md) |
 
 ---
 

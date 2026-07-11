@@ -14,7 +14,7 @@
 4. 新增或扩展 ReportBuilder。
 5. 新增 score / personality / custom adapter。
 6. 持久化 `InterpretReport`。
-7. 发布 `report.generated`，并确认统计投影是否需要新增口径。
+7. 发布 `interpretation.report.generated`，并确认统计投影是否需要新增口径。
 
 ---
 
