@@ -40,6 +40,12 @@ func TestScoreRowToResultUsesRulesetFactorMaxScores(t *testing.T) {
 	if got.FactorScores[0].MaxScore == nil || *got.FactorScores[0].MaxScore != maxScore {
 		t.Fatalf("max score = %#v, want %.1f", got.FactorScores[0].MaxScore, maxScore)
 	}
+	if got.FactorScores[0].FactorCode != "total" || got.FactorScores[0].RiskLevel != string(domainAssessment.RiskLevelMedium) {
+		t.Fatalf("factor score = %#v, want total/medium", got.FactorScores[0])
+	}
+	if !got.FactorScores[0].IsTotalScore {
+		t.Fatal("expected IsTotalScore=true")
+	}
 }
 
 func TestHighRiskFactorsResultFromScoreRowFlagsSevereOverallRisk(t *testing.T) {

@@ -3,6 +3,8 @@ package assessment
 import (
 	"context"
 	"testing"
+
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 func TestMyAssessmentQueryListPassesModelKindFilter(t *testing.T) {
@@ -24,5 +26,13 @@ func TestMyAssessmentQueryListPassesModelKindFilter(t *testing.T) {
 	}
 	if reader.filter.TesteeID == nil || *reader.filter.TesteeID != testeeID {
 		t.Fatalf("filter.TesteeID = %#v, want %d", reader.filter.TesteeID, testeeID)
+	}
+}
+
+func TestNormalizeMyAssessmentStatusesDoneUsesEvaluated(t *testing.T) {
+	got := normalizeMyAssessmentStatuses("done")
+	want := []string{domainAssessment.StatusEvaluated.String()}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("normalizeMyAssessmentStatuses(done) = %#v, want %#v", got, want)
 	}
 }

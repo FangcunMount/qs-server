@@ -64,6 +64,60 @@ func TestReportRowToResultMapsModelNameAndCode(t *testing.T) {
 	}
 }
 
+func TestToAssessmentResultMapsEvaluatedAt(t *testing.T) {
+	evaluatedAt := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
+	a := domainAssessment.Reconstruct(
+		meta.FromUint64(1001),
+		1,
+		testee.NewID(2001),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(3001)),
+		domainAssessment.NewAdhocOrigin(),
+		domainAssessment.StatusEvaluated,
+		nil,
+		nil,
+		nil,
+		&evaluatedAt,
+		nil,
+		nil,
+	)
+
+	got, err := toAssessmentResult(a)
+	if err != nil {
+		t.Fatalf("toAssessmentResult: %v", err)
+	}
+	if got.EvaluatedAt == nil || !got.EvaluatedAt.Equal(evaluatedAt) {
+		t.Fatalf("EvaluatedAt = %#v, want %v", got.EvaluatedAt, evaluatedAt)
+	}
+	if got.InterpretedAt != nil {
+		t.Fatalf("InterpretedAt = %#v, want nil", got.InterpretedAt)
+	}
+}
+
+func TestAssessmentRowToResultMapsEvaluatedAt(t *testing.T) {
+	evaluatedAt := time.Date(2026, 7, 11, 13, 0, 0, 0, time.UTC)
+	got, err := assessmentRowToResult(evaluationreadmodel.AssessmentRow{
+		ID:                   1001,
+		OrgID:                1,
+		TesteeID:             2001,
+		QuestionnaireCode:    "q-code",
+		QuestionnaireVersion: "v1",
+		AnswerSheetID:        3001,
+		OriginType:           "adhoc",
+		Status:               domainAssessment.StatusEvaluated.String(),
+		EvaluatedAt:          &evaluatedAt,
+	})
+	if err != nil {
+		t.Fatalf("assessmentRowToResult: %v", err)
+	}
+	if got.EvaluatedAt == nil || !got.EvaluatedAt.Equal(evaluatedAt) {
+		t.Fatalf("EvaluatedAt = %#v, want %v", got.EvaluatedAt, evaluatedAt)
+	}
+	if got.InterpretedAt != nil {
+		t.Fatalf("InterpretedAt = %#v, want nil", got.InterpretedAt)
+	}
+}
+
 func TestToAssessmentResultRejectsNegativeOrgID(t *testing.T) {
 	a := domainAssessment.Reconstruct(
 		meta.FromUint64(1001),
