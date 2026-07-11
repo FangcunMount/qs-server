@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -105,6 +106,7 @@ type EvaluationDeps struct {
 	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
 	EvaluationService       execute.Service
 	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
+	ReportWaitJourney       reportwaitjourney.Service
 	RunQueryService         runqueryApp.Service
 }
 

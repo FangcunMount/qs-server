@@ -14,6 +14,7 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 		nil,
 		r.deps.Evaluation.EvaluationService,
 		r.deps.Evaluation.ProtectedQueryService,
+		nil,
 	)
 
 	evaluations := apiV2.Group("/evaluations")

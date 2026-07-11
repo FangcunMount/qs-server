@@ -6,7 +6,6 @@ import (
 	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -15,7 +14,7 @@ func TestProtectedQueryProjectsGeneratedReportAsLegacyInterpreted(t *testing.T) 
 	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 901, OrgID: 12, TesteeID: 401, Status: "evaluated"}}
 	reports := &protectedReportQueryStub{report: &ReportResult{AssessmentID: 901, CreatedAt: generatedAt}}
 	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
-	svc := NewProtectedQueryService(management, reports, nil, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
+	svc := NewProtectedQueryService(management, reports, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
 
 	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	if err != nil {
@@ -33,7 +32,7 @@ func TestProtectedQueryKeepsEvaluatedWhenReportIsAbsent(t *testing.T) {
 	management := &protectedManagementStub{getByIDResult: &AssessmentResult{ID: 902, OrgID: 12, TesteeID: 402, Status: "evaluated"}}
 	reports := &protectedReportQueryStub{getErr: cberrors.WithCode(errorCode.ErrInterpretReportNotFound, "report not found")}
 	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
-	svc := NewProtectedQueryService(management, reports, nil, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
+	svc := NewProtectedQueryService(management, reports, nil, NewAssessmentAccessQueryService(management, checker), nil, nil)
 
 	result, err := svc.GetAssessment(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
 	if err != nil {
@@ -49,7 +48,6 @@ func TestProtectedQueryServiceListAssessmentsAdminKeepsWideScopeAndDefaults(t *t
 	checker := &protectedAccessCheckerStub{scope: &TesteeAccessScope{IsAdmin: true}}
 	svc := NewProtectedQueryService(
 		management,
-		nil,
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
@@ -87,7 +85,6 @@ func TestProtectedQueryServiceListAssessmentsClinicianScopeRestrictsToAccessible
 		management,
 		nil,
 		nil,
-		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
 		nil,
@@ -118,7 +115,6 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			management,
 			nil,
 			nil,
-			nil,
 			NewAssessmentAccessQueryService(management, checker),
 			nil,
 			nil,
@@ -137,7 +133,6 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 		svc := NewProtectedQueryService(
 			&protectedManagementStub{},
 			reportQuery,
-			nil,
 			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
 			nil,
@@ -161,7 +156,6 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			&protectedManagementStub{},
 			nil,
 			scoreQuery,
-			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
 			nil,
 			nil,
@@ -185,7 +179,6 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 		management,
 		nil,
 		nil,
-		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
 		nil,
@@ -204,73 +197,16 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 	}
 }
 
-func TestProtectedQueryServiceWaitReportValidatesAccessBeforeWaiting(t *testing.T) {
-	management := &protectedManagementStub{
-		getByIDResult: &AssessmentResult{ID: 901, TesteeID: 401, Status: "submitted"},
-	}
-	checker := &protectedAccessCheckerStub{}
-	wait := &protectedWaitStub{summary: evaluationwaiter.StatusSummary{Status: "interpreted", UpdatedAt: 123}}
-	svc := NewProtectedQueryService(
-		management,
-		nil,
-		nil,
-		wait,
-		NewAssessmentAccessQueryService(management, checker),
-		nil,
-		nil,
-	)
-
-	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
-	if err != nil {
-		t.Fatalf("WaitReport returned error: %v", err)
-	}
-
-	if summary.Status != "interpreted" || wait.lastAssessmentID != 901 {
-		t.Fatalf("summary = %#v wait id=%d, want interpreted via wait service", summary, wait.lastAssessmentID)
-	}
-	if checker.validateCalls != 1 || checker.lastValidateTesteeID != 401 {
-		t.Fatalf("validate calls = %d testee=%d, want assessment access validation first", checker.validateCalls, checker.lastValidateTesteeID)
-	}
-}
-
-func TestProtectedQueryServiceWaitReportWithoutWaitServiceReturnsPendingAfterAccess(t *testing.T) {
-	management := &protectedManagementStub{
-		getByIDResult: &AssessmentResult{ID: 902, TesteeID: 402, Status: "submitted"},
-	}
-	checker := &protectedAccessCheckerStub{}
-	svc := NewProtectedQueryService(
-		management,
-		nil,
-		nil,
-		nil,
-		NewAssessmentAccessQueryService(management, checker),
-		nil,
-		nil,
-	)
-
-	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
-	if err != nil {
-		t.Fatalf("WaitReport returned error: %v", err)
-	}
-
-	if summary.Status != "pending" || summary.UpdatedAt <= 0 {
-		t.Fatalf("summary = %#v, want pending fallback", summary)
-	}
-	if checker.validateCalls != 1 || checker.lastValidateTesteeID != 402 {
-		t.Fatalf("validate calls = %d testee=%d, want assessment access validation first", checker.validateCalls, checker.lastValidateTesteeID)
-	}
-}
-
 func TestProtectedQueryServiceMissingDependenciesReturnModuleNotConfigured(t *testing.T) {
-	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil, nil).
+	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil).
 		ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
 		GetScores(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
 		GetReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 }
@@ -409,16 +345,6 @@ func (s *protectedScoreQueryStub) GetHighRiskFactors(_ context.Context, assessme
 		return nil, s.highRiskErr
 	}
 	return &HighRiskFactorsResult{AssessmentID: assessmentID}, nil
-}
-
-type protectedWaitStub struct {
-	summary          evaluationwaiter.StatusSummary
-	lastAssessmentID uint64
-}
-
-func (s *protectedWaitStub) WaitReport(_ context.Context, assessmentID uint64) evaluationwaiter.StatusSummary {
-	s.lastAssessmentID = assessmentID
-	return s.summary
 }
 
 type protectedAccessCheckerStub struct {

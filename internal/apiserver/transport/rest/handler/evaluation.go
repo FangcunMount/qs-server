@@ -10,6 +10,7 @@ import (
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -22,6 +23,7 @@ type EvaluationHandler struct {
 	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
 	evaluationService       execute.Service
 	protectedQueryService   assessmentApp.AssessmentProtectedQueryService
+	reportWaitJourney       reportwaitjourney.Service
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
@@ -29,12 +31,14 @@ func NewEvaluationHandler(
 	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
 	evaluationService execute.Service,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
+	reportWaitJourney reportwaitjourney.Service,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
 		BaseHandler:             &BaseHandler{},
 		operatorRecoveryService: operatorRecoveryService,
 		evaluationService:       evaluationService,
 		protectedQueryService:   protectedQueryService,
+		reportWaitJourney:       reportWaitJourney,
 	}
 }
 
@@ -421,7 +425,11 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), parseWaitReportTimeout(c.DefaultQuery("timeout", "15")))
 	defer cancel()
 
-	summary, err := h.protectedQueryService.WaitReport(ctx, protectedScope(orgID, operatorUserID), id)
+	summary, err := h.reportWaitJourney.Wait(ctx, reportwaitjourney.Scope{
+		OrgID:          orgID,
+		OperatorUserID: operatorUserID,
+		AssessmentID:   id,
+	})
 	if err != nil {
 		h.Error(c, err)
 		return

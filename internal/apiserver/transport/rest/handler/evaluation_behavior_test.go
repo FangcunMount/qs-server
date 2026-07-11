@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -99,7 +100,8 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, assessmentapp.NewWaitService(management, nil), accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		nil,
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
@@ -158,7 +160,8 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		reportwaitjourney.NewService(accessQuery, waitService),
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
@@ -208,7 +211,8 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, nil),
+		reportwaitjourney.NewService(accessQuery, waitService),
 	)
 
 	baseCtx, cancel := context.WithCancel(context.Background())

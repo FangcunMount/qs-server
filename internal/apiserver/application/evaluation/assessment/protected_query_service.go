@@ -6,7 +6,6 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	runquery "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -15,7 +14,6 @@ type protectedQueryService struct {
 	operatorQueryService AssessmentOperatorQueryService
 	reportQueryService   ReportQueryService
 	scoreQueryService    ScoreQueryService
-	waitService          AssessmentWaitService
 	accessQueryService   AssessmentAccessQueryService
 	assessmentReader     evaluationreadmodel.AssessmentReader
 	runQueryService      runquery.Service
@@ -26,7 +24,6 @@ func NewProtectedQueryService(
 	operatorQueryService AssessmentOperatorQueryService,
 	reportQueryService ReportQueryService,
 	scoreQueryService ScoreQueryService,
-	waitService AssessmentWaitService,
 	accessQueryService AssessmentAccessQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 	runQueryService runquery.Service,
@@ -35,7 +32,6 @@ func NewProtectedQueryService(
 		operatorQueryService: operatorQueryService,
 		reportQueryService:   reportQueryService,
 		scoreQueryService:    scoreQueryService,
-		waitService:          waitService,
 		accessQueryService:   accessQueryService,
 		assessmentReader:     assessmentReader,
 		runQueryService:      runQueryService,
@@ -269,17 +265,6 @@ func (s *protectedQueryService) ListReportsOutcome(ctx context.Context, scope Pr
 		return nil, err
 	}
 	return s.reportQueryService.ListOutcomeByTesteeID(ctx, scopedDTO)
-}
-
-// WaitReport 等待测评报告生成
-func (s *protectedQueryService) WaitReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (evaluationwaiter.StatusSummary, error) {
-	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
-		return evaluationwaiter.StatusSummary{}, err
-	}
-	if s.waitService == nil {
-		return pendingAssessmentStatusSummary(), nil
-	}
-	return s.waitService.WaitReport(ctx, assessmentID), nil
 }
 
 // ListAssessmentRuns 列出评估执行 用于 一个accessible assessment。

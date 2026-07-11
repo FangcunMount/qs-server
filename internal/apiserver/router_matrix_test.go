@@ -15,6 +15,7 @@ import (
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -329,11 +330,12 @@ func newRouterTestContainer() *container.Container {
 		ScoreQueryService:       assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
 	}
 	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.OperatorQueryService, nil)
+	evaluationModule.WaitService = assessmentApp.NewWaitService(evaluationModule.ManagementService, nil, evaluationModule.ReportQueryService)
+	evaluationModule.ReportWaitJourney = reportwaitjourney.NewService(evaluationModule.AccessQueryService, evaluationModule.WaitService)
 	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		evaluationModule.OperatorQueryService,
 		evaluationModule.ReportQueryService,
 		evaluationModule.ScoreQueryService,
-		nil,
 		evaluationModule.AccessQueryService,
 		nil,
 		nil,

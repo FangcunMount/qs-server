@@ -155,7 +155,6 @@ type AssessmentProtectedQueryService interface {
 	ListReports(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportListResult, error)
 	GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error)
 	ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error)
-	WaitReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (evaluationwaiter.StatusSummary, error)
 	ListAssessmentRuns(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64, limit int) (*AssessmentRunListResult, error)
 	GetLatestAssessmentRun(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentRunResult, error)
 }

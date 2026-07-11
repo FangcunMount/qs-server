@@ -99,7 +99,7 @@ func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter" {
-				t.Fatalf("%s imports %s; wait-report must go through evaluation application wait service", path, importPath)
+				t.Fatalf("%s imports %s; wait-report must go through the report-wait journey", path, importPath)
 			}
 		}
 	}
@@ -203,5 +203,8 @@ func TestEvaluationRESTTransportUsesProtectedQueryFacade(t *testing.T) {
 		if strings.Contains(routerText, token) {
 			t.Fatalf("router.go exposes %q; REST evaluation deps should expose the protected query facade, not query/access internals", token)
 		}
+	}
+	if !strings.Contains(routerText, "ReportWaitJourney") {
+		t.Fatal("router.go must expose the report-wait journey instead of the protected-query wait method")
 	}
 }

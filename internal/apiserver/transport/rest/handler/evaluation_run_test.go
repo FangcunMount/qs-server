@@ -60,7 +60,8 @@ func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, nil, accessQuery, nil, runQuery),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, accessQuery, nil, runQuery),
+		nil,
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301/runs?limit=5")

@@ -183,6 +183,16 @@ func TestEvaluationDoesNotConstructReportQueryService(t *testing.T) {
 	}
 }
 
+func TestProtectedAssessmentQueryDoesNotOwnReportWait(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/application/evaluation/assessment/protected_query_service.go"}, []string{"WaitReport"})
+	if len(got) != 0 {
+		t.Fatalf("protected Assessment query must not own report waiting, found in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
 func collectCrossModuleImporters(t *testing.T, root string, scanRoots, forbiddenPrefixes []string) []string {
 	t.Helper()
 	found := make(map[string]struct{})

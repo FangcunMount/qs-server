@@ -19,6 +19,7 @@ import (
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -70,6 +71,7 @@ type Module struct {
 	ReportQueryService      assessmentApp.ReportQueryService
 	ScoreQueryService       assessmentApp.ScoreQueryService
 	WaitService             assessmentApp.AssessmentWaitService
+	ReportWaitJourney       reportwaitjourney.Service
 	AccessQueryService      assessmentApp.AssessmentAccessQueryService
 	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
 	RunQueryService         runqueryApp.Service
@@ -323,12 +325,12 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		m.OperatorQueryService,
 		normalized.TesteeAccessChecker,
 	)
+	m.ReportWaitJourney = reportwaitjourney.NewService(m.AccessQueryService, m.WaitService)
 	m.RunQueryService = runqueryApp.NewService(infra.runRepo)
 	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		m.OperatorQueryService,
 		m.ReportQueryService,
 		m.ScoreQueryService,
-		m.WaitService,
 		m.AccessQueryService,
 		infra.assessmentReader,
 		m.RunQueryService,
