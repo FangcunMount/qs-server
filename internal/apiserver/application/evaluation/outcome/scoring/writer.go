@@ -19,19 +19,16 @@ type Writer interface {
 type writer struct {
 	assessmentRepo  assessment.Repository
 	scoreProjectors interpretationreporting.ScoreProjectorRegistry
-	snapshotStore   SnapshotStore
 }
 
 // NewWriter 创建计分结果写入器。
 func NewWriter(
 	assessmentRepo assessment.Repository,
 	scoreProjectors interpretationreporting.ScoreProjectorRegistry,
-	snapshotStore SnapshotStore,
 ) Writer {
 	return &writer{
 		assessmentRepo:  assessmentRepo,
 		scoreProjectors: scoreProjectors,
-		snapshotStore:   snapshotStore,
 	}
 }
 
@@ -45,11 +42,6 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 	}
 	if err := outcome.Assessment.ApplyScoringOutcome(outcome.Execution); err != nil {
 		return evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
-	}
-	if w.snapshotStore != nil {
-		if err := w.snapshotStore.Save(ctx, outcome.Assessment.ID().Uint64(), outcome.Execution); err != nil {
-			return evalerrors.Database(err, "保存计分快照失败")
-		}
 	}
 	if w.scoreProjectors != nil {
 		mechanismKey, ok := interpretationreporting.MechanismReportBuilderKeyFromOutcome(outcome)

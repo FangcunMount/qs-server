@@ -70,7 +70,7 @@ type AssessmentRow struct {
 	TotalScore               *float64
 	RiskLevel                *string
 	SubmittedAt              *time.Time
-	InterpretedAt            *time.Time
+	EvaluatedAt              *time.Time
 	FailedAt                 *time.Time
 	FailureReason            *string
 }
@@ -118,8 +118,6 @@ type ScoreFactorRow struct {
 	FactorName   string
 	RawScore     float64
 	RiskLevel    string
-	Conclusion   string
-	Suggestion   string
 	IsTotalScore bool
 }
 

@@ -12,8 +12,6 @@ type FactorScoreOutput struct {
 	FactorName   string
 	RawScore     float64
 	RiskLevel    string
-	Conclusion   string
-	Suggestion   string
 	IsTotalScore bool
 }
 
@@ -79,8 +77,6 @@ func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, testeeID, as
 			FactorName:   score.GetFactorName(),
 			RawScore:     score.GetRawScore(),
 			RiskLevel:    score.GetRiskLevel(),
-			Conclusion:   score.GetConclusion(),
-			Suggestion:   score.GetSuggestion(),
 			IsTotalScore: score.GetIsTotalScore(),
 		}
 	}
@@ -139,8 +135,6 @@ func (c *EvaluationClient) GetHighRiskFactors(ctx context.Context, testeeID, ass
 			FactorName:   f.GetFactorName(),
 			RawScore:     f.GetRawScore(),
 			RiskLevel:    f.GetRiskLevel(),
-			Conclusion:   f.GetConclusion(),
-			Suggestion:   f.GetSuggestion(),
 			IsTotalScore: f.GetIsTotalScore(),
 		}
 	}

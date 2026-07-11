@@ -127,8 +127,6 @@ type FactorScoreResponse struct {
 	FactorName   string  `json:"factor_name"`
 	RawScore     float64 `json:"raw_score"`
 	RiskLevel    string  `json:"risk_level,omitempty"`
-	Conclusion   string  `json:"conclusion,omitempty"`
-	Suggestion   string  `json:"suggestion,omitempty"`
 	IsTotalScore bool    `json:"is_total_score"`
 }
 

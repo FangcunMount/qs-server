@@ -6,13 +6,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
+	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -48,7 +47,6 @@ type Deps struct {
 	TopicResolver    eventcatalog.TopicResolver
 	MongoLimiter     backpressure.Acquirer
 	ModelDescriptors []evaldomain.ModelDescriptor
-	TypologyRegistry evalregistry.TypologyRegistry
 	OpsHandle        *cacheplane.Handle
 }
 
@@ -88,10 +86,7 @@ func New(deps Deps) (*Module, error) {
 	module.durableSaver = interpretationreporting.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, module.readyIndexer)
 
 	if len(deps.ModelDescriptors) > 0 {
-		if deps.TypologyRegistry.Len() == 0 {
-			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when model descriptors are configured")
-		}
-		registry, err := buildReportBuilderRegistry(deps.ModelDescriptors, deps.TypologyRegistry)
+		registry, err := buildReportBuilderRegistry(deps.ModelDescriptors)
 		if err != nil {
 			return nil, err
 		}
@@ -131,12 +126,8 @@ func (m *Module) Reader() evaluationreadmodel.ReportReader {
 	return m.reader
 }
 
-func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry evalregistry.TypologyRegistry) (interpretationreporting.ReportBuilderRegistry, error) {
-	wiringDeps := evalmod.WiringDeps{
-		ScaleReportBuilder: domainreport.NewDefaultInterpretReportBuilder(nil),
-		TypologyRegistry:   typologyRegistry,
-	}
-	builders, err := evalmod.MaterializeReportBuilders(descs, wiringDeps)
+func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor) (interpretationreporting.ReportBuilderRegistry, error) {
+	builders, err := reportmaterialize.ReportBuilders(descs, domainreport.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}

@@ -97,8 +97,6 @@ message FactorScore {
   string factor_name = 2;
   double raw_score = 3;
   string risk_level = 4;
-  string conclusion = 5;
-  string suggestion = 6;
   bool is_total_score = 7;
 }
 

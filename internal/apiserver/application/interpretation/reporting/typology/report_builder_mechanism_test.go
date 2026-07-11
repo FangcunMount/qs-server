@@ -3,8 +3,8 @@ package typology_test
 import (
 	"testing"
 
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -12,7 +12,7 @@ import (
 func TestTypologyReportBuilderRegistersDecisionMechanismKeys(t *testing.T) {
 	t.Parallel()
 
-	builder, err := typologyeval.NewConfiguredReportBuilder()
+	builder, err := typologyreporting.NewConfiguredReportBuilder()
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}

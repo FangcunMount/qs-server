@@ -61,7 +61,7 @@ func (s *scaleAnalysisQueryService) GetScaleAnalysis(ctx context.Context, dto Sc
 }
 
 func isScaleAnalysisAssessment(assessment *assessmentApp.AssessmentResult) bool {
-	return assessment != nil && assessment.Status == "interpreted" && assessment.ModelKind != nil && *assessment.ModelKind == "scale" && assessment.ModelCode != nil
+	return assessment != nil && assessment.Status == "evaluated" && assessment.ModelKind != nil && *assessment.ModelKind == "scale" && assessment.ModelCode != nil
 }
 
 func ensureScaleAnalysisTrend(scaleMap map[string]*ScaleTrendQueryResult, assessment *assessmentApp.AssessmentResult) *ScaleTrendQueryResult {
@@ -126,8 +126,8 @@ func (s *scaleAnalysisQueryService) loadScaleAnalysisFactors(ctx context.Context
 }
 
 func scaleAnalysisTestDate(assessment *assessmentApp.AssessmentResult) time.Time {
-	if assessment.InterpretedAt != nil {
-		return *assessment.InterpretedAt
+	if assessment.EvaluatedAt != nil {
+		return *assessment.EvaluatedAt
 	}
 	if assessment.SubmittedAt != nil {
 		return *assessment.SubmittedAt

@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -45,7 +44,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 // V1 contract: personality split-phase path completes with interpreted status and type label.
 func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 	a := submittedMBTIAssessment(t)
-	reportBuilder, err := typologyeval.NewReportBuilder(modelcatalog.AlgorithmMBTI)
+	reportBuilder, err := typologyreporting.NewReportBuilder(modelcatalog.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewReportBuilder: %v", err)
 	}
@@ -72,7 +71,6 @@ func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 // and GenerateReport completes interpretation from stored snapshot.
 func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) {
 	a := submittedScaleAssessment(t)
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 	var staged []string
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
@@ -80,8 +78,7 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
-		Async:         true,
-		SnapshotStore: snapshotStore,
+		Async: true,
 		StageEvaluated: func(_ context.Context, events ...event.DomainEvent) error {
 			for _, evt := range events {
 				staged = append(staged, evt.EventType())
@@ -98,9 +95,6 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	if reportSaver.saved {
 		t.Fatal("report should not be saved before async GenerateReport")
 	}
-	if stored, _ := snapshotStore.Load(context.Background(), a.ID().Uint64()); stored == nil {
-		t.Fatal("expected scoring snapshot to be stored for async report generation")
-	}
 	if len(staged) != 1 || staged[0] != eventcatalog.AssessmentEvaluated {
 		t.Fatalf("staged events = %#v, want [%q]", staged, eventcatalog.AssessmentEvaluated)
 	}
@@ -113,8 +107,5 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	}
 	if !reportSaver.saved {
 		t.Fatal("expected report to be saved after GenerateReport")
-	}
-	if stored, _ := snapshotStore.Load(context.Background(), a.ID().Uint64()); stored != nil {
-		t.Fatal("expected scoring snapshot to be deleted after report generation")
 	}
 }

@@ -37,9 +37,9 @@ type Assessment struct {
 	summary    *ResultSummary
 
 	// === 时间戳 ===
-	submittedAt   *time.Time
-	interpretedAt *time.Time
-	failedAt      *time.Time
+	submittedAt *time.Time
+	evaluatedAt *time.Time
+	failedAt    *time.Time
 
 	// === 失败信息 ===
 	failureReason *string
@@ -176,7 +176,7 @@ func Reconstruct(
 	totalScore *float64,
 	riskLevel *RiskLevel,
 	submittedAt *time.Time,
-	interpretedAt *time.Time,
+	evaluatedAt *time.Time,
 	failedAt *time.Time,
 	failureReason *string,
 	modelRefs ...*EvaluationModelRef,
@@ -202,7 +202,7 @@ func Reconstruct(
 		riskLevel:        riskLevel,
 		summary:          summary,
 		submittedAt:      submittedAt,
-		interpretedAt:    interpretedAt,
+		evaluatedAt:      evaluatedAt,
 		failedAt:         failedAt,
 		failureReason:    failureReason,
 		events:           make([]DomainEvent, 0),
@@ -266,6 +266,8 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 	summary := outcome.Summary
 	a.summary = &summary
 	a.status = StatusEvaluated
+	now := time.Now()
+	a.evaluatedAt = &now
 	return nil
 }
 
@@ -297,7 +299,7 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 	a.status = StatusFailed
 	a.failedAt = &now
 	a.failureReason = &reason
-	a.interpretedAt = nil
+	a.evaluatedAt = nil
 	a.totalScore = nil
 	a.riskLevel = nil
 	a.summary = nil
@@ -451,9 +453,9 @@ func (a *Assessment) SubmittedAt() *time.Time {
 	return a.submittedAt
 }
 
-// InterpretedAt 获取解读时间
-func (a *Assessment) InterpretedAt() *time.Time {
-	return a.interpretedAt
+// EvaluatedAt 获取评分事实可靠提交的时间。
+func (a *Assessment) EvaluatedAt() *time.Time {
+	return a.evaluatedAt
 }
 
 // FailedAt 获取失败时间
@@ -480,17 +482,12 @@ func (a *Assessment) IsSubmitted() bool {
 	return a.status.IsSubmitted()
 }
 
-// IsInterpreted 是否已解读状态
-func (a *Assessment) IsInterpreted() bool {
-	return a.status.IsInterpreted()
-}
-
 // IsFailed 是否失败状态
 func (a *Assessment) IsFailed() bool {
 	return a.status.IsFailed()
 }
 
-// IsCompleted 是否已完成（已解读或失败）
+// IsCompleted 是否已完成（已评分或失败）
 func (a *Assessment) IsCompleted() bool {
 	return a.status.IsTerminal()
 }

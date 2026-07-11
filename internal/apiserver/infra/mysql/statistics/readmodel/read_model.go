@@ -215,7 +215,7 @@ func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (d
 		return overview, err
 	}
 	if err := m.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
-		Where("org_id = ? AND interpreted_at IS NOT NULL AND deleted_at IS NULL", orgID).
+		Where("org_id = ? AND status = ? AND evaluated_at IS NOT NULL AND deleted_at IS NULL", orgID, "evaluated").
 		Count(&overview.ReportCount).Error; err != nil {
 		return overview, err
 	}

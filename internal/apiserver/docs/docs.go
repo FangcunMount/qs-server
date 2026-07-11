@@ -10999,10 +10999,6 @@ const docTemplate = `{
         "response.FactorScoreItem": {
             "type": "object",
             "properties": {
-                "conclusion": {
-                    "description": "结论",
-                    "type": "string"
-                },
                 "factor_code": {
                     "description": "因子编码",
                     "type": "string"
@@ -11029,10 +11025,6 @@ const docTemplate = `{
                 },
                 "risk_level_label": {
                     "description": "风险等级中文",
-                    "type": "string"
-                },
-                "suggestion": {
-                    "description": "建议",
                     "type": "string"
                 }
             }

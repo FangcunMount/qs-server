@@ -41,10 +41,10 @@ func (s *reportScanSource) ListReportGeneratedFacts(
 	}
 	query := s.mysql.WithContext(ctx).
 		Model(&evaluationInfra.AssessmentPO{}).
-		Select("id, org_id, testee_id, interpreted_at, created_at").
-		Where("org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL", orgID)
+		Select("id, org_id, testee_id, evaluated_at, created_at").
+		Where("org_id = ? AND deleted_at IS NULL AND status = ? AND evaluated_at IS NOT NULL", orgID, "evaluated")
 	if !sinceTime.IsZero() {
-		query = query.Where("(id > ? OR interpreted_at > ?)", sinceID, sinceTime)
+		query = query.Where("(id > ? OR evaluated_at > ?)", sinceID, sinceTime)
 	}
 	var rows []evaluationInfra.AssessmentPO
 	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
@@ -66,22 +66,19 @@ func (s *reportScanSource) ListReportGeneratedFacts(
 	facts := make([]domainStatistics.ReportGeneratedFact, 0, len(rows))
 	for _, row := range rows {
 		assessmentID := row.ID.Uint64()
-		occurredAt := row.CreatedAt
-		if row.InterpretedAt != nil {
-			occurredAt = *row.InterpretedAt
+		metaRow, ok := reportMeta[assessmentID]
+		if !ok {
+			continue
 		}
-		reportID := assessmentID
-		if metaRow, ok := reportMeta[assessmentID]; ok {
-			reportID = metaRow.reportID
-			if !metaRow.createdAt.IsZero() {
-				occurredAt = metaRow.createdAt
-			}
+		occurredAt := metaRow.createdAt
+		if occurredAt.IsZero() && row.EvaluatedAt != nil {
+			occurredAt = *row.EvaluatedAt
 		}
 		facts = append(facts, domainStatistics.ReportGeneratedFact{
 			OrgID:        row.OrgID,
 			TesteeID:     row.TesteeID,
 			AssessmentID: assessmentID,
-			ReportID:     reportID,
+			ReportID:     metaRow.reportID,
 			OccurredAt:   occurredAt,
 		})
 	}

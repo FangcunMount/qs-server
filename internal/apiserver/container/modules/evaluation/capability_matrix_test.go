@@ -6,7 +6,6 @@ import (
 	modelcatalogmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	modelcatalogwire "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 )
@@ -21,9 +20,8 @@ func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
 	}
 
 	evaluators, err := modelcatalogmod.MaterializeEvaluators(descs, modelcatalogmod.WiringDeps{
-		ScaleReportBuilder: report.NewDefaultInterpretReportBuilder(nil),
-		ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry:   registry,
+		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
+		TypologyRegistry: registry,
 	})
 	if err != nil {
 		t.Fatalf("MaterializeEvaluators: %v", err)

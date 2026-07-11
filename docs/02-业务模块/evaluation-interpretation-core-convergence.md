@@ -189,3 +189,22 @@ PublishedModelSnapshot
 | Mechanisms 内联 | 顶层 `factor_*` 迁入 `registry/mechanisms/` 并删除旧路径 |
 | Import 守卫 | application 禁止 legacy 顶层路径；container 禁止直引 mechanisms |
 | 测试迁移 | characterization/runtime/domain 架构测试路径同步 |
+
+## Batch 5（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| 装配拆分 | Evaluation container 不再接收 `ReportBuilder` / `ReportSaver`，也不再导出 report builder materialize |
+| Registry 归属 | Interpretation 按 ModelDescriptor / ExecutionPath 自主物化四类 ReportBuilder |
+| Typology 报告迁移 | report builder、adapter registry、模板与 legacy report 兼容映射迁入 `application/interpretation/reporting/typology` |
+| Preview 例外 | Preview 保留进程内组合，但分别调用 Evaluation executor 与 Interpretation builder |
+| 架构守卫 | 禁止 Interpretation container 回调 Evaluation materialize；禁止 Evaluation typology mechanisms 再出现 report 实现 |
+
+## Batch 6（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| 评分恢复事实 | 删除 Redis scoring snapshot；reconciler 从持久化 `EvaluationOutcome` 恢复 `Assessment=evaluated` 投影 |
+| 编排开关 | 删除 `EVALUATION_ASYNC_INTERPRETATION` 与单进程异步兼容开关；生产固定为 worker 分阶段编排 |
+| 分数投影瘦身 | `assessment_score` 删除 conclusion/suggestion 列、PO、读模型和 score API 字段 |
+| Assessment 收敛 | 历史 `interpreted` 数据迁移为 `evaluated`；`interpreted_at` 替换为 `evaluated_at`；查询层仍可按 Report 派生 legacy 状态 |

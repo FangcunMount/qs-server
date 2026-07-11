@@ -559,8 +559,6 @@ type FactorScore struct {
 	FactorName    string                 `protobuf:"bytes,2,opt,name=factor_name,json=factorName,proto3" json:"factor_name,omitempty"`
 	RawScore      float64                `protobuf:"fixed64,3,opt,name=raw_score,json=rawScore,proto3" json:"raw_score,omitempty"`
 	RiskLevel     string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	Conclusion    string                 `protobuf:"bytes,5,opt,name=conclusion,proto3" json:"conclusion,omitempty"`
-	Suggestion    string                 `protobuf:"bytes,6,opt,name=suggestion,proto3" json:"suggestion,omitempty"`
 	IsTotalScore  bool                   `protobuf:"varint,7,opt,name=is_total_score,json=isTotalScore,proto3" json:"is_total_score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -620,20 +618,6 @@ func (x *FactorScore) GetRawScore() float64 {
 func (x *FactorScore) GetRiskLevel() string {
 	if x != nil {
 		return x.RiskLevel
-	}
-	return ""
-}
-
-func (x *FactorScore) GetConclusion() string {
-	if x != nil {
-		return x.Conclusion
-	}
-	return ""
-}
-
-func (x *FactorScore) GetSuggestion() string {
-	if x != nil {
-		return x.Suggestion
 	}
 	return ""
 }
@@ -2203,7 +2187,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"J\x04\b\r\x10\x0eJ\x04\b\x0e\x10\x0fR\n" +
 	"scale_codeR\n" +
 	"scale_nameR\vtotal_scoreR\n" +
-	"risk_level\"\xf1\x01\n" +
+	"risk_level\"\xb1\x01\n" +
 	"\vFactorScore\x12\x1f\n" +
 	"\vfactor_code\x18\x01 \x01(\tR\n" +
 	"factorCode\x12\x1f\n" +
@@ -2211,13 +2195,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"factorName\x12\x1b\n" +
 	"\traw_score\x18\x03 \x01(\x01R\brawScore\x12\x1d\n" +
 	"\n" +
-	"risk_level\x18\x04 \x01(\tR\triskLevel\x12\x1e\n" +
-	"\n" +
-	"conclusion\x18\x05 \x01(\tR\n" +
-	"conclusion\x12\x1e\n" +
-	"\n" +
-	"suggestion\x18\x06 \x01(\tR\n" +
-	"suggestion\x12$\n" +
+	"risk_level\x18\x04 \x01(\tR\triskLevel\x12$\n" +
 	"\x0eis_total_score\x18\a \x01(\bR\fisTotalScore\"\x85\x01\n" +
 	"\n" +
 	"TrendPoint\x12#\n" +

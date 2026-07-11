@@ -37,11 +37,11 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 		AnswerSheetID:          5001,
 		OriginType:             "plan",
 		OriginID:               &originID,
-		Status:                 "interpreted",
+		Status:                 "evaluated",
 		TotalScore:             &total,
 		RiskLevel:              &risk,
 		SubmittedAt:            &now,
-		InterpretedAt:          &now,
+		EvaluatedAt:            &now,
 		FailedAt:               &now,
 		FailureReason:          &failure,
 	})
@@ -75,8 +75,6 @@ func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(
 			IsTotalScore: true,
 			RawScore:     88,
 			RiskLevel:    "high",
-			Conclusion:   "high risk",
-			Suggestion:   "follow",
 		},
 		{
 			AssessmentID: 101,
@@ -93,7 +91,7 @@ func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(
 	if len(rows.FactorScores) != 2 || rows.FactorScores[0].FactorCode != "total" || rows.FactorScores[1].FactorCode != "sleep" {
 		t.Fatalf("unexpected factor rows: %#v", rows.FactorScores)
 	}
-	if !rows.FactorScores[0].IsTotalScore || rows.FactorScores[0].Conclusion != "high risk" || rows.FactorScores[0].Suggestion != "follow" {
+	if !rows.FactorScores[0].IsTotalScore {
 		t.Fatalf("unexpected total factor row: %#v", rows.FactorScores[0])
 	}
 }
@@ -225,7 +223,7 @@ func TestLatestRiskQueueArgsMatchDerivedLatestSQLPlaceholders(t *testing.T) {
 	if len(restricted) != 6 {
 		t.Fatalf("restricted args = %#v, want 6 args", restricted)
 	}
-	if restricted[0] != int64(9) || restricted[2] != "interpreted" || restricted[3] != int64(9) || restricted[4] != "interpreted" {
+	if restricted[0] != int64(9) || restricted[2] != "evaluated" || restricted[3] != int64(9) || restricted[4] != "evaluated" {
 		t.Fatalf("restricted args = %#v, want inner org/status then outer org/status", restricted)
 	}
 	if ids, ok := restricted[1].([]uint64); !ok || len(ids) != 2 || ids[0] != 3002 || ids[1] != 3001 {
@@ -236,7 +234,7 @@ func TestLatestRiskQueueArgsMatchDerivedLatestSQLPlaceholders(t *testing.T) {
 	}
 
 	allOrg := latestRiskQueueArgs(evaluationreadmodel.LatestRiskQueueFilter{OrgID: 9})
-	if len(allOrg) != 5 || allOrg[0] != int64(9) || allOrg[1] != "interpreted" || allOrg[2] != int64(9) || allOrg[3] != "interpreted" {
+	if len(allOrg) != 5 || allOrg[0] != int64(9) || allOrg[1] != "evaluated" || allOrg[2] != int64(9) || allOrg[3] != "evaluated" {
 		t.Fatalf("all-org args = %#v, want inner org/status then outer org/status", allOrg)
 	}
 	if risks, ok := allOrg[4].([]string); !ok || len(risks) != 2 || risks[0] != "high" || risks[1] != "severe" {
@@ -286,7 +284,7 @@ func TestLatestRiskRowsQueryDocumentsCurrentRiskPerTesteeContract(t *testing.T) 
 	for _, token := range []string{
 		"ROW_NUMBER() OVER",
 		"PARTITION BY assessment.testee_id",
-		"ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC",
+		"ORDER BY COALESCE(assessment.evaluated_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC",
 		"assessment.org_id = ?",
 		"assessment.testee_id IN ?",
 		"assessment.status = ?",

@@ -5,12 +5,10 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -38,38 +36,15 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 		contractDetailAdapter,
 		assembleGenericPersonalityTypeOutcome,
 	)
-	reportRegistry := DefaultReportAdapterRegistry().Register(
-		contractReportAdapter,
-		func(_ evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-			return domainReport.NewInterpretReport(
-				domainReport.ID(1),
-				"Injected",
-				"INJECTED",
-				0,
-				domainReport.RiskLevelNone,
-				"injected-conclusion",
-				nil,
-				nil,
-				nil,
-			), nil
-		},
-	)
-
 	registry := NewPersonalityRuntimeRegistryWith(PersonalityRuntimeOptions{
 		DetailRegistry:  detailRegistry,
 		OutcomeRegistry: outcomeRegistry,
-		ReportRegistry:  reportRegistry,
 	}).AsModuleRegistry()
 
 	executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
 	}
-	reportBuilder, err := NewConfiguredReportBuilderWithRegistry(registry)
-	if err != nil {
-		t.Fatalf("NewConfiguredReportBuilderWithRegistry: %v", err)
-	}
-
 	assessmentEntity := contractInjectedAssessment(t)
 	snapshot := contractInjectedInputSnapshot()
 	payload, ok := evaluationinput.TypologyPayload(snapshot)
@@ -92,17 +67,6 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 		t.Fatalf("detail = %#v, want injected marker", detail)
 	}
 
-	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
-		Assessment: assessmentEntity,
-		Input:      snapshot,
-		Execution:  outcome,
-	})
-	if err != nil {
-		t.Fatalf("Build report: %v", err)
-	}
-	if report.Conclusion() != "injected-conclusion" {
-		t.Fatalf("conclusion = %q, want injected-conclusion", report.Conclusion())
-	}
 }
 
 func contractInjectedInputSnapshot() *evaluationinput.InputSnapshot {

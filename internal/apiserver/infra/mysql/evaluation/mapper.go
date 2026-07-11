@@ -62,7 +62,7 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 
 	// 时间戳
 	po.SubmittedAt = domain.SubmittedAt()
-	po.InterpretedAt = domain.InterpretedAt()
+	po.EvaluatedAt = domain.EvaluatedAt()
 	po.FailedAt = domain.FailedAt()
 	po.FailureReason = domain.FailureReason()
 	if runID := domain.CurrentRunID(); runID != "" {
@@ -134,7 +134,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		po.TotalScore,
 		riskLevel,
 		po.SubmittedAt,
-		po.InterpretedAt,
+		po.EvaluatedAt,
 		po.FailedAt,
 		po.FailureReason,
 		modelRef,
@@ -196,8 +196,6 @@ func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID ui
 			IsTotalScore: fs.IsTotalScore(),
 			RawScore:     fs.RawScore(),
 			RiskLevel:    string(fs.RiskLevel()),
-			Conclusion:   "", // 解读内容由 InterpretReport 管理
-			Suggestion:   "", // 建议内容由 InterpretReport 管理
 		}
 		pos = append(pos, po)
 	}

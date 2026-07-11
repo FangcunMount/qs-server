@@ -11,6 +11,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
@@ -43,7 +44,7 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	reportBuilder, err := evalregistry.NewConfiguredReportBuilder()
+	reportBuilder, err := typologyreporting.NewConfiguredReportBuilder()
 	if err != nil {
 		return nil, err
 	}

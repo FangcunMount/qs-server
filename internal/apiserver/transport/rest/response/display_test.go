@@ -19,7 +19,7 @@ func TestNewAssessmentResponseAddsLabelsAndFormatsTimes(t *testing.T) {
 		QuestionnaireVersion: "v1",
 		AnswerSheetID:        4,
 		OriginType:           "plan",
-		Status:               "interpreted",
+		Status:               "evaluated",
 		RiskLevel:            &riskLevel,
 		SubmittedAt:          &submittedAt,
 	}
@@ -32,8 +32,8 @@ func TestNewAssessmentResponseAddsLabelsAndFormatsTimes(t *testing.T) {
 	if resp.OriginTypeLabel != "计划测评" {
 		t.Fatalf("origin_type_label = %q, want %q", resp.OriginTypeLabel, "计划测评")
 	}
-	if resp.StatusLabel != "已解读" {
-		t.Fatalf("status_label = %q, want %q", resp.StatusLabel, "已解读")
+	if resp.StatusLabel != "已计分" {
+		t.Fatalf("status_label = %q, want %q", resp.StatusLabel, "已计分")
 	}
 	if resp.RiskLevelLabel != "高风险" {
 		t.Fatalf("risk_level_label = %q, want %q", resp.RiskLevelLabel, "高风险")

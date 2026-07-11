@@ -373,6 +373,98 @@ func TestEvaluationAssemblerDoesNotOwnReportCapabilities(t *testing.T) {
 	}
 }
 
+func TestBatch5SeparatesEvaluationAndInterpretationAssembly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/container/modules/evaluation/assemble.go",
+		"internal/apiserver/container/modules/evaluation/descriptors.go",
+		"internal/apiserver/container/modules/evaluation/wire.go",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range []string{"ReportBuilder", "ReportSaver", "MaterializeReportBuilders"} {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s contains %q; Evaluation assembly must not receive report write capabilities", rel, token)
+			}
+		}
+	}
+
+	interpretationAssembly := filepath.Join(root, "internal/apiserver/container/modules/interpretation/assemble.go")
+	data, err := os.ReadFile(interpretationAssembly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"container/modules/evaluation", "evalmod.", "MaterializeReportBuilders", "TypologyRegistry"} {
+		if strings.Contains(string(data), token) {
+			t.Fatalf("interpretation assemble.go contains %q; Interpretation must materialize its own report registry", token)
+		}
+	}
+
+	typologyRoot := filepath.Join(root, "internal/apiserver/application/evaluation/registry/mechanisms/typology")
+	err = filepath.WalkDir(typologyRoot, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() || strings.HasSuffix(path, "_test.go") {
+			return walkErr
+		}
+		if strings.HasPrefix(entry.Name(), "report_") {
+			t.Fatalf("Evaluation typology mechanism still owns report implementation %s", entry.Name())
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBatch6RemovesEvaluationCompatibilityStorageAndSwitches(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/container/modules/evaluation/assemble.go",
+		"internal/apiserver/application/evaluation/outcome/commit/committer.go",
+		"internal/apiserver/application/evaluation/consistency/reconciler.go",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range []string{"SnapshotStore", "EVALUATION_ASYNC_INTERPRETATION", "EVALUATION_SINGLE_PROCESS_ASYNC"} {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s contains %q; EvaluationOutcome is the sole durable recovery fact", rel, token)
+			}
+		}
+	}
+
+	for _, rel := range []string{
+		"internal/apiserver/domain/evaluation/assessment/types.go",
+		"internal/apiserver/infra/mysql/evaluation/po.go",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range []string{"StatusInterpreted", "InterpretedAt"} {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s contains %q; interpreted is a query projection, not Assessment storage", rel, token)
+			}
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join(root, "internal/apiserver/infra/mysql/evaluation/po.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"Conclusion", "Suggestion"} {
+		if strings.Contains(string(data), token) {
+			t.Fatalf("assessment_score PO contains %q; report text must not be stored in score projection", token)
+		}
+	}
+}
+
 func TestTransportDepsDelegatesToModuleExports(t *testing.T) {
 	t.Parallel()
 

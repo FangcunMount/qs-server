@@ -2,11 +2,12 @@ package consistency
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 // MismatchKind 标识跨存储不一致类型。
@@ -37,7 +38,7 @@ type ScoringArtifactChecker interface {
 type Reconciler struct {
 	assessments     AssessmentStatusReader
 	artifacts       ScoringArtifactChecker
-	snapshotStore   outcomescoring.SnapshotStore
+	outcomeRepo     domainoutcome.Repository
 	assessmentSaver assessment.Repository
 }
 
@@ -45,13 +46,13 @@ type Reconciler struct {
 func NewReconciler(
 	assessments AssessmentStatusReader,
 	artifacts ScoringArtifactChecker,
-	snapshotStore outcomescoring.SnapshotStore,
+	outcomeRepo domainoutcome.Repository,
 	assessmentSaver assessment.Repository,
 ) *Reconciler {
 	return &Reconciler{
 		assessments:     assessments,
 		artifacts:       artifacts,
-		snapshotStore:   snapshotStore,
+		outcomeRepo:     outcomeRepo,
 		assessmentSaver: assessmentSaver,
 	}
 }
@@ -101,9 +102,9 @@ func (r *Reconciler) scanOne(ctx context.Context, assessmentID uint64, detectedA
 	return mismatches, nil
 }
 
-// RepairEvaluatedFinalization 幂等重放 scoring writer 末步：ApplyScoringOutcome + assessment Save。
+// RepairEvaluatedFinalization 从持久化 EvaluationOutcome 重放 Assessment 的 evaluated 投影。
 func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessmentID uint64) error {
-	if r == nil || r.assessments == nil || r.assessmentSaver == nil || r.snapshotStore == nil {
+	if r == nil || r.assessments == nil || r.assessmentSaver == nil || r.outcomeRepo == nil {
 		return fmt.Errorf("consistency reconciler repair dependencies are not configured")
 	}
 	a, err := r.assessments.FindByID(ctx, assessment.NewID(assessmentID))
@@ -113,7 +114,7 @@ func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessment
 	if a == nil {
 		return fmt.Errorf("assessment %d not found", assessmentID)
 	}
-	if a.Status().IsEvaluated() || a.Status().IsInterpreted() {
+	if a.Status().IsEvaluated() {
 		return nil
 	}
 	if !a.Status().IsSubmitted() {
@@ -128,14 +129,18 @@ func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessment
 			return fmt.Errorf("assessment %d has no scoring artifact to finalize", assessmentID)
 		}
 	}
-	execution, err := r.snapshotStore.Load(ctx, assessmentID)
+	record, err := r.outcomeRepo.FindByAssessmentID(ctx, assessment.NewID(assessmentID))
 	if err != nil {
 		return err
 	}
-	if execution == nil {
-		return fmt.Errorf("assessment %d has no scoring snapshot for evaluated finalization", assessmentID)
+	if record == nil {
+		return fmt.Errorf("assessment %d has no evaluation outcome for evaluated finalization", assessmentID)
 	}
-	if err := a.ApplyScoringOutcome(execution); err != nil {
+	var execution assessment.AssessmentOutcome
+	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
+		return fmt.Errorf("decode evaluation outcome for assessment %d: %w", assessmentID, err)
+	}
+	if err := a.ApplyScoringOutcome(&execution); err != nil {
 		return err
 	}
 	return r.assessmentSaver.Save(ctx, a)

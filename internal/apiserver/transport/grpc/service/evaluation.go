@@ -251,8 +251,6 @@ func (s *EvaluationService) GetAssessmentScores(ctx context.Context, req *pb.Get
 			FactorName:   fs.FactorName,
 			RawScore:     fs.RawScore,
 			RiskLevel:    fs.RiskLevel,
-			Conclusion:   fs.Conclusion,
-			Suggestion:   fs.Suggestion,
 			IsTotalScore: fs.IsTotalScore,
 		})
 	}
@@ -329,8 +327,6 @@ func (s *EvaluationService) GetHighRiskFactors(ctx context.Context, req *pb.GetH
 			FactorName:   fs.FactorName,
 			RawScore:     fs.RawScore,
 			RiskLevel:    fs.RiskLevel,
-			Conclusion:   fs.Conclusion,
-			Suggestion:   fs.Suggestion,
 			IsTotalScore: fs.IsTotalScore,
 		})
 	}

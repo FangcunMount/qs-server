@@ -22,22 +22,7 @@ func TestMaterializeFactoriesAlignWithRuntimeDescriptorRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RegisteredEvaluatorPaths: %v", err)
 	}
-	reportPaths, err := evalruntime.RegisteredReportBuilderPaths()
-	if err != nil {
-		t.Fatalf("RegisteredReportBuilderPaths: %v", err)
-	}
-	scorePaths, err := evalruntime.RegisteredScoreProjectorPaths()
-	if err != nil {
-		t.Fatalf("RegisteredScoreProjectorPaths: %v", err)
-	}
 	assertSamePaths(t, "evaluator", paths, evaluatorPaths)
-	assertSamePaths(t, "report builder", paths, reportPaths)
-	wantScore := []modelcatalog.ExecutionPath{
-		modelcatalog.ExecutionPathScaleDescriptor,
-		modelcatalog.ExecutionPathBehavioralRatingDescriptor,
-		modelcatalog.ExecutionPathCognitiveDescriptor,
-	}
-	assertSamePaths(t, "score projector", wantScore, scorePaths)
 }
 
 func assertSamePaths(t *testing.T, name string, want, got []modelcatalog.ExecutionPath) {

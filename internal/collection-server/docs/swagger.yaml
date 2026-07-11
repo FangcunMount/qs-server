@@ -267,8 +267,6 @@ definitions:
     type: object
   evaluation.FactorScoreResponse:
     properties:
-      conclusion:
-        type: string
       factor_code:
         type: string
       factor_name:
@@ -278,8 +276,6 @@ definitions:
       raw_score:
         type: number
       risk_level:
-        type: string
-      suggestion:
         type: string
     type: object
   evaluation.ListAssessmentsResponse:

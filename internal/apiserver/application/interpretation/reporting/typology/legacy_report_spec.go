@@ -1,4 +1,4 @@
-package legacy
+package typology
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -6,7 +6,7 @@ import (
 )
 
 // ReportBuildContextFromAlgorithm resolves legacy report context when published payload has no runtime spec.
-func ReportBuildContextFromAlgorithm(algorithm modelcatalog.Algorithm) (modeltypology.ReportSpec, modeltypology.OutcomeMappingSpec, modelcatalog.DecisionKind) {
+func reportBuildContextFromAlgorithm(algorithm modelcatalog.Algorithm) (modeltypology.ReportSpec, modeltypology.OutcomeMappingSpec, modelcatalog.DecisionKind) {
 	if algorithm == "" {
 		return modeltypology.ReportSpec{}, modeltypology.OutcomeMappingSpec{}, ""
 	}

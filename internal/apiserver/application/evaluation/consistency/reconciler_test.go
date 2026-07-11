@@ -2,12 +2,15 @@ package consistency_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -40,6 +43,18 @@ func (r *memoryAssessmentRepo) Delete(context.Context, assessment.ID) error {
 
 type stubArtifactChecker struct {
 	exists bool
+}
+
+type stubOutcomeRepo struct {
+	record *domainoutcome.Record
+}
+
+func (r stubOutcomeRepo) Save(context.Context, *domainoutcome.Record) error { return nil }
+func (r stubOutcomeRepo) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
+	return r.record, nil
+}
+func (r stubOutcomeRepo) FindByAssessmentID(context.Context, assessment.ID) (*domainoutcome.Record, error) {
+	return r.record, nil
 }
 
 func (s stubArtifactChecker) HasScoringArtifact(context.Context, uint64) (bool, error) {
@@ -87,16 +102,12 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 
 	a := submittedAssessmentForConsistency(t, 7005)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 	execution := assessment.NewAssessmentOutcome(
 		*a.EvaluationModelRef(),
 		assessment.ResultSummary{PrimaryLabel: "ok"},
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
 	)
-	if err := snapshotStore.Save(context.Background(), a.ID().Uint64(), execution); err != nil {
-		t.Fatal(err)
-	}
-	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, snapshotStore, repo)
+	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, outcomeRecordForConsistency(t, a, execution), repo)
 
 	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("RepairEvaluatedFinalization first: %v", err)
@@ -109,15 +120,40 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestRepairEvaluatedFinalizationRequiresSnapshot(t *testing.T) {
+func TestRepairEvaluatedFinalizationRequiresOutcome(t *testing.T) {
 	t.Parallel()
 
 	a := submittedAssessmentForConsistency(t, 7006)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, outcomescoring.NewMemorySnapshotStore(), repo)
+	reconciler := consistency.NewReconciler(repo, stubArtifactChecker{exists: true}, stubOutcomeRepo{}, repo)
 
 	err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64())
 	if err == nil {
-		t.Fatal("RepairEvaluatedFinalization error = nil, want missing snapshot")
+		t.Fatal("RepairEvaluatedFinalization error = nil, want missing outcome")
 	}
+}
+
+func outcomeRecordForConsistency(t *testing.T, a *assessment.Assessment, execution *assessment.AssessmentOutcome) stubOutcomeRepo {
+	t.Helper()
+	payload, err := json.Marshal(execution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
+		ID:           meta.FromUint64(8001),
+		OrgID:        a.OrgID(),
+		AssessmentID: a.ID(),
+		TesteeID:     a.TesteeID().Uint64(),
+		RunID:        "run-8001",
+		Model: domainoutcome.ModelIdentity{
+			Kind: modelcatalog.KindScale,
+			Code: "SCALE-1",
+		},
+		Payload:     payload,
+		EvaluatedAt: time.Unix(1, 0),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return stubOutcomeRepo{record: record}
 }

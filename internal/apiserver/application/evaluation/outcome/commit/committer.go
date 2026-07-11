@@ -40,7 +40,6 @@ type committer struct {
 	outcomeRepo    domainoutcome.Repository
 	runRepo        evaluationrun.Repository
 	scoreProjector outcomescoring.Projector
-	snapshotStore  outcomescoring.SnapshotStore
 	eventStager    EventStager
 	readyIndexer   *appEventing.PostCommitReadyIndexer
 	newID          func() meta.ID
@@ -52,7 +51,6 @@ func NewCommitter(
 	outcomeRepo domainoutcome.Repository,
 	runRepo evaluationrun.Repository,
 	scoreProjector outcomescoring.Projector,
-	snapshotStore outcomescoring.SnapshotStore,
 	eventStager EventStager,
 	readyIndexer *appEventing.PostCommitReadyIndexer,
 ) Committer {
@@ -62,7 +60,6 @@ func NewCommitter(
 		outcomeRepo:    outcomeRepo,
 		runRepo:        runRepo,
 		scoreProjector: scoreProjector,
-		snapshotStore:  snapshotStore,
 		eventStager:    eventStager,
 		readyIndexer:   readyIndexer,
 		newID:          meta.New,
@@ -78,11 +75,6 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	}
 	if err := request.Outcome.Assessment.ApplyScoringOutcome(request.Outcome.Execution); err != nil {
 		return nil, evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
-	}
-	if c.snapshotStore != nil {
-		if err := c.snapshotStore.Save(ctx, request.Outcome.Assessment.ID().Uint64(), request.Outcome.Execution); err != nil {
-			return nil, evalerrors.Database(err, "保存计分快照失败")
-		}
 	}
 	payload, err := json.Marshal(request.Outcome.Execution)
 	if err != nil {

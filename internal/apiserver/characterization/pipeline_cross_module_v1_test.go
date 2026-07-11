@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -80,7 +80,7 @@ func TestV1CrossModuleSyncMBTISurveySubmitWorkerToInterpretedReport(t *testing.T
 
 	ctx := context.Background()
 	a := draftMBTIAssessment(t)
-	reportBuilder, err := typologyeval.NewReportBuilder(modelcatalog.AlgorithmMBTI)
+	reportBuilder, err := typologyreporting.NewReportBuilder(modelcatalog.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewReportBuilder: %v", err)
 	}

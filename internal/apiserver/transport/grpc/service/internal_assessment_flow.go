@@ -319,8 +319,6 @@ func assessmentResultStatus(result *assessmentApp.AssessmentResult) string {
 		return "evaluated"
 	case string(assessmentDomain.StatusFailed):
 		return "failed"
-	case string(assessmentDomain.StatusInterpreted):
-		return "interpreted"
 	default:
 		return result.Status
 	}

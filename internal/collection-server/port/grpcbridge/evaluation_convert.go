@@ -40,8 +40,6 @@ func toFactorScoreResponses(result []FactorScoreOutput) []evaluation.FactorScore
 			FactorName:   score.FactorName,
 			RawScore:     score.RawScore,
 			RiskLevel:    score.RiskLevel,
-			Conclusion:   score.Conclusion,
-			Suggestion:   score.Suggestion,
 			IsTotalScore: score.IsTotalScore,
 		}
 	}

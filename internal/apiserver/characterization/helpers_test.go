@@ -7,7 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -25,7 +25,6 @@ type v1SplitPhaseConfig struct {
 	ReportBuilder interpretationreporting.ReportBuilder
 
 	Async          bool
-	SnapshotStore  outcomescoring.SnapshotStore
 	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
 }
 
@@ -49,7 +48,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)
 	}
-	scoringWriter := &charCapturingScoringWriter{delegate: outcomescoring.NewWriter(repo, scoreProjectors, cfg.SnapshotStore)}
+	scoringWriter := &charCapturingScoringWriter{delegate: outcomescoring.NewWriter(repo, scoreProjectors)}
 
 	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(cfg.ReportBuilder)
 	if err != nil {
@@ -82,10 +81,9 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		opts...,
 	)
 	return &charSplitPhaseService{
-		Service:       core,
-		capture:       scoringWriter,
-		snapshotStore: cfg.SnapshotStore,
-		inlineLegacy:  !cfg.Async,
+		Service:      core,
+		capture:      scoringWriter,
+		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
 			generation, err := reportGenerator.Generate(ctx, outcome)
 			if err != nil {
@@ -109,7 +107,6 @@ func (w *charCapturingScoringWriter) Write(ctx context.Context, outcome evaloutc
 type charSplitPhaseService struct {
 	evaluationexecute.Service
 	capture        *charCapturingScoringWriter
-	snapshotStore  outcomescoring.SnapshotStore
 	inlineLegacy   bool
 	generateReport func(context.Context, evaloutcome.Outcome) error
 }
@@ -130,9 +127,6 @@ func (s *charSplitPhaseService) GenerateReport(ctx context.Context, assessmentID
 	}
 	if err := s.generateReport(ctx, s.capture.outcome); err != nil {
 		return err
-	}
-	if s.snapshotStore != nil {
-		_ = s.snapshotStore.Delete(ctx, assessmentID)
 	}
 	return nil
 }
@@ -256,9 +250,9 @@ type charEventStagerFunc func(ctx context.Context, events ...event.DomainEvent) 
 func (f charEventStagerFunc) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return f(ctx, events...)
 }
-func mustConfiguredReportBuilder(t *testing.T) typologyeval.ReportBuilder {
+func mustConfiguredReportBuilder(t *testing.T) typologyreporting.ReportBuilder {
 	t.Helper()
-	builder, err := typologyeval.NewConfiguredReportBuilder()
+	builder, err := typologyreporting.NewConfiguredReportBuilder()
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}

@@ -73,8 +73,6 @@ type FactorScoreItem struct {
 	MaxScore       *float64 `json:"max_score,omitempty"`        // 最大分
 	RiskLevel      string   `json:"risk_level"`                 // 风险等级
 	RiskLevelLabel string   `json:"risk_level_label,omitempty"` // 风险等级中文
-	Conclusion     string   `json:"conclusion"`                 // 结论
-	Suggestion     string   `json:"suggestion"`                 // 建议
 	IsTotalScore   bool     `json:"is_total_score"`             // 是否为总分因子
 }
 
@@ -276,8 +274,6 @@ func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
 			MaxScore:       f.MaxScore,
 			RiskLevel:      f.RiskLevel,
 			RiskLevelLabel: LabelForRiskLevel(f.RiskLevel),
-			Conclusion:     f.Conclusion,
-			Suggestion:     f.Suggestion,
 			IsTotalScore:   f.IsTotalScore,
 		})
 	}
@@ -329,8 +325,6 @@ func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighR
 			RawScore:       f.RawScore,
 			RiskLevel:      f.RiskLevel,
 			RiskLevelLabel: LabelForRiskLevel(f.RiskLevel),
-			Conclusion:     f.Conclusion,
-			Suggestion:     f.Suggestion,
 			IsTotalScore:   f.IsTotalScore,
 		})
 	}

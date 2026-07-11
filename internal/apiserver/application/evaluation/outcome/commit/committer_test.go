@@ -6,7 +6,6 @@ import (
 	"time"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -112,14 +111,12 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	outcomeRepo := &commitOutcomeRepoStub{order: &order}
 	runRepo := &commitRunRepoStub{order: &order}
 	stager := &commitEventStagerStub{order: &order}
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 	c := NewCommitter(
 		commitRunnerStub{},
 		commitAssessmentRepoStub{order: &order},
 		outcomeRepo,
 		runRepo,
 		commitScoreProjectorStub{order: &order},
-		snapshotStore,
 		stager,
 		nil,
 	).(*committer)
@@ -163,9 +160,6 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	}
 	if len(a.Events()) != 0 {
 		t.Fatalf("assessment events not cleared: %#v", a.Events())
-	}
-	if cached, loadErr := snapshotStore.Load(context.Background(), a.ID().Uint64()); loadErr != nil || cached == nil {
-		t.Fatalf("compatibility snapshot = %#v err=%v", cached, loadErr)
 	}
 }
 

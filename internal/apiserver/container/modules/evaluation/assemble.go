@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"context"
-	"os"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -10,7 +9,6 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
@@ -109,8 +107,6 @@ type Deps struct {
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
 	PublishedModelReader                        rulesetport.PublishedModelReader
-	AsyncInterpretation                         bool
-	SingleProcessAsyncInterpretation            bool
 }
 
 // New assembles the evaluation module.
@@ -156,7 +152,6 @@ type evaluationInfra struct {
 	assessmentImmediate          *appEventing.ImmediateDispatcher
 	assessmentReadyIndex         *outboxready.Index
 	postCommitReadyIndexer       *appEventing.PostCommitReadyIndexer
-	scoringSnapshotStore         outcomescoring.SnapshotStore
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
@@ -239,20 +234,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
-		var opsRedis redis.UniversalClient
-		if normalized.OpsHandle != nil {
-			opsRedis = normalized.OpsHandle.Client
-		}
-		scoringSnapshotStore, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
-			AsyncInterpretation:  normalized.AsyncInterpretation,
-			SingleProcessAsync:   normalized.SingleProcessAsyncInterpretation,
-			OpsRedis:             opsRedis,
-			OpsUnavailableReason: opsUnavailableReason(normalized.OpsHandle),
-		})
-		if err != nil {
-			return err
-		}
-		infra.scoringSnapshotStore = scoringSnapshotStore
 		scoreProjector := outcomescoring.NewAssessmentScoreProjector(infra.scoreRepo)
 		evaluationCommitter := outcomecommit.NewCommitter(
 			infra.txRunner,
@@ -260,7 +241,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.outcomeRepo,
 			infra.runRepo,
 			scoreProjector,
-			scoringSnapshotStore,
 			infra.assessmentOutboxStore,
 			infra.postCommitReadyIndexer,
 		)
@@ -349,32 +329,12 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 }
 
 func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
-	snapshotStore := infra.scoringSnapshotStore
-	if snapshotStore == nil {
-		var opsRedis redis.UniversalClient
-		if normalized.OpsHandle != nil {
-			opsRedis = normalized.OpsHandle.Client
-		}
-		resolved, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
-			AsyncInterpretation:  normalized.AsyncInterpretation,
-			SingleProcessAsync:   normalized.SingleProcessAsyncInterpretation,
-			OpsRedis:             opsRedis,
-			OpsUnavailableReason: opsUnavailableReason(normalized.OpsHandle),
-		})
-		if err != nil {
-			log.Warnf("evaluation consistency reconcile snapshot store unavailable: %v", err)
-			return
-		}
-		snapshotStore = resolved
-	}
-
 	reconciler := consistencyApp.NewReconciler(
 		infra.assessmentRepo,
 		consistencyApp.CompositeScoringArtifactChecker{
-			SnapshotStore: snapshotStore,
-			ScoreReader:   infra.scoreReader,
+			ScoreReader: infra.scoreReader,
 		},
-		snapshotStore,
+		infra.outcomeRepo,
 		infra.assessmentRepo,
 	)
 	m.ConsistencyReconcileService = consistencyApp.NewReconcileService(reconciler, infra.assessmentReader)
@@ -401,22 +361,7 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.ReportReader == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report reader is required")
 	}
-	if !deps.AsyncInterpretation && asyncInterpretationFromEnv() {
-		deps.AsyncInterpretation = true
-	}
-	if !deps.SingleProcessAsyncInterpretation && singleProcessAsyncFromEnv() {
-		deps.SingleProcessAsyncInterpretation = true
-	}
 	return deps, nil
-}
-
-func asyncInterpretationFromEnv() bool {
-	switch os.Getenv("EVALUATION_ASYNC_INTERPRETATION") {
-	case "1", "true", "TRUE", "yes", "YES":
-		return true
-	default:
-		return false
-	}
 }
 
 // Cleanup releases module resources.

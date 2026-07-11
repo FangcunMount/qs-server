@@ -71,10 +71,10 @@ func TestAssessmentReadModelListAssessmentsFiltersAgainstDatabase(t *testing.T) 
 			EvaluationModelTitle:   &scaleName,
 			AnswerSheetID:          base + 101,
 			OriginType:             "adhoc",
-			Status:                 "interpreted",
+			Status:                 "evaluated",
 			TotalScore:             &totalScore,
 			RiskLevel:              &riskHigh,
-			InterpretedAt:          ptrTime(now.Add(-20 * time.Minute)),
+			EvaluatedAt:            ptrTime(now.Add(-20 * time.Minute)),
 		},
 		{
 			AuditFields:            mysql.AuditFields{ID: meta.FromUint64(base + 2), CreatedAt: now.Add(-25 * time.Minute), UpdatedAt: now},
@@ -196,8 +196,6 @@ func TestScoreReadModelFiltersAndOrdersAgainstDatabase(t *testing.T) {
 			IsTotalScore: true,
 			RawScore:     88,
 			RiskLevel:    "high",
-			Conclusion:   "高风险",
-			Suggestion:   "建议干预",
 		},
 		{
 			AuditFields:  mysql.AuditFields{ID: meta.FromUint64(base + 22)},

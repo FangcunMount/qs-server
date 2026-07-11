@@ -2,7 +2,6 @@ package registry
 
 import (
 	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -12,7 +11,7 @@ type (
 	TypologyRegistry = factorclassification.ModuleRegistry
 	// TypologyModule 描述内置 类型学算法 别名 entry。
 	TypologyModule = factorclassification.Module
-	// TypologyRuntimeOptions 注入类型学 结果/report 注册表 用于 装配。
+	// TypologyRuntimeOptions 注入类型学结果注册表用于装配。
 	TypologyRuntimeOptions = factorclassification.PersonalityRuntimeOptions
 	// TypologyExecutor 执行配置化 类型学 评估s。
 	TypologyExecutor = factorclassification.Executor
@@ -41,11 +40,6 @@ func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 // NewConfiguredTypologyExecutor 返回默认 配置化 类型学 executor。
 func NewConfiguredTypologyExecutor() (*TypologyExecutor, error) {
 	return factorclassification.NewConfiguredTypologyExecutor()
-}
-
-// NewConfiguredReportBuilder 返回默认 配置化 类型学 报告构建器。
-func NewConfiguredReportBuilder() (interpretationreporting.ReportBuilder, error) {
-	return factorclassification.NewConfiguredReportBuilder()
 }
 
 // CategoryLabelFor 解析display label 用于 类型学算法。

@@ -9,10 +9,10 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 )
 
-func TestScaleAnalysisQueryGroupsAndSortsInterpretedAssessments(t *testing.T) {
+func TestScaleAnalysisQueryGroupsAndSortsEvaluatedAssessments(t *testing.T) {
 	submittedAt := time.Date(2026, 4, 2, 10, 0, 0, 0, time.UTC)
-	interpretedLate := time.Date(2026, 4, 3, 10, 0, 0, 0, time.UTC)
-	interpretedEarly := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
+	evaluatedLate := time.Date(2026, 4, 3, 10, 0, 0, 0, time.UTC)
+	evaluatedEarly := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 	score := 18.5
 	risk := "high"
 	scaleA := "scale-a"
@@ -22,10 +22,10 @@ func TestScaleAnalysisQueryGroupsAndSortsInterpretedAssessments(t *testing.T) {
 	scaleKind := "scale"
 	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
 		items: []*assessmentApp.AssessmentResult{
-			{ID: 3, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleB, ModelTitle: &scaleBName, InterpretedAt: &interpretedLate, SubmittedAt: &submittedAt, TotalScore: &score, RiskLevel: &risk},
-			{ID: 9, Status: "submitted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, InterpretedAt: &interpretedEarly},
-			{ID: 4, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, InterpretedAt: &interpretedEarly},
-			{ID: 5, Status: "interpreted"},
+			{ID: 3, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleB, ModelTitle: &scaleBName, EvaluatedAt: &evaluatedLate, SubmittedAt: &submittedAt, TotalScore: &score, RiskLevel: &risk},
+			{ID: 9, Status: "submitted", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, EvaluatedAt: &evaluatedEarly},
+			{ID: 4, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleA, ModelTitle: &scaleAName, EvaluatedAt: &evaluatedEarly},
+			{ID: 5, Status: "evaluated"},
 		},
 	}
 	scoreQuery := &scaleAnalysisScoreQueryStub{
@@ -59,10 +59,10 @@ func TestScaleAnalysisQueryGroupsAndSortsInterpretedAssessments(t *testing.T) {
 		t.Fatalf("expected scales sorted by code, got %+v", result.Scales)
 	}
 	if len(result.Scales[0].Tests) != 1 || result.Scales[0].Tests[0].AssessmentID != 4 {
-		t.Fatalf("expected interpreted scale-a assessment only, got %+v", result.Scales[0].Tests)
+		t.Fatalf("expected evaluated scale-a assessment only, got %+v", result.Scales[0].Tests)
 	}
-	if got := result.Scales[1].Tests[0].TestDate; !got.Equal(interpretedLate) {
-		t.Fatalf("expected interpreted_at to win over submitted_at, got %v", got)
+	if got := result.Scales[1].Tests[0].TestDate; !got.Equal(evaluatedLate) {
+		t.Fatalf("expected evaluated_at to win over submitted_at, got %v", got)
 	}
 	if len(result.Scales[1].Tests[0].Factors) != 1 || result.Scales[1].Tests[0].Factors[0].FactorCode != "f1" {
 		t.Fatalf("expected factor scores to be mapped, got %+v", result.Scales[1].Tests[0].Factors)
@@ -76,8 +76,8 @@ func TestScaleAnalysisQuerySortsTestsByDateAndFallsBackOnScoreError(t *testing.T
 	scaleKind := "scale"
 	assessmentManagement := &scaleAnalysisAssessmentManagementStub{
 		items: []*assessmentApp.AssessmentResult{
-			{ID: 2, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &newer},
-			{ID: 1, Status: "interpreted", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &older},
+			{ID: 2, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &newer},
+			{ID: 1, Status: "evaluated", ModelKind: &scaleKind, ModelCode: &scaleCode, SubmittedAt: &older},
 		},
 	}
 	scoreQuery := &scaleAnalysisScoreQueryStub{

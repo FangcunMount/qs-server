@@ -2442,9 +2442,6 @@ const docTemplate = `{
         "evaluation.FactorScoreResponse": {
             "type": "object",
             "properties": {
-                "conclusion": {
-                    "type": "string"
-                },
                 "factor_code": {
                     "type": "string"
                 },
@@ -2458,9 +2455,6 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "risk_level": {
-                    "type": "string"
-                },
-                "suggestion": {
                     "type": "string"
                 }
             }

@@ -53,8 +53,6 @@ type BootstrapInput struct {
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
 	PublishedModelReader                        rulesetport.PublishedModelReader
-	AsyncInterpretation                         bool
-	SingleProcessAsyncInterpretation            bool
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

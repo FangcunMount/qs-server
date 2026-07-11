@@ -18,7 +18,7 @@ func TestEvaluationModuleUsesDescriptorParityGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(data), "func AssertExecutionPathParity") {
-		t.Fatal("evaluation descriptors must expose execution path parity guard for execute/input/report alignment")
+		t.Fatal("evaluation descriptors must expose execution path parity guard for execute/input alignment")
 	}
 }
 

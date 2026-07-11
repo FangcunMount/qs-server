@@ -10,7 +10,7 @@ func TestContentDailyInsertSQLGroupsByExpressions(t *testing.T) {
 	contentCodeExpr := "COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code)"
 	originTypeExpr := "COALESCE(origin_type, '')"
 
-	for _, column := range []string{"created_at", "interpreted_at", "submitted_at", "failed_at"} {
+	for _, column := range []string{"created_at", "evaluated_at", "submitted_at", "failed_at"} {
 		want := "GROUP BY org_id, " + contentTypeExpr + ", " + contentCodeExpr + ", " + originTypeExpr + ", DATE(" + column + ")"
 		if !strings.Contains(contentDailyInsertSQL, want) {
 			t.Fatalf("content daily SQL must group %s branch by expressions, not select aliases", column)

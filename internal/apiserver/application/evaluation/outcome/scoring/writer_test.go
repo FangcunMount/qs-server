@@ -60,7 +60,7 @@ func (stubScoreProjectorRegistry) ResolveByMechanism(_ interpretationreporting.M
 	return noopScoreProjector{}
 }
 
-func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterSnapshotAndProjector(t *testing.T) {
+func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterProjector(t *testing.T) {
 	t.Parallel()
 
 	a, err := assessment.NewAssessment(
@@ -88,8 +88,7 @@ func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterSnapshotAndProjector(t *te
 
 	saveErr := errors.New("assessment save failed")
 	repo := &failingAssessmentRepo{saveErr: saveErr}
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
-	writer := outcomescoring.NewWriter(repo, stubScoreProjectorRegistry{}, snapshotStore)
+	writer := outcomescoring.NewWriter(repo, stubScoreProjectorRegistry{})
 
 	err = writer.Write(context.Background(), evaloutcome.Outcome{
 		Assessment: a,
@@ -100,9 +99,6 @@ func TestWriteReturnsErrorWhenAssessmentSaveFailsAfterSnapshotAndProjector(t *te
 	}
 	if repo.saveCalls != 1 {
 		t.Fatalf("assessment save calls = %d, want 1", repo.saveCalls)
-	}
-	if loaded, loadErr := snapshotStore.Load(context.Background(), a.ID().Uint64()); loadErr != nil || loaded == nil {
-		t.Fatalf("snapshot after failed save = %#v err=%v, want persisted snapshot", loaded, loadErr)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("assessment status = %s, in-memory state should be evaluated before failed save", a.Status())

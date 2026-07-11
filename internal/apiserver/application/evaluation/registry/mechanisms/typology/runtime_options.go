@@ -8,7 +8,6 @@ import (
 type PersonalityRuntimeOptions struct {
 	DetailRegistry  personalityconfigured.DetailAssemblerRegistry
 	OutcomeRegistry OutcomeAdapterRegistry
-	ReportRegistry  ReportAdapterRegistry
 }
 
 func resolvePersonalityRuntimeOptions(opts PersonalityRuntimeOptions) PersonalityRuntimeOptions {
@@ -17,9 +16,6 @@ func resolvePersonalityRuntimeOptions(opts PersonalityRuntimeOptions) Personalit
 	}
 	if opts.OutcomeRegistry.Len() == 0 {
 		opts.OutcomeRegistry = DefaultOutcomeAdapterRegistry()
-	}
-	if opts.ReportRegistry.Len() == 0 {
-		opts.ReportRegistry = DefaultReportAdapterRegistry()
 	}
 	return opts
 }

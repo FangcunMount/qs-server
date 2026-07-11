@@ -131,7 +131,7 @@ func normalizeMyAssessmentStatuses(raw string) []string {
 	case "pending":
 		return []string{assessment.StatusPending.String(), assessment.StatusSubmitted.String()}
 	case "done":
-		return []string{assessment.StatusInterpreted.String()}
+		return []string{assessment.StatusEvaluated.String()}
 	default:
 		return []string{raw}
 	}

@@ -23,7 +23,6 @@ func InstallFrom(host InstallHost) error {
 		MongoLimiter:     host.MongoLimiter(),
 		OpsHandle:        host.CacheHandle(cacheplane.FamilyOps),
 		ModelDescriptors: catalog.Descriptors,
-		TypologyRegistry: catalog.TypologyRegistry,
 	})
 	if err != nil {
 		return err

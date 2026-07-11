@@ -2,14 +2,12 @@ package typology
 
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 func resolveReportBuildContext(
-	runner algorithmRunner,
 	outcome evaloutcome.Outcome,
 ) (modeltypology.ReportSpec, modeltypology.OutcomeMappingSpec, modelcatalog.DecisionKind) {
 	if outcome.Input != nil {
@@ -19,15 +17,9 @@ func resolveReportBuildContext(
 			}
 		}
 	}
-	algorithm := modelcatalog.Algorithm("")
-	if runner.adapter != nil {
-		algorithm = runner.adapter.Algorithm()
-	}
-	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
-		algorithm = legacyAlgorithmFromOutcome(outcome)
-	}
+	algorithm := legacyAlgorithmFromOutcome(outcome)
 	if algorithm != "" {
-		return typologylegacy.ReportBuildContextFromAlgorithm(algorithm)
+		return reportBuildContextFromAlgorithm(algorithm)
 	}
 	return modeltypology.ReportSpec{}, modeltypology.OutcomeMappingSpec{}, ""
 }

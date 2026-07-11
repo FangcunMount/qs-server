@@ -12,8 +12,8 @@ import (
 )
 
 type ReportBuilder struct {
-	runner *algorithmRunner
-	key    evaluation.ExecutionIdentity
+	registry ReportAdapterRegistry
+	key      evaluation.ExecutionIdentity
 }
 
 var (
@@ -23,49 +23,47 @@ var (
 )
 
 func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
-	return NewReportBuilderWithRegistry(mustDefaultModuleRegistry(), algorithm)
+	return ReportBuilder{
+		registry: DefaultReportAdapterRegistry(),
+		key:      evaluation.PersonalityTypologyIdentity(algorithm),
+	}, nil
 }
 
-func NewConfiguredReportBuilderWithRegistry(registry ModuleRegistry) (ReportBuilder, error) {
-	runner, err := registry.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
-	if err != nil {
-		return ReportBuilder{}, err
+func NewConfiguredReportBuilderWithRegistry(registry ReportAdapterRegistry) (ReportBuilder, error) {
+	if registry.Len() == 0 {
+		return ReportBuilder{}, fmt.Errorf("typology report adapter registry is required")
 	}
 	return ReportBuilder{
-		runner: &runner,
-		key:    evaluation.ExecutionIdentityPersonalityTypology,
+		registry: registry,
+		key:      evaluation.ExecutionIdentityPersonalityTypology,
 	}, nil
 }
 
 func NewConfiguredReportBuilder() (ReportBuilder, error) {
-	return NewConfiguredReportBuilderWithRegistry(mustDefaultModuleRegistry())
+	return NewConfiguredReportBuilderWithRegistry(DefaultReportAdapterRegistry())
 }
 
-func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
-	runner, err := algorithmRunnerFor(registry, algorithm)
-	if err != nil {
-		return ReportBuilder{}, err
+func NewReportBuilderWithRegistry(registry ReportAdapterRegistry, algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
+	if registry.Len() == 0 {
+		return ReportBuilder{}, fmt.Errorf("typology report adapter registry is required")
 	}
 	return ReportBuilder{
-		runner: &runner,
-		key:    evaluation.PersonalityTypologyIdentity(algorithm),
+		registry: registry,
+		key:      evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
 func NewLegacyTypologyAliasReportBuilder(configured ReportBuilder, algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
-	if configured.runner == nil {
+	if configured.registry.Len() == 0 {
 		return ReportBuilder{}, fmt.Errorf("configured typology report builder is required")
 	}
 	return ReportBuilder{
-		runner: configured.runner,
-		key:    evaluation.PersonalityTypologyIdentity(algorithm),
+		registry: configured.registry,
+		key:      evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
 func (b ReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	if b.key.IsZero() && b.runner != nil {
-		return evaluation.PersonalityTypologyIdentity(b.runner.algorithm())
-	}
 	return b.key
 }
 
@@ -107,10 +105,11 @@ func typologyMechanismKeys() []interpretationreporting.MechanismReportBuilderKey
 }
 
 func (b ReportBuilder) Build(_ context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	if b.runner == nil {
+	if b.registry.Len() == 0 {
 		return nil, fmt.Errorf("personality typology report builder is not configured")
 	}
-	rpt, err := b.runner.buildReport(outcome)
+	spec, mapping, decisionKind := resolveReportBuildContext(outcome)
+	rpt, err := b.registry.build(spec, mapping, decisionKind, outcome)
 	if err != nil {
 		return nil, err
 	}

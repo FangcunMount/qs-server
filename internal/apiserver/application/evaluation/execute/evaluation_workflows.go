@@ -53,7 +53,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 		"result", "success",
 	)
 
-	if a.Status().IsEvaluated() || a.Status().IsInterpreted() {
+	if a.Status().IsEvaluated() {
 		log.Infow("测评已有成功评估事实，跳过重复评估",
 			"assessment_id", assessmentID,
 			"status", a.Status().String(),
@@ -86,17 +86,9 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 
 // LoadForInterpretation 加载assessment ready 用于 报告生成。
 func (l assessmentLoader) LoadForInterpretation(ctx context.Context, assessmentID uint64) (*loadedAssessment, error) {
-	log := logger.L(ctx)
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
 	if err != nil {
 		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
-	}
-	if a.Status().IsInterpreted() {
-		log.Infow("测评已解读，跳过重复报告生成",
-			"assessment_id", assessmentID,
-			"status", a.Status().String(),
-		)
-		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
 	}
 	if !a.Status().IsEvaluated() {
 		return nil, evalerrors.AssessmentInvalidStatus("测评尚未计分，无法生成报告")

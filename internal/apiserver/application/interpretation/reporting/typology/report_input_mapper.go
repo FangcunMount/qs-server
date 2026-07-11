@@ -5,7 +5,6 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
@@ -16,11 +15,11 @@ var (
 )
 
 func personalityTypeDetailForReport(payload any) (outcometypology.PersonalityTypeDetail, error) {
-	return typologylegacy.PersonalityTypeDetailForReport(payload)
+	return personalityTypeDetailFromLegacyPayload(payload)
 }
 
 func traitProfileDetailForReport(payload any) (outcometypology.TraitProfileDetail, error) {
-	return typologylegacy.TraitProfileDetailForReport(payload)
+	return traitProfileDetailFromLegacyPayload(payload)
 }
 
 func typologyModelCode(outcome evaloutcome.Outcome) string {

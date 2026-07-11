@@ -35,9 +35,6 @@ const (
 	// StatusEvaluated Evaluation 成功终态：结构化评估事实已可靠提交。
 	StatusEvaluated Status = "evaluated"
 
-	// StatusInterpreted 仅用于读取历史持久化数据；新链路通过 Assessment+Report 查询投影派生。
-	StatusInterpreted Status = "interpreted"
-
 	// StatusFailed 评估失败
 	StatusFailed Status = "failed"
 )
@@ -56,8 +53,6 @@ func (s Status) DisplayName() string {
 		return "已提交"
 	case StatusEvaluated:
 		return "已计分"
-	case StatusInterpreted:
-		return "已解读"
 	case StatusFailed:
 		return "失败"
 	default:
@@ -68,7 +63,7 @@ func (s Status) DisplayName() string {
 // IsValid 检查状态是否有效
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusPending, StatusSubmitted, StatusEvaluated, StatusInterpreted, StatusFailed:
+	case StatusPending, StatusSubmitted, StatusEvaluated, StatusFailed:
 		return true
 	default:
 		return false
@@ -90,11 +85,6 @@ func (s Status) IsEvaluated() bool {
 	return s == StatusEvaluated
 }
 
-// IsInterpreted 是否已解读状态
-func (s Status) IsInterpreted() bool {
-	return s == StatusInterpreted
-}
-
 // IsFailed 是否失败状态
 func (s Status) IsFailed() bool {
 	return s == StatusFailed
@@ -102,7 +92,7 @@ func (s Status) IsFailed() bool {
 
 // IsTerminal 是否终态（不可再迁移）
 func (s Status) IsTerminal() bool {
-	return s == StatusEvaluated || s == StatusInterpreted || s == StatusFailed
+	return s == StatusEvaluated || s == StatusFailed
 }
 
 // CanApplyScoring 是否可应用计分结果

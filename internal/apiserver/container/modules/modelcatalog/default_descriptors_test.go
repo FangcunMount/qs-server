@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
+	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -65,17 +66,16 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	}
 	descs := DefaultEvaluationDescriptors()
 	wiringDeps := evaluation.WiringDeps{
-		ScaleReportBuilder: report.NewDefaultInterpretReportBuilder(nil),
-		ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry:   registry,
+		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
+		TypologyRegistry: registry,
 	}
 	evaluators, err := evaluation.MaterializeEvaluators(descs, wiringDeps)
 	if err != nil {
 		t.Fatalf("MaterializeEvaluators: %v", err)
 	}
-	builders, err := evaluation.MaterializeReportBuilders(descs, wiringDeps)
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
-		t.Fatalf("MaterializeReportBuilders: %v", err)
+		t.Fatalf("ReportBuilders: %v", err)
 	}
 	providers, err := evaluationinputInfra.MaterializeInputProviders(descs, evaluationinputInfra.InputProviderDeps{
 		ScaleCatalog:            evalFakeScaleCatalog{},
@@ -88,8 +88,15 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MaterializeInputProviders: %v", err)
 	}
-	if err := evaluation.AssertRegistryKeyParity(descs, evaluators, builders, providers); err != nil {
-		t.Fatalf("AssertRegistryKeyParity: %v", err)
+	if err := evaluation.AssertExecutionPathParity(descs, evaluators, providers); err != nil {
+		t.Fatalf("AssertExecutionPathParity: %v", err)
+	}
+	for i, desc := range descs {
+		want, _ := evaldomain.ExecutionPathForDescriptor(desc)
+		got, pathErr := interpretationreporting.ExecutionPathForReportBuilder(builders[i])
+		if pathErr != nil || got != want {
+			t.Fatalf("report builder path[%d] = %s, want %s (err=%v)", i, got, want, pathErr)
+		}
 	}
 }
 
@@ -102,9 +109,8 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 	}
 	descs := DefaultEvaluationDescriptors()
 	wiringDeps := evaluation.WiringDeps{
-		ScaleReportBuilder: report.NewDefaultInterpretReportBuilder(nil),
-		ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-		TypologyRegistry:   registry,
+		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
+		TypologyRegistry: registry,
 	}
 	evaluators, err := evaluation.MaterializeEvaluators(descs, wiringDeps)
 	if err != nil {
@@ -124,9 +130,9 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 		}
 	}
 
-	builders, err := evaluation.MaterializeReportBuilders(descs, wiringDeps)
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
-		t.Fatalf("MaterializeReportBuilders: %v", err)
+		t.Fatalf("ReportBuilders: %v", err)
 	}
 	reportRegistry, err := interpretationreporting.NewReportBuilderRegistry(builders...)
 	if err != nil {

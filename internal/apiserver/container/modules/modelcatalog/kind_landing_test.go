@@ -1,19 +1,18 @@
 package modelcatalog
 
 import (
-	"context"
 	"testing"
 
+	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	evaluationmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 )
 
-// Kind landing contract: every RuntimeExecutable capability must materialize evaluator/builder/provider/score-projector.
+// Kind landing contract: every RuntimeExecutable capability must materialize evaluator/builder/provider.
 func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	t.Parallel()
 
@@ -23,23 +22,20 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 		t.Fatalf("DefaultTypologyRegistry: %v", err)
 	}
 	wiringDeps := evaluationmod.WiringDeps{
-		ScaleReportBuilder: report.NewDefaultInterpretReportBuilder(nil),
-		ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-		ScoreRepo:          kindLandingNoopScoreRepo{},
-		TypologyRegistry:   registry,
+		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
+		TypologyRegistry: registry,
 	}
 
 	evaluators, err := evaluationmod.MaterializeEvaluators(descs, wiringDeps)
 	if err != nil {
 		t.Fatalf("MaterializeEvaluators: %v", err)
 	}
-	builders, err := evaluationmod.MaterializeReportBuilders(descs, wiringDeps)
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
 	if err != nil {
-		t.Fatalf("MaterializeReportBuilders: %v", err)
+		t.Fatalf("ReportBuilders: %v", err)
 	}
-	projectors, err := evaluationmod.MaterializeScoreProjectors(descs, wiringDeps)
-	if err != nil {
-		t.Fatalf("MaterializeScoreProjectors: %v", err)
+	if len(builders) != len(descs) {
+		t.Fatalf("report builder count = %d, want %d", len(builders), len(descs))
 	}
 	providers, err := evaluationinputInfra.MaterializeInputProviders(descs, evaluationinputInfra.InputProviderDeps{
 		ScaleCatalog:            evalFakeScaleCatalog{},
@@ -52,8 +48,8 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MaterializeInputProviders: %v", err)
 	}
-	if err := evaluationmod.AssertRegistryKeyParity(descs, evaluators, builders, providers); err != nil {
-		t.Fatalf("AssertRegistryKeyParity: %v", err)
+	if err := evaluationmod.AssertExecutionPathParity(descs, evaluators, providers); err != nil {
+		t.Fatalf("AssertExecutionPathParity: %v", err)
 	}
 
 	descKinds := descriptorDomainKinds(descs)
@@ -74,22 +70,6 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 		}
 	}
 
-	projectorKeys := make(map[evaldomain.ExecutionIdentity]bool, len(projectors))
-	for _, projector := range projectors {
-		projectorKeys[projector.Key()] = true
-	}
-	for _, desc := range descs {
-		path, err := evaldomain.ExecutionPathForDescriptor(desc)
-		if err != nil {
-			t.Fatalf("ExecutionPathForDescriptor: %v", err)
-		}
-		switch path {
-		case domain.ExecutionPathScaleDescriptor, domain.ExecutionPathBehavioralRatingDescriptor, domain.ExecutionPathCognitiveDescriptor:
-			if !projectorKeys[desc.ExecutionIdentity()] {
-				t.Fatalf("missing score projector for %s", desc.ExecutionIdentity())
-			}
-		}
-	}
 }
 
 func descriptorForKind(descs []evaldomain.ModelDescriptor, kind domain.Kind) evaldomain.ModelDescriptor {
@@ -99,13 +79,4 @@ func descriptorForKind(descs []evaldomain.ModelDescriptor, kind domain.Kind) eva
 		}
 	}
 	return evaldomain.ModelDescriptor{}
-}
-
-type kindLandingNoopScoreRepo struct{}
-
-func (kindLandingNoopScoreRepo) SaveScoresWithContext(context.Context, *assessment.Assessment, *assessment.ScaleScoreProjection) error {
-	return nil
-}
-func (kindLandingNoopScoreRepo) DeleteByAssessmentID(context.Context, assessment.ID) error {
-	return nil
 }

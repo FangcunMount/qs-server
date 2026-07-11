@@ -77,7 +77,7 @@ func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint6
 func filterScaleAnalysisRows(items []evaluationreadmodel.AssessmentRow) []evaluationreadmodel.AssessmentRow {
 	filtered := make([]evaluationreadmodel.AssessmentRow, 0, len(items))
 	for _, item := range items {
-		if assessment.Status(item.Status) != assessment.StatusInterpreted || item.EvaluationModelKind == nil || *item.EvaluationModelKind != "scale" || item.EvaluationModelCode == nil {
+		if assessment.Status(item.Status) != assessment.StatusEvaluated || item.EvaluationModelKind == nil || *item.EvaluationModelKind != "scale" || item.EvaluationModelCode == nil {
 			continue
 		}
 		filtered = append(filtered, item)
@@ -113,8 +113,8 @@ func (s *statisticsService) buildScaleTestRecord(ctx context.Context, item evalu
 	record := TestRecordData{
 		AssessmentID: item.ID,
 	}
-	if item.InterpretedAt != nil {
-		record.TestDate = *item.InterpretedAt
+	if item.EvaluatedAt != nil {
+		record.TestDate = *item.EvaluatedAt
 	} else if item.SubmittedAt != nil {
 		record.TestDate = *item.SubmittedAt
 	}
@@ -300,7 +300,7 @@ func sortAssessmentRowsBySubmittedAt(items []evaluationreadmodel.AssessmentRow) 
 func countCompletedAssessmentRows(items []evaluationreadmodel.AssessmentRow) int {
 	count := 0
 	for _, item := range items {
-		if assessment.Status(item.Status) == assessment.StatusInterpreted {
+		if assessment.Status(item.Status) == assessment.StatusEvaluated {
 			count++
 		}
 	}
@@ -328,9 +328,9 @@ func buildPeriodicTask(week int, item evaluationreadmodel.AssessmentRow) Periodi
 	}
 
 	switch assessment.Status(item.Status) {
-	case assessment.StatusInterpreted:
+	case assessment.StatusEvaluated:
 		task.Status = "completed"
-		task.CompletedAt = item.InterpretedAt
+		task.CompletedAt = item.EvaluatedAt
 		assessmentID := item.ID
 		task.AssessmentID = &assessmentID
 	case assessment.StatusFailed:

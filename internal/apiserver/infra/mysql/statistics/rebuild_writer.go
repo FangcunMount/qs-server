@@ -322,8 +322,8 @@ FROM (
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND submitted_at IS NOT NULL AND submitted_at >= ? AND submitted_at < ? GROUP BY DATE(submitted_at)
   UNION ALL SELECT DATE(created_at), 0, COUNT(*), 0, 0
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ? GROUP BY DATE(created_at)
-  UNION ALL SELECT DATE(interpreted_at), 0, 0, COUNT(*), 0
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL AND interpreted_at >= ? AND interpreted_at < ? GROUP BY DATE(interpreted_at)
+  UNION ALL SELECT DATE(evaluated_at), 0, 0, COUNT(*), 0
+  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND status = 'evaluated' AND evaluated_at IS NOT NULL AND evaluated_at >= ? AND evaluated_at < ? GROUP BY DATE(evaluated_at)
   UNION ALL SELECT DATE(failed_at), 0, 0, 0, COUNT(*)
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND failed_at IS NOT NULL AND failed_at >= ? AND failed_at < ? GROUP BY DATE(failed_at)
 ) raw
@@ -350,9 +350,9 @@ FROM (
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
   GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(created_at)
   UNION ALL
-  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(interpreted_at), 0, COUNT(*), 0, 0, COUNT(*), 0
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL AND interpreted_at >= ? AND interpreted_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(interpreted_at)
+  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(evaluated_at), 0, COUNT(*), 0, 0, COUNT(*), 0
+  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND status = 'evaluated' AND evaluated_at IS NOT NULL AND evaluated_at >= ? AND evaluated_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
+  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(evaluated_at)
   UNION ALL
   SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(submitted_at), 0, 0, COUNT(*), 0, 0, 0
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND submitted_at IS NOT NULL AND submitted_at >= ? AND submitted_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
@@ -412,7 +412,7 @@ SELECT
   (SELECT COUNT(*) FROM clinician WHERE org_id = ? AND is_active = 1 AND deleted_at IS NULL) AS clinician_count,
   (SELECT COUNT(*) FROM assessment_entry WHERE org_id = ? AND is_active = 1 AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)) AS active_entry_count,
   (SELECT COUNT(*) FROM assessment WHERE org_id = ? AND deleted_at IS NULL) AS assessment_count,
-  (SELECT COUNT(*) FROM assessment WHERE org_id = ? AND interpreted_at IS NOT NULL AND deleted_at IS NULL) AS report_count,
+  (SELECT COUNT(*) FROM assessment WHERE org_id = ? AND status = 'evaluated' AND evaluated_at IS NOT NULL AND deleted_at IS NULL) AS report_count,
   (SELECT COUNT(*) FROM clinician WHERE org_id = ? AND deleted_at IS NULL) AS dimension_clinician_count,
   (SELECT COUNT(*) FROM assessment_entry WHERE org_id = ? AND deleted_at IS NULL) AS dimension_entry_count,
   (

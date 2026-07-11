@@ -5,30 +5,19 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	portruleengine "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
 type evaluatorFactory func(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (execute.Evaluator, error)
 
-type reportBuilderFactory func(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (interpretationreporting.ReportBuilder, error)
-
-type scoreProjectorFactory func(deps WiringDeps) (interpretationreporting.ScoreProjector, error)
-
-var (
-	evaluatorFactories      map[modelcatalog.ExecutionPath]evaluatorFactory
-	reportBuilderFactories  map[modelcatalog.ExecutionPath]reportBuilderFactory
-	scoreProjectorFactories map[modelcatalog.ExecutionPath]scoreProjectorFactory
-)
+var evaluatorFactories map[modelcatalog.ExecutionPath]evaluatorFactory
 
 func init() {
 	var err error
-	evaluatorFactories, reportBuilderFactories, scoreProjectorFactories, err = buildFactoryMaps(defaultPathMaterializations())
+	evaluatorFactories, err = buildFactoryMaps(defaultPathMaterializations())
 	if err != nil {
 		panic("default materialization specs: " + err.Error())
 	}
@@ -36,15 +25,12 @@ func init() {
 
 // WiringDeps 分组共享 运行时 物化依赖。
 type WiringDeps struct {
-	ScaleReportBuilder report.ReportBuilder
-	ScaleScorer        portruleengine.ScaleFactorScorer
-	ScoreRepo          assessment.ScoreRepository
-	TypologyRegistry   factorclassification.ModuleRegistry
+	ScaleScorer      portruleengine.ScaleFactorScorer
+	TypologyRegistry factorclassification.ModuleRegistry
 }
 
 type wiringSession struct {
-	typologyExecutor      **factorclassification.Executor
-	typologyReportBuilder *factorclassification.ReportBuilder
+	typologyExecutor **factorclassification.Executor
 }
 
 // MaterializeFamilyEvaluators 构建一个evaluator per 算法家族 从 物化 specs。
@@ -102,72 +88,12 @@ func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) 
 	return evaluators, nil
 }
 
-// MaterializeScoreProjectors 构建score 投影器 用于 描述符-backed scale-like 运行时s。
-func MaterializeScoreProjectors(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ScoreProjector, error) {
-	if deps.ScoreRepo == nil {
-		return nil, fmt.Errorf("score repository is required")
-	}
-	projectors := make([]interpretationreporting.ScoreProjector, 0, len(descs))
-	for _, desc := range descs {
-		projector, err := materializeScoreProjector(desc, deps)
-		if err != nil {
-			return nil, err
-		}
-		if projector != nil {
-			projectors = append(projectors, projector)
-		}
-	}
-	return projectors, nil
-}
-
-func materializeScoreProjector(desc evaldomain.ModelDescriptor, deps WiringDeps) (interpretationreporting.ScoreProjector, error) {
-	path, err := executionPathForDescriptor(desc)
-	if err != nil {
-		return nil, err
-	}
-	factory, ok := scoreProjectorFactories[path]
-	if !ok {
-		if path == modelcatalog.ExecutionPathTypologyDescriptor {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
-	}
-	return factory(deps)
-}
-
-// MaterializeReportBuilders 构建报告构建器 从 描述符。
-func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
-	var sharedConfigured factorclassification.ReportBuilder
-	session := wiringSession{typologyReportBuilder: &sharedConfigured}
-	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
-	for _, desc := range descs {
-		builder, err := materializeReportBuilder(desc, deps, session)
-		if err != nil {
-			return nil, err
-		}
-		builders = append(builders, builder)
-	}
-	return builders, nil
-}
-
 func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (execute.Evaluator, error) {
 	path, err := executionPathForDescriptor(desc)
 	if err != nil {
 		return nil, err
 	}
 	factory, ok := evaluatorFactories[path]
-	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
-	}
-	return factory(desc, deps, session)
-}
-
-func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (interpretationreporting.ReportBuilder, error) {
-	path, err := executionPathForDescriptor(desc)
-	if err != nil {
-		return nil, err
-	}
-	factory, ok := reportBuilderFactories[path]
 	if !ok {
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}

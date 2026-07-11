@@ -1,7 +1,6 @@
 package interpretation
 
 import (
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -17,7 +16,6 @@ type WireInput struct {
 	MongoLimiter     backpressure.Acquirer
 	OpsHandle        *cacheplane.Handle
 	ModelDescriptors []evaldomain.ModelDescriptor
-	TypologyRegistry evalregistry.TypologyRegistry
 }
 
 // Wire builds and bootstraps the report module from composition inputs.
@@ -27,7 +25,6 @@ func Wire(in WireInput) (*Module, error) {
 		TopicResolver:    in.TopicResolver,
 		MongoLimiter:     in.MongoLimiter,
 		ModelDescriptors: in.ModelDescriptors,
-		TypologyRegistry: in.TypologyRegistry,
 		OpsHandle:        in.OpsHandle,
 	})
 }

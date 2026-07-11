@@ -8,6 +8,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -25,7 +26,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 		t.Fatalf("executor key = %s, want configured typology key", executor.Key())
 	}
 
-	reportBuilder, err := typologyeval.NewConfiguredReportBuilder()
+	reportBuilder, err := typologyreporting.NewConfiguredReportBuilder()
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}

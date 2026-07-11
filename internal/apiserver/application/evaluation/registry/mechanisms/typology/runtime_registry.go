@@ -11,10 +11,9 @@ import (
 
 // PersonalityRuntimeRegistry 解析类型学 execution 能力 按 评估器键 和 算法别名。
 type PersonalityRuntimeRegistry struct {
-	assembler      OutcomeAssembler
-	reportRegistry ReportAdapterRegistry
-	configured     configuredadapter.Adapter
-	aliases        map[modelcatalog.Algorithm]configuredadapter.Adapter
+	assembler  OutcomeAssembler
+	configured configuredadapter.Adapter
+	aliases    map[modelcatalog.Algorithm]configuredadapter.Adapter
 }
 
 // 默认PersonalityRuntimeRegistry 构建默认 配置化 类型学 运行时。
@@ -41,10 +40,9 @@ func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithm
 		aliases[algorithm] = configuredadapter.NewAdapterWithEvaluator(algorithm, evaluator)
 	}
 	return PersonalityRuntimeRegistry{
-		assembler:      NewOutcomeAssemblerWithRegistry(opts.OutcomeRegistry),
-		reportRegistry: opts.ReportRegistry,
-		configured:     configuredadapter.NewRuntimeAdapterWithEvaluator(evaluator),
-		aliases:        aliases,
+		assembler:  NewOutcomeAssemblerWithRegistry(opts.OutcomeRegistry),
+		configured: configuredadapter.NewRuntimeAdapterWithEvaluator(evaluator),
+		aliases:    aliases,
 	}
 }
 
@@ -61,7 +59,6 @@ func (r PersonalityRuntimeRegistry) runnerForConfigured() algorithmRunner {
 	return algorithmRunner{
 		adapter:          r.configured,
 		outcomeAssembler: r.assembler,
-		reportRegistry:   r.reportRegistry,
 	}
 }
 
@@ -73,7 +70,6 @@ func (r PersonalityRuntimeRegistry) runnerFor(algorithm modelcatalog.Algorithm) 
 	return algorithmRunner{
 		adapter:          adapter,
 		outcomeAssembler: r.assembler,
-		reportRegistry:   r.reportRegistry,
 	}, nil
 }
 

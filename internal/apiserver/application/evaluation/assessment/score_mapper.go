@@ -19,8 +19,6 @@ func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *scalesnap
 			RawScore:     fs.RawScore,
 			MaxScore:     factorMaxScoreMap[fs.FactorCode],
 			RiskLevel:    fs.RiskLevel,
-			Conclusion:   fs.Conclusion,
-			Suggestion:   fs.Suggestion,
 			IsTotalScore: fs.IsTotalScore,
 		})
 	}

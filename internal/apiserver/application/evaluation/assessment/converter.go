@@ -66,8 +66,8 @@ func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 	if submittedAt := a.SubmittedAt(); submittedAt != nil {
 		result.SubmittedAt = submittedAt
 	}
-	if interpretedAt := a.InterpretedAt(); interpretedAt != nil {
-		result.InterpretedAt = interpretedAt
+	if evaluatedAt := a.EvaluatedAt(); evaluatedAt != nil {
+		result.EvaluatedAt = evaluatedAt
 	}
 	if failedAt := a.FailedAt(); failedAt != nil {
 		result.FailedAt = failedAt
@@ -103,7 +103,7 @@ func assessmentRowToResult(row evaluationreadmodel.AssessmentRow) (*AssessmentRe
 		TotalScore:           row.TotalScore,
 		RiskLevel:            row.RiskLevel,
 		SubmittedAt:          row.SubmittedAt,
-		InterpretedAt:        row.InterpretedAt,
+		EvaluatedAt:          row.EvaluatedAt,
 		FailedAt:             row.FailedAt,
 		FailureReason:        row.FailureReason,
 	}, nil

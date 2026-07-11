@@ -167,12 +167,14 @@ sequenceDiagram
     MQ->>Worker: consume assessment.submitted
     Worker->>API: internal gRPC EvaluateAssessment
     API->>Eval: resolve ModelRef + EvaluatorKey
-    Eval->>Eval: Execute evaluator + build report
-    Eval->>Report: Save InterpretReport
-    Eval->>API: stage assessment.evaluated or assessment.interpreted
-    Eval->>API: stage report.generated
+    Eval->>Eval: Execute evaluator + commit EvaluationOutcome
+    Eval->>API: stage assessment.evaluated
 
-    Note over Eval,Report: 异步模式(EVALUATION_ASYNC_INTERPRETATION=1)时<br/>Evaluate 先 stage assessment.evaluated<br/>worker 再调 GenerateReportFromAssessment
+    Outbox->>MQ: publish assessment.evaluated
+    MQ->>Worker: consume assessment.evaluated
+    Worker->>API: Generate report from EvaluationOutcome
+    API->>Report: Save InterpretReport
+    Report->>API: stage report.generated
 ```
 
 这条链路的设计原则：

@@ -59,7 +59,7 @@ type AssessmentPO struct {
 
 	// 时间戳
 	SubmittedAt   *time.Time `gorm:"column:submitted_at"`
-	InterpretedAt *time.Time `gorm:"column:interpreted_at"`
+	EvaluatedAt   *time.Time `gorm:"column:evaluated_at"`
 	FailedAt      *time.Time `gorm:"column:failed_at"`
 	FailureReason *string    `gorm:"column:failure_reason;size:500"`
 	CurrentRunID  *string    `gorm:"column:current_run_id;size:100;index:idx_assessment_current_run_id"`
@@ -103,10 +103,7 @@ type AssessmentScorePO struct {
 	// 得分
 	RawScore float64 `gorm:"column:raw_score;not null"`
 
-	// 解读结果
-	RiskLevel  string `gorm:"column:risk_level;size:50;not null;index:idx_risk_level"`
-	Conclusion string `gorm:"column:conclusion;type:text"`
-	Suggestion string `gorm:"column:suggestion;type:text"`
+	RiskLevel string `gorm:"column:risk_level;size:50;not null;index:idx_risk_level"`
 }
 
 // TableName 指定表名

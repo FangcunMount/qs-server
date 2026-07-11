@@ -144,7 +144,7 @@ func (r *StatisticsRepository) BuildRealtimeTesteeStatistics(ctx context.Context
 	}
 	if err := r.WithContext(ctx).
 		Table("assessment").
-		Select("MIN(created_at) as first_assessment_date, MAX(interpreted_at) as last_assessment_date").
+		Select("MIN(created_at) as first_assessment_date, MAX(evaluated_at) as last_assessment_date").
 		Where("org_id = ? AND testee_id = ? AND deleted_at IS NULL", orgID, testeeID).
 		Scan(&timeInfo).Error; err == nil {
 		result.FirstAssessmentDate = timeInfo.FirstAssessmentDate

@@ -8,12 +8,12 @@ import (
 )
 
 func buildPersonalityTypeReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	spec, _, _ := resolveReportBuildContext(algorithmRunner{}, outcome)
+	spec, _, _ := resolveReportBuildContext(outcome)
 	return buildMechanismPersonalityTypeReport(outcome, spec)
 }
 
 func buildTraitProfileReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	spec, _, _ := resolveReportBuildContext(algorithmRunner{}, outcome)
+	spec, _, _ := resolveReportBuildContext(outcome)
 	return buildMechanismTraitProfileReport(outcome, spec)
 }
 

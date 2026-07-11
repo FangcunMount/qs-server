@@ -23,13 +23,13 @@ SELECT
 	ranked.org_id,
 	ranked.testee_id,
 	ranked.risk_level,
-	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
+	COALESCE(ranked.evaluated_at, ranked.updated_at, ranked.created_at) AS occurred_at
 FROM (
 	SELECT
 		assessment.*,
 		ROW_NUMBER() OVER (
 			PARTITION BY assessment.testee_id
-			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
+			ORDER BY COALESCE(assessment.evaluated_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
 		) AS row_num
 	FROM assessment
 	WHERE assessment.org_id = ?
@@ -70,7 +70,7 @@ SELECT
 	a.org_id,
 	a.testee_id,
 	a.risk_level,
-	COALESCE(a.interpreted_at, a.updated_at, a.created_at) AS occurred_at
+	COALESCE(a.evaluated_at, a.updated_at, a.created_at) AS occurred_at
 ` + latestRiskQueueCoreSQL
 
 const latestRiskQueueCountSQL = `
@@ -168,7 +168,7 @@ func (r *assessmentReadModel) ListLatestRisksByTesteeIDs(
 
 	var rows []latestRiskPO
 	err := r.WithContext(ctx).
-		Raw(latestRiskRowsQuery, filter.OrgID, uniqueUint64(filter.TesteeIDs), "interpreted").
+		Raw(latestRiskRowsQuery, filter.OrgID, uniqueUint64(filter.TesteeIDs), "evaluated").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -287,7 +287,7 @@ func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []int
 	if filter.RestrictToTesteeIDs {
 		args = append(args, uniqueUint64(filter.TesteeIDs))
 	}
-	args = append(args, "interpreted", filter.OrgID, "interpreted", riskLevels)
+	args = append(args, "evaluated", filter.OrgID, "evaluated", riskLevels)
 	return args
 }
 
@@ -365,7 +365,7 @@ func assessmentPOToReadRow(po *AssessmentPO) evaluationreadmodel.AssessmentRow {
 		TotalScore:               po.TotalScore,
 		RiskLevel:                po.RiskLevel,
 		SubmittedAt:              po.SubmittedAt,
-		InterpretedAt:            po.InterpretedAt,
+		EvaluatedAt:              po.EvaluatedAt,
 		FailedAt:                 po.FailedAt,
 		FailureReason:            po.FailureReason,
 	}
@@ -454,8 +454,6 @@ func scorePOsToReadRow(pos []*AssessmentScorePO) evaluationreadmodel.ScoreRow {
 			FactorName:   po.FactorName,
 			RawScore:     po.RawScore,
 			RiskLevel:    po.RiskLevel,
-			Conclusion:   po.Conclusion,
-			Suggestion:   po.Suggestion,
 			IsTotalScore: po.IsTotalScore,
 		}
 		row.FactorScores = append(row.FactorScores, factor)
