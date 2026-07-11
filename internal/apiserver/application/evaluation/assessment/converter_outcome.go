@@ -62,6 +62,12 @@ func reportRowToOutcomeResult(row evaluationreadmodel.ReportRow) *ReportOutcomeR
 	}
 }
 
+// ReportRowToOutcomeResult preserves the current outcome-report projection
+// shape while Interpretation owns report-query execution.
+func ReportRowToOutcomeResult(row evaluationreadmodel.ReportRow) *ReportOutcomeResult {
+	return reportRowToOutcomeResult(row)
+}
+
 func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) ModelIdentityResult {
 	kind := derefString(row.EvaluationModelKind)
 	subKind := derefString(row.EvaluationModelSubKind)

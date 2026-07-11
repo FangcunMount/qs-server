@@ -19,7 +19,8 @@ import (
 // 提供测评结果查询、报告查看等功能
 type EvaluationService struct {
 	pb.UnimplementedEvaluationServiceServer
-	submissionService  assessmentApp.AssessmentSubmissionService
+	intakeService      assessmentApp.AnswerSheetAssessmentIntakeService
+	testeeQueryService assessmentApp.TesteeAssessmentQueryService
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
 	assessmentReader   evaluationreadmodel.AssessmentReader
@@ -27,13 +28,15 @@ type EvaluationService struct {
 
 // NewEvaluationService 创建测评 gRPC 服务
 func NewEvaluationService(
-	submissionService assessmentApp.AssessmentSubmissionService,
+	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
+	testeeQueryService assessmentApp.TesteeAssessmentQueryService,
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 ) *EvaluationService {
 	return &EvaluationService{
-		submissionService:  submissionService,
+		intakeService:      intakeService,
+		testeeQueryService: testeeQueryService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
 		assessmentReader:   assessmentReader,
@@ -52,7 +55,7 @@ func (s *EvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAs
 	if req.TesteeId == 0 || req.AssessmentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
 	}
-	if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
+	if _, err := s.testeeQueryService.GetMine(ctx, req.TesteeId, req.AssessmentId); err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
 	result, err := s.loadAssessmentOutcomeRow(ctx, req.AssessmentId)
@@ -67,7 +70,7 @@ func (s *EvaluationService) ResolveAssessmentByAnswerSheetID(ctx context.Context
 	if req.AnswerSheetId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "answer_sheet_id 不能为空")
 	}
-	result, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswerSheetId)
+	result, err := s.intakeService.FindByAnswerSheetID(ctx, req.AnswerSheetId)
 	if err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
@@ -116,7 +119,7 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		dto.DateFrom = dateFrom
 		dto.DateTo = dateTo
 
-		listResult, err := s.submissionService.ListMyAssessments(ctx, dto)
+		listResult, err := s.testeeQueryService.ListMine(ctx, dto)
 		if err != nil {
 			return nil, toAssessmentQueryGRPCError(err)
 		}
@@ -348,7 +351,7 @@ func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.Get
 	}
 
 	if req.TesteeId > 0 {
-		if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
+		if _, err := s.testeeQueryService.GetMine(ctx, req.TesteeId, req.AssessmentId); err != nil {
 			return nil, toAssessmentQueryGRPCError(err)
 		}
 		if s.reportQueryService == nil {
@@ -438,10 +441,10 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 
 // validateTesteeAssessmentAccess 验证受试者是否有权访问指定测评
 func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, testeeID uint64, assessmentID uint64) error {
-	if s.submissionService == nil {
+	if s.testeeQueryService == nil {
 		return status.Error(codes.FailedPrecondition, "测评服务未初始化")
 	}
-	result, err := s.submissionService.GetMyAssessment(ctx, testeeID, assessmentID)
+	result, err := s.testeeQueryService.GetMine(ctx, testeeID, assessmentID)
 	if err != nil {
 		return toAssessmentQueryGRPCError(err)
 	}

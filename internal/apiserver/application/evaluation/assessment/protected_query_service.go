@@ -12,18 +12,18 @@ import (
 
 // protectedQueryService 受保护的查询服务
 type protectedQueryService struct {
-	managementService  AssessmentManagementService
-	reportQueryService ReportQueryService
-	scoreQueryService  ScoreQueryService
-	waitService        AssessmentWaitService
-	accessQueryService AssessmentAccessQueryService
-	assessmentReader   evaluationreadmodel.AssessmentReader
-	runQueryService    runquery.Service
+	operatorQueryService AssessmentOperatorQueryService
+	reportQueryService   ReportQueryService
+	scoreQueryService    ScoreQueryService
+	waitService          AssessmentWaitService
+	accessQueryService   AssessmentAccessQueryService
+	assessmentReader     evaluationreadmodel.AssessmentReader
+	runQueryService      runquery.Service
 }
 
 // NewProtectedQueryService 创建受保护的查询服务实例
 func NewProtectedQueryService(
-	managementService AssessmentManagementService,
+	operatorQueryService AssessmentOperatorQueryService,
 	reportQueryService ReportQueryService,
 	scoreQueryService ScoreQueryService,
 	waitService AssessmentWaitService,
@@ -32,13 +32,13 @@ func NewProtectedQueryService(
 	runQueryService runquery.Service,
 ) AssessmentProtectedQueryService {
 	return &protectedQueryService{
-		managementService:  managementService,
-		reportQueryService: reportQueryService,
-		scoreQueryService:  scoreQueryService,
-		waitService:        waitService,
-		accessQueryService: accessQueryService,
-		assessmentReader:   assessmentReader,
-		runQueryService:    runQueryService,
+		operatorQueryService: operatorQueryService,
+		reportQueryService:   reportQueryService,
+		scoreQueryService:    scoreQueryService,
+		waitService:          waitService,
+		accessQueryService:   accessQueryService,
+		assessmentReader:     assessmentReader,
+		runQueryService:      runQueryService,
 	}
 }
 
@@ -53,8 +53,8 @@ func (s *protectedQueryService) GetAssessment(ctx context.Context, scope Protect
 
 // ListAssessments 查询测评列表
 func (s *protectedQueryService) ListAssessments(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentListResult, error) {
-	if s.managementService == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment management service is not configured")
+	if s.operatorQueryService == nil {
+		return nil, evalerrors.ModuleNotConfigured("assessment operator query service is not configured")
 	}
 	dto = normalizeAssessmentListQuery(dto)
 	orgScope, err := safeconv.Int64ToUint64(scope.OrgID)
@@ -70,7 +70,7 @@ func (s *protectedQueryService) ListAssessments(ctx context.Context, scope Prote
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.managementService.List(ctx, scopedDTO)
+	result, err := s.operatorQueryService.List(ctx, scopedDTO)
 	if err != nil || result == nil {
 		return result, err
 	}

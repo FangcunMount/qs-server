@@ -8,9 +8,9 @@ func (m *Module) ExportGRPCDeps() grpctransport.EvaluationDeps {
 	if m == nil {
 		return deps
 	}
-	deps.SubmissionService = m.SubmissionService
+	deps.IntakeService = m.IntakeService
+	deps.TesteeQueryService = m.TesteeQueryService
 	deps.ManagementService = m.ManagementService
-	deps.ReportQueryService = m.ReportQueryService
 	deps.ScoreQueryService = m.ScoreQueryService
 	deps.AssessmentReader = m.AssessmentReader
 	deps.EvaluationService = m.EvaluationService

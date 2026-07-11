@@ -13,32 +13,81 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-// managementService 测评管理服务实现
-// 行为者：管理员 (Staff/Admin)
+// managementService 是拆分前 AssessmentManagementService 的兼容门面。
 type managementService struct {
+	query    AssessmentOperatorQueryService
+	recovery AssessmentOperatorRecoveryService
+}
+
+// assessmentOperatorQueryService 服务于后台操作者已授权的 Assessment 查询。
+type assessmentOperatorQueryService struct {
+	repo   assessment.Repository
+	reader evaluationreadmodel.AssessmentReader
+}
+
+// assessmentOperatorRecoveryService 服务于后台操作者的失败恢复。
+type assessmentOperatorRecoveryService struct {
 	repo        assessment.Repository
-	reader      evaluationreadmodel.AssessmentReader
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 }
 
-// NewManagementService 创建测评管理服务实例
+// NewAssessmentOperatorQueryService creates the backend-operator query use case.
+func NewAssessmentOperatorQueryService(
+	repo assessment.Repository,
+	reader evaluationreadmodel.AssessmentReader,
+) AssessmentOperatorQueryService {
+	return &assessmentOperatorQueryService{repo: repo, reader: reader}
+}
+
+// NewAssessmentOperatorRecoveryService creates the backend-operator recovery use case.
+func NewAssessmentOperatorRecoveryService(
+	repo assessment.Repository,
+	txRunner apptransaction.Runner,
+	eventStager EventStager,
+) AssessmentOperatorRecoveryService {
+	return &assessmentOperatorRecoveryService{
+		repo:        repo,
+		txRunner:    txRunner,
+		eventStager: eventStager,
+	}
+}
+
+// NewAssessmentManagementCompatibilityService preserves the former combined
+// management port for callers that have not migrated to operator-specific use cases.
+func NewAssessmentManagementCompatibilityService(
+	query AssessmentOperatorQueryService,
+	recovery AssessmentOperatorRecoveryService,
+) AssessmentManagementService {
+	return &managementService{query: query, recovery: recovery}
+}
+
+// NewManagementService creates the legacy combined management facade.
 func NewManagementService(
 	repo assessment.Repository,
 	reader evaluationreadmodel.AssessmentReader,
 	txRunner apptransaction.Runner,
 	eventStager EventStager,
 ) AssessmentManagementService {
-	return &managementService{
-		repo:        repo,
-		reader:      reader,
-		txRunner:    txRunner,
-		eventStager: eventStager,
-	}
+	query := NewAssessmentOperatorQueryService(repo, reader)
+	recovery := NewAssessmentOperatorRecoveryService(repo, txRunner, eventStager)
+	return NewAssessmentManagementCompatibilityService(query, recovery)
+}
+
+func (s *managementService) GetByID(ctx context.Context, id uint64) (*AssessmentResult, error) {
+	return s.query.GetByID(ctx, id)
+}
+
+func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error) {
+	return s.query.List(ctx, dto)
+}
+
+func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
+	return s.recovery.Retry(ctx, orgID, assessmentID)
 }
 
 // GetByID 根据ID获取测评详情
-func (s *managementService) GetByID(ctx context.Context, id uint64) (*AssessmentResult, error) {
+func (s *assessmentOperatorQueryService) GetByID(ctx context.Context, id uint64) (*AssessmentResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -76,7 +125,7 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*Assessment
 }
 
 // List 查询测评列表
-func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error) {
+func (s *assessmentOperatorQueryService) List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -146,14 +195,14 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	}, nil
 }
 
-// Retry 重试失败的测评
-func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
+// Retry retries one failed Assessment within the backend operator's organization.
+func (s *assessmentOperatorRecoveryService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
 	return assessmentRetryWorkflow{service: s}.Retry(ctx, orgID, assessmentID)
 }
 
 // assessmentRetryWorkflow 测评重试工作流
 type assessmentRetryWorkflow struct {
-	service *managementService
+	service *assessmentOperatorRecoveryService
 }
 
 // Retry 重试失败的测评
@@ -240,7 +289,7 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 // loadAssessmentInOrg 加载测评
 // 场景：管理员重试失败的测评
 // 说明：加载测评数据，并检查是否属于当前机构
-func (s *managementService) loadAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64, action string) (*assessment.Assessment, error) {
+func (s *assessmentOperatorRecoveryService) loadAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64, action string) (*assessment.Assessment, error) {
 	l := logger.L(ctx)
 
 	id := meta.FromUint64(assessmentID)

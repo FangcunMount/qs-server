@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -45,6 +46,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
 			allowedImporters: []string{
+				"internal/apiserver/application/interpretation/report_query_service.go",
 				"internal/apiserver/application/interpretation/reporting/audience_profile_builders.go",
 				"internal/apiserver/application/interpretation/reporting/factor_scoring_report.go",
 				"internal/apiserver/application/interpretation/reporting/materialize/materialize.go",
@@ -87,6 +89,100 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 	}
 }
 
+// These allowlists freeze the two application-role debts that later batches
+// deliberately remove. New code must not add more report-viewing behavior to
+// Evaluation or more operator-only batch behavior to the Worker service.
+func TestEvaluationRoleCompatibilityDebtDoesNotSpread(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	cases := []struct {
+		name      string
+		scanRoots []string
+		tokens    []string
+		want      []string
+	}{
+		{
+			name: "report_viewing_in_evaluation",
+			scanRoots: []string{
+				"internal/apiserver/application/evaluation",
+				"internal/apiserver/container/modules/evaluation",
+			},
+			tokens: []string{"ReportReader", "ReportQueryService", "WaitReport"},
+			want: []string{
+				"internal/apiserver/application/evaluation/assessment/interface.go",
+				"internal/apiserver/application/evaluation/assessment/protected_query_service.go",
+				"internal/apiserver/application/evaluation/assessment/wait_service.go",
+				"internal/apiserver/container/modules/evaluation/assemble.go",
+				"internal/apiserver/container/modules/evaluation/bootstrap.go",
+				"internal/apiserver/container/modules/evaluation/wire.go",
+			},
+		},
+		{
+			name:      "operator_batch_execution_in_worker_service",
+			scanRoots: []string{"internal/apiserver/application/evaluation/execute"},
+			tokens:    []string{"EvaluateBatch"},
+			want: []string{
+				"internal/apiserver/application/evaluation/execute/evaluation_workflows.go",
+				"internal/apiserver/application/evaluation/execute/interface.go",
+				"internal/apiserver/application/evaluation/execute/service.go",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := collectSourceTokenFiles(t, root, tc.scanRoots, tc.tokens)
+			want := append([]string(nil), tc.want...)
+			sort.Strings(want)
+			if strings.Join(got, "\n") != strings.Join(want, "\n") {
+				t.Fatalf("role compatibility debt changed\n got:\n%s\nwant:\n%s\nmove existing ownership deliberately and shrink this allowlist; do not add new callers", strings.Join(got, "\n"), strings.Join(want, "\n"))
+			}
+		})
+	}
+}
+
+// C-facing queries and answer-sheet orchestration must use the narrow actor
+// ports. The former combined submission port remains only as a compatibility
+// facade outside transport wiring.
+func TestEvaluationTransportDoesNotUseCombinedSubmissionPort(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/transport/grpc/service"}, []string{"AssessmentSubmissionService"})
+	if len(got) != 0 {
+		t.Fatalf("gRPC transport must use actor-specific Assessment ports, found combined port in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+// Backend REST transport must receive only the operator recovery use case;
+// all reads are performed by the protected operator-query orchestration.
+func TestEvaluationRESTTransportDoesNotUseCombinedManagementPort(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/transport/rest"}, []string{"AssessmentManagementService"})
+	if len(got) != 0 {
+		t.Fatalf("REST transport must use operator-specific Assessment ports, found combined port in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+// Interpretation owns construction of the report-query use case. Evaluation
+// may consume its port for existing protected-query compatibility, but must
+// not recreate a report reader or query implementation.
+func TestEvaluationDoesNotConstructReportQueryService(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{
+		"internal/apiserver/application/evaluation",
+		"internal/apiserver/container/modules/evaluation",
+	}, []string{"NewReportQueryService("})
+	if len(got) != 0 {
+		t.Fatalf("Evaluation must consume the Interpretation-owned report query port, found construction in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
 func collectCrossModuleImporters(t *testing.T, root string, scanRoots, forbiddenPrefixes []string) []string {
 	t.Helper()
 	found := make(map[string]struct{})
@@ -106,6 +202,42 @@ func collectCrossModuleImporters(t *testing.T, root string, scanRoots, forbidden
 	result := make([]string, 0, len(found))
 	for importer := range found {
 		result = append(result, importer)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func collectSourceTokenFiles(t *testing.T, root string, scanRoots, tokens []string) []string {
+	t.Helper()
+	found := make(map[string]struct{})
+	for _, relRoot := range scanRoots {
+		absRoot := filepath.Join(root, filepath.FromSlash(relRoot))
+		err := filepath.WalkDir(absRoot, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, token := range tokens {
+				if strings.Contains(string(data), token) {
+					found[filepath.ToSlash(mustRel(t, root, path))] = struct{}{}
+					break
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := make([]string, 0, len(found))
+	for rel := range found {
+		result = append(result, rel)
 	}
 	sort.Strings(result)
 	return result

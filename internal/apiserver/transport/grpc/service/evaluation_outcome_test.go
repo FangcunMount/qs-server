@@ -15,7 +15,7 @@ import (
 
 func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *testing.T) {
 	svc := &EvaluationService{
-		submissionService: &fakeAssessmentSubmissionService{
+		testeeQueryService: &fakeTesteeAssessmentQueryService{
 			getMyAssessment: func(context.Context, uint64, uint64) (*assessmentApp.AssessmentResult, error) {
 				return nil, evalerrors.Forbidden("无权访问此测评")
 			},
@@ -37,7 +37,7 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *
 		report: &assessmentApp.ReportOutcomeResult{AssessmentID: 42},
 	}
 	svc := &EvaluationService{
-		submissionService: &fakeAssessmentSubmissionService{
+		testeeQueryService: &fakeTesteeAssessmentQueryService{
 			getMyAssessment: func(_ context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
 				if testeeID != 7 || assessmentID != 42 {
 					t.Fatalf("unexpected ids: testee=%d assessment=%d", testeeID, assessmentID)
@@ -83,31 +83,19 @@ func TestEvaluationServiceGetAssessmentReportWithoutTesteeUsesLegacyPath(t *test
 	}
 }
 
-type fakeAssessmentSubmissionService struct {
+type fakeTesteeAssessmentQueryService struct {
 	getMyAssessment func(ctx context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error)
 }
 
-func (s *fakeAssessmentSubmissionService) Create(context.Context, assessmentApp.CreateAssessmentDTO) (*assessmentApp.AssessmentResult, error) {
-	panic("unexpected Create call")
-}
-
-func (s *fakeAssessmentSubmissionService) Submit(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
-	panic("unexpected Submit call")
-}
-
-func (s *fakeAssessmentSubmissionService) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
+func (s *fakeTesteeAssessmentQueryService) GetMine(ctx context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
 	if s.getMyAssessment == nil {
 		return nil, pkgerrors.WithCode(errorCode.ErrAssessmentNotFound, "assessment not found")
 	}
 	return s.getMyAssessment(ctx, testeeID, assessmentID)
 }
 
-func (s *fakeAssessmentSubmissionService) GetMyAssessmentByAnswerSheetID(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
-	panic("unexpected GetMyAssessmentByAnswerSheetID call")
-}
-
-func (s *fakeAssessmentSubmissionService) ListMyAssessments(context.Context, assessmentApp.ListMyAssessmentsDTO) (*assessmentApp.AssessmentListResult, error) {
-	panic("unexpected ListMyAssessments call")
+func (s *fakeTesteeAssessmentQueryService) ListMine(context.Context, assessmentApp.ListMyAssessmentsDTO) (*assessmentApp.AssessmentListResult, error) {
+	panic("unexpected ListMine call")
 }
 
 type fakeReportQueryService struct {

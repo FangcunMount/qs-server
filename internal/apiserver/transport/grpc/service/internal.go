@@ -34,7 +34,7 @@ import (
 type InternalService struct {
 	pb.UnimplementedInternalServiceServer
 	answerSheetScoringService  answerSheetApp.AnswerSheetScoringService
-	submissionService          assessmentApp.AssessmentSubmissionService
+	intakeService              assessmentApp.AnswerSheetAssessmentIntakeService
 	managementService          assessmentApp.AssessmentManagementService
 	executeService             execute.Service
 	outcomeReportService       interpretationApp.OutcomeReportService
@@ -68,7 +68,7 @@ type operatorBootstrapRoleSyncer interface {
 // NewInternalService 创建内部 gRPC 服务
 func NewInternalService(
 	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
-	submissionService assessmentApp.AssessmentSubmissionService,
+	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
 	managementService assessmentApp.AssessmentManagementService,
 	executeService execute.Service,
 	outcomeReportService interpretationApp.OutcomeReportService,
@@ -89,7 +89,7 @@ func NewInternalService(
 ) *InternalService {
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
-		submissionService:                  submissionService,
+		intakeService:                      intakeService,
 		managementService:                  managementService,
 		executeService:                     executeService,
 		outcomeReportService:               outcomeReportService,
@@ -284,7 +284,7 @@ func (s *InternalService) loadExistingAssessmentResponse(
 	orgID uint64,
 	matchedTask *planApp.TaskAssessmentContext,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, bool) {
-	existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID)
+	existing, err := s.intakeService.FindByAnswerSheetID(ctx, answerSheetID)
 	if err != nil || existing == nil {
 		return nil, false
 	}
@@ -305,7 +305,7 @@ func (s *InternalService) createAssessmentFromAnswerSheet(
 	matchedTask *planApp.TaskAssessmentContext,
 	shouldAutoSubmit bool,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
-	result, err := s.submissionService.Create(ctx, dto)
+	result, err := s.intakeService.CreateForAnswerSheet(ctx, dto)
 	if err != nil {
 		if errors.IsCode(err, errorCode.ErrAssessmentDuplicate) {
 			if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
@@ -352,7 +352,7 @@ func (s *InternalService) markReportStatusQueued(ctx context.Context, assessment
 }
 
 func (s *InternalService) autoSubmitAssessment(ctx context.Context, l *logger.RequestLogger, assessmentID uint64) bool {
-	if _, err := s.submissionService.Submit(ctx, assessmentID); err != nil {
+	if _, err := s.intakeService.SubmitForEvaluation(ctx, assessmentID); err != nil {
 		l.Warnw("自动提交测评失败",
 			"assessment_id", assessmentID,
 			"error", err.Error(),

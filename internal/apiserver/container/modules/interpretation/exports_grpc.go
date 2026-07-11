@@ -6,5 +6,8 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 	if m == nil {
 		return grpctransport.InterpretationDeps{}
 	}
-	return grpctransport.InterpretationDeps{OutcomeReportService: m.OutcomeService()}
+	return grpctransport.InterpretationDeps{
+		OutcomeReportService: m.OutcomeService(),
+		ReportQueryService:   m.QueryService,
+	}
 }

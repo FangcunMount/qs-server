@@ -175,7 +175,7 @@ func (c *Container) ActorPorts() compose.ActorPorts {
 func (c *Container) ReportIntegrationPorts() compose.ReportIntegrationPorts {
 	ports := reportmod.ExportPorts(c.ReportModule)
 	return compose.ReportIntegrationPorts{
-		Reader: ports.Reader,
+		QueryService: ports.QueryService,
 	}
 }
 

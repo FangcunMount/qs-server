@@ -64,7 +64,7 @@ func New(deps Deps) (*Module, error) {
 	}
 	module.stateStore = reportRepo
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
-	module.QueryService = assessmentApp.NewReportQueryService(module.reader)
+	module.QueryService = interpretationapp.NewReportQueryService(module.reader)
 
 	priorityOpts := []mongoEventOutbox.StoreOption{
 		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
@@ -116,14 +116,6 @@ func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {
 		return nil
 	}
 	return m.outcomeService
-}
-
-// Reader exposes the report read model port.
-func (m *Module) Reader() evaluationreadmodel.ReportReader {
-	if m == nil {
-		return nil
-	}
-	return m.reader
 }
 
 func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor) (interpretationreporting.ReportBuilderRegistry, error) {

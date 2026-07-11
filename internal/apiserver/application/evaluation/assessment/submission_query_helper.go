@@ -13,7 +13,12 @@ import (
 
 // myAssessmentListWorkflow 我的测评列表工作流
 type myAssessmentListWorkflow struct {
-	service *submissionService
+	service *testeeAssessmentQueryService
+}
+
+// ListMine returns the Assessment list visible to one testee.
+func (s *testeeAssessmentQueryService) ListMine(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error) {
+	return myAssessmentListWorkflow{service: s}.List(ctx, dto)
 }
 
 // List 查询我的测评列表

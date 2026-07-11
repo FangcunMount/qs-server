@@ -203,7 +203,7 @@ func Wire(in WireInput) (WireResult, error) {
 		ModelDescriptors:                            modelDescriptors,
 		TypologyRegistry:                            in.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
-		ReportReader:                                in.ReportPorts.Reader,
+		ReportQueryService:                          in.ReportPorts.QueryService,
 		PublishedModelReader:                        publishedModelReader,
 	})
 	if err != nil {

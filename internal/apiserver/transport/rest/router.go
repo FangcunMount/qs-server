@@ -102,10 +102,10 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	ManagementService     assessmentApp.AssessmentManagementService
-	EvaluationService     execute.Service
-	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
-	RunQueryService       runqueryApp.Service
+	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
+	EvaluationService       execute.Service
+	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
+	RunQueryService         runqueryApp.Service
 }
 
 type PlanDeps struct {

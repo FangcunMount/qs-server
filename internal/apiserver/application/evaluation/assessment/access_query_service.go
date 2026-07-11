@@ -7,17 +7,17 @@ import (
 )
 
 type assessmentAccessQueryService struct {
-	managementService AssessmentManagementService
-	checker           TesteeAccessChecker
+	operatorQueryService AssessmentOperatorQueryService
+	checker              TesteeAccessChecker
 }
 
 func NewAssessmentAccessQueryService(
-	managementService AssessmentManagementService,
+	operatorQueryService AssessmentOperatorQueryService,
 	checker TesteeAccessChecker,
 ) AssessmentAccessQueryService {
 	return &assessmentAccessQueryService{
-		managementService: managementService,
-		checker:           checker,
+		operatorQueryService: operatorQueryService,
+		checker:              checker,
 	}
 }
 
@@ -27,13 +27,13 @@ func (s *assessmentAccessQueryService) LoadAccessibleAssessment(
 	operatorUserID int64,
 	assessmentID uint64,
 ) (*AccessibleAssessmentContext, error) {
-	if s.managementService == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment management service is not configured")
+	if s.operatorQueryService == nil {
+		return nil, evalerrors.ModuleNotConfigured("assessment operator query service is not configured")
 	}
 	if s.checker == nil {
 		return nil, evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
-	result, err := s.managementService.GetByID(ctx, assessmentID)
+	result, err := s.operatorQueryService.GetByID(ctx, assessmentID)
 	if err != nil {
 		return nil, err
 	}

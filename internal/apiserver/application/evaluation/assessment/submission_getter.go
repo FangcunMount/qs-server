@@ -12,10 +12,14 @@ import (
 
 // assessmentGetter 测评获取器
 type assessmentGetter struct {
-	service *submissionService
+	service *testeeAssessmentQueryService
 }
 
 // GetMyAssessment 获取我的测评详情
+func (s *testeeAssessmentQueryService) GetMine(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error) {
+	return assessmentGetter{service: s}.GetMyAssessment(ctx, testeeID, assessmentID)
+}
+
 func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error) {
 	s := g.service
 	l := logger.L(ctx)
@@ -58,9 +62,8 @@ func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessm
 	return toAssessmentResult(a)
 }
 
-// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
-func (g assessmentGetter) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error) {
-	s := g.service
+// FindByAnswerSheetID resolves the Assessment identity for answer-sheet orchestration.
+func (s *assessmentIntakeService) FindByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 

@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -51,7 +50,7 @@ type BootstrapInput struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	ReportReader                                evaluationreadmodel.ReportReader
+	ReportQueryService                          assessment.ReportQueryService
 	PublishedModelReader                        rulesetport.PublishedModelReader
 }
 

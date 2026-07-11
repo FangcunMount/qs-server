@@ -14,6 +14,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -318,14 +319,18 @@ func newRouterTestContainer() *container.Container {
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}
+	operatorQuery := assessmentApp.NewAssessmentOperatorQueryService(nil, nil)
+	operatorRecovery := assessmentApp.NewAssessmentOperatorRecoveryService(nil, nil, nil)
 	evaluationModule := &evalmod.Module{
-		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
-		ReportQueryService: assessmentApp.NewReportQueryService(nil),
-		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
+		OperatorQueryService:    operatorQuery,
+		OperatorRecoveryService: operatorRecovery,
+		ManagementService:       assessmentApp.NewAssessmentManagementCompatibilityService(operatorQuery, operatorRecovery),
+		ReportQueryService:      interpretationApp.NewReportQueryService(nil),
+		ScoreQueryService:       assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
 	}
-	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.ManagementService, nil)
+	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.OperatorQueryService, nil)
 	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
-		evaluationModule.ManagementService,
+		evaluationModule.OperatorQueryService,
 		evaluationModule.ReportQueryService,
 		evaluationModule.ScoreQueryService,
 		nil,

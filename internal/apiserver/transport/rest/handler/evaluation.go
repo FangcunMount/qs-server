@@ -19,22 +19,22 @@ import (
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	managementService     assessmentApp.AssessmentManagementService
-	evaluationService     execute.Service
-	protectedQueryService assessmentApp.AssessmentProtectedQueryService
+	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
+	evaluationService       execute.Service
+	protectedQueryService   assessmentApp.AssessmentProtectedQueryService
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
-	managementService assessmentApp.AssessmentManagementService,
+	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
 	evaluationService execute.Service,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
-		BaseHandler:           &BaseHandler{},
-		managementService:     managementService,
-		evaluationService:     evaluationService,
-		protectedQueryService: protectedQueryService,
+		BaseHandler:             &BaseHandler{},
+		operatorRecoveryService: operatorRecoveryService,
+		evaluationService:       evaluationService,
+		protectedQueryService:   protectedQueryService,
 	}
 }
 
@@ -387,7 +387,7 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	result, err := h.managementService.Retry(ctx, orgID, id)
+	result, err := h.operatorRecoveryService.Retry(ctx, orgID, id)
 	if err != nil {
 		h.Error(c, err)
 		return

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestComposeReportPortsExposeOnlyReadModelToEvaluation(t *testing.T) {
+func TestComposeReportPortsExposeOnlyQueryCapabilityToEvaluation(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -18,10 +18,10 @@ func TestComposeReportPortsExposeOnlyReadModelToEvaluation(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "evaluationreadmodel.ReportReader") {
-		t.Fatal("compose report ports must expose the report reader")
+	if !strings.Contains(text, "assessmentApp.ReportQueryService") {
+		t.Fatal("compose report ports must expose the Interpretation-owned report query service")
 	}
-	for _, forbidden := range []string{"ReportBuilderRegistry", "ReportDurableSaver", "ReportStateStore"} {
+	for _, forbidden := range []string{"evaluationreadmodel.ReportReader", "ReportBuilderRegistry", "ReportDurableSaver", "ReportStateStore"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("compose report ports must not leak Interpretation write capability %q", forbidden)
 		}
@@ -38,8 +38,10 @@ func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "interpretationreporting.NewGenerator") || !strings.Contains(text, "interpretationapp.NewOutcomeReportService") {
-		t.Fatal("interpretation assemble must own outcome report generation use case")
+	for _, required := range []string{"interpretationreporting.NewGenerator", "interpretationapp.NewOutcomeReportService", "interpretationapp.NewReportQueryService"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("interpretation assemble must own report capability %q", required)
+		}
 	}
 	if strings.Contains(text, "execute.WithOutcomeReportService") {
 		t.Fatal("interpretation assemble must not inject report generation back into evaluation")

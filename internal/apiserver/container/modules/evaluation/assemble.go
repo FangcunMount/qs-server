@@ -58,16 +58,23 @@ type Module struct {
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
-	SubmissionService     assessmentApp.AssessmentSubmissionService
-	ManagementService     assessmentApp.AssessmentManagementService
-	ReportQueryService    assessmentApp.ReportQueryService
-	ScoreQueryService     assessmentApp.ScoreQueryService
-	WaitService           assessmentApp.AssessmentWaitService
-	AccessQueryService    assessmentApp.AssessmentAccessQueryService
-	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
-	RunQueryService       runqueryApp.Service
-	LatestRiskReader      evaluationreadmodel.LatestRiskReader
-	AssessmentReader      evaluationreadmodel.AssessmentReader
+	// SubmissionService is retained only for callers that have not migrated to
+	// actor-specific ports. New transport wiring uses IntakeService and
+	// TesteeQueryService directly.
+	SubmissionService       assessmentApp.AssessmentSubmissionService
+	IntakeService           assessmentApp.AnswerSheetAssessmentIntakeService
+	TesteeQueryService      assessmentApp.TesteeAssessmentQueryService
+	OperatorQueryService    assessmentApp.AssessmentOperatorQueryService
+	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
+	ManagementService       assessmentApp.AssessmentManagementService
+	ReportQueryService      assessmentApp.ReportQueryService
+	ScoreQueryService       assessmentApp.ScoreQueryService
+	WaitService             assessmentApp.AssessmentWaitService
+	AccessQueryService      assessmentApp.AssessmentAccessQueryService
+	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
+	RunQueryService         runqueryApp.Service
+	LatestRiskReader        evaluationreadmodel.LatestRiskReader
+	AssessmentReader        evaluationreadmodel.AssessmentReader
 
 	EvaluationService           execute.Service
 	ReportStatusReporter        *reportstatus.Reporter
@@ -105,7 +112,7 @@ type Deps struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	ReportReader                                evaluationreadmodel.ReportReader
+	ReportQueryService                          assessmentApp.ReportQueryService
 	PublishedModelReader                        rulesetport.PublishedModelReader
 }
 
@@ -278,31 +285,32 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			normalized.AssessmentListPolicy,
 			normalized.Observer,
 		)
-		m.SubmissionService = assessmentApp.NewSubmissionService(
+		m.IntakeService = assessmentApp.NewAnswerSheetAssessmentIntakeService(
 			infra.assessmentRepo,
-			infra.assessmentReader,
 			assessmentCreator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			listCache,
-			assessmentApp.WithImmediateDispatcher(infra.assessmentImmediate),
+			assessmentApp.WithIntakeImmediateDispatcher(infra.assessmentImmediate),
 		)
+		m.TesteeQueryService = assessmentApp.NewTesteeAssessmentQueryService(infra.assessmentRepo, infra.assessmentReader, listCache)
 	} else {
-		m.SubmissionService = assessmentApp.NewSubmissionService(
+		m.IntakeService = assessmentApp.NewAnswerSheetAssessmentIntakeService(
 			infra.assessmentRepo,
-			infra.assessmentReader,
 			assessmentCreator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			nil,
-			assessmentApp.WithImmediateDispatcher(infra.assessmentImmediate),
+			assessmentApp.WithIntakeImmediateDispatcher(infra.assessmentImmediate),
 		)
+		m.TesteeQueryService = assessmentApp.NewTesteeAssessmentQueryService(infra.assessmentRepo, infra.assessmentReader, nil)
 	}
+	m.SubmissionService = assessmentApp.NewAssessmentSubmissionCompatibilityService(m.IntakeService, m.TesteeQueryService)
 
-	m.ManagementService = assessmentApp.NewManagementService(infra.assessmentRepo, infra.assessmentReader, infra.txRunner, infra.assessmentOutboxStore)
-	if normalized.ReportReader != nil {
-		m.ReportQueryService = assessmentApp.NewReportQueryService(normalized.ReportReader)
-	}
+	m.OperatorQueryService = assessmentApp.NewAssessmentOperatorQueryService(infra.assessmentRepo, infra.assessmentReader)
+	m.OperatorRecoveryService = assessmentApp.NewAssessmentOperatorRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
+	m.ManagementService = assessmentApp.NewAssessmentManagementCompatibilityService(m.OperatorQueryService, m.OperatorRecoveryService)
+	m.ReportQueryService = normalized.ReportQueryService
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		infra.outcomeRepo,
 		infra.scoreProjectionReader,
@@ -312,12 +320,12 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 
 	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, infra.waiterRegistry, m.ReportQueryService)
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
-		m.ManagementService,
+		m.OperatorQueryService,
 		normalized.TesteeAccessChecker,
 	)
 	m.RunQueryService = runqueryApp.NewService(infra.runRepo)
 	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
-		m.ManagementService,
+		m.OperatorQueryService,
 		m.ReportQueryService,
 		m.ScoreQueryService,
 		m.WaitService,
@@ -359,8 +367,8 @@ func normalizeDeps(deps Deps) (Deps, error) {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when input resolver is configured")
 		}
 	}
-	if deps.ReportReader == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report reader is required")
+	if deps.ReportQueryService == nil {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report query service is required")
 	}
 	return deps, nil
 }

@@ -83,7 +83,7 @@ func (r *managementRepoStub) FindByAnswerSheetID(context.Context, domain.AnswerS
 	return nil, fmt.Errorf("assessment not found")
 }
 
-func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
+func TestOperatorRecoveryRequiresTransactionalOutbox(t *testing.T) {
 	id := domain.NewID(9001)
 	testeeID := testee.NewID(3001)
 	submittedAt := time.Now().Add(-time.Hour)
@@ -107,7 +107,7 @@ func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
 	)
 
 	repo := &managementRepoStub{assessment: a}
-	svc := NewManagementService(repo, nil, nil, nil)
+	svc := NewAssessmentOperatorRecoveryService(repo, nil, nil)
 
 	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err == nil {
 		t.Fatal("expected Retry to fail when transactional outbox is not configured")
@@ -160,7 +160,7 @@ func TestSaveAssessmentAndStageEventsRequiresCompleteTransactionalOutboxConfig(t
 	})
 }
 
-func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *testing.T) {
+func TestOperatorRecoveryStagesEventsThroughApplicationTransaction(t *testing.T) {
 	id := domain.NewID(9101)
 	submittedAt := time.Now().Add(-time.Hour)
 	failedAt := time.Now().Add(-time.Minute)
@@ -184,7 +184,7 @@ func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *test
 	repo := &managementRepoStub{assessment: a}
 	txRunner := &recordingTxRunner{}
 	stager := &recordingEventStager{}
-	svc := NewManagementService(repo, nil, txRunner, stager)
+	svc := NewAssessmentOperatorRecoveryService(repo, txRunner, stager)
 
 	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err != nil {
 		t.Fatalf("Retry returned error: %v", err)
@@ -206,7 +206,7 @@ func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *test
 	}
 }
 
-func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.T) {
+func TestOperatorQueryListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.T) {
 	submitted := domain.StatusSubmitted
 	reader := &managementAssessmentReaderStub{
 		rows: []evaluationreadmodel.AssessmentRow{
@@ -214,7 +214,7 @@ func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.
 		},
 		total: 3,
 	}
-	svc := NewManagementService(&managementRepoStub{}, reader, nil, nil)
+	svc := NewAssessmentOperatorQueryService(&managementRepoStub{}, reader)
 	testeeID := uint64(3001)
 
 	result, err := svc.List(context.Background(), ListAssessmentsDTO{
@@ -247,7 +247,7 @@ func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.
 	}
 }
 
-func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
+func TestOperatorQueryListUsesAccessScopeStatusFilter(t *testing.T) {
 	submitted := domain.StatusSubmitted
 	reader := &managementAssessmentReaderStub{
 		rows: []evaluationreadmodel.AssessmentRow{
@@ -255,7 +255,7 @@ func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
 		},
 		total: 1,
 	}
-	svc := NewManagementService(&managementRepoStub{}, reader, nil, nil)
+	svc := NewAssessmentOperatorQueryService(&managementRepoStub{}, reader)
 
 	_, err := svc.List(context.Background(), ListAssessmentsDTO{
 		OrgID:                 9,
@@ -291,3 +291,6 @@ func managementAssessmentRowForList(id uint64, orgID int64, testeeID uint64, sta
 		Status:               status.String(),
 	}
 }
+
+var _ AssessmentOperatorQueryService = (*assessmentOperatorQueryService)(nil)
+var _ AssessmentOperatorRecoveryService = (*assessmentOperatorRecoveryService)(nil)

@@ -12,7 +12,7 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 	if m == nil {
 		return deps
 	}
-	deps.ManagementService = m.ManagementService
+	deps.OperatorRecoveryService = m.OperatorRecoveryService
 	deps.EvaluationService = m.EvaluationService
 	deps.ProtectedQueryService = m.ProtectedQueryService
 	deps.RunQueryService = m.RunQueryService

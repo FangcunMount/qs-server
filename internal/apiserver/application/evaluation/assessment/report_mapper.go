@@ -31,6 +31,12 @@ func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
 	}
 }
 
+// ReportRowToResult preserves the current transport result shape while
+// Interpretation owns report-query execution.
+func ReportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
+	return reportRowToResult(row)
+}
+
 func reportModelExtraRowToResult(row *evaluationreadmodel.ReportModelExtraRow) *ModelExtraResult {
 	if row == nil {
 		return nil

@@ -1,27 +1,26 @@
-package assessment
+package interpretation
 
 import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-// reportQueryService 报告查询服务实现
-// 行为者：报告查询者（答题者或管理员）
+// reportQueryService is the Interpretation-owned read use case for completed
+// report projections. Its result shapes remain assessmentApp compatibility
+// DTOs until the public transport contracts are migrated in a later batch.
 type reportQueryService struct {
 	reader evaluationreadmodel.ReportReader
 }
 
-// NewReportQueryService 创建报告查询服务实例
-func NewReportQueryService(reader evaluationreadmodel.ReportReader) ReportQueryService {
-	return &reportQueryService{
-		reader: reader,
-	}
+// NewReportQueryService creates the Interpretation-owned report query service.
+func NewReportQueryService(reader evaluationreadmodel.ReportReader) assessmentApp.ReportQueryService {
+	return &reportQueryService{reader: reader}
 }
 
-// GetByAssessmentID 根据测评ID获取报告
-func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportResult, error) {
+func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*assessmentApp.ReportResult, error) {
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
@@ -29,11 +28,10 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 	if err != nil {
 		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
-	return reportRowToResult(*row), nil
+	return assessmentApp.ReportRowToResult(*row), nil
 }
 
-// GetOutcomeByAssessmentID 根据测评ID获取 结果 报告投影。
-func (s *reportQueryService) GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportOutcomeResult, error) {
+func (s *reportQueryService) GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*assessmentApp.ReportOutcomeResult, error) {
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
@@ -41,12 +39,11 @@ func (s *reportQueryService) GetOutcomeByAssessmentID(ctx context.Context, asses
 	if err != nil {
 		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
-	return reportRowToOutcomeResult(*row), nil
+	return assessmentApp.ReportRowToOutcomeResult(*row), nil
 }
 
-// ListByTesteeID 获取受试者的报告列表
-func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error) {
-	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
+func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto assessmentApp.ListReportsDTO) (*assessmentApp.ReportListResult, error) {
+	page, pageSize := normalizeReportPagination(dto.Page, dto.PageSize)
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
@@ -54,12 +51,12 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	if err != nil {
 		return nil, evalerrors.Database(err, "查询报告列表失败")
 	}
-	items := make([]*ReportResult, 0, len(rows))
+	items := make([]*assessmentApp.ReportResult, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, reportRowToResult(row))
+		items = append(items, assessmentApp.ReportRowToResult(row))
 	}
 	totalInt := int(total)
-	return &ReportListResult{
+	return &assessmentApp.ReportListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,
@@ -68,9 +65,8 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	}, nil
 }
 
-// ListOutcomeByTesteeID 获取受试者的 结果 报告列表。
-func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
-	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
+func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto assessmentApp.ListReportsDTO) (*assessmentApp.ReportOutcomeListResult, error) {
+	page, pageSize := normalizeReportPagination(dto.Page, dto.PageSize)
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
@@ -78,12 +74,12 @@ func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto List
 	if err != nil {
 		return nil, evalerrors.Database(err, "查询报告列表失败")
 	}
-	items := make([]*ReportOutcomeResult, 0, len(rows))
+	items := make([]*assessmentApp.ReportOutcomeResult, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, reportRowToOutcomeResult(row))
+		items = append(items, assessmentApp.ReportRowToOutcomeResult(row))
 	}
 	totalInt := int(total)
-	return &ReportOutcomeListResult{
+	return &assessmentApp.ReportOutcomeListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,
@@ -92,10 +88,9 @@ func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto List
 	}, nil
 }
 
-// listReportRows 查询报告列表数据
 func (s *reportQueryService) listReportRows(
 	ctx context.Context,
-	dto ListReportsDTO,
+	dto assessmentApp.ListReportsDTO,
 	page int,
 	pageSize int,
 ) ([]evaluationreadmodel.ReportRow, int64, error) {
@@ -113,3 +108,18 @@ func (s *reportQueryService) listReportRows(
 	}
 	return s.reader.ListReports(ctx, filter, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
 }
+
+func normalizeReportPagination(page, pageSize int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+var _ assessmentApp.ReportQueryService = (*reportQueryService)(nil)

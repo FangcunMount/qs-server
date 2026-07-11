@@ -76,9 +76,9 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	SubmissionService    assessmentApp.AssessmentSubmissionService
+	IntakeService        assessmentApp.AnswerSheetAssessmentIntakeService
+	TesteeQueryService   assessmentApp.TesteeAssessmentQueryService
 	ManagementService    assessmentApp.AssessmentManagementService
-	ReportQueryService   assessmentApp.ReportQueryService
 	ScoreQueryService    assessmentApp.ScoreQueryService
 	AssessmentReader     evaluationreadmodel.AssessmentReader
 	EvaluationService    execute.Service
@@ -88,6 +88,7 @@ type EvaluationDeps struct {
 
 type InterpretationDeps struct {
 	OutcomeReportService interpretationApp.OutcomeReportService
+	ReportQueryService   assessmentApp.ReportQueryService
 }
 
 type AssessmentModelCatalogDeps struct {
@@ -201,16 +202,18 @@ func (r *Registry) registerActorService() error {
 }
 
 func (r *Registry) registerEvaluationService() error {
-	if r.deps.Evaluation.SubmissionService == nil ||
-		r.deps.Evaluation.ReportQueryService == nil ||
+	if r.deps.Evaluation.IntakeService == nil ||
+		r.deps.Evaluation.TesteeQueryService == nil ||
+		r.deps.Interpretation.ReportQueryService == nil ||
 		r.deps.Evaluation.ScoreQueryService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
 		return nil
 	}
 
 	evaluationService := service.NewEvaluationService(
-		r.deps.Evaluation.SubmissionService,
-		r.deps.Evaluation.ReportQueryService,
+		r.deps.Evaluation.IntakeService,
+		r.deps.Evaluation.TesteeQueryService,
+		r.deps.Interpretation.ReportQueryService,
 		r.deps.Evaluation.ScoreQueryService,
 		r.deps.Evaluation.AssessmentReader,
 	)
@@ -230,7 +233,7 @@ func (r *Registry) registerAssessmentModelCatalogService() error {
 }
 
 func (r *Registry) registerInternalService() error {
-	if r.deps.Evaluation.SubmissionService == nil || r.deps.Evaluation.ManagementService == nil || r.deps.Evaluation.EvaluationService == nil {
+	if r.deps.Evaluation.IntakeService == nil || r.deps.Evaluation.ManagementService == nil || r.deps.Evaluation.EvaluationService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
 		return nil
 	}
@@ -256,7 +259,7 @@ func (r *Registry) registerInternalService() error {
 
 	internalService := service.NewInternalService(
 		r.deps.Survey.AnswerSheetScoringService,
-		r.deps.Evaluation.SubmissionService,
+		r.deps.Evaluation.IntakeService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
 		r.deps.Interpretation.OutcomeReportService,
@@ -308,8 +311,9 @@ func (r *Registry) GetRegisteredServices() []string {
 		r.deps.Actor.ClinicianRelationshipService != nil {
 		services = append(services, "ActorService")
 	}
-	if r.deps.Evaluation.SubmissionService != nil &&
-		r.deps.Evaluation.ReportQueryService != nil &&
+	if r.deps.Evaluation.IntakeService != nil &&
+		r.deps.Evaluation.TesteeQueryService != nil &&
+		r.deps.Interpretation.ReportQueryService != nil &&
 		r.deps.Evaluation.ScoreQueryService != nil {
 		services = append(services, "EvaluationService")
 	}

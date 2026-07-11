@@ -17,12 +17,35 @@ import (
 // 3. 评估引擎 (Evaluation Engine) - 异步消费事件，执行计算和解读
 // 4. 报告查询者 (Report Viewer) - 查看测评报告（答题者或管理员）
 
-// ==================== 答题者服务 ====================
+// ==================== 答卷编排服务 ====================
 
-// AssessmentSubmissionService 测评提交服务
-// 行为者：答题者 (Testee)
-// 职责：创建测评、提交答卷、查看自己的测评
-// 变更来源：答题者的使用需求变化
+// AnswerSheetAssessmentIntakeService 服务于答卷编排系统。
+//
+// 它只负责将已提交的答卷转化为 Assessment，并推进 Assessment 到 submitted；
+// 不承担受试者查询或报告读取职责。
+type AnswerSheetAssessmentIntakeService interface {
+	CreateForAnswerSheet(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error)
+	SubmitForEvaluation(ctx context.Context, assessmentID uint64) (*AssessmentResult, error)
+	FindByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error)
+}
+
+// ==================== 受试者查询服务 ====================
+
+// TesteeAssessmentQueryService 服务于受试者查询。
+//
+// 它负责所有权校验和“我的测评”列表读取，不创建或提交 Assessment。
+type TesteeAssessmentQueryService interface {
+	GetMine(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error)
+	ListMine(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error)
+}
+
+// ==================== 兼容服务 ====================
+
+// AssessmentSubmissionService 是拆分前的兼容门面。
+//
+// 新代码应依行为者使用 AnswerSheetAssessmentIntakeService 或
+// TesteeAssessmentQueryService。保留该接口仅为尚未迁移的调用方和测试提供
+// 无行为变化的过渡路径。
 type AssessmentSubmissionService interface {
 	// Create 创建测评
 	// 场景：答题者开始填写问卷时，创建测评记录
@@ -49,10 +72,24 @@ type AssessmentSubmissionService interface {
 
 // ==================== 管理员服务 ====================
 
-// AssessmentManagementService 测评管理服务
-// 行为者：管理员 (Staff/Admin)
-// 职责：查看、管理、统计测评记录
-// 变更来源：管理后台的管理需求变化
+// AssessmentOperatorQueryService 服务于后台操作者的 Assessment 查询。
+//
+// 调用方必须先完成组织与受试者访问范围的校验；该端口只执行已授权的读取。
+type AssessmentOperatorQueryService interface {
+	GetByID(ctx context.Context, id uint64) (*AssessmentResult, error)
+	List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error)
+}
+
+// AssessmentOperatorRecoveryService 服务于后台操作者的失败恢复动作。
+type AssessmentOperatorRecoveryService interface {
+	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
+}
+
+// AssessmentManagementService 是拆分前后台管理端口的兼容门面。
+//
+// 新的后台查询应使用 AssessmentOperatorQueryService，失败恢复应使用
+// AssessmentOperatorRecoveryService。保留该接口以支撑尚未迁移的 worker 和
+// actor 组合调用，直到后续批次将它们迁走。
 type AssessmentManagementService interface {
 	// GetByID 根据ID获取测评详情
 	// 场景：管理员查看测评的完整信息
