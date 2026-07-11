@@ -7,5 +7,6 @@ const (
 	EventTypeReportFailed    = eventcatalog.InterpretationReportFailed
 )
 
-// AggregateType 聚合根类型
-const AggregateType = "Report"
+// AggregateType is the durable aggregate root for terminal interpretation
+// facts. Artifacts are immutable children of one ReportGeneration.
+const AggregateType = "ReportGeneration"

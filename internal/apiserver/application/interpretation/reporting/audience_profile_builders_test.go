@@ -25,6 +25,9 @@ func (stubBroadBuilder) Key() evaluation.ExecutionIdentity {
 func (stubBroadBuilder) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
 }
+func (stubBroadBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
+func (stubBroadBuilder) BuilderIdentity() string                 { return "audience-test" }
+func (stubBroadBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 func (stubBroadBuilder) MechanismKey() registry.MechanismReportBuilderKey {
 	return registry.MechanismReportBuilderKey{
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,

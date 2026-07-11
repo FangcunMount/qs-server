@@ -131,7 +131,7 @@ func TestMongoReportEventfulSaveCompatibilityEntrypointsAreRemoved(t *testing.T)
 	})
 }
 
-func TestInterpretationAssemblerExclusivelyWiresTransactionalReportDurableSaver(t *testing.T) {
+func TestInterpretationAssemblerExclusivelyWiresGenerationExecutor(t *testing.T) {
 	root := repoRoot(t)
 	evalPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	evalData, err := os.ReadFile(evalPath)
@@ -154,7 +154,11 @@ func TestInterpretationAssemblerExclusivelyWiresTransactionalReportDurableSaver(
 		t.Fatalf("read report assembler: %v", err)
 	}
 	reportText := string(reportData)
-	for _, token := range []string{"NewTransactionalReportDurableSaver(", "NewOutcomeReportService("} {
+	for _, token := range []string{
+		"interpretationgeneration.NewStarter(",
+		"interpretationgeneration.NewExecutor(",
+		"interpretationapp.NewOutcomeReportService(",
+	} {
 		if !strings.Contains(reportText, token) {
 			t.Fatalf("interpretation module must own report write orchestration %q", token)
 		}

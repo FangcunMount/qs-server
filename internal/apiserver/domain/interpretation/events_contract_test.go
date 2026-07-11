@@ -22,25 +22,24 @@ func TestInterpretationDurableEventsAreTerminalReportFacts(t *testing.T) {
 func TestReportTerminalEventsCarryStableOutcomeCorrelation(t *testing.T) {
 	at := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
 	max := 100.0
-	generated := NewInterpretationReportGeneratedEvent(
-		11, "report-7", "assessment-3", "outcome-9", 42, 2,
-		EventModelIdentity{Kind: "scale", Code: "SDS", Version: "1.0.0"},
-		&EventScoreValue{Kind: "raw_total", Value: 42, Label: "total", Max: &max},
-		&EventResultLevel{Code: "high", Label: "high", Severity: "high"},
-		at,
-	)
-	if generated.EventType() != EventTypeReportGenerated || generated.AggregateType() != AggregateType || generated.AggregateID() != "report-7" {
+	generated := NewInterpretationReportGeneratedEvent(ReportGeneratedEventInput{
+		OrgID: 11, GenerationID: "generation-5", RunID: "run-2", ReportID: "report-7", AssessmentID: "assessment-3", OutcomeID: "outcome-9", TesteeID: 42, Attempt: 2,
+		ReportType: "standard", TemplateVersion: "v2", BuilderIdentity: "factor-scoring", ContentSchemaVersion: "report-content/v2",
+		Model: EventModelIdentity{Kind: "scale", Code: "SDS", Version: "1.0.0"}, PrimaryScore: &EventScoreValue{Kind: "raw_total", Value: 42, Label: "total", Max: &max},
+		Level: &EventResultLevel{Code: "high", Label: "high", Severity: "high"}, GeneratedAt: at,
+	})
+	if generated.EventType() != EventTypeReportGenerated || generated.AggregateType() != AggregateType || generated.AggregateID() != "generation-5" {
 		t.Fatalf("generated event identity = type:%q aggregate:%q/%q", generated.EventType(), generated.AggregateType(), generated.AggregateID())
 	}
-	if payload := generated.Payload(); payload.OrgID != 11 || payload.OutcomeID != "outcome-9" || payload.ReportID != "report-7" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || payload.Model.Code != "SDS" || payload.PrimaryScore == nil || payload.PrimaryScore.Value != 42 || payload.PrimaryScore.Max == nil || *payload.PrimaryScore.Max != max || payload.Level == nil || payload.Level.Severity != "high" || !payload.GeneratedAt.Equal(at) {
+	if payload := generated.Payload(); payload.OrgID != 11 || payload.GenerationID != "generation-5" || payload.RunID != "run-2" || payload.OutcomeID != "outcome-9" || payload.ReportID != "report-7" || payload.ReportType != "standard" || payload.TemplateVersion != "v2" || payload.BuilderIdentity != "factor-scoring" || payload.ContentSchemaVersion != "report-content/v2" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || payload.Model.Code != "SDS" || payload.PrimaryScore == nil || payload.PrimaryScore.Value != 42 || payload.PrimaryScore.Max == nil || *payload.PrimaryScore.Max != max || payload.Level == nil || payload.Level.Severity != "high" || !payload.GeneratedAt.Equal(at) {
 		t.Fatalf("generated payload = %#v", payload)
 	}
 
-	failed := NewInterpretationReportFailedEvent(11, "report-7", "assessment-3", "outcome-9", 42, 2, "template unavailable", at)
-	if failed.EventType() != EventTypeReportFailed || failed.AggregateType() != AggregateType || failed.AggregateID() != "report-7" {
+	failed := NewInterpretationReportFailedEvent(ReportFailedEventInput{OrgID: 11, GenerationID: "generation-5", RunID: "run-2", AssessmentID: "assessment-3", OutcomeID: "outcome-9", TesteeID: 42, Attempt: 2, ReportType: "standard", TemplateVersion: "v2", FailureKind: "template", FailureCode: "not_found", Retryable: true, SafeReason: "template unavailable", FailedAt: at})
+	if failed.EventType() != EventTypeReportFailed || failed.AggregateType() != AggregateType || failed.AggregateID() != "generation-5" {
 		t.Fatalf("failed event identity = type:%q aggregate:%q/%q", failed.EventType(), failed.AggregateType(), failed.AggregateID())
 	}
-	if payload := failed.Payload(); payload.OrgID != 11 || payload.OutcomeID != "outcome-9" || payload.ReportID != "report-7" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || payload.Reason != "template unavailable" || !payload.FailedAt.Equal(at) {
+	if payload := failed.Payload(); payload.OrgID != 11 || payload.GenerationID != "generation-5" || payload.RunID != "run-2" || payload.OutcomeID != "outcome-9" || payload.ReportType != "standard" || payload.TemplateVersion != "v2" || payload.FailureKind != "template" || payload.FailureCode != "not_found" || !payload.Retryable || payload.SafeReason != "template unavailable" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || !payload.FailedAt.Equal(at) {
 		t.Fatalf("failed payload = %#v", payload)
 	}
 }

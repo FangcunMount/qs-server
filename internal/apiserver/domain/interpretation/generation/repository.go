@@ -8,5 +8,6 @@ type Repository interface {
 	Create(ctx context.Context, generation *ReportGeneration) error
 	FindByID(ctx context.Context, id ID) (*ReportGeneration, error)
 	FindByKey(ctx context.Context, key Key) (*ReportGeneration, error)
+	ListByOutcomeID(ctx context.Context, outcomeID ID) ([]*ReportGeneration, error)
 	Save(ctx context.Context, generation *ReportGeneration, expectedVersion uint64) error
 }

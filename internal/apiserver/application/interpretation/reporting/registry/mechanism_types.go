@@ -11,6 +11,7 @@ type MechanismReportBuilderKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      domainReport.ReportType
+	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
 	Audience        policy.Audience
@@ -18,7 +19,7 @@ type MechanismReportBuilderKey struct {
 }
 
 func (k MechanismReportBuilderKey) String() string {
-	base := k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType)
+	base := k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType) + "/" + k.TemplateVersion.String()
 	if k.Algorithm != "" {
 		base += "/" + string(k.Algorithm)
 	}

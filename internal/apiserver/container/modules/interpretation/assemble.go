@@ -1,12 +1,15 @@
 package interpretation
 
 import (
+	"time"
+
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -28,16 +31,18 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
-	QueryService interpretationapp.ReportQueryService
+	QueryService          interpretationapp.ReportQueryService
+	LifecycleQueryService interpretationapp.LifecycleQueryService
 
-	reader          evaluationreadmodel.ReportReader
-	builderRegistry interpretationreporting.ReportBuilderRegistry
-	durableSaver    interpretationreporting.ReportDurableSaver
-	stateStore      interpretationapp.ReportStateStore
-	generator       interpretationreporting.Generator
-	outcomeService  interpretationapp.OutcomeReportService
-	readyIndexer    *appEventing.PostCommitReadyIndexer
-	readyIndex      *outboxready.Index
+	reader             evaluationreadmodel.ReportReader
+	builderRegistry    interpretationreporting.ReportBuilderRegistry
+	generationExecutor interpretationgeneration.Executor
+	generationRepo     *mongoEval.GenerationRepository
+	runRepo            *mongoEval.RunRepository
+	artifactRepo       *mongoEval.ArtifactRepository
+	outcomeService     interpretationapp.OutcomeReportService
+	readyIndexer       *appEventing.PostCommitReadyIndexer
+	readyIndex         *outboxready.Index
 }
 
 // Deps defines explicit constructor dependencies for the report module.
@@ -57,13 +62,23 @@ func New(deps Deps) (*Module, error) {
 
 	module := &Module{}
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
-	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(deps.MongoDB, deps.TopicResolver, mongoOptions)
-	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
-	}
-	module.stateStore = reportRepo
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.QueryService = interpretationapp.NewReportQueryService(module.reader)
+	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation repository: %v", err)
+	}
+	module.generationRepo = generationRepo
+	runRepo, err := mongoEval.NewRunRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation run repository: %v", err)
+	}
+	module.runRepo = runRepo
+	artifactRepo, err := mongoEval.NewArtifactRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation artifact repository: %v", err)
+	}
+	module.artifactRepo = artifactRepo
 
 	priorityOpts := []mongoEventOutbox.StoreOption{
 		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
@@ -82,19 +97,25 @@ func New(deps Deps) (*Module, error) {
 	module.readyIndex = outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
 	module.readyIndexer = appEventing.NewPostCommitReadyIndexer(module.readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
-	module.durableSaver = interpretationreporting.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, module.readyIndexer)
-
 	if len(deps.ModelDescriptors) > 0 {
 		registry, err := buildReportBuilderRegistry(deps.ModelDescriptors)
 		if err != nil {
 			return nil, err
 		}
 		module.builderRegistry = registry
-		generator, err := interpretationreporting.NewGenerator(registry)
+		starter, err := interpretationgeneration.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.artifactRepo, 5*time.Minute)
 		if err != nil {
-			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generator: %v", err)
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		module.generator = generator
+		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.artifactRepo, reportOutboxStore, module.readyIndexer)
+		if err != nil {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
+		}
+		executor, err := interpretationgeneration.NewExecutor(starter, registry, committer)
+		if err != nil {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation generation executor: %v", err)
+		}
+		module.generationExecutor = executor
 	}
 
 	return module, nil
@@ -103,10 +124,11 @@ func New(deps Deps) (*Module, error) {
 // BindOutcomeRepository completes the cross-storage Interpretation use case
 // after Evaluation has installed its canonical outcome repository.
 func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
-	if m == nil || repo == nil || m.stateStore == nil || m.generator == nil || m.durableSaver == nil {
+	if m == nil || repo == nil || m.generationExecutor == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
 	}
-	m.outcomeService = interpretationapp.NewOutcomeReportService(repo, m.stateStore, m.generator, m.durableSaver)
+	m.outcomeService = interpretationapp.NewOutcomeReportService(repo, m.generationExecutor)
+	m.LifecycleQueryService = interpretationapp.NewLifecycleQueryService(repo, m.generationRepo, m.runRepo, m.artifactRepo)
 	return nil
 }
 

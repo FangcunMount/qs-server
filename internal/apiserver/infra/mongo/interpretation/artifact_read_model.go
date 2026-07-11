@@ -20,8 +20,19 @@ type reportReadModel struct {
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
+	return NewReportReadModelWithLegacyFallback(db, true, opts...)
+}
+
+// NewReportReadModelWithLegacyFallback keeps cutover explicit: production
+// starts new-first with legacy fallback, then reconciliation can switch the
+// same read model to artifact-only without changing query call sites.
+func NewReportReadModelWithLegacyFallback(db *mongo.Database, legacyFallback bool, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
+	var legacy *legacyReportReadModel
+	if legacyFallback {
+		legacy = newLegacyReportReadModel(db, opts...)
+	}
 	return &reportReadModel{
-		legacy:    newLegacyReportReadModel(db, opts...),
+		legacy:    legacy,
 		artifacts: base.NewBaseRepository(db, (InterpretReportArtifactPO{}).CollectionName(), opts...),
 	}
 }
@@ -34,7 +45,10 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	if row != nil {
 		return row, nil
 	}
-	return r.legacy.GetReportByID(ctx, reportID)
+	if r.legacy != nil {
+		return r.legacy.GetReportByID(ctx, reportID)
+	}
+	return nil, mongo.ErrNoDocuments
 }
 
 func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
@@ -45,7 +59,10 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 	if row != nil {
 		return row, nil
 	}
-	return r.legacy.GetReportByAssessmentID(ctx, assessmentID)
+	if r.legacy != nil {
+		return r.legacy.GetReportByAssessmentID(ctx, assessmentID)
+	}
+	return nil, mongo.ErrNoDocuments
 }
 
 func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationreadmodel.ReportFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.ReportRow, int64, error) {
@@ -53,9 +70,13 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationread
 	if err != nil {
 		return nil, 0, err
 	}
-	legacy, err := r.listLegacy(ctx, filter)
-	if err != nil {
-		return nil, 0, err
+	legacy := []evaluationreadmodel.ReportRow(nil)
+	if r.legacy != nil {
+		var err error
+		legacy, err = r.listLegacy(ctx, filter)
+		if err != nil {
+			return nil, 0, err
+		}
 	}
 	merged := mergeNewFirstReportRows(artifacts, legacy)
 	total := int64(len(merged))

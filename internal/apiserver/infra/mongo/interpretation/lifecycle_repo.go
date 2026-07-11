@@ -76,6 +76,27 @@ func (r *GenerationRepository) FindByKey(ctx context.Context, key generation.Key
 	return r.mapper.GenerationToDomain(&po)
 }
 
+func (r *GenerationRepository) ListByOutcomeID(ctx context.Context, outcomeID generation.ID) ([]*generation.ReportGeneration, error) {
+	cursor, err := r.Find(ctx, bson.M{"outcome_id": outcomeID.Uint64()}, options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}}))
+	if err != nil {
+		return nil, fmt.Errorf("list report generations by outcome id: %w", err)
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	items := make([]*generation.ReportGeneration, 0)
+	for cursor.Next(ctx) {
+		var po ReportGenerationPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		item, err := r.mapper.GenerationToDomain(&po)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, cursor.Err()
+}
+
 func (r *GenerationRepository) Save(ctx context.Context, domain *generation.ReportGeneration, expectedVersion uint64) error {
 	if domain == nil || expectedVersion == 0 || domain.Version() <= expectedVersion {
 		return generation.ErrVersionConflict
@@ -264,4 +285,44 @@ func (r *ArtifactRepository) FindByGenerationID(ctx context.Context, generationI
 		return nil, fmt.Errorf("find interpretation artifact by generation id: %w", err)
 	}
 	return r.mapper.ArtifactToDomain(&po)
+}
+
+func (r *ArtifactRepository) FindLatestByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.Artifact, error) {
+	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}).SetLimit(1))
+	if err != nil {
+		return nil, fmt.Errorf("find latest interpretation artifact by assessment id: %w", err)
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	if !cursor.Next(ctx) {
+		if err := cursor.Err(); err != nil {
+			return nil, err
+		}
+		return nil, domainreport.ErrArtifactNotFound
+	}
+	var po InterpretReportArtifactPO
+	if err := cursor.Decode(&po); err != nil {
+		return nil, err
+	}
+	return r.mapper.ArtifactToDomain(&po)
+}
+
+func (r *ArtifactRepository) ListByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {
+	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
+	if err != nil {
+		return nil, fmt.Errorf("list interpretation artifacts by assessment id: %w", err)
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	items := make([]*domainreport.Artifact, 0)
+	for cursor.Next(ctx) {
+		var po InterpretReportArtifactPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		item, err := r.mapper.ArtifactToDomain(&po)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, cursor.Err()
 }

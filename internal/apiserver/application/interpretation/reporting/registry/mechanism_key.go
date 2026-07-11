@@ -111,6 +111,9 @@ func MechanismKeyFallbackCandidates(key MechanismReportBuilderKey) []MechanismRe
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
+	if key.TemplateVersion == "" {
+		key.TemplateVersion = policy.TemplateVersionV1
+	}
 	base := []MechanismReportBuilderKey{
 		key,
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel, Audience: key.Audience, ReportProfile: key.ReportProfile},
@@ -130,6 +133,9 @@ func MechanismKeyFallbackCandidates(key MechanismReportBuilderKey) []MechanismRe
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ReportProfile: key.ReportProfile},
 		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType},
 		{AlgorithmFamily: key.AlgorithmFamily, ReportType: key.ReportType},
+	}
+	for i := range base {
+		base[i].TemplateVersion = key.TemplateVersion
 	}
 	return dedupeMechanismKeys(base)
 }

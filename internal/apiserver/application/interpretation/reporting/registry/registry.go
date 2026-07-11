@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 )
 
 type reportBuilderKey struct {
@@ -35,6 +36,13 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	if reportType == "" {
 		return fmt.Errorf("interpretation report builder report type is empty")
 	}
+	templateVersion := builder.TemplateVersion()
+	if templateVersion.IsEmpty() {
+		return fmt.Errorf("interpretation report builder template version is empty")
+	}
+	if builder.BuilderIdentity() == "" || builder.ContentSchemaVersion() == "" {
+		return fmt.Errorf("interpretation report builder identity and content schema version are required")
+	}
 	mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
 	if multi, ok := builder.(MultiMechanismKeyedReportBuilder); ok {
 		mechanismKeys = multi.MechanismKeys()
@@ -42,6 +50,12 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	for _, mechanismKey := range mechanismKeys {
 		if mechanismKey.ReportType == "" {
 			mechanismKey.ReportType = reportType
+		}
+		if mechanismKey.TemplateVersion.IsEmpty() {
+			mechanismKey.TemplateVersion = templateVersion
+		}
+		if mechanismKey.TemplateVersion != templateVersion {
+			return fmt.Errorf("interpretation report builder mechanism template version does not match builder: %s", mechanismKey)
 		}
 		if _, exists := r.mechanismItems[mechanismKey]; exists {
 			return fmt.Errorf("interpretation report builder already registered for mechanism %s", mechanismKey)
@@ -78,6 +92,9 @@ func (r *mutableReportBuilderRegistry) ResolveByMechanism(key MechanismReportBui
 	}
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
+	}
+	if key.TemplateVersion.IsEmpty() {
+		key.TemplateVersion = policy.TemplateVersionV1
 	}
 	candidates := MechanismKeyFallbackCandidates(key)
 	for _, candidate := range candidates {

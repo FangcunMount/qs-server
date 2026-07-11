@@ -12,60 +12,69 @@ const (
 	EventTypeReportFailedOutcome    = EventTypeReportFailed
 )
 
-// ReportGeneratedOutcomeData 是结果-enriched report generated 事件载荷。
 type ReportGeneratedOutcomeData = eventoutcome.ReportGeneratedPayload
 type ReportGeneratedOutcomeEvent = event.Event[ReportGeneratedOutcomeData]
 type ReportFailedOutcomeData = eventoutcome.ReportFailedPayload
 type ReportFailedOutcomeEvent = event.Event[ReportFailedOutcomeData]
 
-func NewInterpretationReportGeneratedEvent(
-	orgID int64,
-	reportID string,
-	assessmentID string,
-	outcomeID string,
-	testeeID uint64,
-	attempt uint,
-	model EventModelIdentity,
-	primary *EventScoreValue,
-	level *EventResultLevel,
-	generatedAt time.Time,
-) ReportGeneratedOutcomeEvent {
-	return event.New(EventTypeReportGeneratedOutcome, AggregateType, reportID,
+// ReportGeneratedEventInput captures the complete immutable trace of a
+// generated report. GenerationID, rather than Artifact ID, is the aggregate
+// identity because retries belong to the Generation lifecycle.
+type ReportGeneratedEventInput struct {
+	OrgID                int64
+	GenerationID         string
+	RunID                string
+	ReportID             string
+	AssessmentID         string
+	OutcomeID            string
+	TesteeID             uint64
+	Attempt              uint
+	ReportType           string
+	TemplateVersion      string
+	BuilderIdentity      string
+	ContentSchemaVersion string
+	Model                EventModelIdentity
+	PrimaryScore         *EventScoreValue
+	Level                *EventResultLevel
+	GeneratedAt          time.Time
+}
+
+func NewInterpretationReportGeneratedEvent(input ReportGeneratedEventInput) ReportGeneratedOutcomeEvent {
+	return event.New(EventTypeReportGeneratedOutcome, AggregateType, input.GenerationID,
 		ReportGeneratedOutcomeData{
-			OrgID:        orgID,
-			ReportID:     reportID,
-			AssessmentID: assessmentID,
-			OutcomeID:    outcomeID,
-			TesteeID:     testeeID,
-			Attempt:      attempt,
-			Model:        model,
-			PrimaryScore: primary,
-			Level:        level,
-			GeneratedAt:  generatedAt,
+			OrgID: input.OrgID, GenerationID: input.GenerationID, RunID: input.RunID, ReportID: input.ReportID,
+			AssessmentID: input.AssessmentID, OutcomeID: input.OutcomeID, TesteeID: input.TesteeID, Attempt: input.Attempt,
+			ReportType: input.ReportType, TemplateVersion: input.TemplateVersion, BuilderIdentity: input.BuilderIdentity,
+			ContentSchemaVersion: input.ContentSchemaVersion, Model: input.Model, PrimaryScore: input.PrimaryScore,
+			Level: input.Level, GeneratedAt: input.GeneratedAt,
 		},
 	)
 }
 
-func NewInterpretationReportFailedEvent(
-	orgID int64,
-	reportID string,
-	assessmentID string,
-	outcomeID string,
-	testeeID uint64,
-	attempt uint,
-	reason string,
-	failedAt time.Time,
-) ReportFailedOutcomeEvent {
-	return event.New(EventTypeReportFailedOutcome, AggregateType, reportID,
+type ReportFailedEventInput struct {
+	OrgID           int64
+	GenerationID    string
+	RunID           string
+	AssessmentID    string
+	OutcomeID       string
+	TesteeID        uint64
+	Attempt         uint
+	ReportType      string
+	TemplateVersion string
+	FailureKind     string
+	FailureCode     string
+	Retryable       bool
+	SafeReason      string
+	FailedAt        time.Time
+}
+
+func NewInterpretationReportFailedEvent(input ReportFailedEventInput) ReportFailedOutcomeEvent {
+	return event.New(EventTypeReportFailedOutcome, AggregateType, input.GenerationID,
 		ReportFailedOutcomeData{
-			OrgID:        orgID,
-			ReportID:     reportID,
-			AssessmentID: assessmentID,
-			OutcomeID:    outcomeID,
-			TesteeID:     testeeID,
-			Attempt:      attempt,
-			Reason:       reason,
-			FailedAt:     failedAt,
+			OrgID: input.OrgID, GenerationID: input.GenerationID, RunID: input.RunID, AssessmentID: input.AssessmentID,
+			OutcomeID: input.OutcomeID, TesteeID: input.TesteeID, Attempt: input.Attempt, ReportType: input.ReportType,
+			TemplateVersion: input.TemplateVersion, FailureKind: input.FailureKind, FailureCode: input.FailureCode,
+			Retryable: input.Retryable, SafeReason: input.SafeReason, FailedAt: input.FailedAt,
 		},
 	)
 }

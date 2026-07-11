@@ -83,6 +83,22 @@ func TestHandleGenerateReportResponseTerminalStatusesAck(t *testing.T) {
 	}
 }
 
+func TestHandleGenerateReportResponseAcksNonRetryableGenerationFailure(t *testing.T) {
+	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+		Success:      false,
+		Status:       "failed",
+		Retryable:    false,
+		GenerationId: "generation-9",
+		RunId:        "run-2",
+		FailureKind:  "template",
+		FailureCode:  "builder_not_found",
+		Message:      "报告生成器未配置",
+	})
+	if err != nil {
+		t.Fatalf("non-retryable generation failure must ACK: %v", err)
+	}
+}
+
 func TestHandleGenerateReportResponseRetryableFailedNacks(t *testing.T) {
 	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
 		Success:   false,

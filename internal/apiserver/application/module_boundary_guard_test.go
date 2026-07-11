@@ -49,6 +49,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 			},
 			allowedImporters: []string{
 				"internal/apiserver/application/interpretation/input/legacy_outcome_adapter.go",
+				"internal/apiserver/application/interpretation/input/outcome_record_adapter.go",
 				"internal/apiserver/application/interpretation/reporting/audience_profile_builders.go",
 				"internal/apiserver/application/interpretation/reporting/factor_scoring_report.go",
 				"internal/apiserver/application/interpretation/reporting/materialize/materialize.go",

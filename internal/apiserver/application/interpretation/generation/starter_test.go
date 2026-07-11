@@ -70,6 +70,16 @@ func (r *memoryGenerationRepo) FindByKey(_ context.Context, key domaingeneration
 	return nil, domaingeneration.ErrNotFound
 }
 
+func (r *memoryGenerationRepo) ListByOutcomeID(_ context.Context, outcomeID domaingeneration.ID) ([]*domaingeneration.ReportGeneration, error) {
+	items := make([]*domaingeneration.ReportGeneration, 0)
+	for _, item := range r.items {
+		if item.Key().OutcomeID == outcomeID {
+			items = append(items, item)
+		}
+	}
+	return items, nil
+}
+
 func (r *memoryGenerationRepo) Save(_ context.Context, item *domaingeneration.ReportGeneration, expected uint64) error {
 	if r.versions[item.ID()] != expected {
 		return domaingeneration.ErrVersionConflict
@@ -156,6 +166,29 @@ func (r *memoryArtifactRepo) FindByGenerationID(_ context.Context, id meta.ID) (
 		}
 	}
 	return nil, domainreport.ErrArtifactNotFound
+}
+
+func (r *memoryArtifactRepo) FindLatestByAssessmentID(_ context.Context, assessmentID meta.ID) (*domainreport.Artifact, error) {
+	var latest *domainreport.Artifact
+	for _, item := range r.items {
+		if item.Association().AssessmentID == assessmentID && (latest == nil || item.GeneratedAt().After(latest.GeneratedAt())) {
+			latest = item
+		}
+	}
+	if latest == nil {
+		return nil, domainreport.ErrArtifactNotFound
+	}
+	return latest, nil
+}
+
+func (r *memoryArtifactRepo) ListByAssessmentID(_ context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {
+	items := make([]*domainreport.Artifact, 0)
+	for _, item := range r.items {
+		if item.Association().AssessmentID == assessmentID {
+			items = append(items, item)
+		}
+	}
+	return items, nil
 }
 
 func TestStarterCreatesGenerationAndRunningRunAtomically(t *testing.T) {

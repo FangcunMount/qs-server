@@ -19,6 +19,10 @@ func (t ReportType) IsEmpty() bool {
 // generated artifact.
 type TemplateVersion string
 
+// TemplateVersionV1 names the frozen compatibility release used by existing
+// persisted outcomes until model-catalog publishes explicit template versions.
+const TemplateVersionV1 TemplateVersion = "legacy-v1"
+
 func (v TemplateVersion) String() string {
 	return string(v)
 }

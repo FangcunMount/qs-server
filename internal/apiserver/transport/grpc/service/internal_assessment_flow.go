@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -9,9 +10,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
@@ -278,36 +279,55 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 	)
 
 	if s.outcomeReportService == nil {
-		return generateReportFailureResponse(ctx, s.runQueryService, req.AssessmentId, "interpretation outcome service is not configured"), nil
+		return generateReportFailureResponse(fmt.Errorf("interpretation outcome service is not configured")), nil
 	}
-	var rpt *domainreport.InterpretReport
+	var result *interpretationgeneration.ExecuteResult
 	var err error
 	if req.OutcomeId != "" {
 		outcomeID, parseErr := meta.ParseID(req.OutcomeId)
 		if parseErr != nil || outcomeID.IsZero() {
 			return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
 		}
-		rpt, err = s.outcomeReportService.GenerateByOutcomeID(ctx, outcomeID)
+		result, err = s.outcomeReportService.GenerateByOutcomeID(ctx, outcomeID)
 	} else {
-		rpt, err = s.outcomeReportService.GenerateByAssessmentID(ctx, meta.FromUint64(req.AssessmentId))
+		result, err = s.outcomeReportService.GenerateByAssessmentID(ctx, meta.FromUint64(req.AssessmentId))
 	}
 	if err != nil {
 		l.Errorw("生成报告失败",
 			"assessment_id", req.AssessmentId,
 			"error", err.Error(),
 		)
-		return generateReportFailureResponse(ctx, s.runQueryService, req.AssessmentId, err.Error()), nil
+		return generateReportFailureResponse(err), nil
 	}
-	if s.reportStatusReporter != nil && rpt != nil {
-		id := reportstatus.AssessmentKey(rpt.ID().Uint64())
+	if s.reportStatusReporter != nil && result != nil && result.Artifact != nil {
+		id := reportstatus.AssessmentKey(result.Artifact.Association().AssessmentID.Uint64())
 		s.reportStatusReporter.SetCompleted(ctx, id, "", id)
 	}
+	status, message := "generated", "报告生成完成"
+	if result != nil && result.Status == interpretationgeneration.ExecuteStatusProcessing {
+		status, message = "processing", "报告正在生成"
+	}
 
-	return &pb.GenerateReportFromAssessmentResponse{
+	resp := &pb.GenerateReportFromAssessmentResponse{
 		Success: true,
-		Status:  "generated",
-		Message: "报告生成完成",
-	}, nil
+		Status:  status,
+		Message: message,
+	}
+	if result != nil {
+		if result.Generation != nil {
+			resp.GenerationId = result.Generation.ID().String()
+		}
+		if result.Run != nil {
+			resp.RunId = result.Run.ID().String()
+		}
+		if result.Artifact != nil {
+			resp.ReportId = result.Artifact.ID().String()
+			if resp.RunId == "" {
+				resp.RunId = result.Artifact.InterpretationRunID().String()
+			}
+		}
+	}
+	return resp, nil
 }
 
 func assessmentResultStatus(result *assessmentApp.AssessmentResult) string {

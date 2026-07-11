@@ -33,7 +33,7 @@ func Restore(record *domainoutcome.Record) (Outcome, error) {
 		nil, nil, nil, nil, nil, nil,
 		&modelRef,
 	)
-	reportInput, err := restoreReportInput(record)
+	reportInput, err := RestoreReportInput(record)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -71,7 +71,10 @@ func RestoreExecution(record *domainoutcome.Record) (*domainoutcome.Execution, e
 	return &execution, nil
 }
 
-func restoreReportInput(record *domainoutcome.Record) (*evaluationinput.InputSnapshot, error) {
+// RestoreReportInput reconstructs only the frozen report assets captured by a
+// durable EvaluationOutcome. Interpretation may use this read-only helper to
+// build its own input without reconstructing a synthetic Assessment.
+func RestoreReportInput(record *domainoutcome.Record) (*evaluationinput.InputSnapshot, error) {
 	if len(record.ReportInput()) == 0 {
 		return nil, nil
 	}

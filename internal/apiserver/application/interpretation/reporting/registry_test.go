@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -24,6 +25,11 @@ func (b registryReportBuilderStub) ReportType() domainReport.ReportType {
 func (b registryReportBuilderStub) Key() evaluation.ExecutionIdentity {
 	return b.ExecutionIdentity()
 }
+func (registryReportBuilderStub) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersionV1
+}
+func (registryReportBuilderStub) BuilderIdentity() string      { return "registry-test" }
+func (registryReportBuilderStub) ContentSchemaVersion() string { return "report-content/v1" }
 func (b registryReportBuilderStub) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
 	return nil, nil
 }

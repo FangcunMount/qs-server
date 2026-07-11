@@ -100,6 +100,11 @@ func (b keyedReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
 }
 func (b keyedReportBuilder) Key() evaluation.ExecutionIdentity   { return evaluation.ExecutionIdentity{} }
 func (b keyedReportBuilder) ReportType() domainReport.ReportType { return b.delegate.ReportType() }
+func (b keyedReportBuilder) TemplateVersion() policy.TemplateVersion {
+	return b.delegate.TemplateVersion()
+}
+func (b keyedReportBuilder) BuilderIdentity() string      { return b.delegate.BuilderIdentity() }
+func (b keyedReportBuilder) ContentSchemaVersion() string { return b.delegate.ContentSchemaVersion() }
 func (b keyedReportBuilder) MechanismKey() registry.MechanismReportBuilderKey {
 	return b.key
 }

@@ -35,7 +35,7 @@ func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, required := range []string{"interpretationreporting.NewGenerator", "interpretationapp.NewOutcomeReportService", "interpretationapp.NewReportQueryService"} {
+	for _, required := range []string{"interpretationgeneration.NewStarter", "interpretationgeneration.NewInterpretationCommitter", "interpretationgeneration.NewExecutor", "interpretationapp.NewOutcomeReportService", "interpretationapp.NewReportQueryService"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("interpretation assemble must own report capability %q", required)
 		}
@@ -45,7 +45,29 @@ func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 	}
 }
 
-func TestInterpretationModuleOwnsReportDurableSaverWiring(t *testing.T) {
+func TestExecutorDelegatesTerminalPersistenceToInterpretationCommitter(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "generation", "executor.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{"InterpretationCommitter", ".CommitSuccess(", ".CommitFailure("} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("executor must delegate terminal persistence through InterpretationCommitter: %s", required)
+		}
+	}
+	for _, forbidden := range []string{".artifacts.Insert(", ".generations.Save(", ".runs.Save(", ".stager.Stage("} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("executor must not persist terminal facts directly: %s", forbidden)
+		}
+	}
+}
+
+func TestInterpretationModuleOwnsArtifactCommitterWiring(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -55,19 +77,21 @@ func TestInterpretationModuleOwnsReportDurableSaverWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "interpretationreporting.NewTransactionalReportDurableSaver") {
-		t.Fatalf("interpretation assemble must wire transactional report durable saver from interpretation/reporting")
+	for _, required := range []string{"mongoEval.NewGenerationRepository", "mongoEval.NewRunRepository", "mongoEval.NewArtifactRepository"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("interpretation assemble must wire artifact lifecycle persistence %q", required)
+		}
 	}
-	if strings.Contains(text, "evaluation/result.NewTransactionalReportDurableSaver") {
-		t.Fatal("interpretation assemble must not wire report durable saver from evaluation/result")
+	if strings.Contains(text, "NewTransactionalReportDurableSaver") {
+		t.Fatal("interpretation assemble must not retain legacy InterpretReport durable saver")
 	}
 }
 
-func TestReportingPackageOwnsEventStaging(t *testing.T) {
+func TestGenerationPackageOwnsArtifactEventStaging(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	reportingDir := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting")
+	reportingDir := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "generation")
 	found := false
 	err := filepath.WalkDir(reportingDir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
@@ -77,7 +101,7 @@ func TestReportingPackageOwnsEventStaging(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), "buildReportGeneratedOutcomeEvent") {
+		if strings.Contains(string(data), "NewInterpretationReportGeneratedEvent") {
 			found = true
 		}
 		return nil
@@ -86,7 +110,7 @@ func TestReportingPackageOwnsEventStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !found {
-		t.Fatal("interpretation/reporting must own report generated event staging")
+		t.Fatal("interpretation/generation must own artifact generated event staging")
 	}
 }
 
@@ -128,6 +152,12 @@ func TestOutcomeReportServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T
 	text := string(data)
 	if !strings.Contains(text, "s.outcomes.FindByID") {
 		t.Fatal("report retry must read the durable EvaluationOutcome by id")
+	}
+	if !strings.Contains(text, "interpretationinput.FromOutcomeRecord") {
+		t.Fatal("production interpretation must build input directly from EvaluationOutcome")
+	}
+	if strings.Contains(text, "FromLegacyOutcome") {
+		t.Fatal("production interpretation must not reconstruct legacy Outcome compatibility input")
 	}
 	for _, forbidden := range []string{
 		"application/evaluation/execute",

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -76,6 +77,10 @@ func (b ReportBuilder) Key() evaluation.ExecutionIdentity {
 func (ReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
+
+func (ReportBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
+func (ReportBuilder) BuilderIdentity() string                 { return "typology" }
+func (ReportBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 
 func (ReportBuilder) MechanismKey() interpretationreporting.MechanismReportBuilderKey {
 	return typologyMechanismKeys()[0]

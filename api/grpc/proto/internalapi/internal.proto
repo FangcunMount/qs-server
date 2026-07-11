@@ -375,8 +375,11 @@ message GenerateReportFromAssessmentResponse {
   string status = 2;
   string message = 3;
   bool retryable = 4;                // 失败时是否应 nack 重试
-  string run_id = 5;                 // 失败时关联的 evaluation_run id（若有）
+  string run_id = 5;                 // 关联的 interpretation_run id（若有）
   string failure_kind = 6;           // 失败分类（若有）
+  string generation_id = 7;          // 报告生成聚合 ID
+  string report_id = 8;              // 成功 Artifact ID（若有）
+  string failure_code = 9;           // 失败代码（若有）
 }
 
 // ==================== Assessment Attention Sync ====================

@@ -14,6 +14,7 @@ type ReportRoutingContext struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      domainReport.ReportType
+	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
 	Audience        policy.Audience
@@ -28,6 +29,7 @@ func ReportRoutingContextFromInput(input interpinput.InterpretationInput) (Repor
 		AlgorithmFamily: input.Runtime.AlgorithmFamily,
 		DecisionKind:    input.Runtime.DecisionKind,
 		ReportType:      input.Report.ReportType,
+		TemplateVersion: input.Report.TemplateVersion,
 		Algorithm:       input.Report.Algorithm,
 		ProductChannel:  input.Report.ProductChannel,
 		Audience:        input.Report.Audience,
@@ -35,6 +37,9 @@ func ReportRoutingContextFromInput(input interpinput.InterpretationInput) (Repor
 	}
 	if ctx.ReportType == "" {
 		ctx.ReportType = domainReport.ReportTypeStandard
+	}
+	if ctx.TemplateVersion == "" {
+		ctx.TemplateVersion = policy.TemplateVersionV1
 	}
 	if ctx.DecisionKind == "" {
 		ctx.DecisionKind = defaultDecisionKindForFamily(ctx.AlgorithmFamily)
@@ -101,6 +106,7 @@ func (c ReportRoutingContext) MechanismKey() (MechanismReportBuilderKey, bool) {
 		AlgorithmFamily: c.AlgorithmFamily,
 		DecisionKind:    c.DecisionKind,
 		ReportType:      reportType,
+		TemplateVersion: c.TemplateVersion,
 		Algorithm:       c.Algorithm,
 		ProductChannel:  c.ProductChannel,
 		Audience:        c.Audience,

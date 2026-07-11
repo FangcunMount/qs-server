@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 )
@@ -30,6 +31,12 @@ func (b FactorScoringReportBuilder) Key() evaluation.ExecutionIdentity { return 
 func (FactorScoringReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
+
+func (FactorScoringReportBuilder) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersionV1
+}
+func (FactorScoringReportBuilder) BuilderIdentity() string      { return "factor-scoring" }
+func (FactorScoringReportBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 
 func (b FactorScoringReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.composer == nil {

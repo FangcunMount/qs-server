@@ -2517,9 +2517,12 @@ type GenerateReportFromAssessmentResponse struct {
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	Retryable     bool                   `protobuf:"varint,4,opt,name=retryable,proto3" json:"retryable,omitempty"`                       // 失败时是否应 nack 重试
-	RunId         string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                   // 失败时关联的 evaluation_run id（若有）
-	FailureKind   string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"` // 失败分类（若有）
+	Retryable     bool                   `protobuf:"varint,4,opt,name=retryable,proto3" json:"retryable,omitempty"`                          // 失败时是否应 nack 重试
+	RunId         string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                      // 关联的 interpretation_run id（若有）
+	FailureKind   string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`    // 失败分类（若有）
+	GenerationId  string                 `protobuf:"bytes,7,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"` // 报告生成聚合 ID
+	ReportId      string                 `protobuf:"bytes,8,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`             // 成功 Artifact ID（若有）
+	FailureCode   string                 `protobuf:"bytes,9,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`    // 失败代码（若有）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2592,6 +2595,27 @@ func (x *GenerateReportFromAssessmentResponse) GetRunId() string {
 func (x *GenerateReportFromAssessmentResponse) GetFailureKind() string {
 	if x != nil {
 		return x.FailureKind
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetFailureCode() string {
+	if x != nil {
+		return x.FailureCode
 	}
 	return ""
 }
@@ -3646,14 +3670,17 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\xca\x01\n" +
+	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\xaf\x02\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12\x1c\n" +
 	"\tretryable\x18\x04 \x01(\bR\tretryable\x12\x15\n" +
 	"\x06run_id\x18\x05 \x01(\tR\x05runId\x12!\n" +
-	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\"\x82\x01\n" +
+	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\x12#\n" +
+	"\rgeneration_id\x18\a \x01(\tR\fgenerationId\x12\x1b\n" +
+	"\treport_id\x18\b \x01(\tR\breportId\x12!\n" +
+	"\ffailure_code\x18\t \x01(\tR\vfailureCode\"\x82\x01\n" +
 	"\x1eSyncAssessmentAttentionRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x1d\n" +
 	"\n" +

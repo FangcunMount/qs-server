@@ -49,13 +49,23 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 			if isTerminalReportGenerationStatus(resp.Status) {
 				deps.Logger.Warn("report generation reached terminal status",
 					slog.Int64("assessment_id", data.AssessmentID),
+					slog.String("generation_id", resp.GetGenerationId()),
+					slog.String("run_id", resp.GetRunId()),
 					slog.String("status", resp.Status),
+					slog.String("failure_kind", resp.GetFailureKind()),
+					slog.String("failure_code", resp.GetFailureCode()),
+					slog.Bool("retryable", resp.GetRetryable()),
 					slog.String("message", resp.Message),
 				)
 			} else {
 				deps.Logger.Error("report generation returned unsuccessful response",
 					slog.Int64("assessment_id", data.AssessmentID),
+					slog.String("generation_id", resp.GetGenerationId()),
+					slog.String("run_id", resp.GetRunId()),
 					slog.String("status", resp.Status),
+					slog.String("failure_kind", resp.GetFailureKind()),
+					slog.String("failure_code", resp.GetFailureCode()),
+					slog.Bool("retryable", resp.GetRetryable()),
 					slog.String("message", resp.Message),
 				)
 			}

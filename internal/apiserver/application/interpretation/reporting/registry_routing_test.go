@@ -23,7 +23,9 @@ func (b stubMechanismBuilder) MechanismKey() reporting.MechanismReportBuilderKey
 }
 
 type namedMechanismBuilder struct {
-	key reporting.MechanismReportBuilderKey
+	key     reporting.MechanismReportBuilderKey
+	version policy.TemplateVersion
+	name    string
 }
 
 func (b namedMechanismBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
@@ -40,6 +42,20 @@ func (b namedMechanismBuilder) ReportType() domainReport.ReportType {
 	}
 	return b.key.ReportType
 }
+
+func (b namedMechanismBuilder) TemplateVersion() policy.TemplateVersion {
+	if b.version == "" {
+		return policy.TemplateVersionV1
+	}
+	return b.version
+}
+func (b namedMechanismBuilder) BuilderIdentity() string {
+	if b.name == "" {
+		return "named-mechanism-test"
+	}
+	return b.name
+}
+func (namedMechanismBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 
 func (b namedMechanismBuilder) MechanismKey() reporting.MechanismReportBuilderKey {
 	return b.key
@@ -74,6 +90,39 @@ func TestResolveByMechanismFallsBackFromAlgorithmToFamily(t *testing.T) {
 	}
 	if builder == nil {
 		t.Fatal("builder is nil")
+	}
+}
+
+func TestResolveByMechanismRequiresExactTemplateVersion(t *testing.T) {
+	base := reporting.MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+	v1 := namedMechanismBuilder{key: base, version: "v1", name: "builder-v1"}
+	v2 := namedMechanismBuilder{key: base, version: "v2", name: "builder-v2"}
+	registry, err := reporting.NewReportBuilderRegistry(v1, v2)
+	if err != nil {
+		t.Fatalf("NewReportBuilderRegistry: %v", err)
+	}
+	for _, want := range []struct {
+		version policy.TemplateVersion
+		name    string
+	}{{"v1", "builder-v1"}, {"v2", "builder-v2"}} {
+		key := base
+		key.TemplateVersion = want.version
+		builder, err := registry.ResolveByMechanism(key)
+		if err != nil {
+			t.Fatalf("ResolveByMechanism(%s): %v", want.version, err)
+		}
+		if builder.BuilderIdentity() != want.name {
+			t.Fatalf("version %s resolved %s, want %s", want.version, builder.BuilderIdentity(), want.name)
+		}
+	}
+	key := base
+	key.TemplateVersion = "v3"
+	if _, err := registry.ResolveByMechanism(key); err == nil {
+		t.Fatal("unknown template version resolved through fallback")
 	}
 }
 

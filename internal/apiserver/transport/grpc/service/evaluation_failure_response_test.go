@@ -5,6 +5,10 @@ import (
 	"testing"
 
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
+	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type stubRunQueryService struct {
@@ -57,19 +61,25 @@ func TestEvaluateFailureResponseWithoutRunDefaultsNonRetryable(t *testing.T) {
 	}
 }
 
-func TestGenerateReportFailureResponseUsesIndependentReportRetry(t *testing.T) {
-	resp := generateReportFailureResponse(context.Background(), stubRunQueryService{
-		run: &runqueryApp.RunResult{
-			RunID:     "99:2",
-			Retryable: false,
-			ErrorCode: "validation",
-		},
-	}, 99, "report failed")
-
-	if !resp.GetRetryable() {
-		t.Fatal("expected report failure to remain retryable")
+func TestGenerateReportFailureResponseUsesPersistedInterpretationFailure(t *testing.T) {
+	err := &interpretationgeneration.FailedError{
+		GenerationID: domaingeneration.ID(meta.FromUint64(99)),
+		RunID:        interpretationrun.ID(meta.FromUint64(100)),
+		Failure:      interpretationrun.Failure{Kind: interpretationrun.FailureKindTemplate, Code: "builder_not_found", SafeMessage: "报告生成器未配置", Retryable: false},
 	}
-	if resp.GetRunId() != "" || resp.GetFailureKind() != "report_generation" {
-		t.Fatalf("report retry metadata = run:%q kind:%q", resp.GetRunId(), resp.GetFailureKind())
+	resp := generateReportFailureResponse(err)
+
+	if resp.GetRetryable() {
+		t.Fatal("expected non-retryable persisted report failure")
+	}
+	if resp.GetGenerationId() != "99" || resp.GetRunId() != "100" || resp.GetFailureKind() != "template" || resp.GetFailureCode() != "builder_not_found" || resp.GetMessage() != "报告生成器未配置" {
+		t.Fatalf("report retry metadata = %#v", resp)
+	}
+}
+
+func TestGenerateReportFailureResponseRetriesUncommittedInfrastructureError(t *testing.T) {
+	resp := generateReportFailureResponse(context.DeadlineExceeded)
+	if !resp.GetRetryable() || resp.GetFailureKind() != "internal" || resp.GetGenerationId() != "" {
+		t.Fatalf("infrastructure response = %#v", resp)
 	}
 }

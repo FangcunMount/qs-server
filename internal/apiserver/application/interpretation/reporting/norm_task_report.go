@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
@@ -29,6 +30,12 @@ func (NormProfileReportBuilder) Key() evaluation.ExecutionIdentity {
 func (NormProfileReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
+
+func (NormProfileReportBuilder) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersionV1
+}
+func (NormProfileReportBuilder) BuilderIdentity() string      { return "norm-profile" }
+func (NormProfileReportBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 
 func (b NormProfileReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.scoring.composer == nil {
@@ -56,6 +63,12 @@ func (TaskPerformanceReportBuilder) Key() evaluation.ExecutionIdentity {
 func (TaskPerformanceReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
+
+func (TaskPerformanceReportBuilder) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersionV1
+}
+func (TaskPerformanceReportBuilder) BuilderIdentity() string      { return "task-performance" }
+func (TaskPerformanceReportBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 
 func (b TaskPerformanceReportBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.scoring.composer == nil {

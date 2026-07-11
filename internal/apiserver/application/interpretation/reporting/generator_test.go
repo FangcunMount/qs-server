@@ -12,6 +12,7 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -26,6 +27,11 @@ func (b generatorScaleBuilder) Key() evaluation.ExecutionIdentity { return b.Exe
 func (generatorScaleBuilder) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
 }
+func (generatorScaleBuilder) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersionV1
+}
+func (generatorScaleBuilder) BuilderIdentity() string      { return "generator-scale-test" }
+func (generatorScaleBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 func (generatorScaleBuilder) MechanismKey() MechanismReportBuilderKey {
 	return MechanismReportBuilderKey{
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,

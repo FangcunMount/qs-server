@@ -22,7 +22,9 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-const LegacyTemplateVersion policy.TemplateVersion = "legacy-v1"
+// LegacyTemplateVersion is retained only for preview and characterization
+// compatibility; production uses DefaultTemplateVersion from Outcome records.
+const LegacyTemplateVersion = DefaultTemplateVersion
 
 // FromLegacyOutcome is the temporary compatibility boundary for the old report
 // writer. New Generation/Run orchestration will construct the same input from

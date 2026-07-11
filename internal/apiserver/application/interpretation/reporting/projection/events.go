@@ -77,6 +77,10 @@ func (r *mutableEventAssemblerRegistry) Register(assembler EventAssembler) error
 			if mechanismKey.ReportType == "" {
 				mechanismKey.ReportType = domainReport.ReportTypeStandard
 			}
+			// Event assembly is a legacy compatibility projection and is not a
+			// template resolver. Template-specific selection belongs to the
+			// production ReportBuilderRegistry.
+			mechanismKey.TemplateVersion = ""
 			if _, exists := r.mechanismItems[mechanismKey]; exists {
 				return fmt.Errorf("interpretation event assembler already registered for mechanism %s", mechanismKey)
 			}
@@ -106,7 +110,9 @@ func (r *mutableEventAssemblerRegistry) ResolveByMechanism(key registry.Mechanis
 	if key.ReportType == "" {
 		key.ReportType = domainReport.ReportTypeStandard
 	}
+	key.TemplateVersion = ""
 	for _, candidate := range registry.MechanismKeyFallbackCandidates(key) {
+		candidate.TemplateVersion = ""
 		if assembler, ok := r.mechanismItems[candidate]; ok {
 			return assembler
 		}
