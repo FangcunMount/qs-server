@@ -367,6 +367,6 @@ func (m *Module) ModuleInfo() modules.ModuleInfo {
 	return modules.ModuleInfo{
 		Name:        string(Name),
 		Version:     "1.0.0",
-		Description: "评估模块（测评、执行与得分事实）",
+		Description: "测评评分模块（Assessment、EvaluationRun、Outcome 与 score 投影）",
 	}
 }

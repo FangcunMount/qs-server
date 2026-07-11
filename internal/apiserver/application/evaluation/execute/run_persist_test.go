@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 )
 
 type stubRunRepo struct {
+	mu                 sync.Mutex
 	latest             *evalrun.EvaluationRun
 	saved              []evalrun.EvaluationRun
 	saveErr            error
@@ -20,7 +22,38 @@ type stubRunRepo struct {
 	saveCtxHadTxMarker bool
 }
 
-func (r *stubRunRepo) Save(ctx context.Context, run evalrun.EvaluationRun) error {
+func (r *stubRunRepo) Claim(_ context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := evalrun.NewEvaluationRun(request.AssessmentID)
+	if r.latest != nil {
+		run = *r.latest
+		switch run.Attempt.Status {
+		case evalrun.StatusRunning:
+			if run.HasActiveLease(request.ClaimedAt) {
+				return evaluationrun.ClaimResult{Run: run}, nil
+			}
+		case evalrun.StatusFailed:
+			if !run.Retryable() {
+				return evaluationrun.ClaimResult{Run: run}, nil
+			}
+			run = evalrun.NextEvaluationRun(run)
+		case evalrun.StatusSucceeded:
+			return evaluationrun.ClaimResult{Run: run}, nil
+		}
+	}
+	run.TraceID = request.TraceID
+	if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+		return evaluationrun.ClaimResult{}, err
+	}
+	copy := run
+	r.latest = &copy
+	return evaluationrun.ClaimResult{Run: run, Claimed: true}, nil
+}
+
+func (r *stubRunRepo) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.saveCtxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
 	r.saved = append(r.saved, run)
 	if len(r.saveErrs) > 0 {
@@ -28,7 +61,12 @@ func (r *stubRunRepo) Save(ctx context.Context, run evalrun.EvaluationRun) error
 		r.saveErrs = r.saveErrs[1:]
 		return err
 	}
-	return r.saveErr
+	if r.saveErr != nil {
+		return r.saveErr
+	}
+	copy := run
+	r.latest = &copy
+	return nil
 }
 
 func (r *stubRunRepo) FindLatestByAssessmentID(_ context.Context, _ uint64) (*evalrun.EvaluationRun, error) {
@@ -60,11 +98,13 @@ func TestNewEvaluationRunUsesNextAttemptAfterRetryableFailure(t *testing.T) {
 	}
 	svc := &service{runRepo: repo}
 
-	run, err := svc.newEvaluationRun(context.Background(), 99)
+	now := time.Now()
+	claim, err := svc.claimEvaluationRun(context.Background(), 99, "claim-2", "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Attempt.Number != 2 {
+	run := claim.Run
+	if !claim.Claimed || run.Attempt.Number != 2 {
 		t.Fatalf("attempt=%d, want 2", run.Attempt.Number)
 	}
 	if run.RunID != "99:2" {
@@ -259,19 +299,22 @@ func TestPersistStartedEvaluationRunPersistsRunAndCurrentReferenceInOneTransacti
 	}
 }
 
-func TestNewEvaluationRunReusesRunningAttemptAndRejectsNonRetryableFailure(t *testing.T) {
+func TestClaimEvaluationRunSkipsActiveAndTerminalAttempts(t *testing.T) {
 	t.Parallel()
 
 	running := evalrun.NewEvaluationRunWithAttempt(99, 3)
 	if err := running.Start(time.Unix(100, 0)); err != nil {
 		t.Fatal(err)
 	}
-	run, err := (&service{runRepo: &stubRunRepo{latest: &running}}).newEvaluationRun(context.Background(), 99)
+	now := time.Now()
+	running.ClaimToken = "owner"
+	running.LeaseExpiresAt = ptrTime(now.Add(time.Minute))
+	claim, err := (&service{runRepo: &stubRunRepo{latest: &running}}).claimEvaluationRun(context.Background(), 99, "other", "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.RunID != running.RunID || run.Attempt.Status != evalrun.StatusRunning {
-		t.Fatalf("recovered run = %#v, want %#v", run, running)
+	if claim.Claimed || claim.Run.RunID != running.RunID {
+		t.Fatalf("claim = %#v, want duplicate skip", claim)
 	}
 
 	nonRetryable := evalrun.NewEvaluationRunWithAttempt(99, 4)
@@ -281,7 +324,10 @@ func TestNewEvaluationRunReusesRunningAttemptAndRejectsNonRetryableFailure(t *te
 	if err := nonRetryable.Fail(time.Unix(201, 0), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: "invalid input"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (&service{runRepo: &stubRunRepo{latest: &nonRetryable}}).newEvaluationRun(context.Background(), 99); err == nil {
-		t.Fatal("non-retryable failed run must not create a new attempt")
+	claim, err = (&service{runRepo: &stubRunRepo{latest: &nonRetryable}}).claimEvaluationRun(context.Background(), 99, "claim", "", now)
+	if err != nil || claim.Claimed {
+		t.Fatalf("claim = %#v, err=%v; want terminal duplicate skip", claim, err)
 	}
 }
+
+func ptrTime(value time.Time) *time.Time { return &value }

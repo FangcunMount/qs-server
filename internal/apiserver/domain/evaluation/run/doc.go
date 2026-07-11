@@ -1,3 +1,5 @@
-// Package run 建模execution-phase semantics 用于 单一 评估 尝试。
-// Assessment 保持 lifecycle aggregate; run tracks 尝试/失败 状态。
+// Package run models one durable Evaluation execution attempt.
+//
+// Assessment owns the business lifecycle. EvaluationRun owns attempt state,
+// exclusive worker claim/lease, failure classification and audit references.
 package run

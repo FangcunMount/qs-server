@@ -101,7 +101,6 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 	required := []string{
 		"internal/apiserver/domain/evaluation/pipeline",
 		"internal/apiserver/domain/evaluation/input",
-		"internal/apiserver/domain/evaluation/policy",
 		"internal/apiserver/domain/evaluation/run",
 		"internal/apiserver/domain/evaluation/event",
 		"internal/apiserver/domain/calculation/scoring",

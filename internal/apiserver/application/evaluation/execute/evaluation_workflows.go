@@ -86,21 +86,6 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 	return &loadedAssessment{assessment: a}, nil
 }
 
-// LoadForInterpretation 加载assessment ready 用于 报告生成。
-func (l assessmentLoader) LoadForInterpretation(ctx context.Context, assessmentID uint64) (*loadedAssessment, error) {
-	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
-	if err != nil {
-		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
-	}
-	if !a.Status().IsEvaluated() {
-		return nil, evalerrors.AssessmentInvalidStatus("测评尚未计分，无法生成报告")
-	}
-	if !a.HasEvaluationModel() {
-		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
-	}
-	return &loadedAssessment{assessment: a}, nil
-}
-
 // EnsureAssessmentInOrg 确保评估数据属于当前机构
 func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
@@ -142,7 +127,7 @@ func mapInputResolveError(err error) error {
 
 	switch carrier.FailureKind() {
 	case evaluationinput.FailureKindModelNotFound, evaluationinput.FailureKindUnsupportedModel:
-		return evalerrors.InvalidArgument("解释模型不可用")
+		return evalerrors.InvalidArgument("评估模型不可用")
 	case evaluationinput.FailureKindScaleNotFound:
 		return mapScaleInputResolveError(err)
 	case evaluationinput.FailureKindAnswerSheetNotFound:
@@ -215,7 +200,7 @@ func (f evaluationFailureFinalizer) Finalize(
 		if err := f.repo.Save(txCtx, a); err != nil {
 			return err
 		}
-		if err := f.runRepo.Save(txCtx, *run); err != nil {
+		if err := f.runRepo.SaveClaimed(txCtx, *run); err != nil {
 			return err
 		}
 		if len(eventsToStage) > 0 {

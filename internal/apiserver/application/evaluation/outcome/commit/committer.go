@@ -80,7 +80,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	outcomeToCommit := request.Outcome
 	assessmentToCommit, err := request.Outcome.Assessment.PrepareScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution), request.EvaluatedAt)
 	if err != nil {
-		return nil, evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
+		return nil, evalerrors.AssessmentScoringFailed(err, "应用计分结果失败")
 	}
 	outcomeToCommit.Assessment = assessmentToCommit
 	payload, err := json.Marshal(request.Outcome.Execution)
@@ -140,7 +140,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 		if err := c.assessmentRepo.Save(txCtx, assessmentToCommit); err != nil {
 			return err
 		}
-		if err := c.runRepo.Save(txCtx, runToCommit); err != nil {
+		if err := c.runRepo.SaveClaimed(txCtx, runToCommit); err != nil {
 			return err
 		}
 		if len(eventsToStage) > 0 {

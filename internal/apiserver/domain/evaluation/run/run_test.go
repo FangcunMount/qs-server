@@ -92,3 +92,52 @@ func TestEvaluationRunRejectsInvalidTransitionsAndSnapshotRewrites(t *testing.T)
 		t.Fatal("failed run must not succeed")
 	}
 }
+
+func TestEvaluationRunClaimLeaseAndReclaim(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC)
+	run := NewEvaluationRun(42)
+	if err := run.Claim("worker-a", now, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if run.Attempt.Status != StatusRunning || !run.HasActiveLease(now.Add(30*time.Second)) {
+		t.Fatalf("claimed run = %#v, want active running lease", run)
+	}
+	if err := run.Claim("worker-b", now.Add(2*time.Minute), now.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if run.ClaimToken != "worker-b" || !run.HasActiveLease(now.Add(2*time.Minute)) {
+		t.Fatalf("reclaimed run = %#v, want worker-b ownership", run)
+	}
+	if err := run.Succeed(now.Add(2 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if run.LeaseExpiresAt != nil {
+		t.Fatalf("terminal run retains lease: %v", run.LeaseExpiresAt)
+	}
+	if err := run.Claim("worker-c", now.Add(4*time.Minute), now.Add(5*time.Minute)); err == nil {
+		t.Fatal("terminal run must not be claimable")
+	}
+}
+
+func TestEvaluationRunRejectsInvalidClaim(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	for _, tc := range []struct {
+		name  string
+		token string
+		until time.Time
+	}{
+		{name: "empty token", until: now.Add(time.Minute)},
+		{name: "expired lease", token: "worker", until: now},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := NewEvaluationRun(1)
+			if err := run.Claim(tc.token, now, tc.until); err == nil {
+				t.Fatal("expected invalid claim")
+			}
+		})
+	}
+}

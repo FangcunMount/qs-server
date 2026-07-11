@@ -16,9 +16,13 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	code := evalrun.FailureKindCalculation.String()
 	message := "calculation failed"
 	traceID := "trace-1"
+	claimToken := "worker-a"
+	leaseExpiresAt := started.Add(time.Minute)
 	original := evalrun.EvaluationRun{
-		RunID:        evalrun.ID("42:2"),
-		AssessmentID: 42,
+		RunID:          evalrun.ID("42:2"),
+		AssessmentID:   42,
+		ClaimToken:     claimToken,
+		LeaseExpiresAt: &leaseExpiresAt,
 		Attempt: evalrun.Attempt{
 			Number: 2,
 			Status: evalrun.StatusFailed,
@@ -42,6 +46,9 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	if po.TraceID == nil || *po.TraceID != traceID {
 		t.Fatalf("trace id = %v, want %s", po.TraceID, traceID)
 	}
+	if po.ClaimToken == nil || *po.ClaimToken != claimToken || po.LeaseExpiresAt == nil || !po.LeaseExpiresAt.Equal(leaseExpiresAt) {
+		t.Fatalf("claim fields = token:%v lease:%v", po.ClaimToken, po.LeaseExpiresAt)
+	}
 	if !po.Retryable {
 		t.Fatal("retryable should be true")
 	}
@@ -55,6 +62,9 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	}
 	if roundTrip.Failure == nil || roundTrip.Failure.Message != message || !roundTrip.Failure.Retryable {
 		t.Fatalf("failure = %+v", roundTrip.Failure)
+	}
+	if roundTrip.ClaimToken != claimToken || roundTrip.LeaseExpiresAt == nil || !roundTrip.LeaseExpiresAt.Equal(leaseExpiresAt) {
+		t.Fatalf("round-trip claim = token:%q lease:%v", roundTrip.ClaimToken, roundTrip.LeaseExpiresAt)
 	}
 }
 

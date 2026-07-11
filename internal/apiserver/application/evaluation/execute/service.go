@@ -22,7 +22,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/google/uuid"
 )
+
+const defaultEvaluationRunLease = 2 * time.Minute
 
 // service 评估引擎服务实现
 type service struct {
@@ -39,6 +42,7 @@ type service struct {
 	familyEvaluators    map[modelcatalog.AlgorithmFamily]Evaluator
 	runtimeResolver     *RuntimeResolver
 	runRepo             evaluationrun.Repository
+	runLease            time.Duration
 	evaluationCommitter outcomecommit.Committer
 	reportStatus        *reportstatus.Reporter
 }
@@ -109,6 +113,17 @@ func WithRunRepository(repo evaluationrun.Repository) EngineOption {
 	}
 }
 
+// WithRunLease configures how long one worker owns an EvaluationRun claim.
+// It is primarily exposed for deterministic tests and unusually long-running
+// deployments; production uses a conservative default.
+func WithRunLease(lease time.Duration) EngineOption {
+	return func(s *service) {
+		if lease > 0 {
+			s.runLease = lease
+		}
+	}
+}
+
 // WithEvaluationCommitter configures the canonical Evaluation success boundary.
 func WithEvaluationCommitter(committer outcomecommit.Committer) EngineOption {
 	return func(s *service) {
@@ -127,6 +142,7 @@ func NewEngine(
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
 		evaluators:     newEmptyEvaluatorRegistry(),
+		runLease:       defaultEvaluationRunLease,
 	}
 
 	for _, opt := range opts {
@@ -161,19 +177,19 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
-	evaluationRun, err := s.newEvaluationRun(ctx, assessmentID)
+	claim, err := s.claimEvaluationRun(ctx, assessmentID, uuid.NewString(), log.ExtractTraceID(ctx), time.Now())
 	if err != nil {
 		return err
 	}
-	if evaluationRun.Attempt.Status == evalrun.StatusPending {
-		evaluationRun.TraceID = log.ExtractTraceID(ctx)
-		if err := evaluationRun.Start(time.Now()); err != nil {
-			return err
-		}
+	if !claim.Claimed {
+		l.Infow("测评执行已有有效 claim，跳过重复执行",
+			"assessment_id", assessmentID,
+			"evaluation_run_id", claim.Run.RunID.String(),
+			"result", "duplicate_skipped",
+		)
+		return nil
 	}
-	if evaluationRun.Attempt.Status != evalrun.StatusRunning {
-		return fmt.Errorf("evaluation run %s is not active", evaluationRun.RunID)
-	}
+	evaluationRun := claim.Run
 	if a.CurrentRunID() != evaluationRun.RunID {
 		a.SetCurrentRunID(evaluationRun.RunID)
 		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
@@ -220,7 +236,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+resolveErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()}, resolveErr)
 	}
 
-	l.Infow("开始执行评估解释器",
+	l.Infow("开始执行评估器",
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
 		"evaluation_run_id", evaluationRun.RunID.String(),

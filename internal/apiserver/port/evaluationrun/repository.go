@@ -2,9 +2,26 @@ package evaluationrun
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
+
+var ErrClaimLost = errors.New("evaluation run claim lost")
+
+type ClaimRequest struct {
+	AssessmentID uint64
+	Token        string
+	ClaimedAt    time.Time
+	LeaseUntil   time.Time
+	TraceID      string
+}
+
+type ClaimResult struct {
+	Run     evalrun.EvaluationRun
+	Claimed bool
+}
 
 // RetryableFailedRun is a failed run scoped to an organization for operating queries.
 type RetryableFailedRun struct {
@@ -27,7 +44,8 @@ type ListRetryableFailedResult struct {
 
 // Repository persists evaluation run attempts.
 type Repository interface {
-	Save(ctx context.Context, run evalrun.EvaluationRun) error
+	Claim(ctx context.Context, request ClaimRequest) (ClaimResult, error)
+	SaveClaimed(ctx context.Context, run evalrun.EvaluationRun) error
 	FindLatestByAssessmentID(ctx context.Context, assessmentID uint64) (*evalrun.EvaluationRun, error)
 	ListByAssessmentID(ctx context.Context, assessmentID uint64, limit int) ([]evalrun.EvaluationRun, error)
 	ListRetryableFailed(ctx context.Context, params ListRetryableFailedParams) (*ListRetryableFailedResult, error)

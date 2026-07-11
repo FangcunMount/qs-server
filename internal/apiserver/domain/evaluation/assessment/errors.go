@@ -20,10 +20,10 @@ var (
 	// ErrNoScale 无量表错误
 	ErrNoScale = errors.New("assessment has no medical scale bound")
 
-	// ErrNoEvaluationModel 无解释模型错误
+	// ErrNoEvaluationModel 未绑定评估模型。
 	ErrNoEvaluationModel = errors.New("assessment has no evaluation model bound")
 
-	// ErrEvaluationModelMismatch 评估结果与测评解释模型不匹配
+	// ErrEvaluationModelMismatch 评分结果与测评的评估模型不匹配。
 	ErrEvaluationModelMismatch = errors.New("evaluation result model does not match assessment model")
 
 	// ErrNotFound 未找到错误
@@ -53,14 +53,11 @@ var (
 	// ErrScaleNotLinked 量表未关联
 	ErrScaleNotLinked = errors.New("medical scale is not linked to questionnaire")
 
-	// ErrEvaluationModelNotPublished 解释模型未发布或不存在
+	// ErrEvaluationModelNotPublished 评估模型未发布或不存在。
 	ErrEvaluationModelNotPublished = errors.New("evaluation model is not published")
 
-	// ErrEvaluationModelQuestionnaireMismatch 解释模型与问卷不匹配
+	// ErrEvaluationModelQuestionnaireMismatch 评估模型与问卷不匹配。
 	ErrEvaluationModelQuestionnaireMismatch = errors.New("evaluation model is not linked to questionnaire")
-
-	// ErrReportNotFound 报告未找到
-	ErrReportNotFound = errors.New("interpret report not found")
 
 	// ErrScoreNotFound 得分未找到
 	ErrScoreNotFound = errors.New("assessment score not found")

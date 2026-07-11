@@ -142,3 +142,22 @@ func TestEvaluationOutcomeReportContextMigrationBackfillsOwnership(t *testing.T)
 		}
 	}
 }
+
+func TestEvaluationRunClaimLeaseMigrationContract(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000046_add_evaluation_run_claim_lease.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"`claim_token` varchar(100)",
+		"`lease_expires_at` datetime(3)",
+		"`idx_runtime_checkpoint_claim` (`scope`, `status`, `lease_expires_at`)",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("evaluation run claim migration does not contain %q", token)
+		}
+	}
+}

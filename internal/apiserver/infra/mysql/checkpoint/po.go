@@ -25,6 +25,8 @@ type RuntimeCheckpointPO struct {
 	Retryable        bool       `gorm:"column:retryable;not null;default:false"`
 	TraceID          *string    `gorm:"column:trace_id;size:100"`
 	InputSnapshotRef *string    `gorm:"column:input_snapshot_ref;size:200"`
+	ClaimToken       *string    `gorm:"column:claim_token;size:100;index:idx_runtime_checkpoint_claim"`
+	LeaseExpiresAt   *time.Time `gorm:"column:lease_expires_at;index:idx_runtime_checkpoint_claim"`
 	CreatedAt        time.Time  `gorm:"column:created_at"`
 	UpdatedAt        time.Time  `gorm:"column:updated_at"`
 	DeletedAt        *time.Time `gorm:"column:deleted_at;index:idx_runtime_checkpoint_deleted_at"`

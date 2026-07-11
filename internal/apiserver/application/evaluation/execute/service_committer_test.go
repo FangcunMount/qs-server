@@ -176,12 +176,16 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 		t.Fatalf("RetryFromFailed: %v", err)
 	}
 	a.ClearEvents()
+	runRepo.mu.Lock()
 	runRepo.latest = &failedRun
-	nextRun, err := svc.newEvaluationRun(context.Background(), a.ID().Uint64())
+	runRepo.mu.Unlock()
+	now := time.Now()
+	claim, err := svc.claimEvaluationRun(context.Background(), a.ID().Uint64(), "retry-claim", "", now)
 	if err != nil {
-		t.Fatalf("newEvaluationRun after recovery: %v", err)
+		t.Fatalf("claimEvaluationRun after recovery: %v", err)
 	}
-	if nextRun.Attempt.Number != failedRun.Attempt.Number+1 || nextRun.Attempt.Status != evalrun.StatusPending {
-		t.Fatalf("next run = %#v, want next pending attempt", nextRun)
+	nextRun := claim.Run
+	if !claim.Claimed || nextRun.Attempt.Number != failedRun.Attempt.Number+1 || nextRun.Attempt.Status != evalrun.StatusRunning {
+		t.Fatalf("next claim = %#v, want next running attempt", claim)
 	}
 }

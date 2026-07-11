@@ -4,7 +4,7 @@
 // 设计说明：
 // execute 只承担通用编排：加载 Assessment、解析输入快照、按 EvaluatorKey 选择执行器、
 // 将评分事实可靠提交为 EvaluationOutcome，并统一收口失败；
-// 具体模型解释由 scale / personality typology 等插件实现。
+// 具体评分算法由 scale / personality typology 等机制实现。
 package execute
 
 import (

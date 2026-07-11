@@ -69,7 +69,10 @@ type commitRunRepoStub struct {
 	saveErr error
 }
 
-func (r *commitRunRepoStub) Save(ctx context.Context, run evalrun.EvaluationRun) error {
+func (*commitRunRepoStub) Claim(context.Context, evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	return evaluationrun.ClaimResult{}, nil
+}
+func (r *commitRunRepoStub) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun) error {
 	requireCommitTx(ctx)
 	*r.order = append(*r.order, "run")
 	r.saved = &run

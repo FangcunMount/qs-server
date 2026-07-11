@@ -53,7 +53,9 @@ func AssessmentSubmitFailed(err error, format string, args ...interface{}) error
 	return cberrors.WrapC(err, errorCode.ErrAssessmentSubmitFailed, format, args...)
 }
 
-func AssessmentInterpretFailed(err error, format string, args ...interface{}) error {
+// AssessmentScoringFailed preserves the legacy API code while naming the
+// Evaluation-owned failure accurately.
+func AssessmentScoringFailed(err error, format string, args ...interface{}) error {
 	return cberrors.WrapC(err, errorCode.ErrAssessmentInterpretFailed, format, args...)
 }
 
@@ -63,18 +65,6 @@ func AssessmentScoreNotFound(err error, format string, args ...interface{}) erro
 
 func IsAssessmentScoreNotFound(err error) bool {
 	return cberrors.ParseCoder(err).Code() == errorCode.ErrAssessmentScoreNotFound
-}
-
-func InterpretReportNotFound(err error, format string, args ...interface{}) error {
-	return cberrors.WrapC(err, errorCode.ErrInterpretReportNotFound, format, args...)
-}
-
-func IsInterpretReportNotFound(err error) bool {
-	return cberrors.IsCode(err, errorCode.ErrInterpretReportNotFound)
-}
-
-func InterpretReportGenerationFailed(err error, format string, args ...interface{}) error {
-	return cberrors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, format, args...)
 }
 
 func PermissionDenied(format string, args ...interface{}) error {

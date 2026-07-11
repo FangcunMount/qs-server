@@ -178,7 +178,22 @@ type charRunRepo struct {
 	latest *evalrun.EvaluationRun
 }
 
-func (r *charRunRepo) Save(_ context.Context, run evalrun.EvaluationRun) error {
+func (r *charRunRepo) Claim(_ context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	run := evalrun.NewEvaluationRun(request.AssessmentID)
+	if r.latest != nil {
+		run = *r.latest
+	}
+	if run.Attempt.Status == evalrun.StatusRunning && run.HasActiveLease(request.ClaimedAt) {
+		return evaluationrun.ClaimResult{Run: run}, nil
+	}
+	if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+		return evaluationrun.ClaimResult{}, err
+	}
+	copy := run
+	r.latest = &copy
+	return evaluationrun.ClaimResult{Run: run, Claimed: true}, nil
+}
+func (r *charRunRepo) SaveClaimed(_ context.Context, run evalrun.EvaluationRun) error {
 	copy := run
 	r.latest = &copy
 	return nil

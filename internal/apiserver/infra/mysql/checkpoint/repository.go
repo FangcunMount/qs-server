@@ -2,13 +2,16 @@ package checkpoint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	drivermysql "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository struct {
@@ -28,25 +31,135 @@ var (
 	_ evalrun.CheckpointSeam   = (*Repository)(nil)
 )
 
-func (r *Repository) Save(ctx context.Context, run evalrun.EvaluationRun) error {
+func (r *Repository) Claim(ctx context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	if r == nil || r.db == nil {
+		return evaluationrun.ClaimResult{}, fmt.Errorf("runtime checkpoint repository is not configured")
+	}
+	if request.AssessmentID == 0 || request.Token == "" || request.ClaimedAt.IsZero() || !request.LeaseUntil.After(request.ClaimedAt) {
+		return evaluationrun.ClaimResult{}, fmt.Errorf("invalid evaluation run claim request")
+	}
+	result, err := r.claimOnce(ctx, request)
+	if err == nil || !isDuplicateKey(err) {
+		return result, err
+	}
+	// A concurrent first-attempt insert won the unique key. Re-read the new
+	// latest row; its fresh lease will make this caller a duplicate skip.
+	return r.claimOnce(ctx, request)
+}
+
+func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	result := evaluationrun.ClaimResult{}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var latest RuntimeCheckpointPO
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("scope = ? AND assessment_id = ? AND deleted_at IS NULL", scopeEvaluationRun, request.AssessmentID).
+			Order("attempt_no DESC, id DESC").
+			First(&latest).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			run := evalrun.NewEvaluationRun(request.AssessmentID)
+			run.TraceID = request.TraceID
+			if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+				return err
+			}
+			if err := tx.Create(runToPO(run)).Error; err != nil {
+				return err
+			}
+			result = evaluationrun.ClaimResult{Run: run, Claimed: true}
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		run := runFromPO(latest)
+		switch run.Attempt.Status {
+		case evalrun.StatusPending:
+			// Claim the existing attempt.
+		case evalrun.StatusRunning:
+			if run.HasActiveLease(request.ClaimedAt) {
+				result = evaluationrun.ClaimResult{Run: run}
+				return nil
+			}
+		case evalrun.StatusFailed:
+			if !run.Retryable() {
+				result = evaluationrun.ClaimResult{Run: run}
+				return nil
+			}
+			run = evalrun.NextEvaluationRun(run)
+		case evalrun.StatusSucceeded:
+			result = evaluationrun.ClaimResult{Run: run}
+			return nil
+		default:
+			return fmt.Errorf("latest evaluation run %s has unknown status %q", run.RunID, run.Attempt.Status)
+		}
+		run.TraceID = request.TraceID
+		if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+			return err
+		}
+		po := runToPO(run)
+		if po.ResourceID != latest.ResourceID || po.AttemptNo != latest.AttemptNo {
+			if err := tx.Create(po).Error; err != nil {
+				return err
+			}
+		} else {
+			updates := claimUpdates(po)
+			updated := tx.Model(&RuntimeCheckpointPO{}).
+				Where("id = ? AND status = ? AND deleted_at IS NULL", latest.ID, latest.Status).
+				Updates(updates)
+			if updated.Error != nil {
+				return updated.Error
+			}
+			if updated.RowsAffected != 1 {
+				return evaluationrun.ErrClaimLost
+			}
+		}
+		result = evaluationrun.ClaimResult{Run: run, Claimed: true}
+		return nil
+	})
+	return result, err
+}
+
+func (r *Repository) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("runtime checkpoint repository is not configured")
 	}
+	if run.ClaimToken == "" {
+		return evaluationrun.ErrClaimLost
+	}
 	po := runToPO(run)
-	var existing RuntimeCheckpointPO
-	db := checkpointDB(ctx, r.db)
-	err := db.
-		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
-			scopeEvaluationRun, po.ResourceID, po.AttemptNo).
-		First(&existing).Error
-	if err == gorm.ErrRecordNotFound {
-		return db.Create(po).Error
+	updates := claimUpdates(po)
+	updates["updated_at"] = time.Now()
+	result := checkpointDB(ctx, r.db).Model(&RuntimeCheckpointPO{}).
+		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND claim_token = ? AND status = ? AND deleted_at IS NULL",
+			scopeEvaluationRun, po.ResourceID, po.AttemptNo, run.ClaimToken, evalrun.StatusRunning.String()).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
 	}
-	if err != nil {
-		return err
+	if result.RowsAffected != 1 {
+		return evaluationrun.ErrClaimLost
 	}
-	po.ID = existing.ID
-	return db.Save(po).Error
+	return nil
+}
+
+func claimUpdates(po *RuntimeCheckpointPO) map[string]interface{} {
+	return map[string]interface{}{
+		"status":             po.Status,
+		"started_at":         po.StartedAt,
+		"finished_at":        po.FinishedAt,
+		"error_code":         po.ErrorCode,
+		"error_message":      po.ErrorMessage,
+		"retryable":          po.Retryable,
+		"trace_id":           po.TraceID,
+		"input_snapshot_ref": po.InputSnapshotRef,
+		"claim_token":        po.ClaimToken,
+		"lease_expires_at":   po.LeaseExpiresAt,
+	}
+}
+
+func isDuplicateKey(err error) bool {
+	var mysqlErr *drivermysql.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
 }
 
 func checkpointDB(ctx context.Context, db *gorm.DB) *gorm.DB {
@@ -279,6 +392,11 @@ func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
 		inputSnapshotRef := run.InputSnapshotRef
 		po.InputSnapshotRef = &inputSnapshotRef
 	}
+	if run.ClaimToken != "" {
+		claimToken := run.ClaimToken
+		po.ClaimToken = &claimToken
+	}
+	po.LeaseExpiresAt = run.LeaseExpiresAt
 	if run.Failure != nil {
 		code := run.Failure.Kind.String()
 		message := run.Failure.Message
@@ -306,6 +424,10 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 	if po.InputSnapshotRef != nil {
 		run.InputSnapshotRef = *po.InputSnapshotRef
 	}
+	if po.ClaimToken != nil {
+		run.ClaimToken = *po.ClaimToken
+	}
+	run.LeaseExpiresAt = po.LeaseExpiresAt
 	if po.ErrorCode != nil || po.ErrorMessage != nil {
 		failure := evalrun.Failure{Retryable: po.Retryable}
 		if po.ErrorCode != nil {

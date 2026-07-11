@@ -15,7 +15,10 @@ type stubRunRepo struct {
 	failedPage       *evaluationrun.ListRetryableFailedResult
 }
 
-func (s *stubRunRepo) Save(context.Context, evalrun.EvaluationRun) error { return nil }
+func (s *stubRunRepo) Claim(context.Context, evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
+	return evaluationrun.ClaimResult{}, nil
+}
+func (s *stubRunRepo) SaveClaimed(context.Context, evalrun.EvaluationRun) error { return nil }
 
 func (s *stubRunRepo) FindLatestByAssessmentID(context.Context, uint64) (*evalrun.EvaluationRun, error) {
 	return s.latest, nil
