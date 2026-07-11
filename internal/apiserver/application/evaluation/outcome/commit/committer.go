@@ -73,9 +73,16 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	if request.EvaluatedAt.IsZero() {
 		request.EvaluatedAt = time.Now()
 	}
-	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+	// Prepare terminal state on isolated copies. A failed transaction must leave
+	// the caller-owned submitted Assessment and running Run available for the
+	// execution service's atomic failure finalizer.
+	runToCommit := *request.Run
+	outcomeToCommit := request.Outcome
+	assessmentToCommit, err := request.Outcome.Assessment.PrepareScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution), request.EvaluatedAt)
+	if err != nil {
 		return nil, evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
 	}
+	outcomeToCommit.Assessment = assessmentToCommit
 	payload, err := json.Marshal(request.Outcome.Execution)
 	if err != nil {
 		return nil, fmt.Errorf("marshal canonical evaluation outcome: %w", err)
@@ -89,10 +96,10 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	}
 	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           c.newID(),
-		OrgID:        request.Outcome.Assessment.OrgID(),
-		AssessmentID: request.Outcome.Assessment.ID(),
-		TesteeID:     request.Outcome.Assessment.TesteeID().Uint64(),
-		RunID:        request.Run.RunID.String(),
+		OrgID:        assessmentToCommit.OrgID(),
+		AssessmentID: assessmentToCommit.ID(),
+		TesteeID:     assessmentToCommit.TesteeID().Uint64(),
+		RunID:        runToCommit.RunID.String(),
 		Model: domainoutcome.ModelIdentity{
 			Kind:      request.Outcome.Execution.ModelRef.Kind(),
 			SubKind:   request.Outcome.Execution.ModelRef.SubKind(),
@@ -106,7 +113,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 			DecisionKind:    request.Outcome.RuntimeDescriptorKey.DecisionKind,
 			PayloadFormat:   request.Outcome.RuntimeDescriptorKey.PayloadFormat,
 		},
-		InputSnapshotRef: request.Run.InputSnapshotRef,
+		InputSnapshotRef: runToCommit.InputSnapshotRef,
 		ReportInput:      reportInput,
 		Payload:          payload,
 		SchemaVersion:    domainoutcome.CurrentSchemaVersion,
@@ -116,24 +123,24 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 		return nil, err
 	}
 
-	if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
+	if err := runToCommit.Succeed(request.EvaluatedAt); err != nil {
 		return nil, err
 	}
-	request.Outcome.Assessment.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), request.Run.RunID)
-	eventsToStage := request.Outcome.Assessment.Events()
+	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.RunID)
+	eventsToStage := assessmentToCommit.Events()
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
 			return err
 		}
 		if c.scoreProjector != nil {
-			if err := c.scoreProjector.Project(txCtx, record, request.Outcome); err != nil {
+			if err := c.scoreProjector.Project(txCtx, record, outcomeToCommit); err != nil {
 				return err
 			}
 		}
-		if err := c.assessmentRepo.Save(txCtx, request.Outcome.Assessment); err != nil {
+		if err := c.assessmentRepo.Save(txCtx, assessmentToCommit); err != nil {
 			return err
 		}
-		if err := c.runRepo.Save(txCtx, *request.Run); err != nil {
+		if err := c.runRepo.Save(txCtx, runToCommit); err != nil {
 			return err
 		}
 		if len(eventsToStage) > 0 {
@@ -144,10 +151,13 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 		return nil
 	})
 	if err != nil {
-		request.Outcome.Assessment.ClearEvents()
 		return nil, err
 	}
-	request.Outcome.Assessment.ClearEvents()
+	// Publish the prepared terminal state only after every durable fact and the
+	// outbox event have committed successfully.
+	assessmentToCommit.ClearEvents()
+	*request.Outcome.Assessment = *assessmentToCommit
+	*request.Run = runToCommit
 	if c.readyIndexer != nil && len(eventsToStage) > 0 {
 		c.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, request.EvaluatedAt)
 	}

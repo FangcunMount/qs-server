@@ -239,6 +239,11 @@ func (a *Assessment) Submit() error {
 
 // ApplyScoringOutcome 应用计分结果并将状态迁移为 evaluated。
 func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
+	return a.ApplyScoringOutcomeAt(outcome, time.Now())
+}
+
+// ApplyScoringOutcomeAt 应用计分结果，并使用可靠提交边界提供的统一完成时间。
+func (a *Assessment) ApplyScoringOutcomeAt(outcome *AssessmentOutcome, evaluatedAt time.Time) error {
 	if !a.status.CanApplyScoring() {
 		return NewInvalidStatusError("apply scoring", a.status)
 	}
@@ -246,6 +251,9 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 		return ErrNoEvaluationModel
 	}
 	if outcome == nil {
+		return ErrInvalidArgument
+	}
+	if evaluatedAt.IsZero() {
 		return ErrInvalidArgument
 	}
 	modelRef := outcome.ModelRef
@@ -266,9 +274,21 @@ func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
 	summary := outcome.Summary
 	a.summary = &summary
 	a.status = StatusEvaluated
-	now := time.Now()
-	a.evaluatedAt = &now
+	a.evaluatedAt = &evaluatedAt
 	return nil
+}
+
+// PrepareScoringOutcome 在独立副本上准备 evaluated 终态。
+// 可靠提交器可在事务成功后发布该副本，事务失败时原聚合保持不变。
+func (a *Assessment) PrepareScoringOutcome(outcome *AssessmentOutcome, evaluatedAt time.Time) (*Assessment, error) {
+	clone := a.clone()
+	if clone == nil {
+		return nil, ErrInvalidArgument
+	}
+	if err := clone.ApplyScoringOutcomeAt(outcome, evaluatedAt); err != nil {
+		return nil, err
+	}
+	return clone, nil
 }
 
 // StageEvaluatedEvent records the durable outcome and run references that
@@ -446,6 +466,24 @@ func (a *Assessment) ResultSummary() *ResultSummary {
 	return a.summary
 }
 
+func (a *Assessment) clone() *Assessment {
+	if a == nil {
+		return nil
+	}
+	clone := *a
+	clone.modelRef = cloneValue(a.modelRef)
+	clone.origin.originID = cloneValue(a.origin.originID)
+	clone.totalScore = cloneValue(a.totalScore)
+	clone.riskLevel = cloneValue(a.riskLevel)
+	clone.summary = cloneResultSummary(a.summary)
+	clone.submittedAt = cloneValue(a.submittedAt)
+	clone.evaluatedAt = cloneValue(a.evaluatedAt)
+	clone.failedAt = cloneValue(a.failedAt)
+	clone.failureReason = cloneValue(a.failureReason)
+	clone.events = append([]DomainEvent(nil), a.events...)
+	return &clone
+}
+
 // ==================== 时间戳查询方法 ====================
 
 // SubmittedAt 获取提交时间
@@ -545,4 +583,23 @@ func summaryFromLegacyResult(totalScore *float64, riskLevel *RiskLevel) *ResultS
 		Score:        score,
 		Level:        level,
 	}
+}
+
+func cloneResultSummary(summary *ResultSummary) *ResultSummary {
+	if summary == nil {
+		return nil
+	}
+	clone := *summary
+	clone.Score = cloneValue(summary.Score)
+	clone.Level = cloneValue(summary.Level)
+	clone.Tags = append([]string(nil), summary.Tags...)
+	return &clone
+}
+
+func cloneValue[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }

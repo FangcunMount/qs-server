@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -26,13 +27,14 @@ func (commitRunnerStub) WithinTransaction(ctx context.Context, fn func(context.C
 }
 
 type commitAssessmentRepoStub struct {
-	order *[]string
+	order   *[]string
+	saveErr error
 }
 
 func (r commitAssessmentRepoStub) Save(ctx context.Context, _ *assessment.Assessment) error {
 	requireCommitTx(ctx)
 	*r.order = append(*r.order, "assessment")
-	return nil
+	return r.saveErr
 }
 func (commitAssessmentRepoStub) FindByID(context.Context, assessment.ID) (*assessment.Assessment, error) {
 	return nil, nil
@@ -43,15 +45,16 @@ func (commitAssessmentRepoStub) FindByAnswerSheetID(context.Context, assessment.
 func (commitAssessmentRepoStub) Delete(context.Context, assessment.ID) error { return nil }
 
 type commitOutcomeRepoStub struct {
-	order  *[]string
-	record *domainoutcome.Record
+	order   *[]string
+	record  *domainoutcome.Record
+	saveErr error
 }
 
 func (r *commitOutcomeRepoStub) Save(ctx context.Context, record *domainoutcome.Record) error {
 	requireCommitTx(ctx)
 	*r.order = append(*r.order, "outcome")
 	r.record = record
-	return nil
+	return r.saveErr
 }
 func (*commitOutcomeRepoStub) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
 	return nil, nil
@@ -61,15 +64,16 @@ func (*commitOutcomeRepoStub) FindByAssessmentID(context.Context, assessment.ID)
 }
 
 type commitRunRepoStub struct {
-	order *[]string
-	saved *evalrun.EvaluationRun
+	order   *[]string
+	saved   *evalrun.EvaluationRun
+	saveErr error
 }
 
 func (r *commitRunRepoStub) Save(ctx context.Context, run evalrun.EvaluationRun) error {
 	requireCommitTx(ctx)
 	*r.order = append(*r.order, "run")
 	r.saved = &run
-	return nil
+	return r.saveErr
 }
 func (*commitRunRepoStub) FindLatestByAssessmentID(context.Context, uint64) (*evalrun.EvaluationRun, error) {
 	return nil, nil
@@ -82,25 +86,27 @@ func (*commitRunRepoStub) ListRetryableFailed(context.Context, evaluationrun.Lis
 }
 
 type commitScoreProjectorStub struct {
-	order *[]string
+	order      *[]string
+	projectErr error
 }
 
 func (p commitScoreProjectorStub) Project(ctx context.Context, _ *domainoutcome.Record, _ evaloutcome.Outcome) error {
 	requireCommitTx(ctx)
 	*p.order = append(*p.order, "score")
-	return nil
+	return p.projectErr
 }
 
 type commitEventStagerStub struct {
-	order  *[]string
-	events []event.DomainEvent
+	order    *[]string
+	events   []event.DomainEvent
+	stageErr error
 }
 
 func (s *commitEventStagerStub) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	requireCommitTx(ctx)
 	*s.order = append(*s.order, "event")
 	s.events = append(s.events, events...)
-	return nil
+	return s.stageErr
 }
 
 func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
@@ -151,6 +157,12 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	if !a.Status().IsEvaluated() || run.Attempt.Status != evalrun.StatusSucceeded || runRepo.saved == nil || runRepo.saved.Attempt.Status != evalrun.StatusSucceeded {
 		t.Fatalf("terminal facts: assessment=%s run=%s saved=%#v", a.Status(), run.Attempt.Status, runRepo.saved)
 	}
+	if a.EvaluatedAt() == nil || !a.EvaluatedAt().Equal(evaluatedAt) {
+		t.Fatalf("assessment evaluated_at = %v, want %v", a.EvaluatedAt(), evaluatedAt)
+	}
+	if run.FinishedAt == nil || !run.FinishedAt.Equal(evaluatedAt) || !record.EvaluatedAt().Equal(evaluatedAt) {
+		t.Fatalf("terminal timestamps: assessment=%v run=%v outcome=%v, want %v", a.EvaluatedAt(), run.FinishedAt, record.EvaluatedAt(), evaluatedAt)
+	}
 	if len(stager.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(stager.events))
 	}
@@ -162,8 +174,95 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	if payload.OutcomeID != "9001" || payload.EvaluationRunID != run.RunID.String() {
 		t.Fatalf("evaluated event payload = %#v", payload)
 	}
+	if !payload.CommittedAt.Equal(evaluatedAt) {
+		t.Fatalf("event committed_at = %v, want %v", payload.CommittedAt, evaluatedAt)
+	}
 	if len(a.Events()) != 0 {
 		t.Fatalf("assessment events not cleared: %#v", a.Events())
+	}
+}
+
+func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) {
+	t.Parallel()
+
+	commitErr := errors.New("commit node failed")
+	cases := []struct {
+		name      string
+		configure func(*commitAssessmentRepoStub, *commitOutcomeRepoStub, *commitRunRepoStub, *commitScoreProjectorStub, *commitEventStagerStub)
+	}{
+		{
+			name: "outcome",
+			configure: func(_ *commitAssessmentRepoStub, repo *commitOutcomeRepoStub, _ *commitRunRepoStub, _ *commitScoreProjectorStub, _ *commitEventStagerStub) {
+				repo.saveErr = commitErr
+			},
+		},
+		{
+			name: "score projection",
+			configure: func(_ *commitAssessmentRepoStub, _ *commitOutcomeRepoStub, _ *commitRunRepoStub, projector *commitScoreProjectorStub, _ *commitEventStagerStub) {
+				projector.projectErr = commitErr
+			},
+		},
+		{
+			name: "assessment",
+			configure: func(repo *commitAssessmentRepoStub, _ *commitOutcomeRepoStub, _ *commitRunRepoStub, _ *commitScoreProjectorStub, _ *commitEventStagerStub) {
+				repo.saveErr = commitErr
+			},
+		},
+		{
+			name: "run",
+			configure: func(_ *commitAssessmentRepoStub, _ *commitOutcomeRepoStub, repo *commitRunRepoStub, _ *commitScoreProjectorStub, _ *commitEventStagerStub) {
+				repo.saveErr = commitErr
+			},
+		},
+		{
+			name: "outbox",
+			configure: func(_ *commitAssessmentRepoStub, _ *commitOutcomeRepoStub, _ *commitRunRepoStub, _ *commitScoreProjectorStub, stager *commitEventStagerStub) {
+				stager.stageErr = commitErr
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, execution := commitTestOutcome(t)
+			order := make([]string, 0, 5)
+			assessmentRepo := &commitAssessmentRepoStub{order: &order}
+			outcomeRepo := &commitOutcomeRepoStub{order: &order}
+			runRepo := &commitRunRepoStub{order: &order}
+			projector := &commitScoreProjectorStub{order: &order}
+			stager := &commitEventStagerStub{order: &order}
+			tc.configure(assessmentRepo, outcomeRepo, runRepo, projector, stager)
+			c := NewCommitter(commitRunnerStub{}, assessmentRepo, outcomeRepo, runRepo, projector, stager, nil)
+			run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+			if err := run.Start(time.Unix(100, 0)); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err := c.Commit(context.Background(), Request{
+				Outcome: evaloutcome.Outcome{
+					Assessment:           a,
+					Execution:            evaloutcome.ExecutionFromAssessmentOutcome(execution),
+					RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+				},
+				Run:         &run,
+				EvaluatedAt: time.Unix(200, 0),
+			})
+			if !errors.Is(err, commitErr) {
+				t.Fatalf("Commit error = %v, want %v", err, commitErr)
+			}
+			if !a.Status().IsSubmitted() || a.EvaluatedAt() != nil || a.TotalScore() != nil {
+				t.Fatalf("caller assessment was polluted: status=%s evaluated_at=%v total_score=%v", a.Status(), a.EvaluatedAt(), a.TotalScore())
+			}
+			if run.Attempt.Status != evalrun.StatusRunning || run.FinishedAt != nil || run.Failure != nil {
+				t.Fatalf("caller run was polluted: %#v", run)
+			}
+			if len(a.Events()) != 0 {
+				t.Fatalf("caller assessment events were polluted: %#v", a.Events())
+			}
+		})
 	}
 }
 

@@ -115,6 +115,9 @@ func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
 	if !repo.byID[a.ID().Uint64()].Status().IsEvaluated() {
 		t.Fatalf("status after repair = %s, want evaluated", repo.byID[a.ID().Uint64()].Status())
 	}
+	if evaluatedAt := repo.byID[a.ID().Uint64()].EvaluatedAt(); evaluatedAt == nil || !evaluatedAt.Equal(time.Unix(1, 0)) {
+		t.Fatalf("evaluated_at after repair = %v, want persisted outcome time", evaluatedAt)
+	}
 	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("RepairEvaluatedFinalization second: %v", err)
 	}

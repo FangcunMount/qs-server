@@ -141,7 +141,7 @@ func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessment
 	if err := json.Unmarshal(record.Payload(), &execution); err != nil {
 		return fmt.Errorf("decode evaluation outcome for assessment %d: %w", assessmentID, err)
 	}
-	if err := a.ApplyScoringOutcome(&execution); err != nil {
+	if err := a.ApplyScoringOutcomeAt(&execution, record.EvaluatedAt()); err != nil {
 		return err
 	}
 	return r.assessmentSaver.Save(ctx, a)
