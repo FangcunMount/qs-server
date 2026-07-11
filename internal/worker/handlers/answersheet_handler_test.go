@@ -101,6 +101,7 @@ func (f *fakeWorkerInternalClient) EvaluateAssessment(
 func (f *fakeWorkerInternalClient) GenerateReportFromAssessment(
 	_ context.Context,
 	_ uint64,
+	_ string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++
 	f.calls = append(f.calls, "generate_report")

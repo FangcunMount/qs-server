@@ -44,6 +44,7 @@ type service struct {
 	scoringWriter         outcomescoring.Writer
 	evaluationCommitter   outcomecommit.Committer
 	interpretationService interpretationapp.Service
+	outcomeReportService  interpretationapp.OutcomeReportService
 	scoringSnapshotStore  outcomescoring.SnapshotStore
 	asyncInterpretation   bool
 	reportStatus          *reportstatus.Reporter
@@ -134,6 +135,10 @@ func WithInterpretationService(svc interpretationapp.Service) ServiceOption {
 	return func(s *service) {
 		s.interpretationService = svc
 	}
+}
+
+func WithOutcomeReportService(svc interpretationapp.OutcomeReportService) ServiceOption {
+	return func(s *service) { s.outcomeReportService = svc }
 }
 
 // WithAsyncInterpretation 启用分阶段 评估 (计分事件 + 异步 report)。
@@ -304,10 +309,8 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"error", err.Error(),
 		)
 		if committed {
-			// The Evaluation fact and succeeded run are already durable. Keep the
-			// current compatibility behavior for Assessment until Batch 4, but do
-			// not rewrite EvaluationRun as failed because reporting failed.
-			s.failureFinalizer().MarkAsFailed(ctx, a, "报告生成持久化失败: "+err.Error())
+			// Evaluation facts are already durable. Report owns its failure and
+			// retry lifecycle and must not rewrite Assessment or EvaluationRun.
 			return err
 		}
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
@@ -346,15 +349,25 @@ func (s *service) persistEvaluationOutcome(
 	evaluationRun *evalrun.EvaluationRun,
 ) (bool, error) {
 	if s.evaluationCommitter != nil {
-		if _, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
+		record, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
 			Outcome:     outcome,
 			Run:         evaluationRun,
 			EvaluatedAt: time.Now(),
-		}); err != nil {
+		})
+		if err != nil {
 			return false, err
 		}
 		if s.asyncInterpretation {
 			return true, nil
+		}
+		if s.outcomeReportService != nil {
+			rpt, err := s.outcomeReportService.GenerateByOutcomeID(ctx, record.ID())
+			if err != nil {
+				s.recordReportFailed(ctx, outcome.Assessment.ID().Uint64(), err)
+				return true, err
+			}
+			s.recordReportCompleted(ctx, rpt.ID().Uint64())
+			return true, err
 		}
 		if s.interpretationService == nil {
 			return true, evalerrors.ModuleNotConfigured("interpretation service is not configured")
@@ -387,6 +400,16 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 	if assessmentID == 0 {
 		return evalerrors.InvalidArgument("评估ID不能为空")
 	}
+	if s.outcomeReportService != nil {
+		rpt, err := s.outcomeReportService.GenerateByAssessmentID(ctx, meta.FromUint64(assessmentID))
+		if err != nil {
+			s.recordReportFailed(ctx, assessmentID, err)
+			return err
+		}
+		s.recordReportCompleted(ctx, rpt.ID().Uint64())
+		l.Infow("报告生成完成", "action", "generate_report", "assessment_id", assessmentID, "outcome_id", rpt.OutcomeID().String(), "report_status", rpt.Status(), "attempt", rpt.Attempt())
+		return nil
+	}
 	loaded, err := s.assessmentLoader().LoadForInterpretation(ctx, assessmentID)
 	if err != nil {
 		return err
@@ -395,43 +418,39 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 		return nil
 	}
 	a := loaded.assessment
-	markReportFailed := func(reason string, err error) error {
-		s.failureFinalizer().MarkAsFailed(ctx, a, reason)
-		return err
-	}
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
-		return markReportFailed("报告生成输入解析失败: "+inputResolveFailureReason(err), err)
+		return err
 	}
 
 	var execution *assessment.AssessmentOutcome
 	if a.Status().IsEvaluated() && s.scoringSnapshotStore != nil {
 		execution, err = s.scoringSnapshotStore.Load(ctx, assessmentID)
 		if err != nil {
-			return markReportFailed("报告生成计分快照读取失败: "+err.Error(), err)
+			return err
 		}
 		if execution == nil {
 			err = evalerrors.InvalidArgument("计分快照不存在")
-			return markReportFailed(err.Error(), err)
+			return err
 		}
 	} else {
 		if s.runtimeResolver == nil {
-			return markReportFailed("报告生成执行器未配置", evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured"))
+			return evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured")
 		}
 		var resolved ResolvedExecution
 		execution, resolved, err = s.runtimeResolver.Execute(ctx, a, input)
 		if err != nil {
-			return markReportFailed("报告生成计分失败: "+err.Error(), err)
+			return err
 		}
 		_ = resolved
 	}
 	if s.interpretationService == nil {
 		err = evalerrors.ModuleNotConfigured("interpretation service is not configured")
-		return markReportFailed(err.Error(), err)
+		return err
 	}
 	outcome := evaloutcome.Outcome{Assessment: a, Input: input, Execution: execution}
 	if err := s.interpretationService.GenerateAndPersist(ctx, outcome); err != nil {
-		return markReportFailed("报告生成持久化失败: "+err.Error(), err)
+		return err
 	}
 	if s.scoringSnapshotStore != nil {
 		_ = s.scoringSnapshotStore.Delete(ctx, assessmentID)
@@ -441,6 +460,41 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 		"assessment_id", assessmentID,
 	)
 	return nil
+}
+
+func (s *service) GenerateReportFromOutcome(ctx context.Context, outcomeID string) error {
+	if s.outcomeReportService == nil {
+		return evalerrors.ModuleNotConfigured("outcome report service is not configured")
+	}
+	id, err := meta.ParseID(outcomeID)
+	if err != nil || id.IsZero() {
+		return evalerrors.InvalidArgument("EvaluationOutcome ID 无效")
+	}
+	rpt, err := s.outcomeReportService.GenerateByOutcomeID(ctx, id)
+	if err != nil {
+		if rpt != nil {
+			s.recordReportFailed(ctx, rpt.ID().Uint64(), err)
+		}
+		return err
+	}
+	s.recordReportCompleted(ctx, rpt.ID().Uint64())
+	logger.L(ctx).Infow("报告生成完成", "action", "generate_report_from_outcome", "assessment_id", rpt.ID().Uint64(), "outcome_id", outcomeID, "report_status", rpt.Status(), "attempt", rpt.Attempt())
+	return nil
+}
+
+func (s *service) recordReportCompleted(ctx context.Context, reportID uint64) {
+	if s.reportStatus == nil || reportID == 0 {
+		return
+	}
+	id := reportstatus.AssessmentKey(reportID)
+	s.reportStatus.SetCompleted(ctx, id, "", id)
+}
+
+func (s *service) recordReportFailed(ctx context.Context, assessmentID uint64, cause error) {
+	if s.reportStatus == nil || assessmentID == 0 || cause == nil {
+		return
+	}
+	s.reportStatus.SetFailed(ctx, reportstatus.AssessmentKey(assessmentID), "", "report_generation", cause.Error())
 }
 
 // resolveExecutionIdentity 解析 v2 评估执行键。

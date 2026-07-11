@@ -206,6 +206,7 @@ func Wire(in WireInput) (WireResult, error) {
 		ReportReader:                                in.ReportPorts.Reader,
 		ReportBuilderRegistry:                       in.ReportPorts.BuilderRegistry,
 		ReportDurableSaver:                          in.ReportPorts.DurableSaver,
+		ReportStateStore:                            in.ReportPorts.StateStore,
 		PublishedModelReader:                        publishedModelReader,
 	})
 	if err != nil {

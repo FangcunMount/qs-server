@@ -14,7 +14,9 @@ func TestRecordCopiesCanonicalPayload(t *testing.T) {
 	payload := []byte(`{"primary":{"value":12}}`)
 	record, err := NewRecord(NewRecordInput{
 		ID:           meta.FromUint64(1),
+		OrgID:        11,
 		AssessmentID: meta.FromUint64(2),
+		TesteeID:     3,
 		RunID:        "2:1",
 		Model: ModelIdentity{
 			Kind:    modelcatalog.KindScale,

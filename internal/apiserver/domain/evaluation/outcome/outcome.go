@@ -34,11 +34,14 @@ type RuntimeIdentity struct {
 // adapters to understand mechanism-specific detail DTOs.
 type Record struct {
 	id               ID
+	orgID            int64
 	assessmentID     meta.ID
+	testeeID         uint64
 	runID            string
 	model            ModelIdentity
 	runtime          RuntimeIdentity
 	inputSnapshotRef string
+	reportInput      json.RawMessage
 	payload          json.RawMessage
 	schemaVersion    uint
 	evaluatedAt      time.Time
@@ -46,11 +49,14 @@ type Record struct {
 
 type NewRecordInput struct {
 	ID               ID
+	OrgID            int64
 	AssessmentID     meta.ID
+	TesteeID         uint64
 	RunID            string
 	Model            ModelIdentity
 	Runtime          RuntimeIdentity
 	InputSnapshotRef string
+	ReportInput      json.RawMessage
 	Payload          json.RawMessage
 	SchemaVersion    uint
 	EvaluatedAt      time.Time
@@ -62,6 +68,9 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 	}
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment id is required")
+	}
+	if input.TesteeID == 0 {
+		return nil, fmt.Errorf("testee id is required")
 	}
 	if input.RunID == "" {
 		return nil, fmt.Errorf("evaluation run id is required")
@@ -80,11 +89,14 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 	}
 	return &Record{
 		id:               input.ID,
+		orgID:            input.OrgID,
 		assessmentID:     input.AssessmentID,
+		testeeID:         input.TesteeID,
 		runID:            input.RunID,
 		model:            input.Model,
 		runtime:          input.Runtime,
 		inputSnapshotRef: input.InputSnapshotRef,
+		reportInput:      append(json.RawMessage(nil), input.ReportInput...),
 		payload:          append(json.RawMessage(nil), input.Payload...),
 		schemaVersion:    input.SchemaVersion,
 		evaluatedAt:      input.EvaluatedAt,
@@ -93,7 +105,11 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 
 func (r *Record) ID() ID { return r.id }
 
+func (r *Record) OrgID() int64 { return r.orgID }
+
 func (r *Record) AssessmentID() meta.ID { return r.assessmentID }
+
+func (r *Record) TesteeID() uint64 { return r.testeeID }
 
 func (r *Record) RunID() string { return r.runID }
 
@@ -102,6 +118,10 @@ func (r *Record) Model() ModelIdentity { return r.model }
 func (r *Record) Runtime() RuntimeIdentity { return r.runtime }
 
 func (r *Record) InputSnapshotRef() string { return r.inputSnapshotRef }
+
+func (r *Record) ReportInput() json.RawMessage {
+	return append(json.RawMessage(nil), r.reportInput...)
+}
 
 func (r *Record) Payload() json.RawMessage {
 	return append(json.RawMessage(nil), r.payload...)

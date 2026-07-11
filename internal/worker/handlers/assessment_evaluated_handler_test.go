@@ -13,13 +13,16 @@ type reportGeneratingInternalClient struct {
 	fakeWorkerInternalClient
 	generateReportResp *pb.GenerateReportFromAssessmentResponse
 	generateReportErr  error
+	outcomeID          string
 }
 
 func (f *reportGeneratingInternalClient) GenerateReportFromAssessment(
 	_ context.Context,
 	_ uint64,
+	outcomeID string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++
+	f.outcomeID = outcomeID
 	if f.generateReportErr != nil {
 		return nil, f.generateReportErr
 	}
@@ -49,6 +52,9 @@ func TestHandleAssessmentEvaluated_ReportFailureWithFailedStatusAcks(t *testing.
 	}
 	if client.generateReportCalls != 1 {
 		t.Fatalf("expected 1 generate report call, got %d", client.generateReportCalls)
+	}
+	if client.outcomeID != "9001" {
+		t.Fatalf("outcome id = %q, want 9001", client.outcomeID)
 	}
 }
 

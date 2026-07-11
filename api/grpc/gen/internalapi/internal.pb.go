@@ -2463,6 +2463,7 @@ func (x *ResultLevel) GetSeverity() string {
 type GenerateReportFromAssessmentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	OutcomeId     string                 `protobuf:"bytes,2,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"` // assessment.evaluated 携带的 canonical EvaluationOutcome ID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2502,6 +2503,13 @@ func (x *GenerateReportFromAssessmentRequest) GetAssessmentId() uint64 {
 		return x.AssessmentId
 	}
 	return 0
+}
+
+func (x *GenerateReportFromAssessmentRequest) GetOutcomeId() string {
+	if x != nil {
+		return x.OutcomeId
+	}
+	return ""
 }
 
 type GenerateReportFromAssessmentResponse struct {
@@ -3634,9 +3642,11 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\vResultLevel\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
-	"\bseverity\x18\x03 \x01(\tR\bseverity\"J\n" +
+	"\bseverity\x18\x03 \x01(\tR\bseverity\"i\n" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xca\x01\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
+	"\n" +
+	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\xca\x01\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +

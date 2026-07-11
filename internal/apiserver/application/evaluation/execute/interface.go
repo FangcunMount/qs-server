@@ -28,6 +28,10 @@ type Service interface {
 	// GenerateReport 基于已计分结果生成报告（异步解读阶段）
 	GenerateReport(ctx context.Context, assessmentID uint64) error
 
+	// GenerateReportFromOutcome consumes the canonical EvaluationOutcome and
+	// never executes an Evaluator or reloads Assessment input.
+	GenerateReportFromOutcome(ctx context.Context, outcomeID string) error
+
 	// EvaluateBatch 批量评估
 	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
 }

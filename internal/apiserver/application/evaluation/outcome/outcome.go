@@ -1,6 +1,7 @@
 package outcome
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -12,4 +13,20 @@ type Outcome struct {
 	Input                *evaluationinput.InputSnapshot
 	Execution            *assessment.AssessmentOutcome
 	RuntimeDescriptorKey evalpipeline.RuntimeDescriptorKey
+}
+
+// AssessmentID returns the stable assessment identity carried by either the
+// live aggregate or a restored, persisted EvaluationOutcome.
+func (o Outcome) AssessmentID() assessment.ID {
+	if o.Assessment == nil {
+		return 0
+	}
+	return o.Assessment.ID()
+}
+
+func (o Outcome) TesteeID() testee.ID {
+	if o.Assessment == nil {
+		return 0
+	}
+	return o.Assessment.TesteeID()
 }

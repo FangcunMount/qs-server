@@ -35,14 +35,14 @@ func generateReportFailureResponse(
 	message string,
 ) *pb.GenerateReportFromAssessmentResponse {
 	resp := &pb.GenerateReportFromAssessmentResponse{
-		Success: false,
-		Status:  "failed",
-		Message: message,
+		Success:     false,
+		Status:      "failed",
+		Message:     message,
+		Retryable:   true,
+		FailureKind: "report_generation",
 	}
-	applyLatestRunFailureMetadata(ctx, runQuery, assessmentID, func(retryable bool, runID, failureKind, _, _ string) {
-		resp.Retryable = retryable
-		resp.RunId = runID
-		resp.FailureKind = failureKind
-	})
+	_ = ctx
+	_ = runQuery
+	_ = assessmentID
 	return resp
 }

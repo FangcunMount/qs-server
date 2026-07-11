@@ -12,6 +12,8 @@ type (
 	ScoreProjector                    = interpretationprojection.ScoreProjector
 	ScoreProjectorRegistry            = interpretationprojection.ScoreProjectorRegistry
 	CompletionNotifier                = interpretationwriter.CompletionNotifier
+	Generation                        = interpretationwriter.Generation
+	Generator                         = interpretationwriter.Generator
 	MechanismReportBuilderKey         = interpretationregistry.MechanismReportBuilderKey
 	MechanismKeyedReportBuilder       = interpretationregistry.MechanismKeyedReportBuilder
 	MultiMechanismKeyedReportBuilder  = interpretationregistry.MultiMechanismKeyedReportBuilder
@@ -44,6 +46,7 @@ var (
 	NewWriterWithEventAssemblers                      = interpretationwriter.NewWriterWithEventAssemblers
 	NewTransactionalReportDurableSaver                = interpretationwriter.NewTransactionalReportDurableSaver
 	NewWaiterCompletionNotifier                       = interpretationwriter.NewWaiterCompletionNotifier
+	NewGenerator                                      = interpretationwriter.NewGenerator
 	ExecutionPathForMechanismFamily                   = interpretationwriter.ExecutionPathForMechanismFamily
 	ExecutionPathForReportBuilder                     = interpretationwriter.ExecutionPathForReportBuilder
 	ExecutionPathForScoreProjector                    = interpretationwriter.ExecutionPathForScoreProjector

@@ -77,6 +77,7 @@ type assessmentGenerateReportClient struct {
 func (c *assessmentGenerateReportClient) GenerateReportFromAssessment(
 	_ context.Context,
 	_ uint64,
+	_ string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	c.generateReportCalls++
 	return c.resp, c.err
@@ -93,10 +94,12 @@ func mustBuildAssessmentEvaluatedPayload(t *testing.T, assessmentID int64) []byt
 		"aggregateType": "Assessment",
 		"aggregateID":   "agg-evaluated",
 		"data": map[string]any{
-			"org_id":        18,
-			"assessment_id": assessmentID,
-			"testee_id":     99,
-			"evaluated_at":  now,
+			"org_id":            18,
+			"assessment_id":     assessmentID,
+			"testee_id":         99,
+			"outcome_id":        "9001",
+			"evaluation_run_id": "2001:1",
+			"evaluated_at":      now,
 		},
 	})
 	if err != nil {

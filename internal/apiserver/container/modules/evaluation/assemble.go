@@ -112,6 +112,7 @@ type Deps struct {
 	ReportReader                                evaluationreadmodel.ReportReader
 	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
 	ReportDurableSaver                          interpretationreporting.ReportDurableSaver
+	ReportStateStore                            interpretationapp.ReportStateStore
 	PublishedModelReader                        rulesetport.PublishedModelReader
 	AsyncInterpretation                         bool
 	SingleProcessAsyncInterpretation            bool
@@ -286,6 +287,11 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.postCommitReadyIndexer,
 		)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
+		reportGenerator, err := interpretationreporting.NewGenerator(normalized.ReportBuilderRegistry)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generator: %v", err)
+		}
+		outcomeReportService := interpretationapp.NewOutcomeReportService(infra.outcomeRepo, normalized.ReportStateStore, reportGenerator, normalized.ReportDurableSaver)
 
 		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
@@ -299,6 +305,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithEvaluationCommitter(evaluationCommitter),
 			execute.WithInterpretationService(interpretationService),
+			execute.WithOutcomeReportService(outcomeReportService),
 			execute.WithScoringSnapshotStore(scoringSnapshotStore),
 			execute.WithAsyncInterpretation(normalized.AsyncInterpretation),
 		)
@@ -429,6 +436,9 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		}
 		if deps.ReportDurableSaver == nil {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report durable saver is required when input resolver is configured")
+		}
+		if deps.ReportStateStore == nil {
+			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report state store is required when input resolver is configured")
 		}
 	}
 	if deps.ReportReader == nil {

@@ -260,7 +260,7 @@ func (b *charBridgeInternalClient) EvaluateAssessment(ctx context.Context, asses
 	return b.evaluateResponse(ctx, assessmentID), nil
 }
 
-func (b *charBridgeInternalClient) GenerateReportFromAssessment(ctx context.Context, assessmentID uint64) (*pb.GenerateReportFromAssessmentResponse, error) {
+func (b *charBridgeInternalClient) GenerateReportFromAssessment(ctx context.Context, assessmentID uint64, _ string) (*pb.GenerateReportFromAssessmentResponse, error) {
 	if err := b.execute.GenerateReport(ctx, assessmentID); err != nil {
 		return &pb.GenerateReportFromAssessmentResponse{
 			Success: false,

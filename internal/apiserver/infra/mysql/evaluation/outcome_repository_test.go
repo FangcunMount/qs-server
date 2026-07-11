@@ -15,7 +15,9 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 	evaluatedAt := time.Unix(123, 456000000)
 	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           meta.FromUint64(7001),
+		OrgID:        11,
 		AssessmentID: meta.FromUint64(5001),
+		TesteeID:     3001,
 		RunID:        "5001:1",
 		Model: domainoutcome.ModelIdentity{
 			Kind:      modelcatalog.KindTypology,
@@ -31,6 +33,7 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 			PayloadFormat:   "typology.v2",
 		},
 		InputSnapshotRef: "model:MBTI-16P@1.0.0",
+		ReportInput:      []byte(`{"Payload":{"code":"MBTI-16P"}}`),
 		Payload:          []byte(`{"summary":{"PrimaryLabel":"INTJ"}}`),
 		SchemaVersion:    1,
 		EvaluatedAt:      evaluatedAt,
@@ -44,7 +47,7 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID() != record.ID() || got.AssessmentID() != record.AssessmentID() || got.RunID() != record.RunID() {
+	if got.ID() != record.ID() || got.OrgID() != record.OrgID() || got.AssessmentID() != record.AssessmentID() || got.TesteeID() != record.TesteeID() || got.RunID() != record.RunID() {
 		t.Fatalf("identity round trip: %#v", got)
 	}
 	if got.Model() != record.Model() || got.Runtime() != record.Runtime() {
@@ -52,5 +55,8 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 	}
 	if string(got.Payload()) != string(record.Payload()) || !got.EvaluatedAt().Equal(evaluatedAt) {
 		t.Fatalf("payload/time round trip: payload=%s evaluated_at=%s", got.Payload(), got.EvaluatedAt())
+	}
+	if string(got.ReportInput()) != string(record.ReportInput()) {
+		t.Fatalf("report input = %s", got.ReportInput())
 	}
 }

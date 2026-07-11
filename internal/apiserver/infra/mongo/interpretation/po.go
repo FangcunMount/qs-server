@@ -17,6 +17,14 @@ import (
 type InterpretReportPO struct {
 	base.BaseDocument `bson:",inline"`
 
+	OutcomeID     uint64     `bson:"outcome_id,omitempty" json:"outcome_id,omitempty"`
+	Status        string     `bson:"status,omitempty" json:"status,omitempty"`
+	Attempt       uint       `bson:"attempt" json:"attempt"`
+	FailureReason *string    `bson:"failure_reason,omitempty" json:"failure_reason,omitempty"`
+	GeneratingAt  *time.Time `bson:"generating_at,omitempty" json:"generating_at,omitempty"`
+	GeneratedAt   *time.Time `bson:"generated_at,omitempty" json:"generated_at,omitempty"`
+	FailedAt      *time.Time `bson:"failed_at,omitempty" json:"failed_at,omitempty"`
+
 	// 量表信息（legacy v1）
 	ScaleName string `bson:"scale_name" json:"scale_name"`
 	ScaleCode string `bson:"scale_code" json:"scale_code"`

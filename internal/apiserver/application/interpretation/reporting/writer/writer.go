@@ -27,6 +27,53 @@ type writer struct {
 	reportStatus    *reportstatus.Reporter
 }
 
+type reportGenerator struct {
+	builders   registry.ReportBuilderRegistry
+	assemblers projection.EventAssemblerRegistry
+}
+
+func NewGenerator(builders registry.ReportBuilderRegistry) (Generator, error) {
+	assemblers, err := projection.NewEventAssemblerRegistry(projection.DefaultMechanismEventAssemblers()...)
+	if err != nil {
+		return nil, err
+	}
+	return &reportGenerator{builders: builders, assemblers: assemblers}, nil
+}
+
+func (g *reportGenerator) Generate(ctx context.Context, outcome evaloutcome.Outcome) (Generation, error) {
+	if outcome.Assessment == nil || outcome.Execution == nil {
+		return Generation{}, fmt.Errorf("persisted evaluation outcome context is incomplete")
+	}
+	if !outcome.Assessment.Status().CanApplyInterpretation() {
+		return Generation{}, assessment.NewInvalidStatusError("generate report", outcome.Assessment.Status())
+	}
+	mechanismKey, ok := registry.MechanismReportBuilderKeyFromOutcome(outcome)
+	if !ok {
+		return Generation{}, fmt.Errorf("unsupported mechanism report builder key for outcome")
+	}
+	if g == nil || g.builders == nil {
+		return Generation{}, fmt.Errorf("interpretation report builder registry is not configured")
+	}
+	builder, err := g.builders.ResolveByMechanism(mechanismKey)
+	if err != nil {
+		return Generation{}, err
+	}
+	rpt, err := builder.Build(ctx, outcome)
+	if err != nil {
+		return Generation{}, err
+	}
+	assembler := g.assemblers.ResolveByMechanism(mechanismKey)
+	events := assembler.BuildSuccessEvents(outcome, rpt)
+	filtered := events[:0]
+	for _, evt := range events {
+		if evt == nil || evt.EventType() == assessment.EventTypeInterpretedOutcome {
+			continue
+		}
+		filtered = append(filtered, evt)
+	}
+	return Generation{Report: rpt, Events: filtered}, nil
+}
+
 // NewWriter 创建解释写入器 用于之后 计分 completes。
 func NewWriter(
 	assessmentRepo assessment.Repository,

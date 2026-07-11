@@ -35,7 +35,7 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("invalid assessment id in evaluated event: %w", err)
 		}
 
-		resp, err := deps.InternalClient.GenerateReportFromAssessment(ctx, assessmentID)
+		resp, err := deps.InternalClient.GenerateReportFromAssessment(ctx, assessmentID, data.OutcomeID)
 		if err != nil {
 			deps.Logger.Error("failed to generate report from assessment",
 				slog.Int64("assessment_id", data.AssessmentID),
@@ -45,7 +45,7 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 		}
 		if resp != nil && !resp.Success {
 			if isTerminalReportGenerationStatus(resp.Status) {
-				deps.Logger.Warn("report generation failed and assessment marked failed",
+				deps.Logger.Warn("report generation reached terminal status",
 					slog.Int64("assessment_id", data.AssessmentID),
 					slog.String("status", resp.Status),
 					slog.String("message", resp.Message),

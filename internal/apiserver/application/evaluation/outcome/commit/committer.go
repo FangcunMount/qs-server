@@ -88,9 +88,18 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 	if err != nil {
 		return nil, fmt.Errorf("marshal canonical evaluation outcome: %w", err)
 	}
+	var reportInput json.RawMessage
+	if request.Outcome.Input != nil && request.Outcome.Input.ModelPayload != nil {
+		reportInput, err = json.Marshal(request.Outcome.Input.ModelPayload)
+		if err != nil {
+			return nil, fmt.Errorf("marshal evaluation report input: %w", err)
+		}
+	}
 	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           c.newID(),
+		OrgID:        request.Outcome.Assessment.OrgID(),
 		AssessmentID: request.Outcome.Assessment.ID(),
+		TesteeID:     request.Outcome.Assessment.TesteeID().Uint64(),
 		RunID:        request.Run.RunID.String(),
 		Model: domainoutcome.ModelIdentity{
 			Kind:      request.Outcome.Execution.ModelRef.Kind(),
@@ -106,6 +115,7 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 			PayloadFormat:   request.Outcome.RuntimeDescriptorKey.PayloadFormat,
 		},
 		InputSnapshotRef: request.Run.InputSnapshotRef,
+		ReportInput:      reportInput,
 		Payload:          payload,
 		SchemaVersion:    domainoutcome.CurrentSchemaVersion,
 		EvaluatedAt:      request.EvaluatedAt,

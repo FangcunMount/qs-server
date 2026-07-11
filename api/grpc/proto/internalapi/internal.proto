@@ -367,6 +367,7 @@ message ResultLevel {
 
 message GenerateReportFromAssessmentRequest {
   uint64 assessment_id = 1;
+  string outcome_id = 2;              // assessment.evaluated 携带的 canonical EvaluationOutcome ID
 }
 
 message GenerateReportFromAssessmentResponse {

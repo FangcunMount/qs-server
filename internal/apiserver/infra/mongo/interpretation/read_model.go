@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -26,6 +27,7 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	return r.getReport(ctx, bson.M{
 		"domain_id":  reportID,
 		"deleted_at": nil,
+		"$or":        generatedReportConditions(),
 	})
 }
 
@@ -66,7 +68,7 @@ func (r *reportReadModel) ListReports(
 }
 
 func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
-	query := bson.M{"deleted_at": nil}
+	query := bson.M{"deleted_at": nil, "$or": generatedReportConditions()}
 	if filter.TesteeID != nil {
 		query["testee_id"] = *filter.TesteeID
 	}
@@ -83,6 +85,14 @@ func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 		query["risk_level"] = *filter.RiskLevel
 	}
 	return query
+}
+
+func generatedReportConditions() bson.A {
+	return bson.A{
+		bson.M{"status": string(domainreport.ReportStatusGenerated)},
+		bson.M{"status": bson.M{"$exists": false}},
+		bson.M{"status": ""},
+	}
 }
 
 func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *options.FindOptions {

@@ -2,6 +2,25 @@ package report
 
 import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
+// Status is the lifecycle of report generation, independent from Assessment.
+type Status string
+
+const (
+	StatusPending    Status = "pending"
+	StatusGenerating Status = "generating"
+	StatusGenerated  Status = "generated"
+	StatusFailed     Status = "failed"
+)
+
+func (s Status) IsValid() bool {
+	switch s {
+	case StatusPending, StatusGenerating, StatusGenerated, StatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
 // ID 报告ID类型（与 AssessmentID 一致，使用 meta.ID）
 type ID = meta.ID
 

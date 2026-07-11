@@ -18,6 +18,8 @@ func TestProductionEvaluationUsesCommitterAndEvaluationOwnedScoreProjection(t *t
 		"outcomecommit.NewCommitter(",
 		"outcomescoring.NewAssessmentScoreProjector(",
 		"execute.WithEvaluationCommitter(",
+		"interpretationapp.NewOutcomeReportService(",
+		"execute.WithOutcomeReportService(",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("evaluation production wiring must contain %q", required)

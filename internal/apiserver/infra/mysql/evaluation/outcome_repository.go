@@ -14,7 +14,9 @@ import (
 
 type EvaluationOutcomePO struct {
 	ID               uint64    `gorm:"column:id;primaryKey"`
+	OrgID            int64     `gorm:"column:org_id;not null;index:idx_evaluation_outcome_org"`
 	AssessmentID     uint64    `gorm:"column:assessment_id;not null;uniqueIndex:uk_evaluation_outcome_assessment_id"`
+	TesteeID         uint64    `gorm:"column:testee_id;not null;index:idx_evaluation_outcome_testee"`
 	EvaluationRunID  string    `gorm:"column:evaluation_run_id;size:128;not null;uniqueIndex:uk_evaluation_outcome_run_id"`
 	ModelKind        string    `gorm:"column:model_kind;size:50;not null"`
 	ModelSubKind     *string   `gorm:"column:model_sub_kind;size:50"`
@@ -26,6 +28,7 @@ type EvaluationOutcomePO struct {
 	DecisionKind     *string   `gorm:"column:decision_kind;size:50"`
 	PayloadFormat    *string   `gorm:"column:payload_format;size:100"`
 	InputSnapshotRef *string   `gorm:"column:input_snapshot_ref;size:200"`
+	ReportInputJSON  *string   `gorm:"column:report_input_json;type:longtext"`
 	PayloadJSON      string    `gorm:"column:payload_json;type:longtext;not null"`
 	SchemaVersion    uint      `gorm:"column:schema_version;not null"`
 	EvaluatedAt      time.Time `gorm:"column:evaluated_at;not null"`
@@ -74,7 +77,9 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 	runtime := record.Runtime()
 	return &EvaluationOutcomePO{
 		ID:               record.ID().Uint64(),
+		OrgID:            record.OrgID(),
 		AssessmentID:     record.AssessmentID().Uint64(),
+		TesteeID:         record.TesteeID(),
 		EvaluationRunID:  record.RunID(),
 		ModelKind:        model.Kind.String(),
 		ModelSubKind:     optionalString(string(model.SubKind)),
@@ -86,6 +91,7 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 		DecisionKind:     optionalString(string(runtime.DecisionKind)),
 		PayloadFormat:    optionalString(runtime.PayloadFormat),
 		InputSnapshotRef: optionalString(record.InputSnapshotRef()),
+		ReportInputJSON:  optionalString(string(record.ReportInput())),
 		PayloadJSON:      string(record.Payload()),
 		SchemaVersion:    record.SchemaVersion(),
 		EvaluatedAt:      record.EvaluatedAt(),
@@ -99,7 +105,9 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 	}
 	return domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           meta.FromUint64(po.ID),
+		OrgID:        po.OrgID,
 		AssessmentID: meta.FromUint64(po.AssessmentID),
+		TesteeID:     po.TesteeID,
 		RunID:        po.EvaluationRunID,
 		Model: domainoutcome.ModelIdentity{
 			Kind:      modelcatalog.Kind(po.ModelKind),
@@ -115,6 +123,7 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 			PayloadFormat:   valueOrEmpty(po.PayloadFormat),
 		},
 		InputSnapshotRef: valueOrEmpty(po.InputSnapshotRef),
+		ReportInput:      []byte(valueOrEmpty(po.ReportInputJSON)),
 		Payload:          []byte(po.PayloadJSON),
 		SchemaVersion:    po.SchemaVersion,
 		EvaluatedAt:      po.EvaluatedAt,

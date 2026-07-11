@@ -264,16 +264,23 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 	s := flow.service
 	l := logger.L(ctx)
 
-	if req == nil || req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	if req == nil || (req.AssessmentId == 0 && req.OutcomeId == "") {
+		return nil, status.Error(codes.InvalidArgument, "assessment_id 或 outcome_id 不能为空")
 	}
 
 	l.Infow("gRPC: 收到生成报告请求",
 		"action", "generate_report_from_assessment",
 		"assessment_id", req.AssessmentId,
+		"outcome_id", req.OutcomeId,
 	)
 
-	if err := s.executeService.GenerateReport(ctx, req.AssessmentId); err != nil {
+	var err error
+	if req.OutcomeId != "" {
+		err = s.executeService.GenerateReportFromOutcome(ctx, req.OutcomeId)
+	} else {
+		err = s.executeService.GenerateReport(ctx, req.AssessmentId)
+	}
+	if err != nil {
 		l.Errorw("生成报告失败",
 			"assessment_id", req.AssessmentId,
 			"error", err.Error(),
@@ -283,7 +290,7 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 
 	return &pb.GenerateReportFromAssessmentResponse{
 		Success: true,
-		Status:  "interpreted",
+		Status:  "generated",
 		Message: "报告生成完成",
 	}, nil
 }

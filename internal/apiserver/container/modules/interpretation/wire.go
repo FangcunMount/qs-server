@@ -3,6 +3,7 @@ package interpretation
 import (
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
@@ -40,6 +41,7 @@ type Ports struct {
 	Reader                 evaluationreadmodel.ReportReader
 	BuilderRegistry        interpretationreporting.ReportBuilderRegistry
 	DurableSaver           interpretationreporting.ReportDurableSaver
+	StateStore             interpretationapp.ReportStateStore
 	PostCommitReadyIndexer *eventing.PostCommitReadyIndexer
 	ReadyIndex             *outboxready.Index
 }
@@ -53,6 +55,7 @@ func ExportPorts(module *Module) Ports {
 		Reader:                 module.Reader(),
 		BuilderRegistry:        module.BuilderRegistry(),
 		DurableSaver:           module.DurableSaver(),
+		StateStore:             module.StateStore(),
 		PostCommitReadyIndexer: module.PostCommitReadyIndexer(),
 		ReadyIndex:             module.ReadyIndex(),
 	}

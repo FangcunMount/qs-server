@@ -8,6 +8,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -33,6 +34,7 @@ type Module struct {
 	reader          evaluationreadmodel.ReportReader
 	builderRegistry interpretationreporting.ReportBuilderRegistry
 	durableSaver    interpretationreporting.ReportDurableSaver
+	stateStore      interpretationapp.ReportStateStore
 	readyIndexer    *appEventing.PostCommitReadyIndexer
 	readyIndex      *outboxready.Index
 }
@@ -59,6 +61,7 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
+	module.stateStore = reportRepo
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.QueryService = assessmentApp.NewReportQueryService(module.reader)
 
@@ -117,6 +120,13 @@ func (m *Module) DurableSaver() interpretationreporting.ReportDurableSaver {
 		return nil
 	}
 	return m.durableSaver
+}
+
+func (m *Module) StateStore() interpretationapp.ReportStateStore {
+	if m == nil {
+		return nil
+	}
+	return m.stateStore
 }
 
 // PostCommitReadyIndexer exposes the shared post-commit outbox ready indexer.

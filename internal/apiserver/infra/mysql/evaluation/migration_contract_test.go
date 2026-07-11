@@ -124,3 +124,21 @@ func TestEvaluationOutcomeMigrationCreatesImmutableFactTable(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationOutcomeReportContextMigrationBackfillsOwnership(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000043_add_evaluation_outcome_report_context.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"ADD COLUMN `org_id`", "ADD COLUMN `testee_id`", "ADD COLUMN `report_input_json`",
+		"JOIN `assessment`", "`o`.`org_id` = `a`.`org_id`", "`o`.`testee_id` = `a`.`testee_id`",
+		"idx_evaluation_outcome_org", "idx_evaluation_outcome_testee",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("outcome report context migration does not contain %q", token)
+		}
+	}
+}

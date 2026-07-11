@@ -178,6 +178,7 @@ func (c *Container) ReportIntegrationPorts() compose.ReportIntegrationPorts {
 		Reader:                 ports.Reader,
 		BuilderRegistry:        ports.BuilderRegistry,
 		DurableSaver:           ports.DurableSaver,
+		StateStore:             ports.StateStore,
 		PostCommitReadyIndexer: ports.PostCommitReadyIndexer,
 		ReadyIndex:             ports.ReadyIndex,
 	}

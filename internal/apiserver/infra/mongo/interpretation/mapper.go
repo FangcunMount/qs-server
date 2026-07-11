@@ -30,18 +30,25 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 	}
 
 	po := &InterpretReportPO{
-		ScaleName:    domain.ModelName(),
-		ScaleCode:    domain.ModelCode(),
-		Model:        modelIdentityToPO(domain.Model()),
-		PrimaryScore: scoreValueToPO(domain.PrimaryScore()),
-		Level:        resultLevelToPO(domain.Level()),
-		TesteeID:     testeeID,
-		TotalScore:   domain.TotalScore(),
-		RiskLevel:    string(domain.RiskLevel()),
-		Conclusion:   domain.Conclusion(),
-		Dimensions:   dimensions,
-		Suggestions:  toSuggestionPOs(domain.Suggestions()),
-		ModelExtra:   toModelExtraPO(domain.ModelExtra()),
+		OutcomeID:     domain.OutcomeID().Uint64(),
+		Status:        string(domain.Status()),
+		Attempt:       domain.Attempt(),
+		FailureReason: optionalReportString(domain.FailureReason()),
+		GeneratingAt:  domain.GeneratingAt(),
+		GeneratedAt:   domain.GeneratedAt(),
+		FailedAt:      domain.FailedAt(),
+		ScaleName:     domain.ModelName(),
+		ScaleCode:     domain.ModelCode(),
+		Model:         modelIdentityToPO(domain.Model()),
+		PrimaryScore:  scoreValueToPO(domain.PrimaryScore()),
+		Level:         resultLevelToPO(domain.Level()),
+		TesteeID:      testeeID,
+		TotalScore:    domain.TotalScore(),
+		RiskLevel:     string(domain.RiskLevel()),
+		Conclusion:    domain.Conclusion(),
+		Dimensions:    dimensions,
+		Suggestions:   toSuggestionPOs(domain.Suggestions()),
+		ModelExtra:    toModelExtraPO(domain.ModelExtra()),
 	}
 
 	// 设置 DomainID（与 AssessmentID 一致）
@@ -112,7 +119,31 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 		po.CreatedAt,
 		updatedAt,
 	)
-	return report.AttachOutcomeSummary(r, model, primaryScore, level)
+	r = report.AttachOutcomeSummary(r, model, primaryScore, level)
+	r.RestoreLifecycle(
+		meta.FromUint64(po.OutcomeID),
+		report.ReportStatus(po.Status),
+		po.Attempt,
+		derefReportString(po.FailureReason),
+		po.GeneratingAt,
+		po.GeneratedAt,
+		po.FailedAt,
+	)
+	return r
+}
+
+func optionalReportString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func derefReportString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func toSuggestionPOs(items []report.Suggestion) []SuggestionPO {

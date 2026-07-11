@@ -5,7 +5,27 @@ import (
 	"time"
 
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
+
+func TestReportMapperPersistsIndependentFailureState(t *testing.T) {
+	now := time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC)
+	rpt, err := domainReport.NewPendingInterpretReport(meta.FromUint64(42), meta.FromUint64(99), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rpt.BeginGenerating(now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := rpt.Fail("template unavailable", now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	got := NewReportMapper().ToDomain(NewReportMapper().ToPO(rpt, 7))
+	if got.Status() != domainReport.ReportStatusFailed || got.Attempt() != 1 || got.OutcomeID().Uint64() != 99 || got.FailureReason() != "template unavailable" || got.FailedAt() == nil {
+		t.Fatalf("lifecycle round trip = status:%s attempt:%d outcome:%s reason:%q failed:%v", got.Status(), got.Attempt(), got.OutcomeID(), got.FailureReason(), got.FailedAt())
+	}
+}
 
 func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 	mapper := NewReportMapper()

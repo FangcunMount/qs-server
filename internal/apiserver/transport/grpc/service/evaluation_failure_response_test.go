@@ -57,7 +57,7 @@ func TestEvaluateFailureResponseWithoutRunDefaultsNonRetryable(t *testing.T) {
 	}
 }
 
-func TestGenerateReportFailureResponsePopulatesRetryableFromLatestRun(t *testing.T) {
+func TestGenerateReportFailureResponseUsesIndependentReportRetry(t *testing.T) {
 	resp := generateReportFailureResponse(context.Background(), stubRunQueryService{
 		run: &runqueryApp.RunResult{
 			RunID:     "99:2",
@@ -66,10 +66,10 @@ func TestGenerateReportFailureResponsePopulatesRetryableFromLatestRun(t *testing
 		},
 	}, 99, "report failed")
 
-	if resp.GetRetryable() {
-		t.Fatal("expected retryable=false")
+	if !resp.GetRetryable() {
+		t.Fatal("expected report failure to remain retryable")
 	}
-	if resp.GetRunId() != "99:2" {
-		t.Fatalf("run_id = %q, want 99:2", resp.GetRunId())
+	if resp.GetRunId() != "" || resp.GetFailureKind() != "report_generation" {
+		t.Fatalf("report retry metadata = run:%q kind:%q", resp.GetRunId(), resp.GetFailureKind())
 	}
 }

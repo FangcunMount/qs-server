@@ -62,12 +62,14 @@ func (c *InternalClient) EvaluateAssessment(
 func (c *InternalClient) GenerateReportFromAssessment(
 	ctx context.Context,
 	assessmentID uint64,
+	outcomeID string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GenerateReportFromAssessment(ctx, &pb.GenerateReportFromAssessmentRequest{
 		AssessmentId: assessmentID,
+		OutcomeId:    outcomeID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report from assessment: %w", err)

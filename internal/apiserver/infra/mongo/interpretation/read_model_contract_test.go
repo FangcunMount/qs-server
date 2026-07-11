@@ -88,6 +88,7 @@ func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
 
 	want := bson.M{
 		"deleted_at": nil,
+		"$or":        generatedReportConditions(),
 		"testee_id":  bson.M{"$in": []uint64{8001, 8002}},
 		"risk_level": "high",
 		"scale_code": "SDS",
