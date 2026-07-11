@@ -149,7 +149,6 @@ func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
 		input,
 		evaluationexecute.WithEvaluatorRegistry(registry),
 		evaluationexecute.WithScoringWriter(charRecordingScoring{}),
-		evaluationexecute.WithInterpretationService(&charRecordingInterpretation{cap: &charSplitPhaseCapture{}}),
 	)
 	err = svc.Evaluate(context.Background(), a.ID().Uint64())
 	if err == nil {

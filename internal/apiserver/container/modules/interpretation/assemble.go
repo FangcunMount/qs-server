@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
@@ -35,6 +36,8 @@ type Module struct {
 	builderRegistry interpretationreporting.ReportBuilderRegistry
 	durableSaver    interpretationreporting.ReportDurableSaver
 	stateStore      interpretationapp.ReportStateStore
+	generator       interpretationreporting.Generator
+	outcomeService  interpretationapp.OutcomeReportService
 	readyIndexer    *appEventing.PostCommitReadyIndexer
 	readyIndex      *outboxready.Index
 }
@@ -93,9 +96,31 @@ func New(deps Deps) (*Module, error) {
 			return nil, err
 		}
 		module.builderRegistry = registry
+		generator, err := interpretationreporting.NewGenerator(registry)
+		if err != nil {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generator: %v", err)
+		}
+		module.generator = generator
 	}
 
 	return module, nil
+}
+
+// BindOutcomeRepository completes the cross-storage Interpretation use case
+// after Evaluation has installed its canonical outcome repository.
+func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
+	if m == nil || repo == nil || m.stateStore == nil || m.generator == nil || m.durableSaver == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
+	}
+	m.outcomeService = interpretationapp.NewOutcomeReportService(repo, m.stateStore, m.generator, m.durableSaver)
+	return nil
+}
+
+func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {
+	if m == nil {
+		return nil
+	}
+	return m.outcomeService
 }
 
 // Reader exposes the report read model port.
@@ -104,45 +129,6 @@ func (m *Module) Reader() evaluationreadmodel.ReportReader {
 		return nil
 	}
 	return m.reader
-}
-
-// BuilderRegistry exposes the evaluation report builder registry.
-func (m *Module) BuilderRegistry() interpretationreporting.ReportBuilderRegistry {
-	if m == nil {
-		return nil
-	}
-	return m.builderRegistry
-}
-
-// DurableSaver exposes the transactional report write port.
-func (m *Module) DurableSaver() interpretationreporting.ReportDurableSaver {
-	if m == nil {
-		return nil
-	}
-	return m.durableSaver
-}
-
-func (m *Module) StateStore() interpretationapp.ReportStateStore {
-	if m == nil {
-		return nil
-	}
-	return m.stateStore
-}
-
-// PostCommitReadyIndexer exposes the shared post-commit outbox ready indexer.
-func (m *Module) PostCommitReadyIndexer() *appEventing.PostCommitReadyIndexer {
-	if m == nil {
-		return nil
-	}
-	return m.readyIndexer
-}
-
-// ReadyIndex exposes the Mongo outbox ready index shared with survey relay.
-func (m *Module) ReadyIndex() *outboxready.Index {
-	if m == nil {
-		return nil
-	}
-	return m.readyIndex
 }
 
 func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry evalregistry.TypologyRegistry) (interpretationreporting.ReportBuilderRegistry, error) {

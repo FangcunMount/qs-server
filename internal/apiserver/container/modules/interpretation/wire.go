@@ -2,11 +2,7 @@ package interpretation
 
 import (
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -38,12 +34,7 @@ func Wire(in WireInput) (*Module, error) {
 
 // Ports exposes report integration ports for downstream modules.
 type Ports struct {
-	Reader                 evaluationreadmodel.ReportReader
-	BuilderRegistry        interpretationreporting.ReportBuilderRegistry
-	DurableSaver           interpretationreporting.ReportDurableSaver
-	StateStore             interpretationapp.ReportStateStore
-	PostCommitReadyIndexer *eventing.PostCommitReadyIndexer
-	ReadyIndex             *outboxready.Index
+	Reader evaluationreadmodel.ReportReader
 }
 
 // ExportPorts projects report module ports for evaluation wiring.
@@ -52,11 +43,6 @@ func ExportPorts(module *Module) Ports {
 		return Ports{}
 	}
 	return Ports{
-		Reader:                 module.Reader(),
-		BuilderRegistry:        module.BuilderRegistry(),
-		DurableSaver:           module.DurableSaver(),
-		StateStore:             module.StateStore(),
-		PostCommitReadyIndexer: module.PostCommitReadyIndexer(),
-		ReadyIndex:             module.ReadyIndex(),
+		Reader: module.Reader(),
 	}
 }

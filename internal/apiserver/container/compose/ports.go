@@ -3,25 +3,16 @@ package compose
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
 // ReportIntegrationPorts carries report-side integration ports for evaluation wiring.
 type ReportIntegrationPorts struct {
-	Reader                 evaluationreadmodel.ReportReader
-	BuilderRegistry        interpretationreporting.ReportBuilderRegistry
-	DurableSaver           interpretationreporting.ReportDurableSaver
-	StateStore             interpretationapp.ReportStateStore
-	PostCommitReadyIndexer *eventing.PostCommitReadyIndexer
-	ReadyIndex             *outboxready.Index
+	Reader evaluationreadmodel.ReportReader
 }
 
 // EvaluationCatalog carries shared model descriptors for report/evaluation wiring.

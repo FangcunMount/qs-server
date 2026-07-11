@@ -11,6 +11,9 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 type behaviorProjectionFlow struct {
@@ -274,11 +277,19 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		"outcome_id", req.OutcomeId,
 	)
 
+	if s.outcomeReportService == nil {
+		return generateReportFailureResponse(ctx, s.runQueryService, req.AssessmentId, "interpretation outcome service is not configured"), nil
+	}
+	var rpt *domainreport.InterpretReport
 	var err error
 	if req.OutcomeId != "" {
-		err = s.executeService.GenerateReportFromOutcome(ctx, req.OutcomeId)
+		outcomeID, parseErr := meta.ParseID(req.OutcomeId)
+		if parseErr != nil || outcomeID.IsZero() {
+			return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
+		}
+		rpt, err = s.outcomeReportService.GenerateByOutcomeID(ctx, outcomeID)
 	} else {
-		err = s.executeService.GenerateReport(ctx, req.AssessmentId)
+		rpt, err = s.outcomeReportService.GenerateByAssessmentID(ctx, meta.FromUint64(req.AssessmentId))
 	}
 	if err != nil {
 		l.Errorw("生成报告失败",
@@ -286,6 +297,10 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 			"error", err.Error(),
 		)
 		return generateReportFailureResponse(ctx, s.runQueryService, req.AssessmentId, err.Error()), nil
+	}
+	if s.reportStatusReporter != nil && rpt != nil {
+		id := reportstatus.AssessmentKey(rpt.ID().Uint64())
+		s.reportStatusReporter.SetCompleted(ctx, id, "", id)
 	}
 
 	return &pb.GenerateReportFromAssessmentResponse{

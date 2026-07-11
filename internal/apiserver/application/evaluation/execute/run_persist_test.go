@@ -96,8 +96,8 @@ func TestEvaluateReturnsRunPersistenceErrorBeforeExecuting(t *testing.T) {
 	if evaluator.calls != 0 {
 		t.Fatalf("evaluator calls = %d, want 0 after start run persist failure", evaluator.calls)
 	}
-	if capture.ScoringCalls != 0 || capture.InterpretationCalls != 0 {
-		t.Fatalf("split phase calls = scoring:%d interpretation:%d, want none", capture.ScoringCalls, capture.InterpretationCalls)
+	if capture.ScoringCalls != 0 {
+		t.Fatalf("scoring calls = %d, want none", capture.ScoringCalls)
 	}
 }
 
@@ -237,8 +237,8 @@ func TestEvaluateReturnsSucceededRunPersistenceErrorAfterScoring(t *testing.T) {
 	if evaluator.calls != 1 {
 		t.Fatalf("evaluator calls = %d, want 1", evaluator.calls)
 	}
-	if capture.ScoringCalls != 1 || capture.InterpretationCalls != 1 {
-		t.Fatalf("split phase calls = scoring:%d interpretation:%d, want 1 each", capture.ScoringCalls, capture.InterpretationCalls)
+	if capture.ScoringCalls != 1 {
+		t.Fatalf("scoring calls = %d, want 1", capture.ScoringCalls)
 	}
 	if len(runRepo.saved) != 3 {
 		t.Fatalf("saved runs = %d, want running, input snapshot, and succeeded attempt", len(runRepo.saved))

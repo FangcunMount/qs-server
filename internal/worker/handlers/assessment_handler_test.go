@@ -74,9 +74,8 @@ type assessmentGenerateReportClient struct {
 	generateReportCalls int
 }
 
-func (c *assessmentGenerateReportClient) GenerateReportFromAssessment(
+func (c *assessmentGenerateReportClient) GenerateReportFromOutcome(
 	_ context.Context,
-	_ uint64,
 	_ string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	c.generateReportCalls++

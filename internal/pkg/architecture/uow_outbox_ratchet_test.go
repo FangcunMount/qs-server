@@ -131,7 +131,7 @@ func TestMongoReportEventfulSaveCompatibilityEntrypointsAreRemoved(t *testing.T)
 	})
 }
 
-func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
+func TestInterpretationAssemblerExclusivelyWiresTransactionalReportDurableSaver(t *testing.T) {
 	root := repoRoot(t)
 	evalPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	evalData, err := os.ReadFile(evalPath)
@@ -143,8 +143,8 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 		"normalized.ReportDurableSaver",
 		"normalized.ReportBuilderRegistry",
 	} {
-		if !strings.Contains(evalText, token) {
-			t.Fatalf("evaluation assembler must inject report write ports with %q", token)
+		if strings.Contains(evalText, token) {
+			t.Fatalf("evaluation assembler must not receive report write capability %q", token)
 		}
 	}
 
@@ -154,8 +154,10 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 		t.Fatalf("read report assembler: %v", err)
 	}
 	reportText := string(reportData)
-	if !strings.Contains(reportText, "NewTransactionalReportDurableSaver(") {
-		t.Fatalf("report module must wire transactional report durable saver")
+	for _, token := range []string{"NewTransactionalReportDurableSaver(", "NewOutcomeReportService("} {
+		if !strings.Contains(reportText, token) {
+			t.Fatalf("interpretation module must own report write orchestration %q", token)
+		}
 	}
 }
 

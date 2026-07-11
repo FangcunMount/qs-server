@@ -16,6 +16,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -36,6 +37,7 @@ type InternalService struct {
 	submissionService          assessmentApp.AssessmentSubmissionService
 	managementService          assessmentApp.AssessmentManagementService
 	executeService             execute.Service
+	outcomeReportService       interpretationApp.OutcomeReportService
 	runQueryService            runqueryApp.Service
 	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
@@ -69,6 +71,7 @@ func NewInternalService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	executeService execute.Service,
+	outcomeReportService interpretationApp.OutcomeReportService,
 	runQueryService runqueryApp.Service,
 	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
@@ -89,6 +92,7 @@ func NewInternalService(
 		submissionService:                  submissionService,
 		managementService:                  managementService,
 		executeService:                     executeService,
+		outcomeReportService:               outcomeReportService,
 		runQueryService:                    runQueryService,
 		assessmentBindingResolver:          assessmentBindingResolver,
 		assessmentAttentionService:         assessmentAttentionService,

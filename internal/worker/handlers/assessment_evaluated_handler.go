@@ -30,12 +30,14 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("internal client is not available: cannot generate report for assessment %d", data.AssessmentID)
 		}
 
-		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
-		if err != nil {
+		if _, err := safeconv.Int64ToUint64(data.AssessmentID); err != nil {
 			return fmt.Errorf("invalid assessment id in evaluated event: %w", err)
 		}
+		if data.OutcomeID == "" {
+			return fmt.Errorf("outcome id is required in evaluated event for assessment %d", data.AssessmentID)
+		}
 
-		resp, err := deps.InternalClient.GenerateReportFromAssessment(ctx, assessmentID, data.OutcomeID)
+		resp, err := deps.InternalClient.GenerateReportFromOutcome(ctx, data.OutcomeID)
 		if err != nil {
 			deps.Logger.Error("failed to generate report from assessment",
 				slog.Int64("assessment_id", data.AssessmentID),

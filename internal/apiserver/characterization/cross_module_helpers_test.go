@@ -112,10 +112,11 @@ func buildCharCrossModuleHarnessCore(
 	)
 
 	bridge := &charBridgeInternalClient{
-		execute:      executeSvc,
-		repo:         repo,
-		submitSvc:    h.submitSvc,
-		scaleBinding: h.scaleBinding,
+		execute:        executeSvc,
+		generateReport: executeSvc.GenerateReport,
+		repo:           repo,
+		submitSvc:      h.submitSvc,
+		scaleBinding:   h.scaleBinding,
 	}
 	deps := &workerhandlers.Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -241,10 +242,11 @@ func buildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []byte
 }
 
 type charBridgeInternalClient struct {
-	execute      evaluationexecute.Service
-	repo         *charAssessmentRepo
-	submitSvc    assessmentapp.AssessmentSubmissionService
-	scaleBinding charScaleBinding
+	execute        evaluationexecute.Service
+	generateReport func(context.Context, uint64) error
+	repo           *charAssessmentRepo
+	submitSvc      assessmentapp.AssessmentSubmissionService
+	scaleBinding   charScaleBinding
 }
 
 var _ workerhandlers.InternalClient = (*charBridgeInternalClient)(nil)
@@ -260,8 +262,15 @@ func (b *charBridgeInternalClient) EvaluateAssessment(ctx context.Context, asses
 	return b.evaluateResponse(ctx, assessmentID), nil
 }
 
-func (b *charBridgeInternalClient) GenerateReportFromAssessment(ctx context.Context, assessmentID uint64, _ string) (*pb.GenerateReportFromAssessmentResponse, error) {
-	if err := b.execute.GenerateReport(ctx, assessmentID); err != nil {
+func (b *charBridgeInternalClient) GenerateReportFromOutcome(ctx context.Context, _ string) (*pb.GenerateReportFromAssessmentResponse, error) {
+	assessmentID := uint64(0)
+	if b.repo != nil && b.repo.assessment != nil {
+		assessmentID = b.repo.assessment.ID().Uint64()
+	}
+	if b.generateReport == nil {
+		return &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "interpretation use case unavailable"}, nil
+	}
+	if err := b.generateReport(ctx, assessmentID); err != nil {
 		return &pb.GenerateReportFromAssessmentResponse{
 			Success: false,
 			Status:  "failed",

@@ -18,8 +18,6 @@ func TestProductionEvaluationUsesCommitterAndEvaluationOwnedScoreProjection(t *t
 		"outcomecommit.NewCommitter(",
 		"outcomescoring.NewAssessmentScoreProjector(",
 		"execute.WithEvaluationCommitter(",
-		"interpretationapp.NewOutcomeReportService(",
-		"execute.WithOutcomeReportService(",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("evaluation production wiring must contain %q", required)
@@ -29,6 +27,10 @@ func TestProductionEvaluationUsesCommitterAndEvaluationOwnedScoreProjection(t *t
 		"MaterializeScoreProjectors(",
 		"NewScoreProjectorRegistry(",
 		"execute.WithScoringWriter(",
+		"interpretationapp.NewOutcomeReportService(",
+		"interpretationreporting.NewInterpretationWriter(",
+		"execute.WithOutcomeReportService(",
+		"execute.WithInterpretationService(",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("evaluation production wiring still uses interpretation-owned score path %q", forbidden)

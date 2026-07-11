@@ -204,9 +204,6 @@ func Wire(in WireInput) (WireResult, error) {
 		TypologyRegistry:                            in.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
 		ReportReader:                                in.ReportPorts.Reader,
-		ReportBuilderRegistry:                       in.ReportPorts.BuilderRegistry,
-		ReportDurableSaver:                          in.ReportPorts.DurableSaver,
-		ReportStateStore:                            in.ReportPorts.StateStore,
 		PublishedModelReader:                        publishedModelReader,
 	})
 	if err != nil {

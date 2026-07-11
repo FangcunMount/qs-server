@@ -3,7 +3,7 @@
 //
 // 设计说明：
 // execute 只承担通用编排：加载 Assessment、解析输入快照、按 EvaluatorKey 选择执行器、
-// 经 scoringWriter + interpretationService 分两阶段写入结果，并统一收口失败；
+// 将评分事实可靠提交为 EvaluationOutcome，并统一收口失败；
 // 具体模型解释由 scale / personality typology 等插件实现。
 package execute
 
@@ -24,13 +24,6 @@ import (
 type Service interface {
 	// Evaluate 执行评估
 	Evaluate(ctx context.Context, assessmentID uint64) error
-
-	// GenerateReport 基于已计分结果生成报告（异步解读阶段）
-	GenerateReport(ctx context.Context, assessmentID uint64) error
-
-	// GenerateReportFromOutcome consumes the canonical EvaluationOutcome and
-	// never executes an Evaluator or reloads Assessment input.
-	GenerateReportFromOutcome(ctx context.Context, outcomeID string) error
 
 	// EvaluateBatch 批量评估
 	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)

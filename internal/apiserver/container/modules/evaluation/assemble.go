@@ -21,8 +21,6 @@ import (
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -31,7 +29,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -80,6 +77,7 @@ type Module struct {
 
 	OutboxReadyIndex              *outboxready.Index
 	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
+	outcomeRepository             domainoutcome.Repository
 }
 
 // Deps defines explicit constructor dependencies for the evaluation module.
@@ -110,9 +108,6 @@ type Deps struct {
 	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
-	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
-	ReportDurableSaver                          interpretationreporting.ReportDurableSaver
-	ReportStateStore                            interpretationapp.ReportStateStore
 	PublishedModelReader                        rulesetport.PublishedModelReader
 	AsyncInterpretation                         bool
 	SingleProcessAsyncInterpretation            bool
@@ -134,6 +129,7 @@ func New(deps Deps) (*Module, error) {
 		AssessmentOutboxStatusReader:  infra.assessmentOutboxStatusReader,
 		OutboxReadyIndex:              infra.assessmentReadyIndex,
 		AssessmentOutboxPendingLister: infra.assessmentOutboxStore,
+		outcomeRepository:             infra.outcomeRepo,
 	}
 	if err := module.wireEvaluationEngine(normalized, infra); err != nil {
 		return nil, err
@@ -216,8 +212,6 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 }
 
 func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) error {
-	var suggestionGenerator report.SuggestionGenerator
-
 	if normalized.InputResolver != nil {
 		reportStatusReporter, err := reportstatus.NewReporter(normalized.OpsHandle, normalized.ReportStatusConfig)
 		if err != nil {
@@ -225,11 +219,9 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		}
 		m.ReportStatusReporter = reportStatusReporter
 
-		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
 		wiringDeps := WiringDeps{
-			ScaleReportBuilder: reportBuilder,
-			ScaleScorer:        ruleengine.NewScaleFactorScorer(),
-			TypologyRegistry:   normalized.TypologyRegistry,
+			ScaleScorer:      ruleengine.NewScaleFactorScorer(),
+			TypologyRegistry: normalized.TypologyRegistry,
 		}
 		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
 		if err != nil {
@@ -246,20 +238,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
-		}
-		if normalized.ReportBuilderRegistry == nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
-		}
-		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
-			infra.assessmentRepo,
-			nil,
-			normalized.ReportBuilderRegistry,
-			normalized.ReportDurableSaver,
-			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
-			reportStatusReporter,
-		)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation writer: %v", err)
 		}
 		var opsRedis redis.UniversalClient
 		if normalized.OpsHandle != nil {
@@ -286,13 +264,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.assessmentOutboxStore,
 			infra.postCommitReadyIndexer,
 		)
-		interpretationService := interpretationapp.NewService(interpretationWriter)
-		reportGenerator, err := interpretationreporting.NewGenerator(normalized.ReportBuilderRegistry)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generator: %v", err)
-		}
-		outcomeReportService := interpretationapp.NewOutcomeReportService(infra.outcomeRepo, normalized.ReportStateStore, reportGenerator, normalized.ReportDurableSaver)
-
 		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
 			normalized.InputResolver,
@@ -304,10 +275,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithEvaluationCommitter(evaluationCommitter),
-			execute.WithInterpretationService(interpretationService),
-			execute.WithOutcomeReportService(outcomeReportService),
-			execute.WithScoringSnapshotStore(scoringSnapshotStore),
-			execute.WithAsyncInterpretation(normalized.AsyncInterpretation),
 		)
 	}
 	return nil
@@ -430,15 +397,6 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		}
 		if deps.TypologyRegistry.Len() == 0 {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when input resolver is configured")
-		}
-		if deps.ReportBuilderRegistry == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
-		}
-		if deps.ReportDurableSaver == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report durable saver is required when input resolver is configured")
-		}
-		if deps.ReportStateStore == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report state store is required when input resolver is configured")
 		}
 	}
 	if deps.ReportReader == nil {

@@ -12,6 +12,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -38,6 +39,7 @@ type Deps struct {
 	Survey                 SurveyDeps
 	Actor                  ActorDeps
 	Evaluation             EvaluationDeps
+	Interpretation         InterpretationDeps
 	AssessmentModelCatalog AssessmentModelCatalogDeps
 	Plan                   PlanDeps
 	Statistics             StatisticsDeps
@@ -82,6 +84,10 @@ type EvaluationDeps struct {
 	EvaluationService    execute.Service
 	RunQueryService      runqueryApp.Service
 	ReportStatusReporter *reportstatus.Reporter
+}
+
+type InterpretationDeps struct {
+	OutcomeReportService interpretationApp.OutcomeReportService
 }
 
 type AssessmentModelCatalogDeps struct {
@@ -253,6 +259,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
+		r.deps.Interpretation.OutcomeReportService,
 		r.deps.Evaluation.RunQueryService,
 		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,

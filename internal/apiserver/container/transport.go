@@ -207,6 +207,9 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.EvaluationModule != nil {
 		deps.Evaluation = c.EvaluationModule.ExportGRPCDeps()
 	}
+	if c.ReportModule != nil {
+		deps.Interpretation = c.ReportModule.ExportGRPCDeps()
+	}
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportGRPCDeps()
 		deps.AssessmentModelCatalog = exports.AssessmentModelCatalog

@@ -16,9 +16,8 @@ type reportGeneratingInternalClient struct {
 	outcomeID          string
 }
 
-func (f *reportGeneratingInternalClient) GenerateReportFromAssessment(
+func (f *reportGeneratingInternalClient) GenerateReportFromOutcome(
 	_ context.Context,
-	_ uint64,
 	outcomeID string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++

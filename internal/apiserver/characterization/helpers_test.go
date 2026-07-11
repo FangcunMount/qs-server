@@ -18,8 +18,8 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// v1SplitPhaseConfig wires execute service the same way as production container assembly:
-// scoringWriter -> interpretationService, optionally async with snapshot store.
+// v1SplitPhaseConfig preserves the legacy characterization fixtures while keeping
+// Evaluation and Interpretation as two explicit test-side use-case calls.
 type v1SplitPhaseConfig struct {
 	Assessment    *assessment.Assessment
 	Input         *evaluationinput.InputSnapshot
@@ -32,7 +32,7 @@ type v1SplitPhaseConfig struct {
 
 // buildV1SplitPhaseExecuteService mirrors container/modules/evaluation/assemble.go split-phase wiring.
 // When repos are provided, the first repo is shared with the caller (cross-module harness).
-func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos ...*charAssessmentRepo) (evaluationexecute.Service, *charSplitPhaseReportSaver) {
+func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos ...*charAssessmentRepo) (*charSplitPhaseService, *charSplitPhaseReportSaver) {
 	t.Helper()
 
 	var repo *charAssessmentRepo
@@ -50,7 +50,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)
 	}
-	scoringWriter := outcomescoring.NewWriter(repo, scoreProjectors, cfg.SnapshotStore)
+	scoringWriter := &charCapturingScoringWriter{delegate: outcomescoring.NewWriter(repo, scoreProjectors, cfg.SnapshotStore)}
 
 	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(cfg.ReportBuilder)
 	if err != nil {
@@ -77,26 +77,64 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
 		evaluationexecute.WithFamilyEvaluators(familyEvaluators),
 		evaluationexecute.WithScoringWriter(scoringWriter),
-		evaluationexecute.WithInterpretationService(interpretationService),
-	}
-	if cfg.Async {
-		opts = append(opts,
-			evaluationexecute.WithAsyncInterpretation(true),
-			evaluationexecute.WithScoringSnapshotStore(cfg.SnapshotStore),
-		)
-		if cfg.StageEvaluated != nil {
-			opts = append(opts, evaluationexecute.WithTransactionalOutbox(
-				&charTxRunner{},
-				charEventStagerFunc(cfg.StageEvaluated),
-			))
-		}
+		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(ctx context.Context, events ...event.DomainEvent) error {
+			if cfg.StageEvaluated != nil {
+				return cfg.StageEvaluated(ctx, events...)
+			}
+			return nil
+		})),
 	}
 
-	return evaluationexecute.NewService(
+	core := evaluationexecute.NewService(
 		repo,
 		&charInputResolver{snapshot: cfg.Input},
 		opts...,
-	), reportSaver
+	)
+	return &charSplitPhaseService{
+		Service:        core,
+		interpretation: interpretationService,
+		capture:        scoringWriter,
+		snapshotStore:  cfg.SnapshotStore,
+		inlineLegacy:   !cfg.Async,
+	}, reportSaver
+}
+
+type charCapturingScoringWriter struct {
+	delegate outcomescoring.Writer
+	outcome  evaloutcome.Outcome
+}
+
+func (w *charCapturingScoringWriter) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
+	w.outcome = outcome
+	return w.delegate.Write(ctx, outcome)
+}
+
+type charSplitPhaseService struct {
+	evaluationexecute.Service
+	interpretation interpretationapp.Service
+	capture        *charCapturingScoringWriter
+	snapshotStore  outcomescoring.SnapshotStore
+	inlineLegacy   bool
+}
+
+func (s *charSplitPhaseService) Evaluate(ctx context.Context, assessmentID uint64) error {
+	if err := s.Service.Evaluate(ctx, assessmentID); err != nil {
+		return err
+	}
+	if s.inlineLegacy {
+		return s.GenerateReport(ctx, assessmentID)
+	}
+	return nil
+}
+
+func (s *charSplitPhaseService) GenerateReport(ctx context.Context, assessmentID uint64) error {
+	if err := s.interpretation.GenerateAndPersist(ctx, s.capture.outcome); err != nil {
+		return err
+	}
+	if s.snapshotStore != nil {
+		_ = s.snapshotStore.Delete(ctx, assessmentID)
+	}
+	return nil
 }
 
 type charAssessmentRepo struct {
@@ -164,19 +202,25 @@ func newV1RecordingExecuteService(
 	t *testing.T,
 	a *assessment.Assessment,
 	input *charInputResolver,
-) (evaluationexecute.Service, *charSplitPhaseCapture) {
+) (*charSplitPhaseService, *charSplitPhaseCapture) {
 	t.Helper()
 	capture := &charSplitPhaseCapture{}
-	svc := evaluationexecute.NewService(
+	recording := &charCapturingScoringWriter{delegate: charRecordingScoring{}}
+	core := evaluationexecute.NewService(
 		&charAssessmentRepo{assessment: a},
 		input,
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(wireV1RuntimeDescriptorRegistry(t)),
 		evaluationexecute.WithFamilyEvaluators(newV1FamilyEvaluators(t)),
-		evaluationexecute.WithScoringWriter(charRecordingScoring{}),
-		evaluationexecute.WithInterpretationService(&charRecordingInterpretation{cap: capture}),
+		evaluationexecute.WithScoringWriter(recording),
+		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
-	return svc, capture
+	return &charSplitPhaseService{
+		Service:        core,
+		interpretation: &charRecordingInterpretation{cap: capture},
+		capture:        recording,
+		inlineLegacy:   true,
+	}, capture
 }
 
 type charNoopScoreRepo struct{}

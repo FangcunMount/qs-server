@@ -98,9 +98,8 @@ func (f *fakeWorkerInternalClient) EvaluateAssessment(
 	return &pb.EvaluateAssessmentResponse{}, nil
 }
 
-func (f *fakeWorkerInternalClient) GenerateReportFromAssessment(
+func (f *fakeWorkerInternalClient) GenerateReportFromOutcome(
 	_ context.Context,
-	_ uint64,
 	_ string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++

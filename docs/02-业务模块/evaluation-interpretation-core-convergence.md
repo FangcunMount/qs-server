@@ -24,7 +24,7 @@
 | run 聚合 | **不新增独立 run 聚合**；`domain/evaluation/run` 承载 attempt/failure/retry 执行阶段语义，`assessment` 保留生命周期与结果 |
 | 机制轴 | `AlgorithmFamily` + `DecisionKind` + `PayloadFormat` |
 
-## 模块生命周期边界决策（已锁定，待实现）
+## 模块生命周期边界决策（已锁定，实施中）
 
 > 2026-07-11 确认：Evaluation 负责形成可信的评估事实，Interpretation 负责把该事实转换为报告；报告生成的成败不能改写已经成立的评估事实。
 
@@ -38,7 +38,7 @@
 | 报告重试 | 读取持久化的 EvaluationOutcome，不重新执行 Calculation |
 | 兼容状态 | API 可暂时把 `Assessment=evaluated && Report=generated` 投影为 legacy `interpreted` |
 
-当前代码仍处于迁移前状态：`application/interpretation/reporting.Writer` 会调用 `Assessment.ApplyOutcome` 并保存 Assessment；`evaluation/execute.GenerateReport` 失败时也会把 Assessment 标记为 failed。后续实现必须先以表征测试保护现有契约，再按上述边界拆分。
+Batch 3 完成后，生产 Evaluation Service 已不再暴露 `GenerateReport` / `GenerateReportFromOutcome`，也不再装配 Interpretation Service。Worker 消费 `assessment.evaluated` 后使用 `outcome_id` 直接调用 Interpretation Outcome 用例。`reporting.Writer` 中剩余的 legacy Assessment 推进债务留待后续批次清理。
 
 ## 提交边界决策（已锁定，待实现）
 
@@ -49,7 +49,7 @@
 - AnswerSheet 与 Assessment 跨 Mongo/MySQL，不能伪装成单库原子事务；部分成功通过幂等、outbox 与补偿恢复。
 - 不返回尚未对应持久化 Assessment 的预分配 ID。
 
-## 评估事实与运行边界决策（已锁定，待实现）
+## 评估事实与运行边界决策（已锁定，实施中）
 
 | 决策项 | 选择 |
 |--------|------|
@@ -65,7 +65,16 @@
 
 “评分成功”不是正式 Run 定义，因为 typology、norming、task performance 不一定产出传统分数。统一术语使用“EvaluationOutcome 已可靠提交”。
 
-当前代码仍有两处目标差距：`asyncInterpretation=false` 会在 `Evaluate` 调用栈内继续生成报告；`outcome/scoring.Writer` 通过 Interpretation 的 ScoreProjectorRegistry 写入 score 投影。后续应拆开生产编排和 registry 所有权。
+Batch 1–3 已消除这两处生产主路差距：score projection 由 EvaluationCommitter 提交；Evaluate 只产生并可靠提交 EvaluationOutcome；Report 状态机与重试由 Interpretation Outcome 用例负责。
+
+## 重构批次进度
+
+| 批次 | 状态 | 已落地的不变量 |
+|------|------|------------------|
+| Batch 0：目标不变量测试 | 已完成 | Assessment 的 Evaluation 终态是 `evaluated`；报告失败/重试不改写 Evaluation 事实；跨模块 import 债务只能收缩 |
+| Batch 1：EvaluationOutcome 可靠提交 | 已完成 | Outcome、Run、score projection、Assessment evaluated 与 `assessment.evaluated` 在 EvaluationCommitter 收口 |
+| Batch 2：Report 独立状态机 | 已完成 | Report 独立维护 `pending / generating / generated / failed`、failure reason、attempt 和 outcome ID；重试只读 EvaluationOutcome |
+| Batch 3：切换异步编排 | 已完成 | Worker 以 outcome ID 直调 Interpretation；Evaluation Service 无 GenerateReport；生产 inline report 分支删除；Preview 保留独立内存组合 |
 
 ## 三模块差异承载
 

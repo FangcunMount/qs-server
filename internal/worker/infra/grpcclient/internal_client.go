@@ -58,18 +58,16 @@ func (c *InternalClient) EvaluateAssessment(
 	return resp, nil
 }
 
-// GenerateReportFromAssessment 生成测评报告
-func (c *InternalClient) GenerateReportFromAssessment(
+// GenerateReportFromOutcome 通过 Interpretation 用例消费持久化的评估结果并生成报告。
+func (c *InternalClient) GenerateReportFromOutcome(
 	ctx context.Context,
-	assessmentID uint64,
 	outcomeID string,
 ) (*pb.GenerateReportFromAssessmentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GenerateReportFromAssessment(ctx, &pb.GenerateReportFromAssessmentRequest{
-		AssessmentId: assessmentID,
-		OutcomeId:    outcomeID,
+		OutcomeId: outcomeID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report from assessment: %w", err)

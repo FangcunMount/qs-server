@@ -33,8 +33,6 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 			allowedImporters: []string{
 				"internal/apiserver/application/evaluation/assessment/converter_outcome.go",
 				"internal/apiserver/application/evaluation/assessment/report_mapper.go",
-				"internal/apiserver/application/evaluation/execute/service.go",
-				"internal/apiserver/application/evaluation/execute/split_phase_test_helpers.go",
 				"internal/apiserver/application/evaluation/outcome/scoring/writer.go",
 				"internal/apiserver/application/evaluation/registry/mechanisms/typology/algorithm_runner.go",
 				"internal/apiserver/application/evaluation/registry/mechanisms/typology/materialize.go",
@@ -47,8 +45,6 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 				"internal/apiserver/application/evaluation/registry/typology.go",
 				"internal/apiserver/application/evaluation/runtime/materialization_specs.go",
 				"internal/apiserver/application/evaluation/runtime/materialize.go",
-				"internal/apiserver/container/modules/evaluation/assemble.go",
-				"internal/apiserver/container/modules/evaluation/bootstrap.go",
 				"internal/apiserver/container/modules/evaluation/descriptors.go",
 			},
 		},

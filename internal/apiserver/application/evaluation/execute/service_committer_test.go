@@ -48,7 +48,6 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 		WithEvaluatorRegistry(registry),
 		WithRunRepository(runRepo),
 		WithEvaluationCommitter(committer),
-		WithAsyncInterpretation(true),
 	)
 
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -87,7 +86,6 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
 		WithEvaluationCommitter(committer),
-		WithAsyncInterpretation(true),
 	)
 
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {

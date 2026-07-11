@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestComposeReportPortsUseInterpretationReporting(t *testing.T) {
+func TestComposeReportPortsExposeOnlyReadModelToEvaluation(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -18,29 +18,31 @@ func TestComposeReportPortsUseInterpretationReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "interpretation/reporting") {
-		t.Fatal("compose report ports must import interpretation/reporting")
+	if !strings.Contains(text, "evaluationreadmodel.ReportReader") {
+		t.Fatal("compose report ports must expose the report reader")
 	}
-	if strings.Contains(text, "evaluation/result") {
-		t.Fatal("compose report ports must not import evaluation/result")
+	for _, forbidden := range []string{"ReportBuilderRegistry", "ReportDurableSaver", "ReportStateStore"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("compose report ports must not leak Interpretation write capability %q", forbidden)
+		}
 	}
 }
 
-func TestEvaluationContainerWiresInterpretationReportingWriters(t *testing.T) {
+func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "interpretation", "assemble.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "interpretationreporting.NewInterpretationWriter") {
-		t.Fatal("evaluation assemble must wire interpretation/reporting writer")
+	if !strings.Contains(text, "interpretationreporting.NewGenerator") || !strings.Contains(text, "interpretationapp.NewOutcomeReportService") {
+		t.Fatal("interpretation assemble must own outcome report generation use case")
 	}
-	if strings.Contains(text, "evaluationResult.NewWriter") {
-		t.Fatal("evaluation assemble must not wire writer from evaluation/result")
+	if strings.Contains(text, "execute.WithOutcomeReportService") {
+		t.Fatal("interpretation assemble must not inject report generation back into evaluation")
 	}
 }
 

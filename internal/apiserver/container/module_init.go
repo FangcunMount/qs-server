@@ -51,6 +51,12 @@ func (c *Container) initEvaluationModule() error {
 	if err := evalmod.InstallFrom(c); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
+	if c.ReportModule == nil || c.EvaluationModule == nil {
+		return fmt.Errorf("evaluation and interpretation modules must be installed before binding outcome reporting")
+	}
+	if err := c.ReportModule.BindOutcomeRepository(c.EvaluationModule.OutcomeRepository()); err != nil {
+		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
+	}
 	return nil
 }
 

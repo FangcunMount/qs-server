@@ -7,7 +7,6 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
-
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -46,24 +45,12 @@ func (w *phaseRecordingScoringWriter) Write(_ context.Context, outcome evaloutco
 	return outcome.Assessment.ApplyScoringOutcome(outcome.Execution)
 }
 
-type phaseRecordingInterpretationService struct {
-	rec   *phaseRecorder
-	calls int
-}
-
-func (s *phaseRecordingInterpretationService) GenerateAndPersist(context.Context, evaloutcome.Outcome) error {
-	s.calls++
-	s.rec.record("interpretation")
-	return nil
-}
-
-func TestEvaluateSyncSplitPhaseInvokesScoringBeforeInterpretation(t *testing.T) {
+func TestEvaluateLegacyWriterCommitsScoringWithoutInlineInterpretation(t *testing.T) {
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
 	rec := &phaseRecorder{}
 	scoring := &phaseRecordingScoringWriter{rec: rec}
-	interp := &phaseRecordingInterpretationService{rec: rec}
 
 	evaluator := &countingEvaluator{
 		key: evaluation.ExecutionIdentityScaleDefault,
@@ -83,13 +70,16 @@ func TestEvaluateSyncSplitPhaseInvokesScoringBeforeInterpretation(t *testing.T) 
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
 		WithScoringWriter(scoring),
-		WithInterpretationService(interp),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	)
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if got := rec.snapshot(); len(got) != 2 || got[0] != "scoring" || got[1] != "interpretation" {
-		t.Fatalf("phase order = %#v, want [scoring interpretation]", got)
+	if got := rec.snapshot(); len(got) != 1 || got[0] != "scoring" {
+		t.Fatalf("phases = %#v, want [scoring]", got)
+	}
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %s, want evaluated", a.Status())
 	}
 }
 
@@ -114,15 +104,13 @@ func TestEvaluateRequiresSplitPhaseWriters(t *testing.T) {
 	}
 }
 
-func TestEvaluateAsyncSplitPhaseStagesEvaluatedWithoutInterpretation(t *testing.T) {
+func TestEvaluateLegacyWriterStagesEvaluatedEvent(t *testing.T) {
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
 	rec := &phaseRecorder{}
 	scoring := &phaseRecordingScoringWriter{rec: rec}
-	interp := &phaseRecordingInterpretationService{rec: rec}
 	stager := &engineRecordingEventStager{}
-	snapshotStore := outcomescoring.NewMemorySnapshotStore()
 
 	evaluator := &countingEvaluator{
 		key: evaluation.ExecutionIdentityScaleDefault,
@@ -142,9 +130,6 @@ func TestEvaluateAsyncSplitPhaseStagesEvaluatedWithoutInterpretation(t *testing.
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
 		WithScoringWriter(scoring),
-		WithInterpretationService(interp),
-		WithAsyncInterpretation(true),
-		WithScoringSnapshotStore(snapshotStore),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, stager),
 	)
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -152,9 +137,6 @@ func TestEvaluateAsyncSplitPhaseStagesEvaluatedWithoutInterpretation(t *testing.
 	}
 	if got := rec.snapshot(); len(got) != 1 || got[0] != "scoring" {
 		t.Fatalf("phase order = %#v, want [scoring]", got)
-	}
-	if interp.calls != 0 {
-		t.Fatalf("interpretation calls = %d, want 0 during async Evaluate", interp.calls)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("assessment status = %s, want evaluated", a.Status())
