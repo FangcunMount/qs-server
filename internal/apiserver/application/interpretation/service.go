@@ -12,7 +12,7 @@ import (
 
 // OutcomeReportService is the Interpretation application boundary consumed by
 // worker/gRPC. It accepts an immutable EvaluationOutcome reference and returns
-// Generation/Artifact state; it never exposes legacy InterpretReport writes.
+// Generation/InterpretReport state; it never exposes legacy InterpretReport writes.
 type OutcomeReportService interface {
 	GenerateByOutcomeID(ctx context.Context, outcomeID domainoutcome.ID) (*interpretationgeneration.ExecuteResult, error)
 	GenerateByAssessmentID(ctx context.Context, assessmentID meta.ID) (*interpretationgeneration.ExecuteResult, error)

@@ -174,46 +174,6 @@ func (s *ScalesIndexes) EnsureIndexes(ctx context.Context) error {
 	return nil
 }
 
-// InterpretReportsIndexes 解读报告集合索引定义
-type InterpretReportsIndexes struct {
-	collection *mongo.Collection
-}
-
-// NewInterpretReportsIndexes 创建解读报告索引管理器
-func NewInterpretReportsIndexes(collection *mongo.Collection) *InterpretReportsIndexes {
-	return &InterpretReportsIndexes{collection: collection}
-}
-
-// EnsureIndexes 确保所有推荐索引已创建
-func (i *InterpretReportsIndexes) EnsureIndexes(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	indexModels := []mongo.IndexModel{
-		{
-			Keys: bson.D{
-				{Key: "testee_id", Value: 1},
-				{Key: "deleted_at", Value: 1},
-				{Key: "created_at", Value: -1},
-			},
-			Options: options.Index().SetName("idx_testee_deleted_created"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "domain_id", Value: 1},
-				{Key: "deleted_at", Value: 1},
-			},
-			Options: options.Index().SetName("idx_domain_deleted"),
-		},
-	}
-
-	if _, err := i.collection.Indexes().CreateMany(ctx, indexModels); err != nil {
-		return fmt.Errorf("create interpret_reports indexes: %w", err)
-	}
-
-	return nil
-}
-
 // IndexManager 集中管理所有集合的索引创建
 type IndexManager struct {
 	db *mongo.Database
@@ -238,11 +198,6 @@ func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
 
 	// 量表集合
 	if err := NewScalesIndexes(m.db.Collection("scales")).EnsureIndexes(ctx); err != nil {
-		return err
-	}
-
-	// 解读报告集合
-	if err := NewInterpretReportsIndexes(m.db.Collection("interpret_reports")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
 

@@ -12,21 +12,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// reportReadModel reads current artifacts and immutable historical archives.
+// reportReadModel reads current reports and immutable historical archives.
 type reportReadModel struct {
-	artifacts base.BaseRepository
-	archives  base.BaseRepository
+	reports  base.BaseRepository
+	archives base.BaseRepository
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
 	return &reportReadModel{
-		artifacts: base.NewBaseRepository(db, (InterpretReportArtifactPO{}).CollectionName(), opts...),
-		archives:  base.NewBaseRepository(db, "archived_reports", opts...),
+		reports:  base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...),
+		archives: base.NewBaseRepository(db, "archived_reports", opts...),
 	}
 }
 
 func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*evaluationreadmodel.ReportRow, error) {
-	row, err := r.findArtifact(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil)
+	row, err := r.findReport(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 }
 
 func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
-	row, err := r.findArtifact(ctx, bson.M{"assessment_id": assessmentID, "deleted_at": nil}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
+	row, err := r.findReport(ctx, bson.M{"assessment_id": assessmentID, "deleted_at": nil}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 }
 
 func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationreadmodel.ReportFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.ReportRow, int64, error) {
-	artifacts, err := r.listArtifacts(ctx, filter)
+	reports, err := r.listReportsFromStore(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -62,7 +62,7 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationread
 	if err != nil {
 		return nil, 0, err
 	}
-	merged := mergeNewFirstReportRows(artifacts, archives)
+	merged := mergeCurrentAndArchivedReportRows(reports, archives)
 	total := int64(len(merged))
 	offset, limit := page.Offset(), page.Limit()
 	if offset >= len(merged) {
@@ -88,11 +88,11 @@ func (r *reportReadModel) findArchive(ctx context.Context, filter bson.M, opts *
 	if !cursor.Next(ctx) {
 		return nil, cursor.Err()
 	}
-	var po InterpretReportPO
+	var po ArchivedReportPO
 	if err := cursor.Decode(&po); err != nil {
 		return nil, err
 	}
-	row := reportPOToReadRow(&po)
+	row := archivedReportPOToReadRow(&po)
 	return &row, nil
 }
 
@@ -104,21 +104,21 @@ func (r *reportReadModel) listArchives(ctx context.Context, filter evaluationrea
 	defer func() { _ = cursor.Close(ctx) }()
 	rows := make([]evaluationreadmodel.ReportRow, 0)
 	for cursor.Next(ctx) {
-		var po InterpretReportPO
+		var po ArchivedReportPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		rows = append(rows, reportPOToReadRow(&po))
+		rows = append(rows, archivedReportPOToReadRow(&po))
 	}
 	return rows, cursor.Err()
 }
 
-func (r *reportReadModel) findArtifact(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
+func (r *reportReadModel) findReport(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
 	if opts == nil {
 		opts = options.Find()
 	}
 	opts.SetLimit(1)
-	cursor, err := r.artifacts.Find(ctx, filter, opts)
+	cursor, err := r.reports.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -126,32 +126,32 @@ func (r *reportReadModel) findArtifact(ctx context.Context, filter bson.M, opts 
 	if !cursor.Next(ctx) {
 		return nil, cursor.Err()
 	}
-	var po InterpretReportArtifactPO
+	var po InterpretReportPO
 	if err := cursor.Decode(&po); err != nil {
 		return nil, err
 	}
-	row := artifactPOToReadRow(&po)
+	row := interpretReportPOToReadRow(&po)
 	return &row, nil
 }
 
-func (r *reportReadModel) listArtifacts(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
-	cursor, err := r.artifacts.Find(ctx, buildArtifactReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
+func (r *reportReadModel) listReportsFromStore(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
+	cursor, err := r.reports.Find(ctx, buildInterpretReportReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 	rows := make([]evaluationreadmodel.ReportRow, 0)
 	for cursor.Next(ctx) {
-		var po InterpretReportArtifactPO
+		var po InterpretReportPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		rows = append(rows, artifactPOToReadRow(&po))
+		rows = append(rows, interpretReportPOToReadRow(&po))
 	}
 	return rows, cursor.Err()
 }
 
-func buildArtifactReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
+func buildInterpretReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 	query := bson.M{"deleted_at": nil}
 	if filter.TesteeID != nil {
 		query["testee_id"] = *filter.TesteeID
@@ -171,11 +171,11 @@ func buildArtifactReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M
 	return query
 }
 
-func artifactPOToReadRow(po *InterpretReportArtifactPO) evaluationreadmodel.ReportRow {
+func interpretReportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
 	if po == nil {
 		return evaluationreadmodel.ReportRow{}
 	}
-	legacyShape := &InterpretReportPO{
+	archivedShape := &ArchivedReportPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt},
 		ScaleName:    po.ScaleName,
 		ScaleCode:    po.ScaleCode,
@@ -189,20 +189,20 @@ func artifactPOToReadRow(po *InterpretReportArtifactPO) evaluationreadmodel.Repo
 		Suggestions:  po.Suggestions,
 		ModelExtra:   po.ModelExtra,
 	}
-	return reportPOToReadRow(legacyShape)
+	return archivedReportPOToReadRow(archivedShape)
 }
 
-// mergeNewFirstReportRows maintains legacy ReportReader semantics while v2
-// can hold several report variants per Assessment: the newest artifact wins,
-// then the legacy row is used only when no v2 artifact exists.
-func mergeNewFirstReportRows(artifacts, legacy []evaluationreadmodel.ReportRow) []evaluationreadmodel.ReportRow {
-	byAssessment := make(map[uint64]evaluationreadmodel.ReportRow, len(artifacts)+len(legacy))
-	for _, row := range artifacts {
+// mergeCurrentAndArchivedReportRows preserves ReportReader's assessment-level
+// query semantics: the newest current report wins, and an archived report is
+// used only when no current report exists for that Assessment.
+func mergeCurrentAndArchivedReportRows(reports, archives []evaluationreadmodel.ReportRow) []evaluationreadmodel.ReportRow {
+	byAssessment := make(map[uint64]evaluationreadmodel.ReportRow, len(reports)+len(archives))
+	for _, row := range reports {
 		if current, ok := byAssessment[row.AssessmentID]; !ok || row.CreatedAt.After(current.CreatedAt) {
 			byAssessment[row.AssessmentID] = row
 		}
 	}
-	for _, row := range legacy {
+	for _, row := range archives {
 		if _, exists := byAssessment[row.AssessmentID]; !exists {
 			byAssessment[row.AssessmentID] = row
 		}

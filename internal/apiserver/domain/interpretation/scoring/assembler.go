@@ -15,10 +15,16 @@ type FactorScoringReportInput struct {
 	FactorScores []FactorReportScore
 }
 
-// BuildFactorScoringReport assembles factor-scoring mechanism reports.
-// When factor conclusion/suggestion is empty, interpretation rules generate them;
-// overall conclusion/suggestion falls back to the total-score factor when unset.
-func BuildFactorScoringReport(composer report.ReportBuilder, input FactorScoringReportInput) (*report.InterpretReport, error) {
+// BuildFactorScoringDraft assembles the same factor-scoring content without
+// creating the legacy report representation.
+func BuildFactorScoringDraft(composer report.DraftBuilder, input FactorScoringReportInput) (*report.Draft, error) {
+	if composer == nil {
+		return nil, report.ErrInvalidArgument
+	}
+	return composer.BuildDraft(generateReportInput(resolveFactorScoringInput(input)))
+}
+
+func resolveFactorScoringInput(input FactorScoringReportInput) ReportInput {
 	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
 	for _, fs := range input.FactorScores {
 		if fs.Conclusion == "" && fs.Suggestion == "" {
@@ -37,7 +43,7 @@ func BuildFactorScoringReport(composer report.ReportBuilder, input FactorScoring
 		}
 	}
 
-	return BuildReport(composer, ReportInput{
+	return ReportInput{
 		AssessmentID: input.AssessmentID,
 		Model:        input.Scale,
 		TotalScore:   input.TotalScore,
@@ -45,14 +51,7 @@ func BuildFactorScoringReport(composer report.ReportBuilder, input FactorScoring
 		Conclusion:   conclusion,
 		Suggestion:   suggestion,
 		FactorScores: factorScores,
-	})
-}
-
-func BuildReport(composer report.ReportBuilder, input ReportInput) (*report.InterpretReport, error) {
-	if composer == nil {
-		return nil, report.ErrInvalidArgument
 	}
-	return composer.Build(generateReportInput(input))
 }
 
 func generateReportInput(input ReportInput) report.GenerateReportInput {

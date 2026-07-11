@@ -10,25 +10,25 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
-type factory func(domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error)
+type factory func(domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error)
 
 var factories = map[modelcatalog.ExecutionPath]factory{
-	modelcatalog.ExecutionPathScaleDescriptor: func(composer domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error) {
+	modelcatalog.ExecutionPathScaleDescriptor: func(composer domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error) {
 		return interpretationreporting.NewFactorScoringReportBuilder(composer), nil
 	},
-	modelcatalog.ExecutionPathTypologyDescriptor: func(_ domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error) {
+	modelcatalog.ExecutionPathTypologyDescriptor: func(_ domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error) {
 		return typologyreporting.NewConfiguredReportBuilder()
 	},
-	modelcatalog.ExecutionPathBehavioralRatingDescriptor: func(composer domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error) {
+	modelcatalog.ExecutionPathBehavioralRatingDescriptor: func(composer domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error) {
 		return interpretationreporting.NewNormProfileReportBuilder(composer), nil
 	},
-	modelcatalog.ExecutionPathCognitiveDescriptor: func(composer domainreport.ReportBuilder) (interpretationreporting.ReportBuilder, error) {
+	modelcatalog.ExecutionPathCognitiveDescriptor: func(composer domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error) {
 		return interpretationreporting.NewTaskPerformanceReportBuilder(composer), nil
 	},
 }
 
 // ReportBuilders builds Interpretation-owned report builders from model descriptors.
-func ReportBuilders(descs []evaldomain.ModelDescriptor, composer domainreport.ReportBuilder) ([]interpretationreporting.ReportBuilder, error) {
+func ReportBuilders(descs []evaldomain.ModelDescriptor, composer domainreport.DraftBuilder) ([]interpretationreporting.ReportBuilder, error) {
 	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
 		path, err := evaldomain.ExecutionPathForDescriptor(desc)

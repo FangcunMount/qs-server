@@ -21,7 +21,7 @@ func TestV1CrossModuleSyncCognitiveSurveySubmitWorkerToInterpretedReport(t *test
 			Assessment: a,
 			Input:      cognitiveInputSnapshot(),
 			ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
-				domainreport.NewDefaultInterpretReportBuilder(nil),
+				domainreport.NewDefaultReportBuilder(nil),
 			),
 		},
 	})

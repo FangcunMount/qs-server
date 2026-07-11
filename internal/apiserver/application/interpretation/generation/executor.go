@@ -21,10 +21,10 @@ const (
 )
 
 type ExecuteResult struct {
-	Status     ExecuteStatus
-	Generation *domaingeneration.ReportGeneration
-	Run        *interpretationrun.InterpretationRun
-	Artifact   *domainreport.Artifact
+	Status          ExecuteStatus
+	Generation      *domaingeneration.ReportGeneration
+	Run             *interpretationrun.InterpretationRun
+	InterpretReport *domainreport.InterpretReport
 }
 
 // Executor is the production Interpretation write use case. It consumes a
@@ -65,7 +65,7 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 	}
 	switch start.Status {
 	case StartStatusGenerated:
-		return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: start.Generation, Artifact: start.Artifact}, nil
+		return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: start.Generation, InterpretReport: start.InterpretReport}, nil
 	case StartStatusProcessing:
 		return &ExecuteResult{Status: ExecuteStatusProcessing, Generation: start.Generation, Run: start.Run}, nil
 	case StartStatusStarted:
@@ -93,7 +93,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 
 	at := e.now()
-	artifact, err := domainreport.NewArtifact(domainreport.ArtifactInput{
+	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: e.newID(), GenerationID: generationRecord.ID(), OutcomeID: input.OutcomeID, InterpretationRunID: runRecord.ID(),
 		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,
 		Content: draft.Content(), GeneratedAt: at,
@@ -102,13 +102,13 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "invalid_artifact", SafeMessage: "报告生成失败", Retryable: false})
 	}
 	committed, err := e.committer.CommitSuccess(ctx, CommitSuccessRequest{
-		Generation: generationRecord, Run: runRecord, Artifact: artifact, BuilderIdentity: builder.BuilderIdentity(),
+		Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: builder.BuilderIdentity(),
 		ContentSchemaVersion: builder.ContentSchemaVersion(), CompletedAt: at,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, Artifact: committed.Artifact}, nil
+	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, InterpretReport: committed.InterpretReport}, nil
 }
 
 func (e *executor) fail(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, input interpinput.InterpretationInput, failure interpretationrun.Failure) error {

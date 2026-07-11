@@ -299,8 +299,8 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		)
 		return generateReportFailureResponse(err), nil
 	}
-	if s.reportStatusReporter != nil && result != nil && result.Artifact != nil {
-		id := reportstatus.AssessmentKey(result.Artifact.Association().AssessmentID.Uint64())
+	if s.reportStatusReporter != nil && result != nil && result.InterpretReport != nil {
+		id := reportstatus.AssessmentKey(result.InterpretReport.Association().AssessmentID.Uint64())
 		s.reportStatusReporter.SetCompleted(ctx, id, "", id)
 	}
 	status, message := "generated", "报告生成完成"
@@ -320,10 +320,10 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		if result.Run != nil {
 			resp.RunId = result.Run.ID().String()
 		}
-		if result.Artifact != nil {
-			resp.ReportId = result.Artifact.ID().String()
+		if result.InterpretReport != nil {
+			resp.ReportId = result.InterpretReport.ID().String()
 			if resp.RunId == "" {
-				resp.RunId = result.Artifact.InterpretationRunID().String()
+				resp.RunId = result.InterpretReport.InterpretationRunID().String()
 			}
 		}
 	}

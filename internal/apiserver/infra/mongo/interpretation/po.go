@@ -1,20 +1,14 @@
 package interpretation
 
 import (
-	"time"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-
-	"github.com/FangcunMount/component-base/pkg/util/idutil"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"time"
 )
 
-// ==================== InterpretReport 持久化对象 ====================
+// ==================== ArchivedReport persistence shape ====================
 
-// InterpretReportPO 解读报告MongoDB持久化对象
-type InterpretReportPO struct {
+// ArchivedReportPO is the immutable historical v0 report projection.
+type ArchivedReportPO struct {
 	base.BaseDocument `bson:",inline"`
 
 	OutcomeID     uint64     `bson:"outcome_id,omitempty" json:"outcome_id,omitempty"`
@@ -122,42 +116,6 @@ type ModelRarityPO struct {
 	OneInX  int     `bson:"one_in_x,omitempty" json:"one_in_x,omitempty"`
 }
 
-// CollectionName 集合名称
-func (InterpretReportPO) CollectionName() string {
-	return "interpret_reports"
-}
-
-// BeforeInsert 插入前设置字段
-func (p *InterpretReportPO) BeforeInsert() {
-	if p.ID.IsZero() {
-		p.ID = primitive.NewObjectID()
-	}
-	if p.DomainID.IsZero() {
-		p.DomainID = report.NewID(idutil.GetIntID())
-	}
-	now := time.Now()
-	p.CreatedAt = now
-	p.UpdatedAt = now
-	p.DeletedAt = nil
-}
-
-// BeforeUpdate 更新前设置字段
-func (p *InterpretReportPO) BeforeUpdate() {
-	p.UpdatedAt = time.Now()
-}
-
-// ToBsonM 转换为 BSON.M
-func (p *InterpretReportPO) ToBsonM() (bson.M, error) {
-	data, err := bson.Marshal(p)
-	if err != nil {
-		return nil, err
-	}
-
-	var result bson.M
-	err = bson.Unmarshal(data, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+func (ArchivedReportPO) CollectionName() string {
+	return "archived_reports"
 }

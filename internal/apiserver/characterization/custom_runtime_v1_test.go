@@ -30,10 +30,6 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	if reportBuilder.Key() != evaluation.ExecutionIdentityPersonalityTypology {
-		t.Fatalf("report builder key = %s, want configured typology key", reportBuilder.Key())
-	}
-
 	assessment := submittedCustomRuntimeAssessment(t)
 	snapshot := customRuntimeInputSnapshot()
 	typologyPayload, ok := snapshot.ModelPayload.(evaluationinput.TypologyModelPayload)

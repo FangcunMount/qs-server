@@ -87,8 +87,8 @@ func TestInterpretationMechanismEntryPointsExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "BuildFactorScoringReport") {
-		t.Fatal("scoring/assembler.go must export BuildFactorScoringReport")
+	if !strings.Contains(string(data), "BuildFactorScoringDraft") {
+		t.Fatal("scoring/assembler.go must export BuildFactorScoringDraft")
 	}
 }
 
@@ -123,7 +123,6 @@ func TestInterpretationRootPackageOnlyFacadeFiles(t *testing.T) {
 		"events.go":         {},
 		"events_outcome.go": {},
 		"event_wire.go":     {},
-		"repository.go":     {},
 		"strategy.go":       {},
 	}
 	entries, err := os.ReadDir(interpRoot)

@@ -21,7 +21,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
-			domainreport.NewDefaultInterpretReportBuilder(nil),
+			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -76,7 +76,7 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
-			domainreport.NewDefaultInterpretReportBuilder(nil),
+			domainreport.NewDefaultReportBuilder(nil),
 		),
 		Async: true,
 		StageEvaluated: func(_ context.Context, events ...event.DomainEvent) error {

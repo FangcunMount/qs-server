@@ -61,7 +61,7 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	}
 
 	descs := DefaultEvaluationDescriptors()
-	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}
@@ -114,10 +114,12 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	for _, legacyKey := range legacyTypologyIdentities() {
-		if _, err := reportRegistry.Resolve(legacyKey, report.ReportTypeStandard); err != nil {
-			t.Fatalf("Resolve report(%s): %v", legacyKey, err)
-		}
+	if _, err := reportRegistry.ResolveByMechanism(interpretationreporting.MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+		ReportType:      report.ReportTypeStandard,
+	}); err != nil {
+		t.Fatalf("ResolveByMechanism typology report: %v", err)
 	}
 
 	providers, err := evaluationinputInfra.MaterializeInputProviders(descs, evaluationinputInfra.InputProviderDeps{

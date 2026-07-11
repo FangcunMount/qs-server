@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -33,11 +33,11 @@ type Handler interface {
 
 // PreviewResult 是策略拥有的定义报告预览表示
 type PreviewResult struct {
-	OutcomeCode    string                  // 结果代码
-	OutcomeTitle   string                  // 结果标题
-	ScoreDetail    map[string]float64      // 分数详情
-	ReportSections []PreviewSection        // 报告部分
-	RawReport      *report.InterpretReport // 原始报告
+	OutcomeCode    string             // 结果代码
+	OutcomeTitle   string             // 结果标题
+	ScoreDetail    map[string]float64 // 分数详情
+	ReportSections []PreviewSection   // 报告部分
+	RawReport      *report.Draft      // 原始报告草稿
 }
 
 // PreviewSection 是报告预览的策略部分

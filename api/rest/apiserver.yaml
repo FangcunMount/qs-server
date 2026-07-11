@@ -6214,7 +6214,7 @@ components:
           type: string
         normTableVersion:
           type: string
-    report.InterpretReport:
+    report.Draft:
       type: object
     request.AddQuestionRequest:
       type: object
@@ -6871,7 +6871,7 @@ components:
         outcome:
           $ref: '#/components/schemas/modelcatalog.PreviewOutcome'
         raw_report:
-          $ref: '#/components/schemas/report.InterpretReport'
+          $ref: '#/components/schemas/report.Draft'
         report_sections:
           type: array
           items:

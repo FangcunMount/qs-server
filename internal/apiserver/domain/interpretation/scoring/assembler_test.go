@@ -8,11 +8,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 )
 
-func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {
+func TestBuildFactorScoringDraftAssemblesScoreBasedContent(t *testing.T) {
 	totalMax := 27.0
-	got, err := scoring.BuildReport(builder.NewDefaultInterpretReportBuilder(nil), scoring.ReportInput{
+	got, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(nil), scoring.FactorScoringReportInput{
 		AssessmentID: report.ID(9001),
-		Model: &scoring.ReportModel{
+		Scale: &scoring.ReportModel{
 			Code:  "PHQ9",
 			Title: "抑郁筛查",
 			Factors: []scoring.FactorReportModel{
@@ -35,18 +35,19 @@ func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("BuildReport: %v", err)
+		t.Fatalf("BuildFactorScoringDraft: %v", err)
 	}
-	if got.ModelName() != "抑郁筛查" || got.ModelCode() != "PHQ9" {
-		t.Fatalf("model = %q/%q", got.ModelName(), got.ModelCode())
+	content := got.Content()
+	if content.Model.Title != "抑郁筛查" || content.Model.Code != "PHQ9" {
+		t.Fatalf("model = %#v", content.Model)
 	}
-	if got.TotalScore() != 8 || got.RiskLevel() != report.RiskLevelLow {
-		t.Fatalf("summary = score:%v risk:%s", got.TotalScore(), got.RiskLevel())
+	if content.PrimaryScore == nil || content.PrimaryScore.Value != 8 || content.Level == nil || content.Level.Code != string(report.RiskLevelLow) {
+		t.Fatalf("summary = score:%#v level:%#v", content.PrimaryScore, content.Level)
 	}
-	if got.Conclusion() != "总分提示轻度风险" {
-		t.Fatalf("Conclusion = %q", got.Conclusion())
+	if content.Conclusion != "总分提示轻度风险" {
+		t.Fatalf("Conclusion = %q", content.Conclusion)
 	}
-	dimensions := got.Dimensions()
+	dimensions := content.Dimensions
 	if len(dimensions) != 1 || dimensions[0].Name() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != totalMax {
 		t.Fatalf("unexpected dimensions: %#v", dimensions)
 	}

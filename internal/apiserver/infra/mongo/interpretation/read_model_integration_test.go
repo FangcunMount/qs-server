@@ -77,7 +77,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 		primitive.NewObjectID(),
 	}
 	docs := []interface{}{
-		InterpretReportPO{
+		ArchivedReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[0],
 				DomainID:  meta.FromUint64(baseID + 1),
@@ -91,7 +91,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "high",
 			Conclusion: "高风险",
 		},
-		InterpretReportPO{
+		ArchivedReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[1],
 				DomainID:  meta.FromUint64(baseID + 2),
@@ -105,7 +105,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "medium",
 			Conclusion: "中风险",
 		},
-		InterpretReportPO{
+		ArchivedReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[2],
 				DomainID:  meta.FromUint64(baseID + 3),
@@ -119,7 +119,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "severe",
 			Conclusion: "严重风险",
 		},
-		InterpretReportPO{
+		ArchivedReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[3],
 				DomainID:  meta.FromUint64(baseID + 4),
@@ -135,7 +135,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 		},
 	}
 
-	collection := db.Collection((&InterpretReportPO{}).CollectionName())
+	collection := db.Collection((&ArchivedReportPO{}).CollectionName())
 	if _, err := collection.InsertMany(ctx, docs); err != nil {
 		t.Fatalf("insert reports: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 	}
 }
 
-func TestReportReadModelPrefersArtifactsAndFallsBackToLegacyAgainstMongo(t *testing.T) {
+func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(t *testing.T) {
 	db := openEvaluationMongoContractDB(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -188,26 +188,26 @@ func TestReportReadModelPrefersArtifactsAndFallsBackToLegacyAgainstMongo(t *test
 	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
 	testeeID := baseID + 1000
 	now := time.Now().UTC().Truncate(time.Second)
-	legacyCollection := db.Collection((&InterpretReportPO{}).CollectionName())
-	artifactCollection := db.Collection((InterpretReportArtifactPO{}).CollectionName())
-	legacyIDs := []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()}
-	artifactID := primitive.NewObjectID()
+	archiveCollection := db.Collection((&ArchivedReportPO{}).CollectionName())
+	reportCollection := db.Collection((InterpretReportPO{}).CollectionName())
+	archiveIDs := []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()}
+	reportID := primitive.NewObjectID()
 
-	legacyDocs := []interface{}{
-		InterpretReportPO{
-			BaseDocument: base.BaseDocument{ID: legacyIDs[0], DomainID: meta.FromUint64(baseID + 1), CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute)},
-			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "legacy duplicate", TotalScore: 1,
+	archiveDocs := []interface{}{
+		ArchivedReportPO{
+			BaseDocument: base.BaseDocument{ID: archiveIDs[0], DomainID: meta.FromUint64(baseID + 1), CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute)},
+			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "archived duplicate", TotalScore: 1,
 		},
-		InterpretReportPO{
-			BaseDocument: base.BaseDocument{ID: legacyIDs[1], DomainID: meta.FromUint64(baseID + 2), CreatedAt: now.Add(-time.Minute), UpdatedAt: now.Add(-time.Minute)},
-			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "legacy only", TotalScore: 2,
+		ArchivedReportPO{
+			BaseDocument: base.BaseDocument{ID: archiveIDs[1], DomainID: meta.FromUint64(baseID + 2), CreatedAt: now.Add(-time.Minute), UpdatedAt: now.Add(-time.Minute)},
+			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "archived only", TotalScore: 2,
 		},
 	}
-	if _, err := legacyCollection.InsertMany(ctx, legacyDocs); err != nil {
-		t.Fatalf("insert legacy reports: %v", err)
+	if _, err := archiveCollection.InsertMany(ctx, archiveDocs); err != nil {
+		t.Fatalf("insert archived reports: %v", err)
 	}
-	artifact := InterpretReportArtifactPO{
-		BaseDocument:        base.BaseDocument{ID: artifactID, DomainID: meta.FromUint64(baseID + 101), CreatedAt: now, UpdatedAt: now},
+	reportPO := InterpretReportPO{
+		BaseDocument:        base.BaseDocument{ID: reportID, DomainID: meta.FromUint64(baseID + 101), CreatedAt: now, UpdatedAt: now},
 		GenerationID:        baseID + 201,
 		OutcomeID:           baseID + 301,
 		InterpretationRunID: baseID + 401,
@@ -217,30 +217,30 @@ func TestReportReadModelPrefersArtifactsAndFallsBackToLegacyAgainstMongo(t *test
 		AssessmentID:        baseID + 1,
 		TesteeID:            testeeID,
 		ScaleCode:           "SDS",
-		Conclusion:          "artifact wins",
+		Conclusion:          "current report wins",
 		TotalScore:          42,
 	}
-	if _, err := artifactCollection.InsertOne(ctx, artifact); err != nil {
-		t.Fatalf("insert artifact: %v", err)
+	if _, err := reportCollection.InsertOne(ctx, reportPO); err != nil {
+		t.Fatalf("insert current report: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
-		_, _ = legacyCollection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": legacyIDs}})
-		_, _ = artifactCollection.DeleteOne(cleanupCtx, bson.M{"_id": artifactID})
+		_, _ = archiveCollection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": archiveIDs}})
+		_, _ = reportCollection.DeleteOne(cleanupCtx, bson.M{"_id": reportID})
 	})
 
 	reader := NewReportReadModel(db)
 	newRow, err := reader.GetReportByAssessmentID(ctx, baseID+1)
-	if err != nil || newRow.Conclusion != "artifact wins" || newRow.TotalScore != 42 {
+	if err != nil || newRow.Conclusion != "current report wins" || newRow.TotalScore != 42 {
 		t.Fatalf("new-first report = %#v err=%v", newRow, err)
 	}
-	legacyRow, err := reader.GetReportByID(ctx, baseID+2)
-	if err != nil || legacyRow.Conclusion != "legacy only" {
-		t.Fatalf("legacy fallback report = %#v err=%v", legacyRow, err)
+	archivedRow, err := reader.GetReportByID(ctx, baseID+2)
+	if err != nil || archivedRow.Conclusion != "archived only" {
+		t.Fatalf("archive fallback report = %#v err=%v", archivedRow, err)
 	}
 	rows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
-	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "artifact wins" {
+	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "current report wins" {
 		t.Fatalf("new-first report list = %#v total=%d err=%v", rows, total, err)
 	}
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -282,23 +282,24 @@ func previewResultFromReport(result *modelpreview.Result) *PreviewResult {
 }
 
 // previewSectionsFromReport 从报告结果创建报告预览部分
-func previewSectionsFromReport(reportValue *domainreport.InterpretReport) []PreviewSection {
+func previewSectionsFromReport(reportValue *domainreport.Draft) []PreviewSection {
 	if reportValue == nil {
 		return nil
 	}
+	content := reportValue.Content()
 	sections := make([]PreviewSection, 0)
-	if value := reportValue.Conclusion(); value != "" {
+	if value := content.Conclusion; value != "" {
 		sections = append(sections, PreviewSection{Title: "结论", Content: value, Kind: "conclusion"})
 	}
-	if extra := reportValue.ModelExtra(); extra != nil && extra.Commentary != "" {
+	if extra := content.ModelExtra; extra != nil && extra.Commentary != "" {
 		sections = append(sections, PreviewSection{Title: "解读", Content: extra.Commentary, Kind: "commentary"})
 	}
-	for _, dimension := range reportValue.Dimensions() {
+	for _, dimension := range content.Dimensions {
 		if value := dimension.Description(); value != "" {
 			sections = append(sections, PreviewSection{Title: dimension.Name(), Content: value, Kind: "dimension"})
 		}
 	}
-	for _, suggestion := range reportValue.Suggestions() {
+	for _, suggestion := range content.Suggestions {
 		if suggestion.Content != "" {
 			sections = append(sections, PreviewSection{Title: string(suggestion.Category), Content: suggestion.Content, Kind: "suggestion"})
 		}

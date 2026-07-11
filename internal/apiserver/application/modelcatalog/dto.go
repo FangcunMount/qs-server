@@ -3,7 +3,7 @@ package modelcatalog
 import (
 	"encoding/json"
 
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -214,9 +214,9 @@ type PreviewReportSection struct {
 }
 
 type PreviewReportResult struct {
-	Outcome        PreviewOutcome          `json:"outcome"`
-	ScoreDetail    map[string]float64      `json:"score_detail,omitempty"`
-	ReportSections []PreviewReportSection  `json:"report_sections"`
-	Issues         []ValidationIssue       `json:"issues,omitempty"`
-	RawReport      *report.InterpretReport `json:"raw_report,omitempty"`
+	Outcome        PreviewOutcome         `json:"outcome"`
+	ScoreDetail    map[string]float64     `json:"score_detail,omitempty"`
+	ReportSections []PreviewReportSection `json:"report_sections"`
+	Issues         []ValidationIssue      `json:"issues,omitempty"`
+	RawReport      *report.Draft          `json:"raw_report,omitempty"`
 }

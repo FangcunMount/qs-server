@@ -28,10 +28,9 @@ type TraitProfileReportTemplate struct {
 	ConclusionTitle  string
 }
 
-// BuildPersonalityTypeReport 组装personality-type report 从 机制无关 detail。
-func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl PersonalityTypeReportTemplate) (*report.InterpretReport, error) {
+func BuildPersonalityTypeContent(input PersonalityTypeReportInput, tmpl PersonalityTypeReportTemplate) (report.Content, error) {
 	if input.AssessmentID.IsZero() {
-		return nil, fmt.Errorf("assessment is required")
+		return report.Content{}, fmt.Errorf("assessment is required")
 	}
 	if tmpl.Kind == "" {
 		tmpl.Kind = "personality_type"
@@ -57,17 +56,13 @@ func BuildPersonalityTypeReport(input PersonalityTypeReportInput, tmpl Personali
 		Rarity:           mechanismReportRarity(detail.Rarity),
 		Commentary:       firstNonEmptyMechanism(detail.Profile.Summary, detail.Commentary),
 	}
-	return report.NewInterpretReport(
-		input.AssessmentID,
-		profile.ReportModelName(),
-		profile.ReportModelCode(input.ModelCode),
-		input.TotalScore,
-		input.RiskLevel,
-		profile.Conclusion(mechanismConclusionSuffix(tmpl, detail)),
-		mechanismPersonalityDimensions(detail, tmpl),
-		mechanismPersonalitySuggestions(detail),
-		profile.ModelExtra(),
-	), nil
+	return report.Content{
+		Model:       report.ModelIdentity{Title: profile.ReportModelName(), Code: profile.ReportModelCode(input.ModelCode)},
+		Conclusion:  profile.Conclusion(mechanismConclusionSuffix(tmpl, detail)),
+		Dimensions:  mechanismPersonalityDimensions(detail, tmpl),
+		Suggestions: mechanismPersonalitySuggestions(detail),
+		ModelExtra:  profile.ModelExtra(),
+	}, nil
 }
 
 func mechanismConclusionSuffix(tmpl PersonalityTypeReportTemplate, detail PersonalityTypeReportDetail) string {
@@ -78,9 +73,9 @@ func mechanismConclusionSuffix(tmpl PersonalityTypeReportTemplate, detail Person
 }
 
 // BuildTraitProfileReport 组装trait-画像 report 从 机制无关 detail。
-func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileReportTemplate) (*report.InterpretReport, error) {
+func BuildTraitProfileContent(input TraitProfileReportInput, tmpl TraitProfileReportTemplate) (report.Content, error) {
 	if input.AssessmentID.IsZero() {
-		return nil, fmt.Errorf("assessment is required")
+		return report.Content{}, fmt.Errorf("assessment is required")
 	}
 	if tmpl.Kind == "" {
 		tmpl.Kind = "trait_profile"
@@ -113,17 +108,13 @@ func BuildTraitProfileReport(input TraitProfileReportInput, tmpl TraitProfileRep
 	if summary := mechanismTraitSummary(detail); summary != "" {
 		conclusion += " - " + summary
 	}
-	return report.NewInterpretReport(
-		input.AssessmentID,
-		profile.ReportModelName(),
-		profile.ReportModelCode(input.ModelCode),
-		input.TotalScore,
-		input.RiskLevel,
-		conclusion,
-		mechanismTraitDimensions(detail),
-		mechanismTraitSuggestions(detail),
-		profile.ModelExtra(),
-	), nil
+	return report.Content{
+		Model:       report.ModelIdentity{Title: profile.ReportModelName(), Code: profile.ReportModelCode(input.ModelCode)},
+		Conclusion:  conclusion,
+		Dimensions:  mechanismTraitDimensions(detail),
+		Suggestions: mechanismTraitSuggestions(detail),
+		ModelExtra:  profile.ModelExtra(),
+	}, nil
 }
 
 type PersonalityTypeReportInput struct {

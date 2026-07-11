@@ -7,7 +7,6 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: MBTI scorer resolves INTJ; report exposes type code, match percent,
@@ -65,12 +64,4 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 	assertSuggestionExists(t, suggestions, domainreport.SuggestionCategoryGeneral, "注意：表达克制")
 	assertSuggestionExists(t, suggestions, domainreport.SuggestionCategoryGeneral, "建议：保留沟通空间")
 
-	mapper := mongoevaluation.NewReportMapper()
-	roundTrip := mapper.ToDomain(mapper.ToPO(report, 8002))
-	if roundTrip.ModelExtra() == nil || roundTrip.ModelExtra().TypeCode != "INTJ" {
-		t.Fatalf("mongo round trip model extra = %#v", roundTrip.ModelExtra())
-	}
-	if len(roundTrip.Dimensions()) != 4 {
-		t.Fatalf("mongo round trip dimensions = %d, want 4", len(roundTrip.Dimensions()))
-	}
 }

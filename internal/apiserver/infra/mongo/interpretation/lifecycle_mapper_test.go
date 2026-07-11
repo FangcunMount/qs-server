@@ -45,7 +45,7 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 		t.Fatalf("run round trip = %#v err=%v", restoredRun, err)
 	}
 
-	artifact, err := domainreport.NewArtifact(domainreport.ArtifactInput{
+	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID:                  meta.FromUint64(3),
 		GenerationID:        generationRecord.ID(),
 		OutcomeID:           key.OutcomeID,
@@ -64,7 +64,7 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoredArtifact, err := mapper.ArtifactToDomain(mapper.ArtifactToPO(artifact))
+	restoredArtifact, err := mapper.ReportToDomain(mapper.ReportToPO(artifact))
 	if err != nil || restoredArtifact.Association().AssessmentID != meta.FromUint64(7) || restoredArtifact.Content().Model.Code != "SDS" || restoredArtifact.Content().PrimaryScore.Value != 42 {
 		t.Fatalf("artifact round trip = %#v err=%v", restoredArtifact, err)
 	}

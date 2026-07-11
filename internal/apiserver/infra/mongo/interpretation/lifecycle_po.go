@@ -6,8 +6,7 @@ import (
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 
-// ReportGenerationPO is kept in a distinct collection so legacy
-// interpret_reports documents remain readable throughout the migration.
+// ReportGenerationPO stores the report-generation aggregate.
 type ReportGenerationPO struct {
 	base.BaseDocument `bson:",inline"`
 
@@ -44,9 +43,8 @@ type InterpretationRunPO struct {
 
 func (InterpretationRunPO) CollectionName() string { return "interpretation_runs" }
 
-// InterpretReportArtifactPO is the new immutable artifact collection. The
-// old interpret_reports collection remains untouched until backfill and cutover.
-type InterpretReportArtifactPO struct {
+// InterpretReportPO stores immutable successful reports.
+type InterpretReportPO struct {
 	base.BaseDocument `bson:",inline"`
 
 	GenerationID        uint64    `bson:"generation_id"`
@@ -75,4 +73,4 @@ type InterpretReportArtifactPO struct {
 	ModelExtra   *ModelExtraPO          `bson:"model_extra,omitempty"`
 }
 
-func (InterpretReportArtifactPO) CollectionName() string { return "interpret_report_artifacts" }
+func (InterpretReportPO) CollectionName() string { return "interpret_report_artifacts" }

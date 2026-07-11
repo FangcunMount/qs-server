@@ -14,7 +14,7 @@ func TestReportBuildersOwnEveryDefaultDescriptorPath(t *testing.T) {
 	t.Parallel()
 
 	descs := registry.DefaultEvaluationDescriptors()
-	builders, err := materialize.ReportBuilders(descs, domainreport.NewDefaultInterpretReportBuilder(nil))
+	builders, err := materialize.ReportBuilders(descs, domainreport.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}

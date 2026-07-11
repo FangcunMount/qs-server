@@ -9,7 +9,6 @@ import (
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: scale executor produces total=7 risk=low; report preserves
@@ -38,7 +37,7 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
-	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
+	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 
 	if report.TotalScore() != 5 || report.RiskLevel() != domainreport.RiskLevelLow {
 		t.Fatalf("report summary = score:%v risk:%s", report.TotalScore(), report.RiskLevel())
@@ -74,12 +73,4 @@ suggestionsOK:
 		t.Fatalf("ModelExtra = %#v, want nil for scale", report.ModelExtra())
 	}
 
-	mapper := mongoevaluation.NewReportMapper()
-	roundTrip := mapper.ToDomain(mapper.ToPO(report, 8001))
-	if roundTrip.TotalScore() != 5 || roundTrip.RiskLevel() != domainreport.RiskLevelLow {
-		t.Fatalf("mongo round trip summary = score:%v risk:%s", roundTrip.TotalScore(), roundTrip.RiskLevel())
-	}
-	if len(roundTrip.Dimensions()) != 2 {
-		t.Fatalf("mongo round trip dimensions = %d, want 2", len(roundTrip.Dimensions()))
-	}
 }

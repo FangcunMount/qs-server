@@ -11,12 +11,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 type ReportBuilder struct {
 	registry ReportAdapterRegistry
-	key      evaluation.ExecutionIdentity
 }
 
 var (
@@ -26,9 +25,9 @@ var (
 )
 
 func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
+	_ = algorithm
 	return ReportBuilder{
 		registry: DefaultReportAdapterRegistry(),
-		key:      evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
@@ -38,7 +37,6 @@ func NewConfiguredReportBuilderWithRegistry(registry ReportAdapterRegistry) (Rep
 	}
 	return ReportBuilder{
 		registry: registry,
-		key:      evaluation.ExecutionIdentityPersonalityTypology,
 	}, nil
 }
 
@@ -50,9 +48,9 @@ func NewReportBuilderWithRegistry(registry ReportAdapterRegistry, algorithm mode
 	if registry.Len() == 0 {
 		return ReportBuilder{}, fmt.Errorf("typology report adapter registry is required")
 	}
+	_ = algorithm
 	return ReportBuilder{
 		registry: registry,
-		key:      evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
@@ -60,18 +58,10 @@ func NewLegacyTypologyAliasReportBuilder(configured ReportBuilder, algorithm mod
 	if configured.registry.Len() == 0 {
 		return ReportBuilder{}, fmt.Errorf("configured typology report builder is required")
 	}
+	_ = algorithm
 	return ReportBuilder{
 		registry: configured.registry,
-		key:      evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
-}
-
-func (b ReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return b.key
-}
-
-func (b ReportBuilder) Key() evaluation.ExecutionIdentity {
-	return b.ExecutionIdentity()
 }
 
 func (ReportBuilder) ReportType() domainReport.ReportType {
@@ -118,25 +108,37 @@ func (b ReportBuilder) Build(_ context.Context, input interpinput.Interpretation
 	modelCode := input.Model.Code
 	if input.PersonalityType != nil {
 		adapter := personalityAdapter(input)
-		rpt, err := reporttypology.BuildPersonalityTypeReport(reporttypology.PersonalityTypeReportInput{
+		if !b.registry.Supports(modeltypology.ReportAdapterKey(adapter)) {
+			return nil, fmt.Errorf("unsupported report adapter key: %s", adapter)
+		}
+		content, err := reporttypology.BuildPersonalityTypeContent(reporttypology.PersonalityTypeReportInput{
 			AssessmentID: report.ID(input.Association.AssessmentID), ModelCode: modelCode,
 			TotalScore: primaryValue(input), RiskLevel: riskLevel(input), Detail: input.PersonalityType.Detail,
 		}, reporttypology.PersonalityTypeTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID}))
 		if err != nil {
 			return nil, err
 		}
-		return interpretationreporting.DraftFromLegacyReport(input, rpt), nil
+		content.Model = input.Model
+		content.PrimaryScore = input.Result.Primary
+		content.Level = input.Result.Level
+		return report.NewDraft(content), nil
 	}
 	if input.TraitProfile != nil {
 		adapter := traitProfileAdapter(input)
-		rpt, err := reporttypology.BuildTraitProfileReport(reporttypology.TraitProfileReportInput{
+		if !b.registry.Supports(modeltypology.ReportAdapterKey(adapter)) {
+			return nil, fmt.Errorf("unsupported report adapter key: %s", adapter)
+		}
+		content, err := reporttypology.BuildTraitProfileContent(reporttypology.TraitProfileReportInput{
 			AssessmentID: report.ID(input.Association.AssessmentID), ModelCode: modelCode,
 			TotalScore: primaryValue(input), RiskLevel: riskLevel(input), Detail: input.TraitProfile.Detail,
 		}, reporttypology.TraitProfileTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID}))
 		if err != nil {
 			return nil, err
 		}
-		return interpretationreporting.DraftFromLegacyReport(input, rpt), nil
+		content.Model = input.Model
+		content.PrimaryScore = input.Result.Primary
+		content.Level = input.Result.Level
+		return report.NewDraft(content), nil
 	}
 	return nil, fmt.Errorf("typology interpretation facts are required")
 }

@@ -60,14 +60,14 @@ func TestExecutorDelegatesTerminalPersistenceToInterpretationCommitter(t *testin
 			t.Fatalf("executor must delegate terminal persistence through InterpretationCommitter: %s", required)
 		}
 	}
-	for _, forbidden := range []string{".artifacts.Insert(", ".generations.Save(", ".runs.Save(", ".stager.Stage("} {
+	for _, forbidden := range []string{".reports.Insert(", ".generations.Save(", ".runs.Save(", ".stager.Stage("} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("executor must not persist terminal facts directly: %s", forbidden)
 		}
 	}
 }
 
-func TestInterpretationModuleOwnsArtifactCommitterWiring(t *testing.T) {
+func TestInterpretationModuleOwnsReportCommitterWiring(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -77,9 +77,9 @@ func TestInterpretationModuleOwnsArtifactCommitterWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, required := range []string{"mongoEval.NewGenerationRepository", "mongoEval.NewRunRepository", "mongoEval.NewArtifactRepository"} {
+	for _, required := range []string{"mongoEval.NewGenerationRepository", "mongoEval.NewRunRepository", "mongoEval.NewReportRepository"} {
 		if !strings.Contains(text, required) {
-			t.Fatalf("interpretation assemble must wire artifact lifecycle persistence %q", required)
+			t.Fatalf("interpretation assemble must wire report lifecycle persistence %q", required)
 		}
 	}
 	if strings.Contains(text, "NewTransactionalReportDurableSaver") {
@@ -87,7 +87,7 @@ func TestInterpretationModuleOwnsArtifactCommitterWiring(t *testing.T) {
 	}
 }
 
-func TestGenerationPackageOwnsArtifactEventStaging(t *testing.T) {
+func TestGenerationPackageOwnsReportEventStaging(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -110,7 +110,7 @@ func TestGenerationPackageOwnsArtifactEventStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !found {
-		t.Fatal("interpretation/generation must own artifact generated event staging")
+		t.Fatal("interpretation/generation must own report generated event staging")
 	}
 }
 

@@ -1,7 +1,7 @@
 package report
 
 // Draft is the immutable content assembled by Interpretation before a
-// Generation/Run commits it as an Artifact. It deliberately carries neither
+// Generation/Run commits it as an InterpretReport. It deliberately carries neither
 // lifecycle state nor persistence identifiers.
 type Draft struct {
 	content Content

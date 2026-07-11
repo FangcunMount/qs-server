@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -21,21 +20,6 @@ type statisticsService struct {
 	assessmentReader evaluationreadmodel.AssessmentReader
 	scoreReader      evaluationreadmodel.ScoreReader
 	reportReader     evaluationreadmodel.ReportReader
-}
-
-// NewStatisticsService 创建受试者统计服务。
-//
-// Deprecated: evaluation command repositories 不再暴露读模型方法。
-// 仍需要旧服务时，请使用 NewStatisticsServiceWithReadModels。
-func NewStatisticsService(
-	testeeRepo domain.Repository,
-	_ assessment.Repository,
-	_ assessment.ScoreRepository,
-	_ report.ReportRepository,
-) TesteeStatisticsService {
-	return &statisticsService{
-		testeeRepo: testeeRepo,
-	}
 }
 
 func NewStatisticsServiceWithReadModels(

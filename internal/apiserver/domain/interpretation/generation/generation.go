@@ -10,9 +10,9 @@ import (
 
 type ID = meta.ID
 
-// Key is the stable idempotency identity for one report artifact.
+// Key is the stable idempotency identity for one report.
 // ReportType includes the presentation/audience variant when variants produce
-// different artifacts.
+// different reports.
 type Key struct {
 	OutcomeID       meta.ID
 	ReportType      policy.ReportType
@@ -51,7 +51,7 @@ func (s Status) IsValid() bool {
 }
 
 // ReportGeneration is the aggregate root for a requested report. It tracks
-// only intent, current attempt and successful artifact reference.
+// only intent, current attempt and successful report reference.
 type ReportGeneration struct {
 	id          ID
 	key         Key

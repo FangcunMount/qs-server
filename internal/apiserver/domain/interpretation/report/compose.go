@@ -1,8 +1,9 @@
 package report
 
-// ReportBuilder 报告构建器接口。
-type ReportBuilder interface {
-	Build(input GenerateReportInput) (*InterpretReport, error)
+// DraftBuilder assembles report content without creating a report identity or
+// lifecycle-bearing compatibility object.
+type DraftBuilder interface {
+	BuildDraft(input GenerateReportInput) (*Draft, error)
 }
 
 // GenerateReportInput 生成报告的输入参数。

@@ -8,23 +8,14 @@ import (
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type NormProfileReportBuilder struct {
 	scoring FactorScoringReportBuilder
 }
 
-func NewNormProfileReportBuilder(composer domainReport.ReportBuilder) NormProfileReportBuilder {
+func NewNormProfileReportBuilder(composer domainReport.DraftBuilder) NormProfileReportBuilder {
 	return NormProfileReportBuilder{scoring: NewFactorScoringReportBuilder(composer)}
-}
-
-func (NormProfileReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityBehavioralRatingDefault
-}
-
-func (NormProfileReportBuilder) Key() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityBehavioralRatingDefault
 }
 
 func (NormProfileReportBuilder) ReportType() domainReport.ReportType {
@@ -48,16 +39,8 @@ type TaskPerformanceReportBuilder struct {
 	scoring FactorScoringReportBuilder
 }
 
-func NewTaskPerformanceReportBuilder(composer domainReport.ReportBuilder) TaskPerformanceReportBuilder {
+func NewTaskPerformanceReportBuilder(composer domainReport.DraftBuilder) TaskPerformanceReportBuilder {
 	return TaskPerformanceReportBuilder{scoring: NewFactorScoringReportBuilder(composer)}
-}
-
-func (TaskPerformanceReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityCognitiveDefault
-}
-
-func (TaskPerformanceReportBuilder) Key() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityCognitiveDefault
 }
 
 func (TaskPerformanceReportBuilder) ReportType() domainReport.ReportType {

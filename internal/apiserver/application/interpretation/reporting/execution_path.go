@@ -1,13 +1,11 @@
-package writer
+package reporting
 
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ExecutionPathForMechanismFamily 映射算法家族 到 its 物化路径。
 func ExecutionPathForMechanismFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, bool) {
 	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
@@ -23,15 +21,16 @@ func ExecutionPathForMechanismFamily(family modelcatalog.AlgorithmFamily) (model
 	}
 }
 
-// ExecutionPathForReportBuilder 解析执行路径 用于 报告构建器。
-func ExecutionPathForReportBuilder(builder registry.ReportBuilder) (modelcatalog.ExecutionPath, error) {
+func ExecutionPathForReportBuilder(builder ReportBuilder) (modelcatalog.ExecutionPath, error) {
 	if builder == nil {
 		return "", fmt.Errorf("interpretation report builder is nil")
 	}
-	if keyed, ok := builder.(registry.MechanismKeyedReportBuilder); ok {
-		if path, ok := ExecutionPathForMechanismFamily(keyed.MechanismKey().AlgorithmFamily); ok {
-			return path, nil
-		}
+	keyed, ok := builder.(MechanismKeyedReportBuilder)
+	if !ok {
+		return "", fmt.Errorf("report builder has no mechanism key")
+	}
+	if path, found := ExecutionPathForMechanismFamily(keyed.MechanismKey().AlgorithmFamily); found {
+		return path, nil
 	}
 	return "", fmt.Errorf("unsupported report builder execution path")
 }

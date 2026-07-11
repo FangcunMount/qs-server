@@ -8,7 +8,6 @@ import (
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 const (
@@ -95,10 +94,6 @@ func newKeyedReportBuilder(delegate registry.ReportBuilder, key registry.Mechani
 	return keyedReportBuilder{delegate: delegate, key: key}
 }
 
-func (b keyedReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentity{}
-}
-func (b keyedReportBuilder) Key() evaluation.ExecutionIdentity   { return evaluation.ExecutionIdentity{} }
 func (b keyedReportBuilder) ReportType() domainReport.ReportType { return b.delegate.ReportType() }
 func (b keyedReportBuilder) TemplateVersion() policy.TemplateVersion {
 	return b.delegate.TemplateVersion()

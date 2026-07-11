@@ -16,7 +16,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultInterpretReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}

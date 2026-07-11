@@ -21,7 +21,7 @@ func TestV1CrossModuleSyncBehavioralRatingSurveySubmitWorkerToInterpretedReport(
 			Assessment: a,
 			Input:      behavioralRatingInputSnapshot(),
 			ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
-				domainreport.NewDefaultInterpretReportBuilder(nil),
+				domainreport.NewDefaultReportBuilder(nil),
 			),
 		},
 	})

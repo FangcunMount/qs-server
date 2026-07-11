@@ -7,7 +7,6 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: SBTI scorer resolves HIGH with similarity=1; report projects
@@ -63,12 +62,4 @@ func TestV1SBTIPipelinePreservesOutcomeSimilarityAndReportFields(t *testing.T) {
 	suggestions := report.Suggestions()
 	assertSuggestionExists(t, suggestions, domainreport.SuggestionCategoryGeneral, "你是典型高能者")
 
-	mapper := mongoevaluation.NewReportMapper()
-	roundTrip := mapper.ToDomain(mapper.ToPO(report, 8003))
-	if roundTrip.ModelExtra() == nil || roundTrip.ModelExtra().TypeCode != "HIGH" {
-		t.Fatalf("mongo round trip model extra = %#v", roundTrip.ModelExtra())
-	}
-	if roundTrip.TotalScore() != 100 {
-		t.Fatalf("mongo round trip TotalScore = %.1f, want 100", roundTrip.TotalScore())
-	}
 }

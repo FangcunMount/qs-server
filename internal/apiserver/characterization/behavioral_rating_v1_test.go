@@ -23,7 +23,7 @@ func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
 		Assessment: a,
 		Input:      behavioralRatingInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
-			domainreport.NewDefaultInterpretReportBuilder(nil),
+			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})
 	if err := svc.Evaluate(ctx, a.ID().Uint64()); err != nil {

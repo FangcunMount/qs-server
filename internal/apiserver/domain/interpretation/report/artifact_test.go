@@ -9,10 +9,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestArtifactIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
+func TestInterpretReportIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 	max := 100.0
 	factor := NewFactorCode("sleep")
-	input := ArtifactInput{
+	input := InterpretReportInput{
 		ID:                  meta.FromUint64(1),
 		GenerationID:        meta.FromUint64(2),
 		OutcomeID:           meta.FromUint64(3),
@@ -29,7 +29,7 @@ func TestArtifactIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 			Suggestions: []Suggestion{{Category: SuggestionCategoryDimension, Content: "rest", FactorCode: &factor}},
 		},
 	}
-	artifact, err := NewArtifact(input)
+	artifact, err := NewInterpretReport(input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +57,8 @@ func TestArtifactIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 	}
 }
 
-func TestArtifactRejectsIncompleteProvenance(t *testing.T) {
-	_, err := NewArtifact(ArtifactInput{ID: meta.FromUint64(1), GeneratedAt: time.Now()})
+func TestInterpretReportRejectsIncompleteProvenance(t *testing.T) {
+	_, err := NewInterpretReport(InterpretReportInput{ID: meta.FromUint64(1), GeneratedAt: time.Now()})
 	if err == nil {
 		t.Fatal("artifact accepted incomplete provenance")
 	}

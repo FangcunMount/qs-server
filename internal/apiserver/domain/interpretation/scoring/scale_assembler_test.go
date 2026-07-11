@@ -8,10 +8,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 )
 
-func TestBuildFactorScoringReportAssemblesInterpretReport(t *testing.T) {
+func TestBuildFactorScoringDraftAssemblesInterpretReportContent(t *testing.T) {
 	totalMax := 27.0
 	sleepMax := 3.0
-	got, err := scoring.BuildFactorScoringReport(builder.NewDefaultInterpretReportBuilder(nil), scoring.FactorScoringReportInput{
+	got, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(nil), scoring.FactorScoringReportInput{
 		AssessmentID: report.ID(9001),
 		Scale: &scoring.ReportModel{
 			Code:  "PHQ9",
@@ -44,22 +44,23 @@ func TestBuildFactorScoringReportAssemblesInterpretReport(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("BuildFactorScoringReport: %v", err)
+		t.Fatalf("BuildFactorScoringDraft: %v", err)
 	}
-	if got.ModelName() != "抑郁筛查" {
-		t.Fatalf("ModelName = %q", got.ModelName())
+	content := got.Content()
+	if content.Model.Title != "抑郁筛查" {
+		t.Fatalf("ModelName = %q", content.Model.Title)
 	}
-	if got.ModelCode() != "PHQ9" {
-		t.Fatalf("ModelCode = %q", got.ModelCode())
+	if content.Model.Code != "PHQ9" {
+		t.Fatalf("ModelCode = %q", content.Model.Code)
 	}
-	if got.TotalScore() != 8 || got.RiskLevel() != report.RiskLevelLow {
-		t.Fatalf("summary = score:%v risk:%s", got.TotalScore(), got.RiskLevel())
+	if content.PrimaryScore == nil || content.PrimaryScore.Value != 8 || content.Level == nil || content.Level.Code != string(report.RiskLevelLow) {
+		t.Fatalf("summary = score:%#v level:%#v", content.PrimaryScore, content.Level)
 	}
-	if got.Conclusion() != "总分提示轻度风险" {
-		t.Fatalf("Conclusion = %q", got.Conclusion())
+	if content.Conclusion != "总分提示轻度风险" {
+		t.Fatalf("Conclusion = %q", content.Conclusion)
 	}
 
-	dimensions := got.Dimensions()
+	dimensions := content.Dimensions
 	if len(dimensions) != 2 {
 		t.Fatalf("len(Dimensions) = %d, want 2", len(dimensions))
 	}
@@ -73,12 +74,12 @@ func TestBuildFactorScoringReportAssemblesInterpretReport(t *testing.T) {
 		t.Fatalf("unexpected sleep dimension: %#v", dimensions[1])
 	}
 
-	assertScaleReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "持续观察整体状态")
-	assertScaleReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryGeneral, nil, "保持规律作息")
+	assertScaleReportSuggestion(t, content.Suggestions, report.SuggestionCategoryGeneral, nil, "持续观察整体状态")
+	assertScaleReportSuggestion(t, content.Suggestions, report.SuggestionCategoryGeneral, nil, "保持规律作息")
 	sleepCode := report.FactorCode("SLEEP")
-	assertScaleReportSuggestion(t, got.Suggestions(), report.SuggestionCategoryDimension, &sleepCode, "建立睡前放松流程")
-	if got.ModelExtra() != nil {
-		t.Fatalf("ModelExtra = %#v, want nil", got.ModelExtra())
+	assertScaleReportSuggestion(t, content.Suggestions, report.SuggestionCategoryDimension, &sleepCode, "建立睡前放松流程")
+	if content.ModelExtra != nil {
+		t.Fatalf("ModelExtra = %#v, want nil", content.ModelExtra)
 	}
 }
 

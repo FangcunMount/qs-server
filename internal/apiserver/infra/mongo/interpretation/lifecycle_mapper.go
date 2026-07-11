@@ -88,13 +88,13 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 	})
 }
 
-func (m *LifecycleMapper) ArtifactToPO(domain *domainreport.Artifact) *InterpretReportArtifactPO {
+func (m *LifecycleMapper) ReportToPO(domain *domainreport.InterpretReport) *InterpretReportPO {
 	if domain == nil {
 		return nil
 	}
 	content := domain.Content()
 	association := domain.Association()
-	po := &InterpretReportArtifactPO{
+	po := &InterpretReportPO{
 		BaseDocument:        base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.GeneratedAt(), UpdatedAt: domain.GeneratedAt()},
 		GenerationID:        domain.GenerationID().Uint64(),
 		OutcomeID:           domain.OutcomeID().Uint64(),
@@ -133,11 +133,11 @@ func isArtifactRiskLevelCode(code string) bool {
 	}
 }
 
-func (m *LifecycleMapper) ArtifactToDomain(po *InterpretReportArtifactPO) (*domainreport.Artifact, error) {
+func (m *LifecycleMapper) ReportToDomain(po *InterpretReportPO) (*domainreport.InterpretReport, error) {
 	if po == nil {
 		return nil, nil
 	}
-	artifact, err := domainreport.NewArtifact(domainreport.ArtifactInput{
+	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID:                  po.DomainID,
 		GenerationID:        meta.FromUint64(po.GenerationID),
 		OutcomeID:           meta.FromUint64(po.OutcomeID),
@@ -157,7 +157,7 @@ func (m *LifecycleMapper) ArtifactToDomain(po *InterpretReportArtifactPO) (*doma
 		GeneratedAt: po.GeneratedAt,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("restore interpretation artifact: %w", err)
+		return nil, fmt.Errorf("restore interpretation report: %w", err)
 	}
 	return artifact, nil
 }
@@ -182,4 +182,131 @@ func dimensionsToDomain(items []DimensionInterpretPO) []domainreport.DimensionIn
 		result[i] = dimensionToDomain(item)
 	}
 	return result
+}
+
+func dimensionToPO(d domainreport.DimensionInterpret) DimensionInterpretPO {
+	po := DimensionInterpretPO{
+		Kind: string(d.Kind()), FactorCode: d.Code().String(), FactorName: d.Name(), RawScore: d.RawScore(), MaxScore: d.MaxScore(),
+		RiskLevel: d.Severity(), Role: d.Role(), ParentCode: d.ParentCode(), HierarchyLevel: d.HierarchyLevel(), SortOrder: d.SortOrder(),
+		Description: d.Description(), Suggestion: d.Suggestion(),
+	}
+	po.Score = scoreValueToPO(domainreport.NewRawTotalScore(d.RawScore(), d.MaxScore()))
+	if isArtifactRiskLevelCode(d.Severity()) {
+		po.Level = resultLevelToPO(domainreport.LevelFromRisk(domainreport.RiskLevel(d.Severity())))
+	}
+	return po
+}
+
+func dimensionToDomain(po DimensionInterpretPO) domainreport.DimensionInterpret {
+	rawScore, maxScore, risk := po.RawScore, po.MaxScore, domainreport.RiskLevel(po.RiskLevel)
+	if score := scoreValueToDomain(po.Score); score != nil {
+		rawScore, maxScore = score.Value, score.Max
+	}
+	if level := resultLevelToDomain(po.Level); level != nil && level.Code != "" {
+		risk = domainreport.RiskLevel(level.Code)
+	}
+	kind := domainreport.DimensionKind(po.Kind)
+	if kind != "" && kind != domainreport.DimensionKindFactor {
+		return domainreport.NewNeutralDimensionInterpret(domainreport.NewDimensionCode(po.FactorCode), kind, po.FactorName, rawScore, maxScore, resultLevelToDomain(po.Level), po.Description, po.Suggestion).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
+	}
+	return domainreport.NewDimensionInterpret(domainreport.NewFactorCode(po.FactorCode), po.FactorName, rawScore, maxScore, risk, po.Description, po.Suggestion).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
+}
+
+func toSuggestionPOs(items []domainreport.Suggestion) []SuggestionPO {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]SuggestionPO, len(items))
+	for i, suggestion := range items {
+		var factorCode *string
+		if suggestion.FactorCode != nil {
+			value := suggestion.FactorCode.String()
+			factorCode = &value
+		}
+		result[i] = SuggestionPO{Category: string(suggestion.Category), Content: suggestion.Content, FactorCode: factorCode}
+	}
+	return result
+}
+
+func toDomainSuggestions(items []SuggestionPO) []domainreport.Suggestion {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]domainreport.Suggestion, len(items))
+	for i, suggestion := range items {
+		var factorCode *domainreport.FactorCode
+		if suggestion.FactorCode != nil {
+			value := domainreport.NewFactorCode(*suggestion.FactorCode)
+			factorCode = &value
+		}
+		result[i] = domainreport.Suggestion{Category: domainreport.SuggestionCategory(suggestion.Category), Content: suggestion.Content, FactorCode: factorCode}
+	}
+	return result
+}
+
+func toModelExtraPO(extra *domainreport.ModelExtra) *ModelExtraPO {
+	if extra == nil || extra.IsEmpty() {
+		return nil
+	}
+	po := &ModelExtraPO{Kind: extra.Kind, TypeCode: extra.TypeCode, TypeName: extra.TypeName, OneLiner: extra.OneLiner, ImageURL: extra.ImageURL, MatchPercent: extra.MatchPercent, IsSpecial: extra.IsSpecial, SpecialTrigger: extra.SpecialTrigger, Commentary: extra.Commentary}
+	if extra.Rarity != nil {
+		po.Rarity = &ModelRarityPO{Percent: extra.Rarity.Percent, Label: extra.Rarity.Label, OneInX: extra.Rarity.OneInX}
+	}
+	return po
+}
+
+func toDomainModelExtra(po *ModelExtraPO) *domainreport.ModelExtra {
+	if po == nil {
+		return nil
+	}
+	extra := &domainreport.ModelExtra{Kind: po.Kind, TypeCode: po.TypeCode, TypeName: po.TypeName, OneLiner: po.OneLiner, ImageURL: po.ImageURL, MatchPercent: po.MatchPercent, IsSpecial: po.IsSpecial, SpecialTrigger: po.SpecialTrigger, Commentary: po.Commentary}
+	if po.Rarity != nil {
+		extra.Rarity = &domainreport.ModelRarity{Percent: po.Rarity.Percent, Label: po.Rarity.Label, OneInX: po.Rarity.OneInX}
+	}
+	if extra.IsEmpty() {
+		return nil
+	}
+	return extra
+}
+
+func modelIdentityToPO(model domainreport.ModelIdentity) *ModelIdentityPO {
+	if model.IsEmpty() {
+		return nil
+	}
+	return &ModelIdentityPO{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title, ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily}
+}
+
+func modelIdentityToDomain(po *ModelIdentityPO) domainreport.ModelIdentity {
+	if po == nil {
+		return domainreport.ModelIdentity{}
+	}
+	return domainreport.ModelIdentity{Kind: po.Kind, SubKind: po.SubKind, Algorithm: po.Algorithm, Code: po.Code, Version: po.Version, Title: po.Title, ProductChannel: po.ProductChannel, AlgorithmFamily: po.AlgorithmFamily}
+}
+
+func scoreValueToPO(score *domainreport.ScoreValue) *ScoreValuePO {
+	if score == nil {
+		return nil
+	}
+	return &ScoreValuePO{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max}
+}
+
+func scoreValueToDomain(po *ScoreValuePO) *domainreport.ScoreValue {
+	if po == nil {
+		return nil
+	}
+	return &domainreport.ScoreValue{Kind: po.Kind, Value: po.Value, Label: po.Label, Max: po.Max}
+}
+
+func resultLevelToPO(level *domainreport.ResultLevel) *ResultLevelPO {
+	if level == nil {
+		return nil
+	}
+	return &ResultLevelPO{Code: level.Code, Label: level.Label, Severity: level.Severity}
+}
+
+func resultLevelToDomain(po *ResultLevelPO) *domainreport.ResultLevel {
+	if po == nil {
+		return nil
+	}
+	return &domainreport.ResultLevel{Code: po.Code, Label: po.Label, Severity: po.Severity}
 }

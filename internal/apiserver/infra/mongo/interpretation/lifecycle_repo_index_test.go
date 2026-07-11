@@ -17,7 +17,7 @@ func TestLifecycleIndexesProtectThreeObjectIdentities(t *testing.T) {
 	assertUniqueIndex(t, runIndexes, "uk_interpretation_run_domain_id", bson.D{{Key: "domain_id", Value: 1}})
 	assertUniqueIndex(t, runIndexes, "uk_interpretation_run_generation_attempt", bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: 1}})
 
-	artifactIndexes := artifactIndexModels()
+	artifactIndexes := reportIndexModels()
 	assertUniqueIndex(t, artifactIndexes, "uk_artifact_domain_id", bson.D{{Key: "domain_id", Value: 1}})
 	assertUniqueIndex(t, artifactIndexes, "uk_artifact_generation_id", bson.D{{Key: "generation_id", Value: 1}})
 }

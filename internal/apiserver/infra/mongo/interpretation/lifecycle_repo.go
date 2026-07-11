@@ -226,20 +226,20 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 	return nil
 }
 
-type ArtifactRepository struct {
+type ReportRepository struct {
 	base.BaseRepository
 	mapper *LifecycleMapper
 }
 
-func NewArtifactRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ArtifactRepository, error) {
-	repo := &ArtifactRepository{BaseRepository: base.NewBaseRepository(db, (InterpretReportArtifactPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
-	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), artifactIndexModels()); err != nil {
-		return nil, fmt.Errorf("create interpretation artifact indexes: %w", err)
+func NewReportRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
+	repo := &ReportRepository{BaseRepository: base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
+	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), reportIndexModels()); err != nil {
+		return nil, fmt.Errorf("create interpretation report indexes: %w", err)
 	}
 	return repo, nil
 }
 
-func artifactIndexModels() []mongo.IndexModel {
+func reportIndexModels() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetName("uk_artifact_domain_id").SetUnique(true)},
 		{Keys: bson.D{{Key: "generation_id", Value: 1}}, Options: options.Index().SetName("uk_artifact_generation_id").SetUnique(true)},
@@ -249,76 +249,76 @@ func artifactIndexModels() []mongo.IndexModel {
 	}
 }
 
-var _ domainreport.ArtifactRepository = (*ArtifactRepository)(nil)
+var _ domainreport.ReportRepository = (*ReportRepository)(nil)
 
-func (r *ArtifactRepository) Insert(ctx context.Context, domain *domainreport.Artifact) error {
-	po := r.mapper.ArtifactToPO(domain)
+func (r *ReportRepository) Insert(ctx context.Context, domain *domainreport.InterpretReport) error {
+	po := r.mapper.ReportToPO(domain)
 	if po == nil {
-		return fmt.Errorf("interpretation artifact is required")
+		return fmt.Errorf("interpretation report is required")
 	}
 	if _, err := r.InsertOne(ctx, po); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			return fmt.Errorf("insert interpretation artifact: %w", domainreport.ErrArtifactAlreadyExists)
+			return fmt.Errorf("insert interpretation report: %w", domainreport.ErrInterpretReportAlreadyExists)
 		}
-		return fmt.Errorf("insert interpretation artifact: %w", err)
+		return fmt.Errorf("insert interpretation report: %w", err)
 	}
 	return nil
 }
 
-func (r *ArtifactRepository) FindByID(ctx context.Context, id meta.ID) (*domainreport.Artifact, error) {
-	var po InterpretReportArtifactPO
+func (r *ReportRepository) FindByID(ctx context.Context, id meta.ID) (*domainreport.InterpretReport, error) {
+	var po InterpretReportPO
 	if err := r.FindOne(ctx, bson.M{"domain_id": id.Uint64()}, &po); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, domainreport.ErrArtifactNotFound
+			return nil, domainreport.ErrInterpretReportNotFound
 		}
-		return nil, fmt.Errorf("find interpretation artifact by id: %w", err)
+		return nil, fmt.Errorf("find interpretation report by id: %w", err)
 	}
-	return r.mapper.ArtifactToDomain(&po)
+	return r.mapper.ReportToDomain(&po)
 }
 
-func (r *ArtifactRepository) FindByGenerationID(ctx context.Context, generationID meta.ID) (*domainreport.Artifact, error) {
-	var po InterpretReportArtifactPO
+func (r *ReportRepository) FindByGenerationID(ctx context.Context, generationID meta.ID) (*domainreport.InterpretReport, error) {
+	var po InterpretReportPO
 	if err := r.FindOne(ctx, bson.M{"generation_id": generationID.Uint64()}, &po); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, domainreport.ErrArtifactNotFound
+			return nil, domainreport.ErrInterpretReportNotFound
 		}
-		return nil, fmt.Errorf("find interpretation artifact by generation id: %w", err)
+		return nil, fmt.Errorf("find interpretation report by generation id: %w", err)
 	}
-	return r.mapper.ArtifactToDomain(&po)
+	return r.mapper.ReportToDomain(&po)
 }
 
-func (r *ArtifactRepository) FindLatestByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.Artifact, error) {
+func (r *ReportRepository) FindLatestByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error) {
 	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}).SetLimit(1))
 	if err != nil {
-		return nil, fmt.Errorf("find latest interpretation artifact by assessment id: %w", err)
+		return nil, fmt.Errorf("find latest interpretation report by assessment id: %w", err)
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 	if !cursor.Next(ctx) {
 		if err := cursor.Err(); err != nil {
 			return nil, err
 		}
-		return nil, domainreport.ErrArtifactNotFound
+		return nil, domainreport.ErrInterpretReportNotFound
 	}
-	var po InterpretReportArtifactPO
+	var po InterpretReportPO
 	if err := cursor.Decode(&po); err != nil {
 		return nil, err
 	}
-	return r.mapper.ArtifactToDomain(&po)
+	return r.mapper.ReportToDomain(&po)
 }
 
-func (r *ArtifactRepository) ListByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {
+func (r *ReportRepository) ListByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error) {
 	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
 	if err != nil {
-		return nil, fmt.Errorf("list interpretation artifacts by assessment id: %w", err)
+		return nil, fmt.Errorf("list interpretation reports by assessment id: %w", err)
 	}
 	defer func() { _ = cursor.Close(ctx) }()
-	items := make([]*domainreport.Artifact, 0)
+	items := make([]*domainreport.InterpretReport, 0)
 	for cursor.Next(ctx) {
-		var po InterpretReportArtifactPO
+		var po InterpretReportPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		item, err := r.mapper.ArtifactToDomain(&po)
+		item, err := r.mapper.ReportToDomain(&po)
 		if err != nil {
 			return nil, err
 		}

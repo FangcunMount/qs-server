@@ -23,7 +23,7 @@ func TestV1CognitiveExecuteAndReport(t *testing.T) {
 		Assessment: a,
 		Input:      cognitiveInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
-			domainreport.NewDefaultInterpretReportBuilder(nil),
+			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})
 	if err := svc.Evaluate(ctx, a.ID().Uint64()); err != nil {

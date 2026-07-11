@@ -146,43 +146,43 @@ func (r *memoryRunRepo) Save(_ context.Context, item *interpretationrun.Interpre
 }
 
 type memoryArtifactRepo struct {
-	items map[meta.ID]*domainreport.Artifact
+	items map[meta.ID]*domainreport.InterpretReport
 }
 
-func (r *memoryArtifactRepo) Insert(_ context.Context, item *domainreport.Artifact) error {
+func (r *memoryArtifactRepo) Insert(_ context.Context, item *domainreport.InterpretReport) error {
 	r.items[item.ID()] = item
 	return nil
 }
-func (r *memoryArtifactRepo) FindByID(_ context.Context, id meta.ID) (*domainreport.Artifact, error) {
+func (r *memoryArtifactRepo) FindByID(_ context.Context, id meta.ID) (*domainreport.InterpretReport, error) {
 	if item, ok := r.items[id]; ok {
 		return item, nil
 	}
-	return nil, domainreport.ErrArtifactNotFound
+	return nil, domainreport.ErrInterpretReportNotFound
 }
-func (r *memoryArtifactRepo) FindByGenerationID(_ context.Context, id meta.ID) (*domainreport.Artifact, error) {
+func (r *memoryArtifactRepo) FindByGenerationID(_ context.Context, id meta.ID) (*domainreport.InterpretReport, error) {
 	for _, item := range r.items {
 		if item.GenerationID() == id {
 			return item, nil
 		}
 	}
-	return nil, domainreport.ErrArtifactNotFound
+	return nil, domainreport.ErrInterpretReportNotFound
 }
 
-func (r *memoryArtifactRepo) FindLatestByAssessmentID(_ context.Context, assessmentID meta.ID) (*domainreport.Artifact, error) {
-	var latest *domainreport.Artifact
+func (r *memoryArtifactRepo) FindLatestByAssessmentID(_ context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error) {
+	var latest *domainreport.InterpretReport
 	for _, item := range r.items {
 		if item.Association().AssessmentID == assessmentID && (latest == nil || item.GeneratedAt().After(latest.GeneratedAt())) {
 			latest = item
 		}
 	}
 	if latest == nil {
-		return nil, domainreport.ErrArtifactNotFound
+		return nil, domainreport.ErrInterpretReportNotFound
 	}
 	return latest, nil
 }
 
-func (r *memoryArtifactRepo) ListByAssessmentID(_ context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {
-	items := make([]*domainreport.Artifact, 0)
+func (r *memoryArtifactRepo) ListByAssessmentID(_ context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error) {
+	items := make([]*domainreport.InterpretReport, 0)
 	for _, item := range r.items {
 		if item.Association().AssessmentID == assessmentID {
 			items = append(items, item)
@@ -244,7 +244,7 @@ func TestStarterClosesStaleRunAndStartsNextAttemptInOneTransaction(t *testing.T)
 	}
 }
 
-func TestStarterReturnsArtifactForGeneratedGeneration(t *testing.T) {
+func TestStarterReturnsReportForGeneratedGeneration(t *testing.T) {
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	service, generations, runs, tx := newStarterFixture(t, now)
 	generationRecord, runRecord := seedGenerating(t, now, time.Minute)
@@ -257,13 +257,13 @@ func TestStarterReturnsArtifactForGeneratedGeneration(t *testing.T) {
 	generations.put(generationRecord)
 	runs.items[runRecord.ID()] = runRecord
 	artifact := testArtifact(t, generationRecord, runRecord, meta.FromUint64(99), now)
-	service.(*starter).artifacts.(*memoryArtifactRepo).items[artifact.ID()] = artifact
+	service.(*starter).reports.(*memoryArtifactRepo).items[artifact.ID()] = artifact
 
 	result, err := service.Start(context.Background(), StartRequest{Key: starterKey()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != StartStatusGenerated || result.Artifact != artifact || tx.calls != 0 || runs.creates != 0 {
+	if result.Status != StartStatusGenerated || result.InterpretReport != artifact || tx.calls != 0 || runs.creates != 0 {
 		t.Fatalf("generated result=%#v tx=%d runcreates=%d", result, tx.calls, runs.creates)
 	}
 }
@@ -277,7 +277,7 @@ func newStarterFixture(t *testing.T, now time.Time) (Starter, *memoryGenerationR
 	generations := newMemoryGenerationRepo()
 	runs := newMemoryRunRepo()
 	tx := &starterTx{}
-	service, err := NewStarter(tx, generations, runs, &memoryArtifactRepo{items: map[meta.ID]*domainreport.Artifact{}}, time.Minute)
+	service, err := NewStarter(tx, generations, runs, &memoryArtifactRepo{items: map[meta.ID]*domainreport.InterpretReport{}}, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,9 +307,9 @@ func seedGenerating(t *testing.T, startedAt time.Time, lease time.Duration) (*do
 	return generationRecord, runRecord
 }
 
-func testArtifact(t *testing.T, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, id meta.ID, at time.Time) *domainreport.Artifact {
+func testArtifact(t *testing.T, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, id meta.ID, at time.Time) *domainreport.InterpretReport {
 	t.Helper()
-	artifact, err := domainreport.NewArtifact(domainreport.ArtifactInput{
+	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID:                  id,
 		GenerationID:        generationRecord.ID(),
 		OutcomeID:           generationRecord.Key().OutcomeID,

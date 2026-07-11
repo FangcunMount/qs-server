@@ -43,7 +43,7 @@ type Module struct {
 	generationExecutor   interpretationgeneration.Executor
 	generationRepo       *mongoEval.GenerationRepository
 	runRepo              *mongoEval.RunRepository
-	artifactRepo         *mongoEval.ArtifactRepository
+	reportRepo           *mongoEval.ReportRepository
 	outcomeService       interpretationapp.OutcomeReportService
 	readyIndexer         *appEventing.PostCommitReadyIndexer
 	readyIndex           *outboxready.Index
@@ -85,11 +85,11 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation run repository: %v", err)
 	}
 	module.runRepo = runRepo
-	artifactRepo, err := mongoEval.NewArtifactRepository(deps.MongoDB, mongoOptions)
+	reportRepo, err := mongoEval.NewReportRepository(deps.MongoDB, mongoOptions)
 	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation artifact repository: %v", err)
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation report repository: %v", err)
 	}
-	module.artifactRepo = artifactRepo
+	module.reportRepo = reportRepo
 
 	priorityOpts := []mongoEventOutbox.StoreOption{
 		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
@@ -114,11 +114,11 @@ func New(deps Deps) (*Module, error) {
 			return nil, err
 		}
 		module.builderRegistry = registry
-		starter, err := interpretationgeneration.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.artifactRepo, 5*time.Minute)
+		starter, err := interpretationgeneration.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, 5*time.Minute)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.artifactRepo, reportOutboxStore, module.readyIndexer)
+		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}
@@ -143,7 +143,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		outcomeCorrelationAdapter{repo: repo},
 		m.generationRepo,
 		m.runRepo,
-		m.artifactRepo,
+		m.reportRepo,
 	)
 	return nil
 }
@@ -176,7 +176,7 @@ func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {
 }
 
 func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor) (interpretationreporting.ReportBuilderRegistry, error) {
-	builders, err := reportmaterialize.ReportBuilders(descs, domainreport.NewDefaultInterpretReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(descs, domainreport.NewDefaultReportBuilder(nil))
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}

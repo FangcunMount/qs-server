@@ -3,7 +3,6 @@ package registry
 // NewReportBuilderRegistry 创建注册表 从 given builders。
 func NewReportBuilderRegistry(builders ...ReportBuilder) (*mutableReportBuilderRegistry, error) {
 	r := &mutableReportBuilderRegistry{
-		items:          make(map[reportBuilderKey]ReportBuilder),
 		mechanismItems: make(map[MechanismReportBuilderKey]ReportBuilder),
 	}
 	for _, builder := range builders {

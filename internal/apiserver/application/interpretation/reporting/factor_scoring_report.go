@@ -9,24 +9,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 // FactorScoringReportBuilder only consumes Interpretation facts. Conversion
 // from EvaluationOutcome and its model snapshots happens before this boundary.
 type FactorScoringReportBuilder struct {
-	composer domainReport.ReportBuilder
+	composer domainReport.DraftBuilder
 }
 
-func NewFactorScoringReportBuilder(composer domainReport.ReportBuilder) FactorScoringReportBuilder {
+func NewFactorScoringReportBuilder(composer domainReport.DraftBuilder) FactorScoringReportBuilder {
 	return FactorScoringReportBuilder{composer: composer}
 }
-
-func (b FactorScoringReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityScaleDefault
-}
-
-func (b FactorScoringReportBuilder) Key() evaluation.ExecutionIdentity { return b.ExecutionIdentity() }
 
 func (FactorScoringReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
@@ -46,7 +39,7 @@ func (b FactorScoringReportBuilder) Build(ctx context.Context, input interpinput
 		return nil, fmt.Errorf("factor_scoring interpretation facts are required")
 	}
 	_ = ctx
-	rpt, err := reportscore.BuildFactorScoringReport(b.composer, reportscore.FactorScoringReportInput{
+	draft, err := reportscore.BuildFactorScoringDraft(b.composer, reportscore.FactorScoringReportInput{
 		AssessmentID: report.ID(input.Association.AssessmentID),
 		Scale:        input.FactorScoring.Model,
 		TotalScore:   primaryValue(input),
@@ -56,7 +49,7 @@ func (b FactorScoringReportBuilder) Build(ctx context.Context, input interpinput
 	if err != nil {
 		return nil, err
 	}
-	return DraftFromLegacyReport(input, rpt), nil
+	return draftWithInputSummary(input, draft), nil
 }
 
 func primaryValue(input interpinput.InterpretationInput) float64 {

@@ -533,7 +533,7 @@ definitions:
       normTableVersion:
         type: string
     type: object
-  report.InterpretReport:
+  report.Draft:
     type: object
   request.AddQuestionRequest:
     properties:
@@ -1189,7 +1189,7 @@ definitions:
       outcome:
         $ref: '#/definitions/modelcatalog.PreviewOutcome'
       raw_report:
-        $ref: '#/definitions/report.InterpretReport'
+        $ref: '#/definitions/report.Draft'
       report_sections:
         items:
           $ref: '#/definitions/modelcatalog.PreviewReportSection'

@@ -3,6 +3,6 @@ package report
 import "errors"
 
 var (
-	ErrArtifactNotFound      = errors.New("interpretation report artifact not found")
-	ErrArtifactAlreadyExists = errors.New("interpretation report artifact already exists")
+	ErrInterpretReportNotFound      = errors.New("interpretation report not found")
+	ErrInterpretReportAlreadyExists = errors.New("interpretation report already exists")
 )

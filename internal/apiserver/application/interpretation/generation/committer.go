@@ -23,7 +23,7 @@ type EventStager interface {
 }
 
 // InterpretationCommitter is the only terminal persistence boundary for one
-// InterpretationRun. It commits immutable Artifact, Generation/Run state and
+// InterpretationRun. It commits immutable InterpretReport, Generation/Run state and
 // durable outbox events atomically.
 type InterpretationCommitter interface {
 	CommitSuccess(ctx context.Context, request CommitSuccessRequest) (*CommitResult, error)
@@ -33,7 +33,7 @@ type InterpretationCommitter interface {
 type CommitSuccessRequest struct {
 	Generation           *domaingeneration.ReportGeneration
 	Run                  *interpretationrun.InterpretationRun
-	Artifact             *domainreport.Artifact
+	InterpretReport      *domainreport.InterpretReport
 	BuilderIdentity      string
 	ContentSchemaVersion string
 	CompletedAt          time.Time
@@ -49,16 +49,16 @@ type CommitFailureRequest struct {
 }
 
 type CommitResult struct {
-	Generation *domaingeneration.ReportGeneration
-	Run        *interpretationrun.InterpretationRun
-	Artifact   *domainreport.Artifact
+	Generation      *domaingeneration.ReportGeneration
+	Run             *interpretationrun.InterpretationRun
+	InterpretReport *domainreport.InterpretReport
 }
 
 type interpretationCommitter struct {
 	txRunner     apptransaction.Runner
 	generations  domaingeneration.Repository
 	runs         interpretationrun.Repository
-	artifacts    domainreport.ArtifactRepository
+	reports      domainreport.ReportRepository
 	stager       EventStager
 	readyIndexer *appEventing.PostCommitReadyIndexer
 }
@@ -67,15 +67,15 @@ func NewInterpretationCommitter(
 	txRunner apptransaction.Runner,
 	generations domaingeneration.Repository,
 	runs interpretationrun.Repository,
-	artifacts domainreport.ArtifactRepository,
+	reports domainreport.ReportRepository,
 	stager EventStager,
 	readyIndexer *appEventing.PostCommitReadyIndexer,
 ) (InterpretationCommitter, error) {
-	if txRunner == nil || generations == nil || runs == nil || artifacts == nil || stager == nil {
+	if txRunner == nil || generations == nil || runs == nil || reports == nil || stager == nil {
 		return nil, fmt.Errorf("interpretation committer dependencies are required")
 	}
 	return &interpretationCommitter{
-		txRunner: txRunner, generations: generations, runs: runs, artifacts: artifacts, stager: stager, readyIndexer: readyIndexer,
+		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, readyIndexer: readyIndexer,
 	}, nil
 }
 
@@ -102,12 +102,12 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 	if err := runToCommit.Succeed(completedAt); err != nil {
 		return nil, err
 	}
-	if err := generationToCommit.Succeed(runToCommit.ID(), request.Artifact.ID(), completedAt); err != nil {
+	if err := generationToCommit.Succeed(runToCommit.ID(), request.InterpretReport.ID(), completedAt); err != nil {
 		return nil, err
 	}
-	events := outboxpolicy.Filter(generatedEvents(request.Artifact, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion))
+	events := outboxpolicy.Filter(generatedEvents(request.InterpretReport, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion))
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := c.artifacts.Insert(txCtx, request.Artifact); err != nil {
+		if err := c.reports.Insert(txCtx, request.InterpretReport); err != nil {
 			return err
 		}
 		if err := c.runs.Save(txCtx, runToCommit); err != nil {
@@ -121,7 +121,7 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 		return nil, err
 	}
 	c.enqueueAfterCommit(ctx, events, completedAt)
-	return &CommitResult{Generation: generationToCommit, Run: runToCommit, Artifact: request.Artifact}, nil
+	return &CommitResult{Generation: generationToCommit, Run: runToCommit, InterpretReport: request.InterpretReport}, nil
 }
 
 func (c *interpretationCommitter) CommitFailure(ctx context.Context, request CommitFailureRequest) (*CommitResult, error) {
@@ -171,29 +171,38 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 }
 
 func (c *interpretationCommitter) validateSuccess(request CommitSuccessRequest) error {
-	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.artifacts == nil || c.stager == nil {
+	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil {
 		return fmt.Errorf("interpretation committer is not configured")
 	}
-	if request.Generation == nil || request.Run == nil || request.Artifact == nil {
+	if request.Generation == nil || request.Run == nil || request.InterpretReport == nil {
 		return fmt.Errorf("interpretation generation, run and artifact are required")
 	}
 	if request.BuilderIdentity == "" || request.ContentSchemaVersion == "" {
 		return fmt.Errorf("interpretation builder identity and content schema version are required")
 	}
-	if request.Generation.ID() != request.Run.GenerationID() || request.Artifact.GenerationID() != request.Generation.ID() || request.Artifact.InterpretationRunID() != request.Run.ID() {
+	key := request.Generation.Key()
+	if request.Generation.ID() != request.Run.GenerationID() ||
+		request.Generation.LatestRunID() != request.Run.ID() ||
+		request.InterpretReport.GenerationID() != request.Generation.ID() ||
+		request.InterpretReport.InterpretationRunID() != request.Run.ID() ||
+		request.InterpretReport.OutcomeID() != key.OutcomeID ||
+		request.InterpretReport.ReportType() != key.ReportType ||
+		request.InterpretReport.TemplateVersion() != key.TemplateVersion {
 		return fmt.Errorf("interpretation commit references do not match")
 	}
 	return nil
 }
 
 func (c *interpretationCommitter) validateFailure(request CommitFailureRequest) error {
-	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.artifacts == nil || c.stager == nil {
+	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil {
 		return fmt.Errorf("interpretation committer is not configured")
 	}
 	if request.Generation == nil || request.Run == nil || request.OutcomeID.IsZero() {
 		return fmt.Errorf("interpretation generation, run and outcome are required")
 	}
-	if request.Generation.ID() != request.Run.GenerationID() {
+	if request.Generation.ID() != request.Run.GenerationID() ||
+		request.Generation.LatestRunID() != request.Run.ID() ||
+		request.OutcomeID != request.Generation.Key().OutcomeID {
 		return fmt.Errorf("interpretation failure commit references do not match")
 	}
 	return request.Failure.Validate()
@@ -232,7 +241,7 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 	})
 }
 
-func generatedEvents(artifact *domainreport.Artifact, attempt int, builderIdentity, contentSchemaVersion string) []event.DomainEvent {
+func generatedEvents(artifact *domainreport.InterpretReport, attempt int, builderIdentity, contentSchemaVersion string) []event.DomainEvent {
 	if artifact == nil {
 		return nil
 	}

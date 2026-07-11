@@ -12,13 +12,13 @@ import (
 
 // LifecycleQueryService exposes the three-object Interpretation read model.
 // Assessment lookup is a correlation query through Outcome, never a ReportID
-// alias; a single assessment can have multiple historical template artifacts.
+// alias; a single assessment can have multiple historical template reports.
 type LifecycleQueryService interface {
-	FindReportByID(ctx context.Context, reportID meta.ID) (*domainreport.Artifact, error)
+	FindReportByID(ctx context.Context, reportID meta.ID) (*domainreport.InterpretReport, error)
 	FindGenerationsByOutcomeID(ctx context.Context, outcomeID meta.ID) ([]GenerationResult, error)
-	FindLatestReportByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.Artifact, error)
+	FindLatestReportByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error)
 	FindLifecycleByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]GenerationResult, error)
-	ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error)
+	ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error)
 }
 
 // OutcomeCorrelationPort resolves AssessmentID -> OutcomeID without importing
@@ -28,32 +28,32 @@ type OutcomeCorrelationPort interface {
 }
 
 type GenerationResult struct {
-	Generation *domaingeneration.ReportGeneration
-	LatestRun  *interpretationrun.InterpretationRun
-	Artifact   *domainreport.Artifact
+	Generation      *domaingeneration.ReportGeneration
+	LatestRun       *interpretationrun.InterpretationRun
+	InterpretReport *domainreport.InterpretReport
 }
 
 type lifecycleQueryService struct {
 	outcomes    OutcomeCorrelationPort
 	generations domaingeneration.Repository
 	runs        interpretationrun.Repository
-	artifacts   domainreport.ArtifactRepository
+	reports     domainreport.ReportRepository
 }
 
 func NewLifecycleQueryService(
 	outcomes OutcomeCorrelationPort,
 	generations domaingeneration.Repository,
 	runs interpretationrun.Repository,
-	artifacts domainreport.ArtifactRepository,
+	reports domainreport.ReportRepository,
 ) LifecycleQueryService {
-	return &lifecycleQueryService{outcomes: outcomes, generations: generations, runs: runs, artifacts: artifacts}
+	return &lifecycleQueryService{outcomes: outcomes, generations: generations, runs: runs, reports: reports}
 }
 
-func (s *lifecycleQueryService) FindReportByID(ctx context.Context, reportID meta.ID) (*domainreport.Artifact, error) {
+func (s *lifecycleQueryService) FindReportByID(ctx context.Context, reportID meta.ID) (*domainreport.InterpretReport, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	return s.artifacts.FindByID(ctx, reportID)
+	return s.reports.FindByID(ctx, reportID)
 }
 
 func (s *lifecycleQueryService) FindGenerationsByOutcomeID(ctx context.Context, outcomeID meta.ID) ([]GenerationResult, error) {
@@ -70,11 +70,11 @@ func (s *lifecycleQueryService) FindGenerationsByOutcomeID(ctx context.Context, 
 	return s.toResults(ctx, items)
 }
 
-func (s *lifecycleQueryService) FindLatestReportByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.Artifact, error) {
+func (s *lifecycleQueryService) FindLatestReportByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	return s.artifacts.FindLatestByAssessmentID(ctx, assessmentID)
+	return s.reports.FindLatestByAssessmentID(ctx, assessmentID)
 }
 
 func (s *lifecycleQueryService) FindLifecycleByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]GenerationResult, error) {
@@ -91,11 +91,11 @@ func (s *lifecycleQueryService) FindLifecycleByAssessmentID(ctx context.Context,
 	return s.FindGenerationsByOutcomeID(ctx, outcomeID)
 }
 
-func (s *lifecycleQueryService) ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.Artifact, error) {
+func (s *lifecycleQueryService) ListHistoricalReportsByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	return s.artifacts.ListByAssessmentID(ctx, assessmentID)
+	return s.reports.ListByAssessmentID(ctx, assessmentID)
 }
 
 func (s *lifecycleQueryService) toResults(ctx context.Context, generations []*domaingeneration.ReportGeneration) ([]GenerationResult, error) {
@@ -113,11 +113,11 @@ func (s *lifecycleQueryService) toResults(ctx context.Context, generations []*do
 			result.LatestRun = run
 		}
 		if generation.Status() == domaingeneration.StatusGenerated {
-			artifact, err := s.artifacts.FindByGenerationID(ctx, generation.ID())
+			artifact, err := s.reports.FindByGenerationID(ctx, generation.ID())
 			if err != nil {
 				return nil, err
 			}
-			result.Artifact = artifact
+			result.InterpretReport = artifact
 		}
 		results = append(results, result)
 	}
@@ -125,7 +125,7 @@ func (s *lifecycleQueryService) toResults(ctx context.Context, generations []*do
 }
 
 func (s *lifecycleQueryService) validate() error {
-	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.artifacts == nil {
+	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil {
 		return fmt.Errorf("interpretation lifecycle query service is not configured")
 	}
 	return nil

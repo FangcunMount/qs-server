@@ -8,18 +8,38 @@ import (
 	"testing"
 )
 
-func TestMongoReportRepositoryDoesNotExposeDurableSaverEntry(t *testing.T) {
+func TestLegacyMongoReportWriteRepositoryDoesNotExist(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	path := filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation", "repo.go")
-	data, err := os.ReadFile(path)
-	if err != nil {
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("legacy interpret_reports write repository must not exist")
+	} else if !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	text := string(data)
-	if strings.Contains(text, "func (r *ReportRepository) SaveReportDurably") {
-		t.Fatalf("%s exposes SaveReportDurably; production wiring must use application ReportDurableSaver only", filepath.ToSlash(mustRel(t, root, path)))
+}
+
+func TestProductionCodeDoesNotReadLegacyInterpretReports(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	internalRoot := filepath.Join(root, "internal")
+	err := filepath.WalkDir(internalRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		if strings.Contains(string(data), `"interpret_reports"`) {
+			t.Fatalf("production code still reads legacy interpret_reports in %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -40,13 +60,4 @@ func repoRoot(t *testing.T) string {
 		}
 		dir = parent
 	}
-}
-
-func mustRel(t *testing.T, root, path string) string {
-	t.Helper()
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return rel
 }

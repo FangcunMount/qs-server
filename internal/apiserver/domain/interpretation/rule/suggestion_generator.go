@@ -8,7 +8,7 @@ import (
 
 // SuggestionGenerator 建议生成器接口。
 type SuggestionGenerator interface {
-	Generate(ctx context.Context, report *report.InterpretReport) ([]Suggestion, error)
+	Generate(ctx context.Context, content report.Content) ([]Suggestion, error)
 }
 
 // RuleBasedSuggestionGenerator 基于规则的建议生成器。
@@ -23,12 +23,12 @@ func NewRuleBasedSuggestionGenerator(strategies ...SuggestionStrategy) *RuleBase
 	}
 }
 
-func (g *RuleBasedSuggestionGenerator) Generate(ctx context.Context, r *report.InterpretReport) ([]Suggestion, error) {
+func (g *RuleBasedSuggestionGenerator) Generate(ctx context.Context, content report.Content) ([]Suggestion, error) {
 	var allSuggestions []Suggestion
 
 	for _, strategy := range g.strategies {
-		if strategy.CanHandle(r) {
-			suggestions, err := strategy.GenerateSuggestions(ctx, r)
+		if strategy.CanHandle(content) {
+			suggestions, err := strategy.GenerateSuggestions(ctx, content)
 			if err != nil {
 				continue
 			}

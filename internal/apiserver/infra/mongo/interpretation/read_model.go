@@ -1,14 +1,13 @@
 package interpretation
 
 import (
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
-	query := bson.M{"deleted_at": nil, "$or": generatedReportConditions()}
+	query := bson.M{"deleted_at": nil}
 	if filter.TesteeID != nil {
 		query["testee_id"] = *filter.TesteeID
 	}
@@ -27,14 +26,6 @@ func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 	return query
 }
 
-func generatedReportConditions() bson.A {
-	return bson.A{
-		bson.M{"status": string(domainreport.ReportStatusGenerated)},
-		bson.M{"status": bson.M{"$exists": false}},
-		bson.M{"status": ""},
-	}
-}
-
 func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *options.FindOptions {
 	return options.Find().
 		SetSkip(int64(page.Offset())).
@@ -42,7 +33,7 @@ func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *opti
 		SetSort(bson.M{"created_at": -1})
 }
 
-func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
+func archivedReportPOToReadRow(po *ArchivedReportPO) evaluationreadmodel.ReportRow {
 	if po == nil {
 		return evaluationreadmodel.ReportRow{}
 	}

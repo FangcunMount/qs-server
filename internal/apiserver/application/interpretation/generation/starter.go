@@ -29,10 +29,10 @@ type StartRequest struct {
 }
 
 type StartResult struct {
-	Status     StartStatus
-	Generation *domaingeneration.ReportGeneration
-	Run        *interpretationrun.InterpretationRun
-	Artifact   *domainreport.Artifact
+	Status          StartStatus
+	Generation      *domaingeneration.ReportGeneration
+	Run             *interpretationrun.InterpretationRun
+	InterpretReport *domainreport.InterpretReport
 }
 
 type Starter interface {
@@ -43,7 +43,7 @@ type starter struct {
 	txRunner      apptransaction.Runner
 	generations   domaingeneration.Repository
 	runs          interpretationrun.Repository
-	artifacts     domainreport.ArtifactRepository
+	reports       domainreport.ReportRepository
 	leaseDuration time.Duration
 	now           func() time.Time
 	newID         func() meta.ID
@@ -53,10 +53,10 @@ func NewStarter(
 	txRunner apptransaction.Runner,
 	generations domaingeneration.Repository,
 	runs interpretationrun.Repository,
-	artifacts domainreport.ArtifactRepository,
+	reports domainreport.ReportRepository,
 	leaseDuration time.Duration,
 ) (Starter, error) {
-	if txRunner == nil || generations == nil || runs == nil || artifacts == nil {
+	if txRunner == nil || generations == nil || runs == nil || reports == nil {
 		return nil, fmt.Errorf("generation starter requires transaction, generation, run and artifact repositories")
 	}
 	if leaseDuration <= 0 {
@@ -66,7 +66,7 @@ func NewStarter(
 		txRunner:      txRunner,
 		generations:   generations,
 		runs:          runs,
-		artifacts:     artifacts,
+		reports:       reports,
 		leaseDuration: leaseDuration,
 		now:           time.Now,
 		newID:         meta.New,
@@ -74,7 +74,7 @@ func NewStarter(
 }
 
 func (s *starter) Start(ctx context.Context, request StartRequest) (*StartResult, error) {
-	if s == nil || s.txRunner == nil || s.generations == nil || s.runs == nil || s.artifacts == nil {
+	if s == nil || s.txRunner == nil || s.generations == nil || s.runs == nil || s.reports == nil {
 		return nil, fmt.Errorf("generation starter is not configured")
 	}
 	if err := request.Key.Validate(); err != nil {
@@ -138,11 +138,11 @@ func (s *starter) startExisting(ctx context.Context, generationRecord *domaingen
 	}
 	switch generationRecord.Status() {
 	case domaingeneration.StatusGenerated:
-		artifact, err := s.artifacts.FindByID(ctx, generationRecord.ReportID())
+		artifact, err := s.reports.FindByID(ctx, generationRecord.ReportID())
 		if err != nil {
-			return nil, fmt.Errorf("load generated interpretation artifact: %w", err)
+			return nil, fmt.Errorf("load generated interpretation report: %w", err)
 		}
-		return &StartResult{Status: StartStatusGenerated, Generation: generationRecord, Artifact: artifact}, nil
+		return &StartResult{Status: StartStatusGenerated, Generation: generationRecord, InterpretReport: artifact}, nil
 	case domaingeneration.StatusGenerating:
 		return s.resumeOrRecover(ctx, generationRecord, request)
 	case domaingeneration.StatusPending, domaingeneration.StatusFailed:

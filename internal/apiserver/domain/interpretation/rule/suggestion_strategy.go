@@ -9,8 +9,8 @@ import (
 // SuggestionStrategy 建议生成策略接口。
 type SuggestionStrategy interface {
 	Name() string
-	CanHandle(report *report.InterpretReport) bool
-	GenerateSuggestions(ctx context.Context, report *report.InterpretReport) ([]Suggestion, error)
+	CanHandle(content report.Content) bool
+	GenerateSuggestions(ctx context.Context, content report.Content) ([]Suggestion, error)
 }
 
 // FactorInterpretationSuggestionStrategy 基于因子解读配置的建议策略。
@@ -28,11 +28,11 @@ func (s *FactorInterpretationSuggestionStrategy) Name() string {
 	return "factor_interpretation_strategy"
 }
 
-func (s *FactorInterpretationSuggestionStrategy) CanHandle(_ *report.InterpretReport) bool {
+func (s *FactorInterpretationSuggestionStrategy) CanHandle(_ report.Content) bool {
 	return len(s.factorScores) > 0
 }
 
-func (s *FactorInterpretationSuggestionStrategy) GenerateSuggestions(_ context.Context, _ *report.InterpretReport) ([]Suggestion, error) {
+func (s *FactorInterpretationSuggestionStrategy) GenerateSuggestions(_ context.Context, _ report.Content) ([]Suggestion, error) {
 	if len(s.factorScores) == 0 {
 		return []Suggestion{}, nil
 	}

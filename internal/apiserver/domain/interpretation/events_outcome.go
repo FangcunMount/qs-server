@@ -18,7 +18,7 @@ type ReportFailedOutcomeData = eventoutcome.ReportFailedPayload
 type ReportFailedOutcomeEvent = event.Event[ReportFailedOutcomeData]
 
 // ReportGeneratedEventInput captures the complete immutable trace of a
-// generated report. GenerationID, rather than Artifact ID, is the aggregate
+// generated report. GenerationID, rather than InterpretReport ID, is the aggregate
 // identity because retries belong to the Generation lifecycle.
 type ReportGeneratedEventInput struct {
 	OrgID                int64

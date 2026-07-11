@@ -8,7 +8,7 @@ package modelpreview
 import (
 	"context"
 
-	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -30,7 +30,7 @@ type Result struct {
 	OutcomeCode  string
 	OutcomeTitle string
 	Scores       map[string]float64
-	Report       *interpretation.InterpretReport
+	Report       *interpretationreport.Draft
 }
 
 // ReportPreviewer runs an evaluation and builds an interpretation report for preview.

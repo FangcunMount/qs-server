@@ -9397,7 +9397,7 @@ const docTemplate = `{
                 }
             }
         },
-        "report.InterpretReport": {
+        "report.Draft": {
             "type": "object"
         },
         "request.AddQuestionRequest": {
@@ -10376,7 +10376,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/modelcatalog.PreviewOutcome"
                 },
                 "raw_report": {
-                    "$ref": "#/definitions/report.InterpretReport"
+                    "$ref": "#/definitions/report.Draft"
                 },
                 "report_sections": {
                     "type": "array",

@@ -8,10 +8,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// Artifact is the target immutable InterpretReport. It is introduced beside
-// the legacy lifecycle-bearing InterpretReport in Batch I1; Batch I2/I8 move
-// persistence and callers to this type before the legacy aggregate is removed.
-type Artifact struct {
+// InterpretReport is the immutable successful report produced by one
+// InterpretationRun under a ReportGeneration.
+type InterpretReport struct {
 	id                  meta.ID
 	generationID        meta.ID
 	outcomeID           meta.ID
@@ -43,7 +42,7 @@ type Association struct {
 	TesteeID     uint64
 }
 
-type ArtifactInput struct {
+type InterpretReportInput struct {
 	ID                  meta.ID
 	GenerationID        meta.ID
 	OutcomeID           meta.ID
@@ -55,7 +54,7 @@ type ArtifactInput struct {
 	GeneratedAt         time.Time
 }
 
-func NewArtifact(input ArtifactInput) (*Artifact, error) {
+func NewInterpretReport(input InterpretReportInput) (*InterpretReport, error) {
 	if input.ID.IsZero() || input.GenerationID.IsZero() || input.OutcomeID.IsZero() || input.InterpretationRunID.IsZero() {
 		return nil, fmt.Errorf("report, generation, outcome and interpretation run ids are required")
 	}
@@ -68,7 +67,7 @@ func NewArtifact(input ArtifactInput) (*Artifact, error) {
 	if input.GeneratedAt.IsZero() {
 		return nil, fmt.Errorf("report generated at is required")
 	}
-	return &Artifact{
+	return &InterpretReport{
 		id:                  input.ID,
 		generationID:        input.GenerationID,
 		outcomeID:           input.OutcomeID,
@@ -81,23 +80,23 @@ func NewArtifact(input ArtifactInput) (*Artifact, error) {
 	}, nil
 }
 
-func (a *Artifact) ID() meta.ID { return a.id }
+func (r *InterpretReport) ID() meta.ID { return r.id }
 
-func (a *Artifact) GenerationID() meta.ID { return a.generationID }
+func (r *InterpretReport) GenerationID() meta.ID { return r.generationID }
 
-func (a *Artifact) OutcomeID() meta.ID { return a.outcomeID }
+func (r *InterpretReport) OutcomeID() meta.ID { return r.outcomeID }
 
-func (a *Artifact) InterpretationRunID() meta.ID { return a.interpretationRunID }
+func (r *InterpretReport) InterpretationRunID() meta.ID { return r.interpretationRunID }
 
-func (a *Artifact) Association() Association { return a.association }
+func (r *InterpretReport) Association() Association { return r.association }
 
-func (a *Artifact) ReportType() policy.ReportType { return a.reportType }
+func (r *InterpretReport) ReportType() policy.ReportType { return r.reportType }
 
-func (a *Artifact) TemplateVersion() policy.TemplateVersion { return a.templateVersion }
+func (r *InterpretReport) TemplateVersion() policy.TemplateVersion { return r.templateVersion }
 
-func (a *Artifact) Content() Content { return cloneContent(a.content) }
+func (r *InterpretReport) Content() Content { return cloneContent(r.content) }
 
-func (a *Artifact) GeneratedAt() time.Time { return a.generatedAt }
+func (r *InterpretReport) GeneratedAt() time.Time { return r.generatedAt }
 
 func cloneContent(content Content) Content {
 	cloned := Content{

@@ -9,10 +9,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestArtifactReadQueryUsesExistingReportFilterSemantics(t *testing.T) {
+func TestCurrentReportReadQueryUsesExistingFilterSemantics(t *testing.T) {
 	testeeID := uint64(8)
 	risk := "medium"
-	got := buildArtifactReadModelQuery(evaluationreadmodel.ReportFilter{
+	got := buildInterpretReportReadModelQuery(evaluationreadmodel.ReportFilter{
 		TesteeID:     &testeeID,
 		TesteeIDs:    []uint64{8, 9},
 		HighRiskOnly: true,
@@ -26,22 +26,22 @@ func TestArtifactReadQueryUsesExistingReportFilterSemantics(t *testing.T) {
 		"scale_code": "SDS",
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("artifact query = %#v, want %#v", got, want)
+		t.Fatalf("current report query = %#v, want %#v", got, want)
 	}
 }
 
-func TestMergeNewFirstReportRowsPrefersArtifactsAndPreservesLegacyFallback(t *testing.T) {
+func TestMergeCurrentAndArchivedReportRowsPrefersCurrentReport(t *testing.T) {
 	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
-	artifacts := []evaluationreadmodel.ReportRow{
+	reports := []evaluationreadmodel.ReportRow{
 		{AssessmentID: 1, Conclusion: "new", CreatedAt: now},
 		{AssessmentID: 3, Conclusion: "newer variant", CreatedAt: now.Add(time.Minute)},
 		{AssessmentID: 3, Conclusion: "older variant", CreatedAt: now},
 	}
-	legacy := []evaluationreadmodel.ReportRow{
-		{AssessmentID: 1, Conclusion: "legacy duplicate", CreatedAt: now.Add(2 * time.Minute)},
-		{AssessmentID: 2, Conclusion: "legacy only", CreatedAt: now.Add(30 * time.Second)},
+	archives := []evaluationreadmodel.ReportRow{
+		{AssessmentID: 1, Conclusion: "archived duplicate", CreatedAt: now.Add(2 * time.Minute)},
+		{AssessmentID: 2, Conclusion: "archived only", CreatedAt: now.Add(30 * time.Second)},
 	}
-	merged := mergeNewFirstReportRows(artifacts, legacy)
+	merged := mergeCurrentAndArchivedReportRows(reports, archives)
 	if len(merged) != 3 {
 		t.Fatalf("merged rows = %#v", merged)
 	}

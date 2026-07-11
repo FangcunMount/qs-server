@@ -2,19 +2,20 @@ package characterization_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -58,11 +59,6 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	reportGenerator, err := interpretationreporting.NewGenerator(reportBuilders)
-	if err != nil {
-		t.Fatalf("NewGenerator: %v", err)
-	}
-
 	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
 
 	opts := []evaluationexecute.EngineOption{
@@ -87,11 +83,23 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		capture:      committer,
 		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
-			generation, err := reportGenerator.Generate(ctx, outcome)
+			input, err := interpretationinput.FromLegacyOutcome(outcome)
 			if err != nil {
 				return err
 			}
-			return reportSaver.SaveReportDurably(ctx, generation.Report, outcome.TesteeID(), generation.Events)
+			key, ok := interpretationreporting.MechanismReportBuilderKeyFromInput(input)
+			if !ok {
+				return fmt.Errorf("report builder mechanism key is required")
+			}
+			builder, err := reportBuilders.ResolveByMechanism(key)
+			if err != nil {
+				return err
+			}
+			draft, err := builder.Build(ctx, input)
+			if err != nil {
+				return err
+			}
+			return reportSaver.SaveDraft(draft)
 		},
 	}, reportSaver
 }
@@ -270,15 +278,11 @@ func newV1RecordingExecuteService(
 }
 
 type charSplitPhaseReportSaver struct {
-	saved      bool
-	eventTypes []string
+	saved bool
 }
 
-func (s *charSplitPhaseReportSaver) SaveReportDurably(_ context.Context, _ *domainreport.InterpretReport, _ testee.ID, events []event.DomainEvent) error {
+func (s *charSplitPhaseReportSaver) SaveDraft(_ *domainreport.Draft) error {
 	s.saved = true
-	for _, evt := range events {
-		s.eventTypes = append(s.eventTypes, evt.EventType())
-	}
 	return nil
 }
 

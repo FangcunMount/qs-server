@@ -24,13 +24,13 @@ type PersonalityTypeTemplate = typologytemplate.PersonalityTypeReportTemplate
 // TraitProfileTemplate 是类型学 trait-画像 呈现 template。
 type TraitProfileTemplate = typologytemplate.TraitProfileReportTemplate
 
-// BuildPersonalityTypeReport renders personality-type report 从 机制无关 detail。
-var BuildPersonalityTypeReport = typologytemplate.BuildPersonalityTypeReport
+// BuildPersonalityTypeContent renders personality-type report content.
+var BuildPersonalityTypeContent = typologytemplate.BuildPersonalityTypeContent
 
-// BuildTraitProfileReport renders trait-画像 report 从 机制无关 detail。
-var BuildTraitProfileReport = typologytemplate.BuildTraitProfileReport
+// BuildTraitProfileContent renders trait-profile report content.
+var BuildTraitProfileContent = typologytemplate.BuildTraitProfileContent
 
 // DefaultReportBuilder 是共享默认 report composer。
 type DefaultReportBuilder = builder.DefaultReportBuilder
 
-var NewDefaultInterpretReportBuilder = builder.NewDefaultInterpretReportBuilder
+var NewDefaultReportBuilder = builder.NewDefaultReportBuilder

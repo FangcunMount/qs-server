@@ -5,22 +5,14 @@ import (
 
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
-type reportBuilderKey struct {
-	key        evaluation.ExecutionIdentity
-	reportType domainReport.ReportType
-}
-
-// ReportBuilderRegistry 解析报告构建器 按 评估器键 和 report type。
+// ReportBuilderRegistry resolves builders by Interpretation-owned mechanism identity.
 type ReportBuilderRegistry interface {
-	Resolve(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error)
 	ResolveByMechanism(key MechanismReportBuilderKey) (ReportBuilder, error)
 }
 
 type mutableReportBuilderRegistry struct {
-	items          map[reportBuilderKey]ReportBuilder
 	mechanismItems map[MechanismReportBuilderKey]ReportBuilder
 }
 
@@ -62,28 +54,7 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 		}
 		r.mechanismItems[mechanismKey] = builder
 	}
-	if id := builder.ExecutionIdentity(); !id.IsZero() {
-		registryKey := reportBuilderKey{key: id, reportType: reportType}
-		if _, exists := r.items[registryKey]; exists {
-			return fmt.Errorf("interpretation report builder already registered for identity %s report type %s", id, reportType)
-		}
-		r.items[registryKey] = builder
-	}
 	return nil
-}
-
-func (r *mutableReportBuilderRegistry) Resolve(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
-	if r == nil {
-		return nil, fmt.Errorf("interpretation report builder registry is not configured")
-	}
-	if reportType == "" {
-		reportType = domainReport.ReportTypeStandard
-	}
-	builder, err := r.resolveReportBuilder(key, reportType)
-	if err != nil {
-		return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
-	}
-	return builder, nil
 }
 
 func (r *mutableReportBuilderRegistry) ResolveByMechanism(key MechanismReportBuilderKey) (ReportBuilder, error) {

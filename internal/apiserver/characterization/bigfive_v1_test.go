@@ -6,7 +6,6 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: Big Five scorer resolves trait-profile raw scores; report exposes
@@ -63,15 +62,4 @@ func TestV1BigFivePipelinePreservesTraitScoresAndReportFields(t *testing.T) {
 	assertSuggestionExists(t, suggestions, domainreport.SuggestionCategoryGeneral, "特质分布：Openness 6 / Conscientiousness 8 / Extraversion 6 / Agreeableness 8 / Neuroticism 4")
 	assertSuggestionExists(t, suggestions, domainreport.SuggestionCategoryGeneral, "来源与授权：IPIP；License: CC0；非商业使用: false。")
 
-	mapper := mongoevaluation.NewReportMapper()
-	roundTrip := mapper.ToDomain(mapper.ToPO(report, 8004))
-	if roundTrip.ModelExtra() == nil || roundTrip.ModelExtra().Kind != "bigfive" {
-		t.Fatalf("mongo round trip model extra = %#v", roundTrip.ModelExtra())
-	}
-	if len(roundTrip.Dimensions()) != 5 {
-		t.Fatalf("mongo round trip dimensions = %d, want 5", len(roundTrip.Dimensions()))
-	}
-	if roundTrip.Dimensions()[0].Kind() != domainreport.DimensionKindTrait {
-		t.Fatalf("mongo round trip dimension kind = %s, want trait", roundTrip.Dimensions()[0].Kind())
-	}
 }

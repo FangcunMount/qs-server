@@ -8,9 +8,6 @@ import (
 
 var (
 	NewInterpretReport           = report.NewInterpretReport
-	ReconstructInterpretReport   = report.ReconstructInterpretReport
-	FinalizeInterpretReport      = report.FinalizeInterpretReport
-	AttachOutcomeSummary         = report.AttachOutcomeSummary
 	NewDimensionInterpret        = report.NewDimensionInterpret
 	NewNeutralDimensionInterpret = report.NewNeutralDimensionInterpret
 	NewFactorCode                = report.NewFactorCode
@@ -23,15 +20,9 @@ var (
 
 	IsRiskLevelCode = rule.IsRiskLevelCode
 
-	NewDefaultReportBuilder          = builder.NewDefaultReportBuilder
-	NewDefaultInterpretReportBuilder = builder.NewDefaultInterpretReportBuilder
-	NewRuleBasedSuggestionGenerator  = rule.NewRuleBasedSuggestionGenerator
+	NewDefaultReportBuilder         = builder.NewDefaultReportBuilder
+	NewRuleBasedSuggestionGenerator = rule.NewRuleBasedSuggestionGenerator
 )
-
-// NewScaleReportBuilder 创建默认报告构建器（deprecated 名称兼容）。
-func NewScaleReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultReportBuilder {
-	return NewDefaultInterpretReportBuilder(suggestionGenerator)
-}
 
 // NewFactorInterpretationSuggestionStrategy 创建基于因子解读配置的建议策略（根包兼容签名）。
 func NewFactorInterpretationSuggestionStrategy(input GenerateReportInput) *FactorInterpretationSuggestionStrategy {

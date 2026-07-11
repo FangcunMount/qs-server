@@ -1,42 +1,11 @@
 package registry
 
 import (
-	"fmt"
-
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationroute"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
-
-// MechanismReportBuilderKeyFromRuntimeDescriptorKey 映射运行时描述符 路由 到 报告构建器。
-func MechanismReportBuilderKeyFromRuntimeDescriptorKey(
-	key evalpipeline.RuntimeDescriptorKey,
-	reportType domainReport.ReportType,
-) (MechanismReportBuilderKey, bool) {
-	if key.IsZero() {
-		return MechanismReportBuilderKey{}, false
-	}
-	if reportType == "" {
-		reportType = domainReport.ReportTypeStandard
-	}
-	decision := key.DecisionKind
-	if decision == "" {
-		decision = defaultDecisionKindForFamily(key.AlgorithmFamily)
-	}
-	if decision == "" {
-		return MechanismReportBuilderKey{}, false
-	}
-	return MechanismReportBuilderKey{
-		AlgorithmFamily: key.AlgorithmFamily,
-		DecisionKind:    decision,
-		ReportType:      reportType,
-		ReportProfile:   policy.ReportProfileForDecisionKind(decision),
-	}, true
-}
 
 func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
 	switch family {
@@ -51,49 +20,6 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 	default:
 		return ""
 	}
-}
-
-// MechanismReportBuilderKeyFromExecutionIdentity 推导机制 路由 键 从 评估器键。
-func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (MechanismReportBuilderKey, bool) {
-	if reportType == "" {
-		reportType = domainReport.ReportTypeStandard
-	}
-	switch key.Kind {
-	case modelcatalog.KindBehavioralRating:
-		return MechanismReportBuilderKey{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
-			DecisionKind:    modelcatalog.DecisionKindNormLookup,
-			ReportType:      reportType,
-		}, true
-	case modelcatalog.KindCognitive:
-		return MechanismReportBuilderKey{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
-			DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
-			ReportType:      reportType,
-		}, true
-	}
-	family, ok := modelcatalog.AlgorithmFamilyFromIdentity(key.Kind, key.SubKind, key.Algorithm)
-	if !ok {
-		return MechanismReportBuilderKey{}, false
-	}
-	decision := defaultDecisionKindForFamily(family)
-	if decision == "" {
-		return MechanismReportBuilderKey{}, false
-	}
-	return MechanismReportBuilderKey{
-		AlgorithmFamily: family,
-		DecisionKind:    decision,
-		ReportType:      reportType,
-	}, true
-}
-
-// MechanismReportBuilderKeyFromOutcome 推导机制 路由 键 从 scored 结果。
-func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (MechanismReportBuilderKey, bool) {
-	ctx, ok := ReportRoutingContextFromOutcome(outcome)
-	if !ok {
-		return MechanismReportBuilderKey{}, false
-	}
-	return ctx.MechanismKey()
 }
 
 // MechanismReportBuilderKeyFromInput resolves a mechanism route from
@@ -154,15 +80,4 @@ func dedupeMechanismKeys(keys []MechanismReportBuilderKey) []MechanismReportBuil
 		out = append(out, key)
 	}
 	return out
-}
-
-func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
-	if reportType == "" {
-		reportType = domainReport.ReportTypeStandard
-	}
-	mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, reportType)
-	if !ok {
-		return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
-	}
-	return r.ResolveByMechanism(mechanismKey)
 }

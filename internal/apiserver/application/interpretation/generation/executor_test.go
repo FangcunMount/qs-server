@@ -65,9 +65,9 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 	now := time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
 	gens := newMemoryGenerationRepo()
 	runs := newMemoryRunRepo()
-	artifacts := &memoryArtifactRepo{items: map[meta.ID]*report.Artifact{}}
+	reports := &memoryArtifactRepo{items: map[meta.ID]*report.InterpretReport{}}
 	tx := &starterTx{}
-	starter, err := NewStarter(tx, gens, runs, artifacts, time.Minute)
+	starter, err := NewStarter(tx, gens, runs, reports, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 		t.Fatal(err)
 	}
 	stager := &eventStagerStub{}
-	committer, err := NewInterpretationCommitter(tx, gens, runs, artifacts, stager, nil)
+	committer, err := NewInterpretationCommitter(tx, gens, runs, reports, stager, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,24 +87,24 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 	impl := service.(*executor)
 	impl.now = func() time.Time { return now }
 	impl.newID = meta.New
-	return impl, gens, runs, artifacts, stager, tx
+	return impl, gens, runs, reports, stager, tx
 }
 
-func TestExecutorCommitsArtifactRunGenerationAndEvents(t *testing.T) {
+func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	builder := &executorBuilder{}
-	service, gens, runs, artifacts, stager, tx := newExecutorFixture(t, builder)
+	service, gens, runs, reports, stager, tx := newExecutorFixture(t, builder)
 	result, err := service.Execute(context.Background(), executorInput(), "trace")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != ExecuteStatusGenerated || result.Artifact == nil || result.Generation.Status() != domaingeneration.StatusGenerated {
+	if result.Status != ExecuteStatusGenerated || result.InterpretReport == nil || result.Generation.Status() != domaingeneration.StatusGenerated {
 		t.Fatalf("result=%#v", result)
 	}
-	if run, err := runs.FindByID(context.Background(), result.Artifact.InterpretationRunID()); err != nil || run.Status() != interpretationrun.StatusSucceeded {
+	if run, err := runs.FindByID(context.Background(), result.InterpretReport.InterpretationRunID()); err != nil || run.Status() != interpretationrun.StatusSucceeded {
 		t.Fatalf("run=%#v err=%v", run, err)
 	}
-	if len(artifacts.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 2 || tx.calls != 2 {
-		t.Fatalf("artifacts=%d events=%#v tx=%d", len(artifacts.items), stager.events, tx.calls)
+	if len(reports.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 2 || tx.calls != 2 {
+		t.Fatalf("reports=%d events=%#v tx=%d", len(reports.items), stager.events, tx.calls)
 	}
 	if _, err := service.Execute(context.Background(), executorInput(), "duplicate"); err != nil {
 		t.Fatal(err)
@@ -145,10 +145,10 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Artifact == nil || builder.calls != 2 {
+	if result.InterpretReport == nil || builder.calls != 2 {
 		t.Fatalf("result=%#v calls=%d", result, builder.calls)
 	}
-	run, err := runs.FindByID(context.Background(), result.Artifact.InterpretationRunID())
+	run, err := runs.FindByID(context.Background(), result.InterpretReport.InterpretationRunID())
 	if err != nil || run.Attempt() != 2 {
 		t.Fatalf("retry run=%#v err=%v", run, err)
 	}

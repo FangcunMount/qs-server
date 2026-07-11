@@ -16,7 +16,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 	factorCode := "sleep"
 	createdAt := time.Date(2026, 5, 2, 11, 0, 0, 0, time.UTC)
 
-	row := reportPOToReadRow(&InterpretReportPO{
+	row := archivedReportPOToReadRow(&ArchivedReportPO{
 		BaseDocument: base.BaseDocument{
 			DomainID:  meta.FromUint64(7001),
 			CreatedAt: createdAt,
@@ -59,7 +59,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 }
 
 func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
-	row := reportPOToReadRow(&InterpretReportPO{
+	row := archivedReportPOToReadRow(&ArchivedReportPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 	})
 
@@ -88,7 +88,6 @@ func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
 
 	want := bson.M{
 		"deleted_at": nil,
-		"$or":        generatedReportConditions(),
 		"testee_id":  bson.M{"$in": []uint64{8001, 8002}},
 		"risk_level": "high",
 		"scale_code": "SDS",
@@ -108,20 +107,6 @@ func TestBuildReportReadModelQueryExactRiskOverridesHighRiskOnly(t *testing.T) {
 
 	if got := query["risk_level"]; got != "medium" {
 		t.Fatalf("risk filter = %#v, want exact risk level", got)
-	}
-}
-
-// Legacy reports predate the explicit lifecycle field. Keep their read
-// compatibility until Batch I8 switches the query path to Generation -> Report.
-func TestGeneratedReportConditionsIncludeLegacyGeneratedDocuments(t *testing.T) {
-	got := generatedReportConditions()
-	want := bson.A{
-		bson.M{"status": "generated"},
-		bson.M{"status": bson.M{"$exists": false}},
-		bson.M{"status": ""},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("generated report conditions = %#v, want %#v", got, want)
 	}
 }
 

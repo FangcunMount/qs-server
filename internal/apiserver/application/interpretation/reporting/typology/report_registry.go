@@ -1,92 +1,40 @@
 package typology
 
-import (
-	"fmt"
+import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
-)
-
-type reportBuilderFunc func(evaloutcome.Outcome) (*domainReport.InterpretReport, error)
-
-// ReportAdapterRegistry 解析报告构建器 按 报告适配器 键。
+// ReportAdapterRegistry records the configured Interpretation-owned typology
+// adapters. Builders consume InterpretationInput directly; the registry no
+// longer stores functions over Evaluation outcomes.
 type ReportAdapterRegistry struct {
-	adapters map[modeltypology.ReportAdapterKey]reportBuilderFunc
+	adapters map[modeltypology.ReportAdapterKey]struct{}
 }
 
-// 默认ReportAdapterRegistry 返回内置 类型学 报告适配器。
 func DefaultReportAdapterRegistry() ReportAdapterRegistry {
 	return NewReportAdapterRegistry()
 }
 
-// NewReportAdapterRegistry 返回内置 类型学 报告适配器。
 func NewReportAdapterRegistry() ReportAdapterRegistry {
-	return ReportAdapterRegistry{
-		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
-			modeltypology.ReportAdapterPersonalityType: buildTypologyReportAdapter(modeltypology.ReportAdapterPersonalityType),
-			modeltypology.ReportAdapterTraitProfile:    buildTypologyReportAdapter(modeltypology.ReportAdapterTraitProfile),
-		},
-	}
+	return ReportAdapterRegistry{adapters: map[modeltypology.ReportAdapterKey]struct{}{
+		modeltypology.ReportAdapterPersonalityType: {},
+		modeltypology.ReportAdapterTraitProfile:    {},
+		modeltypology.ReportAdapterMBTI:            {},
+		modeltypology.ReportAdapterSBTI:            {},
+		modeltypology.ReportAdapterBigFive:         {},
+	}}
 }
 
-// Len 报告数量 报告构建器 是 已注册。
-func (r ReportAdapterRegistry) Len() int {
-	return len(r.adapters)
+func (r ReportAdapterRegistry) Len() int { return len(r.adapters) }
+
+func (r ReportAdapterRegistry) Supports(key modeltypology.ReportAdapterKey) bool {
+	_, ok := r.adapters[key]
+	return ok
 }
 
-// Register 返回注册表副本 使用 额外 或 覆盖 报告构建器。
-func (r ReportAdapterRegistry) Register(key modeltypology.ReportAdapterKey, builder reportBuilderFunc) ReportAdapterRegistry {
-	next := ReportAdapterRegistry{adapters: make(map[modeltypology.ReportAdapterKey]reportBuilderFunc, len(r.adapters)+1)}
-	for k, v := range r.adapters {
-		next.adapters[k] = v
+func (r ReportAdapterRegistry) Register(key modeltypology.ReportAdapterKey) ReportAdapterRegistry {
+	next := ReportAdapterRegistry{adapters: make(map[modeltypology.ReportAdapterKey]struct{}, len(r.adapters)+1)}
+	for current := range r.adapters {
+		next.adapters[current] = struct{}{}
 	}
-	next.adapters[key] = builder
+	next.adapters[key] = struct{}{}
 	return next
-}
-
-func (r ReportAdapterRegistry) build(
-	spec modeltypology.ReportSpec,
-	mapping modeltypology.OutcomeMappingSpec,
-	decisionKind modelcatalog.DecisionKind,
-	outcome evaloutcome.Outcome,
-) (*domainReport.InterpretReport, error) {
-	adapterKey := spec.ResolvedAdapterKey(mapping, decisionKind)
-	return r.buildByAdapter(adapterKey, outcome)
-}
-
-func (r ReportAdapterRegistry) buildByAdapter(
-	adapterKey modeltypology.ReportAdapterKey,
-	outcome evaloutcome.Outcome,
-) (*domainReport.InterpretReport, error) {
-	if adapterKey == "" {
-		return nil, fmt.Errorf("report adapter key is required")
-	}
-	builder, ok := r.adapters[adapterKey]
-	if !ok {
-		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)
-	}
-	return builder(outcome)
-}
-
-// build类型学ReportAdapter returns 报告构建器 用于 固定适配器键。
-func buildTypologyReportAdapter(adapterKey modeltypology.ReportAdapterKey) reportBuilderFunc {
-	return func(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-		return buildTypologyReport(adapterKey, outcome)
-	}
-}
-
-func buildTypologyReport(
-	adapterKey modeltypology.ReportAdapterKey,
-	outcome evaloutcome.Outcome,
-) (*domainReport.InterpretReport, error) {
-	switch adapterKey {
-	case modeltypology.ReportAdapterPersonalityType:
-		return buildPersonalityTypeReport(adapterKey, outcome)
-	case modeltypology.ReportAdapterTraitProfile:
-		return buildTraitProfileReport(adapterKey, outcome)
-	default:
-		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)
-	}
 }

@@ -9,21 +9,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type registryReportBuilderStub struct {
-	key       evaluation.ExecutionIdentity
 	mechanism MechanismReportBuilderKey
 }
 
-func (b registryReportBuilderStub) ExecutionIdentity() evaluation.ExecutionIdentity { return b.key }
 func (b registryReportBuilderStub) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
-}
-
-func (b registryReportBuilderStub) Key() evaluation.ExecutionIdentity {
-	return b.ExecutionIdentity()
 }
 func (registryReportBuilderStub) TemplateVersion() policy.TemplateVersion {
 	return policy.TemplateVersionV1
@@ -46,8 +39,8 @@ func (b registryReportBuilderStub) MechanismKey() MechanismReportBuilderKey {
 
 func TestReportBuilderRegistryRejectsDuplicateKey(t *testing.T) {
 	_, err := NewReportBuilderRegistry(
-		registryReportBuilderStub{key: evaluation.ExecutionIdentityScaleDefault},
-		registryReportBuilderStub{key: evaluation.ExecutionIdentityScaleDefault},
+		registryReportBuilderStub{},
+		registryReportBuilderStub{},
 	)
 	if err == nil {
 		t.Fatal("NewReportBuilderRegistry error = nil, want duplicate key")
@@ -55,43 +48,12 @@ func TestReportBuilderRegistryRejectsDuplicateKey(t *testing.T) {
 }
 
 func TestReportBuilderRegistryRejectsUnknownKey(t *testing.T) {
-	registry, err := NewReportBuilderRegistry(registryReportBuilderStub{key: evaluation.ExecutionIdentityScaleDefault})
+	registry, err := NewReportBuilderRegistry(registryReportBuilderStub{})
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI), domainReport.ReportTypeStandard); err == nil {
-		t.Fatal("Resolve error = nil, want unsupported key")
-	}
-}
-
-func TestReportBuilderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
-	registry, err := NewReportBuilderRegistry(registryReportBuilderStub{
-		key: evaluation.ExecutionIdentityPersonalityTypology,
-		mechanism: MechanismReportBuilderKey{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
-			ReportType:      domainReport.ReportTypeStandard,
-		},
-	})
-	if err != nil {
-		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
-	}
-	for _, legacyKey := range legacyTypologyIdentities() {
-		builder, err := registry.Resolve(legacyKey, domainReport.ReportTypeStandard)
-		if err != nil {
-			t.Fatalf("Resolve(%s): %v", legacyKey, err)
-		}
-		if builder.Key() != evaluation.ExecutionIdentityPersonalityTypology {
-			t.Fatalf("builder key = %s, want configured typology", builder.Key())
-		}
-	}
-}
-
-func legacyTypologyIdentities() []evaluation.ExecutionIdentity {
-	return []evaluation.ExecutionIdentity{
-		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI),
-		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI),
-		evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive),
+	if _, err := registry.ResolveByMechanism(MechanismReportBuilderKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: domainReport.ReportTypeStandard}); err == nil {
+		t.Fatal("ResolveByMechanism error = nil, want unsupported key")
 	}
 }
 
@@ -108,21 +70,8 @@ func TestReportBuilderRegistryResolvesByMechanismKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if builder.Key() != evaluation.ExecutionIdentityScaleDefault {
-		t.Fatalf("builder key = %s", builder.Key())
-	}
-}
-
-func TestReportBuilderRegistryFallsBackToMechanismFromEvaluatorKey(t *testing.T) {
-	registry, err := NewReportBuilderRegistry(NewNormProfileReportBuilder(nil))
-	if err != nil {
-		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
-	}
-	builder, err := registry.Resolve(evaluation.ExecutionIdentityBehavioralRatingDefault, domainReport.ReportTypeStandard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if builder.Key() != evaluation.ExecutionIdentityBehavioralRatingDefault {
-		t.Fatalf("builder key = %s", builder.Key())
+	keyed, ok := builder.(MechanismKeyedReportBuilder)
+	if !ok || keyed.MechanismKey().AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
+		t.Fatalf("builder mechanism = %#v", builder)
 	}
 }
