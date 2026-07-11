@@ -19,6 +19,9 @@ mongodb/
 | `questionnaires` | 问卷集合 | domain_id, code+version, status |
 | `scales` | 量表集合 | domain_id, code, questionnaire |
 | `interpret_reports` | 解读报告集合 | domain_id, testee_id, scale_code |
+| `report_generations` | 报告生成意图（v2） | outcome_id, report_type, template_version |
+| `interpretation_runs` | 报告生成尝试（v2） | generation_id, attempt |
+| `interpret_report_artifacts` | 成功报告成品（v2） | generation_id, assessment_id, testee_id |
 
 ## 🔧 迁移文件格式
 
@@ -80,4 +83,3 @@ MongoDB 迁移文件使用 JSON 格式，包含 `db.runCommand` 操作数组：
 2. 迁移主要用于管理索引和 Schema 验证规则
 3. `_id` 索引由 MongoDB 自动创建和管理
 4. 回滚脚本使用 `"index": "*"` 删除所有非 `_id` 索引
-

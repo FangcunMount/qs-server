@@ -13,17 +13,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type reportReadModel struct {
+// legacyReportReadModel owns the original lifecycle-bearing collection only.
+// The public reader facade is implemented in artifact_read_model.go.
+type legacyReportReadModel struct {
 	base.BaseRepository
 }
 
-func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
-	return &reportReadModel{
+func newLegacyReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) *legacyReportReadModel {
+	return &legacyReportReadModel{
 		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName(), opts...),
 	}
 }
 
-func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*evaluationreadmodel.ReportRow, error) {
+func (r *legacyReportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*evaluationreadmodel.ReportRow, error) {
 	return r.getReport(ctx, bson.M{
 		"domain_id":  reportID,
 		"deleted_at": nil,
@@ -31,11 +33,11 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	})
 }
 
-func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
+func (r *legacyReportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
 	return r.GetReportByID(ctx, assessmentID)
 }
 
-func (r *reportReadModel) ListReports(
+func (r *legacyReportReadModel) ListReports(
 	ctx context.Context,
 	filter evaluationreadmodel.ReportFilter,
 	page evaluationreadmodel.PageRequest,
@@ -102,7 +104,7 @@ func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *opti
 		SetSort(bson.M{"created_at": -1})
 }
 
-func (r *reportReadModel) getReport(ctx context.Context, filter bson.M) (*evaluationreadmodel.ReportRow, error) {
+func (r *legacyReportReadModel) getReport(ctx context.Context, filter bson.M) (*evaluationreadmodel.ReportRow, error) {
 	var po InterpretReportPO
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {

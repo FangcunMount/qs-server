@@ -1,0 +1,5 @@
+[
+  { "drop": "interpret_report_artifacts" },
+  { "drop": "interpretation_runs" },
+  { "drop": "report_generations" }
+]

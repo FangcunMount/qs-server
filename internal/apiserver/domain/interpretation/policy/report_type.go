@@ -9,6 +9,24 @@ func (t ReportType) String() string {
 	return string(t)
 }
 
+func (t ReportType) IsEmpty() bool {
+	return t == ""
+}
+
+// TemplateVersion identifies one immutable release of all report-producing
+// assets: template, builder behavior, interpretation rules and content schema.
+// A new version produces a new ReportGeneration instead of overwriting a
+// generated artifact.
+type TemplateVersion string
+
+func (v TemplateVersion) String() string {
+	return string(v)
+}
+
+func (v TemplateVersion) IsEmpty() bool {
+	return v == ""
+}
+
 // ResolveReportType 选择报告展示策略。
 func ResolveReportType() ReportType {
 	return ReportTypeStandard

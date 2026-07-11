@@ -13,10 +13,58 @@ func TestInterpretationSubpackagesOwnMechanismConcerns(t *testing.T) {
 
 	root := repoRoot(t)
 	interpRoot := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
-	required := []string{"report", "builder", "rule", "template", "policy"}
+	required := []string{"generation", "run", "report", "builder", "rule", "template", "policy"}
 	for _, pkg := range required {
 		if _, err := os.Stat(filepath.Join(interpRoot, pkg)); err != nil {
 			t.Fatalf("missing interpretation subpackage %q", pkg)
+		}
+	}
+}
+
+func TestInterpretationLifecyclePackagesDoNotDependOnEvaluation(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	paths := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "generation"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "run"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "report", "artifact.go"),
+	}
+	forbidden := []string{
+		"application/evaluation",
+		"domain/evaluation",
+		"port/evaluation",
+		"infra/mongo/evaluation",
+	}
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := []string{path}
+		if info.IsDir() {
+			entries, readErr := os.ReadDir(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			files = files[:0]
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+					continue
+				}
+				files = append(files, filepath.Join(path, entry.Name()))
+			}
+		}
+		for _, file := range files {
+			data, readErr := os.ReadFile(file)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			for _, token := range forbidden {
+				if strings.Contains(string(data), token) {
+					t.Fatalf("Interpretation lifecycle package depends on Evaluation in %s: %s", file, token)
+				}
+			}
 		}
 	}
 }

@@ -1,0 +1,31 @@
+[
+  { "create": "report_generations" },
+  { "create": "interpretation_runs" },
+  { "create": "interpret_report_artifacts" },
+  {
+    "createIndexes": "report_generations",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_generation_domain_id", "unique": true },
+      { "key": { "outcome_id": 1, "report_type": 1, "template_version": 1 }, "name": "uk_generation_key", "unique": true },
+      { "key": { "outcome_id": 1, "status": 1, "updated_at": -1 }, "name": "idx_generation_outcome_status_updated" }
+    ]
+  },
+  {
+    "createIndexes": "interpretation_runs",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_interpretation_run_domain_id", "unique": true },
+      { "key": { "generation_id": 1, "attempt": 1 }, "name": "uk_interpretation_run_generation_attempt", "unique": true },
+      { "key": { "generation_id": 1, "attempt": -1 }, "name": "idx_interpretation_run_generation_attempt_desc" }
+    ]
+  },
+  {
+    "createIndexes": "interpret_report_artifacts",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_artifact_domain_id", "unique": true },
+      { "key": { "generation_id": 1 }, "name": "uk_artifact_generation_id", "unique": true },
+      { "key": { "outcome_id": 1, "report_type": 1, "template_version": 1 }, "name": "idx_artifact_outcome_type_version" },
+      { "key": { "assessment_id": 1, "generated_at": -1 }, "name": "idx_artifact_assessment_generated" },
+      { "key": { "testee_id": 1, "generated_at": -1 }, "name": "idx_artifact_testee_generated" }
+    ]
+  }
+]
