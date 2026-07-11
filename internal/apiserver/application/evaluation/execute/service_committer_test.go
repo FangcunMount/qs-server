@@ -23,7 +23,9 @@ func (s *evaluationCommitterStub) Commit(_ context.Context, request outcomecommi
 	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
 		return nil, err
 	}
-	request.Run.Succeed(time.Unix(200, 0))
+	if err := request.Run.Succeed(time.Unix(200, 0)); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -49,6 +51,7 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 		WithEvaluatorRegistry(registry),
 		WithRunRepository(runRepo),
 		WithEvaluationCommitter(committer),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	)
 
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -86,7 +89,9 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 		&fakeAssessmentRepo{assessment: a},
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
+		WithRunRepository(&stubRunRepo{}),
 		WithEvaluationCommitter(committer),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	)
 
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -94,5 +99,31 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 	}
 	if evaluator.calls != 0 || committer.calls != 0 {
 		t.Fatalf("duplicate evaluated execution: evaluator=%d committer=%d", evaluator.calls, committer.calls)
+	}
+}
+
+func TestEvaluateRejectsSuccessfulPathWithoutEvaluationCommitter(t *testing.T) {
+	t.Parallel()
+
+	a := splitPhaseAssessment(t)
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
+	registry, err := NewEvaluatorRegistry(evaluator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(
+		&fakeAssessmentRepo{assessment: a},
+		stubInputResolver{},
+		WithEvaluatorRegistry(registry),
+		WithRunRepository(&stubRunRepo{}),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
+	)
+
+	err = svc.Evaluate(context.Background(), a.ID().Uint64())
+	if err == nil {
+		t.Fatalf("Evaluate error = %v, want missing EvaluationCommitter", err)
+	}
+	if evaluator.calls != 1 {
+		t.Fatalf("evaluator calls = %d, want 1", evaluator.calls)
 	}
 }

@@ -122,8 +122,12 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	).(*committer)
 	c.newID = func() meta.ID { return meta.FromUint64(9001) }
 	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
-	run.AttachInputSnapshot("model:SCALE-1@1.0.0")
-	run.Start(time.Unix(100, 0))
+	if err := run.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.AttachInputSnapshot("model:SCALE-1@1.0.0"); err != nil {
+		t.Fatal(err)
+	}
 	evaluatedAt := time.Unix(200, 0)
 
 	record, err := c.Commit(context.Background(), Request{

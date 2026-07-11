@@ -19,8 +19,12 @@ func TestReportFailureDoesNotModifyEvaluationFacts(t *testing.T) {
 	assessmentBefore := evaluatedAssessmentForReport(t)
 	scoreBefore := *assessmentBefore.TotalScore()
 	run := evalrun.NewEvaluationRunWithAttempt(assessmentBefore.ID().Uint64(), 1)
-	run.Start(time.Unix(100, 0))
-	run.Succeed(time.Unix(200, 0))
+	if err := run.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Succeed(time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	}
 	outcomes := &outcomeRepoForReport{record: record}
 	states := &reportStateStoreStub{}
 	svc := NewOutcomeReportService(outcomes, states, &failThenGenerate{}, &durableReportSaverStub{})

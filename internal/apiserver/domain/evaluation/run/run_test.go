@@ -9,7 +9,12 @@ func TestNextEvaluationRunIncrementsAttempt(t *testing.T) {
 	t.Parallel()
 
 	first := NewEvaluationRunWithAttempt(42, 1)
-	first.Fail(time.Now(), Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true})
+	if err := first.Start(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Fail(time.Now(), Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true}); err != nil {
+		t.Fatal(err)
+	}
 	second := NextEvaluationRun(first)
 	if second.Attempt.Number != 2 {
 		t.Fatalf("attempt=%d, want 2", second.Attempt.Number)
@@ -24,13 +29,17 @@ func TestEvaluationRunLifecycle(t *testing.T) {
 
 	now := time.Date(2026, 7, 7, 10, 0, 0, 0, time.UTC)
 	run := NewEvaluationRun(42)
-	run.Start(now)
+	if err := run.Start(now); err != nil {
+		t.Fatal(err)
+	}
 	if run.Attempt.Status != StatusRunning {
 		t.Fatalf("status=%s", run.Attempt.Status)
 	}
 
 	done := now.Add(time.Minute)
-	run.Succeed(done)
+	if err := run.Succeed(done); err != nil {
+		t.Fatal(err)
+	}
 	if run.Attempt.Status != StatusSucceeded {
 		t.Fatalf("status=%s", run.Attempt.Status)
 	}
@@ -43,8 +52,43 @@ func TestEvaluationRunFailureRetryable(t *testing.T) {
 	t.Parallel()
 
 	run := NewEvaluationRun(7)
-	run.Fail(time.Now(), Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true})
+	if err := run.Start(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Fail(time.Now(), Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true}); err != nil {
+		t.Fatal(err)
+	}
 	if !run.Retryable() {
 		t.Fatal("expected retryable failure")
+	}
+}
+
+func TestEvaluationRunRejectsInvalidTransitionsAndSnapshotRewrites(t *testing.T) {
+	t.Parallel()
+
+	run := NewEvaluationRun(7)
+	if err := run.Succeed(time.Now()); err == nil {
+		t.Fatal("pending run must not succeed")
+	}
+	if err := run.Fail(time.Now(), Failure{Kind: FailureKindInternal, Message: "failed"}); err == nil {
+		t.Fatal("pending run must not fail")
+	}
+	if err := run.Start(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Start(time.Now()); err == nil {
+		t.Fatal("running run must not start again")
+	}
+	if err := run.AttachInputSnapshot("snapshot:v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.AttachInputSnapshot("snapshot:v2"); err == nil {
+		t.Fatal("run input snapshot must be immutable")
+	}
+	if err := run.Fail(time.Now(), Failure{Kind: FailureKindInternal, Message: "failed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Succeed(time.Now()); err == nil {
+		t.Fatal("failed run must not succeed")
 	}
 }

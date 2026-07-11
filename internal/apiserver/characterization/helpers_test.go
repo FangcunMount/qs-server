@@ -6,14 +6,18 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -40,15 +44,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		repo = &charAssessmentRepo{assessment: cfg.Assessment}
 	}
 	reportSaver := &charSplitPhaseReportSaver{}
-	scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
-		interpretationreporting.NewFactorScoringScoreProjector(&charNoopScoreRepo{}),
-		interpretationreporting.NewNormProfileScoreProjector(&charNoopScoreRepo{}),
-		interpretationreporting.NewTaskPerformanceScoreProjector(&charNoopScoreRepo{}),
-	)
-	if err != nil {
-		t.Fatalf("NewScoreProjectorRegistry: %v", err)
-	}
-	scoringWriter := &charCapturingScoringWriter{delegate: outcomescoring.NewWriter(repo, scoreProjectors)}
+	committer := &charCapturingEvaluationCommitter{stage: cfg.StageEvaluated}
 
 	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(cfg.ReportBuilder)
 	if err != nil {
@@ -66,7 +62,8 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
 		evaluationexecute.WithFamilyEvaluators(familyEvaluators),
-		evaluationexecute.WithScoringWriter(scoringWriter),
+		evaluationexecute.WithEvaluationCommitter(committer),
+		evaluationexecute.WithRunRepository(&charRunRepo{}),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(ctx context.Context, events ...event.DomainEvent) error {
 			if cfg.StageEvaluated != nil {
 				return cfg.StageEvaluated(ctx, events...)
@@ -82,7 +79,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	)
 	return &charSplitPhaseService{
 		Service:      core,
-		capture:      scoringWriter,
+		capture:      committer,
 		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
 			generation, err := reportGenerator.Generate(ctx, outcome)
@@ -94,19 +91,38 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	}, reportSaver
 }
 
-type charCapturingScoringWriter struct {
-	delegate outcomescoring.Writer
-	outcome  evaloutcome.Outcome
+type charCapturingEvaluationCommitter struct {
+	stage   func(ctx context.Context, events ...event.DomainEvent) error
+	outcome evaloutcome.Outcome
 }
 
-func (w *charCapturingScoringWriter) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
-	w.outcome = outcome
-	return w.delegate.Write(ctx, outcome)
+func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
+	c.outcome = request.Outcome
+	if request.Outcome.Assessment == nil || request.Outcome.Execution == nil {
+		return nil, nil
+	}
+	if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+		return nil, err
+	}
+	if request.Run != nil {
+		if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
+			return nil, err
+		}
+		request.Outcome.Assessment.StageEvaluatedEvent(request.EvaluatedAt, meta.FromUint64(1), request.Run.RunID)
+	}
+	if c.stage != nil {
+		events := request.Outcome.Assessment.Events()
+		if err := c.stage(ctx, events...); err != nil {
+			return nil, err
+		}
+	}
+	request.Outcome.Assessment.ClearEvents()
+	return nil, nil
 }
 
 type charSplitPhaseService struct {
 	evaluationexecute.Service
-	capture        *charCapturingScoringWriter
+	capture        *charCapturingEvaluationCommitter
 	inlineLegacy   bool
 	generateReport func(context.Context, evaloutcome.Outcome) error
 }
@@ -158,6 +174,30 @@ func (r *charAssessmentRepo) FindByAnswerSheetID(_ context.Context, ref assessme
 	return nil, nil
 }
 
+type charRunRepo struct {
+	latest *evalrun.EvaluationRun
+}
+
+func (r *charRunRepo) Save(_ context.Context, run evalrun.EvaluationRun) error {
+	copy := run
+	r.latest = &copy
+	return nil
+}
+func (r *charRunRepo) FindLatestByAssessmentID(_ context.Context, _ uint64) (*evalrun.EvaluationRun, error) {
+	return r.latest, nil
+}
+func (r *charRunRepo) ListByAssessmentID(_ context.Context, _ uint64, _ int) ([]evalrun.EvaluationRun, error) {
+	if r.latest == nil {
+		return nil, nil
+	}
+	return []evalrun.EvaluationRun{*r.latest}, nil
+}
+func (*charRunRepo) ListRetryableFailed(context.Context, evaluationrun.ListRetryableFailedParams) (*evaluationrun.ListRetryableFailedResult, error) {
+	return &evaluationrun.ListRetryableFailedResult{}, nil
+}
+
+var _ evaluationrun.Repository = (*charRunRepo)(nil)
+
 type charInputResolver struct {
 	snapshot *evaluationinput.InputSnapshot
 	lastRef  evaluationinput.InputRef
@@ -183,15 +223,6 @@ func (s *charRecordingInterpretation) GenerateAndPersist(_ context.Context, outc
 	return nil
 }
 
-type charRecordingScoring struct{}
-
-func (charRecordingScoring) Write(_ context.Context, outcome evaloutcome.Outcome) error {
-	if outcome.Assessment != nil && outcome.Execution != nil {
-		return outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
-	}
-	return nil
-}
-
 func newV1RecordingExecuteService(
 	t *testing.T,
 	a *assessment.Assessment,
@@ -199,14 +230,15 @@ func newV1RecordingExecuteService(
 ) (*charSplitPhaseService, *charSplitPhaseCapture) {
 	t.Helper()
 	capture := &charSplitPhaseCapture{}
-	recording := &charCapturingScoringWriter{delegate: charRecordingScoring{}}
+	recording := &charCapturingEvaluationCommitter{}
 	core := evaluationexecute.NewService(
 		&charAssessmentRepo{assessment: a},
 		input,
 		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
 		evaluationexecute.WithRuntimeDescriptorRegistry(wireV1RuntimeDescriptorRegistry(t)),
 		evaluationexecute.WithFamilyEvaluators(newV1FamilyEvaluators(t)),
-		evaluationexecute.WithScoringWriter(recording),
+		evaluationexecute.WithEvaluationCommitter(recording),
+		evaluationexecute.WithRunRepository(&charRunRepo{}),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
 	return &charSplitPhaseService{
@@ -218,13 +250,6 @@ func newV1RecordingExecuteService(
 		},
 	}, capture
 }
-
-type charNoopScoreRepo struct{}
-
-func (*charNoopScoreRepo) SaveScoresWithContext(context.Context, *assessment.Assessment, *assessment.ScaleScoreProjection) error {
-	return nil
-}
-func (*charNoopScoreRepo) DeleteByAssessmentID(context.Context, assessment.ID) error { return nil }
 
 type charSplitPhaseReportSaver struct {
 	saved      bool

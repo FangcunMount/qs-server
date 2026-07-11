@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	stderrors "errors"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -11,10 +12,11 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // loadedAssessment 加载的评估数据
@@ -166,14 +168,30 @@ func inputResolveFailureReason(err error) string {
 // evaluationFailureFinalizer 评估失败标记器
 type evaluationFailureFinalizer struct {
 	repo         assessment.Repository
+	runRepo      evaluationrun.Repository
 	txRunner     apptransaction.Runner
 	eventStager  EventStager
 	reportStatus *reportstatus.Reporter
 	readyIndexer *appEventing.PostCommitReadyIndexer
 }
 
-// MarkAsFailed 标记评估失败
-func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessment.Assessment, reason string) {
+// Finalize atomically persists the Assessment failure, terminal Run and failure event.
+func (f evaluationFailureFinalizer) Finalize(
+	ctx context.Context,
+	a *assessment.Assessment,
+	run *evalrun.EvaluationRun,
+	reason string,
+	failure evalrun.Failure,
+) error {
+	if f.repo == nil || f.runRepo == nil || f.txRunner == nil || f.eventStager == nil {
+		return evalerrors.ModuleNotConfigured("evaluation failure finalizer requires transaction, assessment, run and outbox dependencies")
+	}
+	if a == nil || run == nil {
+		return fmt.Errorf("assessment and evaluation run are required")
+	}
+	if run.AssessmentID != a.ID().Uint64() {
+		return fmt.Errorf("evaluation run assessment does not match failure assessment")
+	}
 	log := logger.L(ctx)
 
 	log.Warnw("标记测评为失败",
@@ -187,47 +205,38 @@ func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessm
 			"assessment_id", a.ID().Uint64(),
 			"error", err.Error(),
 		)
-		return
+		return err
 	}
-	if err := f.SaveAssessmentWithEvents(ctx, a); err != nil {
-		log.Warnw("failed to persist failed assessment with outbox",
+	if err := run.Fail(time.Now(), failure); err != nil {
+		return err
+	}
+	eventsToStage := a.Events()
+	if err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := f.repo.Save(txCtx, a); err != nil {
+			return err
+		}
+		if err := f.runRepo.Save(txCtx, *run); err != nil {
+			return err
+		}
+		if len(eventsToStage) > 0 {
+			return f.eventStager.Stage(txCtx, eventsToStage...)
+		}
+		return nil
+	}); err != nil {
+		log.Warnw("failed to persist failed assessment, run and outbox",
 			"assessment_id", a.ID().Uint64(),
 			"error", err.Error(),
 		)
+		return err
+	}
+	a.ClearEvents()
+	if f.readyIndexer != nil && len(eventsToStage) > 0 {
+		f.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, time.Now())
 	}
 	if f.reportStatus != nil {
 		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
 		f.reportStatus.SetFailed(ctx, assessmentID, answerSheetID, "evaluation_failed", reason)
 	}
-}
-
-// SaveAssessmentWithEvents 保存评估数据和事件
-func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
-	if f.txRunner == nil || f.eventStager == nil {
-		return evalerrors.ModuleNotConfigured("assessment engine transactional outbox requires transaction runner and event stager")
-	}
-	if a == nil {
-		return nil
-	}
-	var stagedEvents []event.DomainEvent
-	err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := f.repo.Save(txCtx, a); err != nil {
-			return err
-		}
-		eventsToStage := a.Events()
-		if len(eventsToStage) == 0 {
-			return nil
-		}
-		stagedEvents = eventsToStage
-		return f.eventStager.Stage(txCtx, eventsToStage...)
-	})
-	if err != nil {
-		return err
-	}
-	if f.readyIndexer != nil && len(stagedEvents) > 0 {
-		f.readyIndexer.EnqueueAfterCommit(ctx, stagedEvents, time.Now())
-	}
-	a.ClearEvents()
 	return nil
 }
 

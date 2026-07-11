@@ -13,13 +13,15 @@ import (
 )
 
 type stubRunRepo struct {
-	latest   *evalrun.EvaluationRun
-	saved    []evalrun.EvaluationRun
-	saveErr  error
-	saveErrs []error
+	latest             *evalrun.EvaluationRun
+	saved              []evalrun.EvaluationRun
+	saveErr            error
+	saveErrs           []error
+	saveCtxHadTxMarker bool
 }
 
-func (r *stubRunRepo) Save(_ context.Context, run evalrun.EvaluationRun) error {
+func (r *stubRunRepo) Save(ctx context.Context, run evalrun.EvaluationRun) error {
+	r.saveCtxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
 	r.saved = append(r.saved, run)
 	if len(r.saveErrs) > 0 {
 		err := r.saveErrs[0]
@@ -96,8 +98,8 @@ func TestEvaluateReturnsRunPersistenceErrorBeforeExecuting(t *testing.T) {
 	if evaluator.calls != 0 {
 		t.Fatalf("evaluator calls = %d, want 0 after start run persist failure", evaluator.calls)
 	}
-	if capture.ScoringCalls != 0 {
-		t.Fatalf("scoring calls = %d, want none", capture.ScoringCalls)
+	if capture.CommitCalls != 0 {
+		t.Fatalf("committer calls = %d, want none", capture.CommitCalls)
 	}
 }
 
@@ -128,8 +130,8 @@ func TestEvaluateReturnsCurrentRunPersistenceErrorBeforeExecuting(t *testing.T) 
 	if evaluator.calls != 0 {
 		t.Fatalf("evaluator calls = %d, want 0 after current run persist failure", evaluator.calls)
 	}
-	if !a.Status().IsFailed() {
-		t.Fatalf("assessment status = %s, want failed for start persistence failure", a.Status())
+	if !a.Status().IsSubmitted() {
+		t.Fatalf("assessment status = %s, want submitted when start transaction rolls back", a.Status())
 	}
 }
 
@@ -153,6 +155,7 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
 		WithRunRepository(runRepo),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	).(*service)
 
 	err = svc.Evaluate(context.Background(), a.ID().Uint64())
@@ -188,6 +191,7 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 		stubInputResolver{},
 		WithEvaluatorRegistry(registry),
 		WithRunRepository(runRepo),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	).(*service)
 
 	err = svc.Evaluate(context.Background(), a.ID().Uint64())
@@ -205,67 +209,79 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	}
 }
 
-func TestEvaluateReturnsSucceededRunPersistenceErrorAfterScoring(t *testing.T) {
-	t.Parallel()
-
-	persistErr := errors.New("succeeded run save failed")
-	a := splitPhaseAssessment(t)
-	outcome := domainAssessment.NewAssessmentOutcome(
-		*a.EvaluationModelRef(),
-		domainAssessment.ResultSummary{PrimaryLabel: "ok"},
-		domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
-	)
-	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: outcome}
-	registry, err := NewEvaluatorRegistry(evaluator)
-	if err != nil {
-		t.Fatalf("NewEvaluatorRegistry: %v", err)
-	}
-	capture := &splitPhaseCapture{}
-	runRepo := &stubRunRepo{saveErrs: []error{nil, nil, persistErr}}
-	svc := newSplitPhaseTestService(
-		&fakeAssessmentRepo{assessment: a},
-		stubInputResolver{},
-		capture,
-		WithEvaluatorRegistry(registry),
-		WithRunRepository(runRepo),
-	)
-
-	err = svc.Evaluate(context.Background(), a.ID().Uint64())
-	if !errors.Is(err, persistErr) {
-		t.Fatalf("Evaluate error = %v, want succeeded run persistence error", err)
-	}
-	if evaluator.calls != 1 {
-		t.Fatalf("evaluator calls = %d, want 1", evaluator.calls)
-	}
-	if capture.ScoringCalls != 1 {
-		t.Fatalf("scoring calls = %d, want 1", capture.ScoringCalls)
-	}
-	if len(runRepo.saved) != 3 {
-		t.Fatalf("saved runs = %d, want running, input snapshot, and succeeded attempt", len(runRepo.saved))
-	}
-	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusSucceeded {
-		t.Fatalf("last run status = %s, want succeeded", got)
-	}
-	if a.Status().IsFailed() {
-		t.Fatalf("assessment status = %s, terminal run persistence error must not mark assessment failed", a.Status())
-	}
-}
-
 func TestPersistStartedEvaluationRunReturnsCurrentRunSaveError(t *testing.T) {
 	t.Parallel()
 
 	persistErr := errors.New("assessment save failed")
 	a := splitPhaseAssessment(t)
 	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
-	run.Start(time.Now())
+	if err := run.Start(time.Now()); err != nil {
+		t.Fatal(err)
+	}
 	a.SetCurrentRunID(run.RunID)
 	svc := &service{
 		assessmentRepo: &fakeAssessmentRepo{assessment: a, saveErr: persistErr},
 		runRepo:        &stubRunRepo{},
+		txRunner:       &engineRecordingTxRunner{},
 	}
 
 	err := svc.persistStartedEvaluationRun(context.Background(), a, run)
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("persistStartedEvaluationRun error = %v, want assessment save error", err)
+	}
+}
+
+func TestPersistStartedEvaluationRunPersistsRunAndCurrentReferenceInOneTransaction(t *testing.T) {
+	t.Parallel()
+
+	a := splitPhaseAssessment(t)
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	if err := run.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	a.SetCurrentRunID(run.RunID)
+	repo := &fakeAssessmentRepo{assessment: a}
+	runRepo := &stubRunRepo{}
+	svc := &service{
+		assessmentRepo: repo,
+		runRepo:        runRepo,
+		txRunner:       &engineRecordingTxRunner{},
+	}
+
+	if err := svc.persistStartedEvaluationRun(context.Background(), a, run); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.saveCtxHadTxMarker || !runRepo.saveCtxHadTxMarker {
+		t.Fatalf("start writes must share transaction context: assessment=%v run=%v", repo.saveCtxHadTxMarker, runRepo.saveCtxHadTxMarker)
+	}
+	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt.Status != evalrun.StatusRunning {
+		t.Fatalf("saved run = %#v, want one running run", runRepo.saved)
+	}
+}
+
+func TestNewEvaluationRunReusesRunningAttemptAndRejectsNonRetryableFailure(t *testing.T) {
+	t.Parallel()
+
+	running := evalrun.NewEvaluationRunWithAttempt(99, 3)
+	if err := running.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	run, err := (&service{runRepo: &stubRunRepo{latest: &running}}).newEvaluationRun(context.Background(), 99)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.RunID != running.RunID || run.Attempt.Status != evalrun.StatusRunning {
+		t.Fatalf("recovered run = %#v, want %#v", run, running)
+	}
+
+	nonRetryable := evalrun.NewEvaluationRunWithAttempt(99, 4)
+	if err := nonRetryable.Start(time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := nonRetryable.Fail(time.Unix(201, 0), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: "invalid input"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&service{runRepo: &stubRunRepo{latest: &nonRetryable}}).newEvaluationRun(context.Background(), 99); err == nil {
+		t.Fatal("non-retryable failed run must not create a new attempt")
 	}
 }

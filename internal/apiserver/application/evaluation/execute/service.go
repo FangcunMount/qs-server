@@ -2,6 +2,7 @@ package execute
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -10,7 +11,6 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -20,7 +20,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -40,7 +39,6 @@ type service struct {
 	familyEvaluators    map[modelcatalog.AlgorithmFamily]Evaluator
 	runtimeResolver     *RuntimeResolver
 	runRepo             evaluationrun.Repository
-	scoringWriter       outcomescoring.Writer
 	evaluationCommitter outcomecommit.Committer
 	reportStatus        *reportstatus.Reporter
 }
@@ -111,13 +109,6 @@ func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
 	}
 }
 
-// WithScoringWriter 配置计分结果写入器 用于 分阶段 评估。
-func WithScoringWriter(writer outcomescoring.Writer) ServiceOption {
-	return func(s *service) {
-		s.scoringWriter = writer
-	}
-}
-
 // WithEvaluationCommitter configures the canonical Evaluation success boundary.
 func WithEvaluationCommitter(committer outcomecommit.Committer) ServiceOption {
 	return func(s *service) {
@@ -173,11 +164,20 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err != nil {
 		return err
 	}
-	evaluationRun.TraceID = log.ExtractTraceID(ctx)
-	evaluationRun.Start(time.Now())
-	a.SetCurrentRunID(evaluationRun.RunID)
-	if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
-		return err
+	if evaluationRun.Attempt.Status == evalrun.StatusPending {
+		evaluationRun.TraceID = log.ExtractTraceID(ctx)
+		if err := evaluationRun.Start(time.Now()); err != nil {
+			return err
+		}
+	}
+	if evaluationRun.Attempt.Status != evalrun.StatusRunning {
+		return fmt.Errorf("evaluation run %s is not active", evaluationRun.RunID)
+	}
+	if a.CurrentRunID() != evaluationRun.RunID {
+		a.SetCurrentRunID(evaluationRun.RunID)
+		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
+			return err
+		}
 	}
 	if s.reportStatus != nil {
 		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
@@ -187,16 +187,13 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
-		s.failureFinalizer().MarkAsFailed(ctx, a, inputResolveFailureReason(err))
-		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()})
-		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
-			return persistErr
-		}
-		return err
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, inputResolveFailureReason(err), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()}, err)
 	}
 
 	if ref := inputSnapshotRefFromResolvedInput(a, input); ref != "" {
-		evaluationRun.AttachInputSnapshot(ref)
+		if err := evaluationRun.AttachInputSnapshot(ref); err != nil {
+			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入快照无效: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()}, err)
+		}
 		if err := s.persistStartedEvaluationRun(ctx, a, evaluationRun); err != nil {
 			return err
 		}
@@ -205,12 +202,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	// 解析并执行评估模型
 	if s.runtimeResolver == nil {
 		err := evalerrors.ModuleNotConfigured("evaluation runtime resolver is not configured")
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()})
-		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
-			return persistErr
-		}
-		return err
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()}, err)
 	}
 
 	resolved, resolveErr := s.runtimeResolver.ResolveExecution(a, input)
@@ -224,12 +216,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", resolveErr.Error(),
 		)
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+resolveErr.Error())
-		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()})
-		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
-			return persistErr
-		}
-		return resolveErr
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+resolveErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()}, resolveErr)
 	}
 
 	l.Infow("开始执行评估解释器",
@@ -254,16 +241,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", err.Error(),
 		)
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true})
-		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
-			return persistErr
-		}
-		return err
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true}, err)
 	}
 
 	// 执行评估成功，可靠提交规范 EvaluationOutcome。
-	committed, err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
+	err = s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
 		Assessment:           a,
 		Input:                input,
 		Execution:            evaluationOutcome,
@@ -278,25 +260,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", err.Error(),
 		)
-		if committed {
-			// Evaluation facts are already durable. Report owns its failure and
-			// retry lifecycle and must not rewrite Assessment or EvaluationRun.
-			return err
-		}
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error(), Retryable: true})
-		if persistErr := s.persistTerminalEvaluationRun(ctx, evaluationRun); persistErr != nil {
-			return persistErr
-		}
-		return err
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error(), Retryable: true}, err)
 	}
 
-	if !committed {
-		evaluationRun.Succeed(time.Now())
-		if err := s.persistTerminalEvaluationRun(ctx, evaluationRun); err != nil {
-			return err
-		}
-	}
 	l.Infow("评估执行完成",
 		"action", "evaluate",
 		"resource", "assessment",
@@ -317,30 +283,30 @@ func (s *service) persistEvaluationOutcome(
 	ctx context.Context,
 	outcome evaloutcome.Outcome,
 	evaluationRun *evalrun.EvaluationRun,
-) (bool, error) {
-	if s.evaluationCommitter != nil {
-		_, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
-			Outcome:     outcome,
-			Run:         evaluationRun,
-			EvaluatedAt: time.Now(),
-		})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+) error {
+	if s.evaluationCommitter == nil {
+		return evalerrors.ModuleNotConfigured("evaluation committer is not configured")
 	}
-	if s.scoringWriter == nil {
-		return false, evalerrors.ModuleNotConfigured("evaluation outcome writer is not configured")
+	_, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
+		Outcome:     outcome,
+		Run:         evaluationRun,
+		EvaluatedAt: time.Now(),
+	})
+	return err
+}
+
+func (s *service) finalizeEvaluationFailure(
+	ctx context.Context,
+	a *assessment.Assessment,
+	run *evalrun.EvaluationRun,
+	reason string,
+	failure evalrun.Failure,
+	cause error,
+) error {
+	if err := s.failureFinalizer().Finalize(ctx, a, run, reason, failure); err != nil {
+		return fmt.Errorf("persist evaluation failure: %w", err)
 	}
-	if err := s.scoringWriter.Write(ctx, outcome); err != nil {
-		return false, err
-	}
-	var runID evalrun.ID
-	if evaluationRun != nil {
-		runID = evaluationRun.RunID
-	}
-	outcome.Assessment.StageEvaluatedEvent(time.Now(), meta.ZeroID, runID)
-	return false, s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
+	return cause
 }
 
 // resolveExecutionIdentity 解析 v2 评估执行键。
@@ -390,6 +356,7 @@ func (s *service) assessmentLoader() assessmentLoader {
 func (s *service) failureFinalizer() evaluationFailureFinalizer {
 	return evaluationFailureFinalizer{
 		repo:         s.assessmentRepo,
+		runRepo:      s.runRepo,
 		txRunner:     s.txRunner,
 		eventStager:  s.eventStager,
 		reportStatus: s.reportStatus,

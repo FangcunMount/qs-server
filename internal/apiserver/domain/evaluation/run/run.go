@@ -1,9 +1,17 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
+)
+
+var (
+	// ErrInvalidTransition indicates a terminal or otherwise invalid EvaluationRun transition.
+	ErrInvalidTransition = errors.New("invalid evaluation run transition")
+	// ErrInputSnapshotConflict indicates that a run is being associated with two input snapshots.
+	ErrInputSnapshotConflict = errors.New("evaluation run input snapshot conflict")
 )
 
 // ID 标识一个评估执行 在 测评生命周期。
@@ -45,40 +53,63 @@ func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
 	return NewEvaluationRunWithAttempt(latest.AssessmentID, latest.Attempt.Number+1)
 }
 
-// AttachInputSnapshot records a stable audit reference to the resolved input snapshot.
-func (r *EvaluationRun) AttachInputSnapshot(ref string) {
+// AttachInputSnapshot records the stable audit reference for a running attempt.
+func (r *EvaluationRun) AttachInputSnapshot(ref string) error {
 	if r == nil {
-		return
+		return fmt.Errorf("%w: nil run", ErrInvalidTransition)
+	}
+	if r.Attempt.Status != StatusRunning {
+		return fmt.Errorf("%w: attach input snapshot from %s", ErrInvalidTransition, r.Attempt.Status)
+	}
+	if ref == "" || r.InputSnapshotRef == ref {
+		return nil
+	}
+	if r.InputSnapshotRef != "" {
+		return fmt.Errorf("%w: existing=%q incoming=%q", ErrInputSnapshotConflict, r.InputSnapshotRef, ref)
 	}
 	r.InputSnapshotRef = ref
+	return nil
 }
 
 // Start 标记run 作为 活跃ly executing。
-func (r *EvaluationRun) Start(now time.Time) {
+func (r *EvaluationRun) Start(now time.Time) error {
 	if r == nil {
-		return
+		return fmt.Errorf("%w: nil run", ErrInvalidTransition)
+	}
+	if r.Attempt.Status != StatusPending {
+		return fmt.Errorf("%w: start from %s", ErrInvalidTransition, r.Attempt.Status)
 	}
 	r.Attempt.Status = StatusRunning
 	r.StartedAt = now
+	return nil
 }
 
 // Succeed 标记run 作为 completed 成功ly。
-func (r *EvaluationRun) Succeed(now time.Time) {
+func (r *EvaluationRun) Succeed(now time.Time) error {
 	if r == nil {
-		return
+		return fmt.Errorf("%w: nil run", ErrInvalidTransition)
+	}
+	if r.Attempt.Status != StatusRunning {
+		return fmt.Errorf("%w: succeed from %s", ErrInvalidTransition, r.Attempt.Status)
 	}
 	r.Attempt.Status = StatusSucceeded
+	r.Failure = nil
 	r.FinishedAt = &now
+	return nil
 }
 
 // Fail 标记run 作为 失败 使用 重试元数据。
-func (r *EvaluationRun) Fail(now time.Time, failure Failure) {
+func (r *EvaluationRun) Fail(now time.Time, failure Failure) error {
 	if r == nil {
-		return
+		return fmt.Errorf("%w: nil run", ErrInvalidTransition)
+	}
+	if r.Attempt.Status != StatusRunning {
+		return fmt.Errorf("%w: fail from %s", ErrInvalidTransition, r.Attempt.Status)
 	}
 	r.Attempt.Status = StatusFailed
 	r.Failure = &failure
 	r.FinishedAt = &now
+	return nil
 }
 
 // Retryable 报告是否 最新 失败 can be retried。

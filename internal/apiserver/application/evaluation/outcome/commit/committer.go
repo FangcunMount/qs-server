@@ -116,7 +116,9 @@ func (c *committer) Commit(ctx context.Context, request Request) (*domainoutcome
 		return nil, err
 	}
 
-	request.Run.Succeed(request.EvaluatedAt)
+	if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
+		return nil, err
+	}
 	request.Outcome.Assessment.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), request.Run.RunID)
 	eventsToStage := request.Outcome.Assessment.Events()
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -164,6 +166,9 @@ func (c *committer) validate(request Request) error {
 	}
 	if request.Run == nil || request.Run.RunID == "" {
 		return fmt.Errorf("evaluation run is required")
+	}
+	if request.Run.Attempt.Status != evalrun.StatusRunning {
+		return fmt.Errorf("evaluation run must be running before commit")
 	}
 	if request.Run.AssessmentID != request.Outcome.Assessment.ID().Uint64() {
 		return fmt.Errorf("evaluation run assessment does not match outcome assessment")

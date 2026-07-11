@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -88,6 +90,7 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 	svc := &service{
 		assessmentRepo: aRepo,
 		inputResolver:  failingInputResolver{err: inputFailure{reason: "加载问卷失败: 问卷不存在或版本不匹配"}},
+		runRepo:        &stubRunRepo{},
 		txRunner:       &engineRecordingTxRunner{},
 		eventStager:    &engineRecordingEventStager{},
 	}
@@ -107,17 +110,18 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 	}
 }
 
-func TestSaveAssessmentWithEventsRequiresTransactionalOutbox(t *testing.T) {
+func TestFailureFinalizerRequiresAtomicDependencies(t *testing.T) {
 	a := engineAssessmentForOutboxTest(t)
-	if err := a.MarkAsFailed("pipeline failed"); err != nil {
-		t.Fatalf("MarkAsFailed returned error: %v", err)
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	if err := run.Start(time.Now()); err != nil {
+		t.Fatal(err)
 	}
 	repo := &fakeAssessmentRepo{}
 	finalizer := evaluationFailureFinalizer{repo: repo}
 
-	err := finalizer.SaveAssessmentWithEvents(context.Background(), a)
+	err := finalizer.Finalize(context.Background(), a, &run, "pipeline failed", evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: "pipeline failed"})
 	if err == nil {
-		t.Fatal("expected missing transactional outbox dependencies to fail")
+		t.Fatal("expected missing atomic failure dependencies to fail")
 	}
 	if repo.saveCalls != 0 {
 		t.Fatalf("repository save calls = %d, want 0", repo.saveCalls)
@@ -154,18 +158,20 @@ func TestMapInputResolveErrorPreservesExternalAPICodes(t *testing.T) {
 	}
 }
 
-func TestSaveAssessmentWithEventsStagesThroughApplicationTransaction(t *testing.T) {
+func TestFailureFinalizerStagesAssessmentRunAndOutboxThroughOneTransaction(t *testing.T) {
 	a := engineAssessmentForOutboxTest(t)
-	if err := a.MarkAsFailed("pipeline failed"); err != nil {
-		t.Fatalf("MarkAsFailed returned error: %v", err)
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	if err := run.Start(time.Now()); err != nil {
+		t.Fatal(err)
 	}
 	repo := &fakeAssessmentRepo{}
+	runRepo := &stubRunRepo{}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
-	finalizer := evaluationFailureFinalizer{repo: repo, txRunner: txRunner, eventStager: stager}
+	finalizer := evaluationFailureFinalizer{repo: repo, runRepo: runRepo, txRunner: txRunner, eventStager: stager}
 
-	if err := finalizer.SaveAssessmentWithEvents(context.Background(), a); err != nil {
-		t.Fatalf("SaveAssessmentWithEvents returned error: %v", err)
+	if err := finalizer.Finalize(context.Background(), a, &run, "pipeline failed", evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: "pipeline failed"}); err != nil {
+		t.Fatalf("Finalize returned error: %v", err)
 	}
 	if !txRunner.called {
 		t.Fatal("expected transaction runner to be used")
@@ -175,6 +181,12 @@ func TestSaveAssessmentWithEventsStagesThroughApplicationTransaction(t *testing.
 	}
 	if !repo.saveCtxHadTxMarker {
 		t.Fatal("assessment Save should receive transaction context")
+	}
+	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt.Status != evalrun.StatusFailed {
+		t.Fatalf("saved runs = %#v, want one failed run", runRepo.saved)
+	}
+	if !runRepo.saveCtxHadTxMarker {
+		t.Fatal("evaluation run Save should receive transaction context")
 	}
 	if !stager.ctxHadTxMarker {
 		t.Fatal("event stager should receive transaction context")
@@ -305,7 +317,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if capture.ScoringCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).TotalScore != 7 {
+	if capture.CommitCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).TotalScore != 7 {
 		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
@@ -387,7 +399,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if capture.ScoringCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
+	if capture.CommitCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
 		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
@@ -447,8 +459,8 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	if !aRepo.assessment.Status().IsFailed() {
 		t.Fatalf("assessment status = %s, want failed", aRepo.assessment.Status())
 	}
-	if aRepo.saveCalls != 1 || !txRunner.called {
-		t.Fatalf("failure finalizer did not persist through transaction: saveCalls=%d tx=%v", aRepo.saveCalls, txRunner.called)
+	if aRepo.saveCalls != 3 || !txRunner.called {
+		t.Fatalf("run start, snapshot and terminal failure must persist through transactions: saveCalls=%d tx=%v", aRepo.saveCalls, txRunner.called)
 	}
 	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domainAssessment.EventTypeFailed {
 		t.Fatalf("staged event types = %#v, want assessment failed", stager.eventTypes)

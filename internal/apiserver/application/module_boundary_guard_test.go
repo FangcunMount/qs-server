@@ -34,7 +34,6 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 			allowedImporters: []string{
 				"internal/apiserver/application/evaluation/assessment/converter_outcome.go",
 				"internal/apiserver/application/evaluation/assessment/report_mapper.go",
-				"internal/apiserver/application/evaluation/outcome/scoring/writer.go",
 				"internal/apiserver/application/evaluation/preview/previewer.go",
 			},
 		},

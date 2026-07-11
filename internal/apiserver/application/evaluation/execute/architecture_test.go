@@ -43,3 +43,21 @@ func TestEvaluatorContractsReturnDomainOutcomeExecution(t *testing.T) {
 		}
 	}
 }
+
+func TestEngineServiceHasNoScoringWriterSuccessPath(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("service.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, forbidden := range []string{"WithScoringWriter", "scoringWriter", "outcome/scoring"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("service.go must commit successful evaluations only through EvaluationCommitter: %s", forbidden)
+		}
+	}
+	if !strings.Contains(text, "evaluation committer is not configured") {
+		t.Fatal("service.go must reject a successful evaluation when no EvaluationCommitter is configured")
+	}
+}

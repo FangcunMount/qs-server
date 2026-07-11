@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
@@ -15,40 +16,42 @@ func (s *service) newEvaluationRun(ctx context.Context, assessmentID uint64) (ev
 		if err != nil {
 			return evalrun.EvaluationRun{}, fmt.Errorf("load latest evaluation run: %w", err)
 		}
-		if latest != nil && latest.Attempt.Status == evalrun.StatusFailed && latest.Retryable() {
-			attemptNo = latest.Attempt.Number + 1
+		if latest != nil {
+			switch latest.Attempt.Status {
+			case evalrun.StatusPending, evalrun.StatusRunning:
+				return *latest, nil
+			case evalrun.StatusFailed:
+				if !latest.Retryable() {
+					return evalrun.EvaluationRun{}, fmt.Errorf("latest evaluation run %s is not retryable", latest.RunID)
+				}
+				attemptNo = latest.Attempt.Number + 1
+			case evalrun.StatusSucceeded:
+				return evalrun.EvaluationRun{}, fmt.Errorf("latest evaluation run %s already succeeded", latest.RunID)
+			default:
+				return evalrun.EvaluationRun{}, fmt.Errorf("latest evaluation run %s has unknown status %q", latest.RunID, latest.Attempt.Status)
+			}
 		}
 	}
 	return evalrun.NewEvaluationRunWithAttempt(assessmentID, attemptNo), nil
 }
 
-func (s *service) persistEvaluationRun(ctx context.Context, run evalrun.EvaluationRun) error {
-	if s == nil || s.runRepo == nil {
-		return nil
-	}
-	return s.runRepo.Save(ctx, run)
-}
-
 func (s *service) persistStartedEvaluationRun(ctx context.Context, a *assessment.Assessment, run evalrun.EvaluationRun) error {
-	if err := s.persistEvaluationRun(ctx, run); err != nil {
-		if a != nil {
-			s.failureFinalizer().MarkAsFailed(ctx, a, "评估运行记录保存失败: "+err.Error())
+	if s == nil || s.txRunner == nil || s.runRepo == nil || s.assessmentRepo == nil {
+		return evalerrors.ModuleNotConfigured("evaluation run lifecycle requires transaction, assessment and run dependencies")
+	}
+	if a == nil {
+		return fmt.Errorf("assessment is required")
+	}
+	if run.RunID == "" || a.CurrentRunID() != run.RunID {
+		return fmt.Errorf("assessment current run does not match evaluation run")
+	}
+	return s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.runRepo.Save(txCtx, run); err != nil {
+			return fmt.Errorf("persist evaluation run: %w", err)
 		}
-		return fmt.Errorf("persist evaluation run: %w", err)
-	}
-	if s == nil || a == nil || s.runRepo == nil || s.assessmentRepo == nil || a.CurrentRunID() == "" {
+		if err := s.assessmentRepo.Save(txCtx, a); err != nil {
+			return fmt.Errorf("persist current evaluation run id: %w", err)
+		}
 		return nil
-	}
-	if err := s.assessmentRepo.Save(ctx, a); err != nil {
-		s.failureFinalizer().MarkAsFailed(ctx, a, "当前运行ID保存失败: "+err.Error())
-		return fmt.Errorf("persist current evaluation run id: %w", err)
-	}
-	return nil
-}
-
-func (s *service) persistTerminalEvaluationRun(ctx context.Context, run evalrun.EvaluationRun) error {
-	if err := s.persistEvaluationRun(ctx, run); err != nil {
-		return fmt.Errorf("persist evaluation run: %w", err)
-	}
-	return nil
+	})
 }

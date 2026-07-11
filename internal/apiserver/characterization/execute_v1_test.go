@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
@@ -148,7 +149,8 @@ func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
 		repo,
 		input,
 		evaluationexecute.WithEvaluatorRegistry(registry),
-		evaluationexecute.WithScoringWriter(charRecordingScoring{}),
+		evaluationexecute.WithRunRepository(&charRunRepo{}),
+		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
 	err = svc.Evaluate(context.Background(), a.ID().Uint64())
 	if err == nil {

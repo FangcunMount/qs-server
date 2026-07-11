@@ -2,9 +2,11 @@ package execute
 
 import (
 	"context"
+	"testing"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -39,21 +41,28 @@ func (stubInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*ev
 }
 
 type splitPhaseCapture struct {
-	ScoringCalls int
-	Outcome      evaloutcome.Outcome
+	CommitCalls int
+	Outcome     evaloutcome.Outcome
 }
 
-type recordingSplitPhaseScoringWriter struct {
+type recordingEvaluationCommitter struct {
 	capture *splitPhaseCapture
 }
 
-func (w *recordingSplitPhaseScoringWriter) Write(_ context.Context, outcome evaloutcome.Outcome) error {
-	w.capture.ScoringCalls++
-	w.capture.Outcome = outcome
-	if outcome.Assessment != nil && outcome.Execution != nil {
-		return outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(outcome.Execution))
+func (c *recordingEvaluationCommitter) Commit(_ context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
+	c.capture.CommitCalls++
+	c.capture.Outcome = request.Outcome
+	if request.Outcome.Assessment != nil && request.Outcome.Execution != nil {
+		if err := request.Outcome.Assessment.ApplyScoringOutcome(evaloutcome.AssessmentOutcomeFromExecution(request.Outcome.Execution)); err != nil {
+			return nil, err
+		}
 	}
-	return nil
+	if request.Run != nil {
+		if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
 }
 
 func newSplitPhaseTestService(
@@ -63,10 +72,31 @@ func newSplitPhaseTestService(
 	opts ...ServiceOption,
 ) Service {
 	base := []ServiceOption{
-		WithScoringWriter(&recordingSplitPhaseScoringWriter{capture: capture}),
+		WithEvaluationCommitter(&recordingEvaluationCommitter{capture: capture}),
+		WithRunRepository(&stubRunRepo{}),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
 	}
 	return NewService(repo, input, append(base, opts...)...)
 }
 
-var _ outcomescoring.Writer = (*recordingSplitPhaseScoringWriter)(nil)
+func splitPhaseAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(9001),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(8001)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7001)),
+		assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("SCALE-1"), "", "scale")),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	return a
+}
+
+var _ outcomecommit.Committer = (*recordingEvaluationCommitter)(nil)
