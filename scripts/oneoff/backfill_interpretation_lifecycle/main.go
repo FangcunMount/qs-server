@@ -19,9 +19,10 @@ import (
 )
 
 type config struct {
-	uri, db  string
-	apply    bool
-	pageSize int
+	uri, db   string
+	apply     bool
+	archiveV0 bool
+	pageSize  int
 }
 type summary struct{ scanned, candidates, existing, backfilled, skipped, failed int }
 
@@ -30,6 +31,7 @@ func main() {
 	flag.StringVar(&cfg.uri, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI (or MONGO_URI)")
 	flag.StringVar(&cfg.db, "mongo-db", os.Getenv("MONGO_DB"), "MongoDB database (or MONGO_DB)")
 	flag.BoolVar(&cfg.apply, "apply", false, "write three-object records (default dry-run)")
+	flag.BoolVar(&cfg.archiveV0, "archive-v0", false, "copy reports without outcome_id into archived_reports")
 	flag.IntVar(&cfg.pageSize, "page-size", 500, "Mongo cursor batch size")
 	flag.Parse()
 	if cfg.uri == "" || cfg.db == "" || cfg.pageSize < 1 {
@@ -43,11 +45,43 @@ func main() {
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 	db := client.Database(cfg.db)
+	if cfg.archiveV0 {
+		if err := archiveV0(ctx, db, cfg); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	s, err := run(ctx, db, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("mode=%s scanned=%d candidates=%d existing=%d backfilled=%d skipped=%d failed=%d\n", map[bool]string{true: "apply", false: "dry-run"}[cfg.apply], s.scanned, s.candidates, s.existing, s.backfilled, s.skipped, s.failed)
+}
+
+func archiveV0(ctx context.Context, db *mongo.Database, cfg config) error {
+	legacy := db.Collection("interpret_reports")
+	filter := bson.M{"$or": bson.A{bson.M{"outcome_id": bson.M{"$exists": false}}, bson.M{"outcome_id": 0}}}
+	count, err := legacy.CountDocuments(ctx, filter)
+	if err != nil {
+		return err
+	}
+	if !cfg.apply {
+		fmt.Printf("mode=dry-run archive_v0_candidates=%d\n", count)
+		return nil
+	}
+	archive := db.Collection("archived_reports")
+	if _, err := archive.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uk_archived_report_assessment")}); err != nil {
+		return err
+	}
+	_, err = legacy.Aggregate(ctx, mongo.Pipeline{
+		{{Key: "$match", Value: filter}},
+		{{Key: "$set", Value: bson.M{"archive_source": "legacy_v0", "archived_at": time.Now().UTC()}}},
+		{{Key: "$merge", Value: bson.M{"into": "archived_reports", "on": "domain_id", "whenMatched": "replace", "whenNotMatched": "insert"}}},
+	})
+	if err == nil {
+		fmt.Printf("mode=apply archive_v0_candidates=%d\n", count)
+	}
+	return err
 }
 
 func run(ctx context.Context, db *mongo.Database, cfg config) (summary, error) {

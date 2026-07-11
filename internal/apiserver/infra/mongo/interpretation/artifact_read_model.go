@@ -17,6 +17,7 @@ import (
 type reportReadModel struct {
 	legacy    *legacyReportReadModel
 	artifacts base.BaseRepository
+	archives  base.BaseRepository
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
@@ -34,6 +35,7 @@ func NewReportReadModelWithLegacyFallback(db *mongo.Database, legacyFallback boo
 	return &reportReadModel{
 		legacy:    legacy,
 		artifacts: base.NewBaseRepository(db, (InterpretReportArtifactPO{}).CollectionName(), opts...),
+		archives:  base.NewBaseRepository(db, "archived_reports", opts...),
 	}
 }
 
@@ -44,6 +46,9 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	}
 	if row != nil {
 		return row, nil
+	}
+	if row, err := r.findArchive(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil); err != nil || row != nil {
+		return row, err
 	}
 	if r.legacy != nil {
 		return r.legacy.GetReportByID(ctx, reportID)
@@ -59,6 +64,9 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 	if row != nil {
 		return row, nil
 	}
+	if row, err := r.findArchive(ctx, bson.M{"domain_id": assessmentID, "deleted_at": nil}, nil); err != nil || row != nil {
+		return row, err
+	}
 	if r.legacy != nil {
 		return r.legacy.GetReportByAssessmentID(ctx, assessmentID)
 	}
@@ -70,7 +78,11 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationread
 	if err != nil {
 		return nil, 0, err
 	}
-	legacy := []evaluationreadmodel.ReportRow(nil)
+	archives, err := r.listArchives(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	legacy := archives
 	if r.legacy != nil {
 		var err error
 		legacy, err = r.listLegacy(ctx, filter)
@@ -89,6 +101,44 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationread
 		end = len(merged)
 	}
 	return merged[offset:end], total, nil
+}
+
+func (r *reportReadModel) findArchive(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
+	if opts == nil {
+		opts = options.Find()
+	}
+	opts.SetLimit(1)
+	cursor, err := r.archives.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	if !cursor.Next(ctx) {
+		return nil, cursor.Err()
+	}
+	var po InterpretReportPO
+	if err := cursor.Decode(&po); err != nil {
+		return nil, err
+	}
+	row := reportPOToReadRow(&po)
+	return &row, nil
+}
+
+func (r *reportReadModel) listArchives(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
+	cursor, err := r.archives.Find(ctx, buildReportReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	rows := make([]evaluationreadmodel.ReportRow, 0)
+	for cursor.Next(ctx) {
+		var po InterpretReportPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		rows = append(rows, reportPOToReadRow(&po))
+	}
+	return rows, cursor.Err()
 }
 
 func (r *reportReadModel) findArtifact(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
