@@ -46,6 +46,11 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	if actor.Principal.Kind == securityplane.PrincipalKindUnknown {
 		return errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
 	}
+	// Published-only service resolution (collection/worker mTLS or ServiceAuth) has
+	// no IAM user snapshot; align with trustedRuntimeAuthorizer.
+	if action == ActionResolvePublished && IsTrustedServiceActor(actor) {
+		return nil
+	}
 	if action != ActionResolvePublished && !actor.Scope.HasOrgID && !IsTrustedServiceActor(actor) {
 		return errors.WithCode(code.ErrPermissionDenied, "resolved organization scope is required")
 	}

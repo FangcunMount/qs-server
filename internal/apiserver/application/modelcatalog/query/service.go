@@ -69,7 +69,7 @@ func (s *catalogQueryService) List(ctx context.Context, actor modelcatalog.Actor
 }
 
 func (s *catalogQueryService) GetPublished(ctx context.Context, actor modelcatalog.ActorContext, codeValue, version string) (*modelcatalog.PublishedModelDetail, error) {
-	if err := s.authorize(ctx, actor, modelcatalog.Resource{Code: codeValue}); err != nil {
+	if err := s.authorizePublished(ctx, actor, modelcatalog.Resource{Code: codeValue}); err != nil {
 		return nil, err
 	}
 	if codeValue == "" || s.deps.Published == nil {
@@ -92,7 +92,7 @@ func (s *catalogQueryService) GetPublished(ctx context.Context, actor modelcatal
 }
 
 func (s *catalogQueryService) ListPublished(ctx context.Context, actor modelcatalog.ActorContext, input modelcatalog.ListModelsDTO) (*modelcatalog.PublishedModelListResult, error) {
-	if err := s.authorize(ctx, actor, modelcatalog.Resource{}); err != nil {
+	if err := s.authorizePublished(ctx, actor, modelcatalog.Resource{}); err != nil {
 		return nil, err
 	}
 	if s.deps.Published == nil {
@@ -118,7 +118,7 @@ func (s *catalogQueryService) ListPublished(ctx context.Context, actor modelcata
 }
 
 func (s *catalogQueryService) ListHotPublished(ctx context.Context, actor modelcatalog.ActorContext, input modelcatalog.ListModelsDTO, limit, windowDays int) (*modelcatalog.HotModelListResult, error) {
-	if err := s.authorize(ctx, actor, modelcatalog.Resource{}); err != nil {
+	if err := s.authorizePublished(ctx, actor, modelcatalog.Resource{}); err != nil {
 		return nil, err
 	}
 	if s.deps.HotRank == nil {
@@ -155,7 +155,7 @@ func (s *catalogQueryService) GetQuestionnaire(ctx context.Context, actor modelc
 }
 
 func (s *catalogQueryService) Options(ctx context.Context, actor modelcatalog.ActorContext, kind string) (*modelcatalog.OptionsResult, error) {
-	if err := s.authorize(ctx, actor, modelcatalog.Resource{}); err != nil {
+	if err := s.authorizePublished(ctx, actor, modelcatalog.Resource{}); err != nil {
 		return nil, err
 	}
 	if kind != "" && !modelcatalog.IsSupportedAPIKind(kind) {
@@ -191,6 +191,20 @@ func (s *catalogQueryService) authorize(ctx context.Context, actor modelcatalog.
 		return errors.WithCode(code.ErrInternalServerError, "catalogue authorizer is not configured")
 	}
 	return s.deps.Authorizer.Authorize(ctx, actor, modelcatalog.ActionReadCatalog, resource)
+}
+
+// authorizePublished allows trusted service actors (gRPC catalogue) to resolve
+// published models without an IAM user snapshot, while operator HTTP reads keep
+// ActionReadCatalog + snapshot capability checks.
+func (s *catalogQueryService) authorizePublished(ctx context.Context, actor modelcatalog.ActorContext, resource modelcatalog.Resource) error {
+	if s.deps.Authorizer == nil {
+		return errors.WithCode(code.ErrInternalServerError, "catalogue authorizer is not configured")
+	}
+	action := modelcatalog.ActionReadCatalog
+	if modelcatalog.IsTrustedServiceActor(actor) {
+		action = modelcatalog.ActionResolvePublished
+	}
+	return s.deps.Authorizer.Authorize(ctx, actor, action, resource)
 }
 
 func draftListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.ListFilter, error) {

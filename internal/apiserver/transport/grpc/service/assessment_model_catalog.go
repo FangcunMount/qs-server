@@ -8,9 +8,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/assessmentmodel"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
@@ -117,5 +119,12 @@ func catalogStatusError(err error) error {
 	if domain.IsNotFound(err) {
 		return status.Error(codes.NotFound, err.Error())
 	}
-	return status.Error(codes.Internal, err.Error())
+	switch pkgerrors.ParseCoder(err).Code() {
+	case errorCode.ErrPermissionDenied, errorCode.ErrForbidden:
+		return status.Error(codes.PermissionDenied, err.Error())
+	case errorCode.ErrInvalidArgument, errorCode.ErrValidation, errorCode.ErrBind:
+		return status.Error(codes.InvalidArgument, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
+	}
 }

@@ -64,3 +64,17 @@ func TestSnapshotAuthorizerAllowsTrustedServiceCatalogCommandWithoutOrganization
 		t.Fatalf("Authorize() trusted service actor error = %v", err)
 	}
 }
+
+func TestSnapshotAuthorizerAllowsTrustedServiceResolvePublishedWithoutSnapshot(t *testing.T) {
+	t.Parallel()
+	actor := ActorContext{Principal: securityplane.Principal{
+		Kind:   securityplane.PrincipalKindService,
+		Source: securityplane.PrincipalSourceMTLS,
+	}}
+	if err := (SnapshotAuthorizer{}).Authorize(context.Background(), actor, ActionResolvePublished, Resource{}); err != nil {
+		t.Fatalf("Authorize() trusted resolve without snapshot error = %v", err)
+	}
+	if err := (SnapshotAuthorizer{}).Authorize(context.Background(), actor, ActionReadCatalog, Resource{}); err == nil {
+		t.Fatal("Authorize() trusted read_catalog without snapshot should fail")
+	}
+}
