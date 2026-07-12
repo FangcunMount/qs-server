@@ -202,8 +202,11 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
 	}
-	if !a.Status().IsFailed() {
-		t.Fatalf("assessment status = %s, want failed after execution failure", a.Status())
+	if !a.Status().IsSubmitted() {
+		t.Fatalf("assessment status = %s, want submitted when failure transaction does not commit", a.Status())
+	}
+	if runRepo.latest == nil || runRepo.latest.Attempt.Status != evalrun.StatusRunning {
+		t.Fatalf("caller/latest run = %#v, want running when failure transaction does not commit", runRepo.latest)
 	}
 }
 

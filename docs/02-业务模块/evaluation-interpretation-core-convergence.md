@@ -75,7 +75,7 @@ Batch 1–3 已消除这两处生产主路差距：score projection 由 Evaluati
 | Batch 1：EvaluationOutcome 可靠提交 | 已完成 | Outcome、Run、score projection、Assessment evaluated 与 `assessment.evaluated` 在 EvaluationCommitter 收口 |
 | Batch 2：Report 独立状态机 | 已完成 | Report 独立维护 `pending / generating / generated / failed`、failure reason、attempt 和 outcome ID；重试只读 EvaluationOutcome |
 | Batch 3：切换异步编排 | 已完成 | Worker 以 outcome ID 直调 Interpretation；Evaluation Service 无 GenerateReport；生产 inline report 分支删除；Preview 保留独立内存组合 |
-| Batch 4：切断状态越界 | 已完成 | Interpretation 无 Assessment 写权；删除 `ApplyOutcome`；`evaluated` 后禁止 `MarkAsFailed`；legacy `interpreted` 由 Assessment+Report 查询投影派生；consistency 仅修复 Evaluation 终态 |
+| Batch 4：切断状态越界 | 已完成 | Interpretation 无 Assessment 写权；删除 `ApplyOutcome`；`evaluated` 后禁止 `MarkAsFailed`；legacy `interpreted` 由 Assessment+Report 查询投影派生；consistency 后续已冻结自动修复，只保留历史漂移审计 |
 
 ## 三模块差异承载
 
@@ -204,7 +204,7 @@ PublishedModelSnapshot
 
 | 交付 | 说明 |
 |------|------|
-| 评分恢复事实 | 删除 Redis scoring snapshot；reconciler 从持久化 `EvaluationOutcome` 恢复 `Assessment=evaluated` 投影 |
+| 评分恢复事实 | 删除 Redis scoring snapshot；reconciler 收缩为只读漂移审计，不在缺少 Run/score/outbox 完整证据时自动推进 Assessment |
 | 编排开关 | 删除 `EVALUATION_ASYNC_INTERPRETATION` 与单进程异步兼容开关；生产固定为 worker 分阶段编排 |
 | 分数投影瘦身 | `assessment_score` 删除 conclusion/suggestion 列、PO、读模型和 score API 字段 |
 | Assessment 收敛 | 历史 `interpreted` 数据迁移为 `evaluated`；`interpreted_at` 替换为 `evaluated_at`；查询层仍可按 Report 派生 legacy 状态 |
@@ -223,4 +223,4 @@ E7 的物理删除有两个明确的数据门禁：
 1. `evaluation/consistency` 只能在生产审计证明 Assessment/Outcome/Run 零漂移后删除。
 2. typology legacy payload/outcome adapter 只能在历史 Outcome 与已发布模型快照审计证明无存量依赖后删除。
 
-在审计完成前，两者均为只读/修复兼容路径，不允许新生产主路继续写入对它们的依赖。
+在审计完成前，consistency 只保留读取、指标与告警；typology legacy 只保留历史读兼容。不允许新生产主路继续写入对它们的依赖。

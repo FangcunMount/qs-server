@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 // MismatchKind 标识跨存储不一致类型。
@@ -35,26 +33,22 @@ type OutcomeChecker interface {
 	HasOutcome(ctx context.Context, assessmentID uint64) (bool, error)
 }
 
-// Reconciler 扫描并修复 scoring/reporting 跨库部分成功窗口。
+// Reconciler scans historical Evaluation finalization drift. Automatic repair
+// is intentionally disabled until a production audit proves the complete
+// Outcome/Run/score/outbox evidence needed by the evaluated invariant.
 type Reconciler struct {
-	assessments     AssessmentStatusReader
-	outcomes        OutcomeChecker
-	outcomeRepo     domainoutcome.Repository
-	assessmentSaver assessment.Repository
+	assessments AssessmentStatusReader
+	outcomes    OutcomeChecker
 }
 
 // NewReconciler 创建跨存储对账器。
 func NewReconciler(
 	assessments AssessmentStatusReader,
 	outcomes OutcomeChecker,
-	outcomeRepo domainoutcome.Repository,
-	assessmentSaver assessment.Repository,
 ) *Reconciler {
 	return &Reconciler{
-		assessments:     assessments,
-		outcomes:        outcomes,
-		outcomeRepo:     outcomeRepo,
-		assessmentSaver: assessmentSaver,
+		assessments: assessments,
+		outcomes:    outcomes,
 	}
 }
 
@@ -101,48 +95,4 @@ func (r *Reconciler) scanOne(ctx context.Context, assessmentID uint64, detectedA
 		}
 	}
 	return mismatches, nil
-}
-
-// RepairEvaluatedFinalization 从持久化 EvaluationOutcome 重放 Assessment 的 evaluated 投影。
-func (r *Reconciler) RepairEvaluatedFinalization(ctx context.Context, assessmentID uint64) error {
-	if r == nil || r.assessments == nil || r.assessmentSaver == nil || r.outcomeRepo == nil {
-		return fmt.Errorf("consistency reconciler repair dependencies are not configured")
-	}
-	a, err := r.assessments.FindByID(ctx, assessment.NewID(assessmentID))
-	if err != nil {
-		return err
-	}
-	if a == nil {
-		return fmt.Errorf("assessment %d not found", assessmentID)
-	}
-	if a.Status().IsEvaluated() {
-		return nil
-	}
-	if !a.Status().IsSubmitted() {
-		return fmt.Errorf("assessment %d status %s cannot finalize evaluated", assessmentID, a.Status())
-	}
-	if r.outcomes != nil {
-		hasOutcome, err := r.outcomes.HasOutcome(ctx, assessmentID)
-		if err != nil {
-			return err
-		}
-		if !hasOutcome {
-			return fmt.Errorf("assessment %d has no evaluation outcome to finalize", assessmentID)
-		}
-	}
-	record, err := r.outcomeRepo.FindByAssessmentID(ctx, assessment.NewID(assessmentID))
-	if err != nil {
-		return err
-	}
-	if record == nil {
-		return fmt.Errorf("assessment %d has no evaluation outcome for evaluated finalization", assessmentID)
-	}
-	execution, err := evaloutcome.RestoreExecution(record)
-	if err != nil {
-		return err
-	}
-	if err := a.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(execution), record.EvaluatedAt()); err != nil {
-		return err
-	}
-	return r.assessmentSaver.Save(ctx, a)
 }

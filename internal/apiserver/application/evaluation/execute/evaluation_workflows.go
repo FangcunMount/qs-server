@@ -62,6 +62,12 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
 	}
 
+	// A failed Assessment may be reopened only after the engine proves that its
+	// latest Run is retryable and atomically claims the next attempt.
+	if a.Status().IsFailed() {
+		return &loadedAssessment{assessment: a}, nil
+	}
+
 	if !a.Status().IsSubmitted() {
 		log.Warnw("测评状态不正确",
 			"assessment_id", assessmentID,
@@ -82,20 +88,6 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 	}
 
 	return &loadedAssessment{assessment: a}, nil
-}
-
-// EnsureAssessmentInOrg 确保评估数据属于当前机构
-func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
-	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
-	if err != nil {
-		return evalerrors.AssessmentNotFound(err, "测评不存在")
-	}
-
-	if a.OrgID() != orgID {
-		return evalerrors.PermissionDenied("测评不属于当前机构")
-	}
-
-	return nil
 }
 
 // evaluationInputWorkflow 评估输入解析器
@@ -182,22 +174,25 @@ func (f evaluationFailureFinalizer) Finalize(
 		"action", "mark_failed",
 	)
 
-	if err := a.MarkAsFailed(reason); err != nil {
+	failedAt := time.Now()
+	assessmentToCommit, err := a.PrepareFailure(reason, failedAt)
+	if err != nil {
 		log.Warnw("failed to transition assessment to failed",
 			"assessment_id", a.ID().Uint64(),
 			"error", err.Error(),
 		)
 		return err
 	}
-	if err := run.Fail(time.Now(), failure); err != nil {
+	runToCommit := *run
+	if err := runToCommit.Fail(failedAt, failure); err != nil {
 		return err
 	}
-	eventsToStage := a.Events()
+	eventsToStage := assessmentToCommit.Events()
 	if err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := f.repo.Save(txCtx, a); err != nil {
+		if err := f.repo.Save(txCtx, assessmentToCommit); err != nil {
 			return err
 		}
-		if err := f.runRepo.SaveClaimed(txCtx, *run); err != nil {
+		if err := f.runRepo.SaveClaimed(txCtx, runToCommit); err != nil {
 			return err
 		}
 		if len(eventsToStage) > 0 {
@@ -211,7 +206,9 @@ func (f evaluationFailureFinalizer) Finalize(
 		)
 		return err
 	}
-	a.ClearEvents()
+	assessmentToCommit.ClearEvents()
+	*a = *assessmentToCommit
+	*run = runToCommit
 	if f.readyIndexer != nil && len(eventsToStage) > 0 {
 		f.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, time.Now())
 	}

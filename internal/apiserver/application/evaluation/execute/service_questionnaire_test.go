@@ -32,16 +32,21 @@ type engineTxCtxMarker struct{}
 
 type engineRecordingTxRunner struct {
 	called bool
+	err    error
 }
 
 func (r *engineRecordingTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
 	r.called = true
+	if r.err != nil {
+		return r.err
+	}
 	return fn(context.WithValue(ctx, engineTxCtxMarker{}, true))
 }
 
 type engineRecordingEventStager struct {
 	ctxHadTxMarker bool
 	eventTypes     []string
+	err            error
 }
 
 func (s *engineRecordingEventStager) Stage(ctx context.Context, events ...event.DomainEvent) error {
@@ -49,7 +54,7 @@ func (s *engineRecordingEventStager) Stage(ctx context.Context, events ...event.
 	for _, evt := range events {
 		s.eventTypes = append(s.eventTypes, evt.EventType())
 	}
-	return nil
+	return s.err
 }
 
 func (r *fakeAssessmentRepo) Save(ctx context.Context, assessment *domainAssessment.Assessment) error {
@@ -197,6 +202,69 @@ func TestFailureFinalizerStagesAssessmentRunAndOutboxThroughOneTransaction(t *te
 	}
 	if len(a.Events()) != 0 {
 		t.Fatalf("expected events to be cleared after successful transaction, got %d", len(a.Events()))
+	}
+}
+
+func TestFailureFinalizerTransactionErrorsDoNotPolluteCallerState(t *testing.T) {
+	t.Parallel()
+
+	commitErr := errors.New("failure transaction node failed")
+	cases := []struct {
+		name      string
+		configure func(*fakeAssessmentRepo, *stubRunRepo, *engineRecordingTxRunner, *engineRecordingEventStager)
+	}{
+		{
+			name: "transaction runner",
+			configure: func(_ *fakeAssessmentRepo, _ *stubRunRepo, runner *engineRecordingTxRunner, _ *engineRecordingEventStager) {
+				runner.err = commitErr
+			},
+		},
+		{
+			name: "assessment",
+			configure: func(repo *fakeAssessmentRepo, _ *stubRunRepo, _ *engineRecordingTxRunner, _ *engineRecordingEventStager) {
+				repo.saveErr = commitErr
+			},
+		},
+		{
+			name: "run",
+			configure: func(_ *fakeAssessmentRepo, repo *stubRunRepo, _ *engineRecordingTxRunner, _ *engineRecordingEventStager) {
+				repo.saveErr = commitErr
+			},
+		},
+		{
+			name: "outbox",
+			configure: func(_ *fakeAssessmentRepo, _ *stubRunRepo, _ *engineRecordingTxRunner, stager *engineRecordingEventStager) {
+				stager.err = commitErr
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := engineAssessmentForOutboxTest(t)
+			a.ClearEvents()
+			run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+			if err := run.Start(time.Unix(100, 0)); err != nil {
+				t.Fatal(err)
+			}
+			repo := &fakeAssessmentRepo{assessment: a}
+			runRepo := &stubRunRepo{}
+			runner := &engineRecordingTxRunner{}
+			stager := &engineRecordingEventStager{}
+			tc.configure(repo, runRepo, runner, stager)
+			finalizer := evaluationFailureFinalizer{repo: repo, runRepo: runRepo, txRunner: runner, eventStager: stager}
+
+			err := finalizer.Finalize(context.Background(), a, &run, "pipeline failed", evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: "pipeline failed"})
+			if !errors.Is(err, commitErr) {
+				t.Fatalf("Finalize() error = %v, want %v", err, commitErr)
+			}
+			if !a.Status().IsSubmitted() || a.FailedAt() != nil || a.FailureReason() != nil || len(a.Events()) != 0 {
+				t.Fatalf("caller Assessment polluted: status=%s failed_at=%v reason=%v events=%v", a.Status(), a.FailedAt(), a.FailureReason(), a.Events())
+			}
+			if run.Attempt.Status != evalrun.StatusRunning || run.FinishedAt != nil || run.Failure != nil {
+				t.Fatalf("caller Run polluted: %#v", run)
+			}
+		})
 	}
 }
 

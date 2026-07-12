@@ -1,5 +1,5 @@
 // Package execute 评估引擎
-// 负责调度一次测评执行，由 qs-worker 消费 AssessmentSubmittedEvent 后调用。
+// 负责调度一次测评执行，由 qs-worker 消费 evaluation.requested 后调用。
 //
 // 设计说明：
 // execute 只承担通用编排：加载 Assessment、解析输入快照、解析 RuntimeDescriptor、

@@ -113,52 +113,6 @@ func WithID(id ID) AssessmentOption {
 	}
 }
 
-// WithStatus 设置状态（用于重建）
-func WithStatus(status Status) AssessmentOption {
-	return func(a *Assessment) {
-		a.status = status
-	}
-}
-
-// ==================== 快捷工厂方法 ====================
-
-// NewAdhocAssessment 创建一次性测评
-func NewAdhocAssessment(
-	orgID int64,
-	testeeID testee.ID,
-	questionnaireRef QuestionnaireRef,
-	answerSheetRef AnswerSheetRef,
-	opts ...AssessmentOption,
-) (*Assessment, error) {
-	return NewAssessment(
-		orgID,
-		testeeID,
-		questionnaireRef,
-		answerSheetRef,
-		NewAdhocOrigin(),
-		opts...,
-	)
-}
-
-// NewPlanAssessment 从测评计划创建测评
-func NewPlanAssessment(
-	orgID int64,
-	testeeID testee.ID,
-	questionnaireRef QuestionnaireRef,
-	answerSheetRef AnswerSheetRef,
-	planID string,
-	opts ...AssessmentOption,
-) (*Assessment, error) {
-	return NewAssessment(
-		orgID,
-		testeeID,
-		questionnaireRef,
-		answerSheetRef,
-		NewPlanOrigin(planID),
-		opts...,
-	)
-}
-
 // ==================== 重建方法（仓储层使用）====================
 
 // Reconstruct 从持久化数据重建测评对象
@@ -300,16 +254,21 @@ func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.I
 // 前置条件：仅 submitted 状态可以标记 Evaluation 失败。
 // 后置条件：状态变为 failed，记录失败原因，发布 evaluation.failed
 func (a *Assessment) MarkAsFailed(reason string) error {
+	return a.MarkAsFailedAt(reason, time.Now())
+}
+
+// MarkAsFailedAt records a canonical failure timestamp shared by Assessment,
+// EvaluationRun and the failure event.
+func (a *Assessment) MarkAsFailedAt(reason string, failedAt time.Time) error {
 	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("mark as failed", a.status)
 	}
-	if reason == "" {
+	if reason == "" || failedAt.IsZero() {
 		return ErrInvalidArgument
 	}
 
-	now := time.Now()
 	a.status = StatusFailed
-	a.failedAt = &now
+	a.failedAt = &failedAt
 	a.failureReason = &reason
 	a.evaluatedAt = nil
 	a.totalScore = nil
@@ -322,10 +281,23 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 		a.id,
 		a.testeeRef,
 		reason,
-		now,
+		failedAt,
 	))
 
 	return nil
+}
+
+// PrepareFailure builds terminal failure state on an isolated aggregate copy.
+// Callers publish the copy only after the durable transaction commits.
+func (a *Assessment) PrepareFailure(reason string, failedAt time.Time) (*Assessment, error) {
+	clone := a.clone()
+	if clone == nil {
+		return nil, ErrInvalidArgument
+	}
+	if err := clone.MarkAsFailedAt(reason, failedAt); err != nil {
+		return nil, err
+	}
+	return clone, nil
 }
 
 // RetryFromFailed 从失败状态重试
@@ -353,6 +325,20 @@ func (a *Assessment) RetryFromFailed() error {
 		now,
 	))
 
+	return nil
+}
+
+// ResumeForExecutionRetry reopens a failed Assessment after the Run repository
+// has atomically claimed a new retryable attempt. It deliberately emits no
+// evaluation.requested event: the current worker is already handling the
+// redelivered request that owns the new Run claim.
+func (a *Assessment) ResumeForExecutionRetry() error {
+	if !a.status.IsFailed() {
+		return NewInvalidStatusError("resume for execution retry", a.status)
+	}
+	a.status = StatusSubmitted
+	a.failedAt = nil
+	a.failureReason = nil
 	return nil
 }
 

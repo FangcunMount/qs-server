@@ -151,7 +151,26 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
-	claim, err := s.claimEvaluationRun(ctx, assessmentID, uuid.NewString(), log.ExtractTraceID(ctx), time.Now())
+	claimAt := time.Now()
+	if a.Status().IsFailed() {
+		if s.runRepo == nil {
+			return evalerrors.ModuleNotConfigured("evaluation run repository is not configured")
+		}
+		latest, latestErr := s.runRepo.FindLatestByAssessmentID(ctx, assessmentID)
+		if latestErr != nil {
+			return fmt.Errorf("load retryable evaluation run: %w", latestErr)
+		}
+		retryableFailure := latest != nil && latest.Retryable()
+		expiredRunningAttempt := latest != nil && latest.Attempt.Status == evalrun.StatusRunning && !latest.HasActiveLease(claimAt)
+		if !retryableFailure && !expiredRunningAttempt {
+			l.Infow("测评失败且不存在可重试运行，跳过重复请求",
+				"assessment_id", assessmentID,
+				"result", "terminal_failure_skipped",
+			)
+			return nil
+		}
+	}
+	claim, err := s.claimEvaluationRun(ctx, assessmentID, uuid.NewString(), log.ExtractTraceID(ctx), claimAt)
 	if err != nil {
 		return err
 	}
@@ -164,6 +183,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	evaluationRun := claim.Run
+	if a.Status().IsFailed() {
+		if err := a.ResumeForExecutionRetry(); err != nil {
+			return err
+		}
+	}
 	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {

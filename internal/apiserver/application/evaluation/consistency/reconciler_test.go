@@ -2,15 +2,11 @@ package consistency_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -45,18 +41,6 @@ type stubOutcomeChecker struct {
 	exists bool
 }
 
-type stubOutcomeRepo struct {
-	record *domainoutcome.Record
-}
-
-func (r stubOutcomeRepo) Save(context.Context, *domainoutcome.Record) error { return nil }
-func (r stubOutcomeRepo) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
-	return r.record, nil
-}
-func (r stubOutcomeRepo) FindByAssessmentID(context.Context, assessment.ID) (*domainoutcome.Record, error) {
-	return r.record, nil
-}
-
 func (s stubOutcomeChecker) HasOutcome(context.Context, uint64) (bool, error) {
 	return s.exists, nil
 }
@@ -86,7 +70,7 @@ func TestScanDetectsOutcomeWithoutEvaluatedStatus(t *testing.T) {
 
 	a := submittedAssessmentForConsistency(t, 7002)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true}, nil, repo)
+	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true})
 
 	mismatches, err := reconciler.Scan(context.Background(), []uint64{a.ID().Uint64()})
 	if err != nil {
@@ -97,65 +81,17 @@ func TestScanDetectsOutcomeWithoutEvaluatedStatus(t *testing.T) {
 	}
 }
 
-func TestRepairEvaluatedFinalizationIsIdempotent(t *testing.T) {
+func TestScanNeverMutatesSubmittedAssessment(t *testing.T) {
 	t.Parallel()
 
 	a := submittedAssessmentForConsistency(t, 7005)
 	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	execution := domainoutcome.NewExecution(
-		domainoutcome.ModelRef{ModelKind: modelcatalog.KindScale, ModelCode: "SCALE-1"},
-		domainoutcome.Summary{PrimaryLabel: "ok"}, domainoutcome.Detail{Kind: modelcatalog.KindScale},
-	)
-	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true}, outcomeRecordForConsistency(t, a, execution), repo)
+	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{exists: true})
 
-	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
-		t.Fatalf("RepairEvaluatedFinalization first: %v", err)
-	}
-	if !repo.byID[a.ID().Uint64()].Status().IsEvaluated() {
-		t.Fatalf("status after repair = %s, want evaluated", repo.byID[a.ID().Uint64()].Status())
-	}
-	if evaluatedAt := repo.byID[a.ID().Uint64()].EvaluatedAt(); evaluatedAt == nil || !evaluatedAt.Equal(time.Unix(1, 0)) {
-		t.Fatalf("evaluated_at after repair = %v, want persisted outcome time", evaluatedAt)
-	}
-	if err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64()); err != nil {
-		t.Fatalf("RepairEvaluatedFinalization second: %v", err)
-	}
-}
-
-func TestRepairEvaluatedFinalizationRequiresOutcome(t *testing.T) {
-	t.Parallel()
-
-	a := submittedAssessmentForConsistency(t, 7006)
-	repo := &memoryAssessmentRepo{byID: map[uint64]*assessment.Assessment{a.ID().Uint64(): a}}
-	reconciler := consistency.NewReconciler(repo, stubOutcomeChecker{}, stubOutcomeRepo{}, repo)
-
-	err := reconciler.RepairEvaluatedFinalization(context.Background(), a.ID().Uint64())
-	if err == nil {
-		t.Fatal("RepairEvaluatedFinalization error = nil, want missing outcome")
-	}
-}
-
-func outcomeRecordForConsistency(t *testing.T, a *assessment.Assessment, execution *domainoutcome.Execution) stubOutcomeRepo {
-	t.Helper()
-	payload, err := json.Marshal(execution)
-	if err != nil {
+	if _, err := reconciler.Scan(context.Background(), []uint64{a.ID().Uint64()}); err != nil {
 		t.Fatal(err)
 	}
-	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
-		ID:           meta.FromUint64(8001),
-		OrgID:        a.OrgID(),
-		AssessmentID: a.ID(),
-		TesteeID:     a.TesteeID().Uint64(),
-		RunID:        "run-8001",
-		Model: domainoutcome.ModelIdentity{
-			Kind: modelcatalog.KindScale,
-			Code: "SCALE-1",
-		},
-		Payload:     payload,
-		EvaluatedAt: time.Unix(1, 0),
-	})
-	if err != nil {
-		t.Fatal(err)
+	if !repo.byID[a.ID().Uint64()].Status().IsSubmitted() || repo.byID[a.ID().Uint64()].EvaluatedAt() != nil {
+		t.Fatalf("scan mutated assessment: status=%s evaluated_at=%v", repo.byID[a.ID().Uint64()].Status(), repo.byID[a.ID().Uint64()].EvaluatedAt())
 	}
-	return stubOutcomeRepo{record: record}
 }

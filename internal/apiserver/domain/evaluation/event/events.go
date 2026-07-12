@@ -16,10 +16,6 @@ const (
 	TypeRequested        = eventcatalog.EvaluationRequested        // 测评请求事件
 	TypeOutcomeCommitted = eventcatalog.EvaluationOutcomeCommitted // 测评结果提交事件
 	TypeFailed           = eventcatalog.EvaluationFailed           // 测评失败事件
-
-	// Deprecated identifiers resolve to the new wire contract. 已弃用，保留是为了兼容旧版本
-	TypeSubmitted = TypeRequested        // 测评提交事件
-	TypeEvaluated = TypeOutcomeCommitted // 测评评估事件
 )
 
 // AggregateType 聚合根类型

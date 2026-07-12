@@ -306,8 +306,6 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 		consistencyApp.OutcomeExistenceChecker{
 			Repository: infra.outcomeRepo,
 		},
-		infra.outcomeRepo,
-		infra.assessmentRepo,
 	)
 	m.ConsistencyReconcileService = consistencyApp.NewReconcileService(reconciler, infra.assessmentReader)
 }

@@ -47,8 +47,9 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}
 	runRepo := &stubRunRepo{}
 	committer := &evaluationCommitterStub{}
+	assessmentRepo := &fakeAssessmentRepo{assessment: a}
 	svc := NewEngine(
-		&fakeAssessmentRepo{assessment: a},
+		assessmentRepo,
 		stubInputResolver{},
 		withTestEvaluator(evaluator),
 		WithRunRepository(runRepo),
@@ -171,5 +172,94 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 	nextRun := claim.Run
 	if !claim.Claimed || nextRun.Attempt.Number != failedRun.Attempt.Number+1 || nextRun.Attempt.Status != evalrun.StatusRunning {
 		t.Fatalf("next claim = %#v, want next running attempt", claim)
+	}
+}
+
+func TestRetryableFailureRedeliveryClaimsNextAttemptAndCompletes(t *testing.T) {
+	t.Parallel()
+
+	a := splitPhaseAssessment(t)
+	a.ClearEvents()
+	var calls int
+	evaluator := evaluatorStub{
+		key: evaluation.ExecutionIdentityScaleDefault,
+		execute: func(_ context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
+			calls++
+			if calls == 1 {
+				return nil, errors.New("temporary calculation failure")
+			}
+			return executionForAssessment(input.Assessment, "recovered"), nil
+		},
+	}
+	runRepo := &stubRunRepo{}
+	committer := &evaluationCommitterStub{}
+	assessmentRepo := &fakeAssessmentRepo{assessment: a}
+	svc := NewEngine(
+		assessmentRepo,
+		stubInputResolver{},
+		withTestEvaluator(evaluator),
+		WithRunRepository(runRepo),
+		WithEvaluationCommitter(committer),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
+	)
+
+	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err == nil {
+		t.Fatal("first Evaluate() error = nil, want retryable calculation failure")
+	}
+	if !a.Status().IsFailed() {
+		t.Fatalf("assessment status after first attempt = %s, want failed", a.Status())
+	}
+	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
+		t.Fatalf("redelivered Evaluate(): %v", err)
+	}
+	if calls != 2 || committer.calls != 1 {
+		t.Fatalf("evaluator calls=%d committer calls=%d, want 2/1", calls, committer.calls)
+	}
+	if committer.request.Run == nil || committer.request.Run.Attempt.Number != 2 || committer.request.Run.Attempt.Status != evalrun.StatusSucceeded {
+		t.Fatalf("committed run = %#v, want succeeded attempt 2", committer.request.Run)
+	}
+	if assessmentRepo.assessment == nil || !assessmentRepo.assessment.Status().IsEvaluated() {
+		t.Fatalf("assessment status = %v, want evaluated", assessmentRepo.assessment)
+	}
+	if len(assessmentRepo.assessment.Events()) != 0 {
+		t.Fatalf("redelivery emitted duplicate requested events: %#v", assessmentRepo.assessment.Events())
+	}
+}
+
+func TestFailedAssessmentReclaimsExpiredRunningAttempt(t *testing.T) {
+	t.Parallel()
+
+	a := splitPhaseAssessment(t)
+	a.ClearEvents()
+	if err := a.MarkAsFailed("worker crashed after failure state persisted"); err != nil {
+		t.Fatal(err)
+	}
+	a.ClearEvents()
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	claimedAt := time.Now().Add(-2 * time.Minute)
+	if err := run.Claim("expired-owner", claimedAt, claimedAt.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	runRepo := &stubRunRepo{latest: &run}
+	committer := &evaluationCommitterStub{}
+	assessmentRepo := &fakeAssessmentRepo{assessment: a}
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: executionForAssessment(a, "reclaimed")}
+	svc := NewEngine(
+		assessmentRepo,
+		stubInputResolver{},
+		withTestEvaluator(evaluator),
+		WithRunRepository(runRepo),
+		WithEvaluationCommitter(committer),
+		WithTransactionalOutbox(&engineRecordingTxRunner{}, &engineRecordingEventStager{}),
+	)
+
+	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
+		t.Fatal(err)
+	}
+	if evaluator.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt.Number != 1 || committer.request.Run.Attempt.Status != evalrun.StatusSucceeded {
+		t.Fatalf("reclaimed execution = calls:%d run:%#v", evaluator.calls, committer.request.Run)
+	}
+	if assessmentRepo.assessment == nil || !assessmentRepo.assessment.Status().IsEvaluated() {
+		t.Fatalf("assessment after reclaim = %#v", assessmentRepo.assessment)
 	}
 }

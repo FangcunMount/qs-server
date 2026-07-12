@@ -1023,7 +1023,7 @@ func TestApplicationEvaluationDoesNotCallApplyEvaluation(t *testing.T) {
 	}
 }
 
-func TestEvaluationReconcilerRestoresCanonicalExecution(t *testing.T) {
+func TestEvaluationReconcilerIsReadOnlyUntilMigrationAudit(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -1033,12 +1033,9 @@ func TestEvaluationReconcilerRestoresCanonicalExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "RestoreExecution(record)") {
-		t.Fatal("evaluation reconciler must restore the canonical Execution fact")
-	}
-	for _, forbidden := range []string{"json.Unmarshal", "AssessmentOutcome"} {
+	for _, forbidden := range []string{"RestoreExecution", "ApplyScoringProjection", ".Save("} {
 		if strings.Contains(text, forbidden) {
-			t.Fatalf("evaluation reconciler contains %q; it must not decode an Assessment-owned outcome", forbidden)
+			t.Fatalf("evaluation reconciler contains %q; historical drift audit must remain read-only", forbidden)
 		}
 	}
 }

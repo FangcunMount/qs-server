@@ -14,7 +14,7 @@ type Service interface {
 	ReconcileOnce(ctx context.Context, limit int) (int, error)
 }
 
-// ReconcileService scans candidate assessments and repairs detected cross-store drift.
+// ReconcileService scans candidate assessments and reports historical drift.
 type ReconcileService struct {
 	reconciler *Reconciler
 	reader     evaluationreadmodel.AssessmentReader
@@ -64,25 +64,13 @@ func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, e
 		return 0, err
 	}
 
-	repaired := 0
+	detected := 0
 	for _, mismatch := range mismatches {
 		observeMismatch(mismatch.Kind)
-
-		var repairErr error
-		switch mismatch.Kind {
-		case MismatchOutcomeWithoutEvaluatedStatus:
-			repairErr = s.reconciler.RepairEvaluatedFinalization(ctx, mismatch.AssessmentID)
-		default:
-			continue
-		}
-		if repairErr != nil {
-			observeRepair(mismatch.Kind, "error")
-			log.Warnf("evaluation consistency repair failed (assessment_id=%d, kind=%s): %v",
-				mismatch.AssessmentID, mismatch.Kind, repairErr)
-			continue
-		}
-		observeRepair(mismatch.Kind, "success")
-		repaired++
+		observeRepair(mismatch.Kind, "deferred")
+		log.Warnf("evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s)",
+			mismatch.AssessmentID, mismatch.Kind)
+		detected++
 	}
-	return repaired, nil
+	return detected, nil
 }

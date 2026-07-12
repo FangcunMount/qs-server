@@ -198,7 +198,7 @@ func TestOperatorRecoveryStagesEventsThroughApplicationTransaction(t *testing.T)
 	if !stager.ctxHadTxMarker {
 		t.Fatal("expected outbox stager to receive transaction context")
 	}
-	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domain.EventTypeSubmitted {
+	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domain.EventTypeRequested {
 		t.Fatalf("staged event types = %#v, want assessment submitted", stager.eventTypes)
 	}
 	if len(a.Events()) != 0 {

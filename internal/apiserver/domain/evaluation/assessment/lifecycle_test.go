@@ -105,6 +105,38 @@ func TestAssessmentFailedAndRetryLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestResumeForExecutionRetryDoesNotEmitDuplicateRequestedEvent(t *testing.T) {
+	a, err := NewAssessment(
+		1,
+		testee.NewID(1002),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v2"),
+		NewAnswerSheetRef(meta.FromUint64(2002)),
+		NewAdhocOrigin(),
+		WithID(NewID(5001)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatal(err)
+	}
+	a.ClearEvents()
+	if err := a.MarkAsFailed("retryable failure"); err != nil {
+		t.Fatal(err)
+	}
+	a.ClearEvents()
+
+	if err := a.ResumeForExecutionRetry(); err != nil {
+		t.Fatal(err)
+	}
+	if !a.Status().IsSubmitted() || a.FailedAt() != nil || a.FailureReason() != nil {
+		t.Fatalf("resumed assessment = status:%s failed_at:%v reason:%v", a.Status(), a.FailedAt(), a.FailureReason())
+	}
+	if len(a.Events()) != 0 {
+		t.Fatalf("resume emitted duplicate events: %#v", a.Events())
+	}
+}
+
 type creatorModelValidatorStub struct {
 	called           bool
 	modelRef         EvaluationModelRef

@@ -169,7 +169,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	if len(stager.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(stager.events))
 	}
-	evaluatedEvent, ok := stager.events[0].(assessment.AssessmentEvaluatedEvent)
+	evaluatedEvent, ok := stager.events[0].(assessment.EvaluationOutcomeCommittedEvent)
 	if !ok {
 		t.Fatalf("event type = %T", stager.events[0])
 	}

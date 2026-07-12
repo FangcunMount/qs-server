@@ -16,9 +16,6 @@ const (
 	EventTypeRequested        = evaldomainevent.TypeRequested
 	EventTypeOutcomeCommitted = evaldomainevent.TypeOutcomeCommitted
 	EventTypeFailed           = evaldomainevent.TypeFailed
-	// Deprecated identifiers resolve to the new wire contract.
-	EventTypeSubmitted = EventTypeRequested
-	EventTypeEvaluated = EventTypeOutcomeCommitted
 )
 
 const AggregateType = evaldomainevent.AggregateType
@@ -32,12 +29,6 @@ type EvaluationOutcomeCommittedData = eventpayload.EvaluationOutcomeCommittedDat
 type EvaluationRequestedEvent = event.Event[EvaluationRequestedData]
 type EvaluationFailedEvent = event.Event[EvaluationFailedData]
 type EvaluationOutcomeCommittedEvent = event.Event[EvaluationOutcomeCommittedData]
-
-// Deprecated type aliases keep tests and internal fixtures source-compatible
-// while publishing only the new event types.
-type AssessmentSubmittedEvent = EvaluationRequestedEvent
-type AssessmentEvaluatedEvent = EvaluationOutcomeCommittedEvent
-type AssessmentFailedEvent = EvaluationFailedEvent
 
 func NewEvaluationRequestedEvent(
 	orgID int64,
