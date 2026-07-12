@@ -1,14 +1,11 @@
 package interpretation
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
@@ -16,7 +13,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 	factorCode := "sleep"
 	createdAt := time.Date(2026, 5, 2, 11, 0, 0, 0, time.UTC)
 
-	row := archivedReportPOToReadRow(&ArchivedReportPO{
+	row := projectArchivedReportRow(&ArchivedReportPO{
 		BaseDocument: base.BaseDocument{
 			DomainID:  meta.FromUint64(7001),
 			CreatedAt: createdAt,
@@ -59,7 +56,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 }
 
 func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
-	row := archivedReportPOToReadRow(&ArchivedReportPO{
+	row := projectArchivedReportRow(&ArchivedReportPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 	})
 
@@ -71,55 +68,5 @@ func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
 	}
 	if row.Suggestions == nil {
 		t.Fatalf("suggestions should be an empty slice for stable response mapping")
-	}
-}
-
-func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
-	testeeID := uint64(8001)
-	riskLevel := "high"
-
-	query := buildReportReadModelQuery(evaluationreadmodel.ReportFilter{
-		TesteeID:     &testeeID,
-		TesteeIDs:    []uint64{8001, 8002},
-		HighRiskOnly: true,
-		ModelCode:    "SDS",
-		RiskLevel:    &riskLevel,
-	})
-
-	want := bson.M{
-		"deleted_at": nil,
-		"testee_id":  bson.M{"$in": []uint64{8001, 8002}},
-		"risk_level": "high",
-		"scale_code": "SDS",
-	}
-	if !reflect.DeepEqual(query, want) {
-		t.Fatalf("query = %#v, want %#v", query, want)
-	}
-}
-
-func TestBuildReportReadModelQueryExactRiskOverridesHighRiskOnly(t *testing.T) {
-	riskLevel := "medium"
-
-	query := buildReportReadModelQuery(evaluationreadmodel.ReportFilter{
-		HighRiskOnly: true,
-		RiskLevel:    &riskLevel,
-	})
-
-	if got := query["risk_level"]; got != "medium" {
-		t.Fatalf("risk filter = %#v, want exact risk level", got)
-	}
-}
-
-func TestBuildReportReadModelFindOptionsDocumentsPageAndSortContract(t *testing.T) {
-	opts := buildReportReadModelFindOptions(evaluationreadmodel.PageRequest{Page: 3, PageSize: 20})
-
-	if opts.Skip == nil || *opts.Skip != 40 {
-		t.Fatalf("skip = %v, want 40", opts.Skip)
-	}
-	if opts.Limit == nil || *opts.Limit != 20 {
-		t.Fatalf("limit = %v, want 20", opts.Limit)
-	}
-	if !reflect.DeepEqual(opts.Sort, bson.M{"created_at": -1}) {
-		t.Fatalf("sort = %#v, want created_at desc", opts.Sort)
 	}
 }

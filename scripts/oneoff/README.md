@@ -33,10 +33,9 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | 脚本 | 用途 | 主要写入对象 |
 | ---- | ---- | ------------ |
 | `audit_evaluation_cleanup.sql` | Batch E 清理前只读审计 Outcome/Run/Assessment 一致性、schema 版本与 legacy payload 存量 | 无写入 |
-| `dedupe_interpret_reports_domain/` | 清理 `interpret_reports` 未删除重复 `domain_id`，解除 `uk_report_domain_deleted` 建索引阻塞 | Mongo `interpret_reports`（软删除重复行） |
-| `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
-| `cleanup_orphaned_assessment_documents/` | 直接扫描 Mongo，清理不存在 MySQL Assessment 的历史报告和旧答卷 | Mongo `archived_reports` / `interpret_reports` / `report_query_catalog` / `answersheets` / `answersheet_submit_idempotency` |
-| `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/reports/outbox |
+| `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` |
+| `cleanup_orphaned_assessment_documents/` | 直接扫描 Mongo，清理不存在 MySQL Assessment 的历史报告和旧答卷 | Mongo `archived_reports` / `report_query_catalog` / `answersheets` / `answersheet_submit_idempotency` |
+| `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/outbox |
 | `rewrite_seeddata_assessment_times/main.go` | 将 seeddata plan task 测评从错误集中日期改回任务计划日期 | MySQL `assessment` / `assessment_task` / `assessment_score` / `testee` |
 | `rebuild_access_funnel_from_sources/main.go` | 从接入业务源重建接入漏斗统计源和聚合 | MySQL `assessment_entry_intake_log` / `statistics_journey_daily.access_*` |
 | `rebuild_statistics_facts_from_sources/main.go` | 从业务源表重建统计事实层 | MySQL `behavior_footprint` / `assessment_episode` |
@@ -61,33 +60,6 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `audit_published_model_payload_formats/` | legacy payload_format 审计 |
 | `audit_personality_kind_values/` / `migrate_personality_kind_values/` | `personality` → `typology` kind 迁移 |
 | `migrate_modelcatalog_definition_v2/` | DefinitionV2 + norm 行回填 |
-
-## dedupe_interpret_reports_domain
-
-### 做什么
-
-清理 `interpret_reports` 中 `deleted_at=null` 且同一 `domain_id` 多条文档的冲突，解除启动时 `uk_report_domain_deleted` 建索引失败。
-
-- 默认 dry-run：只打印 KEEP / DROP
-- `--apply`：软删除 DROP 行（`deleted_at` 错开毫秒，避免唯一键再次冲突）
-- `--ensure-index`：清理后创建唯一索引（有残留重复时需配合 `--apply`）
-
-保留策略：优先 `status=generated`，再比 `generated_at` / `updated_at` / `created_at` / `_id`。
-
-### 如何调用
-
-```bash
-export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?authSource=admin&directConnection=true'
-
-# 1) dry-run
-go run ./scripts/oneoff/dedupe_interpret_reports_domain/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs
-
-# 2) apply + 建索引
-go run ./scripts/oneoff/dedupe_interpret_reports_domain/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs \
-  --apply --ensure-index
-```
 
 ## observe_outbox_by_event_type
 
@@ -225,11 +197,11 @@ db.assessment_models.find(
 - MySQL `clinician_relation`、`assessment_entry_intake_log`。
 - MySQL `behavior_footprint`、`assessment_episode`、旧版 testee 维度 `statistics_daily` / `statistics_accumulated`。
 - MySQL `domain_event_outbox`、`analytics_pending_event`、`runtime_checkpoint`。
-- MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox`。
+- MongoDB `answersheets`、`answersheet_submit_idempotency`、`domain_event_outbox`。
 
 脚本默认 dry-run，只输出命中数量和受试者预览。执行 `--apply` 时会先创建备份表和备份集合，除非显式传入 `--skip-backup`。
 
-脚本会在跑 MySQL 作用域查询前，对 MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox` 做只读权限预检。`ping` 成功但 `find requires authentication` 失败时，说明地址已经连通，但 `MONGO_URI` 缺少账号密码或认证库不对。
+脚本会在跑 MySQL 作用域查询前，对 MongoDB `answersheets`、`answersheet_submit_idempotency`、`domain_event_outbox` 做只读权限预检。`ping` 成功但 `find requires authentication` 失败时，说明地址已经连通，但 `MONGO_URI` 缺少账号密码或认证库不对。
 
 MongoDB 单条命令有 16MB BSON 限制。脚本会把大量 `domain_id` / `aggregate_id` 的 `$in` 查询分批执行，避免几十万压测数据一次性塞进一条 `find`、`count`、`backup` 或 `delete` 命令。
 
@@ -326,7 +298,6 @@ go run scripts/oneoff/cleanup_perf_testee_data/main.go \
 - 软删除匹配的 MySQL `behavior_footprint` 行。
 - 软删除匹配的 MySQL `assessment_episode` 行。
 - 按 `answersheet_id` 软删除 Mongo `answersheets` 文档。
-- 按 `assessment_id` / `report_id` 软删除 Mongo `interpret_reports` 文档。
 - 默认先创建备份表和备份集合，除非显式传入 `--skip-backup`。
 
 ### 解决什么问题
@@ -860,7 +831,7 @@ go run ./scripts/oneoff/backfill_interpretation_report_catalog \
 - `--progress-interval`：进度条刷新间隔，默认 2 秒；`--no-progress` 可关闭。
 - `--timeout`：整次命令超时，默认 24 小时；传 `0` 禁用。
 
-进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。最终摘要会把缺失归属区分为 `missing_assessment`、`missing_testee` 和 `missing_org`。必须在这三项以及 `missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
+进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。最终摘要会把缺失归属区分为 `missing_assessment`、`missing_testee` 和 `missing_org`。`--verify-only` 也必须传入 MySQL DSN，以分批确认 catalog 的 Assessment 引用仍存在。必须在这些缺失项、`failed`，以及 verify 输出的 `count_mismatch`、`missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
 
 ## Assessment 孤岛 Mongo 文档清理
 

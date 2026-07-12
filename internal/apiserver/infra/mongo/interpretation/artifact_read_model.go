@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	readmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -128,7 +129,12 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 		key := fmt.Sprintf("%s:%d", e.SourceKind, e.SourceID)
 		row, ok := byKey[key]
 		if !ok {
-			return nil, fmt.Errorf("report catalog dangling source: assessment=%d source=%s/%d", e.AssessmentID, e.SourceKind, e.SourceID)
+			logger.L(ctx).Errorw("report catalog points to a missing source",
+				"assessment_id", e.AssessmentID,
+				"source_kind", e.SourceKind,
+				"source_id", e.SourceID,
+			)
+			return nil, &readmodel.CatalogDanglingSourceError{AssessmentID: e.AssessmentID, SourceKind: e.SourceKind, SourceID: e.SourceID}
 		}
 		rows = append(rows, row)
 	}
@@ -167,7 +173,7 @@ func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst ma
 		if err := cur.Decode(&po); err != nil {
 			return err
 		}
-		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = archivedReportPOToReadRow(&po)
+		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = projectArchivedReportRow(&po)
 	}
 	return cur.Err()
 }
@@ -177,5 +183,5 @@ func interpretReportPOToReadRow(po *InterpretReportPO) readmodel.ReportRow {
 		return readmodel.ReportRow{}
 	}
 	archived := &ArchivedReportPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra}
-	return archivedReportPOToReadRow(archived)
+	return projectArchivedReportRow(archived)
 }

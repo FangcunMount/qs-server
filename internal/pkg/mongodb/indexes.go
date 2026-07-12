@@ -267,23 +267,11 @@ db.scales.createIndex(
     }
 );
 
-// ========== InterpretReports 集合 ==========
-db.interpret_reports.createIndex(
-    { testee_id: 1, deleted_at: 1, created_at: -1 },
-    { name: "idx_testee_deleted_created" }
-);
-
-db.interpret_reports.createIndex(
-    { domain_id: 1, deleted_at: 1 },
-    { name: "idx_domain_deleted" }
-);
-
 // ========== 验证索引 ==========
 // 查看所有索引
 db.questionnaires.getIndexes();
 db.answersheets.getIndexes();
 db.scales.getIndexes();
-db.interpret_reports.getIndexes();
 
 // 删除索引（如需要）
 // db.questionnaires.dropIndex("idx_code_record_role_deleted");

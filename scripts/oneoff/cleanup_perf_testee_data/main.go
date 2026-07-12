@@ -652,7 +652,6 @@ func verifyMongoReadAccess(ctx context.Context, db *mongo.Database) error {
 	collections := []string{
 		"answersheets",
 		"answersheet_submit_idempotency",
-		"interpret_reports",
 		"domain_event_outbox",
 	}
 	for _, name := range collections {
@@ -738,7 +737,6 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	tasks := []mongoFieldTask{
 		{coll: "answersheets", field: "domain_id", label: "answersheets.domain_id"},
 		{coll: "answersheet_submit_idempotency", field: "answersheet_id", label: "answersheet_submit_idempotency.answersheet_id"},
-		{coll: "interpret_reports", field: "domain_id", label: "interpret_reports.domain_id"},
 	}
 	results := make([][]uint64, len(tasks))
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -760,7 +758,6 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	}
 
 	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, results[0]...), results[1]...))
-	ids.ReportIDs = uniqueUint64(append(ids.ReportIDs, results[2]...))
 	return ids, nil
 }
 
@@ -1807,7 +1804,6 @@ func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
 	return []mongoCollectionScope{
 		{name: "answersheets", coll: "answersheets", filters: answersheetFilters(ids)},
 		{name: "answersheet_submit_idempotency", coll: "answersheet_submit_idempotency", filters: answerSheetIdempotencyFilters(ids)},
-		{name: "interpret_reports", coll: "interpret_reports", filters: reportFilters(ids)},
 		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
 	}
 }
@@ -1860,13 +1856,6 @@ func answerSheetIdempotencyFilters(ids scopeIDs) []bson.M {
 		inUint64Filters("testee_id", ids.TesteeIDs),
 		inUint64Filters("answersheet_id", ids.AnswerSheetIDs)...,
 	)
-}
-
-func reportFilters(ids scopeIDs) []bson.M {
-	filters := inUint64Filters("testee_id", ids.TesteeIDs)
-	filters = append(filters, inUint64Filters("domain_id", ids.ReportIDs)...)
-	filters = append(filters, inUint64Filters("domain_id", ids.AssessmentIDs)...)
-	return filters
 }
 
 func mongoOutboxFilters(ids scopeIDs) []bson.M {

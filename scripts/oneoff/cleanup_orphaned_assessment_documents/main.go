@@ -164,7 +164,7 @@ func validateConfig(c config) error {
 func reportPhase() phase {
 	return phase{name: "reports", collection: "archived_reports", filter: activeRangeFilter,
 		lookupSQL: func(n int) string { return inQuery("SELECT id FROM assessment WHERE id IN (", n) },
-		related:   []relatedCollection{{"interpret_reports", "domain_id", true}, {"report_query_catalog", "assessment_id", false}}}
+		related:   []relatedCollection{{"report_query_catalog", "assessment_id", false}}}
 }
 
 func answerSheetPhase() phase {

@@ -49,7 +49,6 @@ type cleanupCounts struct {
 	BehaviorFootprints int64
 	AssessmentEpisodes int64
 	MongoAnswersheets  int64
-	MongoReports       int64
 }
 
 type queueSummary struct {
@@ -57,7 +56,6 @@ type queueSummary struct {
 	BehaviorFootprintRefs int
 	AssessmentEpisodeRefs int
 	MongoAnswerSheetIDs   int
-	MongoReportIDs        int
 }
 
 // cleanup_deleted_assessment_orphans scans assessment-related runtime rows whose
@@ -65,7 +63,7 @@ type queueSummary struct {
 //
 // It uses MySQL behavior_footprint and assessment_episode as the source of truth
 // for orphan references, then soft-deletes matching MySQL rows plus MongoDB
-// answersheets / interpret_reports derived from those orphan references.
+// answersheets derived from those orphan references.
 //
 // Typical usage:
 //
@@ -122,8 +120,8 @@ func main() {
 	}
 	log.Printf("scope: %s source_created_start=%q source_created_end=%q apply=%v backup=%v",
 		scopeDescription(cfg), cfg.sourceCreatedStart, cfg.sourceCreatedEnd, cfg.apply, !cfg.skipBackup)
-	log.Printf("candidate orphan refs: total=%d behavior_footprint=%d assessment_episode=%d derived_mongo_answersheet_ids=%d derived_mongo_report_ids=%d",
-		summary.TotalRefs, summary.BehaviorFootprintRefs, summary.AssessmentEpisodeRefs, summary.MongoAnswerSheetIDs, summary.MongoReportIDs)
+	log.Printf("candidate orphan refs: total=%d behavior_footprint=%d assessment_episode=%d derived_mongo_answersheet_ids=%d",
+		summary.TotalRefs, summary.BehaviorFootprintRefs, summary.AssessmentEpisodeRefs, summary.MongoAnswerSheetIDs)
 	if summary.TotalRefs == 0 {
 		log.Print("scope is empty; nothing to clean")
 		return
@@ -166,8 +164,8 @@ func main() {
 		}
 		if len(rows) == 0 {
 			printProgressBar(totalProcessed, summary.TotalRefs)
-			log.Printf("cleanup completed: orphan_refs_scanned=%d behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d mongo_reports=%d",
-				totalProcessed, totalCounts.BehaviorFootprints, totalCounts.AssessmentEpisodes, totalCounts.MongoAnswersheets, totalCounts.MongoReports)
+			log.Printf("cleanup completed: orphan_refs_scanned=%d behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d",
+				totalProcessed, totalCounts.BehaviorFootprints, totalCounts.AssessmentEpisodes, totalCounts.MongoAnswersheets)
 			return
 		}
 
@@ -186,8 +184,8 @@ func main() {
 
 		totalProcessed += len(rows)
 		totalCounts = addCounts(totalCounts, counts)
-		log.Printf("batch cleaned: behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d mongo_reports=%d",
-			counts.BehaviorFootprints, counts.AssessmentEpisodes, counts.MongoAnswersheets, counts.MongoReports)
+		log.Printf("batch cleaned: behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d",
+			counts.BehaviorFootprints, counts.AssessmentEpisodes, counts.MongoAnswersheets)
 		printProgressBar(totalProcessed, summary.TotalRefs)
 	}
 }
@@ -382,42 +380,7 @@ SELECT
 FROM cleanup_assessment_orphan_queue`).Scan(&s.TotalRefs, &s.BehaviorFootprintRefs, &s.AssessmentEpisodeRefs, &s.MongoAnswerSheetIDs); err != nil {
 		return s, err
 	}
-	reportIDs, err := countDistinctReportDomainIDs(ctx, conn)
-	if err != nil {
-		return s, err
-	}
-	s.MongoReportIDs = reportIDs
 	return s, nil
-}
-
-func countDistinctReportDomainIDs(ctx context.Context, conn *sql.Conn) (int, error) {
-	if _, err := conn.ExecContext(ctx, `DROP TEMPORARY TABLE IF EXISTS cleanup_assessment_orphan_report_ids`); err != nil {
-		return 0, err
-	}
-	if _, err := conn.ExecContext(ctx, `
-CREATE TEMPORARY TABLE cleanup_assessment_orphan_report_ids (
-  report_domain_id BIGINT UNSIGNED NOT NULL PRIMARY KEY
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`); err != nil {
-		return 0, err
-	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT IGNORE INTO cleanup_assessment_orphan_report_ids (report_domain_id)
-SELECT assessment_id
-FROM cleanup_assessment_orphan_queue
-WHERE assessment_id <> 0`); err != nil {
-		return 0, err
-	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT IGNORE INTO cleanup_assessment_orphan_report_ids (report_domain_id)
-SELECT report_id
-FROM cleanup_assessment_orphan_queue
-WHERE report_id <> 0`); err != nil {
-		return 0, err
-	}
-
-	var count int
-	err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM cleanup_assessment_orphan_report_ids`).Scan(&count)
-	return count, err
 }
 
 func loadQueuedOrphanRefs(ctx context.Context, conn *sql.Conn, cfg config) (rows []orphanRefRow, err error) {
@@ -557,14 +520,10 @@ func backupMongo(ctx context.Context, db *mongo.Database, rows []orphanRefRow, s
 	if err != nil {
 		return err
 	}
-	reportIDs, err := reportDomainIDs(rows)
-	if err != nil {
-		return err
-	}
 	if err := backupMongoCollection(ctx, db.Collection("answersheets"), db.Collection("cleanup_bak_answersheets_"+suffix), answerIDs); err != nil {
 		return err
 	}
-	return backupMongoCollection(ctx, db.Collection("interpret_reports"), db.Collection("cleanup_bak_interpret_reports_"+suffix), reportIDs)
+	return nil
 }
 
 func backupMongoCollection(ctx context.Context, src, dst *mongo.Collection, domainIDs []int64) (err error) {
@@ -655,11 +614,6 @@ func cleanupMongo(ctx context.Context, db *mongo.Database, rows []orphanRefRow) 
 	if err != nil {
 		return cleanupCounts{}, err
 	}
-	reportIDs, err := reportDomainIDs(rows)
-	if err != nil {
-		return cleanupCounts{}, err
-	}
-
 	counts := cleanupCounts{}
 	if len(answerIDs) > 0 {
 		answerResult, err := db.Collection("answersheets").UpdateMany(ctx, bson.M{
@@ -670,16 +624,6 @@ func cleanupMongo(ctx context.Context, db *mongo.Database, rows []orphanRefRow) 
 			return cleanupCounts{}, err
 		}
 		counts.MongoAnswersheets = answerResult.ModifiedCount
-	}
-	if len(reportIDs) > 0 {
-		reportResult, err := db.Collection("interpret_reports").UpdateMany(ctx, bson.M{
-			"domain_id":  bson.M{"$in": reportIDs},
-			"deleted_at": nil,
-		}, bson.M{"$set": bson.M{"deleted_at": now, "updated_at": now}})
-		if err != nil {
-			return cleanupCounts{}, err
-		}
-		counts.MongoReports = reportResult.ModifiedCount
 	}
 	return counts, nil
 }
@@ -712,24 +656,10 @@ func countMongoOrphans(ctx context.Context, db *mongo.Database, rows []orphanRef
 	if err != nil {
 		return cleanupCounts{}, err
 	}
-	reportIDs, err := reportDomainIDs(rows)
-	if err != nil {
-		return cleanupCounts{}, err
-	}
-
 	counts := cleanupCounts{}
 	if len(answerIDs) > 0 {
 		counts.MongoAnswersheets, err = db.Collection("answersheets").CountDocuments(ctx, bson.M{
 			"domain_id":  bson.M{"$in": answerIDs},
-			"deleted_at": nil,
-		})
-		if err != nil {
-			return cleanupCounts{}, err
-		}
-	}
-	if len(reportIDs) > 0 {
-		counts.MongoReports, err = db.Collection("interpret_reports").CountDocuments(ctx, bson.M{
-			"domain_id":  bson.M{"$in": reportIDs},
 			"deleted_at": nil,
 		})
 		if err != nil {
@@ -769,28 +699,6 @@ func answerSheetDomainIDs(rows []orphanRefRow) ([]int64, error) {
 	return ids, nil
 }
 
-func reportDomainIDs(rows []orphanRefRow) ([]int64, error) {
-	seen := make(map[uint64]struct{}, len(rows)*2)
-	ids := make([]int64, 0, len(rows))
-	for _, row := range rows {
-		for _, candidate := range []uint64{row.AssessmentID, row.ReportID} {
-			if candidate == 0 {
-				continue
-			}
-			if _, ok := seen[candidate]; ok {
-				continue
-			}
-			seen[candidate] = struct{}{}
-			id, err := uint64ToInt64(candidate)
-			if err != nil {
-				return nil, fmt.Errorf("report domain_id %d: %w", candidate, err)
-			}
-			ids = append(ids, id)
-		}
-	}
-	return ids, nil
-}
-
 func uint64ToInt64(v uint64) (int64, error) {
 	const maxInt64 = uint64(9223372036854775807)
 	if v > maxInt64 {
@@ -804,7 +712,6 @@ func addCounts(a, b cleanupCounts) cleanupCounts {
 		BehaviorFootprints: a.BehaviorFootprints + b.BehaviorFootprints,
 		AssessmentEpisodes: a.AssessmentEpisodes + b.AssessmentEpisodes,
 		MongoAnswersheets:  a.MongoAnswersheets + b.MongoAnswersheets,
-		MongoReports:       a.MongoReports + b.MongoReports,
 	}
 }
 
@@ -837,8 +744,8 @@ func formatNullTime(v sql.NullTime) string {
 }
 
 func printPreview(rows []orphanRefRow, limit int, counts cleanupCounts) {
-	log.Printf("preview batch orphan_refs=%d active_orphans_in_preview: behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d mongo_reports=%d",
-		len(rows), counts.BehaviorFootprints, counts.AssessmentEpisodes, counts.MongoAnswersheets, counts.MongoReports)
+	log.Printf("preview batch orphan_refs=%d active_orphans_in_preview: behavior_footprints=%d assessment_episodes=%d mongo_answersheets=%d",
+		len(rows), counts.BehaviorFootprints, counts.AssessmentEpisodes, counts.MongoAnswersheets)
 	if limit > len(rows) {
 		limit = len(rows)
 	}

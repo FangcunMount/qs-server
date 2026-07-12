@@ -2,38 +2,9 @@ package interpretation
 
 import (
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
-	query := bson.M{"deleted_at": nil}
-	if filter.TesteeID != nil {
-		query["testee_id"] = *filter.TesteeID
-	}
-	if len(filter.TesteeIDs) > 0 {
-		query["testee_id"] = bson.M{"$in": filter.TesteeIDs}
-	}
-	if filter.HighRiskOnly {
-		query["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
-	}
-	if filter.ModelCode != "" {
-		query["scale_code"] = filter.ModelCode
-	}
-	if filter.RiskLevel != nil {
-		query["risk_level"] = *filter.RiskLevel
-	}
-	return query
-}
-
-func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *options.FindOptions {
-	return options.Find().
-		SetSkip(int64(page.Offset())).
-		SetLimit(int64(page.Limit())).
-		SetSort(bson.M{"created_at": -1})
-}
-
-func archivedReportPOToReadRow(po *ArchivedReportPO) evaluationreadmodel.ReportRow {
+func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRow {
 	if po == nil {
 		return evaluationreadmodel.ReportRow{}
 	}

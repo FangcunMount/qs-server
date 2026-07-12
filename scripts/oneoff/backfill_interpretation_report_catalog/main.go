@@ -91,15 +91,9 @@ func main() {
 	if err := ensureIndexes(ctx, db); err != nil {
 		log.Fatal(err)
 	}
-	if c.verifyOnly {
-		if err := verify(ctx, db); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
 
 	var mysqlDB *sql.DB
-	if c.source == "archive" || c.source == "all" {
+	if c.verifyOnly || c.source == "archive" || c.source == "all" {
 		mysqlDB, err = sql.Open("mysql", c.mysqlDSN)
 		if err != nil {
 			log.Fatal(err)
@@ -111,6 +105,12 @@ func main() {
 		if err := mysqlDB.PingContext(ctx); err != nil {
 			log.Fatalf("ping mysql: %v", err)
 		}
+	}
+	if c.verifyOnly {
+		if err := verify(ctx, db, mysqlDB, c.batchSize); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	if c.source == "archive" || c.source == "all" {
@@ -157,8 +157,8 @@ func validateConfig(c config) error {
 	if c.source != "archive" && c.source != "artifact" && c.source != "all" {
 		return fmt.Errorf("source must be archive, artifact or all")
 	}
-	if !c.verifyOnly && (c.source == "archive" || c.source == "all") && c.mysqlDSN == "" {
-		return fmt.Errorf("mysql-dsn is required for archive backfill")
+	if (c.verifyOnly || c.source == "archive" || c.source == "all") && c.mysqlDSN == "" {
+		return fmt.Errorf("mysql-dsn is required for archive backfill and verification")
 	}
 	if c.batchSize < 1 || c.batchSize > 10000 {
 		return fmt.Errorf("batch-size must be between 1 and 10000")
@@ -670,9 +670,17 @@ func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 	return err
 }
 
-func verify(ctx context.Context, db *mongo.Database) error {
+func verify(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, batchSize int64) error {
 	cat := db.Collection("report_query_catalog")
 	total, err := cat.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+	missingAssessment, err := countMissingAssessmentReferences(ctx, cat, mysqlDB, batchSize)
+	if err != nil {
+		return err
+	}
+	expectedTotal, err := expectedCatalogCount(ctx, db)
 	if err != nil {
 		return err
 	}
@@ -685,6 +693,7 @@ func verify(ctx context.Context, db *mongo.Database) error {
 		return err
 	}
 	wrongPriority, err := aggregateCount(ctx, db.Collection("interpret_report_artifacts"), mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"deleted_at": nil}}},
 		{{Key: "$sort", Value: bson.D{{Key: "assessment_id", Value: 1}, {Key: "generated_at", Value: -1}, {Key: "domain_id", Value: -1}}}},
 		{{Key: "$group", Value: bson.M{"_id": "$assessment_id", "source_id": bson.M{"$first": "$domain_id"}}}},
 		{{Key: "$lookup", Value: bson.M{"from": "report_query_catalog", "localField": "_id", "foreignField": "assessment_id", "as": "catalog"}}},
@@ -694,11 +703,11 @@ func verify(ctx context.Context, db *mongo.Database) error {
 	if err != nil {
 		return err
 	}
-	danglingArtifact, err := aggregateCount(ctx, cat, mongo.Pipeline{{{Key: "$match", Value: bson.M{"source_kind": "artifact"}}}, {{Key: "$lookup", Value: bson.M{"from": "interpret_report_artifacts", "localField": "source_id", "foreignField": "domain_id", "as": "source"}}}, {{Key: "$match", Value: bson.M{"source": bson.M{"$size": 0}}}}})
+	danglingArtifact, err := aggregateCount(ctx, cat, danglingSourcePipeline("artifact", "interpret_report_artifacts"))
 	if err != nil {
 		return err
 	}
-	danglingArchive, err := aggregateCount(ctx, cat, mongo.Pipeline{{{Key: "$match", Value: bson.M{"source_kind": "archive"}}}, {{Key: "$lookup", Value: bson.M{"from": "archived_reports", "localField": "source_id", "foreignField": "domain_id", "as": "source"}}}, {{Key: "$match", Value: bson.M{"source": bson.M{"$size": 0}}}}})
+	danglingArchive, err := aggregateCount(ctx, cat, danglingSourcePipeline("archive", "archived_reports"))
 	if err != nil {
 		return err
 	}
@@ -706,11 +715,113 @@ func verify(ctx context.Context, db *mongo.Database) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("verify catalog=%d missing_org=%d missing_testee=%d missing_archive=%d wrong_priority=%d dangling_source=%d\n", total, missingOrg, missingTestee, missingArchive, wrongPriority, danglingArtifact+danglingArchive)
-	if missingOrg+missingTestee+missingArchive+wrongPriority+danglingArtifact+danglingArchive > 0 {
+	countMismatch := int64(0)
+	if total != expectedTotal {
+		countMismatch = 1
+	}
+	fmt.Printf("verify catalog=%d expected_catalog=%d count_mismatch=%d missing_assessment=%d missing_org=%d missing_testee=%d missing_archive=%d wrong_priority=%d dangling_source=%d\n", total, expectedTotal, countMismatch, missingAssessment, missingOrg, missingTestee, missingArchive, wrongPriority, danglingArtifact+danglingArchive)
+	if countMismatch+missingAssessment+missingOrg+missingTestee+missingArchive+wrongPriority+danglingArtifact+danglingArchive > 0 {
 		return fmt.Errorf("catalog reconciliation failed")
 	}
 	return nil
+}
+
+func countMissingAssessmentReferences(ctx context.Context, catalog *mongo.Collection, mysqlDB *sql.DB, batchSize int64) (int64, error) {
+	if mysqlDB == nil {
+		return 0, fmt.Errorf("mysql database is required for assessment reconciliation")
+	}
+	cursor, err := catalog.Find(ctx, bson.M{}, options.Find().SetProjection(bson.M{"assessment_id": 1}).SetBatchSize(int32(batchSize)))
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	ids := make([]uint64, 0, batchSize)
+	var missing int64
+	flush := func() error {
+		if len(ids) == 0 {
+			return nil
+		}
+		args := make([]any, len(ids))
+		for i, id := range ids {
+			args[i] = id
+		}
+		rows, queryErr := mysqlDB.QueryContext(ctx, assessmentAssociationQuery(len(args)), args...)
+		if queryErr != nil {
+			return queryErr
+		}
+		found := 0
+		for rows.Next() {
+			var assessmentID, testeeID uint64
+			var orgID int64
+			if scanErr := rows.Scan(&assessmentID, &testeeID, &orgID); scanErr != nil {
+				_ = rows.Close()
+				return scanErr
+			}
+			found++
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			_ = rows.Close()
+			return rowsErr
+		}
+		if closeErr := rows.Close(); closeErr != nil {
+			return closeErr
+		}
+		missing += int64(len(ids) - found)
+		ids = ids[:0]
+		return nil
+	}
+	for cursor.Next(ctx) {
+		var row struct {
+			AssessmentID uint64 `bson:"assessment_id"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			return 0, err
+		}
+		ids = append(ids, row.AssessmentID)
+		if int64(len(ids)) == batchSize {
+			if err := flush(); err != nil {
+				return 0, err
+			}
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return 0, err
+	}
+	if err := flush(); err != nil {
+		return 0, err
+	}
+	return missing, nil
+}
+
+func danglingSourcePipeline(sourceKind, collection string) mongo.Pipeline {
+	return mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"source_kind": sourceKind}}},
+		{{Key: "$lookup", Value: bson.M{
+			"from": collection,
+			"let":  bson.M{"source_id": "$source_id"},
+			"pipeline": mongo.Pipeline{
+				{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{"$domain_id", "$$source_id"}},
+					bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$deleted_at", nil}}, nil}},
+				}}}}},
+			},
+			"as": "source",
+		}}},
+		{{Key: "$match", Value: bson.M{"source": bson.M{"$size": 0}}}},
+	}
+}
+
+func expectedCatalogCount(ctx context.Context, db *mongo.Database) (int64, error) {
+	return aggregateCount(ctx, db.Collection("archived_reports"), mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"deleted_at": nil}}},
+		{{Key: "$project", Value: bson.M{"assessment_id": "$domain_id"}}},
+		{{Key: "$unionWith", Value: bson.M{"coll": "interpret_report_artifacts", "pipeline": mongo.Pipeline{
+			{{Key: "$match", Value: bson.M{"deleted_at": nil}}},
+			{{Key: "$project", Value: bson.M{"assessment_id": 1}}},
+		}}}},
+		{{Key: "$group", Value: bson.M{"_id": "$assessment_id"}}},
+	})
 }
 
 func aggregateCount(ctx context.Context, collection *mongo.Collection, pipeline mongo.Pipeline) (int64, error) {

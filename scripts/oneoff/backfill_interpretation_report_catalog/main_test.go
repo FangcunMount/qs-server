@@ -38,6 +38,17 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
+func TestVerifyRequiresMySQL(t *testing.T) {
+	c := config{mongoURI: "mongodb://localhost", mongoDB: "qs", source: "artifact", batchSize: 1000, workers: 8, progressInterval: time.Second, verifyOnly: true}
+	if err := validateConfig(c); err == nil {
+		t.Fatal("verify must require MySQL for assessment reconciliation")
+	}
+	c.mysqlDSN = "dsn"
+	if err := validateConfig(c); err != nil {
+		t.Fatalf("verify config: %v", err)
+	}
+}
+
 func TestRangeFilter(t *testing.T) {
 	filter := rangeFilter(100, 200)
 	rangeQuery, ok := filter["domain_id"].(bson.M)
@@ -137,5 +148,18 @@ func TestApplyBulkResult(t *testing.T) {
 	applyBulkResult(&delta, 10, nil, 2)
 	if delta.conflict != 2 || delta.unchanged != 8 {
 		t.Fatalf("conflict=%d unchanged=%d, want 2 and 8", delta.conflict, delta.unchanged)
+	}
+}
+
+func TestDanglingSourcePipelineRequiresActiveSource(t *testing.T) {
+	doc, err := bson.MarshalExtJSON(bson.M{"pipeline": danglingSourcePipeline("archive", "archived_reports")}, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(doc)
+	for _, want := range []string{`"source_kind":"archive"`, `"from":"archived_reports"`, `"$domain_id"`, `"$deleted_at"`, `"$ifNull"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("pipeline %s does not contain %s", text, want)
+		}
 	}
 }

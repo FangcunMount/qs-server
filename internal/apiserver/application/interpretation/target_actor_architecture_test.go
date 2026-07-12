@@ -91,3 +91,76 @@ func TestTargetInterpretationApplicationHasNoActorNeutralFacades(t *testing.T) {
 		}
 	}
 }
+
+func TestTargetProductionDoesNotReferenceLegacyInterpretReports(t *testing.T) {
+	root := repoRoot(t)
+	productionRoot := filepath.Join(root, "internal")
+	err := filepath.WalkDir(productionRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		if strings.Contains(string(data), "interpret_reports") {
+			t.Fatalf("production legacy report collection reference remains in %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTargetStatisticsResolvesCurrentReportOnlyThroughCatalog(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "infra", "statistics", "report_scan_source.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "report_query_catalog") {
+		t.Fatal("statistics report scan must use report_query_catalog")
+	}
+	for _, forbidden := range []string{"interpret_report_artifacts", "archived_reports", "loadCurrentReportMeta", "loadArchivedReportMeta"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("statistics report scan bypasses catalog through %q", forbidden)
+		}
+	}
+}
+
+func TestTargetParticipantReportGRPCDoesNotLeakUnknownErrors(t *testing.T) {
+	root := repoRoot(t)
+	paths := []string{
+		filepath.Join(root, "internal", "apiserver", "transport", "grpc", "service", "participant_report.go"),
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "status.Error(codes.Internal, err.Error())") {
+			t.Fatalf("participant report gRPC can leak an internal error through %s", path)
+		}
+	}
+}
+
+func TestTargetOnlyActiveProfileLinkMiddlewareRemains(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "collection-server", "transport", "rest", "middleware", "iam_middleware.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, forbidden := range []string{"func ProfileLinkMiddleware(", "func OptionalProfileLinkMiddleware("} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("unused profile-link middleware returned: %s", forbidden)
+		}
+	}
+	if !strings.Contains(text, "func TesteeProfileLinkMiddleware(") {
+		t.Fatal("active testee profile-link middleware is missing")
+	}
+}

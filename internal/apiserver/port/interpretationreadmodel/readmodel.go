@@ -6,10 +6,23 @@ package interpretationreadmodel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
 var ErrReportNotFound = errors.New("interpretation report not found")
+
+// CatalogDanglingSourceError identifies a catalog entry whose selected report
+// body is missing. It is an internal consistency error, not a public message.
+type CatalogDanglingSourceError struct {
+	AssessmentID uint64
+	SourceKind   string
+	SourceID     uint64
+}
+
+func (e *CatalogDanglingSourceError) Error() string {
+	return fmt.Sprintf("report catalog dangling source: assessment=%d source=%s/%d", e.AssessmentID, e.SourceKind, e.SourceID)
+}
 
 type PageRequest struct {
 	Page     int

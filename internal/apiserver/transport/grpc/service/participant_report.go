@@ -51,7 +51,7 @@ func (s *ParticipantReportService) ListMyReports(ctx context.Context, req *pb.Li
 	}
 	result, err := s.service.ListMyReports(ctx, participant.Actor{TesteeID: req.TesteeId}, participant.ListQuery{Page: page, PageSize: pageSize})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAssessmentQueryGRPCError(err)
 	}
 	items := make([]*pb.AssessmentReport, 0, len(result.Items))
 	for _, item := range result.Items {

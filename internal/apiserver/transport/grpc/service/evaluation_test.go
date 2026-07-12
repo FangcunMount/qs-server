@@ -68,5 +68,8 @@ func TestToAssessmentQueryGRPCError(t *testing.T) {
 		if status.Code(got) != codes.Internal {
 			t.Fatalf("expected Internal, got %s", status.Code(got))
 		}
+		if status.Convert(got).Message() != "internal error" {
+			t.Fatalf("unknown internal error leaked: %q", status.Convert(got).Message())
+		}
 	})
 }

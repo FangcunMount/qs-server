@@ -101,7 +101,7 @@ func toAssessmentQueryGRPCError(err error) error {
 	case errorCode.ErrPermissionDenied, errorCode.ErrForbidden:
 		return status.Error(codes.PermissionDenied, err.Error())
 	default:
-		return status.Error(codes.Internal, err.Error())
+		return status.Error(codes.Internal, "internal error")
 	}
 }
 

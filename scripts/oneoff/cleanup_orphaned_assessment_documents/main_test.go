@@ -54,9 +54,9 @@ func TestAnswerSheetFilterIncludesSafetyCutoff(t *testing.T) {
 	}
 }
 
-func TestReportRelatedCleanupIncludesLegacyAndCatalog(t *testing.T) {
+func TestReportRelatedCleanupIncludesCatalog(t *testing.T) {
 	got := reportPhase().related
-	want := []relatedCollection{{"interpret_reports", "domain_id", true}, {"report_query_catalog", "assessment_id", false}}
+	want := []relatedCollection{{"report_query_catalog", "assessment_id", false}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("related = %#v, want %#v", got, want)
 	}
