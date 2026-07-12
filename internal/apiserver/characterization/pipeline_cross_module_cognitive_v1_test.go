@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 )
 
 // V1 cross-module contract: cognitive follows submit → worker → split-phase report path.
@@ -20,7 +20,7 @@ func TestV1CrossModuleSyncCognitiveSurveySubmitWorkerToInterpretedReport(t *test
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      cognitiveInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
+			ReportBuilder: interpretationreporting.NewTaskPerformanceBuilder(
 				domainreport.NewDefaultReportBuilder(nil),
 			),
 		},

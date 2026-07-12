@@ -5,16 +5,16 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
+	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 type behaviorProjectionFlow struct {
@@ -268,8 +268,8 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 	s := flow.service
 	l := logger.L(ctx)
 
-	if req == nil || (req.AssessmentId == 0 && req.OutcomeId == "") {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 或 outcome_id 不能为空")
+	if req == nil || req.OutcomeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "outcome_id 不能为空")
 	}
 
 	l.Infow("gRPC: 收到生成报告请求",
@@ -278,20 +278,17 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		"outcome_id", req.OutcomeId,
 	)
 
-	if s.outcomeReportService == nil {
-		return generateReportFailureResponse(fmt.Errorf("interpretation outcome service is not configured")), nil
+	if s.automationService == nil {
+		return generateReportFailureResponse(fmt.Errorf("interpretation automation service is not configured")), nil
 	}
-	var result *interpretationgeneration.ExecuteResult
-	var err error
-	if req.OutcomeId != "" {
-		outcomeID, parseErr := meta.ParseID(req.OutcomeId)
-		if parseErr != nil || outcomeID.IsZero() {
-			return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
-		}
-		result, err = s.outcomeReportService.GenerateByOutcomeID(ctx, outcomeID)
-	} else {
-		result, err = s.outcomeReportService.GenerateByAssessmentID(ctx, meta.FromUint64(req.AssessmentId))
+	outcomeID, parseErr := meta.ParseID(req.OutcomeId)
+	if parseErr != nil || outcomeID.IsZero() {
+		return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
 	}
+	result, err := s.automationService.Generate(ctx, interpretationautomation.GenerateCommand{
+		Actor: interpretationautomation.TrustedServiceActor("internal-grpc"), OutcomeID: outcomeID,
+		TraceID: interpretationTraceID(ctx),
+	})
 	if err != nil {
 		l.Errorw("生成报告失败",
 			"assessment_id", req.AssessmentId,
@@ -299,12 +296,8 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		)
 		return generateReportFailureResponse(err), nil
 	}
-	if s.reportStatusReporter != nil && result != nil && result.InterpretReport != nil {
-		id := reportstatus.AssessmentKey(result.InterpretReport.Association().AssessmentID.Uint64())
-		s.reportStatusReporter.SetCompleted(ctx, id, "", id)
-	}
 	status, message := "generated", "报告生成完成"
-	if result != nil && result.Status == interpretationgeneration.ExecuteStatusProcessing {
+	if result != nil && result.Status == interpretationautomation.StatusProcessing {
 		status, message = "processing", "报告正在生成"
 	}
 
@@ -314,20 +307,23 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 		Message: message,
 	}
 	if result != nil {
-		if result.Generation != nil {
-			resp.GenerationId = result.Generation.ID().String()
-		}
-		if result.Run != nil {
-			resp.RunId = result.Run.ID().String()
-		}
-		if result.InterpretReport != nil {
-			resp.ReportId = result.InterpretReport.ID().String()
-			if resp.RunId == "" {
-				resp.RunId = result.InterpretReport.InterpretationRunID().String()
-			}
-		}
+		resp.GenerationId = result.GenerationID.String()
+		resp.RunId = result.RunID.String()
+		resp.ReportId = result.ReportID.String()
 	}
 	return resp, nil
+}
+
+func interpretationTraceID(ctx context.Context) string {
+	values, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	items := values.Get("x-event-id")
+	if len(items) == 0 {
+		return ""
+	}
+	return items[0]
 }
 
 func assessmentResultStatus(result *assessmentApp.AssessmentResult) string {

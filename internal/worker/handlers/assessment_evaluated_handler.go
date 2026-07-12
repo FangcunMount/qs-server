@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -37,7 +39,8 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("outcome id is required in evaluation outcome committed event for assessment %d", data.AssessmentID)
 		}
 
-		resp, err := deps.InternalClient.GenerateReportFromOutcome(ctx, data.OutcomeID)
+		callCtx := metadata.AppendToOutgoingContext(ctx, "x-event-id", env.ID)
+		resp, err := deps.InternalClient.GenerateReportFromOutcome(callCtx, data.OutcomeID)
 		if err != nil {
 			deps.Logger.Error("failed to generate report from assessment",
 				slog.Int64("assessment_id", data.AssessmentID),

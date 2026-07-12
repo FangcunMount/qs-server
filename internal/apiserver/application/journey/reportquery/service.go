@@ -1,143 +1,95 @@
-// Package reportquery composes protected Assessment access with Interpretation report reads.
+// Package reportquery preserves the cross-module Assessment status projection
+// while delegating all authorized report reads to the administration actor.
 package reportquery
 
 import (
 	"context"
-	"time"
-
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationAdmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"time"
 )
 
-// AssessmentProjection is the Journey-owned legacy view composed from an
-// Evaluation Assessment and, when present, an Interpretation report.
 type AssessmentProjection struct {
 	Assessment    *assessmentApp.AssessmentResult
 	Status        string
 	InterpretedAt *time.Time
 }
-
 type AssessmentListProjection struct {
-	Items      []*AssessmentProjection
-	Total      int
-	Page       int
-	PageSize   int
-	TotalPages int
+	Items                             []*AssessmentProjection
+	Total, Page, PageSize, TotalPages int
 }
+type Scope struct{ OrgID, OperatorUserID int64 }
+type ListQuery = interpretationAdmin.ListQuery
+type Report = interpretationAdmin.Report
+type ReportList = interpretationAdmin.ListResult
 
-type Scope struct {
-	OrgID          int64
-	OperatorUserID int64
-}
-
-type AssessmentAccess interface {
-	LoadAccessibleAssessment(ctx context.Context, orgID int64, operatorUserID int64, assessmentID uint64) (*assessmentApp.AccessibleAssessmentContext, error)
-	ScopeTesteeList(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) (assessmentApp.TesteeListAccessScope, error)
-}
-
-// Service owns cross-module report authorization and legacy journey projection.
 type Service interface {
-	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*AssessmentProjection, error)
-	ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error)
-	GetReport(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportResult, error)
-	GetReportOutcome(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportOutcomeResult, error)
-	ListReports(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (*interpretationApp.ReportListResult, error)
-	ListReportsOutcome(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (*interpretationApp.ReportOutcomeListResult, error)
+	ProjectAssessment(context.Context, *assessmentApp.AssessmentResult) (*AssessmentProjection, error)
+	ProjectAssessmentList(context.Context, *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error)
+	GetReport(context.Context, Scope, uint64) (*Report, error)
+	GetReportOutcome(context.Context, Scope, uint64) (*Report, error)
+	ListReports(context.Context, Scope, ListQuery) (*ReportList, error)
+	ListReportsOutcome(context.Context, Scope, ListQuery) (*ReportList, error)
 }
-
 type service struct {
-	access  AssessmentAccess
-	reports interpretationApp.ReportQueryService
+	reader interpretationreadmodel.ReportReader
+	admin  interpretationAdmin.Service
 }
 
-func NewService(access AssessmentAccess, reports interpretationApp.ReportQueryService) Service {
-	return &service{access: access, reports: reports}
+func NewAdministrationService(reader interpretationreadmodel.ReportReader, admin interpretationAdmin.Service) Service {
+	return &service{reader: reader, admin: admin}
 }
-
 func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*AssessmentProjection, error) {
-	projected := &AssessmentProjection{Assessment: result}
+	p := &AssessmentProjection{Assessment: result}
 	if result != nil {
-		projected.Status = result.Status
+		p.Status = result.Status
 	}
-	if result == nil || result.Status != "evaluated" || s.reports == nil {
-		return projected, nil
+	if result == nil || result.Status != "evaluated" || s.reader == nil {
+		return p, nil
 	}
-	report, err := s.reports.GetByAssessmentID(ctx, result.ID)
+	row, err := s.reader.GetReportByAssessmentID(ctx, result.ID)
 	if err != nil {
-		if interpretationApp.IsReportNotFound(err) {
-			return projected, nil
+		if cberrors.IsCode(err, code.ErrInterpretReportNotFound) {
+			return p, nil
 		}
 		return nil, err
 	}
-	if report == nil {
-		return projected, nil
+	if row != nil {
+		p.Status = "interpreted"
+		at := row.CreatedAt
+		p.InterpretedAt = &at
 	}
-	projected.Status = "interpreted"
-	interpretedAt := report.CreatedAt
-	projected.InterpretedAt = &interpretedAt
-	return projected, nil
+	return p, nil
 }
-
 func (s *service) ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error) {
 	if result == nil {
 		return nil, nil
 	}
-	projected := &AssessmentListProjection{
-		Items:      make([]*AssessmentProjection, 0, len(result.Items)),
-		Total:      result.Total,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		TotalPages: result.TotalPages,
-	}
+	out := &AssessmentListProjection{Items: make([]*AssessmentProjection, 0, len(result.Items)), Total: result.Total, Page: result.Page, PageSize: result.PageSize, TotalPages: result.TotalPages}
 	for _, item := range result.Items {
-		value, err := s.ProjectAssessment(ctx, item)
+		p, err := s.ProjectAssessment(ctx, item)
 		if err != nil {
 			return nil, err
 		}
-		projected.Items = append(projected.Items, value)
+		out.Items = append(out.Items, p)
 	}
-	return projected, nil
+	return out, nil
 }
-
-func (s *service) GetReport(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportResult, error) {
-	if _, err := s.access.LoadAccessibleAssessment(ctx, scope.OrgID, scope.OperatorUserID, assessmentID); err != nil {
-		return nil, err
-	}
-	return s.reports.GetByAssessmentID(ctx, assessmentID)
+func (s *service) GetReport(ctx context.Context, scope Scope, id uint64) (*Report, error) {
+	return s.admin.GetReport(ctx, actor(scope), interpretationAdmin.GetQuery{AssessmentID: id})
 }
-
-func (s *service) GetReportOutcome(ctx context.Context, scope Scope, assessmentID uint64) (*interpretationApp.ReportOutcomeResult, error) {
-	if _, err := s.access.LoadAccessibleAssessment(ctx, scope.OrgID, scope.OperatorUserID, assessmentID); err != nil {
-		return nil, err
-	}
-	return s.reports.GetOutcomeByAssessmentID(ctx, assessmentID)
+func (s *service) GetReportOutcome(ctx context.Context, scope Scope, id uint64) (*Report, error) {
+	return s.GetReport(ctx, scope, id)
 }
-
-func (s *service) ListReports(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (*interpretationApp.ReportListResult, error) {
-	scoped, err := s.scopeList(ctx, scope, dto)
-	if err != nil {
-		return nil, err
-	}
-	return s.reports.ListByTesteeID(ctx, scoped)
+func (s *service) ListReports(ctx context.Context, scope Scope, q ListQuery) (*ReportList, error) {
+	return s.admin.ListReports(ctx, actor(scope), q)
 }
-
-func (s *service) ListReportsOutcome(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (*interpretationApp.ReportOutcomeListResult, error) {
-	scoped, err := s.scopeList(ctx, scope, dto)
-	if err != nil {
-		return nil, err
-	}
-	return s.reports.ListOutcomeByTesteeID(ctx, scoped)
+func (s *service) ListReportsOutcome(ctx context.Context, scope Scope, q ListQuery) (*ReportList, error) {
+	return s.ListReports(ctx, scope, q)
 }
-
-func (s *service) scopeList(ctx context.Context, scope Scope, dto interpretationApp.ListReportsDTO) (interpretationApp.ListReportsDTO, error) {
-	access, err := s.access.ScopeTesteeList(ctx, scope.OrgID, scope.OperatorUserID, dto.TesteeID)
-	if err != nil {
-		return dto, err
-	}
-	dto.TesteeID = access.TesteeID
-	dto.AccessibleTesteeIDs = append([]uint64(nil), access.AccessibleTesteeIDs...)
-	dto.RestrictToAccessScope = access.RestrictToAccessScope
-	return dto, nil
+func actor(s Scope) interpretationAdmin.Actor {
+	return interpretationAdmin.Actor{OrgID: s.OrgID, OperatorUserID: s.OperatorUserID}
 }
-
-var _ Service = (*service)(nil)

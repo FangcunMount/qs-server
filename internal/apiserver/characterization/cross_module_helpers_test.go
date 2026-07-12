@@ -12,9 +12,9 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	workerhandlers "github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -60,7 +60,7 @@ func buildCharAnswerSheetCrossModuleHarness(t *testing.T, cfg charAnswerSheetCro
 	t.Helper()
 	splitCfg := v1SplitPhaseConfig{
 		Input: scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
 			domainreport.NewDefaultReportBuilder(nil),
 		),
 		Async: cfg.Async,
@@ -454,7 +454,7 @@ func scaleCrossModuleConfig(t *testing.T, a *assessment.Assessment, async bool) 
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      scaleInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
+			ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
 				domainreport.NewDefaultReportBuilder(nil),
 			),
 			Async: async,

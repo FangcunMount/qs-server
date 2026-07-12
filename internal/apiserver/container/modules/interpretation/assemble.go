@@ -10,13 +10,16 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
-	reportmaterialize "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/materialize"
+	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
+	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
+	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
+	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
@@ -34,19 +37,20 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
-	QueryService          interpretationapp.ReportQueryService
-	LifecycleQueryService interpretationapp.LifecycleQueryService
-
-	reader               evaluationreadmodel.ReportReader
-	builderRegistry      interpretationreporting.ReportBuilderRegistry
-	generationExecutor   interpretationgeneration.Executor
-	generationRepo       *mongoEval.GenerationRepository
-	runRepo              *mongoEval.RunRepository
-	reportRepo           *mongoEval.ReportRepository
-	outcomeService       interpretationapp.OutcomeReportService
-	readyIndexer         *appEventing.PostCommitReadyIndexer
-	readyIndex           *outboxready.Index
-	ReportStatusReporter *reportstatus.Reporter
+	reader                evaluationreadmodel.ReportReader
+	builderRegistry       rendering.Registry
+	generationExecutor    interpretationgeneration.Executor
+	generationRepo        *mongoEval.GenerationRepository
+	runRepo               *mongoEval.RunRepository
+	reportRepo            *mongoEval.ReportRepository
+	automationService     interpretationautomation.Service
+	participantService    interpretationparticipant.Service
+	administrationService interpretationadmin.Service
+	clinicianService      interpretationclinician.Service
+	operationsService     interpretationoperations.Service
+	readyIndexer          *appEventing.PostCommitReadyIndexer
+	readyIndex            *outboxready.Index
+	ReportStatusReporter  *reportstatus.Reporter
 }
 
 // Deps defines explicit constructor dependencies for the report module.
@@ -72,7 +76,6 @@ func New(deps Deps) (*Module, error) {
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
-	module.QueryService = interpretationapp.NewReportQueryService(module.reader)
 	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation repository: %v", err)
@@ -136,14 +139,32 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	if m == nil || repo == nil || m.generationExecutor == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
 	}
-	m.outcomeService = interpretationapp.NewOutcomeReportService(repo, m.generationExecutor)
-	m.LifecycleQueryService = interpretationapp.NewLifecycleQueryService(
+	automationService, err := interpretationautomation.NewService(repo, m.generationExecutor)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation automation service: %v", err)
+	}
+	m.automationService = automationService
+	m.operationsService = interpretationoperations.NewService(
 		outcomeCorrelationAdapter{repo: repo},
 		m.generationRepo,
 		m.runRepo,
 		m.reportRepo,
 	)
 	return nil
+}
+
+func (m *Module) OperationsService() interpretationoperations.Service {
+	if m == nil {
+		return nil
+	}
+	return m.operationsService
+}
+
+func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
+	if m == nil {
+		return nil
+	}
+	return m.reader
 }
 
 // outcomeCorrelationAdapter keeps Evaluation outcome types inside the
@@ -166,20 +187,62 @@ func (a outcomeCorrelationAdapter) FindOutcomeIDByAssessmentID(ctx context.Conte
 	return record.ID(), nil
 }
 
-func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {
+func (m *Module) AutomationService() interpretationautomation.Service {
 	if m == nil {
 		return nil
 	}
-	return m.outcomeService
+	return m.automationService
 }
 
-func buildReportBuilderRegistry() (interpretationreporting.ReportBuilderRegistry, error) {
-	builders, err := reportmaterialize.ReportBuilders(domainreport.NewDefaultReportBuilder(nil))
-	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
+// BindParticipantAccess installs the participant-owned read use cases after
+// Evaluation has exposed its ownership-checking query service.
+func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) error {
+	if m == nil || access == nil || m.reader == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation participant service dependencies are not configured")
 	}
-	expanded := interpretationreporting.ExpandAudienceProfileBuilders(builders...)
-	registry, err := interpretationreporting.NewReportBuilderRegistry(expanded...)
+	m.participantService = interpretationparticipant.NewService(m.reader, access)
+	return nil
+}
+
+func (m *Module) BindAdministrationAccess(access interpretationadmin.Access) error {
+	if m == nil || access == nil || m.reader == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation administration service dependencies are not configured")
+	}
+	m.administrationService = interpretationadmin.NewService(m.reader, access)
+	return nil
+}
+
+func (m *Module) AdministrationService() interpretationadmin.Service {
+	if m == nil {
+		return nil
+	}
+	return m.administrationService
+}
+
+func (m *Module) BindClinicianAccess(access interpretationclinician.Access) error {
+	if m == nil || access == nil || m.reader == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation clinician service dependencies are not configured")
+	}
+	m.clinicianService = interpretationclinician.NewService(m.reader, access)
+	return nil
+}
+func (m *Module) ClinicianService() interpretationclinician.Service {
+	if m == nil {
+		return nil
+	}
+	return m.clinicianService
+}
+
+func (m *Module) ParticipantService() interpretationparticipant.Service {
+	if m == nil {
+		return nil
+	}
+	return m.participantService
+}
+
+func buildReportBuilderRegistry() (rendering.Registry, error) {
+	builders := rendering.DefaultBuilders(domainreport.NewDefaultReportBuilder(nil))
+	registry, err := rendering.NewRegistry(builders...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report builder registry: %v", err)
 	}

@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -168,10 +168,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 		t.Fatalf("profile = %#v, want code %s", outcome.Profile, tc.wantProfileCode)
 	}
 
-	reportBuilder, err := typologyreporting.NewConfiguredReportBuilder()
-	if err != nil {
-		t.Fatalf("NewConfiguredReportBuilder: %v", err)
-	}
+	reportBuilder := typologyreporting.NewTypologyBuilder()
 	ref := outcome.ModelRef
 	factModel := evaluationfact.ModelIdentity{Kind: ref.Kind(), SubKind: ref.SubKind(), Algorithm: ref.Algorithm(), Code: ref.Code().String(), Version: ref.Version(), Title: ref.Title()}
 	decoded, err := evaluationfactcodec.DecodeTransientExecution(outcome, factModel, evaluationfact.RuntimeIdentity{})

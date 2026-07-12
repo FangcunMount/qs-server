@@ -1,23 +1,33 @@
 package service
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+
+	"google.golang.org/grpc/metadata"
 )
 
-func TestReportRPCDelegatesDirectlyToInterpretationOutcomeUseCase(t *testing.T) {
+func TestReportRPCDelegatesDirectlyToInterpretationAutomationUseCase(t *testing.T) {
 	data, err := os.ReadFile("internal_assessment_flow.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	source := string(data)
-	if !strings.Contains(source, "outcomeReportService.GenerateByOutcomeID(") {
-		t.Fatal("report RPC must call the Interpretation outcome use case")
+	if !strings.Contains(source, "automationService.Generate(") {
+		t.Fatal("report RPC must call the Interpretation automation use case")
 	}
 	for _, forbidden := range []string{"executeService.GenerateReport(", "executeService.GenerateReportFromOutcome("} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("report RPC must not route through Evaluation Service: %q", forbidden)
 		}
+	}
+}
+
+func TestInterpretationTraceIDReadsWorkerEventMetadata(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-event-id", "evt-42"))
+	if got := interpretationTraceID(ctx); got != "evt-42" {
+		t.Fatalf("trace id = %q, want evt-42", got)
 	}
 }

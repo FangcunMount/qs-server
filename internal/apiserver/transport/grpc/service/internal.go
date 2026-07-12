@@ -16,7 +16,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -37,7 +37,7 @@ type InternalService struct {
 	intakeService              assessmentApp.AnswerSheetAssessmentIntakeService
 	assessmentResultReader     assessmentApp.AssessmentResultReader
 	workerExecutionService     execute.WorkerExecutionService
-	outcomeReportService       interpretationApp.OutcomeReportService
+	automationService          interpretationAutomation.Service
 	runQueryService            runqueryApp.Service
 	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
@@ -71,7 +71,7 @@ func NewInternalService(
 	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
 	assessmentResultReader assessmentApp.AssessmentResultReader,
 	workerExecutionService execute.WorkerExecutionService,
-	outcomeReportService interpretationApp.OutcomeReportService,
+	automationService interpretationAutomation.Service,
 	runQueryService runqueryApp.Service,
 	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
@@ -92,7 +92,7 @@ func NewInternalService(
 		intakeService:                      intakeService,
 		assessmentResultReader:             assessmentResultReader,
 		workerExecutionService:             workerExecutionService,
-		outcomeReportService:               outcomeReportService,
+		automationService:                  automationService,
 		runQueryService:                    runQueryService,
 		assessmentBindingResolver:          assessmentBindingResolver,
 		assessmentAttentionService:         assessmentAttentionService,

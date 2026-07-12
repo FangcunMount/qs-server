@@ -6,8 +6,8 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
@@ -37,7 +37,7 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
-	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
+	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
 
 	if report.TotalScore() != 5 || report.RiskLevel() != domainreport.RiskLevelLow {
 		t.Fatalf("report summary = score:%v risk:%s", report.TotalScore(), report.RiskLevel())

@@ -15,7 +15,6 @@ import (
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -352,9 +351,7 @@ func newRouterTestContainer() *container.Container {
 			AssessmentEntryService: &routerAssessmentEntryServiceStub{},
 		},
 		EvaluationModule: evaluationModule,
-		ReportModule: &interpretationmod.Module{
-			QueryService: interpretationApp.NewReportQueryService(nil),
-		},
+		ReportModule:     &interpretationmod.Module{},
 		PlanModule: &planmod.Module{
 			CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
 			QueryService:   planApp.NewQueryService(nil, nil, nil),

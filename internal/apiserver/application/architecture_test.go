@@ -213,20 +213,20 @@ func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	})
 }
 
-func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
+func TestInterpretationRenderingDoesNotOwnScaleRules(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "rendering"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
 		for _, forbidden := range forbiddenImports {
 			if strings.HasPrefix(importPath, forbidden) {
-				t.Fatalf("%s imports %s; report writer must orchestrate outputs without owning scale rules", filepath.ToSlash(mustRel(t, root, path)), importPath)
+				t.Fatalf("%s imports %s; report renderer must not own scale rules", filepath.ToSlash(mustRel(t, root, path)), importPath)
 			}
 		}
 	})

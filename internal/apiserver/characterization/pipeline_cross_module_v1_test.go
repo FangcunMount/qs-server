@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -80,10 +80,7 @@ func TestV1CrossModuleSyncMBTISurveySubmitWorkerToInterpretedReport(t *testing.T
 
 	ctx := context.Background()
 	a := draftMBTIAssessment(t)
-	reportBuilder, err := typologyreporting.NewReportBuilder(modelcatalog.AlgorithmMBTI)
-	if err != nil {
-		t.Fatalf("NewReportBuilder: %v", err)
-	}
+	reportBuilder := typologyreporting.NewTypologyBuilder()
 	h := buildCharCrossModuleHarness(t, charCrossModuleConfig{
 		Assessment: a,
 		v1SplitPhaseConfig: v1SplitPhaseConfig{

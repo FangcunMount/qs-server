@@ -35,7 +35,7 @@ func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, required := range []string{"interpretationgeneration.NewStarter", "interpretationgeneration.NewInterpretationCommitter", "interpretationgeneration.NewExecutor", "interpretationapp.NewOutcomeReportService", "interpretationapp.NewReportQueryService"} {
+	for _, required := range []string{"interpretationgeneration.NewStarter", "interpretationgeneration.NewInterpretationCommitter", "interpretationgeneration.NewExecutor", "interpretationautomation.NewService", "interpretationparticipant.NewService", "interpretationadmin.NewService"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("interpretation assemble must own report capability %q", required)
 		}
@@ -49,7 +49,7 @@ func TestExecutorDelegatesTerminalPersistenceToInterpretationCommitter(t *testin
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "generation", "executor.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "automation", "execution", "executor.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestGenerationPackageOwnsReportEventStaging(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	reportingDir := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "generation")
+	reportingDir := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "automation", "execution")
 	found := false
 	err := filepath.WalkDir(reportingDir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
@@ -140,11 +140,11 @@ func TestInterpretationCannotMutateAssessmentLifecycle(t *testing.T) {
 	}
 }
 
-func TestOutcomeReportServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T) {
+func TestAutomationServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "service.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "automation", "service.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ func TestOutcomeReportServiceCannotReevaluateOrWriteEvaluationFacts(t *testing.T
 		"ScoreProjector",
 	} {
 		if strings.Contains(text, forbidden) {
-			t.Fatalf("OutcomeReportService must not re-evaluate or write Evaluation facts: %s", forbidden)
+			t.Fatalf("automation service must not re-evaluate or write Evaluation facts: %s", forbidden)
 		}
 	}
 }

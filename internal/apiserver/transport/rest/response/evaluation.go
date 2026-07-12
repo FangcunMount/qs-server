@@ -5,7 +5,7 @@ import (
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
-	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	reportquery "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 )
 
@@ -134,7 +134,7 @@ type DimensionItem struct {
 	Suggestion     string   `json:"suggestion,omitempty"`       // 维度建议
 }
 
-func newDimensionItem(d interpretation.DimensionResult) *DimensionItem {
+func newDimensionItem(d interpretation.Dimension) *DimensionItem {
 	return &DimensionItem{
 		FactorCode:     d.FactorCode,
 		FactorName:     d.FactorName,
@@ -369,7 +369,7 @@ func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighR
 }
 
 // NewReportResponse 从应用层 Result 创建报告响应
-func NewReportResponse(result *interpretation.ReportResult) *ReportResponse {
+func NewReportResponse(result *interpretation.Report) *ReportResponse {
 	if result == nil {
 		return nil
 	}
@@ -379,13 +379,20 @@ func NewReportResponse(result *interpretation.ReportResult) *ReportResponse {
 		dimensions = append(dimensions, newDimensionItem(d))
 	}
 
+	totalScore, riskLevel := 0.0, ""
+	if result.PrimaryScore != nil {
+		totalScore = result.PrimaryScore.Value
+	}
+	if result.Level != nil {
+		riskLevel = result.Level.Code
+	}
 	return &ReportResponse{
 		AssessmentID:   fmt.Sprintf("%d", result.AssessmentID),
-		ScaleName:      result.ModelName,
-		ScaleCode:      result.ModelCode,
-		TotalScore:     result.TotalScore,
-		RiskLevel:      result.RiskLevel,
-		RiskLevelLabel: LabelForRiskLevel(result.RiskLevel),
+		ScaleName:      result.Model.Title,
+		ScaleCode:      result.Model.Code,
+		TotalScore:     totalScore,
+		RiskLevel:      riskLevel,
+		RiskLevelLabel: LabelForRiskLevel(riskLevel),
 		Conclusion:     result.Conclusion,
 		Dimensions:     dimensions,
 		Suggestions:    toSuggestionItems(result.Suggestions),
@@ -393,7 +400,7 @@ func NewReportResponse(result *interpretation.ReportResult) *ReportResponse {
 	}
 }
 
-func toSuggestionItems(items []interpretation.SuggestionDTO) []SuggestionItem {
+func toSuggestionItems(items []interpretation.Suggestion) []SuggestionItem {
 	if len(items) == 0 {
 		return nil
 	}
@@ -409,7 +416,7 @@ func toSuggestionItems(items []interpretation.SuggestionDTO) []SuggestionItem {
 }
 
 // NewReportListResponse 从应用层 Result 创建报告列表响应
-func NewReportListResponse(result *interpretation.ReportListResult) *ReportListResponse {
+func NewReportListResponse(result *interpretation.ListResult) *ReportListResponse {
 	if result == nil {
 		return nil
 	}

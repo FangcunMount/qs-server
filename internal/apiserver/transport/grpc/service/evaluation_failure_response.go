@@ -6,7 +6,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
+	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 )
 
 func evaluateFailureResponse(
@@ -38,13 +38,13 @@ func generateReportFailureResponse(err error) *pb.GenerateReportFromAssessmentRe
 		Retryable:   true,
 		FailureKind: "internal",
 	}
-	if failed, ok := interpretationgeneration.FailureFrom(err); ok {
-		resp.Retryable = failed.Failure.Retryable
+	if failed, ok := interpretationautomation.FailureFrom(err); ok {
+		resp.Retryable = failed.Retryable
 		resp.GenerationId = failed.GenerationID.String()
 		resp.RunId = failed.RunID.String()
-		resp.FailureKind = string(failed.Failure.Kind)
-		resp.FailureCode = failed.Failure.Code
-		resp.Message = failed.Failure.SafeMessage
+		resp.FailureKind = string(failed.Kind)
+		resp.FailureCode = failed.Code
+		resp.Message = failed.SafeMessage
 	}
 	if err != nil && resp.Message == "报告生成失败" {
 		resp.Message = fmt.Sprintf("报告生成失败: %v", err)

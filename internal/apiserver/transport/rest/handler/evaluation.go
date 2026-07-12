@@ -10,7 +10,6 @@ import (
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
@@ -339,7 +338,7 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 		return
 	}
 
-	dto := interpretationApp.ListReportsDTO{
+	dto := reportqueryjourney.ListQuery{
 		TesteeID: req.TesteeID,
 		Page:     req.Page,
 		PageSize: req.PageSize,

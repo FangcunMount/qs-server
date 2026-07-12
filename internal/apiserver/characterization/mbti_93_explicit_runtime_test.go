@@ -6,9 +6,9 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -29,10 +29,7 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 			}
-			reportBuilder, err := typologyreporting.NewConfiguredReportBuilder()
-			if err != nil {
-				t.Fatalf("NewConfiguredReportBuilder: %v", err)
-			}
+			reportBuilder := typologyreporting.NewTypologyBuilder()
 
 			payload := mbti93ExplicitRuntimePayload(algorithm)
 			snapshot := mbti93InputSnapshot(payload)

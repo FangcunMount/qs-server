@@ -4,7 +4,7 @@ import (
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -199,28 +199,23 @@ func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcome
 	return summary
 }
 
-func toProtoAssessmentReportFromOutcome(result *interpretationApp.ReportOutcomeResult) *evaluationpb.AssessmentReport {
+func toProtoParticipantReport(result *interpretationParticipant.Report) *evaluationpb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
 	report := &evaluationpb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
-		Model:        toReportProtoModelIdentity(result.Model),
-		PrimaryScore: toReportProtoScoreValue(result.PrimaryScore),
-		Level:        toReportProtoResultLevel(result.Level),
-		Conclusion:   result.Conclusion,
-		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
+		Model:        &evaluationpb.ModelIdentity{Kind: result.Model.Kind, SubKind: result.Model.SubKind, Algorithm: result.Model.Algorithm, Code: result.Model.Code, Version: result.Model.Version, Title: result.Model.Title, ProductChannel: result.Model.ProductChannel, AlgorithmFamily: result.Model.AlgorithmFamily},
+		Conclusion:   result.Conclusion, CreatedAt: result.CreatedAt.Format("2006-01-02 15:04:05"),
+	}
+	if result.PrimaryScore != nil {
+		report.PrimaryScore = &evaluationpb.ScoreValue{Kind: result.PrimaryScore.Kind, Value: result.PrimaryScore.Value, Label: result.PrimaryScore.Label, Max: result.PrimaryScore.Max}
+	}
+	if result.Level != nil {
+		report.Level = &evaluationpb.ResultLevel{Code: result.Level.Code, Label: result.Level.Label, Severity: result.Level.Severity}
 	}
 	for _, d := range result.Dimensions {
-		report.Dimensions = append(report.Dimensions, &evaluationpb.DimensionInterpret{
-			FactorCode:  d.FactorCode,
-			FactorName:  d.FactorName,
-			RawScore:    d.RawScore,
-			MaxScore:    derefFloat64(d.MaxScore),
-			RiskLevel:   d.RiskLevel,
-			Description: d.Description,
-			Suggestion:  d.Suggestion,
-		})
+		report.Dimensions = append(report.Dimensions, &evaluationpb.DimensionInterpret{FactorCode: d.FactorCode, FactorName: d.FactorName, RawScore: d.RawScore, MaxScore: derefFloat64(d.MaxScore), RiskLevel: d.RiskLevel, Description: d.Description, Suggestion: d.Suggestion})
 	}
 	for _, s := range result.Suggestions {
 		item := &evaluationpb.Suggestion{Category: s.Category, Content: s.Content}
@@ -230,31 +225,12 @@ func toProtoAssessmentReportFromOutcome(result *interpretationApp.ReportOutcomeR
 		report.Suggestions = append(report.Suggestions, item)
 	}
 	if result.ModelExtra != nil {
-		report.ModelExtra = toProtoModelExtra(result.ModelExtra)
+		report.ModelExtra = &evaluationpb.ModelExtra{Kind: result.ModelExtra.Kind, TypeCode: result.ModelExtra.TypeCode, TypeName: result.ModelExtra.TypeName, OneLiner: result.ModelExtra.OneLiner, ImageUrl: result.ModelExtra.ImageURL, MatchPercent: result.ModelExtra.MatchPercent, IsSpecial: result.ModelExtra.IsSpecial, SpecialTrigger: result.ModelExtra.SpecialTrigger, Commentary: result.ModelExtra.Commentary}
+		if result.ModelExtra.Rarity != nil {
+			report.ModelExtra.Rarity = &evaluationpb.ModelRarity{Percent: result.ModelExtra.Rarity.Percent, Label: result.ModelExtra.Rarity.Label, OneInX: int32(result.ModelExtra.Rarity.OneInX)}
+		}
 	}
 	return report
-}
-
-func toReportProtoModelIdentity(model interpretationApp.ModelIdentityResult) *evaluationpb.ModelIdentity {
-	return &evaluationpb.ModelIdentity{
-		Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
-		Code: model.Code, Version: model.Version, Title: model.Title,
-		ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily,
-	}
-}
-
-func toReportProtoScoreValue(score *interpretationApp.ScoreValueResult) *evaluationpb.ScoreValue {
-	if score == nil {
-		return nil
-	}
-	return &evaluationpb.ScoreValue{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max}
-}
-
-func toReportProtoResultLevel(level *interpretationApp.ResultLevelResult) *evaluationpb.ResultLevel {
-	if level == nil {
-		return nil
-	}
-	return &evaluationpb.ResultLevel{Code: level.Code, Label: level.Label, Severity: level.Severity}
 }
 
 func derefFloat64(v *float64) float64 {

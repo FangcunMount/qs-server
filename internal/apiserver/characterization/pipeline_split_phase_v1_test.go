@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -20,7 +19,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
 			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})
@@ -44,10 +43,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 // V1 contract: personality split-phase path completes with interpreted status and type label.
 func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 	a := submittedMBTIAssessment(t)
-	reportBuilder, err := typologyreporting.NewReportBuilder(modelcatalog.AlgorithmMBTI)
-	if err != nil {
-		t.Fatalf("NewReportBuilder: %v", err)
-	}
+	reportBuilder := typologyreporting.NewTypologyBuilder()
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment:    a,
 		Input:         mbtiInputSnapshot(),
@@ -75,7 +71,7 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
 			domainreport.NewDefaultReportBuilder(nil),
 		),
 		Async: true,

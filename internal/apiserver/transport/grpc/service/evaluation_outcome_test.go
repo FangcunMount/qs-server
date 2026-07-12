@@ -8,7 +8,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,12 +16,7 @@ import (
 
 func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *testing.T) {
 	svc := &EvaluationService{
-		testeeQueryService: &fakeTesteeAssessmentQueryService{
-			getMyAssessment: func(context.Context, uint64, uint64) (*assessmentApp.AssessmentResult, error) {
-				return nil, evalerrors.Forbidden("无权访问此测评")
-			},
-		},
-		reportQueryService: &fakeReportQueryService{},
+		participantReports: &fakeParticipantReportService{err: evalerrors.Forbidden("无权访问此测评")},
 	}
 
 	_, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
@@ -34,19 +29,11 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *tes
 }
 
 func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *testing.T) {
-	reportSvc := &fakeReportQueryService{
-		report: &interpretationApp.ReportOutcomeResult{AssessmentID: 42},
+	reportSvc := &fakeParticipantReportService{
+		report: &interpretationParticipant.Report{AssessmentID: 42},
 	}
 	svc := &EvaluationService{
-		testeeQueryService: &fakeTesteeAssessmentQueryService{
-			getMyAssessment: func(_ context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
-				if testeeID != 7 || assessmentID != 42 {
-					t.Fatalf("unexpected ids: testee=%d assessment=%d", testeeID, assessmentID)
-				}
-				return &assessmentApp.AssessmentResult{ID: 42, TesteeID: 7}, nil
-			},
-		},
-		reportQueryService: reportSvc,
+		participantReports: reportSvc,
 	}
 
 	resp, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
@@ -64,23 +51,11 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *
 	}
 }
 
-func TestEvaluationServiceGetAssessmentReportWithoutTesteeUsesLegacyPath(t *testing.T) {
-	reportSvc := &fakeReportQueryService{
-		legacyReport: &interpretationApp.ReportResult{AssessmentID: 99},
-	}
-	svc := &EvaluationService{
-		reportQueryService: reportSvc,
-	}
-
-	resp, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{AssessmentId: 99})
-	if err != nil {
-		t.Fatalf("GetAssessmentReport() error = %v", err)
-	}
-	if resp.GetReport().GetAssessmentId() != 99 {
-		t.Fatalf("assessment_id = %d, want 99", resp.GetReport().GetAssessmentId())
-	}
-	if reportSvc.legacyCalls != 1 {
-		t.Fatalf("legacyCalls = %d, want 1", reportSvc.legacyCalls)
+func TestEvaluationServiceGetAssessmentReportRequiresTestee(t *testing.T) {
+	svc := &EvaluationService{participantReports: &fakeParticipantReportService{}}
+	_, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{AssessmentId: 99})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))
 	}
 }
 
@@ -99,33 +74,22 @@ func (s *fakeTesteeAssessmentQueryService) ListMine(context.Context, assessmentA
 	panic("unexpected ListMine call")
 }
 
-type fakeReportQueryService struct {
+type fakeParticipantReportService struct {
 	calls        int
-	legacyCalls  int
 	assessmentID uint64
-	report       *interpretationApp.ReportOutcomeResult
-	legacyReport *interpretationApp.ReportResult
+	report       *interpretationParticipant.Report
 	err          error
 }
 
-func (s *fakeReportQueryService) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*interpretationApp.ReportOutcomeResult, error) {
+func (s *fakeParticipantReportService) GetMyReport(_ context.Context, actor interpretationParticipant.Actor, query interpretationParticipant.GetQuery) (*interpretationParticipant.Report, error) {
 	s.calls++
-	s.assessmentID = assessmentID
+	s.assessmentID = query.AssessmentID
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.report, nil
 }
 
-func (s *fakeReportQueryService) GetByAssessmentID(context.Context, uint64) (*interpretationApp.ReportResult, error) {
-	s.legacyCalls++
-	return s.legacyReport, nil
-}
-
-func (s *fakeReportQueryService) ListByTesteeID(context.Context, interpretationApp.ListReportsDTO) (*interpretationApp.ReportListResult, error) {
-	panic("unexpected ListByTesteeID call")
-}
-
-func (s *fakeReportQueryService) ListOutcomeByTesteeID(context.Context, interpretationApp.ListReportsDTO) (*interpretationApp.ReportOutcomeListResult, error) {
+func (s *fakeParticipantReportService) ListMyReports(context.Context, interpretationParticipant.Actor, interpretationParticipant.ListQuery) (*interpretationParticipant.ListResult, error) {
 	panic("unexpected ListOutcomeByTesteeID call")
 }

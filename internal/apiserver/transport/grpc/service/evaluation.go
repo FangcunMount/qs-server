@@ -11,7 +11,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -22,7 +22,7 @@ type EvaluationService struct {
 	pb.UnimplementedEvaluationServiceServer
 	intakeService      assessmentApp.AnswerSheetAssessmentIntakeService
 	testeeQueryService assessmentApp.TesteeAssessmentQueryService
-	reportQueryService interpretationApp.ReportQueryService
+	participantReports interpretationParticipant.Service
 	scoreQueryService  assessmentApp.ScoreQueryService
 	assessmentReader   evaluationreadmodel.AssessmentReader
 }
@@ -31,14 +31,14 @@ type EvaluationService struct {
 func NewEvaluationService(
 	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
 	testeeQueryService assessmentApp.TesteeAssessmentQueryService,
-	reportQueryService interpretationApp.ReportQueryService,
+	participantReports interpretationParticipant.Service,
 	scoreQueryService assessmentApp.ScoreQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 ) *EvaluationService {
 	return &EvaluationService{
 		intakeService:      intakeService,
 		testeeQueryService: testeeQueryService,
-		reportQueryService: reportQueryService,
+		participantReports: participantReports,
 		scoreQueryService:  scoreQueryService,
 		assessmentReader:   assessmentReader,
 	}
@@ -345,41 +345,22 @@ func (s *EvaluationService) GetHighRiskFactors(ctx context.Context, req *pb.GetH
 
 // ==================== 报告查询接口 ====================
 
-// GetAssessmentReport 获取测评报告；testee_id 有值时校验归属并返回 outcome 投影
+// GetAssessmentReport 获取当前受试者自己的测评报告。
 func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.GetAssessmentReportRequest) (*pb.GetAssessmentReportResponse, error) {
-	if req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	if req.TesteeId == 0 || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
 	}
-
-	if req.TesteeId > 0 {
-		if _, err := s.testeeQueryService.GetMine(ctx, req.TesteeId, req.AssessmentId); err != nil {
-			return nil, toAssessmentQueryGRPCError(err)
-		}
-		if s.reportQueryService == nil {
-			return nil, status.Error(codes.FailedPrecondition, "report query service is not configured")
-		}
-		result, err := s.reportQueryService.GetOutcomeByAssessmentID(ctx, req.AssessmentId)
-		if err != nil {
-			return nil, toAssessmentQueryGRPCError(err)
-		}
-		if result == nil {
-			return nil, status.Error(codes.NotFound, "报告不存在")
-		}
-		return &pb.GetAssessmentReportResponse{Report: toProtoAssessmentReportFromOutcome(result)}, nil
+	if s.participantReports == nil {
+		return nil, status.Error(codes.FailedPrecondition, "participant report service is not configured")
 	}
-
-	result, err := s.reportQueryService.GetByAssessmentID(ctx, req.AssessmentId)
+	result, err := s.participantReports.GetMyReport(ctx, interpretationParticipant.Actor{TesteeID: req.TesteeId}, interpretationParticipant.GetQuery{AssessmentID: req.AssessmentId})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAssessmentQueryGRPCError(err)
 	}
-
 	if result == nil {
 		return nil, status.Error(codes.NotFound, "报告不存在")
 	}
-
-	return &pb.GetAssessmentReportResponse{
-		Report: toProtoReport(result),
-	}, nil
+	return &pb.GetAssessmentReportResponse{Report: toProtoParticipantReport(result)}, nil
 }
 
 // ListMyReports 获取我的报告列表
@@ -397,20 +378,14 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 		pageSize = 10
 	}
 
-	dto := interpretationApp.ListReportsDTO{
-		TesteeID: req.TesteeId,
-		Page:     page,
-		PageSize: pageSize,
-	}
-
-	result, err := s.reportQueryService.ListByTesteeID(ctx, dto)
+	result, err := s.participantReports.ListMyReports(ctx, interpretationParticipant.Actor{TesteeID: req.TesteeId}, interpretationParticipant.ListQuery{Page: page, PageSize: pageSize})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	items := make([]*pb.AssessmentReport, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, toProtoReport(item))
+		items = append(items, toProtoParticipantReport(item))
 	}
 	total, err := protoInt32FromInt("total", result.Total)
 	if err != nil {
@@ -480,89 +455,4 @@ func normalizeGRPCAssessmentStatuses(raw string) []string {
 	default:
 		return []string{raw}
 	}
-}
-
-// ==================== 转换函数 ====================
-
-// toProtoReport 转换为 proto 报告
-func toProtoReport(result *interpretationApp.ReportResult) *pb.AssessmentReport {
-	if result == nil {
-		return nil
-	}
-
-	dimensions := make([]*pb.DimensionInterpret, 0, len(result.Dimensions))
-	for _, d := range result.Dimensions {
-		var maxScore float64
-		if d.MaxScore != nil {
-			maxScore = *d.MaxScore
-		}
-		dimensions = append(dimensions, &pb.DimensionInterpret{
-			FactorCode:  d.FactorCode,
-			FactorName:  d.FactorName,
-			RawScore:    d.RawScore,
-			MaxScore:    maxScore,
-			RiskLevel:   d.RiskLevel,
-			Description: d.Description,
-			Suggestion:  d.Suggestion,
-		})
-	}
-
-	return &pb.AssessmentReport{
-		AssessmentId: result.AssessmentID,
-		Model: &pb.ModelIdentity{
-			Code:  result.ModelCode,
-			Title: result.ModelName,
-		},
-		PrimaryScore: &pb.ScoreValue{Value: result.TotalScore},
-		Level:        &pb.ResultLevel{Code: result.RiskLevel, Label: result.RiskLevel},
-		Conclusion:   result.Conclusion,
-		Dimensions:   dimensions,
-		Suggestions:  toProtoSuggestions(result.Suggestions),
-		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
-		ModelExtra:   toProtoModelExtra(result.ModelExtra),
-	}
-}
-
-func toProtoModelExtra(extra *interpretationApp.ModelExtraResult) *pb.ModelExtra {
-	if extra == nil {
-		return nil
-	}
-	protoExtra := &pb.ModelExtra{
-		Kind:           extra.Kind,
-		TypeCode:       extra.TypeCode,
-		TypeName:       extra.TypeName,
-		OneLiner:       extra.OneLiner,
-		ImageUrl:       extra.ImageURL,
-		MatchPercent:   extra.MatchPercent,
-		IsSpecial:      extra.IsSpecial,
-		SpecialTrigger: extra.SpecialTrigger,
-		Commentary:     extra.Commentary,
-	}
-	if extra.Rarity != nil {
-		protoExtra.Rarity = &pb.ModelRarity{
-			Percent: extra.Rarity.Percent,
-			Label:   extra.Rarity.Label,
-			OneInX:  int32(extra.Rarity.OneInX),
-		}
-	}
-	return protoExtra
-}
-
-// toProtoSuggestions 转换为 proto 建议列表
-func toProtoSuggestions(dtos []interpretationApp.SuggestionDTO) []*pb.Suggestion {
-	if len(dtos) == 0 {
-		return nil
-	}
-	result := make([]*pb.Suggestion, len(dtos))
-	for i, dto := range dtos {
-		suggestion := &pb.Suggestion{
-			Category: dto.Category,
-			Content:  dto.Content,
-		}
-		if dto.FactorCode != nil {
-			suggestion.FactorCode = *dto.FactorCode
-		}
-		result[i] = suggestion
-	}
-	return result
 }

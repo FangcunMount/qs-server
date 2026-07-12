@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -126,7 +125,7 @@ func (h *EvaluationHandler) ListReportsOutcome(c *gin.Context) {
 		h.BadRequestResponse(c, "请求参数无效", err)
 		return
 	}
-	dto := interpretationApp.ListReportsDTO{
+	dto := reportqueryjourney.ListQuery{
 		TesteeID: req.TesteeID,
 		Page:     req.Page,
 		PageSize: req.PageSize,

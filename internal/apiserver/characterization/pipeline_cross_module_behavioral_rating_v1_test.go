@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 )
 
 // V1 cross-module contract: behavioral_rating follows submit → worker → split-phase report path.
@@ -20,7 +20,7 @@ func TestV1CrossModuleSyncBehavioralRatingSurveySubmitWorkerToInterpretedReport(
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      behavioralRatingInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
+			ReportBuilder: interpretationreporting.NewNormProfileBuilder(
 				domainreport.NewDefaultReportBuilder(nil),
 			),
 		},

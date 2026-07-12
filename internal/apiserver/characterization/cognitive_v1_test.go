@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 )
 
 func TestV1CognitiveExecuteAndReport(t *testing.T) {
@@ -22,7 +22,7 @@ func TestV1CognitiveExecuteAndReport(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      cognitiveInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
+		ReportBuilder: interpretationreporting.NewTaskPerformanceBuilder(
 			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})

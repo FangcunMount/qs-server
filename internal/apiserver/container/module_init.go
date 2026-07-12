@@ -1,8 +1,13 @@
 package container
 
 import (
+	"context"
 	"fmt"
 
+	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
@@ -57,7 +62,60 @@ func (c *Container) initEvaluationModule() error {
 	if err := c.ReportModule.BindOutcomeRepository(c.EvaluationModule.OutcomeRepository()); err != nil {
 		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
 	}
+	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{access: c.EvaluationModule.TesteeQueryService}); err != nil {
+		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
+	}
+	if err := c.ReportModule.BindAdministrationAccess(administrationInterpretationAccess{access: c.EvaluationModule.AccessQueryService}); err != nil {
+		return fmt.Errorf("failed to bind interpretation administration service: %w", err)
+	}
+	if c.ActorModule == nil {
+		return fmt.Errorf("actor module must be installed before binding interpretation clinician service")
+	}
+	if err := c.ReportModule.BindClinicianAccess(clinicianInterpretationAccess{relations: c.ActorModule.TesteeAccessService, ownership: c.EvaluationModule.TesteeQueryService}); err != nil {
+		return fmt.Errorf("failed to bind interpretation clinician service: %w", err)
+	}
 	return nil
+}
+
+type participantInterpretationAccess struct {
+	access assessmentapp.TesteeAssessmentQueryService
+}
+
+func (a participantInterpretationAccess) AuthorizeOwnAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
+	_, err := a.access.GetMine(ctx, testeeID, assessmentID)
+	return err
+}
+
+type administrationInterpretationAccess struct {
+	access assessmentapp.AssessmentAccessQueryService
+}
+
+type clinicianInterpretationAccess struct {
+	relations actoraccess.TesteeAccessService
+	ownership assessmentapp.TesteeAssessmentQueryService
+}
+
+func (a clinicianInterpretationAccess) AuthorizeParticipant(ctx context.Context, actor interpretationclinician.Actor, testeeID uint64) error {
+	return a.relations.ValidateTesteeAccess(ctx, actor.OrgID, actor.OperatorUserID, testeeID)
+}
+func (a clinicianInterpretationAccess) AuthorizeParticipantAssessment(ctx context.Context, actor interpretationclinician.Actor, testeeID, assessmentID uint64) error {
+	if err := a.AuthorizeParticipant(ctx, actor, testeeID); err != nil {
+		return err
+	}
+	_, err := a.ownership.GetMine(ctx, testeeID, assessmentID)
+	return err
+}
+
+func (a administrationInterpretationAccess) AuthorizeAssessment(ctx context.Context, actor interpretationadmin.Actor, assessmentID uint64) error {
+	_, err := a.access.LoadAccessibleAssessment(ctx, actor.OrgID, actor.OperatorUserID, assessmentID)
+	return err
+}
+func (a administrationInterpretationAccess) ScopeReports(ctx context.Context, actor interpretationadmin.Actor, testeeID uint64) (interpretationadmin.ListScope, error) {
+	scope, err := a.access.ScopeTesteeList(ctx, actor.OrgID, actor.OperatorUserID, testeeID)
+	if err != nil {
+		return interpretationadmin.ListScope{}, err
+	}
+	return interpretationadmin.ListScope{TesteeID: scope.TesteeID, AccessibleTesteeIDs: scope.AccessibleTesteeIDs, Restricted: scope.RestrictToAccessScope}, nil
 }
 
 // initPlanModule 初始化计划模块

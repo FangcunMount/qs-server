@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 )
 
 func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
@@ -22,7 +22,7 @@ func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      behavioralRatingInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
+		ReportBuilder: interpretationreporting.NewNormProfileBuilder(
 			domainreport.NewDefaultReportBuilder(nil),
 		),
 	})

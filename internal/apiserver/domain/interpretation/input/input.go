@@ -46,7 +46,6 @@ type ReportSpec struct {
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
-	Audience        policy.Audience
 	ReportProfile   policy.ReportProfile
 	AdapterKey      string
 	TemplateID      string

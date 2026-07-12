@@ -8,13 +8,13 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
-	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
+	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
@@ -29,7 +29,7 @@ import (
 type v1SplitPhaseConfig struct {
 	Assessment    *assessment.Assessment
 	Input         *evaluationinput.InputSnapshot
-	ReportBuilder interpretationreporting.ReportBuilder
+	ReportBuilder interpretationreporting.Builder
 
 	Async          bool
 	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
@@ -58,9 +58,9 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	reportSaver := &charSplitPhaseReportSaver{}
 	committer := &charCapturingEvaluationCommitter{stage: cfg.StageEvaluated}
 
-	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(cfg.ReportBuilder)
+	reportBuilders, err := interpretationreporting.NewRegistry(cfg.ReportBuilder)
 	if err != nil {
-		t.Fatalf("NewReportBuilderRegistry: %v", err)
+		t.Fatalf("NewRegistry: %v", err)
 	}
 	runtimeDescriptorRegistry := wireV1RuntimeDescriptorRegistry(t)
 
@@ -90,7 +90,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 			if err != nil {
 				return err
 			}
-			key, ok := interpretationreporting.MechanismReportBuilderKeyFromInput(input)
+			key, ok := interpretationreporting.KeyFromInput(input)
 			if !ok {
 				return fmt.Errorf("report builder mechanism key is required")
 			}
@@ -328,11 +328,7 @@ type charEventStagerFunc func(ctx context.Context, events ...event.DomainEvent) 
 func (f charEventStagerFunc) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return f(ctx, events...)
 }
-func mustConfiguredReportBuilder(t *testing.T) typologyreporting.ReportBuilder {
+func mustConfiguredReportBuilder(t *testing.T) typologyreporting.TypologyBuilder {
 	t.Helper()
-	builder, err := typologyreporting.NewConfiguredReportBuilder()
-	if err != nil {
-		t.Fatalf("NewConfiguredReportBuilder: %v", err)
-	}
-	return builder
+	return typologyreporting.NewTypologyBuilder()
 }

@@ -12,7 +12,8 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	interpretationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
+	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -86,8 +87,8 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	OutcomeReportService interpretationApp.OutcomeReportService
-	ReportQueryService   interpretationApp.ReportQueryService
+	AutomationService    interpretationAutomation.Service
+	ParticipantService   interpretationParticipant.Service
 	ReportStatusReporter *reportstatus.Reporter
 }
 
@@ -204,7 +205,7 @@ func (r *Registry) registerActorService() error {
 func (r *Registry) registerEvaluationService() error {
 	if r.deps.Evaluation.IntakeService == nil ||
 		r.deps.Evaluation.TesteeQueryService == nil ||
-		r.deps.Interpretation.ReportQueryService == nil ||
+		r.deps.Interpretation.ParticipantService == nil ||
 		r.deps.Evaluation.ScoreQueryService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
 		return nil
@@ -213,7 +214,7 @@ func (r *Registry) registerEvaluationService() error {
 	evaluationService := service.NewEvaluationService(
 		r.deps.Evaluation.IntakeService,
 		r.deps.Evaluation.TesteeQueryService,
-		r.deps.Interpretation.ReportQueryService,
+		r.deps.Interpretation.ParticipantService,
 		r.deps.Evaluation.ScoreQueryService,
 		r.deps.Evaluation.AssessmentReader,
 	)
@@ -262,7 +263,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.IntakeService,
 		r.deps.Evaluation.WorkerResultReader,
 		r.deps.Evaluation.WorkerExecutionService,
-		r.deps.Interpretation.OutcomeReportService,
+		r.deps.Interpretation.AutomationService,
 		r.deps.Evaluation.RunQueryService,
 		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
@@ -313,7 +314,7 @@ func (r *Registry) GetRegisteredServices() []string {
 	}
 	if r.deps.Evaluation.IntakeService != nil &&
 		r.deps.Evaluation.TesteeQueryService != nil &&
-		r.deps.Interpretation.ReportQueryService != nil &&
+		r.deps.Interpretation.ParticipantService != nil &&
 		r.deps.Evaluation.ScoreQueryService != nil {
 		services = append(services, "EvaluationService")
 	}

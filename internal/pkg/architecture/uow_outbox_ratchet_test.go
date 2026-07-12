@@ -157,7 +157,7 @@ func TestInterpretationAssemblerExclusivelyWiresGenerationExecutor(t *testing.T)
 	for _, token := range []string{
 		"interpretationgeneration.NewStarter(",
 		"interpretationgeneration.NewExecutor(",
-		"interpretationapp.NewOutcomeReportService(",
+		"interpretationautomation.NewService(",
 	} {
 		if !strings.Contains(reportText, token) {
 			t.Fatalf("interpretation module must own report write orchestration %q", token)
