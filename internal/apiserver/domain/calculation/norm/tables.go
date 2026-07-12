@@ -36,6 +36,9 @@ type NormBand struct {
 type NormLookupEntry struct {
 	RawMin        float64
 	RawMax        float64
+	MinAgeMonths  int
+	MaxAgeMonths  int
+	Gender        string
 	TScore        float64
 	Percentile    float64
 	StandardScore *float64
@@ -69,7 +72,7 @@ func LookupNormScore(tables *NormTables, factorCode string, rawScore float64, su
 	if !ok {
 		return NormScore{}, false
 	}
-	if score, ok := lookupDirect(table, rawScore); ok {
+	if score, ok := lookupDirect(table, rawScore, subject); ok {
 		return score, true
 	}
 	if score, ok := lookupParametric(table, rawScore, subject); ok {
@@ -105,13 +108,47 @@ func factorTable(tables *NormTables, factorCode string) (FactorNormTable, bool) 
 	return FactorNormTable{}, false
 }
 
-func lookupDirect(table FactorNormTable, rawScore float64) (NormScore, bool) {
+func lookupDirect(table FactorNormTable, rawScore float64, subject Subject) (NormScore, bool) {
+	var generic *NormLookupEntry
 	for _, entry := range table.Lookup {
-		if rawScore >= entry.RawMin && rawScore <= entry.RawMax {
+		if rawScore < entry.RawMin || rawScore > entry.RawMax {
+			continue
+		}
+		if entryMatchesSubject(entry, subject) {
 			return NormScore{TScore: entry.TScore, Percentile: entry.Percentile, StandardScore: cloneFloat64(entry.StandardScore)}, true
 		}
+		if entry.MinAgeMonths == 0 && entry.MaxAgeMonths == 0 && entry.Gender == "" && generic == nil {
+			copy := entry
+			generic = &copy
+		}
+	}
+	if generic != nil {
+		return NormScore{TScore: generic.TScore, Percentile: generic.Percentile, StandardScore: cloneFloat64(generic.StandardScore)}, true
 	}
 	return NormScore{}, false
+}
+
+func entryMatchesSubject(entry NormLookupEntry, subject Subject) bool {
+	if entry.MinAgeMonths == 0 && entry.MaxAgeMonths == 0 && entry.Gender == "" {
+		return false
+	}
+	if entry.Gender != "" {
+		if subject.Gender == "" || entry.Gender != subject.Gender {
+			return false
+		}
+	}
+	if entry.MinAgeMonths > 0 || entry.MaxAgeMonths > 0 {
+		if subject.AgeMonths <= 0 {
+			return false
+		}
+		if entry.MinAgeMonths > 0 && subject.AgeMonths < entry.MinAgeMonths {
+			return false
+		}
+		if entry.MaxAgeMonths > 0 && subject.AgeMonths > entry.MaxAgeMonths {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneFloat64(value *float64) *float64 {

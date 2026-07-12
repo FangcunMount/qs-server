@@ -72,6 +72,7 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		{name: "personality_sbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmSBTI, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "personality_bigfive", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmBigFive, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "behavioral_rating_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
+		{name: "behavioral_rating_spm_sensory", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmSPMSensory, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "behavioral_rating_default", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBehavioralRatingDefault, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "cognitive_spm", kind: binding.KindCognitive, algorithm: binding.AlgorithmSPM, want: identity.AlgorithmFamilyTaskPerformance, wantOK: true},
@@ -104,6 +105,7 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 	}{
 		{binding.KindScale, binding.SubKindEmpty, binding.AlgorithmScaleDefault, binding.DecisionKindScoreRange},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBrief2, binding.DecisionKindNormLookup},
+		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmSPMSensory, binding.DecisionKindNormLookup},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBehavioralRatingDefault, binding.DecisionKindNormLookup},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, "", binding.DecisionKindNormLookup},
 		{binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM, binding.DecisionKindAbilityLevel},

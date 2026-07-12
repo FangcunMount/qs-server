@@ -51,6 +51,7 @@ func algorithmOptions(kind string) []modelcatalog.Option {
 		{Label: "SBTI", Value: string(domain.AlgorithmSBTI)},
 		{Label: "Big Five", Value: string(domain.AlgorithmBigFive)},
 		{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)},
+		{Label: "SPM（感觉统合）", Value: string(domain.AlgorithmSPMSensory)},
 		{Label: "SPM", Value: string(domain.AlgorithmSPM)},
 	}
 	switch kind {
@@ -73,7 +74,7 @@ func algorithmOptions(kind string) []modelcatalog.Option {
 				filtered = append(filtered, item)
 			}
 		case modelcatalog.KindBehavioralRating:
-			if item.Value == string(domain.AlgorithmBrief2) {
+			if item.Value == string(domain.AlgorithmBrief2) || item.Value == string(domain.AlgorithmSPMSensory) {
 				filtered = append(filtered, item)
 			}
 		case modelcatalog.KindCognitive:

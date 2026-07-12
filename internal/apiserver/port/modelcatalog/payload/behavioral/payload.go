@@ -110,10 +110,13 @@ type brief2NormBand struct {
 }
 
 type brief2LookupEntry struct {
-	RawMin     float64 `json:"raw_min"`
-	RawMax     float64 `json:"raw_max"`
-	TScore     float64 `json:"t_score"`
-	Percentile float64 `json:"percentile"`
+	RawMin       float64 `json:"raw_min"`
+	RawMax       float64 `json:"raw_max"`
+	MinAgeMonths int     `json:"min_age_months,omitempty"`
+	MaxAgeMonths int     `json:"max_age_months,omitempty"`
+	Gender       string  `json:"gender,omitempty"`
+	TScore       float64 `json:"t_score"`
+	Percentile   float64 `json:"percentile"`
 }
 
 type brief2TScoreRule struct {
@@ -205,7 +208,7 @@ func normTablesFromPayload(body *brief2Extension) *calcnorm.NormTables {
 			})
 		}
 		for _, entry := range factor.Lookup {
-			table.Lookup = append(table.Lookup, calcnorm.NormLookupEntry{RawMin: entry.RawMin, RawMax: entry.RawMax, TScore: entry.TScore, Percentile: entry.Percentile})
+			table.Lookup = append(table.Lookup, calcnorm.NormLookupEntry{RawMin: entry.RawMin, RawMax: entry.RawMax, MinAgeMonths: entry.MinAgeMonths, MaxAgeMonths: entry.MaxAgeMonths, Gender: entry.Gender, TScore: entry.TScore, Percentile: entry.Percentile})
 		}
 		tables.Factors = append(tables.Factors, table)
 	}
@@ -242,7 +245,7 @@ func normFromPayload(body *brief2Extension) *catalognorm.Norm {
 		}
 		for _, entry := range factorPayload.Lookup {
 			factorTable.Lookup = append(factorTable.Lookup, catalognorm.LookupEntry{
-				RawScoreMin: entry.RawMin, RawScoreMax: entry.RawMax, TScore: entry.TScore, Percentile: entry.Percentile,
+				RawScoreMin: entry.RawMin, RawScoreMax: entry.RawMax, MinAgeMonths: entry.MinAgeMonths, MaxAgeMonths: entry.MaxAgeMonths, Gender: entry.Gender, TScore: entry.TScore, Percentile: entry.Percentile,
 			})
 		}
 		out.Factors = append(out.Factors, factorTable)

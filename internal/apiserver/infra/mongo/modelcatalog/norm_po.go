@@ -38,6 +38,9 @@ type NormBandPO struct {
 type NormLookupPO struct {
 	RawScoreMin   float64  `bson:"raw_score_min"`
 	RawScoreMax   float64  `bson:"raw_score_max"`
+	MinAgeMonths  int      `bson:"min_age_months,omitempty"`
+	MaxAgeMonths  int      `bson:"max_age_months,omitempty"`
+	Gender        string   `bson:"gender,omitempty"`
 	TScore        float64  `bson:"t_score"`
 	Percentile    float64  `bson:"percentile"`
 	StandardScore *float64 `bson:"standard_score,omitempty"`
@@ -85,7 +88,7 @@ func normToPO(value *norm.Norm) *NormPO {
 			if factor.Lookup != nil {
 				item.Lookup = make([]NormLookupPO, 0, len(factor.Lookup))
 				for _, lookup := range factor.Lookup {
-					item.Lookup = append(item.Lookup, NormLookupPO{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
+					item.Lookup = append(item.Lookup, NormLookupPO{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, MinAgeMonths: lookup.MinAgeMonths, MaxAgeMonths: lookup.MaxAgeMonths, Gender: lookup.Gender, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
 				}
 			}
 			out.Factors = append(out.Factors, item)
@@ -112,7 +115,7 @@ func normFromPO(value *NormPO) *norm.Norm {
 			if factor.Lookup != nil {
 				item.Lookup = make([]norm.LookupEntry, 0, len(factor.Lookup))
 				for _, lookup := range factor.Lookup {
-					item.Lookup = append(item.Lookup, norm.LookupEntry{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
+					item.Lookup = append(item.Lookup, norm.LookupEntry{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, MinAgeMonths: lookup.MinAgeMonths, MaxAgeMonths: lookup.MaxAgeMonths, Gender: lookup.Gender, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
 				}
 			}
 			out.Factors = append(out.Factors, item)

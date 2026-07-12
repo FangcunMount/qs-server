@@ -43,6 +43,7 @@ func TestProductModelRuntimeContractMatrix(t *testing.T) {
 		{"scale", KindScale, domain.ProductChannelMedicalScale, domain.KindScale, "", domain.AlgorithmScaleDefault, domain.AlgorithmFamilyFactorScoring, domain.ExecutionPathScaleDescriptor},
 		{"typology", KindTypology, domain.ProductChannelTypology, domain.KindTypology, domain.SubKindTypology, domain.AlgorithmMBTI, domain.AlgorithmFamilyFactorClassification, domain.ExecutionPathTypologyDescriptor},
 		{"behavioral_rating", KindBehavioralRating, domain.ProductChannelBehaviorAbility, domain.KindBehavioralRating, "", domain.AlgorithmBrief2, domain.AlgorithmFamilyFactorNorm, domain.ExecutionPathBehavioralRatingDescriptor},
+		{"behavioral_rating_spm_sensory", KindBehavioralRating, domain.ProductChannelBehaviorAbility, domain.KindBehavioralRating, "", domain.AlgorithmSPMSensory, domain.AlgorithmFamilyFactorNorm, domain.ExecutionPathBehavioralRatingDescriptor},
 		{"cognitive", KindCognitive, domain.ProductChannelBehaviorAbility, domain.KindCognitive, "", domain.AlgorithmSPM, domain.AlgorithmFamilyTaskPerformance, domain.ExecutionPathCognitiveDescriptor},
 	}
 	for _, tc := range cases {

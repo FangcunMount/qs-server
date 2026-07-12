@@ -32,8 +32,14 @@ type Band struct {
 }
 
 type LookupEntry struct {
-	RawScoreMin   float64
-	RawScoreMax   float64
+	RawScoreMin float64
+	RawScoreMax float64
+	// MinAgeMonths, MaxAgeMonths and Gender scope a direct lookup to a
+	// demographic norm stratum. Empty scope keeps compatibility with legacy,
+	// unstratified norm tables.
+	MinAgeMonths  int
+	MaxAgeMonths  int
+	Gender        string
 	TScore        float64
 	Percentile    float64
 	StandardScore *float64

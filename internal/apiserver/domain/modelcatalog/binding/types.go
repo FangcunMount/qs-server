@@ -27,6 +27,7 @@ const (
 	AlgorithmMBTI                    = identitypkg.AlgorithmMBTI
 	AlgorithmSBTI                    = identitypkg.AlgorithmSBTI
 	AlgorithmBrief2                  = identitypkg.AlgorithmBrief2
+	AlgorithmSPMSensory              = identitypkg.AlgorithmSPMSensory
 	AlgorithmSPM                     = identitypkg.AlgorithmSPM
 	AlgorithmBehavioralRatingDefault = identitypkg.AlgorithmBehavioralRatingDefault
 

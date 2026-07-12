@@ -17,4 +17,8 @@ func TestCatalogOptionsFilterAlgorithmsByCanonicalKind(t *testing.T) {
 	if got := algorithmOptions("personality"); len(got) != 0 {
 		t.Fatalf("personality algorithms = %#v, want empty", got)
 	}
+	behavioral := catalogOptionsForKind(modelcatalog.KindBehavioralRating)
+	if len(behavioral.Algorithms) != 2 || behavioral.Algorithms[0].Value != string(domain.AlgorithmBrief2) || behavioral.Algorithms[1].Value != string(domain.AlgorithmSPMSensory) {
+		t.Fatalf("behavioral_rating algorithms = %#v", behavioral.Algorithms)
+	}
 }

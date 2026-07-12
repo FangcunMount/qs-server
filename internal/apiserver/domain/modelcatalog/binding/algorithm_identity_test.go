@@ -19,6 +19,7 @@ func TestAlgorithmConstantsStayFrozen(t *testing.T) {
 		"AlgorithmMBTI":                    "mbti",
 		"AlgorithmSBTI":                    "sbti",
 		"AlgorithmBrief2":                  "brief2",
+		"AlgorithmSPMSensory":              "spm_sensory",
 		"AlgorithmSPM":                     "spm",
 		"AlgorithmBehavioralRatingDefault": "behavioral_rating_default",
 	}

@@ -10,7 +10,9 @@
 // 可执行模型家族的约束应使用 ModelFamilyCapability。
 //
 //   - behavioral_rating / cognitive（CapabilityRoleModelFamily）：可执行家族；
-//     Brief-2 落在 behavioral_rating+AlgorithmBrief2，SPM 落在 cognitive+AlgorithmSPM。
+//     Brief-2 落在 behavioral_rating+AlgorithmBrief2，Raven SPM 落在
+//     cognitive+AlgorithmSPM；感觉统合 SPM 落在
+//     behavioral_rating+AlgorithmSPMSensory。
 //
 // API 类型 behavior_ability 只是聚合 behavioral_rating 和 cognitive 列表的产品通道；
 // 它不映射到领域 Kind。领域 KindBehavioralRating 是独立 behavioral_rating 运行时

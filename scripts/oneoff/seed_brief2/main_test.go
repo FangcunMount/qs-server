@@ -1,0 +1,85 @@
+package main
+
+import (
+	"fmt"
+	"testing"
+
+	surveyquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
+
+func TestBuildDefinitionAssignsAllQuestionsAndCompositeIndexes(t *testing.T) {
+	questionnaire := testQuestionnaire(t, 9)
+	catalog := testCatalog()
+	mapping := factorMap{}
+	for index, code := range catalog.order[:9] {
+		mapping[code] = []string{fmt.Sprintf("q%d", index)}
+	}
+
+	definition, err := buildDefinition(questionnaire, mapping, catalog, "brief2-test", "parent")
+	if err != nil {
+		t.Fatalf("buildDefinition() error = %v", err)
+	}
+	if got := definition.Execution.Brief2.PrimaryFactorCode; got != "f12" {
+		t.Fatalf("primary factor = %s, want f12", got)
+	}
+	if len(definition.Measure.Factors) != 13 || len(definition.Measure.Scoring) != 13 {
+		t.Fatalf("factors=%d scoring=%d, want 13 each", len(definition.Measure.Factors), len(definition.Measure.Scoring))
+	}
+	if len(definition.Measure.FactorGraph.Edges) != 12 {
+		t.Fatalf("factor graph edges = %d, want 12", len(definition.Measure.FactorGraph.Edges))
+	}
+}
+
+func TestBuildDefinitionRejectsDuplicateQuestionAssignment(t *testing.T) {
+	questionnaire := testQuestionnaire(t, 9)
+	catalog := testCatalog()
+	mapping := factorMap{}
+	for index, code := range catalog.order[:9] {
+		mapping[code] = []string{fmt.Sprintf("q%d", index)}
+	}
+	mapping[catalog.order[1]] = []string{"q0", "q1"}
+
+	if _, err := buildDefinition(questionnaire, mapping, catalog, "brief2-test", "parent"); err == nil {
+		t.Fatal("buildDefinition() error = nil, want duplicate question error")
+	}
+}
+
+func testCatalog() normCatalog {
+	catalog := normCatalog{byNormName: map[string]string{}, titles: map[string]string{}, order: make([]string, 0, 13)}
+	for index := 0; index < 13; index++ {
+		code := fmt.Sprintf("f%d", index)
+		catalog.order = append(catalog.order, code)
+		catalog.titles[code] = code
+	}
+	return catalog
+}
+
+func testQuestionnaire(t *testing.T, count int) *surveyquestionnaire.Questionnaire {
+	t.Helper()
+	questionnaire, err := surveyquestionnaire.NewQuestionnaire(meta.NewCode("brief2-test"), "BRIEF-2", surveyquestionnaire.WithVersion(surveyquestionnaire.NewVersion("1.0.0")))
+	if err != nil {
+		t.Fatalf("NewQuestionnaire() error = %v", err)
+	}
+	questions := make([]surveyquestionnaire.Question, 0, count)
+	for index := 0; index < count; index++ {
+		option, err := surveyquestionnaire.NewOptionWithStringCode("1", "从不", 1)
+		if err != nil {
+			t.Fatalf("NewOptionWithStringCode() error = %v", err)
+		}
+		question, err := surveyquestionnaire.NewQuestion(
+			surveyquestionnaire.WithCode(meta.NewCode(fmt.Sprintf("q%d", index))),
+			surveyquestionnaire.WithStem(fmt.Sprintf("题目 %d", index)),
+			surveyquestionnaire.WithQuestionType(surveyquestionnaire.QuestionType("Radio")),
+			surveyquestionnaire.WithOptions([]surveyquestionnaire.Option{option}),
+		)
+		if err != nil {
+			t.Fatalf("NewQuestion() error = %v", err)
+		}
+		questions = append(questions, question)
+	}
+	if err := questionnaire.ReplaceQuestions(questions); err != nil {
+		t.Fatalf("ReplaceQuestions() error = %v", err)
+	}
+	return questionnaire
+}

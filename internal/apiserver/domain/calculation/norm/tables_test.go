@@ -24,6 +24,30 @@ func TestLookupNormScoreDirectTable(t *testing.T) {
 	}
 }
 
+func TestLookupNormScoreSelectsDemographicDirectLookup(t *testing.T) {
+	t.Parallel()
+
+	tables := &calcnorm.NormTables{
+		Factors: []calcnorm.FactorNormTable{{
+			FactorCode: "gec",
+			Lookup: []calcnorm.NormLookupEntry{
+				{RawMin: 10, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "male", TScore: 61, Percentile: 87},
+				{RawMin: 10, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 55, Percentile: 69},
+				{RawMin: 10, RawMax: 10, TScore: 50, Percentile: 50},
+			},
+		}},
+	}
+
+	score, ok := calcnorm.LookupNormScore(tables, "gec", 10, calcnorm.Subject{AgeMonths: 72, Gender: "female"})
+	if !ok || score.TScore != 55 || score.Percentile != 69 {
+		t.Fatalf("female lookup = %#v, ok = %v", score, ok)
+	}
+	score, ok = calcnorm.LookupNormScore(tables, "gec", 10, calcnorm.Subject{AgeMonths: 120, Gender: "female"})
+	if !ok || score.TScore != 50 || score.Percentile != 50 {
+		t.Fatalf("generic fallback = %#v, ok = %v", score, ok)
+	}
+}
+
 func TestLookupNormScoreParametricBand(t *testing.T) {
 	t.Parallel()
 

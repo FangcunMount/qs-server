@@ -332,7 +332,7 @@ func runtimeSPMSpecFromPayload(payload *spmExtension, factors []FactorSnapshot) 
 	for _, set := range payload.ItemSets {
 		out := SPMItemSet{Code: set.Code, Items: make([]SPMItem, 0, len(set.Items))}
 		for _, item := range set.Items {
-			out.Items = append(out.Items, SPMItem{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+			out.Items = append(out.Items, SPMItem(item))
 		}
 		spec.ItemSets = append(spec.ItemSets, out)
 	}

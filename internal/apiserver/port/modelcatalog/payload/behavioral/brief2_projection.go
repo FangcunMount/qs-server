@@ -145,10 +145,13 @@ func brief2NormsFromTable(table *catalognorm.Norm) []brief2FactorPayload {
 			item.Lookup = make([]brief2LookupEntry, 0, len(factorTable.Lookup))
 			for _, entry := range factorTable.Lookup {
 				item.Lookup = append(item.Lookup, brief2LookupEntry{
-					RawMin:     entry.RawScoreMin,
-					RawMax:     entry.RawScoreMax,
-					TScore:     entry.TScore,
-					Percentile: entry.Percentile,
+					RawMin:       entry.RawScoreMin,
+					RawMax:       entry.RawScoreMax,
+					MinAgeMonths: entry.MinAgeMonths,
+					MaxAgeMonths: entry.MaxAgeMonths,
+					Gender:       entry.Gender,
+					TScore:       entry.TScore,
+					Percentile:   entry.Percentile,
 				})
 			}
 		}
