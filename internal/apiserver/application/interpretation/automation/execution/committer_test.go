@@ -32,11 +32,29 @@ func commitFixture(t *testing.T, stager *eventStagerStub) (*interpretationCommit
 	if err != nil {
 		t.Fatal(err)
 	}
-	committer, err := NewInterpretationCommitter(tx, gens, runs, reports, stager, nil)
+	committer, err := NewInterpretationCommitter(tx, gens, runs, reports, stager, nil, catalogProjectorStub{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return committer.(*interpretationCommitter), started.Generation, started.Run, gens, runs, reports, tx, now
+}
+
+type catalogProjectorStub struct{ err error }
+
+func (s catalogProjectorStub) ProjectCurrent(context.Context, *domainreport.InterpretReport) error {
+	return s.err
+}
+
+func TestInterpretationCommitterCatalogFailureDoesNotPublishTerminalState(t *testing.T) {
+	committer, generationRecord, runRecord, _, _, _, _, now := commitFixture(t, &eventStagerStub{})
+	committer.catalog = catalogProjectorStub{err: errors.New("catalog unavailable")}
+	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: commitArtifact(t, generationRecord, runRecord, now), BuilderIdentity: "builder", ContentSchemaVersion: "v1", CompletedAt: now})
+	if err == nil {
+		t.Fatal("expected catalog error")
+	}
+	if generationRecord.Status() != domaingeneration.StatusGenerating || runRecord.Status() != interpretationrun.StatusRunning {
+		t.Fatal("caller terminal state leaked after catalog failure")
+	}
 }
 
 func commitArtifact(t *testing.T, generation *domaingeneration.ReportGeneration, run *interpretationrun.InterpretationRun, now time.Time) *domainreport.InterpretReport {

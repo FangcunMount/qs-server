@@ -9,9 +9,9 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -188,7 +188,7 @@ func TestFailureFinalizerStagesAssessmentRunAndOutboxThroughOneTransaction(t *te
 	if !repo.saveCtxHadTxMarker {
 		t.Fatal("assessment Save should receive transaction context")
 	}
-	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt.Status != evalrun.StatusFailed {
+	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt().Status != evalrun.StatusFailed {
 		t.Fatalf("saved runs = %#v, want one failed run", runRepo.saved)
 	}
 	if !runRepo.saveCtxHadTxMarker {
@@ -261,7 +261,7 @@ func TestFailureFinalizerTransactionErrorsDoNotPolluteCallerState(t *testing.T) 
 			if !a.Status().IsSubmitted() || a.FailedAt() != nil || a.FailureReason() != nil || len(a.Events()) != 0 {
 				t.Fatalf("caller Assessment polluted: status=%s failed_at=%v reason=%v events=%v", a.Status(), a.FailedAt(), a.FailureReason(), a.Events())
 			}
-			if run.Attempt.Status != evalrun.StatusRunning || run.FinishedAt != nil || run.Failure != nil {
+			if run.Attempt().Status != evalrun.StatusRunning || run.FinishedAt() != nil || run.Failure() != nil {
 				t.Fatalf("caller Run polluted: %#v", run)
 			}
 		})
@@ -398,7 +398,7 @@ func scaleModelRef() *domainAssessment.EvaluationModelRef {
 
 func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
-		domainAssessment.EvaluationModelKindPersonality,
+		domainAssessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
@@ -426,7 +426,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:      evaluationinput.EvaluationModelKindPersonality,
+			Kind:      evaluationinput.EvaluationModelKindTypology,
 			SubKind:   string(modelcatalog.SubKindTypology),
 			Algorithm: string(modelcatalog.AlgorithmMBTI),
 			Code:      "FAKE-MODEL",
@@ -465,13 +465,13 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if capture.CommitCalls != 1 || capture.Request.Execution == nil || capture.Request.Execution.ModelRef.Kind() != modelcatalog.KindTypology {
 		t.Fatalf("unexpected evaluation execution: %#v", capture.Request.Execution)
 	}
-	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
+	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindTypology || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
 	}
 }
 
 func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
-	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindTypology, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
 			meta.FromUint64(102),
@@ -492,7 +492,7 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:    evaluationinput.EvaluationModelKindPersonality,
+			Kind:    evaluationinput.EvaluationModelKindTypology,
 			Code:    "MBTI-16P",
 			Version: "1.0.0",
 			Title:   "MBTI",

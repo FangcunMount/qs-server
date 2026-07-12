@@ -136,13 +136,23 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 	}
 
 	collection := db.Collection((&ArchivedReportPO{}).CollectionName())
+	catalog := db.Collection((ReportCatalogPO{}).CollectionName())
 	if _, err := collection.InsertMany(ctx, docs); err != nil {
 		t.Fatalf("insert reports: %v", err)
+	}
+	catalogDocs := make([]interface{}, 0, len(docs))
+	for _, raw := range docs {
+		po := raw.(ArchivedReportPO)
+		catalogDocs = append(catalogDocs, ReportCatalogPO{AssessmentID: po.DomainID.Uint64(), OrgID: 1, TesteeID: po.TesteeID, SourceKind: ReportCatalogSourceArchive, SourceID: po.DomainID.Uint64(), ModelCode: po.ScaleCode, RiskLevel: po.RiskLevel, SortAt: po.CreatedAt})
+	}
+	if _, err := catalog.InsertMany(ctx, catalogDocs); err != nil {
+		t.Fatalf("insert report catalog: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
 		_, _ = collection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": ids}})
+		_, _ = catalog.DeleteMany(cleanupCtx, bson.M{"assessment_id": bson.M{"$gte": baseID + 1, "$lte": baseID + 4}})
 	})
 
 	reader := NewReportReadModel(db)
@@ -190,6 +200,7 @@ func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(
 	now := time.Now().UTC().Truncate(time.Second)
 	archiveCollection := db.Collection((&ArchivedReportPO{}).CollectionName())
 	reportCollection := db.Collection((InterpretReportPO{}).CollectionName())
+	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
 	archiveIDs := []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()}
 	reportID := primitive.NewObjectID()
 
@@ -223,11 +234,15 @@ func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(
 	if _, err := reportCollection.InsertOne(ctx, reportPO); err != nil {
 		t.Fatalf("insert current report: %v", err)
 	}
+	if _, err := catalogCollection.InsertMany(ctx, []interface{}{ReportCatalogPO{AssessmentID: baseID + 1, OrgID: 1, TesteeID: testeeID, SourceKind: ReportCatalogSourceArtifact, SourceID: baseID + 101, ModelCode: "SDS", SortAt: now, SortReportID: baseID + 101}, ReportCatalogPO{AssessmentID: baseID + 2, OrgID: 1, TesteeID: testeeID, SourceKind: ReportCatalogSourceArchive, SourceID: baseID + 2, ModelCode: "SDS", SortAt: now.Add(-time.Minute)}}); err != nil {
+		t.Fatalf("insert catalog: %v", err)
+	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
 		_, _ = archiveCollection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": archiveIDs}})
 		_, _ = reportCollection.DeleteOne(cleanupCtx, bson.M{"_id": reportID})
+		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": bson.M{"$in": []uint64{baseID + 1, baseID + 2}}})
 	})
 
 	reader := NewReportReadModel(db)
@@ -235,7 +250,7 @@ func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(
 	if err != nil || newRow.Conclusion != "current report wins" || newRow.TotalScore != 42 {
 		t.Fatalf("new-first report = %#v err=%v", newRow, err)
 	}
-	archivedRow, err := reader.GetReportByID(ctx, baseID+2)
+	archivedRow, err := reader.GetReportByAssessmentID(ctx, baseID+2)
 	if err != nil || archivedRow.Conclusion != "archived only" {
 		t.Fatalf("archive fallback report = %#v err=%v", archivedRow, err)
 	}

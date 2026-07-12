@@ -95,13 +95,13 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 		return nil, err
 	}
 	if latest != nil {
-		result.RunID = latest.RunID.String()
-		result.TraceID = latest.TraceID
-		result.InputSnapshotRef = latest.InputSnapshotRef
+		result.RunID = latest.ID().String()
+		result.TraceID = latest.TraceID()
+		result.InputSnapshotRef = latest.InputSnapshotRef()
 		result.Retryable = latest.Retryable()
-		if latest.Failure != nil {
-			result.FailureKind = latest.Failure.Kind.String()
-			result.FailureMessage = latest.Failure.Message
+		if failure := latest.Failure(); failure != nil {
+			result.FailureKind = failure.Kind.String()
+			result.FailureMessage = failure.Message
 		}
 	}
 	if !a.Status().IsEvaluated() {

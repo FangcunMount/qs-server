@@ -1,9 +1,9 @@
-package pipeline_test
+package evaluation_test
 
 import (
 	"testing"
 
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

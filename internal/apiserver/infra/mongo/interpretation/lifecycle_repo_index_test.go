@@ -8,6 +8,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+func TestReportCatalogIsAContentFreeAssessmentProjection(t *testing.T) {
+	typ := reflect.TypeOf(ReportCatalogPO{})
+	for _, forbidden := range []string{"Conclusion", "Dimensions", "Suggestions", "ModelExtra"} {
+		if _, ok := typ.FieldByName(forbidden); ok {
+			t.Fatalf("report catalog must not store %s", forbidden)
+		}
+	}
+	indexes := reportCatalogIndexModels()
+	assertUniqueIndex(t, indexes, "uk_report_catalog_assessment", bson.D{{Key: "assessment_id", Value: 1}})
+}
+
 func TestLifecycleIndexesProtectThreeObjectIdentities(t *testing.T) {
 	generationIndexes := generationIndexModels()
 	assertUniqueIndex(t, generationIndexes, "uk_generation_domain_id", bson.D{{Key: "domain_id", Value: 1}})

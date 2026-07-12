@@ -10,9 +10,8 @@ import (
 
 type ID = meta.ID
 
-// Key is the stable idempotency identity for one report.
-// ReportType includes the presentation/audience variant when variants produce
-// different reports.
+// Key is the stable idempotency identity for one complete report. Audience is
+// applied by read projection and never participates in this identity.
 type Key struct {
 	OutcomeID       meta.ID
 	ReportType      policy.ReportType

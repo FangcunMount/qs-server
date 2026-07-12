@@ -53,8 +53,7 @@ func TestExecuteReturnsRetryableFailureReceiptWithoutTransportRequery(t *testing
 	if err := run.Fail(time.Unix(11, 0), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: "calculation failed", Retryable: true}); err != nil {
 		t.Fatal(err)
 	}
-	run.TraceID = "trace-1"
-	run.InputSnapshotRef = "model:S@1"
+	run = evalrun.Reconstruct(evalrun.ReconstructInput{RunID: run.ID(), AssessmentID: run.AssessmentID(), Attempt: run.Attempt(), Failure: run.Failure(), TraceID: "trace-1", InputSnapshotRef: "model:S@1", StartedAt: run.StartedAt(), FinishedAt: run.FinishedAt()})
 	svc := NewService(engineStub{err: errors.New("boom")}, assessmentRepoStub{value: a}, nil, runRepoStub{value: &run})
 	result, err := svc.Execute(context.Background(), Command{AssessmentID: 1})
 	if err != nil {

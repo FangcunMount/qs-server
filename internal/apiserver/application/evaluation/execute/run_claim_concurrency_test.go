@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 )
 
 type blockingEvaluator struct {

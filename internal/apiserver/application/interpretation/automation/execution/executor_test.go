@@ -71,7 +71,7 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 		t.Fatal(err)
 	}
 	stager := &eventStagerStub{}
-	committer, err := NewInterpretationCommitter(tx, gens, runs, reports, stager, nil)
+	committer, err := NewInterpretationCommitter(tx, gens, runs, reports, stager, nil, catalogProjectorStub{})
 	if err != nil {
 		t.Fatal(err)
 	}

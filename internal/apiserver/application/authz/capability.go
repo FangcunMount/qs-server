@@ -21,6 +21,7 @@ const (
 	CapabilityReadAnswersheets                 Capability = "read_answersheets"
 	CapabilityManageEvaluationPlans            Capability = "manage_evaluation_plans"
 	CapabilityEvaluateAssessments              Capability = "evaluate_assessments"
+	CapabilityAuditInterpretation              Capability = "audit_interpretation"
 )
 
 func hasAnyResourceAction(s *Snapshot, resource string, actions []string) bool {
@@ -141,6 +142,7 @@ func isKnownCapability(c Capability) bool {
 	case CapabilityReadAnswersheets:
 	case CapabilityManageEvaluationPlans:
 	case CapabilityEvaluateAssessments:
+	case CapabilityAuditInterpretation:
 	default:
 		return false
 	}
@@ -151,6 +153,8 @@ func capabilityAllowed(s *Snapshot, c Capability) bool {
 	switch c {
 	case CapabilityOrgAdmin:
 		return s.IsQSAdmin()
+	case CapabilityAuditInterpretation:
+		return s.IsQSAdmin() || hasAnyResourceAction(s, "qs:interpretation_reports", []string{"audit"})
 	case CapabilityReadQuestionnaires:
 		if s.IsQSAdmin() {
 			return true

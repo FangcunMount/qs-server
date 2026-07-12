@@ -67,7 +67,7 @@ func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
 
 func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),

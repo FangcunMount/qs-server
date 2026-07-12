@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"

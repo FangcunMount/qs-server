@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type Actor struct {
@@ -34,23 +33,23 @@ type BatchResult struct {
 type service struct {
 	assessments assessment.Repository
 	engine      ExecutionEngine
+	authorizer  authorizer
 }
 
-func NewBatchExecutionService(assessments assessment.Repository, engine ExecutionEngine) BatchExecutionService {
-	return &service{assessments: assessments, engine: engine}
+func NewBatchExecutionService(assessments assessment.Repository, engine ExecutionEngine, access AccessChecker) BatchExecutionService {
+	return &service{assessments: assessments, engine: engine, authorizer: authorizer{assessments: assessments, access: access}}
 }
 
 func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error) {
-	if actor.OrgID == 0 {
-		return nil, apperrors.InvalidArgument("机构ID不能为空")
+	if err := s.authorizer.validateActor(actor); err != nil {
+		return nil, err
+	}
+	if s.engine == nil {
+		return nil, apperrors.ModuleNotConfigured("evaluation execution engine is not configured")
 	}
 	for _, id := range assessmentIDs {
-		a, err := s.assessments.FindByID(ctx, meta.FromUint64(id))
-		if err != nil {
-			return nil, apperrors.AssessmentNotFound(err, "测评不存在")
-		}
-		if a.OrgID() != actor.OrgID {
-			return nil, apperrors.PermissionDenied("测评不属于当前机构")
+		if _, err := s.authorizer.loadAssessment(ctx, actor, id); err != nil {
+			return nil, err
 		}
 	}
 	result := &BatchResult{TotalCount: len(assessmentIDs), FailedIDs: make([]uint64, 0)}

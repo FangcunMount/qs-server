@@ -23,6 +23,7 @@ const (
 	CapabilityReadAnswersheets                 = authzapp.CapabilityReadAnswersheets
 	CapabilityManageEvaluationPlans            = authzapp.CapabilityManageEvaluationPlans
 	CapabilityEvaluateAssessments              = authzapp.CapabilityEvaluateAssessments
+	CapabilityAuditInterpretation              = authzapp.CapabilityAuditInterpretation
 )
 
 // RequireCapabilityMiddleware 要求当前请求具备指定能力（基于 IAM 授权快照的 resource/action，不信任 JWT roles）。

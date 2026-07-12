@@ -14,14 +14,19 @@ import (
 	"time"
 )
 
-const PermissionAudit = "interpretation.audit"
-
 type Actor struct {
 	OrgID, OperatorUserID int64
-	Permissions           []string
+}
+type OutcomeRef struct {
+	ID, AssessmentID meta.ID
+	OrgID            int64
 }
 type OutcomeCorrelation interface {
-	FindOutcomeIDByAssessmentID(context.Context, meta.ID) (meta.ID, error)
+	FindOutcomeByID(context.Context, meta.ID) (OutcomeRef, error)
+	FindOutcomeByAssessmentID(context.Context, meta.ID) (OutcomeRef, error)
+}
+type Access interface {
+	AuthorizeAudit(context.Context, Actor, int64) error
 }
 type Generation struct {
 	ID, OutcomeID, LatestRunID, ReportID uint64
@@ -58,27 +63,32 @@ type service struct {
 	generations domaingeneration.Repository
 	runs        domainrun.Repository
 	reports     domainreport.ReportRepository
+	access      Access
 }
 
-func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r domainrun.Repository, reports domainreport.ReportRepository) Service {
-	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports}
+func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r domainrun.Repository, reports domainreport.ReportRepository, access Access) Service {
+	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, access: access}
 }
 func (s *service) FindReportByID(ctx context.Context, a Actor, id meta.ID) (*Report, error) {
-	if err := s.authorize(a); err != nil {
-		return nil, err
-	}
 	item, err := s.reports.FindByID(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, a, item.Association().OrgID); err != nil {
 		return nil, err
 	}
 	return mapReport(item), nil
 }
 func (s *service) FindGenerationsByOutcomeID(ctx context.Context, a Actor, id meta.ID) ([]Generation, error) {
-	if err := s.authorize(a); err != nil {
-		return nil, err
-	}
 	if id.IsZero() {
 		return nil, fmt.Errorf("evaluation outcome id is required")
+	}
+	ref, err := s.outcomes.FindOutcomeByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, a, ref.OrgID); err != nil {
+		return nil, err
 	}
 	items, err := s.generations.ListByOutcomeID(ctx, id)
 	if err != nil {
@@ -87,24 +97,28 @@ func (s *service) FindGenerationsByOutcomeID(ctx context.Context, a Actor, id me
 	return s.mapGenerations(ctx, items)
 }
 func (s *service) FindLifecycleByAssessmentID(ctx context.Context, a Actor, id meta.ID) ([]Generation, error) {
-	if err := s.authorize(a); err != nil {
-		return nil, err
-	}
 	if id.IsZero() {
 		return nil, fmt.Errorf("assessment id is required")
 	}
-	outcomeID, err := s.outcomes.FindOutcomeIDByAssessmentID(ctx, id)
+	ref, err := s.outcomes.FindOutcomeByAssessmentID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.generations.ListByOutcomeID(ctx, outcomeID)
+	if err := s.authorize(ctx, a, ref.OrgID); err != nil {
+		return nil, err
+	}
+	items, err := s.generations.ListByOutcomeID(ctx, ref.ID)
 	if err != nil {
 		return nil, err
 	}
 	return s.mapGenerations(ctx, items)
 }
 func (s *service) ListHistoricalReportsByAssessmentID(ctx context.Context, a Actor, id meta.ID) ([]Report, error) {
-	if err := s.authorize(a); err != nil {
+	ref, err := s.outcomes.FindOutcomeByAssessmentID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, a, ref.OrgID); err != nil {
 		return nil, err
 	}
 	items, err := s.reports.ListByAssessmentID(ctx, id)
@@ -119,19 +133,14 @@ func (s *service) ListHistoricalReportsByAssessmentID(ctx context.Context, a Act
 	}
 	return result, nil
 }
-func (s *service) authorize(a Actor) error {
-	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil {
+func (s *service) authorize(ctx context.Context, a Actor, resourceOrgID int64) error {
+	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil || s.access == nil {
 		return cberrors.WithCode(code.ErrModuleInitializationFailed, "interpretation operations service is not configured")
 	}
-	if a.OperatorUserID == 0 {
+	if a.OperatorUserID == 0 || a.OrgID == 0 || resourceOrgID == 0 {
 		return cberrors.WithCode(code.ErrPermissionDenied, "operations actor is required")
 	}
-	for _, p := range a.Permissions {
-		if p == PermissionAudit {
-			return nil
-		}
-	}
-	return cberrors.WithCode(code.ErrPermissionDenied, "interpretation audit permission is required")
+	return s.access.AuthorizeAudit(ctx, a, resourceOrgID)
 }
 func (s *service) mapGenerations(ctx context.Context, items []*domaingeneration.ReportGeneration) ([]Generation, error) {
 	result := make([]Generation, 0, len(items))

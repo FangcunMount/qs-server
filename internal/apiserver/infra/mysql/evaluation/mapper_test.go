@@ -46,7 +46,7 @@ func TestAssessmentMapperWritesAndReadsScaleEvaluationModelRef(t *testing.T) {
 }
 
 func TestAssessmentMapperWritesModelOnlyAssessment(t *testing.T) {
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindTypology, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(2001),
@@ -75,7 +75,7 @@ func TestAssessmentMapperWritesModelOnlyAssessment(t *testing.T) {
 	if roundTrip.EvaluationModelRef() == nil {
 		t.Fatal("round trip assessment should have evaluation model ref")
 	}
-	if roundTrip.EvaluationModelRef().Kind() != assessment.EvaluationModelKindPersonality ||
+	if roundTrip.EvaluationModelRef().Kind() != assessment.EvaluationModelKindTypology ||
 		roundTrip.EvaluationModelRef().Code().String() != "MBTI-16P" {
 		t.Fatalf("unexpected round trip assessment ref: model=%#v", roundTrip.EvaluationModelRef())
 	}

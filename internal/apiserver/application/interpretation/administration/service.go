@@ -19,6 +19,7 @@ type ListQuery struct {
 	Page, PageSize int
 }
 type ListScope struct {
+	OrgID               int64
 	TesteeID            uint64
 	AccessibleTesteeIDs []uint64
 	Restricted          bool
@@ -89,7 +90,11 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	case scope.Restricted:
 		filter.TesteeIDs = append([]uint64(nil), scope.AccessibleTesteeIDs...)
 	default:
-		return nil, cberrors.WithCode(code.ErrInvalidArgument, "report scope is empty")
+		orgID := scope.OrgID
+		if orgID == 0 {
+			return nil, cberrors.WithCode(code.ErrInvalidArgument, "report organization scope is empty")
+		}
+		filter.OrgID = &orgID
 	}
 	page, pageSize := normalize(query.Page, query.PageSize)
 	rows, total, err := s.reader.ListReports(ctx, filter, interpretationreadmodel.PageRequest{Page: page, PageSize: pageSize})

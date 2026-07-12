@@ -8,7 +8,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
-	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/testutil/interpretationinput"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -116,7 +116,7 @@ func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request o
 		return nil, nil
 	}
 	decoded, err := previewOutcomeFromExecution(request.Assessment, request.Input, request.Execution, evaluationfact.RuntimeIdentity{
-		AlgorithmFamily: request.RuntimeDescriptorKey.AlgorithmFamily, DecisionKind: request.RuntimeDescriptorKey.DecisionKind, PayloadFormat: request.RuntimeDescriptorKey.PayloadFormat,
+		AlgorithmFamily: request.DescriptorKey.AlgorithmFamily, DecisionKind: request.DescriptorKey.DecisionKind, PayloadFormat: request.DescriptorKey.PayloadFormat,
 	})
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request o
 		if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
 			return nil, err
 		}
-		request.Assessment.StageEvaluatedEvent(request.EvaluatedAt, meta.FromUint64(1), request.Run.RunID)
+		request.Assessment.StageEvaluatedEvent(request.EvaluatedAt, meta.FromUint64(1), request.Run.ID())
 	}
 	if c.stage != nil {
 		events := request.Assessment.Events()
@@ -204,10 +204,10 @@ func (r *charRunRepo) Claim(_ context.Context, request evaluationrun.ClaimReques
 	if r.latest != nil {
 		run = *r.latest
 	}
-	if run.Attempt.Status == evalrun.StatusRunning && run.HasActiveLease(request.ClaimedAt) {
+	if run.Attempt().Status == evalrun.StatusRunning && run.HasActiveLease(request.ClaimedAt) {
 		return evaluationrun.ClaimResult{Run: run}, nil
 	}
-	if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+	if err := run.Claim(evalrun.ClaimInput{Token: request.Token, TraceID: request.TraceID, ClaimedAt: request.ClaimedAt, LeaseExpiresAt: request.LeaseUntil}); err != nil {
 		return evaluationrun.ClaimResult{}, err
 	}
 	copy := run

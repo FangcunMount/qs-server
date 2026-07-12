@@ -30,6 +30,28 @@ func TestTargetInterpretationApplicationIsOrganizedByActors(t *testing.T) {
 	}
 }
 
+func TestTargetInterpretationQueryAndAuditDebtDoesNotReturn(t *testing.T) {
+	root := repoRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "internal", "apiserver", "application", "interpretation", "automation", "input", "preview_outcome_adapter.go")); err == nil {
+		t.Fatal("preview outcome adapter must remain test-only")
+	}
+	checks := map[string][]string{
+		filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation", "artifact_read_model.go"): {"interpret_reports", "mergeCurrentAndArchivedReportRows", "listReportsFromStore", "listArchives("},
+		filepath.Join(root, "internal", "apiserver", "application", "interpretation", "operations", "service.go"):  {"Permissions []string", "PermissionAudit"},
+	}
+	for path, forbidden := range checks {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range forbidden {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("forbidden Interpretation debt %q remains in %s", token, path)
+			}
+		}
+	}
+}
+
 func TestTargetInterpretationApplicationHasNoActorNeutralFacades(t *testing.T) {
 	t.Parallel()
 

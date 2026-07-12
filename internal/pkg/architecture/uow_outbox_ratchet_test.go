@@ -85,8 +85,8 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore)",
-		"assessmentApp.NewAnswerSheetAssessmentIntakeService(",
-		"assessmentApp.NewAssessmentOperatorRecoveryService(",
+		"evaluationintake.NewService(",
+		"evaluationoperator.NewRecoveryService(",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

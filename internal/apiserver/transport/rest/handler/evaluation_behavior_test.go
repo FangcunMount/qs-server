@@ -64,6 +64,12 @@ func (s *operatorQueryStub) ListRetryableFailedRuns(_ context.Context, actor eva
 	return s.failedRuns, nil
 }
 
+type assessmentProjectionStub struct{}
+
+func (*assessmentProjectionStub) ProjectAssessment(_ context.Context, result *evaluationoperator.Assessment) (*reportqueryjourney.AssessmentProjection, error) {
+	return &reportqueryjourney.AssessmentProjection{Assessment: result, Status: "interpreted"}, nil
+}
+
 func protectedContext(method, target string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -89,7 +95,7 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 	gin.SetMode(gin.TestMode)
 	total, risk := 18.5, "medium"
 	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 302, OrgID: 12, TesteeID: 5001, Status: "interpreted", TotalScore: &total, RiskLevel: &risk}}
-	h := NewAssessmentReportJourneyHandler(nil, reportwaitjourney.NewService(query, nil))
+	h := NewAssessmentReportJourneyHandler(nil, reportwaitjourney.NewService(query, &assessmentProjectionStub{}))
 	c, rec := protectedContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
 	c.Params = gin.Params{{Key: "id", Value: "302"}}
 	h.WaitReport(c)

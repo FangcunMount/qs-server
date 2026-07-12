@@ -37,6 +37,17 @@ type PersonalityTypeDetail struct {
 	Commentary     string                       `json:"commentary,omitempty"`
 }
 
+// ClassificationFact is the schema-v2 durable typology fact. It deliberately
+// excludes report prose and display assets, which are frozen in ReportInput.
+type ClassificationFact struct {
+	TypeCode       string  `json:"type_code"`
+	Pattern        string  `json:"pattern,omitempty"`
+	MatchPercent   float64 `json:"match_percent,omitempty"`
+	Similarity     float64 `json:"similarity,omitempty"`
+	SpecialTrigger string  `json:"special_trigger,omitempty"`
+	IsSpecial      bool    `json:"is_special,omitempty"`
+}
+
 // TraitProfileFactorResult 是一个scored 因子 in 通用特质画像结果。
 type TraitProfileFactorResult struct {
 	Code     string  `json:"code"`

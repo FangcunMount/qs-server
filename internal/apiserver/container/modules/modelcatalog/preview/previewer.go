@@ -10,8 +10,8 @@ package preview
 import (
 	"context"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -67,7 +67,7 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 
 func buildSubmittedAssessment(req modelpreview.Request) (*assessment.Assessment, error) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		req.SubKind,
 		req.Algorithm,
 		meta.ID(0),

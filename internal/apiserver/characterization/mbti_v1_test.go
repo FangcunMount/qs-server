@@ -3,19 +3,25 @@ package characterization_test
 import (
 	"testing"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // V1 contract: MBTI scorer resolves INTJ; report exposes type code, match percent,
 // dimension preference text, and profile-derived suggestions.
 func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 	model := mbtiINTJModel()
-	detail, err := typologylegacy.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
+	result, err := configured.NewEvaluator().Score(modeltypology.FromMBTI(model), mbtiINTJAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
+	}
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if detail.TypeCode != "INTJ" {
 		t.Fatalf("TypeCode = %s, want INTJ", detail.TypeCode)

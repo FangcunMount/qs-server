@@ -2059,6 +2059,107 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/clinicians/me/testees/{testee_id}/reports": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Clinician"
+                ],
+                "summary": "查询当前临床人员获授权受试者报告",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ReportListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Clinician"
+                ],
+                "summary": "查询当前临床人员获授权受试者报告详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/clinicians/{id}": {
             "get": {
                 "produces": [
@@ -2950,7 +3051,7 @@ const docTemplate = `{
         },
         "/api/v1/evaluations/reports": {
             "get": {
-                "description": "查询指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表），维度中的 suggestion 字段为字符串类型",
+                "description": "查询当前机构或指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表）",
                 "produces": [
                     "application/json"
                 ],
@@ -2961,10 +3062,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "受试者ID",
+                        "description": "受试者ID；管理员省略时查询当前机构",
                         "name": "testee_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "integer",
@@ -7760,6 +7860,118 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/assessments/{assessment_id}/lifecycle": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "查询 Assessment 的 Interpretation 生命周期",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/assessments/{assessment_id}/reports": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "查询 Assessment 的历史模板报告",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/outcomes/{outcome_id}/generations": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "查询 Outcome 的报告生成历史",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OutcomeID",
+                        "name": "outcome_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/reports/{report_id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "按 ReportID 查询 Interpretation 成品元数据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "报告ID",
+                        "name": "report_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }

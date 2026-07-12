@@ -2137,7 +2137,7 @@
                     "type": "string"
                 },
                 "assessment_id": {
-                    "description": "AssessmentID 在 status=done 且异步测评已落库后出现；未就绪时省略，客户端可继续轮询 submit-status。",
+                    "description": "AssessmentID 与 AnswerSheetID 共同构成 status=done 的完成不变量。",
                     "type": "string"
                 },
                 "status": {

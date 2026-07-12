@@ -30,6 +30,22 @@ type workerStub struct {
 	fails map[uint64]error
 }
 
+type accessCheckerStub struct {
+	denied map[uint64]error
+	calls  []uint64
+}
+
+func (*accessCheckerStub) ResolveAccessScope(context.Context, int64, int64) (*AccessScope, error) {
+	return &AccessScope{IsAdmin: true}, nil
+}
+func (s *accessCheckerStub) ValidateTesteeAccess(_ context.Context, _, _ int64, testeeID uint64) error {
+	s.calls = append(s.calls, testeeID)
+	return s.denied[testeeID]
+}
+func (*accessCheckerStub) ListAccessibleTesteeIDs(context.Context, int64, int64) ([]uint64, error) {
+	return nil, nil
+}
+
 func (s *workerStub) Evaluate(_ context.Context, assessmentID uint64) error {
 	s.calls = append(s.calls, assessmentID)
 	return s.fails[assessmentID]
@@ -41,8 +57,9 @@ func TestEvaluateBatchValidatesEntireOrganizationBeforeExecuting(t *testing.T) {
 		2: newAssessment(t, 2, 2),
 	}}
 	worker := &workerStub{}
+	access := &accessCheckerStub{}
 
-	if _, err := NewBatchExecutionService(repo, worker).EvaluateBatch(context.Background(), Actor{OrgID: 1}, []uint64{1, 2}); err == nil {
+	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
 		t.Fatal("EvaluateBatch() error = nil, want organization mismatch")
 	}
 	if len(worker.calls) != 0 {
@@ -57,8 +74,9 @@ func TestEvaluateBatchPreservesSynchronousAggregateResult(t *testing.T) {
 		3: newAssessment(t, 1, 3),
 	}}
 	worker := &workerStub{fails: map[uint64]error{2: errors.New("failed")}}
+	access := &accessCheckerStub{}
 
-	result, err := NewBatchExecutionService(repo, worker).EvaluateBatch(context.Background(), Actor{OrgID: 1}, []uint64{1, 2, 3})
+	result, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2, 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,6 +85,22 @@ func TestEvaluateBatchPreservesSynchronousAggregateResult(t *testing.T) {
 	}
 	if !reflect.DeepEqual(worker.calls, []uint64{1, 2, 3}) {
 		t.Fatalf("worker calls = %v", worker.calls)
+	}
+}
+
+func TestEvaluateBatchValidatesEveryTesteeBeforeExecuting(t *testing.T) {
+	repo := &assessmentRepoStub{items: map[uint64]*assessment.Assessment{
+		1: newAssessment(t, 1, 1),
+		2: newAssessment(t, 1, 2),
+	}}
+	worker := &workerStub{}
+	access := &accessCheckerStub{denied: map[uint64]error{102: errors.New("forbidden")}}
+
+	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
+		t.Fatal("EvaluateBatch() error = nil, want testee access denial")
+	}
+	if len(worker.calls) != 0 {
+		t.Fatalf("worker calls = %v, want none before all access checks complete", worker.calls)
 	}
 }
 

@@ -77,6 +77,8 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 			c.EvaluationModule.OperatorQuery,
 			reportQuery,
 		)
+		deps.Interpretation.ClinicianService = c.ReportModule.ClinicianService()
+		deps.Interpretation.OperationsService = c.ReportModule.OperationsService()
 	}
 	if c.PlanModule != nil {
 		var testeeAccess actorAccessApp.TesteeAccessService

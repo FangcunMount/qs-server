@@ -308,10 +308,10 @@ func (h *AssessmentReportJourneyHandler) GetReport(c *gin.Context) {
 
 // ListReports 查询报告列表
 // @Summary 查询报告列表
-// @Description 查询指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表），维度中的 suggestion 字段为字符串类型
+// @Description 查询当前机构或指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表）
 // @Tags Evaluation-Report
 // @Produce json
-// @Param testee_id query string true "受试者ID"
+// @Param testee_id query string false "受试者ID；管理员省略时查询当前机构"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
 // @Success 200 {object} core.Response{data=response.ReportListResponse}

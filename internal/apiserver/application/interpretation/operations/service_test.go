@@ -11,8 +11,8 @@ import (
 
 func TestOperationsRequiresAuditPermissionBeforeRepositoryRead(t *testing.T) {
 	g := &genRepo{}
-	s := NewService(outcome{}, g, runRepo{}, reportRepo{})
-	_, err := s.FindGenerationsByOutcomeID(context.Background(), Actor{OperatorUserID: 1}, meta.ID(2))
+	s := NewService(outcome{}, g, runRepo{}, reportRepo{}, access{err: context.Canceled})
+	_, err := s.FindGenerationsByOutcomeID(context.Background(), Actor{OrgID: 1, OperatorUserID: 1}, meta.ID(2))
 	if err == nil {
 		t.Fatal("expected permission error")
 	}
@@ -23,9 +23,16 @@ func TestOperationsRequiresAuditPermissionBeforeRepositoryRead(t *testing.T) {
 
 type outcome struct{}
 
-func (outcome) FindOutcomeIDByAssessmentID(context.Context, meta.ID) (meta.ID, error) {
-	return meta.ID(1), nil
+func (outcome) FindOutcomeByAssessmentID(context.Context, meta.ID) (OutcomeRef, error) {
+	return OutcomeRef{ID: meta.ID(1), OrgID: 1}, nil
 }
+func (outcome) FindOutcomeByID(context.Context, meta.ID) (OutcomeRef, error) {
+	return OutcomeRef{ID: meta.ID(1), OrgID: 1}, nil
+}
+
+type access struct{ err error }
+
+func (a access) AuthorizeAudit(context.Context, Actor, int64) error { return a.err }
 
 type genRepo struct{ calls int }
 

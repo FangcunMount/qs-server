@@ -14,7 +14,6 @@ import (
 	modelbinding "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -179,7 +178,7 @@ func (s *queryService) ScopeTesteeList(ctx context.Context, actor Actor, testeeI
 		return result, err
 	}
 	if scope != nil && scope.IsAdmin {
-		return result, evalerrors.Bind("受试者ID不能为空")
+		return result, nil
 	}
 	result.AccessibleTesteeIDs, err = s.access.ListAccessibleTesteeIDs(ctx, actor.OrgID, actor.OperatorUserID)
 	result.Restricted = true
@@ -209,20 +208,7 @@ func (s *queryService) ValidateTesteeAccess(ctx context.Context, actor Actor, te
 }
 
 func (s *queryService) loadAccessible(ctx context.Context, actor Actor, id uint64) (*domainassessment.Assessment, error) {
-	if s.assessments == nil {
-		return nil, evalerrors.ModuleNotConfigured("assessment repository is not configured")
-	}
-	a, err := s.assessments.FindByID(ctx, meta.FromUint64(id))
-	if err != nil {
-		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
-	}
-	if a.OrgID() != actor.OrgID {
-		return nil, evalerrors.PermissionDenied("测评不属于当前机构")
-	}
-	if err := s.ValidateTesteeAccess(ctx, actor, a.TesteeID().Uint64()); err != nil {
-		return nil, err
-	}
-	return a, nil
+	return (authorizer{assessments: s.assessments, access: s.access}).loadAssessment(ctx, actor, id)
 }
 
 func (s *queryService) GetAssessment(ctx context.Context, actor Actor, id uint64) (*Assessment, error) {
@@ -441,22 +427,20 @@ type recoveryService struct {
 	assessments domainassessment.Repository
 	tx          apptransaction.Runner
 	events      EventStager
+	authorizer  authorizer
 }
 
-func NewRecoveryService(assessments domainassessment.Repository, tx apptransaction.Runner, events EventStager) RecoveryService {
-	return &recoveryService{assessments: assessments, tx: tx, events: events}
+func NewRecoveryService(assessments domainassessment.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker) RecoveryService {
+	return &recoveryService{assessments: assessments, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}}
 }
 
 func (s *recoveryService) Retry(ctx context.Context, actor Actor, id uint64) (*Assessment, error) {
 	if s.assessments == nil || s.tx == nil || s.events == nil {
 		return nil, evalerrors.ModuleNotConfigured("assessment recovery transactional outbox is not configured")
 	}
-	a, err := s.assessments.FindByID(ctx, meta.FromUint64(id))
+	a, err := s.authorizer.loadAssessment(ctx, actor, id)
 	if err != nil {
-		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
-	}
-	if a.OrgID() != actor.OrgID {
-		return nil, evalerrors.PermissionDenied("测评不属于当前机构")
+		return nil, err
 	}
 	if !a.Status().IsFailed() {
 		return nil, evalerrors.AssessmentInvalidStatus("只能重试失败的测评")
@@ -573,9 +557,10 @@ func scoreFromFact(fact *evaluationoutcome.ScoreFact) *Score {
 }
 
 func runFromDomain(run evalrun.EvaluationRun) *Run {
-	result := &Run{RunID: run.RunID.String(), AssessmentID: run.AssessmentID, AttemptNo: run.Attempt.Number, Status: run.Attempt.Status.String(), Retryable: run.Retryable(), StartedAt: run.StartedAt, FinishedAt: run.FinishedAt, TraceID: run.TraceID, InputSnapshotRef: run.InputSnapshotRef}
-	if run.Failure != nil {
-		result.ErrorCode, result.ErrorMessage, result.Retryable = run.Failure.Kind.String(), run.Failure.Message, run.Failure.Retryable
+	attempt := run.Attempt()
+	result := &Run{RunID: run.ID().String(), AssessmentID: run.AssessmentID(), AttemptNo: attempt.Number, Status: attempt.Status.String(), Retryable: run.Retryable(), StartedAt: run.StartedAt(), FinishedAt: run.FinishedAt(), TraceID: run.TraceID(), InputSnapshotRef: run.InputSnapshotRef()}
+	if failure := run.Failure(); failure != nil {
+		result.ErrorCode, result.ErrorMessage, result.Retryable = failure.Kind.String(), failure.Message, failure.Retryable
 	}
 	return result
 }

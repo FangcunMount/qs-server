@@ -52,3 +52,23 @@ func TestDecodeExecutionRetainsLegacyMBTIProfile(t *testing.T) {
 		t.Fatalf("legacy MBTI detail = %#v", execution.Detail.Payload)
 	}
 }
+
+func TestDecodeExecutionReadsSchemaV2ClassificationFacts(t *testing.T) {
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(12), SchemaVersion: 2,
+		Model:   evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI"},
+		Runtime: evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80,"special_trigger":"stable"}},"Dimensions":[{"Code":"EI","Score":{"Value":8},"Preference":"I"}]}`),
+	})
+	execution, err := DecodeExecution(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fact, ok := ClassificationFactFromPayload(execution.Detail.Payload)
+	if !ok || fact.TypeCode != "INTJ" || fact.MatchPercent != 80 || fact.SpecialTrigger != "stable" {
+		t.Fatalf("classification fact = %#v", execution.Detail.Payload)
+	}
+	if len(execution.Dimensions) != 1 || execution.Dimensions[0].Preference != "I" {
+		t.Fatalf("dimensions = %#v", execution.Dimensions)
+	}
+}

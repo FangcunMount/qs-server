@@ -4751,6 +4751,67 @@ paths:
       summary: 查询当前从业者受试者列表
       tags:
       - Clinician
+  /api/v1/clinicians/me/testees/{testee_id}/reports:
+    get:
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ReportListResponse'
+              type: object
+      summary: 查询当前临床人员获授权受试者报告
+      tags:
+      - Interpretation-Clinician
+  /api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id}:
+    get:
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      - description: 测评ID
+        in: path
+        name: assessment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ReportResponse'
+              type: object
+      summary: 查询当前临床人员获授权受试者报告详情
+      tags:
+      - Interpretation-Clinician
   /api/v1/codes/apply:
     post:
       consumes:
@@ -5061,13 +5122,11 @@ paths:
       - Evaluation-Admin
   /api/v1/evaluations/reports:
     get:
-      description: 查询指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表），维度中的 suggestion
-        字段为字符串类型
+      description: 查询当前机构或指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表）
       parameters:
-      - description: 受试者ID
+      - description: 受试者ID；管理员省略时查询当前机构
         in: query
         name: testee_id
-        required: true
         type: string
       - default: 1
         description: 页码
@@ -8084,6 +8143,78 @@ paths:
       summary: 查询可重试失败运行列表
       tags:
       - Evaluation-Run-Internal
+  /internal/v1/interpretation/assessments/{assessment_id}/lifecycle:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: assessment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Assessment 的 Interpretation 生命周期
+      tags:
+      - Interpretation-Operations
+  /internal/v1/interpretation/assessments/{assessment_id}/reports:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: assessment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Assessment 的历史模板报告
+      tags:
+      - Interpretation-Operations
+  /internal/v1/interpretation/outcomes/{outcome_id}/generations:
+    get:
+      parameters:
+      - description: OutcomeID
+        in: path
+        name: outcome_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Outcome 的报告生成历史
+      tags:
+      - Interpretation-Operations
+  /internal/v1/interpretation/reports/{report_id}:
+    get:
+      parameters:
+      - description: 报告ID
+        in: path
+        name: report_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 按 ReportID 查询 Interpretation 成品元数据
+      tags:
+      - Interpretation-Operations
   /internal/v1/plans/tasks/{id}/complete:
     post:
       description: 系统动作：用户完成测评后回写任务状态，仅内部路由暴露

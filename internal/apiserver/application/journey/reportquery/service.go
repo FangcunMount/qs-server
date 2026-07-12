@@ -38,9 +38,7 @@ type Service interface {
 	ListAssessmentProjection(context.Context, Scope, evaluationoperator.ListQuery) (*AssessmentListProjection, error)
 	ProjectAssessment(context.Context, *evaluationoperator.Assessment) (*AssessmentProjection, error)
 	GetReport(context.Context, Scope, uint64) (*Report, error)
-	GetReportOutcome(context.Context, Scope, uint64) (*Report, error)
 	ListReports(context.Context, Scope, ListQuery) (*ReportList, error)
-	ListReportsOutcome(context.Context, Scope, ListQuery) (*ReportList, error)
 }
 type service struct {
 	reader   interpretationreadmodel.ReportReader
@@ -98,14 +96,8 @@ func (s *service) ProjectAssessment(ctx context.Context, result *evaluationopera
 func (s *service) GetReport(ctx context.Context, scope Scope, id uint64) (*Report, error) {
 	return s.admin.GetReport(ctx, actor(scope), interpretationAdmin.GetQuery{AssessmentID: id})
 }
-func (s *service) GetReportOutcome(ctx context.Context, scope Scope, id uint64) (*Report, error) {
-	return s.GetReport(ctx, scope, id)
-}
 func (s *service) ListReports(ctx context.Context, scope Scope, q ListQuery) (*ReportList, error) {
 	return s.admin.ListReports(ctx, actor(scope), q)
-}
-func (s *service) ListReportsOutcome(ctx context.Context, scope Scope, q ListQuery) (*ReportList, error) {
-	return s.ListReports(ctx, scope, q)
 }
 func actor(s Scope) interpretationAdmin.Actor {
 	return interpretationAdmin.Actor{OrgID: s.OrgID, OperatorUserID: s.OperatorUserID}

@@ -36,6 +36,7 @@ func (p PageRequest) Limit() int {
 }
 
 type ReportFilter struct {
+	OrgID        *int64
 	TesteeID     *uint64
 	TesteeIDs    []uint64
 	HighRiskOnly bool

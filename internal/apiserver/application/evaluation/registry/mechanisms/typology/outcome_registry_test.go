@@ -35,10 +35,3 @@ func TestDefaultOutcomeAdapterRegistryOnlyRegistersMechanismKeys(t *testing.T) {
 		}
 	}
 }
-
-func TestRegisterLegacyOutcomeAdaptersRestoresLegacyKeys(t *testing.T) {
-	registry := RegisterLegacyOutcomeAdapters(DefaultOutcomeAdapterRegistry())
-	if registry.Len() != 5 {
-		t.Fatalf("registry len = %d, want 5 with legacy adapters", registry.Len())
-	}
-}

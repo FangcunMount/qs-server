@@ -14,7 +14,7 @@ func TestNewEvaluationRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	t.Parallel()
 
 	modelRef := NewEvaluationModelRefWithIdentity(
-		EvaluationModelKindPersonality,
+		EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),

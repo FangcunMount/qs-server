@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,6 +39,7 @@ func (s *InterpretationAutomationService) GenerateReportFromAssessment(ctx conte
 	}
 	result, err := s.service.Generate(ctx, automation.GenerateCommand{Actor: automation.TrustedServiceActor("internal-grpc"), OutcomeID: outcomeID, TraceID: interpretationTraceID(ctx)})
 	if err != nil {
+		slog.ErrorContext(ctx, "interpretation automation failed", "outcome_id", req.OutcomeId, "error", err)
 		return generateReportFailureResponse(err), nil
 	}
 	statusValue, message := "generated", "报告生成完成"
@@ -60,7 +62,7 @@ func generateReportFailureResponse(err error) *pb.GenerateReportFromAssessmentRe
 		resp.FailureKind, resp.FailureCode, resp.Message = string(failed.Kind), failed.Code, failed.SafeMessage
 	}
 	if err != nil && resp.Message == "报告生成失败" {
-		resp.Message = fmt.Sprintf("报告生成失败: %v", err)
+		resp.FailureCode = "internal_error"
 	}
 	return resp
 }

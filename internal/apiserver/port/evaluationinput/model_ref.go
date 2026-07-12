@@ -1,7 +1,7 @@
 package evaluationinput
 
 import (
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )

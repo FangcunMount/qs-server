@@ -235,7 +235,7 @@ func TestEvaluationAndPipelineDoNotRouteByBehaviorAbilityProductChannel(t *testi
 
 	root := repoRoot(t)
 	scanRoots := []string{
-		filepath.Join(root, "internal/apiserver/domain/evaluation/pipeline"),
+		filepath.Join(root, "internal/apiserver/domain/evaluation/routing"),
 		filepath.Join(root, "internal/apiserver/application/evaluation/execute"),
 		filepath.Join(root, "internal/apiserver/application/evaluation/runtime"),
 		filepath.Join(root, "internal/apiserver/application/evaluation/registry"),

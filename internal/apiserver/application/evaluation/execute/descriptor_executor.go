@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 )
 
 type descriptorDrivenExecutor struct{}
@@ -13,7 +13,7 @@ type descriptorDrivenExecutor struct{}
 func (descriptorDrivenExecutor) Execute(
 	ctx context.Context,
 	desc evalpipeline.RuntimeDescriptor,
-	input ExecutionInput,
+	input evalpipeline.ExecutionInput,
 ) (*domainoutcome.Execution, error) {
 	if desc.InputAssembler == nil || desc.Calculator == nil || desc.OutcomeAssembler == nil {
 		return nil, fmt.Errorf("descriptor pipeline is incomplete for family %s", desc.AlgorithmFamily)
@@ -26,7 +26,7 @@ func (descriptorDrivenExecutor) Execute(
 	if err != nil {
 		return nil, err
 	}
-	raw, err := desc.Calculator.Calculate(ContextWithExecutionInput(ctx, input), calcInput)
+	raw, err := desc.Calculator.Calculate(evalpipeline.ContextWithExecutionInput(ctx, input), calcInput)
 	if err != nil {
 		return nil, err
 	}

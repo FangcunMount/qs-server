@@ -99,7 +99,8 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 
 	root := repoRoot(t)
 	required := []string{
-		"internal/apiserver/domain/evaluation/pipeline",
+		"internal/apiserver/domain/evaluation/routing",
+		"internal/apiserver/application/evaluation/runtime/descriptor",
 		"internal/apiserver/domain/evaluation/input",
 		"internal/apiserver/domain/evaluation/run",
 		"internal/apiserver/domain/evaluation/event",
@@ -170,7 +171,7 @@ func TestExecutionPathRoutingLivesInPipelinePackage(t *testing.T) {
 		"func algorithmFamilyFromModelKind(",
 	}
 	allowedFiles := map[string]struct{}{
-		"internal/apiserver/domain/evaluation/pipeline/resolve.go": {},
+		"internal/apiserver/domain/evaluation/routing/resolve.go": {},
 	}
 	scanRoots := []string{
 		"internal/apiserver/domain/evaluation",
@@ -197,7 +198,7 @@ func TestExecutionPathRoutingLivesInPipelinePackage(t *testing.T) {
 			text := string(data)
 			for _, token := range forbiddenTokens {
 				if strings.Contains(text, token) {
-					t.Fatalf("%s contains %q; route ExecutionPath mapping through domain/evaluation/pipeline only", rel, token)
+					t.Fatalf("%s contains %q; route ExecutionPath mapping through domain/evaluation/routing only", rel, token)
 				}
 			}
 			return nil

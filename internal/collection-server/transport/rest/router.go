@@ -9,6 +9,7 @@ import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
@@ -385,6 +386,11 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	evaluationHandler := r.container.EvaluationHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+	var profileLinks *iam.ProfileLinkService
+	if r.container.IAMModule != nil {
+		profileLinks = r.container.IAMModule.ProfileLinkService()
+	}
+	reportIdentity := collectionmiddleware.TesteeProfileLinkMiddleware(r.container.TesteeService(), profileLinks, "testee_id")
 
 	assessments := api.Group("/assessments")
 	{
@@ -444,7 +450,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetAssessmentTrendSummary,
 		)...)
 		// 长轮询等待报告生成
-		assessments.GET("/:id/report-status", r.rateLimitedReportStatusHandlers(
+		assessments.GET("/:id/report-status", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedReportStatusHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -453,8 +459,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetReportStatus,
-		)...)
-		assessments.GET("/:id/wait-report", r.waitReportHandlers(
+		)...)...)
+		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(
 			rateLimitedHandlers(
 				r.container.RateLimitBackend(),
 				"wait-report",
@@ -465,7 +471,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 				rateCfg.WaitReportUserBurst,
 				evaluationHandler.WaitReport,
 			)...,
-		)...)
+		)...)...)
 	}
 }
 
@@ -513,6 +519,11 @@ func (r *Router) registerTypologyModelRoutes(api *gin.RouterGroup) {
 func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 	handler := r.container.TypologyAssessmentHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+	var profileLinks *iam.ProfileLinkService
+	if r.container.IAMModule != nil {
+		profileLinks = r.container.IAMModule.ProfileLinkService()
+	}
+	reportIdentity := collectionmiddleware.TesteeProfileLinkMiddleware(r.container.TesteeService(), profileLinks, "testee_id")
 
 	assessments := api.Group("/typology-assessments")
 	{
@@ -526,7 +537,7 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.List,
 		)...)
-		assessments.GET("/:id/report-status", r.rateLimitedReportStatusHandlers(
+		assessments.GET("/:id/report-status", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedReportStatusHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -535,8 +546,8 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
 			handler.GetReportStatus,
-		)...)
-		assessments.GET("/:id/wait-report", r.waitReportHandlers(
+		)...)...)
+		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(
 			rateLimitedHandlers(
 				r.container.RateLimitBackend(),
 				"wait-report",
@@ -547,8 +558,8 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 				rateCfg.WaitReportUserBurst,
 				handler.WaitReport,
 			)...,
-		)...)
-		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
+		)...)...)
+		assessments.GET("/:id/report", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -557,7 +568,7 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
 			handler.GetReport,
-		)...)
+		)...)...)
 		assessments.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",

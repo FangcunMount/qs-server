@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -149,7 +149,7 @@ func contractInjectedRuntimePayload() *modeltypology.Payload {
 func contractInjectedAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),

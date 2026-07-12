@@ -3,7 +3,8 @@ package ruleset
 import (
 	"testing"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -16,7 +17,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := typologylegacy.ScoreMBTIReference(model, sheet)
+		got, err := scoreConfiguredMBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -49,7 +50,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := typologylegacy.ScoreMBTIReference(model, sheet)
+		got, err := scoreConfiguredMBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -60,6 +61,14 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			t.Fatalf("MatchPercent = %.2f, want > 0", got.MatchPercent)
 		}
 	})
+}
+
+func scoreConfiguredMBTI(model *modeltypology.MBTILegacyModel, sheet *evalinput.AnswerSheet) (outcometypology.PersonalityTypeDetail, error) {
+	result, err := configured.NewEvaluator().Score(modeltypology.FromMBTI(model), sheet)
+	if err != nil {
+		return outcometypology.PersonalityTypeDetail{}, err
+	}
+	return outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
 }
 
 func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *evalinput.AnswerSheet {

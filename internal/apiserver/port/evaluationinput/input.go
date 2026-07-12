@@ -12,9 +12,8 @@ import (
 type EvaluationModelKind string
 
 const (
-	EvaluationModelKindScale       EvaluationModelKind = "scale"
-	EvaluationModelKindTypology    EvaluationModelKind = "typology"
-	EvaluationModelKindPersonality EvaluationModelKind = EvaluationModelKindTypology
+	EvaluationModelKindScale    EvaluationModelKind = "scale"
+	EvaluationModelKindTypology EvaluationModelKind = "typology"
 )
 
 const (
@@ -156,7 +155,7 @@ func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
 		return nil
 	}
 	return &ModelSnapshot{
-		Kind:           EvaluationModelKindPersonality,
+		Kind:           EvaluationModelKindTypology,
 		SubKind:        "typology",
 		Algorithm:      string(payload.Algorithm),
 		ProductChannel: string(modelcatalog.ProductChannelTypology),

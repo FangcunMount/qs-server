@@ -379,7 +379,7 @@ type Algorithm = identity.Algorithm
 
 | Round | 动作 |
 |-------|------|
-| R17 | `Outcome.RuntimeDescriptorKey` 三元组与 Evaluate 主路径接线 |
+| R17 | `Outcome.DescriptorKey` 三元组与 Evaluate 主路径接线 |
 | R18 | `writer.ResolveByMechanism` 机制键报告生成；删除 EvaluatorKey 报告分叉 |
 | R19 | BR/COG characterization 热修（暴露路由三轨分裂） |
 | R20 | `EvaluationRun` 域模型 + Evaluate 内存编排 |

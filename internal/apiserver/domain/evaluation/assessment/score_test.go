@@ -11,7 +11,7 @@ import (
 
 func TestApplyScoringProjectionDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 	modelRef := NewEvaluationModelRefWithIdentity(
-		EvaluationModelKindPersonality,
+		EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),

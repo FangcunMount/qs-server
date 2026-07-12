@@ -114,7 +114,7 @@ func (a administrationInterpretationAccess) ScopeReports(ctx context.Context, ac
 	if err != nil {
 		return interpretationadmin.ListScope{}, err
 	}
-	return interpretationadmin.ListScope{TesteeID: scope.TesteeID, AccessibleTesteeIDs: scope.AccessibleTesteeIDs, Restricted: scope.Restricted}, nil
+	return interpretationadmin.ListScope{OrgID: actor.OrgID, TesteeID: scope.TesteeID, AccessibleTesteeIDs: scope.AccessibleTesteeIDs, Restricted: scope.Restricted}, nil
 }
 
 // initPlanModule 初始化计划模块

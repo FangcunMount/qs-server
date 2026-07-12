@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -48,7 +48,7 @@ func TestEvaluatePersistsTraceIDFromContext(t *testing.T) {
 	if len(runRepo.saved) != 1 {
 		t.Fatalf("saved runs = %d, want input snapshot update", len(runRepo.saved))
 	}
-	if got := runRepo.saved[0].TraceID; got != "trace-abc-123" {
+	if got := runRepo.saved[0].TraceID(); got != "trace-abc-123" {
 		t.Fatalf("first saved trace_id = %q, want trace-abc-123", got)
 	}
 }
@@ -76,7 +76,7 @@ func TestEvaluatePersistsInputSnapshotRefBeforeExecuting(t *testing.T) {
 	if len(runRepo.saved) != 1 {
 		t.Fatalf("saved runs = %d, want one input snapshot update", len(runRepo.saved))
 	}
-	if got := runRepo.saved[0].InputSnapshotRef; got != "model:SCALE-1@1.0.0" {
+	if got := runRepo.saved[0].InputSnapshotRef(); got != "model:SCALE-1@1.0.0" {
 		t.Fatalf("saved input_snapshot_ref = %q, want model:SCALE-1@1.0.0", got)
 	}
 }
@@ -106,10 +106,10 @@ func TestEvaluateReturnsInputSnapshotPersistenceErrorBeforeExecuting(t *testing.
 	if len(runRepo.saved) != 1 {
 		t.Fatalf("saved runs = %d, want failed input snapshot update", len(runRepo.saved))
 	}
-	if got := runRepo.saved[len(runRepo.saved)-1].InputSnapshotRef; got != "model:SCALE-1@1.0.0" {
+	if got := runRepo.saved[len(runRepo.saved)-1].InputSnapshotRef(); got != "model:SCALE-1@1.0.0" {
 		t.Fatalf("last saved input_snapshot_ref = %q", got)
 	}
-	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusRunning {
+	if got := runRepo.saved[len(runRepo.saved)-1].Attempt().Status; got != evalrun.StatusRunning {
 		t.Fatalf("last saved status = %s, want running", got)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
@@ -174,7 +173,7 @@ func mbtiINTJAnswerSheet() *evalinput.AnswerSheet {
 func submittedMBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
@@ -252,7 +251,7 @@ func sbtiHighAnswerSheet() *evalinput.AnswerSheet {
 func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmSBTI,
 		meta.ID(0),
@@ -554,7 +553,7 @@ func bigFiveAnswerSheet() *evalinput.AnswerSheet {
 func submittedBigFiveAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmBigFive,
 		meta.ID(0),
@@ -684,7 +683,7 @@ func customRuntimeInputSnapshot() *evaluationinput.InputSnapshot {
 func submittedCustomRuntimeAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
@@ -733,16 +732,16 @@ func scoreBigFiveCharacterization(
 	t *testing.T,
 	payload *modeltypology.Payload,
 	sheet *evalinput.AnswerSheet,
-) (legacy.BigFiveResultDetail, error) {
+) (outcometypology.TraitProfileDetail, error) {
 	t.Helper()
 	evaluator := configured.NewEvaluator()
 	result, err := evaluator.Score(payload, sheet)
 	if err != nil {
-		return legacy.BigFiveResultDetail{}, err
+		return outcometypology.TraitProfileDetail{}, err
 	}
 	generic, err := outcometypology.TraitProfileDetailFromPayload(result.Detail)
 	if err != nil {
-		return legacy.BigFiveResultDetail{}, err
+		return outcometypology.TraitProfileDetail{}, err
 	}
-	return legacy.BigFiveResultDetailFromTraitProfile(generic), nil
+	return generic, nil
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"

@@ -812,6 +812,26 @@ python3 scripts/oneoff/enroll_testees_after_date.py \
 - `--sleep-ms`：每次 enroll 调用后的暂停时间，用于降低接口压力。
 - `--dry-run`：只列出匹配受试者，不调用 enroll。
 
+## Interpretation 报告目录回填
+
+代码先上线 `report_query_catalog` 索引和新报告事务投影，随后手工执行：
+
+```bash
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --mysql-dsn "$MYSQL_DSN" --source all --page-size 500
+
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --mysql-dsn "$MYSQL_DSN" --source all --page-size 500 --apply
+
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --mysql-dsn "$MYSQL_DSN" --verify-only
+```
+
+默认 dry-run；`--after-id` 可从已确认的 `domain_id` 续跑。必须在 `missing_org`、`missing_testee`、`missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
+
 ## 验证
 
 Go 脚本的最小编译/测试检查：

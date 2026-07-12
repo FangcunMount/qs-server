@@ -9,11 +9,11 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -34,7 +34,7 @@ type service struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	descriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
-	descriptorExecutor  DescriptorExecutor
+	descriptorExecutor  evalpipeline.DescriptorExecutor
 	runtimeResolver     *RuntimeResolver
 	runRepo             evaluationrun.Repository
 	runLease            time.Duration
@@ -72,7 +72,7 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 
 // WithDescriptorExecutor replaces descriptor execution. Production uses the
 // native descriptor pipeline; the option is kept as a narrow testing seam.
-func WithDescriptorExecutor(executor DescriptorExecutor) EngineOption {
+func WithDescriptorExecutor(executor evalpipeline.DescriptorExecutor) EngineOption {
 	return func(s *service) {
 		s.descriptorExecutor = executor
 	}
@@ -160,7 +160,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			return fmt.Errorf("load retryable evaluation run: %w", latestErr)
 		}
 		retryableFailure := latest != nil && latest.Retryable()
-		expiredRunningAttempt := latest != nil && latest.Attempt.Status == evalrun.StatusRunning && !latest.HasActiveLease(claimAt)
+		expiredRunningAttempt := latest != nil && latest.Attempt().Status == evalrun.StatusRunning && !latest.HasActiveLease(claimAt)
 		if !retryableFailure && !expiredRunningAttempt {
 			l.Infow("测评失败且不存在可重试运行，跳过重复请求",
 				"assessment_id", assessmentID,
@@ -176,7 +176,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if !claim.Claimed {
 		l.Infow("测评执行已有有效 claim，跳过重复执行",
 			"assessment_id", assessmentID,
-			"evaluation_run_id", claim.Run.RunID.String(),
+			"evaluation_run_id", claim.Run.ID().String(),
 			"result", "duplicate_skipped",
 		)
 		return nil
@@ -213,7 +213,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		l.Errorw("评估运行时解析失败",
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
-			"evaluation_run_id", evaluationRun.RunID.String(),
+			"evaluation_run_id", evaluationRun.ID().String(),
 			"model_key", resolved.ExecutionIdentity.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"result", "failed",
@@ -225,7 +225,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	l.Infow("开始执行评估器",
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
-		"evaluation_run_id", evaluationRun.RunID.String(),
+		"evaluation_run_id", evaluationRun.ID().String(),
 		"model_key", resolved.ExecutionIdentity.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),
@@ -236,7 +236,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
-			"evaluation_run_id", evaluationRun.RunID.String(),
+			"evaluation_run_id", evaluationRun.ID().String(),
 			"model_key", resolved.ExecutionIdentity.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
@@ -248,12 +248,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 	// 执行评估成功，可靠提交规范 EvaluationOutcome。
 	err = s.persistEvaluationOutcome(ctx, outcomecommit.CommitRequest{
-		Assessment:           a,
-		Input:                input,
-		Execution:            evaluationOutcome,
-		RuntimeDescriptorKey: resolved.DescriptorKey,
-		Run:                  &evaluationRun,
-		EvaluatedAt:          time.Now(),
+		Assessment:    a,
+		Input:         input,
+		Execution:     evaluationOutcome,
+		DescriptorKey: resolved.DescriptorKey,
+		Run:           &evaluationRun,
+		EvaluatedAt:   time.Now(),
 	})
 	if err != nil {
 		l.Errorw("评估结果写入失败",
@@ -273,7 +273,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"result", "success",
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
-		"evaluation_run_id", evaluationRun.RunID.String(),
+		"evaluation_run_id", evaluationRun.ID().String(),
 		"model_key", resolved.ExecutionIdentity.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),

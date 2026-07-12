@@ -21,24 +21,3 @@ const (
 )
 
 func (p ReportProfile) String() string { return string(p) }
-
-// VisibilityPolicy 控制which report sections 是 visible 到 audience。
-type VisibilityPolicy struct {
-	Audience Audience
-	Hidden   []string
-}
-
-// 默认VisibilityPolicy 返回策略 that shows 全部sections。
-func DefaultVisibilityPolicy(audience Audience) VisibilityPolicy {
-	return VisibilityPolicy{Audience: audience}
-}
-
-// IsVisible 报告是否 section 是 visible under 策略。
-func (p VisibilityPolicy) IsVisible(section string) bool {
-	for _, hidden := range p.Hidden {
-		if hidden == section {
-			return false
-		}
-	}
-	return true
-}

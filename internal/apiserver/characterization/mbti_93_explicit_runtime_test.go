@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
@@ -146,7 +146,7 @@ func mbti93InputSnapshot(payload *modeltypology.Payload) *evaluationinput.InputS
 func submittedMBTI93Assessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),

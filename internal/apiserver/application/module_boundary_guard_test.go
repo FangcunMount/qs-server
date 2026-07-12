@@ -43,7 +43,7 @@ func TestEvaluationInterpretationCrossModuleImportDebtDoesNotSpread(t *testing.T
 			},
 			forbiddenPrefixes: []string{
 				"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation",
-				"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation",
+				"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing",
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
 			allowedImporters: []string{},

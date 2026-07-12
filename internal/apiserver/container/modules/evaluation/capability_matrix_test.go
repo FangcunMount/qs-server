@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalrouting "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -24,7 +24,7 @@ func TestEvaluationModuleRegistersOnlyDeclaredDescriptorFamilies(t *testing.T) {
 	}
 	for _, kind := range domain.RuntimeExecutableKinds() {
 		capability, ok := domain.FamilyCapabilityByKind(kind)
-		family, familyOK := evalpipeline.AlgorithmFamilyFromModelKind(evalpipeline.ModelKind(kind))
+		family, familyOK := evalrouting.ExecutionFamilyFromRoute(evalrouting.ModelRoute{Kind: kind})
 		if !ok || !capability.RuntimeExecutable || !familyOK || !registry.HasAlgorithmFamily(family) {
 			t.Fatalf("runtime descriptor missing for kind %s", kind)
 		}

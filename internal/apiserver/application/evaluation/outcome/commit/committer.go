@@ -10,11 +10,11 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -30,12 +30,12 @@ type EventStager interface {
 // It deliberately distinguishes the Evaluator's in-memory Execution from the
 // immutable Record created by Committer.
 type CommitRequest struct {
-	Assessment           *assessment.Assessment
-	Input                *evaluationinput.InputSnapshot
-	Execution            *domainoutcome.Execution
-	RuntimeDescriptorKey evalpipeline.RuntimeDescriptorKey
-	Run                  *evalrun.EvaluationRun
-	EvaluatedAt          time.Time
+	Assessment    *assessment.Assessment
+	Input         *evaluationinput.InputSnapshot
+	Execution     *domainoutcome.Execution
+	DescriptorKey evalpipeline.DescriptorKey
+	Run           *evalrun.EvaluationRun
+	EvaluatedAt   time.Time
 }
 
 type Committer interface {
@@ -89,7 +89,7 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err != nil {
 		return nil, evalerrors.AssessmentScoringFailed(err, "应用计分结果失败")
 	}
-	payload, err := json.Marshal(request.Execution)
+	payload, err := evaloutcome.MarshalRecordV2(request.Execution)
 	if err != nil {
 		return nil, fmt.Errorf("marshal canonical evaluation outcome: %w", err)
 	}
@@ -105,7 +105,7 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		OrgID:        assessmentToCommit.OrgID(),
 		AssessmentID: assessmentToCommit.ID(),
 		TesteeID:     assessmentToCommit.TesteeID().Uint64(),
-		RunID:        runToCommit.RunID.String(),
+		RunID:        runToCommit.ID().String(),
 		Model: domainoutcome.ModelIdentity{
 			Kind:      request.Execution.ModelRef.Kind(),
 			SubKind:   request.Execution.ModelRef.SubKind(),
@@ -115,11 +115,11 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 			Title:     request.Execution.ModelRef.Title(),
 		},
 		Runtime: domainoutcome.RuntimeIdentity{
-			AlgorithmFamily: request.RuntimeDescriptorKey.AlgorithmFamily,
-			DecisionKind:    request.RuntimeDescriptorKey.DecisionKind,
-			PayloadFormat:   request.RuntimeDescriptorKey.PayloadFormat,
+			AlgorithmFamily: request.DescriptorKey.AlgorithmFamily,
+			DecisionKind:    request.DescriptorKey.DecisionKind,
+			PayloadFormat:   request.DescriptorKey.PayloadFormat,
 		},
-		InputSnapshotRef: runToCommit.InputSnapshotRef,
+		InputSnapshotRef: runToCommit.InputSnapshotRef(),
 		ReportInput:      reportInput,
 		Payload:          payload,
 		SchemaVersion:    domainoutcome.CurrentSchemaVersion,
@@ -132,7 +132,7 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err := runToCommit.Succeed(request.EvaluatedAt); err != nil {
 		return nil, err
 	}
-	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.RunID)
+	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.ID())
 	eventsToStage := assessmentToCommit.Events()
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
@@ -180,13 +180,13 @@ func (c *committer) validate(request CommitRequest) error {
 	if request.Execution == nil {
 		return fmt.Errorf("evaluation outcome is required")
 	}
-	if request.Run == nil || request.Run.RunID == "" {
+	if request.Run == nil || request.Run.ID() == "" {
 		return fmt.Errorf("evaluation run is required")
 	}
-	if request.Run.Attempt.Status != evalrun.StatusRunning {
+	if request.Run.Attempt().Status != evalrun.StatusRunning {
 		return fmt.Errorf("evaluation run must be running before commit")
 	}
-	if request.Run.AssessmentID != request.Assessment.ID().Uint64() {
+	if request.Run.AssessmentID() != request.Assessment.ID().Uint64() {
 		return fmt.Errorf("evaluation run assessment does not match outcome assessment")
 	}
 	return nil

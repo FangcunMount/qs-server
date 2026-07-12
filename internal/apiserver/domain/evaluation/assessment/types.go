@@ -173,9 +173,6 @@ const (
 
 	// EvaluationModelKindTypology 类型学模型（trait 等子形态由 SubKind/Algorithm 区分）。
 	EvaluationModelKindTypology EvaluationModelKind = modelcatalog.KindTypology
-
-	// EvaluationModelKindPersonality is a deprecated alias for EvaluationModelKindTypology.
-	EvaluationModelKindPersonality EvaluationModelKind = EvaluationModelKindTypology
 )
 
 // EvaluationModelRef 表示执行期模型引用（含计分与解读规则快照）。
@@ -190,7 +187,7 @@ type EvaluationModelRef struct {
 }
 
 // NewEvaluationModelRef 创建通用测评模型引用。
-func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
+func newEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
 	return NewEvaluationModelRefWithIdentity(kind, modelcatalog.SubKindEmpty, "", id, code, version, title)
 }
 
@@ -221,7 +218,7 @@ func NewEvaluationModelRefWithIdentity(
 
 // NewScaleEvaluationModelRef 创建 Scale 测评模型引用。
 func NewScaleEvaluationModelRef(id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
-	return NewEvaluationModelRef(EvaluationModelKindScale, id, code, version, title)
+	return newEvaluationModelRef(EvaluationModelKindScale, id, code, version, title)
 }
 
 func (r EvaluationModelRef) ID() meta.ID {
@@ -364,16 +361,6 @@ func (o Origin) Type() OriginType {
 // ID 获取来源ID
 func (o Origin) ID() *string {
 	return o.originID
-}
-
-// IsAdhoc 是否一次性测评
-func (o Origin) IsAdhoc() bool {
-	return o.originType == OriginAdhoc
-}
-
-// IsPlan 是否来自测评计划
-func (o Origin) IsPlan() bool {
-	return o.originType == OriginPlan
 }
 
 // ReconstructOrigin 从持久化数据重建 Origin（用于仓储层）

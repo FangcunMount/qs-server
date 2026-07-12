@@ -11,16 +11,19 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
-const schemaV1 uint = 1
+const (
+	schemaV1 uint = 1
+	schemaV2 uint = 2
+)
 
 func DecodeExecution(record *evaluationfact.Record) (*evaluationfact.Execution, error) {
 	if record == nil {
 		return nil, fmt.Errorf("evaluation outcome is required")
 	}
-	if record.SchemaVersion() != 0 && record.SchemaVersion() != schemaV1 {
+	if record.SchemaVersion() != 0 && record.SchemaVersion() != schemaV1 && record.SchemaVersion() != schemaV2 {
 		return nil, fmt.Errorf("unsupported evaluation outcome schema version %d", record.SchemaVersion())
 	}
-	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime())
+	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime(), record.SchemaVersion())
 	if err != nil {
 		return nil, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
 	}
@@ -34,10 +37,10 @@ func DecodeTransientExecution(value any, model evaluationfact.ModelIdentity, run
 	if err != nil {
 		return nil, fmt.Errorf("encode transient evaluation execution: %w", err)
 	}
-	return decodeExecution(payload, model, runtime)
+	return decodeExecution(payload, model, runtime, schemaV1)
 }
 
-func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity) (*evaluationfact.Execution, error) {
+func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity, schema uint) (*evaluationfact.Execution, error) {
 	var execution evaluationfact.Execution
 	if err := json.Unmarshal(payload, &execution); err != nil {
 		return nil, err
@@ -46,10 +49,65 @@ func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime
 		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
 		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
 	}
-	if err := restoreTypedDetail(payload, model, runtime, &execution); err != nil {
+	if schema == schemaV2 {
+		if err := restoreV2TypedDetail(payload, runtime, &execution); err != nil {
+			return nil, err
+		}
+	} else if err := restoreTypedDetail(payload, model, runtime, &execution); err != nil {
 		return nil, err
 	}
 	return &execution, nil
+}
+
+// ClassificationFact is the schema-v2 typology fact contract. It has no
+// report prose or presentation assets.
+type ClassificationFact struct {
+	TypeCode       string  `json:"type_code"`
+	Pattern        string  `json:"pattern,omitempty"`
+	MatchPercent   float64 `json:"match_percent,omitempty"`
+	Similarity     float64 `json:"similarity,omitempty"`
+	SpecialTrigger string  `json:"special_trigger,omitempty"`
+	IsSpecial      bool    `json:"is_special,omitempty"`
+}
+
+func ClassificationFactFromPayload(payload any) (ClassificationFact, bool) {
+	fact, ok := payload.(ClassificationFact)
+	if ok {
+		return fact, true
+	}
+	if pointer, ok := payload.(*ClassificationFact); ok && pointer != nil {
+		return *pointer, true
+	}
+	return ClassificationFact{}, false
+}
+
+func restoreV2TypedDetail(payload []byte, runtime evaluationfact.RuntimeIdentity, execution *evaluationfact.Execution) error {
+	if runtime.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorClassification {
+		execution.Detail.Payload = nil
+		return nil
+	}
+	if runtime.DecisionKind == modelcatalog.DecisionKindTraitProfile {
+		execution.Detail.Payload = nil
+		return nil
+	}
+	var wire struct {
+		Detail struct{ Payload json.RawMessage }
+	}
+	if err := json.Unmarshal(payload, &wire); err != nil {
+		return err
+	}
+	if len(wire.Detail.Payload) == 0 || string(wire.Detail.Payload) == "null" {
+		return fmt.Errorf("schema v2 typology classification fact is missing")
+	}
+	var fact ClassificationFact
+	if err := json.Unmarshal(wire.Detail.Payload, &fact); err != nil {
+		return err
+	}
+	if fact.TypeCode == "" {
+		return fmt.Errorf("schema v2 typology classification code is missing")
+	}
+	execution.Detail.Payload = fact
+	return nil
 }
 
 func DecodeReportInput(record *evaluationfact.Record) (*evaluationinput.InputSnapshot, error) {

@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -33,7 +33,7 @@ func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.Ru
 	for _, spec := range specs {
 		decisionKind := defaultDecisionKindForFamily(spec.family)
 		descs = append(descs, evalpipeline.RuntimeDescriptor{
-			Key: evalpipeline.RuntimeDescriptorKey{
+			Key: evalpipeline.DescriptorKey{
 				AlgorithmFamily: spec.family,
 			},
 			AlgorithmFamily: spec.family,

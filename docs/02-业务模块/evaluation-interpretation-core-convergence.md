@@ -110,7 +110,7 @@ PublishedModelSnapshot
 
 | 交付 | 说明 |
 |------|------|
-| 路由单点 | `ExecutionPath` 映射收敛到 `domain/evaluation/pipeline/resolve.go`；`runtime_path.go` 薄委托 |
+| 路由单点 | 纯路由规则收敛到 `domain/evaluation/routing`；RuntimeDescriptor 与 Registry 位于 `application/evaluation/runtime/descriptor` |
 | 机制键主路径 | `reporting/registry` 与 `writer` 优先 `MechanismReportBuilderKey`，`EvaluatorKey` 作 legacy fallback |
 | 表征测试 | `pipeline/routing_equivalence_test.go`、`reporting/registry_mechanism_primary_test.go` |
 | 架构守卫 | 禁止在 pipeline 外新增 `executionPathForFamily` / `algorithmFamilyFromModelKind` |

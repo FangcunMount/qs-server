@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -55,9 +55,9 @@ func (c factorNormCalculator) Calculate(ctx context.Context, _ evalpipeline.Calc
 	if c.scoring == nil {
 		return nil, fmt.Errorf("factor_norm evaluation calculator is not configured")
 	}
-	execInput, ok := evaluationexecute.ExecutionInputFromContext(ctx)
+	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
 	if !ok {
-		return nil, evaluationexecute.ErrDescriptorPipelineContext
+		return nil, evalpipeline.ErrExecutionContextMissing
 	}
 	scaleSnapshot, ok := portevaluationinput.BehavioralRatingScaleSnapshot(execInput.Input)
 	if !ok || scaleSnapshot == nil {

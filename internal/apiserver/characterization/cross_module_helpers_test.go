@@ -105,7 +105,7 @@ func buildCharCrossModuleHarnessCore(
 
 	h.intakeSvc = evaluationintake.NewService(
 		repo,
-		assessment.NewDefaultAssessmentCreator(),
+		nil,
 		&charTxRunner{},
 		submitStager,
 		nil,

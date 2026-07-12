@@ -18,7 +18,7 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	traceID := "trace-1"
 	claimToken := "worker-a"
 	leaseExpiresAt := started.Add(time.Minute)
-	original := evalrun.EvaluationRun{
+	original := evalrun.Reconstruct(evalrun.ReconstructInput{
 		RunID:          evalrun.ID("42:2"),
 		AssessmentID:   42,
 		ClaimToken:     claimToken,
@@ -35,7 +35,7 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 			Message:   message,
 			Retryable: true,
 		},
-	}
+	})
 	po := checkpoint.RunToPOForTest(original)
 	if po.ResourceID != "42:2" || po.AssessmentID == nil || *po.AssessmentID != 42 || po.AttemptNo != 2 {
 		t.Fatalf("unexpected po: %+v", po)
@@ -54,16 +54,16 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	}
 
 	roundTrip := checkpoint.RunFromPOForTest(*po)
-	if roundTrip.RunID != original.RunID {
-		t.Fatalf("run id = %s, want %s", roundTrip.RunID, original.RunID)
+	if roundTrip.ID() != original.ID() {
+		t.Fatalf("run id = %s, want %s", roundTrip.ID(), original.ID())
 	}
-	if roundTrip.Attempt.Number != original.Attempt.Number || roundTrip.Attempt.Status != original.Attempt.Status {
-		t.Fatalf("attempt = %+v, want %+v", roundTrip.Attempt, original.Attempt)
+	if roundTrip.Attempt() != original.Attempt() {
+		t.Fatalf("attempt = %+v, want %+v", roundTrip.Attempt(), original.Attempt())
 	}
-	if roundTrip.Failure == nil || roundTrip.Failure.Message != message || !roundTrip.Failure.Retryable {
-		t.Fatalf("failure = %+v", roundTrip.Failure)
+	if roundTrip.Failure() == nil || roundTrip.Failure().Message != message || !roundTrip.Failure().Retryable {
+		t.Fatalf("failure = %+v", roundTrip.Failure())
 	}
-	if roundTrip.ClaimToken != claimToken || roundTrip.LeaseExpiresAt == nil || !roundTrip.LeaseExpiresAt.Equal(leaseExpiresAt) {
-		t.Fatalf("round-trip claim = token:%q lease:%v", roundTrip.ClaimToken, roundTrip.LeaseExpiresAt)
+	if roundTrip.ClaimToken() != claimToken || roundTrip.LeaseExpiresAt() == nil || !roundTrip.LeaseExpiresAt().Equal(leaseExpiresAt) {
+		t.Fatalf("round-trip claim = token:%q lease:%v", roundTrip.ClaimToken(), roundTrip.LeaseExpiresAt())
 	}
 }

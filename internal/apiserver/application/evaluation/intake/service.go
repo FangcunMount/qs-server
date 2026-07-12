@@ -36,9 +36,12 @@ type Service interface {
 type assessmentListCache interface {
 	Invalidate(context.Context, uint64) error
 }
+type EvaluationModelValidator interface {
+	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error
+}
 type service struct {
 	repo      domainassessment.Repository
-	creator   domainassessment.AssessmentCreator
+	validator EvaluationModelValidator
 	tx        apptransaction.Runner
 	events    EventStager
 	cache     assessmentListCache
@@ -49,8 +52,8 @@ type Option func(*service)
 func WithImmediateDispatcher(v *appEventing.ImmediateDispatcher) Option {
 	return func(s *service) { s.immediate = v }
 }
-func NewService(repo domainassessment.Repository, creator domainassessment.AssessmentCreator, tx apptransaction.Runner, events EventStager, cache assessmentListCache, opts ...Option) Service {
-	s := &service{repo: repo, creator: creator, tx: tx, events: events, cache: cache}
+func NewService(repo domainassessment.Repository, validator EvaluationModelValidator, tx apptransaction.Runner, events EventStager, cache assessmentListCache, opts ...Option) Service {
+	s := &service{repo: repo, validator: validator, tx: tx, events: events, cache: cache}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(s)
@@ -73,7 +76,16 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 	if err != nil {
 		return nil, err
 	}
-	a, err := s.creator.Create(ctx, req)
+	if req.ModelRef != nil && s.validator != nil {
+		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef); err != nil {
+			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
+		}
+	}
+	assessmentOptions := make([]domainassessment.AssessmentOption, 0, 1)
+	if req.ModelRef != nil {
+		assessmentOptions = append(assessmentOptions, domainassessment.WithEvaluationModel(*req.ModelRef))
+	}
+	a, err := domainassessment.NewAssessment(req.OrgID, req.TesteeID, req.QuestionnaireRef, req.AnswerSheetRef, req.Origin, assessmentOptions...)
 	if err != nil {
 		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -219,7 +219,7 @@ func TestRepositoryResolverUnsupportedRuleSetKindCarriesFailureKind(t *testing.T
 		t.Fatalf("NewResolver returned error: %v", err)
 	}
 	_, err = resolver.Resolve(context.Background(), port.InputRef{
-		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindPersonality, Code: "MBTI-16P"},
+		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindTypology, Code: "MBTI-16P"},
 	})
 	if err == nil {
 		t.Fatal("expected unsupported model kind error")

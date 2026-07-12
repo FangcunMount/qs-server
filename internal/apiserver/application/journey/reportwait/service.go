@@ -17,7 +17,7 @@ type Scope struct {
 	AssessmentID   uint64
 }
 
-type LegacyProjection interface {
+type AssessmentReportProjection interface {
 	ProjectAssessment(ctx context.Context, result *evaluationoperator.Assessment) (*reportqueryApp.AssessmentProjection, error)
 }
 
@@ -32,10 +32,10 @@ type Service interface {
 
 type service struct {
 	operator   AssessmentQuery
-	projection LegacyProjection
+	projection AssessmentReportProjection
 }
 
-func NewService(operator AssessmentQuery, projection LegacyProjection) Service {
+func NewService(operator AssessmentQuery, projection AssessmentReportProjection) Service {
 	return &service{operator: operator, projection: projection}
 }
 
@@ -78,10 +78,7 @@ func (s *service) loadTerminalSummary(ctx context.Context, scope Scope) (evaluat
 		}
 		return statusSummary(projected.Assessment, projected.Status), true
 	}
-	if result.Status != "interpreted" && result.Status != "failed" {
-		return evaluationwaiter.StatusSummary{}, false
-	}
-	return statusSummary(result, result.Status), true
+	return evaluationwaiter.StatusSummary{}, false
 }
 
 func statusSummary(result *evaluationoperator.Assessment, status string) evaluationwaiter.StatusSummary {

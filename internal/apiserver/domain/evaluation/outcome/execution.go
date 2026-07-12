@@ -1,7 +1,7 @@
 package outcome
 
 import (
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -122,6 +122,13 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
+	// Typology classification facts. Display prose remains in the frozen
+	// ReportInput attached to the durable Outcome record.
+	Preference string
+	Strength   *float64
+	LeftPole   string
+	RightPole  string
+	Model      string
 }
 
 type ValidityResult struct {

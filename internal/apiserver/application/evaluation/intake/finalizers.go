@@ -26,7 +26,7 @@ type assessmentCreateFinalizer struct {
 func (f assessmentCreateFinalizer) SaveAndStage(
 	ctx context.Context,
 	a *domainAssessment.Assessment,
-	req domainAssessment.CreateAssessmentRequest,
+	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
 	occurredAt := time.Now()

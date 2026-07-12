@@ -54,7 +54,7 @@ func (s *stagerStub) Stage(_ context.Context, events ...event.DomainEvent) error
 
 func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testing.T) {
 	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
-	service := NewService(repo, domainassessment.NewDefaultAssessmentCreator(), tx, stager, nil)
+	service := NewService(repo, nil, tx, stager, nil)
 	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc"})
 	if err != nil {
 		t.Fatal(err)

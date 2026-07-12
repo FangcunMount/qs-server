@@ -3,19 +3,25 @@ package characterization_test
 import (
 	"testing"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // V1 contract: SBTI scorer resolves HIGH with similarity=1; report projects
 // outcome commentary, rarity, and dimension level descriptions.
 func TestV1SBTIPipelinePreservesOutcomeSimilarityAndReportFields(t *testing.T) {
 	model := sbtiCharacterizationModel()
-	detail, err := typologylegacy.ScoreSBTIReference(model, sbtiHighAnswerSheet())
+	result, err := configured.NewEvaluator().Score(modeltypology.FromSBTI(model), sbtiHighAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
+	}
+	detail, err := outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if detail.TypeCode != "HIGH" {
 		t.Fatalf("TypeCode = %s, want HIGH", detail.TypeCode)

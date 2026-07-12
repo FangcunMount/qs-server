@@ -74,6 +74,7 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	r.registerAssessmentModelProtectedRoutes(apiV1)
 	r.registerAnswersheetProtectedRoutes(apiV1)
 	r.registerEvaluationProtectedRoutes(apiV1)
+	r.registerInterpretationProtectedRoutes(apiV1)
 	r.registerActorProtectedRoutes(apiV1)
 	r.registerPlanProtectedRoutes(apiV1)
 	r.registerStatisticsProtectedRoutes(apiV1)
@@ -97,6 +98,7 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 	r.registerResilienceInternalRoutes(internalV1)
 	r.registerSystemGovernanceInternalRoutes(internalV1)
 	r.registerEvaluationRunInternalRoutes(internalV1)
+	r.registerInterpretationInternalRoutes(internalV1)
 }
 
 func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, routePrefix string) {

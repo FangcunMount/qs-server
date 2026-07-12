@@ -5,12 +5,12 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -30,33 +30,48 @@ type Mismatch struct {
 type Service interface {
 	AuditOnce(context.Context, int) (int, error)
 }
+
+// SubmittedCandidateReader is the scheduler-specific keyset scan port. It has
+// no user-facing pagination semantics.
+type SubmittedCandidateReader interface {
+	ListSubmittedAssessmentIDsAfter(context.Context, uint64, int) ([]uint64, error)
+}
+
 type service struct {
 	assessments domainassessment.Repository
 	outcomes    domainoutcome.Repository
-	reader      evaluationreadmodel.AssessmentReader
+	reader      SubmittedCandidateReader
+	mu          sync.Mutex
+	cursor      uint64
 }
 
-func NewService(assessments domainassessment.Repository, outcomes domainoutcome.Repository, reader evaluationreadmodel.AssessmentReader) Service {
+func NewService(assessments domainassessment.Repository, outcomes domainoutcome.Repository, reader SubmittedCandidateReader) Service {
 	return &service{assessments: assessments, outcomes: outcomes, reader: reader}
 }
 
 func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
-	if s == nil || s.assessments == nil || s.reader == nil {
-		return 0, fmt.Errorf("evaluation consistency audit is not configured")
+	if s == nil || s.assessments == nil || s.outcomes == nil || s.reader == nil {
+		return 0, fmt.Errorf("evaluation consistency audit is not configured: assessment, outcome and candidate repositories are required")
 	}
 	if limit <= 0 {
 		return 0, nil
 	}
-	rows, _, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{Statuses: []string{domainassessment.StatusSubmitted.String()}}, evaluationreadmodel.PageRequest{Page: 1, PageSize: limit})
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids, err := s.reader.ListSubmittedAssessmentIDsAfter(ctx, s.cursor, limit)
 	if err != nil {
 		return 0, err
 	}
+	if len(ids) == 0 {
+		s.cursor = 0
+		return 0, nil
+	}
 	detected := 0
-	for _, row := range rows {
-		if row.ID == 0 {
+	for _, assessmentID := range ids {
+		if assessmentID == 0 {
 			continue
 		}
-		mismatch, scanErr := s.scanOne(ctx, row.ID)
+		mismatch, scanErr := s.scanOne(ctx, assessmentID)
 		if scanErr != nil {
 			return 0, scanErr
 		}
@@ -68,6 +83,7 @@ func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
 		log.Warnf("evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s)", mismatch.AssessmentID, mismatch.Kind)
 		detected++
 	}
+	s.cursor = ids[len(ids)-1]
 	return detected, nil
 }
 
@@ -76,7 +92,7 @@ func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*Mismatch, 
 	if err != nil || a == nil {
 		return nil, err
 	}
-	if s.outcomes == nil || !a.Status().IsSubmitted() {
+	if !a.Status().IsSubmitted() {
 		return nil, nil
 	}
 	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
@@ -93,7 +109,7 @@ func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*Mismatch, 
 }
 
 var (
-	evaluationConsistencyMismatchTotal    = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "mismatch_total", Help: "Total evaluation cross-store mismatches detected by the consistency reconciler."}, []string{"kind"})
+	evaluationConsistencyMismatchTotal    = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "mismatch_total", Help: "Total evaluation cross-store mismatches detected by the consistency audit."}, []string{"kind"})
 	evaluationConsistencyDispositionTotal = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "disposition_total", Help: "Total evaluation consistency mismatches by kind and audit disposition."}, []string{"kind", "disposition"})
 )
 

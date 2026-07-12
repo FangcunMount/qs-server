@@ -2,215 +2,179 @@ package interpretation
 
 import (
 	"context"
-	"sort"
+	"fmt"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
+	readmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// reportReadModel reads current reports and immutable historical archives.
+// reportReadModel resolves assessment-level report queries through the compact
+// report catalog and loads report bodies only for the requested page.
 type reportReadModel struct {
-	reports  base.BaseRepository
-	archives base.BaseRepository
+	reports, archives, catalog base.BaseRepository
 }
 
-func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) evaluationreadmodel.ReportReader {
+func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) readmodel.ReportReader {
 	return &reportReadModel{
 		reports:  base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...),
-		archives: base.NewBaseRepository(db, "archived_reports", opts...),
+		archives: base.NewBaseRepository(db, (ArchivedReportPO{}).CollectionName(), opts...),
+		catalog:  base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...),
 	}
 }
 
-func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*evaluationreadmodel.ReportRow, error) {
-	row, err := r.findReport(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil)
-	if err != nil {
-		return nil, err
-	}
-	if row != nil {
-		return row, nil
-	}
-	if row, err := r.findArchive(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil); err != nil || row != nil {
-		return row, err
-	}
-	return nil, evaluationreadmodel.ErrReportNotFound
-}
-
-func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
-	row, err := r.findReport(ctx, bson.M{"assessment_id": assessmentID, "deleted_at": nil}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
-	if err != nil {
-		return nil, err
-	}
-	if row != nil {
-		return row, nil
-	}
-	if row, err := r.findArchive(ctx, bson.M{"domain_id": assessmentID, "deleted_at": nil}, nil); err != nil || row != nil {
-		return row, err
-	}
-	return nil, evaluationreadmodel.ErrReportNotFound
-}
-
-func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationreadmodel.ReportFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.ReportRow, int64, error) {
-	reports, err := r.listReportsFromStore(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	archives, err := r.listArchives(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	merged := mergeCurrentAndArchivedReportRows(reports, archives)
-	total := int64(len(merged))
-	offset, limit := page.Offset(), page.Limit()
-	if offset >= len(merged) {
-		return []evaluationreadmodel.ReportRow{}, total, nil
-	}
-	end := offset + limit
-	if end > len(merged) {
-		end = len(merged)
-	}
-	return merged[offset:end], total, nil
-}
-
-func (r *reportReadModel) findArchive(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
-	if opts == nil {
-		opts = options.Find()
-	}
-	opts.SetLimit(1)
-	cursor, err := r.archives.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	if !cursor.Next(ctx) {
-		return nil, cursor.Err()
-	}
-	var po ArchivedReportPO
-	if err := cursor.Decode(&po); err != nil {
-		return nil, err
-	}
-	row := archivedReportPOToReadRow(&po)
-	return &row, nil
-}
-
-func (r *reportReadModel) listArchives(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
-	cursor, err := r.archives.Find(ctx, buildReportReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	rows := make([]evaluationreadmodel.ReportRow, 0)
-	for cursor.Next(ctx) {
-		var po ArchivedReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		rows = append(rows, archivedReportPOToReadRow(&po))
-	}
-	return rows, cursor.Err()
-}
-
-func (r *reportReadModel) findReport(ctx context.Context, filter bson.M, opts *options.FindOptions) (*evaluationreadmodel.ReportRow, error) {
-	if opts == nil {
-		opts = options.Find()
-	}
-	opts.SetLimit(1)
-	cursor, err := r.reports.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	if !cursor.Next(ctx) {
-		return nil, cursor.Err()
-	}
+func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*readmodel.ReportRow, error) {
 	var po InterpretReportPO
-	if err := cursor.Decode(&po); err != nil {
+	if err := r.reports.FindOne(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, &po); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, readmodel.ErrReportNotFound
+		}
 		return nil, err
 	}
 	row := interpretReportPOToReadRow(&po)
 	return &row, nil
 }
 
-func (r *reportReadModel) listReportsFromStore(ctx context.Context, filter evaluationreadmodel.ReportFilter) ([]evaluationreadmodel.ReportRow, error) {
-	cursor, err := r.reports.Find(ctx, buildInterpretReportReadModelQuery(filter), options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
+func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*readmodel.ReportRow, error) {
+	var entry ReportCatalogPO
+	if err := r.catalog.FindOne(ctx, bson.M{"assessment_id": assessmentID}, &entry); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, readmodel.ErrReportNotFound
+		}
+		return nil, err
+	}
+	rows, err := r.loadCatalogRows(ctx, []ReportCatalogPO{entry})
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = cursor.Close(ctx) }()
-	rows := make([]evaluationreadmodel.ReportRow, 0)
-	for cursor.Next(ctx) {
-		var po InterpretReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		rows = append(rows, interpretReportPOToReadRow(&po))
-	}
-	return rows, cursor.Err()
+	return &rows[0], nil
 }
 
-func buildInterpretReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
-	query := bson.M{"deleted_at": nil}
+func (r *reportReadModel) ListReports(ctx context.Context, filter readmodel.ReportFilter, page readmodel.PageRequest) ([]readmodel.ReportRow, int64, error) {
+	query := buildCatalogQuery(filter)
+	total, err := r.catalog.CountDocuments(ctx, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	cur, err := r.catalog.Find(ctx, query, options.Find().SetSort(bson.D{{Key: "sort_at", Value: -1}, {Key: "sort_report_id", Value: -1}, {Key: "assessment_id", Value: -1}}).SetSkip(int64(page.Offset())).SetLimit(int64(page.Limit())))
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	entries := make([]ReportCatalogPO, 0, page.Limit())
+	for cur.Next(ctx) {
+		var entry ReportCatalogPO
+		if err := cur.Decode(&entry); err != nil {
+			return nil, 0, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.loadCatalogRows(ctx, entries)
+	return rows, total, err
+}
+
+func buildCatalogQuery(filter readmodel.ReportFilter) bson.M {
+	q := bson.M{}
+	if filter.OrgID != nil {
+		q["org_id"] = *filter.OrgID
+	}
 	if filter.TesteeID != nil {
-		query["testee_id"] = *filter.TesteeID
+		q["testee_id"] = *filter.TesteeID
 	}
 	if len(filter.TesteeIDs) > 0 {
-		query["testee_id"] = bson.M{"$in": filter.TesteeIDs}
-	}
-	if filter.HighRiskOnly {
-		query["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
+		q["testee_id"] = bson.M{"$in": filter.TesteeIDs}
 	}
 	if filter.ModelCode != "" {
-		query["scale_code"] = filter.ModelCode
+		q["model_code"] = filter.ModelCode
 	}
 	if filter.RiskLevel != nil {
-		query["risk_level"] = *filter.RiskLevel
+		q["risk_level"] = *filter.RiskLevel
+	} else if filter.HighRiskOnly {
+		q["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
 	}
-	return query
+	return q
 }
 
-func interpretReportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
+func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportCatalogPO) ([]readmodel.ReportRow, error) {
+	if len(entries) == 0 {
+		return []readmodel.ReportRow{}, nil
+	}
+	artifactIDs, archiveIDs := make([]uint64, 0, len(entries)), make([]uint64, 0, len(entries))
+	for _, e := range entries {
+		if e.SourceKind == ReportCatalogSourceArtifact {
+			artifactIDs = append(artifactIDs, e.SourceID)
+		} else if e.SourceKind == ReportCatalogSourceArchive {
+			archiveIDs = append(archiveIDs, e.SourceID)
+		} else {
+			return nil, fmt.Errorf("unknown report catalog source %q", e.SourceKind)
+		}
+	}
+	byKey := map[string]readmodel.ReportRow{}
+	if err := r.loadArtifacts(ctx, artifactIDs, byKey); err != nil {
+		return nil, err
+	}
+	if err := r.loadArchives(ctx, archiveIDs, byKey); err != nil {
+		return nil, err
+	}
+	rows := make([]readmodel.ReportRow, 0, len(entries))
+	for _, e := range entries {
+		key := fmt.Sprintf("%s:%d", e.SourceKind, e.SourceID)
+		row, ok := byKey[key]
+		if !ok {
+			return nil, fmt.Errorf("report catalog dangling source: assessment=%d source=%s/%d", e.AssessmentID, e.SourceKind, e.SourceID)
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst map[string]readmodel.ReportRow) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	cur, err := r.reports.Find(ctx, bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	for cur.Next(ctx) {
+		var po InterpretReportPO
+		if err := cur.Decode(&po); err != nil {
+			return err
+		}
+		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = interpretReportPOToReadRow(&po)
+	}
+	return cur.Err()
+}
+func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst map[string]readmodel.ReportRow) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	cur, err := r.archives.Find(ctx, bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	for cur.Next(ctx) {
+		var po ArchivedReportPO
+		if err := cur.Decode(&po); err != nil {
+			return err
+		}
+		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = archivedReportPOToReadRow(&po)
+	}
+	return cur.Err()
+}
+
+func interpretReportPOToReadRow(po *InterpretReportPO) readmodel.ReportRow {
 	if po == nil {
-		return evaluationreadmodel.ReportRow{}
+		return readmodel.ReportRow{}
 	}
-	archivedShape := &ArchivedReportPO{
-		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt},
-		ScaleName:    po.ScaleName,
-		ScaleCode:    po.ScaleCode,
-		Model:        po.Model,
-		PrimaryScore: po.PrimaryScore,
-		Level:        po.Level,
-		TotalScore:   po.TotalScore,
-		RiskLevel:    po.RiskLevel,
-		Conclusion:   po.Conclusion,
-		Dimensions:   po.Dimensions,
-		Suggestions:  po.Suggestions,
-		ModelExtra:   po.ModelExtra,
-	}
-	return archivedReportPOToReadRow(archivedShape)
-}
-
-// mergeCurrentAndArchivedReportRows preserves ReportReader's assessment-level
-// query semantics: the newest current report wins, and an archived report is
-// used only when no current report exists for that Assessment.
-func mergeCurrentAndArchivedReportRows(reports, archives []evaluationreadmodel.ReportRow) []evaluationreadmodel.ReportRow {
-	byAssessment := make(map[uint64]evaluationreadmodel.ReportRow, len(reports)+len(archives))
-	for _, row := range reports {
-		if current, ok := byAssessment[row.AssessmentID]; !ok || row.CreatedAt.After(current.CreatedAt) {
-			byAssessment[row.AssessmentID] = row
-		}
-	}
-	for _, row := range archives {
-		if _, exists := byAssessment[row.AssessmentID]; !exists {
-			byAssessment[row.AssessmentID] = row
-		}
-	}
-	merged := make([]evaluationreadmodel.ReportRow, 0, len(byAssessment))
-	for _, row := range byAssessment {
-		merged = append(merged, row)
-	}
-	sort.SliceStable(merged, func(i, j int) bool { return merged[i].CreatedAt.After(merged[j].CreatedAt) })
-	return merged
+	archived := &ArchivedReportPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra}
+	return archivedReportPOToReadRow(archived)
 }

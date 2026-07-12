@@ -14,7 +14,7 @@ type TypologyEvaluationModelValidator struct {
 	reader port.PublishedModelReader
 }
 
-func NewTypologyEvaluationModelValidator(reader port.PublishedModelReader) evalassessment.EvaluationModelValidator {
+func NewTypologyEvaluationModelValidator(reader port.PublishedModelReader) EvaluationModelValidator {
 	return TypologyEvaluationModelValidator{reader: reader}
 }
 
@@ -23,7 +23,7 @@ func (v TypologyEvaluationModelValidator) ValidateEvaluationModel(
 	modelRef evalassessment.EvaluationModelRef,
 	questionnaireRef evalassessment.QuestionnaireRef,
 ) error {
-	if v.reader == nil || modelRef.IsEmpty() || modelRef.Kind() != evalassessment.EvaluationModelKindPersonality {
+	if v.reader == nil || modelRef.IsEmpty() || modelRef.Kind() != evalassessment.EvaluationModelKindTypology {
 		return nil
 	}
 	if modelRef.Version() == "" {

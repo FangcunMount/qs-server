@@ -603,7 +603,7 @@ func isEvaluationRulesetPayloadImport(importPath string) bool {
 	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog" {
 		return true
 	}
-	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation" {
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing" {
 		return true
 	}
 	for _, allowed := range []string{
@@ -1209,8 +1209,7 @@ func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "Kind:           EvaluationModelKindTypology") &&
-		!strings.Contains(text, "Kind:           EvaluationModelKindPersonality") {
+	if !strings.Contains(text, "Kind:           EvaluationModelKindTypology") {
 		t.Fatal("port/evaluationinput typology snapshots must set Kind=typology")
 	}
 	for _, want := range []string{

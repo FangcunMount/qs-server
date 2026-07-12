@@ -28,8 +28,3 @@ type ScoringSpecialMatch struct {
 	Trigger     string
 	SkipScoring bool
 }
-
-// LegacyDetail 返回typed 明细载荷 用于 backward-compatible callers。
-func (r ScoringResult) LegacyDetail() any {
-	return r.Detail
-}

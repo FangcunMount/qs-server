@@ -1,6 +1,6 @@
 package runtime
 
-import evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+import evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 
 // 默认RuntimeDescriptorRegistry registers 机制 描述符 aligned 使用 materialize 因子ies。
 func DefaultRuntimeDescriptorRegistry() (*evalpipeline.RuntimeDescriptorRegistry, error) {

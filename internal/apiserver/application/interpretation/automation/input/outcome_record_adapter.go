@@ -63,7 +63,7 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		assetModel := factorModel(assets, in.Runtime.AlgorithmFamily)
 		in.FactorScoring = &interpinput.FactorScoringFacts{Model: assetModel, Factors: factorScores(execution, assetModel)}
 	case modelcatalog.AlgorithmFamilyFactorClassification:
-		if err := populateTypologyFacts(&in, execution); err != nil {
+		if err := populateTypologyFacts(&in, execution, assets); err != nil {
 			return interpinput.InterpretationInput{}, err
 		}
 		if payload, ok := evaluationinput.TypologyPayload(assets); ok && payload != nil {

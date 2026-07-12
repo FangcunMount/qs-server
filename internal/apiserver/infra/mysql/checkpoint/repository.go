@@ -57,8 +57,7 @@ func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimR
 			First(&latest).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			run := evalrun.NewEvaluationRun(request.AssessmentID)
-			run.TraceID = request.TraceID
-			if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+			if err := run.Claim(evalrun.ClaimInput{Token: request.Token, TraceID: request.TraceID, ClaimedAt: request.ClaimedAt, LeaseExpiresAt: request.LeaseUntil}); err != nil {
 				return err
 			}
 			if err := tx.Create(runToPO(run)).Error; err != nil {
@@ -72,7 +71,8 @@ func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimR
 		}
 
 		run := runFromPO(latest)
-		switch run.Attempt.Status {
+		attempt := run.Attempt()
+		switch attempt.Status {
 		case evalrun.StatusPending:
 			// Claim the existing attempt.
 		case evalrun.StatusRunning:
@@ -90,10 +90,9 @@ func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimR
 			result = evaluationrun.ClaimResult{Run: run}
 			return nil
 		default:
-			return fmt.Errorf("latest evaluation run %s has unknown status %q", run.RunID, run.Attempt.Status)
+			return fmt.Errorf("latest evaluation run %s has unknown status %q", run.ID(), attempt.Status)
 		}
-		run.TraceID = request.TraceID
-		if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+		if err := run.Claim(evalrun.ClaimInput{Token: request.Token, TraceID: request.TraceID, ClaimedAt: request.ClaimedAt, LeaseExpiresAt: request.LeaseUntil}); err != nil {
 			return err
 		}
 		po := runToPO(run)
@@ -123,7 +122,7 @@ func (r *Repository) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun)
 	if r == nil || r.db == nil {
 		return fmt.Errorf("runtime checkpoint repository is not configured")
 	}
-	if run.ClaimToken == "" {
+	if run.ClaimToken() == "" {
 		return evaluationrun.ErrClaimLost
 	}
 	po := runToPO(run)
@@ -131,7 +130,7 @@ func (r *Repository) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun)
 	updates["updated_at"] = time.Now()
 	result := checkpointDB(ctx, r.db).Model(&RuntimeCheckpointPO{}).
 		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND claim_token = ? AND status = ? AND deleted_at IS NULL",
-			scopeEvaluationRun, po.ResourceID, po.AttemptNo, run.ClaimToken, evalrun.StatusRunning.String()).
+			scopeEvaluationRun, po.ResourceID, po.AttemptNo, run.ClaimToken(), evalrun.StatusRunning.String()).
 		Updates(updates)
 	if result.Error != nil {
 		return result.Error
@@ -334,61 +333,56 @@ func analyticsStatusFromCheckpoint(status string) string {
 }
 
 func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
-	assessmentID := run.AssessmentID
+	assessmentID := run.AssessmentID()
+	attempt := run.Attempt()
 	po := &RuntimeCheckpointPO{
 		Scope:        scopeEvaluationRun,
-		ResourceID:   run.RunID.String(),
-		AttemptNo:    uint(run.Attempt.Number),
+		ResourceID:   run.ID().String(),
+		AttemptNo:    uint(attempt.Number),
 		AssessmentID: &assessmentID,
-		Status:       run.Attempt.Status.String(),
-		StartedAt:    run.StartedAt,
-		FinishedAt:   run.FinishedAt,
+		Status:       attempt.Status.String(),
+		StartedAt:    run.StartedAt(),
+		FinishedAt:   run.FinishedAt(),
 		Retryable:    run.Retryable(),
 	}
-	if run.TraceID != "" {
-		traceID := run.TraceID
+	if run.TraceID() != "" {
+		traceID := run.TraceID()
 		po.TraceID = &traceID
 	}
-	if run.InputSnapshotRef != "" {
-		inputSnapshotRef := run.InputSnapshotRef
+	if run.InputSnapshotRef() != "" {
+		inputSnapshotRef := run.InputSnapshotRef()
 		po.InputSnapshotRef = &inputSnapshotRef
 	}
-	if run.ClaimToken != "" {
-		claimToken := run.ClaimToken
+	if run.ClaimToken() != "" {
+		claimToken := run.ClaimToken()
 		po.ClaimToken = &claimToken
 	}
-	po.LeaseExpiresAt = run.LeaseExpiresAt
-	if run.Failure != nil {
-		code := run.Failure.Kind.String()
-		message := run.Failure.Message
+	po.LeaseExpiresAt = run.LeaseExpiresAt()
+	if failure := run.Failure(); failure != nil {
+		code := failure.Kind.String()
+		message := failure.Message
 		po.ErrorCode = &code
 		po.ErrorMessage = &message
-		po.Retryable = run.Failure.Retryable
+		po.Retryable = failure.Retryable
 	}
 	return po
 }
 
 func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
-	run := evalrun.EvaluationRun{
-		RunID:        evalrun.ID(po.ResourceID),
-		AssessmentID: derefUint64(po.AssessmentID),
-		Attempt: evalrun.Attempt{
-			Number: int(po.AttemptNo),
-			Status: evalrun.Status(po.Status),
-		},
-		StartedAt:  po.StartedAt,
-		FinishedAt: po.FinishedAt,
+	input := evalrun.ReconstructInput{
+		RunID: evalrun.ID(po.ResourceID), AssessmentID: derefUint64(po.AssessmentID),
+		Attempt:   evalrun.Attempt{Number: int(po.AttemptNo), Status: evalrun.Status(po.Status)},
+		StartedAt: po.StartedAt, FinishedAt: po.FinishedAt, LeaseExpiresAt: po.LeaseExpiresAt,
 	}
 	if po.TraceID != nil {
-		run.TraceID = *po.TraceID
+		input.TraceID = *po.TraceID
 	}
 	if po.InputSnapshotRef != nil {
-		run.InputSnapshotRef = *po.InputSnapshotRef
+		input.InputSnapshotRef = *po.InputSnapshotRef
 	}
 	if po.ClaimToken != nil {
-		run.ClaimToken = *po.ClaimToken
+		input.ClaimToken = *po.ClaimToken
 	}
-	run.LeaseExpiresAt = po.LeaseExpiresAt
 	if po.ErrorCode != nil || po.ErrorMessage != nil {
 		failure := evalrun.Failure{Retryable: po.Retryable}
 		if po.ErrorCode != nil {
@@ -397,9 +391,9 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 		if po.ErrorMessage != nil {
 			failure.Message = *po.ErrorMessage
 		}
-		run.Failure = &failure
+		input.Failure = &failure
 	}
-	return run
+	return evalrun.Reconstruct(input)
 }
 
 func derefUint64(v *uint64) uint64 {

@@ -32,7 +32,7 @@ func TestEngineServiceDoesNotOwnPipelineAssemblyDependencies(t *testing.T) {
 func TestEvaluatorContractsReturnDomainOutcomeExecution(t *testing.T) {
 	t.Parallel()
 
-	for _, path := range []string{"interface.go", "runtime_resolver.go", "descriptor_executor.go"} {
+	for _, path := range []string{"runtime_resolver.go", "descriptor_executor.go"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -41,6 +41,13 @@ func TestEvaluatorContractsReturnDomainOutcomeExecution(t *testing.T) {
 		if !strings.Contains(text, "domainoutcome.Execution") {
 			t.Fatalf("%s must expose domain outcome Execution as the evaluator result contract", path)
 		}
+	}
+	data, err := os.ReadFile("../runtime/descriptor/contracts.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "domainoutcome.Execution") {
+		t.Fatal("runtime descriptor contract must expose domain outcome Execution")
 	}
 }
 

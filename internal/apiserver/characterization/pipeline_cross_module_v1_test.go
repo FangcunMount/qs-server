@@ -107,7 +107,7 @@ func TestV1CrossModuleSyncMBTISurveySubmitWorkerToInterpretedReport(t *testing.T
 func draftMBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
 		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),

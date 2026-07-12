@@ -10,8 +10,8 @@ import (
 	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance"
 	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -68,7 +68,7 @@ func TestV1ExecuteServiceDispatchesMBTIByLegacyKind(t *testing.T) {
 		t.Fatalf("interpretation calls = %d, want 1", capture.interpretationCalls)
 	}
 	result := capture.outcome.Execution
-	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
+	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindTypology {
 		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
 	if result.Summary.PrimaryLabel != "INTJ" {
@@ -89,7 +89,7 @@ func TestV1ExecuteServiceDispatchesSBTIByLegacyKind(t *testing.T) {
 		t.Fatalf("interpretation calls = %d, want 1", capture.interpretationCalls)
 	}
 	result := capture.outcome.Execution
-	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
+	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindTypology {
 		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
 	if result.Summary.PrimaryLabel != "HIGH" {

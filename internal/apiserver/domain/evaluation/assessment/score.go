@@ -19,7 +19,7 @@ func NewScaleScoreProjection(
 		assessmentID: assessmentID,
 		totalScore:   totalScore,
 		riskLevel:    riskLevel,
-		factorScores: factorScores,
+		factorScores: append([]ScaleFactorScore(nil), factorScores...),
 	}
 }
 
@@ -36,7 +36,7 @@ func (s *ScaleScoreProjection) RiskLevel() RiskLevel {
 }
 
 func (s *ScaleScoreProjection) FactorScores() []ScaleFactorScore {
-	return s.factorScores
+	return append([]ScaleFactorScore(nil), s.factorScores...)
 }
 
 // ScaleFactorScore 记录一个因子行 in scale score 投影。

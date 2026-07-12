@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 )
@@ -28,7 +28,7 @@ func (r *stubRunRepo) Claim(_ context.Context, request evaluationrun.ClaimReques
 	run := evalrun.NewEvaluationRun(request.AssessmentID)
 	if r.latest != nil {
 		run = *r.latest
-		switch run.Attempt.Status {
+		switch run.Attempt().Status {
 		case evalrun.StatusRunning:
 			if run.HasActiveLease(request.ClaimedAt) {
 				return evaluationrun.ClaimResult{Run: run}, nil
@@ -42,8 +42,7 @@ func (r *stubRunRepo) Claim(_ context.Context, request evaluationrun.ClaimReques
 			return evaluationrun.ClaimResult{Run: run}, nil
 		}
 	}
-	run.TraceID = request.TraceID
-	if err := run.Claim(request.Token, request.ClaimedAt, request.LeaseUntil); err != nil {
+	if err := run.Claim(evalrun.ClaimInput{Token: request.Token, TraceID: request.TraceID, ClaimedAt: request.ClaimedAt, LeaseExpiresAt: request.LeaseUntil}); err != nil {
 		return evaluationrun.ClaimResult{}, err
 	}
 	copy := run
@@ -90,11 +89,11 @@ func TestNewEvaluationRunUsesNextAttemptAfterRetryableFailure(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRunRepo{
-		latest: &evalrun.EvaluationRun{
+		latest: ptrRun(evalrun.Reconstruct(evalrun.ReconstructInput{
 			AssessmentID: 99,
 			Attempt:      evalrun.Attempt{Number: 1, Status: evalrun.StatusFailed},
 			Failure:      &evalrun.Failure{Retryable: true},
-		},
+		})),
 	}
 	svc := &service{runRepo: repo}
 
@@ -104,11 +103,11 @@ func TestNewEvaluationRunUsesNextAttemptAfterRetryableFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	run := claim.Run
-	if !claim.Claimed || run.Attempt.Number != 2 {
-		t.Fatalf("attempt=%d, want 2", run.Attempt.Number)
+	if !claim.Claimed || run.Attempt().Number != 2 {
+		t.Fatalf("attempt=%d, want 2", run.Attempt().Number)
 	}
-	if run.RunID != "99:2" {
-		t.Fatalf("run id=%s", run.RunID)
+	if run.ID() != "99:2" {
+		t.Fatalf("run id=%s", run.ID())
 	}
 }
 
@@ -166,7 +165,7 @@ func TestEvaluateReturnsOriginalExecutionErrorWhenFailedRunPersists(t *testing.T
 	if len(runRepo.saved) != 2 {
 		t.Fatalf("saved runs = %d, want input snapshot and terminal failed run", len(runRepo.saved))
 	}
-	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
+	if got := runRepo.saved[len(runRepo.saved)-1].Attempt().Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
 	}
 }
@@ -199,13 +198,13 @@ func TestEvaluateReturnsFailedRunPersistenceErrorWhenExecutionFails(t *testing.T
 	if len(runRepo.saved) != 2 {
 		t.Fatalf("saved runs = %d, want input snapshot and attempted failed run save", len(runRepo.saved))
 	}
-	if got := runRepo.saved[len(runRepo.saved)-1].Attempt.Status; got != evalrun.StatusFailed {
+	if got := runRepo.saved[len(runRepo.saved)-1].Attempt().Status; got != evalrun.StatusFailed {
 		t.Fatalf("last run status = %s, want failed", got)
 	}
 	if !a.Status().IsSubmitted() {
 		t.Fatalf("assessment status = %s, want submitted when failure transaction does not commit", a.Status())
 	}
-	if runRepo.latest == nil || runRepo.latest.Attempt.Status != evalrun.StatusRunning {
+	if runRepo.latest == nil || runRepo.latest.Attempt().Status != evalrun.StatusRunning {
 		t.Fatalf("caller/latest run = %#v, want running when failure transaction does not commit", runRepo.latest)
 	}
 }
@@ -232,7 +231,7 @@ func TestPersistClaimedEvaluationRunUpdatesOnlyRunRepository(t *testing.T) {
 	if repo.saveCtxHadTxMarker || runRepo.saveCtxHadTxMarker {
 		t.Fatalf("run update must not write Assessment or require a transaction: assessment=%v run=%v", repo.saveCtxHadTxMarker, runRepo.saveCtxHadTxMarker)
 	}
-	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt.Status != evalrun.StatusRunning {
+	if len(runRepo.saved) != 1 || runRepo.saved[0].Attempt().Status != evalrun.StatusRunning {
 		t.Fatalf("saved run = %#v, want one running run", runRepo.saved)
 	}
 }
@@ -241,17 +240,15 @@ func TestClaimEvaluationRunSkipsActiveAndTerminalAttempts(t *testing.T) {
 	t.Parallel()
 
 	running := evalrun.NewEvaluationRunWithAttempt(99, 3)
-	if err := running.Start(time.Unix(100, 0)); err != nil {
+	now := time.Now()
+	if err := running.Claim(evalrun.ClaimInput{Token: "owner", ClaimedAt: time.Unix(100, 0), LeaseExpiresAt: now.Add(time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now()
-	running.ClaimToken = "owner"
-	running.LeaseExpiresAt = ptrTime(now.Add(time.Minute))
 	claim, err := (&service{runRepo: &stubRunRepo{latest: &running}}).claimEvaluationRun(context.Background(), 99, "other", "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if claim.Claimed || claim.Run.RunID != running.RunID {
+	if claim.Claimed || claim.Run.ID() != running.ID() {
 		t.Fatalf("claim = %#v, want duplicate skip", claim)
 	}
 
@@ -269,3 +266,5 @@ func TestClaimEvaluationRunSkipsActiveAndTerminalAttempts(t *testing.T) {
 }
 
 func ptrTime(value time.Time) *time.Time { return &value }
+
+func ptrRun(value evalrun.EvaluationRun) *evalrun.EvaluationRun { return &value }

@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // ResolvedExecution records the one descriptor route selected for an execution.
 type ResolvedExecution struct {
-	DescriptorKey     evalpipeline.RuntimeDescriptorKey
+	DescriptorKey     evalpipeline.DescriptorKey
 	Descriptor        evalpipeline.RuntimeDescriptor
 	ExecutionIdentity evaluation.ExecutionIdentity
 }
@@ -21,13 +21,13 @@ type ResolvedExecution struct {
 // RuntimeResolver routes Evaluation exclusively through RuntimeDescriptor.
 type RuntimeResolver struct {
 	descriptors *evalpipeline.RuntimeDescriptorRegistry
-	executor    DescriptorExecutor
+	executor    evalpipeline.DescriptorExecutor
 }
 
 // NewRuntimeResolver creates the descriptor-only runtime resolver.
 func NewRuntimeResolver(
 	descriptors *evalpipeline.RuntimeDescriptorRegistry,
-	executor DescriptorExecutor,
+	executor evalpipeline.DescriptorExecutor,
 ) *RuntimeResolver {
 	return &RuntimeResolver{
 		descriptors: descriptors,
@@ -57,7 +57,7 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	if err != nil {
 		return resolved, err
 	}
-	key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(route)
+	key, err := evalpipeline.DescriptorKeyFromRoute(route)
 	if err != nil {
 		return ResolvedExecution{}, err
 	}
@@ -79,6 +79,6 @@ func (r *RuntimeResolver) Execute(
 	if err != nil {
 		return nil, ResolvedExecution{}, err
 	}
-	outcome, err := r.executor.Execute(ctx, resolved.Descriptor, ExecutionInput{Assessment: a, Input: input})
+	outcome, err := r.executor.Execute(ctx, resolved.Descriptor, evalpipeline.ExecutionInput{Assessment: a, Input: input})
 	return outcome, resolved, err
 }

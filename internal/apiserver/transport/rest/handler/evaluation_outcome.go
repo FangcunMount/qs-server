@@ -100,7 +100,7 @@ func (h *AssessmentReportJourneyHandler) GetReportOutcome(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.reportQueryJourney.GetReportOutcome(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, id)
+	result, err := h.reportQueryJourney.GetReport(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -135,7 +135,7 @@ func (h *AssessmentReportJourneyHandler) ListReportsOutcome(c *gin.Context) {
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
-	result, err := h.reportQueryJourney.ListReportsOutcome(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, dto)
+	result, err := h.reportQueryJourney.ListReports(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, dto)
 	if err != nil {
 		h.Error(c, err)
 		return

@@ -30,7 +30,7 @@ func TestTargetEvaluationInterpretationHaveNoCrossModuleImplementationImports(t 
 			scanRoots: []string{"internal/apiserver/application/interpretation", "internal/apiserver/container/modules/interpretation"},
 			forbiddenPrefixes: []string{
 				"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation",
-				"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation",
+				"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing",
 				"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation",
 			},
 		},

@@ -7,11 +7,11 @@ import (
 )
 
 type compositeEvaluationModelValidator struct {
-	validators []evalassessment.EvaluationModelValidator
+	validators []EvaluationModelValidator
 }
 
-func NewCompositeEvaluationModelValidator(validators ...evalassessment.EvaluationModelValidator) evalassessment.EvaluationModelValidator {
-	filtered := make([]evalassessment.EvaluationModelValidator, 0, len(validators))
+func NewCompositeEvaluationModelValidator(validators ...EvaluationModelValidator) EvaluationModelValidator {
+	filtered := make([]EvaluationModelValidator, 0, len(validators))
 	for _, validator := range validators {
 		if validator != nil {
 			filtered = append(filtered, validator)

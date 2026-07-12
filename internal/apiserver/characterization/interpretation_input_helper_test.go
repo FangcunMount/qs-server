@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/testutil/interpretationinput"
 )
 
 type draftReportBuilder interface {

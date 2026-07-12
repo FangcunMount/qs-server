@@ -3,8 +3,8 @@ package execute
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -13,7 +13,7 @@ import (
 
 func TestResolveExecutionIdentityPrefersInputAlgorithmWhenAssessmentMissingIt(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefByCode(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		meta.NewCode("BIG5_IPIP_50"),
 		"1.0.0",
 		"大五人格",

@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-const CurrentSchemaVersion uint = 1
+const CurrentSchemaVersion uint = 2
 
 type ID = meta.ID
 

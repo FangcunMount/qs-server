@@ -1,13 +1,13 @@
-package pipeline_test
+package evaluation_test
 
 import (
 	"testing"
 
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestRuntimeDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
+func TestDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
 	t.Parallel()
 
 	cases := []evalpipeline.ModelRoute{
@@ -30,13 +30,13 @@ func TestRuntimeDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
 		},
 	}
 	for i, route := range cases {
-		key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(route)
+		key, err := evalpipeline.DescriptorKeyFromRoute(route)
 		if err != nil {
 			t.Fatalf("case %d: %v", i, err)
 		}
-		family, ok := evalpipeline.AlgorithmFamilyFromRoute(route)
+		family, ok := evalpipeline.ExecutionFamilyFromRoute(route)
 		if !ok {
-			t.Fatalf("case %d: AlgorithmFamilyFromRoute failed", i)
+			t.Fatalf("case %d: ExecutionFamilyFromRoute failed", i)
 		}
 		if key.AlgorithmFamily != family {
 			t.Fatalf("case %d: key family=%s route family=%s", i, key.AlgorithmFamily, family)
@@ -132,7 +132,7 @@ func TestRouteRoutingUsesCanonicalTypologyKind(t *testing.T) {
 	}
 }
 
-func TestRuntimeDescriptorKeyAlignsWithMechanismReportBuilderFamilyAndDecision(t *testing.T) {
+func TestDescriptorKeyAlignsWithMechanismReportBuilderFamilyAndDecision(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -149,7 +149,7 @@ func TestRuntimeDescriptorKeyAlignsWithMechanismReportBuilderFamilyAndDecision(t
 		},
 	}
 	for i, tc := range cases {
-		key, err := evalpipeline.RuntimeDescriptorKeyFromRoute(tc.route)
+		key, err := evalpipeline.DescriptorKeyFromRoute(tc.route)
 		if err != nil {
 			t.Fatalf("case %d: %v", i, err)
 		}

@@ -22,6 +22,10 @@ type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
+type ReportCatalogProjector interface {
+	ProjectCurrent(context.Context, *domainreport.InterpretReport) error
+}
+
 // InterpretationCommitter is the only terminal persistence boundary for one
 // InterpretationRun. It commits immutable InterpretReport, Generation/Run state and
 // durable outbox events atomically.
@@ -61,6 +65,7 @@ type interpretationCommitter struct {
 	reports      domainreport.ReportRepository
 	stager       EventStager
 	readyIndexer *appEventing.PostCommitReadyIndexer
+	catalog      ReportCatalogProjector
 }
 
 func NewInterpretationCommitter(
@@ -70,12 +75,13 @@ func NewInterpretationCommitter(
 	reports domainreport.ReportRepository,
 	stager EventStager,
 	readyIndexer *appEventing.PostCommitReadyIndexer,
+	catalog ReportCatalogProjector,
 ) (InterpretationCommitter, error) {
-	if txRunner == nil || generations == nil || runs == nil || reports == nil || stager == nil {
+	if txRunner == nil || generations == nil || runs == nil || reports == nil || stager == nil || catalog == nil {
 		return nil, fmt.Errorf("interpretation committer dependencies are required")
 	}
 	return &interpretationCommitter{
-		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, readyIndexer: readyIndexer,
+		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, readyIndexer: readyIndexer, catalog: catalog,
 	}, nil
 }
 
@@ -108,6 +114,9 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 	events := outboxpolicy.Filter(generatedEvents(request.InterpretReport, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion))
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.reports.Insert(txCtx, request.InterpretReport); err != nil {
+			return err
+		}
+		if err := c.catalog.ProjectCurrent(txCtx, request.InterpretReport); err != nil {
 			return err
 		}
 		if err := c.runs.Save(txCtx, runToCommit); err != nil {
@@ -171,7 +180,7 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 }
 
 func (c *interpretationCommitter) validateSuccess(request CommitSuccessRequest) error {
-	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil {
+	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil || c.catalog == nil {
 		return fmt.Errorf("interpretation committer is not configured")
 	}
 	if request.Generation == nil || request.Run == nil || request.InterpretReport == nil {

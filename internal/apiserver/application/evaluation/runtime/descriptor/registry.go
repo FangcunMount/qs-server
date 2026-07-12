@@ -1,19 +1,20 @@
-package pipeline
+package descriptor
 
 import (
 	"fmt"
 
+	evalrouting "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // RuntimeDescriptorRegistry 解析运行时描述符 按 机制键。
 type RuntimeDescriptorRegistry struct {
-	byKey map[RuntimeDescriptorKey]RuntimeDescriptor
+	byKey map[DescriptorKey]RuntimeDescriptor
 }
 
 // NewRuntimeDescriptorRegistry 创建空 描述符注册表。
 func NewRuntimeDescriptorRegistry() *RuntimeDescriptorRegistry {
-	return &RuntimeDescriptorRegistry{byKey: make(map[RuntimeDescriptorKey]RuntimeDescriptor)}
+	return &RuntimeDescriptorRegistry{byKey: make(map[DescriptorKey]RuntimeDescriptor)}
 }
 
 // Register 添加运行时描述符. 载荷格式 可以是 空 到 match 任意 格式 在 家族。
@@ -47,14 +48,14 @@ func (r *RuntimeDescriptorRegistry) Resolve(route ModelRoute) (RuntimeDescriptor
 	if r == nil {
 		return RuntimeDescriptor{}, fmt.Errorf("runtime descriptor registry is nil")
 	}
-	key, err := RuntimeDescriptorKeyFromRoute(route)
+	key, err := evalrouting.DescriptorKeyFromRoute(route)
 	if err != nil {
 		return RuntimeDescriptor{}, err
 	}
 	if desc, ok := r.byKey[key]; ok {
 		return desc, nil
 	}
-	formatKey := RuntimeDescriptorKey{
+	formatKey := DescriptorKey{
 		AlgorithmFamily: key.AlgorithmFamily,
 		PayloadFormat:   key.PayloadFormat,
 	}
@@ -68,7 +69,7 @@ func (r *RuntimeDescriptorRegistry) Resolve(route ModelRoute) (RuntimeDescriptor
 }
 
 func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
-	familyKey := RuntimeDescriptorKey{AlgorithmFamily: family}
+	familyKey := DescriptorKey{AlgorithmFamily: family}
 	if desc, ok := r.byKey[familyKey]; ok {
 		return desc, true
 	}
@@ -117,7 +118,7 @@ func (r *RuntimeDescriptorRegistry) ReplaceFamilyDescriptor(family modelcatalog.
 	if r == nil {
 		return fmt.Errorf("runtime descriptor registry is nil")
 	}
-	familyKey := RuntimeDescriptorKey{AlgorithmFamily: family}
+	familyKey := DescriptorKey{AlgorithmFamily: family}
 	if _, ok := r.byKey[familyKey]; !ok {
 		return fmt.Errorf("runtime descriptor is not registered for family %s", family)
 	}

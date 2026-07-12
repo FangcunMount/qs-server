@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	evalmodule "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"

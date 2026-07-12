@@ -73,4 +73,4 @@ func TestWaitReturnsPendingWhenContextEndsBeforeReportExists(t *testing.T) {
 }
 
 var _ AssessmentQuery = (*assessmentQueryStub)(nil)
-var _ LegacyProjection = (*projectionStub)(nil)
+var _ AssessmentReportProjection = (*projectionStub)(nil)

@@ -29,7 +29,7 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 func applyPrimaryScoreFields(po *AssessmentPO, a *assessment.Assessment) {
 	if summary := a.ResultSummary(); summary != nil && summary.Score != nil {
 		label := summary.PrimaryLabel
-		if ref := a.EvaluationModelRef(); ref != nil && ref.Kind() == assessment.EvaluationModelKindPersonality {
+		if ref := a.EvaluationModelRef(); ref != nil && ref.Kind() == assessment.EvaluationModelKindTypology {
 			po.PrimaryScoreKind = strPtr(string(domainoutcome.ScoreKindMatchPercent))
 			po.PrimaryScoreValue = summary.Score
 			if label != "" {

@@ -6,8 +6,7 @@ import (
 	"os"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -18,6 +17,7 @@ import (
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
+	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/testutil/interpretationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -194,7 +194,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 func frontendSubmittedAssessment(t *testing.T, tc frontendPayloadCase, algorithm domainmodel.Algorithm) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
+		assessment.EvaluationModelKindTypology,
 		domainmodel.SubKindTypology,
 		algorithm,
 		meta.ID(0),

@@ -4,21 +4,14 @@ import (
 	"context"
 	"testing"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 )
 
 // V1 contract: typology executor scores legacy MBTI payload identically to domain scorer.
 func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
-	model := mbtiINTJModel()
-	want, err := typologylegacy.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
-	if err != nil {
-		t.Fatalf("domain Score: %v", err)
-	}
-
 	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
@@ -31,8 +24,8 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("Execute: %v", err)
 	}
 	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
-	if detail.TypeCode != want.TypeCode || detail.MatchPercent != want.MatchPercent {
-		t.Fatalf("detail = %#v, want type=%s match=%.0f", detail, want.TypeCode, want.MatchPercent)
+	if detail.TypeCode != "INTJ" || detail.MatchPercent != 40 {
+		t.Fatalf("detail = %#v, want type=INTJ match=40", detail)
 	}
 	if result.Summary.PrimaryLabel != "INTJ" {
 		t.Fatalf("PrimaryLabel = %q, want INTJ", result.Summary.PrimaryLabel)
@@ -41,12 +34,6 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 
 // V1 contract: typology executor scores legacy SBTI payload identically to domain scorer.
 func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
-	model := sbtiCharacterizationModel()
-	want, err := typologylegacy.ScoreSBTIReference(model, sbtiHighAnswerSheet())
-	if err != nil {
-		t.Fatalf("domain Score: %v", err)
-	}
-
 	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
@@ -59,8 +46,8 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("Execute: %v", err)
 	}
 	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
-	if detail.TypeCode != want.TypeCode || detail.Similarity != want.Similarity {
-		t.Fatalf("detail = %#v, want type=%s similarity=%.0f", detail, want.TypeCode, want.Similarity)
+	if detail.TypeCode != "HIGH" || detail.Similarity != 1 {
+		t.Fatalf("detail = %#v, want type=HIGH similarity=1", detail)
 	}
 	if result.Summary.Score == nil || *result.Summary.Score != 100 {
 		t.Fatalf("Score = %v, want 100", result.Summary.Score)

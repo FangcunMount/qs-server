@@ -6,15 +6,17 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
+
+type ExecutionInput = evalpipeline.ExecutionInput
 
 type countingEvaluator struct {
 	key     evaluation.ExecutionIdentity
@@ -56,7 +58,7 @@ func withTestEvaluator(evaluator testEvaluator) EngineOption {
 		}
 		registry := evalpipeline.NewRuntimeDescriptorRegistry()
 		if err := registry.Register(evalpipeline.RuntimeDescriptor{
-			Key: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: family}, AlgorithmFamily: family,
+			Key: evalpipeline.DescriptorKey{AlgorithmFamily: family}, AlgorithmFamily: family,
 		}); err != nil {
 			panic(err)
 		}

@@ -85,6 +85,7 @@ const latestRiskQueueUnrestrictedTesteePredicate = ``
 func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
 	evaluationreadmodel.AssessmentReader
 	evaluationreadmodel.LatestRiskReader
+	ListSubmittedAssessmentIDsAfter(context.Context, uint64, int) ([]uint64, error)
 } {
 	return &assessmentReadModel{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db, opts...),
@@ -156,6 +157,22 @@ func (r *assessmentReadModel) ListAssessments(
 		rows = append(rows, assessmentPOToReadRow(po))
 	}
 	return rows, total, nil
+}
+
+// ListSubmittedAssessmentIDsAfter implements the Evaluation scheduler's
+// stable keyset scan without exposing maintenance pagination to actor queries.
+func (r *assessmentReadModel) ListSubmittedAssessmentIDsAfter(ctx context.Context, afterID uint64, limit int) ([]uint64, error) {
+	if limit <= 0 {
+		return []uint64{}, nil
+	}
+	ids := make([]uint64, 0, limit)
+	err := r.WithContext(ctx).
+		Model(&AssessmentPO{}).
+		Where("status = ? AND id > ? AND deleted_at IS NULL", "submitted", afterID).
+		Order("id ASC").
+		Limit(limit).
+		Pluck("id", &ids).Error
+	return ids, err
 }
 
 func (r *assessmentReadModel) ListLatestRisksByTesteeIDs(

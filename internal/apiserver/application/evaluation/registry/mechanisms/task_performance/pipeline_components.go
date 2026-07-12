@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -54,9 +54,9 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	if c.scoring == nil {
 		return nil, fmt.Errorf("task_performance evaluation calculator is not configured")
 	}
-	execInput, ok := evaluationexecute.ExecutionInputFromContext(ctx)
+	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
 	if !ok {
-		return nil, evaluationexecute.ErrDescriptorPipelineContext
+		return nil, evalpipeline.ErrExecutionContextMissing
 	}
 	cognitivePayload, ok := portevaluationinput.CognitivePayload(execInput.Input)
 	if !ok || cognitivePayload.Snapshot == nil {

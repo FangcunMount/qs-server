@@ -375,7 +375,7 @@ func (a *Assessment) AnswerSheetRef() AnswerSheetRef {
 
 // EvaluationModelRef 获取解释模型引用。
 func (a *Assessment) EvaluationModelRef() *EvaluationModelRef {
-	return a.modelRef
+	return cloneValue(a.modelRef)
 }
 
 // HasEvaluationModel 是否绑定了解释模型。
@@ -397,7 +397,7 @@ func (a *Assessment) OriginType() OriginType {
 
 // OriginID 获取来源ID
 func (a *Assessment) OriginID() *string {
-	return a.origin.ID()
+	return cloneValue(a.origin.ID())
 }
 
 // ==================== 状态与结果查询方法 ====================
@@ -409,17 +409,17 @@ func (a *Assessment) Status() Status {
 
 // TotalScore 获取总分
 func (a *Assessment) TotalScore() *float64 {
-	return a.totalScore
+	return cloneValue(a.totalScore)
 }
 
 // RiskLevel 获取风险等级
 func (a *Assessment) RiskLevel() *RiskLevel {
-	return a.riskLevel
+	return cloneValue(a.riskLevel)
 }
 
 // ResultSummary 获取通用结果摘要。
 func (a *Assessment) ResultSummary() *ResultSummary {
-	return a.summary
+	return cloneResultSummary(a.summary)
 }
 
 func (a *Assessment) clone() *Assessment {
@@ -444,24 +444,24 @@ func (a *Assessment) clone() *Assessment {
 
 // SubmittedAt 获取提交时间
 func (a *Assessment) SubmittedAt() *time.Time {
-	return a.submittedAt
+	return cloneValue(a.submittedAt)
 }
 
 // EvaluatedAt 获取评分事实可靠提交的时间。
 func (a *Assessment) EvaluatedAt() *time.Time {
-	return a.evaluatedAt
+	return cloneValue(a.evaluatedAt)
 }
 
 // FailedAt 获取失败时间
 func (a *Assessment) FailedAt() *time.Time {
-	return a.failedAt
+	return cloneValue(a.failedAt)
 }
 
 // ==================== 失败信息查询方法 ====================
 
 // FailureReason 获取失败原因
 func (a *Assessment) FailureReason() *string {
-	return a.failureReason
+	return cloneValue(a.failureReason)
 }
 
 // ==================== 状态判断辅助方法 ====================
@@ -490,7 +490,7 @@ func (a *Assessment) NeedsEvaluation() bool {
 
 // Events 获取待发布的领域事件
 func (a *Assessment) Events() []DomainEvent {
-	return a.events
+	return append([]DomainEvent(nil), a.events...)
 }
 
 // ClearEvents 清空领域事件（持久化后调用）

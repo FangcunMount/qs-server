@@ -74,3 +74,25 @@ type InterpretReportPO struct {
 }
 
 func (InterpretReportPO) CollectionName() string { return "interpret_report_artifacts" }
+
+const (
+	ReportCatalogSourceArtifact = "artifact"
+	ReportCatalogSourceArchive  = "archive"
+)
+
+// ReportCatalogPO is a compact, assessment-level query index. Report content
+// remains in interpret_report_artifacts or archived_reports.
+type ReportCatalogPO struct {
+	AssessmentID uint64    `bson:"assessment_id"`
+	OrgID        int64     `bson:"org_id"`
+	TesteeID     uint64    `bson:"testee_id"`
+	SourceKind   string    `bson:"source_kind"`
+	SourceID     uint64    `bson:"source_id"`
+	ModelCode    string    `bson:"model_code,omitempty"`
+	RiskLevel    string    `bson:"risk_level,omitempty"`
+	SortAt       time.Time `bson:"sort_at"`
+	SortReportID uint64    `bson:"sort_report_id"`
+	UpdatedAt    time.Time `bson:"updated_at"`
+}
+
+func (ReportCatalogPO) CollectionName() string { return "report_query_catalog" }

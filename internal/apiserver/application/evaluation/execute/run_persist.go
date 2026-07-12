@@ -41,7 +41,7 @@ func (s *service) persistClaimedEvaluationRun(ctx context.Context, run evalrun.E
 	if s == nil || s.runRepo == nil {
 		return evalerrors.ModuleNotConfigured("evaluation run repository is not configured")
 	}
-	if run.RunID == "" {
+	if run.ID() == "" {
 		return fmt.Errorf("evaluation run id is required")
 	}
 	if err := s.runRepo.SaveClaimed(ctx, run); err != nil {

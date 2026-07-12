@@ -3,7 +3,8 @@ package ruleset
 import (
 	"testing"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
+	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -16,7 +17,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := typologylegacy.ScoreSBTIReference(model, sheet)
+		got, err := scoreConfiguredSBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -35,7 +36,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := typologylegacy.ScoreSBTIReference(&modelCopy, sheet)
+		got, err := scoreConfiguredSBTI(&modelCopy, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -50,7 +51,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := typologylegacy.ScoreSBTIReference(model, sheet)
+		got, err := scoreConfiguredSBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -61,6 +62,14 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 			t.Fatal("expected image url for DRUNK outcome")
 		}
 	})
+}
+
+func scoreConfiguredSBTI(model *modeltypology.SBTILegacyModel, sheet *evalinput.AnswerSheet) (outcometypology.PersonalityTypeDetail, error) {
+	result, err := configured.NewEvaluator().Score(modeltypology.FromSBTI(model), sheet)
+	if err != nil {
+		return outcometypology.PersonalityTypeDetail{}, err
+	}
+	return outcometypology.PersonalityTypeDetailFromPayload(result.Detail)
 }
 
 func sbtiAllThreesAnswerSheet(model *modeltypology.SBTILegacyModel) *evalinput.AnswerSheet {

@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -42,9 +41,9 @@ type typologyCalculator struct {
 }
 
 func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {
-	execInput, ok := evaluationexecute.ExecutionInputFromContext(ctx)
+	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
 	if !ok {
-		return nil, evaluationexecute.ErrDescriptorPipelineContext
+		return nil, evalpipeline.ErrExecutionContextMissing
 	}
 	if execInput.Assessment == nil {
 		return nil, fmt.Errorf("assessment is required")

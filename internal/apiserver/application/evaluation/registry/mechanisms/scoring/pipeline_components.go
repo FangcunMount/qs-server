@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -63,9 +62,9 @@ func (c factorScoringCalculator) Calculate(ctx context.Context, calcInput evalpi
 	if c.evaluator == nil {
 		return nil, fmt.Errorf("factor_scoring evaluation calculator is not configured")
 	}
-	execInput, ok := evaluationexecute.ExecutionInputFromContext(ctx)
+	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
 	if !ok {
-		return nil, evaluationexecute.ErrDescriptorPipelineContext
+		return nil, evalpipeline.ErrExecutionContextMissing
 	}
 	scoringInput := ExecutionInput{
 		Assessment: execInput.Assessment,

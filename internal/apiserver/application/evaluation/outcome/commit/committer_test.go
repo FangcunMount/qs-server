@@ -7,10 +7,10 @@ import (
 	"time"
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -140,11 +140,11 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	evaluatedAt := time.Unix(200, 0)
 
 	record, err := c.Commit(context.Background(), CommitRequest{
-		Assessment:           a,
-		Execution:            execution,
-		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
-		Run:                  &run,
-		EvaluatedAt:          evaluatedAt,
+		Assessment:    a,
+		Execution:     execution,
+		DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		Run:           &run,
+		EvaluatedAt:   evaluatedAt,
 	})
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
@@ -155,14 +155,14 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	if record.ID().String() != "9001" || outcomeRepo.record != record {
 		t.Fatalf("outcome record = %#v", record)
 	}
-	if !a.Status().IsEvaluated() || run.Attempt.Status != evalrun.StatusSucceeded || runRepo.saved == nil || runRepo.saved.Attempt.Status != evalrun.StatusSucceeded {
-		t.Fatalf("terminal facts: assessment=%s run=%s saved=%#v", a.Status(), run.Attempt.Status, runRepo.saved)
+	if !a.Status().IsEvaluated() || run.Attempt().Status != evalrun.StatusSucceeded || runRepo.saved == nil || runRepo.saved.Attempt().Status != evalrun.StatusSucceeded {
+		t.Fatalf("terminal facts: assessment=%s run=%s saved=%#v", a.Status(), run.Attempt().Status, runRepo.saved)
 	}
 	if a.EvaluatedAt() == nil || !a.EvaluatedAt().Equal(evaluatedAt) {
 		t.Fatalf("assessment evaluated_at = %v, want %v", a.EvaluatedAt(), evaluatedAt)
 	}
-	if run.FinishedAt == nil || !run.FinishedAt.Equal(evaluatedAt) || !record.EvaluatedAt().Equal(evaluatedAt) {
-		t.Fatalf("terminal timestamps: assessment=%v run=%v outcome=%v, want %v", a.EvaluatedAt(), run.FinishedAt, record.EvaluatedAt(), evaluatedAt)
+	if run.FinishedAt() == nil || !run.FinishedAt().Equal(evaluatedAt) || !record.EvaluatedAt().Equal(evaluatedAt) {
+		t.Fatalf("terminal timestamps: assessment=%v run=%v outcome=%v, want %v", a.EvaluatedAt(), run.FinishedAt(), record.EvaluatedAt(), evaluatedAt)
 	}
 	if len(stager.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(stager.events))
@@ -172,7 +172,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 		t.Fatalf("event type = %T", stager.events[0])
 	}
 	payload := evaluatedEvent.Payload()
-	if payload.OutcomeID != "9001" || payload.EvaluationRunID != run.RunID.String() {
+	if payload.OutcomeID != "9001" || payload.EvaluationRunID != run.ID().String() {
 		t.Fatalf("evaluated event payload = %#v", payload)
 	}
 	if !payload.CommittedAt.Equal(evaluatedAt) {
@@ -243,11 +243,11 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 			}
 
 			_, err := c.Commit(context.Background(), CommitRequest{
-				Assessment:           a,
-				Execution:            execution,
-				RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
-				Run:                  &run,
-				EvaluatedAt:          time.Unix(200, 0),
+				Assessment:    a,
+				Execution:     execution,
+				DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+				Run:           &run,
+				EvaluatedAt:   time.Unix(200, 0),
 			})
 			if !errors.Is(err, commitErr) {
 				t.Fatalf("Commit error = %v, want %v", err, commitErr)
@@ -255,7 +255,7 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 			if !a.Status().IsSubmitted() || a.EvaluatedAt() != nil || a.TotalScore() != nil {
 				t.Fatalf("caller assessment was polluted: status=%s evaluated_at=%v total_score=%v", a.Status(), a.EvaluatedAt(), a.TotalScore())
 			}
-			if run.Attempt.Status != evalrun.StatusRunning || run.FinishedAt != nil || run.Failure != nil {
+			if run.Attempt().Status != evalrun.StatusRunning || run.FinishedAt() != nil || run.Failure() != nil {
 				t.Fatalf("caller run was polluted: %#v", run)
 			}
 			if len(a.Events()) != 0 {

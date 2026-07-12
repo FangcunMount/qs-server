@@ -100,6 +100,13 @@ type ClientBundle struct {
 	AssessmentModelCatalog *grpcclient.AssessmentModelCatalogClient
 }
 
+func (c *Container) TesteeService() *testee.Service {
+	if c == nil {
+		return nil
+	}
+	return c.testeeService
+}
+
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
 	c := &Container{

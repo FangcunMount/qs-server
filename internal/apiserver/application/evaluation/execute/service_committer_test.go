@@ -8,9 +8,9 @@ import (
 
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
 
@@ -60,11 +60,11 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatal(err)
 	}
-	if committer.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt.Status.String() != "succeeded" {
+	if committer.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt().Status.String() != "succeeded" {
 		t.Fatalf("committer request = %#v calls=%d", committer.request, committer.calls)
 	}
 	for _, saved := range runRepo.saved {
-		if saved.Attempt.Status.String() == "succeeded" {
+		if saved.Attempt().Status.String() == "succeeded" {
 			t.Fatalf("service persisted succeeded run outside committer: %#v", runRepo.saved)
 		}
 	}
@@ -150,7 +150,7 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 		t.Fatalf("saved runs = %d, want input snapshot and terminal failed run", len(runRepo.saved))
 	}
 	failedRun := runRepo.saved[len(runRepo.saved)-1]
-	if failedRun.Attempt.Status != evalrun.StatusFailed || !failedRun.Retryable() || failedRun.Failure == nil || failedRun.Failure.Kind != evalrun.FailureKindInternal {
+	if failedRun.Attempt().Status != evalrun.StatusFailed || !failedRun.Retryable() || failedRun.Failure() == nil || failedRun.Failure().Kind != evalrun.FailureKindInternal {
 		t.Fatalf("failed run = %#v, want retryable internal failure", failedRun)
 	}
 	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domainAssessment.EventTypeFailed {
@@ -170,7 +170,7 @@ func TestEvaluateCommitFailureFinalizesRetryableRunAndAllowsNextAttempt(t *testi
 		t.Fatalf("claimEvaluationRun after recovery: %v", err)
 	}
 	nextRun := claim.Run
-	if !claim.Claimed || nextRun.Attempt.Number != failedRun.Attempt.Number+1 || nextRun.Attempt.Status != evalrun.StatusRunning {
+	if !claim.Claimed || nextRun.Attempt().Number != failedRun.Attempt().Number+1 || nextRun.Attempt().Status != evalrun.StatusRunning {
 		t.Fatalf("next claim = %#v, want next running attempt", claim)
 	}
 }
@@ -215,7 +215,7 @@ func TestRetryableFailureRedeliveryClaimsNextAttemptAndCompletes(t *testing.T) {
 	if calls != 2 || committer.calls != 1 {
 		t.Fatalf("evaluator calls=%d committer calls=%d, want 2/1", calls, committer.calls)
 	}
-	if committer.request.Run == nil || committer.request.Run.Attempt.Number != 2 || committer.request.Run.Attempt.Status != evalrun.StatusSucceeded {
+	if committer.request.Run == nil || committer.request.Run.Attempt().Number != 2 || committer.request.Run.Attempt().Status != evalrun.StatusSucceeded {
 		t.Fatalf("committed run = %#v, want succeeded attempt 2", committer.request.Run)
 	}
 	if assessmentRepo.assessment == nil || !assessmentRepo.assessment.Status().IsEvaluated() {
@@ -237,7 +237,7 @@ func TestFailedAssessmentReclaimsExpiredRunningAttempt(t *testing.T) {
 	a.ClearEvents()
 	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
 	claimedAt := time.Now().Add(-2 * time.Minute)
-	if err := run.Claim("expired-owner", claimedAt, claimedAt.Add(time.Minute)); err != nil {
+	if err := run.Claim(evalrun.ClaimInput{Token: "expired-owner", ClaimedAt: claimedAt, LeaseExpiresAt: claimedAt.Add(time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
 	runRepo := &stubRunRepo{latest: &run}
@@ -256,7 +256,7 @@ func TestFailedAssessmentReclaimsExpiredRunningAttempt(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatal(err)
 	}
-	if evaluator.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt.Number != 1 || committer.request.Run.Attempt.Status != evalrun.StatusSucceeded {
+	if evaluator.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt().Number != 1 || committer.request.Run.Attempt().Status != evalrun.StatusSucceeded {
 		t.Fatalf("reclaimed execution = calls:%d run:%#v", evaluator.calls, committer.request.Run)
 	}
 	if assessmentRepo.assessment == nil || !assessmentRepo.assessment.Status().IsEvaluated() {

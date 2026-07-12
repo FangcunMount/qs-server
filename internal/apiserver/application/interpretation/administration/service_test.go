@@ -31,6 +31,17 @@ func TestListUsesResolvedScope(t *testing.T) {
 	}
 }
 
+func TestListUsesOrganizationScopeForAdministrator(t *testing.T) {
+	r := &adminReader{}
+	s := NewService(r, adminAccess{scope: ListScope{OrgID: 9}})
+	if _, err := s.ListReports(context.Background(), Actor{OrgID: 9, OperatorUserID: 2}, ListQuery{}); err != nil {
+		t.Fatal(err)
+	}
+	if r.filter.OrgID == nil || *r.filter.OrgID != 9 {
+		t.Fatalf("filter=%#v", r.filter)
+	}
+}
+
 type adminAccess struct {
 	err   error
 	scope ListScope

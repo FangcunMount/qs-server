@@ -13,6 +13,7 @@ import (
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	evaluationscheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
@@ -23,7 +24,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
@@ -131,6 +131,7 @@ type evaluationInfra struct {
 	outcomeRepo                  domainoutcome.Repository
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
+	submittedCandidateReader     evaluationscheduler.SubmittedCandidateReader
 	latestRiskReader             evaluationreadmodel.LatestRiskReader
 	scoreProjectionReader        evaluationreadmodel.ScoreProjectionReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
@@ -154,6 +155,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 	assessmentReadModel := mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
 	infra.assessmentReader = assessmentReadModel
+	infra.submittedCandidateReader = assessmentReadModel
 	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreProjectionReader = mysqlEval.NewScoreProjectionReadModel(normalized.MySQLDB, mysqlOptions)
@@ -223,21 +225,18 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		)
 		m.WorkerExecutionService = engine
 		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
-		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine)
+		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine, normalized.TesteeAccessChecker)
 	}
 	return nil
 }
 
 func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationInfra) {
-	creatorOpts := make([]assessment.AssessmentCreatorOption, 0, 1)
+	var modelValidator evaluationintake.EvaluationModelValidator
 	if normalized.PublishedModelReader != nil {
-		creatorOpts = append(creatorOpts, assessment.WithEvaluationModelValidator(
-			evaluationintake.NewCompositeEvaluationModelValidator(
-				evaluationintake.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
-			),
-		))
+		modelValidator = evaluationintake.NewCompositeEvaluationModelValidator(
+			evaluationintake.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
+		)
 	}
-	assessmentCreator := assessment.NewDefaultAssessmentCreator(creatorOpts...)
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
 		listCache := cachequery.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
 			cacheentry.NewRedisCache(normalized.QueryRedisClient),
@@ -248,7 +247,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 		m.IntakeService = evaluationintake.NewService(
 			infra.assessmentRepo,
-			assessmentCreator,
+			modelValidator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			listCache,
@@ -257,7 +256,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	} else {
 		m.IntakeService = evaluationintake.NewService(
 			infra.assessmentRepo,
-			assessmentCreator,
+			modelValidator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			nil,
@@ -267,14 +266,14 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader, infra.assessmentReader, normalized.ScaleCatalog)
 	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
-	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
+	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.LatestRiskReader = infra.latestRiskReader
 	m.AssessmentReader = infra.assessmentReader
 }
 
 func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
-	m.SchedulerService = evaluationscheduler.NewService(infra.assessmentRepo, infra.outcomeRepo, infra.assessmentReader)
+	m.SchedulerService = evaluationscheduler.NewService(infra.assessmentRepo, infra.outcomeRepo, infra.submittedCandidateReader)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

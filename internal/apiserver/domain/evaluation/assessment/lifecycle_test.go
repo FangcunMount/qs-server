@@ -1,7 +1,6 @@
 package assessment
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -9,19 +8,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestDefaultAssessmentCreatorCreateKeepsPendingByDefault(t *testing.T) {
-	creator := NewDefaultAssessmentCreator()
-	req := NewCreateAssessmentRequest(
+func TestNewAssessmentKeepsPendingByDefault(t *testing.T) {
+	got, err := NewAssessment(
 		1,
 		testee.NewID(1001),
 		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
 		NewAnswerSheetRef(meta.FromUint64(2001)),
 		NewAdhocOrigin(),
 	)
-
-	got, err := creator.Create(context.Background(), req)
 	if err != nil {
-		t.Fatalf("Create returned error: %v", err)
+		t.Fatalf("NewAssessment returned error: %v", err)
 	}
 
 	if !got.Status().IsPending() {
@@ -32,30 +28,6 @@ func TestDefaultAssessmentCreatorCreateKeepsPendingByDefault(t *testing.T) {
 	}
 	if len(got.Events()) != 0 {
 		t.Fatalf("expected create to not emit events, got %d", len(got.Events()))
-	}
-}
-
-func TestDefaultAssessmentCreatorUsesEvaluationModelValidator(t *testing.T) {
-	validator := &creatorModelValidatorStub{}
-	creator := NewDefaultAssessmentCreator(WithEvaluationModelValidator(validator))
-	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
-	req := NewCreateAssessmentRequest(
-		1,
-		testee.NewID(1001),
-		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
-		NewAnswerSheetRef(meta.FromUint64(2001)),
-		NewAdhocOrigin(),
-	).WithEvaluationModel(modelRef)
-
-	got, err := creator.Create(context.Background(), req)
-	if err != nil {
-		t.Fatalf("Create returned error: %v", err)
-	}
-	if got.EvaluationModelRef() == nil || got.EvaluationModelRef().Kind() != EvaluationModelKindPersonality {
-		t.Fatalf("unexpected model ref: %#v", got.EvaluationModelRef())
-	}
-	if !validator.called || validator.modelRef.Code() != modelRef.Code() || validator.questionnaireRef.Code().String() != "q-code" {
-		t.Fatalf("validator call = %v ref=%#v questionnaire=%#v", validator.called, validator.modelRef, validator.questionnaireRef)
 	}
 }
 
@@ -136,20 +108,6 @@ func TestResumeForExecutionRetryDoesNotEmitDuplicateRequestedEvent(t *testing.T)
 	if len(a.Events()) != 0 {
 		t.Fatalf("resume emitted duplicate events: %#v", a.Events())
 	}
-}
-
-type creatorModelValidatorStub struct {
-	called           bool
-	modelRef         EvaluationModelRef
-	questionnaireRef QuestionnaireRef
-	err              error
-}
-
-func (s *creatorModelValidatorStub) ValidateEvaluationModel(_ context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error {
-	s.called = true
-	s.modelRef = modelRef
-	s.questionnaireRef = questionnaireRef
-	return s.err
 }
 
 func TestEvaluatedAssessmentIsTerminalAndRejectsFailureRewrite(t *testing.T) {
@@ -259,7 +217,7 @@ func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
 }
 
 func TestApplyScoringProjectionValidatesEvaluationModelRef(t *testing.T) {
-	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindTypology, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1005),
@@ -292,7 +250,7 @@ func TestApplyScoringProjectionRejectsMismatchedEvaluationModelRef(t *testing.T)
 		NewAnswerSheetRef(meta.FromUint64(2006)),
 		NewAdhocOrigin(),
 		WithID(NewID(5005)),
-		WithEvaluationModel(NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")),
+		WithEvaluationModel(NewEvaluationModelRefByCode(EvaluationModelKindTypology, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)

@@ -179,6 +179,11 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
+	Preference     string
+	Strength       *float64
+	LeftPole       string
+	RightPole      string
+	Model          string
 }
 
 type ValidityResult struct {

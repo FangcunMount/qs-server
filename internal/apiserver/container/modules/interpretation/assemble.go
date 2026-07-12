@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
@@ -91,6 +92,10 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation report repository: %v", err)
 	}
 	module.reportRepo = reportRepo
+	catalogProjector, err := mongoEval.NewReportCatalogProjector(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
+	}
 
 	priorityOpts := []mongoEventOutbox.StoreOption{
 		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
@@ -119,7 +124,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer)
+		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer, catalogProjector)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}
@@ -149,6 +154,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		m.generationRepo,
 		m.runRepo,
 		m.reportRepo,
+		operationsAccessAdapter{},
 	)
 	return nil
 }
@@ -173,18 +179,42 @@ type outcomeCorrelationAdapter struct {
 	repo domainoutcome.Repository
 }
 
-func (a outcomeCorrelationAdapter) FindOutcomeIDByAssessmentID(ctx context.Context, assessmentID meta.ID) (meta.ID, error) {
+func (a outcomeCorrelationAdapter) FindOutcomeByAssessmentID(ctx context.Context, assessmentID meta.ID) (interpretationoperations.OutcomeRef, error) {
 	if a.repo == nil {
-		return meta.ZeroID, fmt.Errorf("evaluation outcome repository is not configured")
+		return interpretationoperations.OutcomeRef{}, fmt.Errorf("evaluation outcome repository is not configured")
 	}
 	record, err := a.repo.FindByAssessmentID(ctx, assessmentID)
 	if err != nil {
-		return meta.ZeroID, err
+		return interpretationoperations.OutcomeRef{}, err
 	}
 	if record == nil {
-		return meta.ZeroID, fmt.Errorf("evaluation outcome not found for assessment %d", assessmentID.Uint64())
+		return interpretationoperations.OutcomeRef{}, fmt.Errorf("evaluation outcome not found for assessment %d", assessmentID.Uint64())
 	}
-	return record.ID(), nil
+	return interpretationoperations.OutcomeRef{ID: record.ID(), AssessmentID: record.AssessmentID(), OrgID: record.OrgID()}, nil
+}
+
+func (a outcomeCorrelationAdapter) FindOutcomeByID(ctx context.Context, id meta.ID) (interpretationoperations.OutcomeRef, error) {
+	if a.repo == nil {
+		return interpretationoperations.OutcomeRef{}, fmt.Errorf("evaluation outcome repository is not configured")
+	}
+	record, err := a.repo.FindByID(ctx, id)
+	if err != nil {
+		return interpretationoperations.OutcomeRef{}, err
+	}
+	return interpretationoperations.OutcomeRef{ID: record.ID(), AssessmentID: record.AssessmentID(), OrgID: record.OrgID()}, nil
+}
+
+type operationsAccessAdapter struct{}
+
+func (operationsAccessAdapter) AuthorizeAudit(ctx context.Context, actor interpretationoperations.Actor, resourceOrgID int64) error {
+	if actor.OrgID != resourceOrgID {
+		return errors.WithCode(code.ErrPermissionDenied, "interpretation resource is outside current organization")
+	}
+	snapshot, ok := authzapp.FromContext(ctx)
+	if !ok || !authzapp.DecideCapability(snapshot, authzapp.CapabilityAuditInterpretation).Allowed {
+		return errors.WithCode(code.ErrPermissionDenied, "interpretation audit permission is required")
+	}
+	return nil
 }
 
 func (m *Module) AutomationService() interpretationautomation.Service {

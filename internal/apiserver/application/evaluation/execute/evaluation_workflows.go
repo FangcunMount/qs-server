@@ -163,7 +163,7 @@ func (f evaluationFailureFinalizer) Finalize(
 	if a == nil || run == nil {
 		return fmt.Errorf("assessment and evaluation run are required")
 	}
-	if run.AssessmentID != a.ID().Uint64() {
+	if run.AssessmentID() != a.ID().Uint64() {
 		return fmt.Errorf("evaluation run assessment does not match failure assessment")
 	}
 	log := logger.L(ctx)

@@ -9,11 +9,6 @@ package execute
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // WorkerExecutionService 服务于 Worker 的一次评估执行。
@@ -26,14 +21,3 @@ type WorkerExecutionService interface {
 
 // Engine is the Worker-facing concrete execution capability.
 type Engine interface{ WorkerExecutionService }
-
-// DescriptorExecutor 执行 RuntimeDescriptor 已解析后的评估路径。
-type DescriptorExecutor interface {
-	Execute(ctx context.Context, descriptor evalpipeline.RuntimeDescriptor, input ExecutionInput) (*domainoutcome.Execution, error)
-}
-
-// ExecutionInput 执行输入
-type ExecutionInput struct {
-	Assessment *assessment.Assessment
-	Input      *evaluationinput.InputSnapshot
-}

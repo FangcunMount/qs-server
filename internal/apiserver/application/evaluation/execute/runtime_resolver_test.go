@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -15,7 +15,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},

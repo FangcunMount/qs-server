@@ -18,7 +18,7 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 		"run":        {},
 		"input":      {},
 		"policy":     {},
-		"pipeline":   {},
+		"routing":    {},
 		"event":      {},
 		"outcome":    {},
 	}
@@ -37,7 +37,7 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 			rel, _ := filepath.Rel(evalRoot, path)
 			if !strings.Contains(rel, string(filepath.Separator)) {
 				if _, ok := allowedTopLevel[entry.Name()]; !ok {
-					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/policy/pipeline/event/outcome", entry.Name())
+					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/policy/routing/event/outcome", entry.Name())
 				}
 			}
 			if entry.Name() == "norming" || entry.Name() == "task_performance" {
@@ -52,6 +52,34 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 		for _, token := range forbiddenAssessmentCodeFiles {
 			if strings.Contains(base, token) {
 				t.Fatalf("%s leaks assessment code filename %q under domain/evaluation", path, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDomainDoesNotOwnRuntimeExecutionMechanisms(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join(repoRoot(t), "internal", "apiserver", "domain", "evaluation")
+	forbidden := []string{"RuntimeDescriptorRegistry", "InputAssembler", "OutcomeAssembler", "Calculator interface"}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, token := range forbidden {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s contains application runtime mechanism %q", path, token)
 			}
 		}
 		return nil
