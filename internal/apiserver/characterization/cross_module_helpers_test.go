@@ -16,8 +16,9 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	workerhandlers "github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -70,7 +71,7 @@ func buildCharAnswerSheetCrossModuleHarness(t *testing.T, cfg charAnswerSheetCro
 	splitCfg := v1SplitPhaseConfig{
 		Input: scaleInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
-			domainreport.NewDefaultReportBuilder(nil),
+			interpretationbuilder.NewDefaultReportBuilder(),
 		),
 		Async: cfg.Async,
 	}
@@ -417,7 +418,7 @@ func scaleCrossModuleConfig(t *testing.T, a *assessment.Assessment, async bool) 
 			Assessment: a,
 			Input:      scaleInputSnapshot(),
 			ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
-				domainreport.NewDefaultReportBuilder(nil),
+				interpretationbuilder.NewDefaultReportBuilder(),
 			),
 			Async: async,
 		},

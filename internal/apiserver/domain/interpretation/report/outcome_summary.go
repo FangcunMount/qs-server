@@ -58,8 +58,3 @@ func severityFromRisk(risk RiskLevel) string {
 func IsHighSeverity(severity string) bool {
 	return eventoutcome.IsHighSeverity(severity)
 }
-
-// AttentionRiskLevel 映射 v2 等级投影到旧版 risk_level 供 attention sync。
-func AttentionRiskLevel(level *eventoutcome.ResultLevel) string {
-	return eventoutcome.AttentionRiskLevel(level)
-}

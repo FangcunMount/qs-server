@@ -30,3 +30,20 @@ func ReportProfileForDecisionKind(decision modelcatalog.DecisionKind) ReportProf
 		return ReportProfileDefault
 	}
 }
+
+// DefaultDecisionKind returns the compatibility decision for an algorithm
+// family when an older frozen outcome did not persist one explicitly.
+func DefaultDecisionKind(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	switch family {
+	case modelcatalog.AlgorithmFamilyFactorScoring:
+		return modelcatalog.DecisionKindScoreRange
+	case modelcatalog.AlgorithmFamilyFactorClassification:
+		return modelcatalog.DecisionKindPoleComposition
+	case modelcatalog.AlgorithmFamilyFactorNorm:
+		return modelcatalog.DecisionKindNormLookup
+	case modelcatalog.AlgorithmFamilyTaskPerformance:
+		return modelcatalog.DecisionKindAbilityLevel
+	default:
+		return ""
+	}
+}

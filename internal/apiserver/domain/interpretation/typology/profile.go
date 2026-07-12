@@ -22,18 +22,6 @@ type Profile struct {
 	Commentary       string
 }
 
-// Input 人格类报告组装输入。
-type Input struct {
-	AssessmentID report.ID
-	ModelCode    string
-	TotalScore   float64
-	RiskLevel    report.RiskLevel
-	Profile      Profile
-	Conclusion   string
-	Dimensions   []report.DimensionInterpret
-	Suggestions  []report.Suggestion
-}
-
 // ReportModelName 返回展示用模型名称。
 func (p Profile) ReportModelName() string {
 	if p.TypeName == "" {

@@ -12,6 +12,5 @@ type ReportRepository interface {
 	Insert(ctx context.Context, report *InterpretReport) error
 	FindByID(ctx context.Context, id meta.ID) (*InterpretReport, error)
 	FindByGenerationID(ctx context.Context, generationID meta.ID) (*InterpretReport, error)
-	FindLatestByAssessmentID(ctx context.Context, assessmentID meta.ID) (*InterpretReport, error)
 	ListByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*InterpretReport, error)
 }

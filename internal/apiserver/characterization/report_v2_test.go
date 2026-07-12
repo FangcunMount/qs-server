@@ -6,8 +6,9 @@ import (
 
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
@@ -22,7 +23,7 @@ func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
+	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringBuilder(interpretationbuilder.NewDefaultReportBuilder()), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
 	if report.Model().Kind != "scale" || report.Model().Algorithm != "scale_default" {
 		t.Fatalf("model = %#v", report.Model())
 	}

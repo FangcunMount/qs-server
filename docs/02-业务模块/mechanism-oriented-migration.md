@@ -488,7 +488,7 @@ type Algorithm = identity.Algorithm
 | R42 | `domain/calculation/scoring` 承接量表计分；`evaluation/scoring` 瘦身为 ACL |
 | R43 | `domain/calculation/classification` 承接 trait 机制；legacy MBTI/SBTI scorer 迁至 application typology/legacy |
 | R44 | 删除 `evaluation/norming`、`evaluation/task_performance` 占位包；新增 evaluation 架构守卫 |
-| R45 | `policy/report_type.go` 承接 `ResolveReportType`；interpretation 子包结构守卫 |
+| R45 | `policy/report_type.go` 曾承接默认报告类型选择；C3 已删除无调用 helper，并保留 interpretation 子包结构守卫 |
 | R46 | `interpretation/scoring` 暴露 `BuildFactorScoringReport` 机制入口 |
 | R47 | typology patterns 以 `mechanism_assembler` 为主；legacy `*_assembler` 标记 transitional |
 | R48 | reporting 架构守卫禁止新增测评 code builder 名；`legacy_report_aliases` 保留 deprecated ACL |

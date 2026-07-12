@@ -6,8 +6,9 @@ import (
 
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -29,7 +30,7 @@ func TestV1ScaleDefaultInterpretationTextIsStable(t *testing.T) {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
+	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringBuilder(interpretationbuilder.NewDefaultReportBuilder()), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
 
 	if report.Conclusion() != "总分得分5.0分，处于正常水平" {
 		t.Fatalf("Conclusion = %q", report.Conclusion())

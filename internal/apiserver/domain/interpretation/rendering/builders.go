@@ -4,24 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rule"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type FactorScoringBuilder struct {
-	composer domaininterpretation.DraftBuilder
+	composer report.DraftBuilder
 }
 
-func NewFactorScoringBuilder(composer domaininterpretation.DraftBuilder) FactorScoringBuilder {
+func NewFactorScoringBuilder(composer report.DraftBuilder) FactorScoringBuilder {
 	return FactorScoringBuilder{composer: composer}
 }
-func (FactorScoringBuilder) ReportType() domaininterpretation.ReportType {
-	return domaininterpretation.ReportTypeStandard
+func (FactorScoringBuilder) ReportType() policy.ReportType {
+	return policy.ReportTypeStandard
 }
 func (FactorScoringBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (FactorScoringBuilder) BuilderIdentity() string                 { return "factor-scoring" }
@@ -48,11 +48,11 @@ func (b FactorScoringBuilder) Build(_ context.Context, input interpinput.Interpr
 
 type NormProfileBuilder struct{ scoring FactorScoringBuilder }
 
-func NewNormProfileBuilder(composer domaininterpretation.DraftBuilder) NormProfileBuilder {
+func NewNormProfileBuilder(composer report.DraftBuilder) NormProfileBuilder {
 	return NormProfileBuilder{scoring: NewFactorScoringBuilder(composer)}
 }
-func (NormProfileBuilder) ReportType() domaininterpretation.ReportType {
-	return domaininterpretation.ReportTypeStandard
+func (NormProfileBuilder) ReportType() policy.ReportType {
+	return policy.ReportTypeStandard
 }
 func (NormProfileBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (NormProfileBuilder) BuilderIdentity() string                 { return "norm-profile" }
@@ -66,11 +66,11 @@ func (b NormProfileBuilder) Build(ctx context.Context, input interpinput.Interpr
 
 type TaskPerformanceBuilder struct{ scoring FactorScoringBuilder }
 
-func NewTaskPerformanceBuilder(composer domaininterpretation.DraftBuilder) TaskPerformanceBuilder {
+func NewTaskPerformanceBuilder(composer report.DraftBuilder) TaskPerformanceBuilder {
 	return TaskPerformanceBuilder{scoring: NewFactorScoringBuilder(composer)}
 }
-func (TaskPerformanceBuilder) ReportType() domaininterpretation.ReportType {
-	return domaininterpretation.ReportTypeStandard
+func (TaskPerformanceBuilder) ReportType() policy.ReportType {
+	return policy.ReportTypeStandard
 }
 func (TaskPerformanceBuilder) TemplateVersion() policy.TemplateVersion {
 	return policy.TemplateVersionV1
@@ -94,8 +94,8 @@ func NewTypologyBuilder() TypologyBuilder {
 		reporttypology.ReportAdapterMBTI: {}, reporttypology.ReportAdapterSBTI: {}, reporttypology.ReportAdapterBigFive: {},
 	}}
 }
-func (TypologyBuilder) ReportType() domaininterpretation.ReportType {
-	return domaininterpretation.ReportTypeStandard
+func (TypologyBuilder) ReportType() policy.ReportType {
+	return policy.ReportTypeStandard
 }
 func (TypologyBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (TypologyBuilder) BuilderIdentity() string                 { return "typology" }
@@ -103,9 +103,9 @@ func (TypologyBuilder) ContentSchemaVersion() string            { return "report
 func (b TypologyBuilder) MechanismKey() Key                     { return b.MechanismKeys()[0] }
 func (TypologyBuilder) MechanismKeys() []Key {
 	return []Key{
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: domaininterpretation.ReportTypeStandard},
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile, ReportType: domaininterpretation.ReportTypeStandard},
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern, ReportType: domaininterpretation.ReportTypeStandard},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: policy.ReportTypeStandard},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile, ReportType: policy.ReportTypeStandard},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern, ReportType: policy.ReportTypeStandard},
 	}
 }
 func (b TypologyBuilder) Build(_ context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
@@ -145,7 +145,7 @@ func (b TypologyBuilder) Build(_ context.Context, input interpinput.Interpretati
 	return nil, fmt.Errorf("typology interpretation facts are required")
 }
 
-func DefaultBuilders(composer domaininterpretation.DraftBuilder) []Builder {
+func DefaultBuilders(composer report.DraftBuilder) []Builder {
 	return []Builder{NewFactorScoringBuilder(composer), NewTypologyBuilder(), NewNormProfileBuilder(composer), NewTaskPerformanceBuilder(composer)}
 }
 
@@ -167,7 +167,7 @@ func primaryValue(input interpinput.InterpretationInput) float64 {
 	return input.Result.Primary.Value
 }
 func riskLevel(input interpinput.InterpretationInput) report.RiskLevel {
-	if input.Result.Level == nil || !domaininterpretation.IsRiskLevelCode(input.Result.Level.Code) {
+	if input.Result.Level == nil || !rule.IsRiskLevelCode(input.Result.Level.Code) {
 		return report.RiskLevelNone
 	}
 	return report.RiskLevel(input.Result.Level.Code)

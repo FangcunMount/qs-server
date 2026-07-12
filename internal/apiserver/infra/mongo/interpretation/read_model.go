@@ -1,6 +1,8 @@
 package interpretation
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
@@ -81,7 +83,51 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 			Severity: po.Level.Severity,
 		}
 	}
+	normalizeArchivedReportRow(&row)
 	return row
+}
+
+func normalizeArchivedReportRow(row *evaluationreadmodel.ReportRow) {
+	if row == nil {
+		return
+	}
+	if row.Model.Kind == "" && row.Model.Code == "" {
+		row.Model.Kind = string(modelcatalog.KindScale)
+		row.Model.Code = row.ModelCode
+		row.Model.Title = row.ModelName
+	}
+	kind := binding.Kind(row.Model.Kind)
+	row.Model.ProductChannel = binding.ProductChannelForIdentity(kind, row.Model.ProductChannel)
+	row.Model.AlgorithmFamily = binding.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(row.Model.SubKind), binding.Algorithm(row.Model.Algorithm))
+
+	if row.PrimaryScore == nil && (row.TotalScore != 0 || row.RiskLevel != "") {
+		row.PrimaryScore = &evaluationreadmodel.ScoreValueRow{Kind: "raw_total", Value: row.TotalScore}
+	}
+	if row.Level != nil {
+		return
+	}
+	if severity := legacyRiskSeverity(row.RiskLevel); severity != "" {
+		row.Level = &evaluationreadmodel.ResultLevelRow{Code: row.RiskLevel, Label: row.RiskLevel, Severity: severity}
+		return
+	}
+	if row.ModelExtra != nil && row.ModelExtra.TypeCode != "" {
+		row.Level = &evaluationreadmodel.ResultLevelRow{Code: row.ModelExtra.TypeCode, Label: row.ModelExtra.TypeCode, Severity: "none"}
+	}
+}
+
+func legacyRiskSeverity(risk string) string {
+	switch risk {
+	case "severe", "high":
+		return "high"
+	case "medium":
+		return "medium"
+	case "low":
+		return "low"
+	case "none":
+		return "none"
+	default:
+		return ""
+	}
 }
 
 func reportModelExtraPOToRow(po *ModelExtraPO) *evaluationreadmodel.ReportModelExtraRow {

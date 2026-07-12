@@ -107,30 +107,9 @@ func (d DimensionInterpret) Name() string {
 	return d.factorName
 }
 
-// FactorCode 获取因子编码
-//
-// Deprecated: 使用 Code()。
-func (d DimensionInterpret) FactorCode() FactorCode {
-	return d.factorCode
-}
-
-// FactorName 获取因子名称
-//
-// Deprecated: 使用 Name()。
-func (d DimensionInterpret) FactorName() string {
-	return d.factorName
-}
-
 // RawScore 获取原始得分
 func (d DimensionInterpret) RawScore() float64 {
 	return d.rawScore
-}
-
-// RiskLevel 获取风险等级
-//
-// Deprecated: 使用 Severity() 表达中性语义；RiskLevel 仅用于旧量表兼容。
-func (d DimensionInterpret) RiskLevel() RiskLevel {
-	return d.riskLevel
 }
 
 // Severity 返回中性 severity label。

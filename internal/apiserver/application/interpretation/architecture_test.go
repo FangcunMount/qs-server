@@ -35,7 +35,7 @@ func TestInterpretationContainerOwnsOutcomeReportUseCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, required := range []string{"interpretationgeneration.NewStarter", "interpretationgeneration.NewInterpretationCommitter", "interpretationgeneration.NewExecutor", "interpretationautomation.NewService", "interpretationparticipant.NewService", "interpretationadmin.NewService"} {
+	for _, required := range []string{"interpretationexecution.NewStarter", "interpretationexecution.NewInterpretationCommitter", "interpretationexecution.NewExecutor", "interpretationautomation.NewService", "interpretationparticipant.NewService", "interpretationadmin.NewService"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("interpretation assemble must own report capability %q", required)
 		}
@@ -87,7 +87,54 @@ func TestInterpretationModuleOwnsReportCommitterWiring(t *testing.T) {
 	}
 }
 
-func TestGenerationPackageOwnsReportEventStaging(t *testing.T) {
+func TestArtifactRepositoryDoesNotSelectLatestReportByAssessment(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "report", "artifact_repository.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "FindLatestByAssessmentID") {
+		t.Fatal("artifact repository must not select the current report; report_query_catalog owns that decision")
+	}
+}
+
+func TestInterpretationRootContainsOnlyTerminalEventSurface(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
+	allowed := map[string]bool{"doc.go": true, "events.go": true, "events_outcome.go": true, "event_wire.go": true}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		if !allowed[entry.Name()] {
+			t.Fatalf("interpretation root compatibility facade returned: %s", entry.Name())
+		}
+	}
+}
+
+func TestApplicationProjectionDoesNotInferLegacyPersistenceFields(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "internal", "reportprojection", "mapper.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"domain/modelcatalog", "modelcatalog/binding", "row.TotalScore", "row.RiskLevel"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("application report projection must not infer legacy persistence field %q", forbidden)
+		}
+	}
+}
+
+func TestExecutionPackageOwnsReportEventStaging(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)

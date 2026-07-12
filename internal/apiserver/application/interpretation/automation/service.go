@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -45,10 +45,10 @@ type Service interface {
 
 type service struct {
 	outcomes evaluationfact.Repository
-	executor interpretationgeneration.Executor
+	executor interpretationexecution.Executor
 }
 
-func NewService(outcomes evaluationfact.Repository, executor interpretationgeneration.Executor) (Service, error) {
+func NewService(outcomes evaluationfact.Repository, executor interpretationexecution.Executor) (Service, error) {
 	if outcomes == nil || executor == nil {
 		return nil, fmt.Errorf("interpretation automation dependencies are required")
 	}
@@ -70,12 +70,12 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 	if err != nil {
 		return nil, err
 	}
-	executed, err := interpretationgeneration.ExecuteOutcome(ctx, s.executor, record, input, command.TraceID)
+	executed, err := interpretationexecution.ExecuteOutcome(ctx, s.executor, record, input, command.TraceID)
 	if err != nil {
 		return nil, err
 	}
 	result := &Result{}
-	if executed.Status == interpretationgeneration.ExecuteStatusProcessing {
+	if executed.Status == interpretationexecution.ExecuteStatusProcessing {
 		result.Status = StatusProcessing
 	} else {
 		result.Status = StatusGenerated
@@ -105,7 +105,7 @@ type Failure struct {
 }
 
 func FailureFrom(err error) (Failure, bool) {
-	failed, ok := interpretationgeneration.FailureFrom(err)
+	failed, ok := interpretationexecution.FailureFrom(err)
 	if !ok {
 		return Failure{}, false
 	}

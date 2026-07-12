@@ -1,6 +1,9 @@
 package interpretation
 
-import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+)
 
 // EventModelIdentity 是线缆投影 of ModelIdentity on 领域事件。
 type EventModelIdentity = eventoutcome.ModelIdentity
@@ -11,11 +14,11 @@ type EventScoreValue = eventoutcome.ScoreValue
 // EventResultLevel 是线缆投影 of ResultLevel on 领域事件。
 type EventResultLevel = eventoutcome.ResultLevel
 
-func EventModelIdentityFrom(model ModelIdentity) EventModelIdentity {
+func EventModelIdentityFrom(model report.ModelIdentity) EventModelIdentity {
 	return EventModelIdentity(model)
 }
 
-func EventScoreValueFrom(score *ScoreValue) *EventScoreValue {
+func EventScoreValueFrom(score *report.ScoreValue) *EventScoreValue {
 	if score == nil {
 		return nil
 	}
@@ -27,7 +30,7 @@ func EventScoreValueFrom(score *ScoreValue) *EventScoreValue {
 	}
 }
 
-func EventResultLevelFrom(level *ResultLevel) *EventResultLevel {
+func EventResultLevelFrom(level *report.ResultLevel) *EventResultLevel {
 	if level == nil {
 		return nil
 	}

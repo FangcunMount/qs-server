@@ -287,25 +287,6 @@ func (r *ReportRepository) FindByGenerationID(ctx context.Context, generationID 
 	return r.mapper.ReportToDomain(&po)
 }
 
-func (r *ReportRepository) FindLatestByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error) {
-	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}).SetLimit(1))
-	if err != nil {
-		return nil, fmt.Errorf("find latest interpretation report by assessment id: %w", err)
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	if !cursor.Next(ctx) {
-		if err := cursor.Err(); err != nil {
-			return nil, err
-		}
-		return nil, domainreport.ErrInterpretReportNotFound
-	}
-	var po InterpretReportPO
-	if err := cursor.Decode(&po); err != nil {
-		return nil, err
-	}
-	return r.mapper.ReportToDomain(&po)
-}
-
 func (r *ReportRepository) ListByAssessmentID(ctx context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error) {
 	cursor, err := r.Find(ctx, bson.M{"assessment_id": assessmentID.Uint64()}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: -1}}))
 	if err != nil {

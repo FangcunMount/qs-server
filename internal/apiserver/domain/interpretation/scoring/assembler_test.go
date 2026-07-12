@@ -10,7 +10,7 @@ import (
 
 func TestBuildFactorScoringDraftAssemblesScoreBasedContent(t *testing.T) {
 	totalMax := 27.0
-	got, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(nil), scoring.FactorScoringReportInput{
+	got, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(), scoring.FactorScoringReportInput{
 		AssessmentID: report.ID(9001),
 		Scale: &scoring.ReportModel{
 			Code:  "PHQ9",

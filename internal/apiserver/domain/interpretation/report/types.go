@@ -8,16 +8,6 @@ type ID = meta.ID
 // AssessmentID 测评ID类型（用于关联 assessment 聚合）
 type AssessmentID = ID
 
-// NewID 创建报告ID
-func NewID(id uint64) ID {
-	return meta.FromUint64(id)
-}
-
-// ParseID 解析报告ID
-func ParseID(s string) (ID, error) {
-	return meta.ParseID(s)
-}
-
 // RiskLevel 风险等级
 type RiskLevel string
 

@@ -70,6 +70,9 @@ func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r do
 	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, access: access}
 }
 func (s *service) FindReportByID(ctx context.Context, a Actor, id meta.ID) (*Report, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
 	item, err := s.reports.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -80,6 +83,9 @@ func (s *service) FindReportByID(ctx context.Context, a Actor, id meta.ID) (*Rep
 	return mapReport(item), nil
 }
 func (s *service) FindGenerationsByOutcomeID(ctx context.Context, a Actor, id meta.ID) ([]Generation, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
 	if id.IsZero() {
 		return nil, fmt.Errorf("evaluation outcome id is required")
 	}
@@ -97,6 +103,9 @@ func (s *service) FindGenerationsByOutcomeID(ctx context.Context, a Actor, id me
 	return s.mapGenerations(ctx, items)
 }
 func (s *service) FindLifecycleByAssessmentID(ctx context.Context, a Actor, id meta.ID) ([]Generation, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
 	if id.IsZero() {
 		return nil, fmt.Errorf("assessment id is required")
 	}
@@ -114,6 +123,9 @@ func (s *service) FindLifecycleByAssessmentID(ctx context.Context, a Actor, id m
 	return s.mapGenerations(ctx, items)
 }
 func (s *service) ListHistoricalReportsByAssessmentID(ctx context.Context, a Actor, id meta.ID) ([]Report, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
 	ref, err := s.outcomes.FindOutcomeByAssessmentID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -134,13 +146,17 @@ func (s *service) ListHistoricalReportsByAssessmentID(ctx context.Context, a Act
 	return result, nil
 }
 func (s *service) authorize(ctx context.Context, a Actor, resourceOrgID int64) error {
-	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil || s.access == nil {
-		return cberrors.WithCode(code.ErrModuleInitializationFailed, "interpretation operations service is not configured")
-	}
 	if a.OperatorUserID == 0 || a.OrgID == 0 || resourceOrgID == 0 {
 		return cberrors.WithCode(code.ErrPermissionDenied, "operations actor is required")
 	}
 	return s.access.AuthorizeAudit(ctx, a, resourceOrgID)
+}
+
+func (s *service) ensureConfigured() error {
+	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil || s.access == nil {
+		return cberrors.WithCode(code.ErrModuleInitializationFailed, "interpretation operations service is not configured")
+	}
+	return nil
 }
 func (s *service) mapGenerations(ctx context.Context, items []*domaingeneration.ReportGeneration) ([]Generation, error) {
 	result := make([]Generation, 0, len(items))

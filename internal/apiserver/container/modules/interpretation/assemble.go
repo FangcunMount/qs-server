@@ -13,13 +13,13 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
@@ -40,7 +40,7 @@ import (
 type Module struct {
 	reader                evaluationreadmodel.ReportReader
 	builderRegistry       rendering.Registry
-	generationExecutor    interpretationgeneration.Executor
+	executionExecutor     interpretationexecution.Executor
 	generationRepo        *mongoEval.GenerationRepository
 	runRepo               *mongoEval.RunRepository
 	reportRepo            *mongoEval.ReportRepository
@@ -120,19 +120,19 @@ func New(deps Deps) (*Module, error) {
 			return nil, err
 		}
 		module.builderRegistry = registry
-		starter, err := interpretationgeneration.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, 5*time.Minute)
+		starter, err := interpretationexecution.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, 5*time.Minute)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationgeneration.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer, catalogProjector)
+		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer, catalogProjector)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}
-		executor, err := interpretationgeneration.NewExecutor(starter, registry, committer)
+		executor, err := interpretationexecution.NewExecutor(starter, registry, committer)
 		if err != nil {
-			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation generation executor: %v", err)
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation execution: %v", err)
 		}
-		module.generationExecutor = executor
+		module.executionExecutor = executor
 	}
 
 	return module, nil
@@ -141,10 +141,10 @@ func New(deps Deps) (*Module, error) {
 // BindOutcomeRepository completes the cross-storage Interpretation use case
 // after Evaluation has installed its canonical outcome repository.
 func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
-	if m == nil || repo == nil || m.generationExecutor == nil {
+	if m == nil || repo == nil || m.executionExecutor == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
 	}
-	automationService, err := interpretationautomation.NewService(repo, m.generationExecutor)
+	automationService, err := interpretationautomation.NewService(repo, m.executionExecutor)
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation automation service: %v", err)
 	}
@@ -271,7 +271,7 @@ func (m *Module) ParticipantService() interpretationparticipant.Service {
 }
 
 func buildReportBuilderRegistry() (rendering.Registry, error) {
-	builders := rendering.DefaultBuilders(domainreport.NewDefaultReportBuilder(nil))
+	builders := rendering.DefaultBuilders(interpretationbuilder.NewDefaultReportBuilder())
 	registry, err := rendering.NewRegistry(builders...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report builder registry: %v", err)

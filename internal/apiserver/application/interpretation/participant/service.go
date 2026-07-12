@@ -20,6 +20,7 @@ type Report = reportprojection.Report
 type ListResult = reportprojection.ListResult
 
 type Access interface {
+	AuthorizeParticipant(ctx context.Context, actor Actor) error
 	AuthorizeOwnAssessment(ctx context.Context, testeeID, assessmentID uint64) error
 }
 
@@ -58,8 +59,11 @@ func (s *service) ListMyReports(ctx context.Context, actor Actor, query ListQuer
 	if actor.TesteeID == 0 {
 		return nil, cberrors.WithCode(code.ErrInvalidArgument, "testee ID is required")
 	}
-	if s.reader == nil {
+	if s.reader == nil || s.access == nil {
 		return nil, cberrors.WithCode(code.ErrModuleInitializationFailed, "participant report service is not configured")
+	}
+	if err := s.access.AuthorizeParticipant(ctx, actor); err != nil {
+		return nil, err
 	}
 	page, pageSize := normalizePagination(query.Page, query.PageSize)
 	testeeID := actor.TesteeID

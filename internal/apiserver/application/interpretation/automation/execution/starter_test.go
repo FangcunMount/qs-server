@@ -1,4 +1,4 @@
-package generation
+package execution
 
 import (
 	"context"
@@ -166,19 +166,6 @@ func (r *memoryArtifactRepo) FindByGenerationID(_ context.Context, id meta.ID) (
 		}
 	}
 	return nil, domainreport.ErrInterpretReportNotFound
-}
-
-func (r *memoryArtifactRepo) FindLatestByAssessmentID(_ context.Context, assessmentID meta.ID) (*domainreport.InterpretReport, error) {
-	var latest *domainreport.InterpretReport
-	for _, item := range r.items {
-		if item.Association().AssessmentID == assessmentID && (latest == nil || item.GeneratedAt().After(latest.GeneratedAt())) {
-			latest = item
-		}
-	}
-	if latest == nil {
-		return nil, domainreport.ErrInterpretReportNotFound
-	}
-	return latest, nil
 }
 
 func (r *memoryArtifactRepo) ListByAssessmentID(_ context.Context, assessmentID meta.ID) ([]*domainreport.InterpretReport, error) {

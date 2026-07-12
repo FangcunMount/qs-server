@@ -3,8 +3,6 @@ package reportprojection
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/presentation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
@@ -38,26 +36,16 @@ func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*
 }
 
 func modelIdentity(row interpretationreadmodel.ReportRow) ModelIdentity {
-	model := ModelIdentity{
+	return ModelIdentity{
 		Kind: row.Model.Kind, SubKind: row.Model.SubKind, Algorithm: row.Model.Algorithm,
 		Code: row.Model.Code, Version: row.Model.Version, Title: row.Model.Title,
 		ProductChannel: row.Model.ProductChannel, AlgorithmFamily: row.Model.AlgorithmFamily,
 	}
-	if model.Kind == "" && model.Code == "" {
-		model.Kind, model.Code, model.Title = string(modelcatalog.KindScale), row.ModelCode, row.ModelName
-	}
-	kind := binding.Kind(model.Kind)
-	model.ProductChannel = binding.ProductChannelForIdentity(kind, model.ProductChannel)
-	model.AlgorithmFamily = binding.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(model.SubKind), binding.Algorithm(model.Algorithm))
-	return model
 }
 
 func primaryScore(row interpretationreadmodel.ReportRow) *ScoreValue {
 	if row.PrimaryScore != nil {
 		return &ScoreValue{Kind: row.PrimaryScore.Kind, Value: row.PrimaryScore.Value, Label: row.PrimaryScore.Label, Max: row.PrimaryScore.Max}
-	}
-	if row.TotalScore != 0 || row.RiskLevel != "" {
-		return &ScoreValue{Kind: "raw_total", Value: row.TotalScore}
 	}
 	return nil
 }
@@ -65,15 +53,6 @@ func primaryScore(row interpretationreadmodel.ReportRow) *ScoreValue {
 func resultLevel(row interpretationreadmodel.ReportRow) *ResultLevel {
 	if row.Level != nil {
 		return &ResultLevel{Code: row.Level.Code, Label: row.Level.Label, Severity: row.Level.Severity}
-	}
-	if row.RiskLevel != "" {
-		severity := map[string]string{"severe": "high", "high": "high", "medium": "medium", "low": "low", "none": "none"}[row.RiskLevel]
-		if severity != "" {
-			return &ResultLevel{Code: row.RiskLevel, Label: row.RiskLevel, Severity: severity}
-		}
-	}
-	if row.ModelExtra != nil && row.ModelExtra.TypeCode != "" {
-		return &ResultLevel{Code: row.ModelExtra.TypeCode, Label: row.ModelExtra.TypeCode, Severity: "none"}
 	}
 	return nil
 }

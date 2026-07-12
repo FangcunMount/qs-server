@@ -128,7 +128,6 @@ func TestMechanismOrientedInterpretationPackagesExist(t *testing.T) {
 	root := repoRoot(t)
 	required := []string{
 		"internal/apiserver/domain/interpretation/report",
-		"internal/apiserver/domain/interpretation/template",
 		"internal/apiserver/domain/interpretation/builder",
 		"internal/apiserver/domain/interpretation/rule",
 		"internal/apiserver/domain/interpretation/policy",

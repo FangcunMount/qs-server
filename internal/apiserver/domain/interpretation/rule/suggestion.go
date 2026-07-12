@@ -17,10 +17,3 @@ const (
 	SuggestionCategoryHealth    = report.SuggestionCategoryHealth
 	SuggestionCategoryDimension = report.SuggestionCategoryDimension
 )
-
-// SuggestionInput 建议生成输入。
-type SuggestionInput struct {
-	RiskLevel          RiskLevel
-	HighRiskFactors    []report.FactorScoreInput
-	OriginalSuggestion string
-}

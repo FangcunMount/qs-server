@@ -47,6 +47,15 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 	if row.TotalScore != 88 || row.RiskLevel != "high" || row.Conclusion != "高风险" || !row.CreatedAt.Equal(createdAt) {
 		t.Fatalf("unexpected report summary: %#v", row)
 	}
+	if row.Model.Kind != "scale" || row.Model.Code != "sds" || row.Model.Title != "SDS" || row.Model.ProductChannel == "" || row.Model.AlgorithmFamily == "" {
+		t.Fatalf("legacy model identity was not normalized: %#v", row.Model)
+	}
+	if row.PrimaryScore == nil || row.PrimaryScore.Kind != "raw_total" || row.PrimaryScore.Value != 88 {
+		t.Fatalf("legacy primary score was not normalized: %#v", row.PrimaryScore)
+	}
+	if row.Level == nil || row.Level.Code != "high" || row.Level.Severity != "high" {
+		t.Fatalf("legacy result level was not normalized: %#v", row.Level)
+	}
 	if len(row.Dimensions) != 1 || row.Dimensions[0].FactorCode != "total" || row.Dimensions[0].MaxScore == nil || *row.Dimensions[0].MaxScore != maxScore {
 		t.Fatalf("unexpected dimensions: %#v", row.Dimensions)
 	}

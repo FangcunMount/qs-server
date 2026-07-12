@@ -1,6 +1,5 @@
-// Package interpretation 负责最终 呈现 aggregate 在之后 评估 model execution。
-//
-// 面向机制 structure 位于 interpretation/{report,template,builder,rule,策略,因子_计分,因子_分类}。
-// Report rendering mechanisms live in domain/interpretation/rendering and are
-// assembled by the Interpretation container.
+// Package interpretation owns the durable terminal events emitted by report
+// generation. The Generation, Run and immutable Report models live in their
+// explicit subpackages; rendering consumes Evaluation outcomes as read-only
+// facts and never advances Evaluation state.
 package interpretation

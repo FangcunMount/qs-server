@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

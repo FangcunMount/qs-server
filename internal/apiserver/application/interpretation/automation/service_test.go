@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -28,9 +28,9 @@ type executorStub struct {
 	traceID string
 }
 
-func (s *executorStub) Execute(_ context.Context, input interpinput.InterpretationInput, traceID string) (*interpretationgeneration.ExecuteResult, error) {
+func (s *executorStub) Execute(_ context.Context, input interpinput.InterpretationInput, traceID string) (*interpretationexecution.ExecuteResult, error) {
 	s.input, s.traceID = input, traceID
-	return &interpretationgeneration.ExecuteResult{Status: interpretationgeneration.ExecuteStatusProcessing}, nil
+	return &interpretationexecution.ExecuteResult{Status: interpretationexecution.ExecuteStatusProcessing}, nil
 }
 
 func TestGenerateRequiresTrustedActorBeforeReadingOutcome(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
@@ -14,7 +13,7 @@ import (
 )
 
 type Builder interface {
-	ReportType() domaininterpretation.ReportType
+	ReportType() policy.ReportType
 	TemplateVersion() policy.TemplateVersion
 	BuilderIdentity() string
 	ContentSchemaVersion() string
@@ -24,7 +23,7 @@ type Builder interface {
 type Key struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	ReportType      domaininterpretation.ReportType
+	ReportType      policy.ReportType
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
@@ -114,7 +113,7 @@ func (r *registry) ResolveByMechanism(key Key) (Builder, error) {
 		return nil, fmt.Errorf("interpretation report builder registry is not configured")
 	}
 	if key.ReportType == "" {
-		key.ReportType = domaininterpretation.ReportTypeStandard
+		key.ReportType = policy.ReportTypeStandard
 	}
 	if key.TemplateVersion.IsEmpty() {
 		key.TemplateVersion = policy.TemplateVersionV1
@@ -130,7 +129,7 @@ func (r *registry) ResolveByMechanism(key Key) (Builder, error) {
 type RoutingContext struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	ReportType      domaininterpretation.ReportType
+	ReportType      policy.ReportType
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
 	ProductChannel  modelcatalog.ProductChannel
@@ -148,13 +147,13 @@ func RoutingContextFromInput(input interpinput.InterpretationInput) (RoutingCont
 		ReportProfile:   input.Report.ReportProfile,
 	}
 	if value.ReportType == "" {
-		value.ReportType = domaininterpretation.ReportTypeStandard
+		value.ReportType = policy.ReportTypeStandard
 	}
 	if value.TemplateVersion.IsEmpty() {
 		value.TemplateVersion = policy.TemplateVersionV1
 	}
 	if value.DecisionKind == "" {
-		value.DecisionKind = defaultDecisionKind(value.AlgorithmFamily)
+		value.DecisionKind = policy.DefaultDecisionKind(value.AlgorithmFamily)
 	}
 	if value.ReportProfile == "" {
 		value.ReportProfile = policy.ReportProfileForDecisionKind(value.DecisionKind)
@@ -171,21 +170,6 @@ func KeyFromInput(input interpinput.InterpretationInput) (Key, bool) {
 		return Key{}, false
 	}
 	return Key(value), true
-}
-
-func defaultDecisionKind(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
-	switch family {
-	case modelcatalog.AlgorithmFamilyFactorScoring:
-		return modelcatalog.DecisionKindScoreRange
-	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return modelcatalog.DecisionKindPoleComposition
-	case modelcatalog.AlgorithmFamilyFactorNorm:
-		return modelcatalog.DecisionKindNormLookup
-	case modelcatalog.AlgorithmFamilyTaskPerformance:
-		return modelcatalog.DecisionKindAbilityLevel
-	default:
-		return ""
-	}
 }
 
 func fallbackCandidates(key Key) []Key {

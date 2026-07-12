@@ -2,12 +2,23 @@ package operations
 
 import (
 	"context"
+	"testing"
+
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"testing"
 )
+
+func TestOperationsRejectsUnconfiguredServiceBeforeRepositoryAccess(t *testing.T) {
+	service := NewService(nil, nil, nil, nil, nil)
+	_, err := service.FindReportByID(context.Background(), Actor{OrgID: 1, OperatorUserID: 1}, meta.ID(1))
+	if !cberrors.IsCode(err, code.ErrModuleInitializationFailed) {
+		t.Fatalf("error = %v, want module initialization failure", err)
+	}
+}
 
 func TestOperationsRequiresAuditPermissionBeforeRepositoryRead(t *testing.T) {
 	g := &genRepo{}
@@ -72,9 +83,6 @@ func (reportRepo) FindByID(context.Context, meta.ID) (*domainreport.InterpretRep
 	return nil, nil
 }
 func (reportRepo) FindByGenerationID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
-	return nil, nil
-}
-func (reportRepo) FindLatestByAssessmentID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
 	return nil, nil
 }
 func (reportRepo) ListByAssessmentID(context.Context, meta.ID) ([]*domainreport.InterpretReport, error) {

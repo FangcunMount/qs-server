@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	actortestee "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
+	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
@@ -60,17 +62,17 @@ func (c *Container) initEvaluationModule() error {
 	if c.ReportModule == nil || c.EvaluationModule == nil {
 		return fmt.Errorf("evaluation and interpretation modules must be installed before binding outcome reporting")
 	}
+	if c.ActorModule == nil {
+		return fmt.Errorf("actor module must be installed before binding interpretation access")
+	}
 	if err := c.ReportModule.BindOutcomeRepository(c.EvaluationModule.OutcomeRepository()); err != nil {
 		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
 	}
-	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{access: c.EvaluationModule.TesteeService}); err != nil {
+	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
 	}
 	if err := c.ReportModule.BindAdministrationAccess(administrationInterpretationAccess{access: c.EvaluationModule.OperatorQuery}); err != nil {
 		return fmt.Errorf("failed to bind interpretation administration service: %w", err)
-	}
-	if c.ActorModule == nil {
-		return fmt.Errorf("actor module must be installed before binding interpretation clinician service")
 	}
 	if err := c.ReportModule.BindClinicianAccess(clinicianInterpretationAccess{relations: c.ActorModule.TesteeAccessService, ownership: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation clinician service: %w", err)
@@ -79,11 +81,32 @@ func (c *Container) initEvaluationModule() error {
 }
 
 type participantInterpretationAccess struct {
-	access evaluationtestee.Service
+	testees     actortestee.TesteeQueryService
+	assessments evaluationtestee.Service
+}
+
+func (a participantInterpretationAccess) AuthorizeParticipant(ctx context.Context, actor interpretationparticipant.Actor) error {
+	if a.testees == nil {
+		return fmt.Errorf("participant testee query service is not configured")
+	}
+	testee, err := a.testees.GetByID(ctx, actor.TesteeID)
+	if err != nil {
+		return err
+	}
+	if testee == nil || testee.ID != actor.TesteeID {
+		return fmt.Errorf("participant testee identity does not exist")
+	}
+	return nil
 }
 
 func (a participantInterpretationAccess) AuthorizeOwnAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
-	return a.access.AuthorizeAssessment(ctx, evaluationtestee.Actor{TesteeID: testeeID}, assessmentID)
+	if err := a.AuthorizeParticipant(ctx, interpretationparticipant.Actor{TesteeID: testeeID}); err != nil {
+		return err
+	}
+	if a.assessments == nil {
+		return fmt.Errorf("participant assessment access service is not configured")
+	}
+	return a.assessments.AuthorizeAssessment(ctx, evaluationtestee.Actor{TesteeID: testeeID}, assessmentID)
 }
 
 type administrationInterpretationAccess struct {

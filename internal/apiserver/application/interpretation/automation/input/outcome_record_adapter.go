@@ -54,7 +54,7 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		in.Runtime.AlgorithmFamily, _ = modelcatalog.AlgorithmFamilyFromIdentity(modelcatalog.Kind(model.Kind), modelcatalog.SubKind(model.SubKind), modelcatalog.Algorithm(model.Algorithm))
 	}
 	if in.Runtime.DecisionKind == "" {
-		in.Runtime.DecisionKind = defaultDecisionKind(in.Runtime.AlgorithmFamily)
+		in.Runtime.DecisionKind = policy.DefaultDecisionKind(in.Runtime.AlgorithmFamily)
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
 

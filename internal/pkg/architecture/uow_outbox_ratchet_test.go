@@ -131,7 +131,7 @@ func TestMongoReportEventfulSaveCompatibilityEntrypointsAreRemoved(t *testing.T)
 	})
 }
 
-func TestInterpretationAssemblerExclusivelyWiresGenerationExecutor(t *testing.T) {
+func TestInterpretationAssemblerExclusivelyWiresExecution(t *testing.T) {
 	root := repoRoot(t)
 	evalPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	evalData, err := os.ReadFile(evalPath)
@@ -155,8 +155,8 @@ func TestInterpretationAssemblerExclusivelyWiresGenerationExecutor(t *testing.T)
 	}
 	reportText := string(reportData)
 	for _, token := range []string{
-		"interpretationgeneration.NewStarter(",
-		"interpretationgeneration.NewExecutor(",
+		"interpretationexecution.NewStarter(",
+		"interpretationexecution.NewExecutor(",
 		"interpretationautomation.NewService(",
 	} {
 		if !strings.Contains(reportText, token) {

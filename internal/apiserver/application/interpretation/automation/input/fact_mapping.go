@@ -3,9 +3,9 @@ package input
 import (
 	"fmt"
 
-	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	interpretationrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rule"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -31,25 +31,10 @@ func level(execution *domainoutcome.Execution) *report.ResultLevel {
 		return nil
 	}
 	value := execution.Level
-	if domaininterpretation.IsRiskLevelCode(value.Code) {
+	if interpretationrule.IsRiskLevelCode(value.Code) {
 		return report.LevelFromRisk(report.RiskLevel(value.Code))
 	}
 	return &report.ResultLevel{Code: value.Code, Label: value.Label, Severity: value.Severity}
-}
-
-func defaultDecisionKind(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
-	switch family {
-	case modelcatalog.AlgorithmFamilyFactorScoring:
-		return modelcatalog.DecisionKindScoreRange
-	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return modelcatalog.DecisionKindPoleComposition
-	case modelcatalog.AlgorithmFamilyFactorNorm:
-		return modelcatalog.DecisionKindNormLookup
-	case modelcatalog.AlgorithmFamilyTaskPerformance:
-		return modelcatalog.DecisionKindAbilityLevel
-	default:
-		return ""
-	}
 }
 
 func factorModel(snapshot *evaluationinput.InputSnapshot, family modelcatalog.AlgorithmFamily) *reportscore.ReportModel {
@@ -99,7 +84,7 @@ func factorScores(execution *domainoutcome.Execution, model *reportscore.ReportM
 			continue
 		}
 		risk := report.RiskLevelNone
-		if dimension.Level != nil && domaininterpretation.IsRiskLevelCode(dimension.Level.Code) {
+		if dimension.Level != nil && interpretationrule.IsRiskLevelCode(dimension.Level.Code) {
 			risk = report.RiskLevel(dimension.Level.Code)
 		}
 		items = append(items, reportscore.FactorReportScore{FactorCode: dimension.Code, FactorName: dimension.Name, RawScore: dimension.Score.Value, RiskLevel: risk, IsTotalScore: totalCodes[dimension.Code] || dimension.Role == "total", Role: dimension.Role, ParentCode: dimension.ParentCode, HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder})

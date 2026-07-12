@@ -30,8 +30,3 @@ func (v TemplateVersion) String() string {
 func (v TemplateVersion) IsEmpty() bool {
 	return v == ""
 }
-
-// ResolveReportType 选择报告展示策略。
-func ResolveReportType() ReportType {
-	return ReportTypeStandard
-}

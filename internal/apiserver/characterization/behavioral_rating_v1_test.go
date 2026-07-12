@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 )
 
@@ -23,7 +23,7 @@ func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
 		Assessment: a,
 		Input:      behavioralRatingInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewNormProfileBuilder(
-			domainreport.NewDefaultReportBuilder(nil),
+			interpretationbuilder.NewDefaultReportBuilder(),
 		),
 	})
 	if err := svc.Evaluate(ctx, a.ID().Uint64()); err != nil {

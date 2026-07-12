@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -19,7 +19,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
-			domainreport.NewDefaultReportBuilder(nil),
+			interpretationbuilder.NewDefaultReportBuilder(),
 		),
 	})
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
@@ -71,7 +71,7 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
 		ReportBuilder: interpretationreporting.NewFactorScoringBuilder(
-			domainreport.NewDefaultReportBuilder(nil),
+			interpretationbuilder.NewDefaultReportBuilder(),
 		),
 		Async: true,
 		StageEvaluated: func(_ context.Context, events ...event.DomainEvent) error {

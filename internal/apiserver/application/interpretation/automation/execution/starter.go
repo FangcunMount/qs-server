@@ -1,6 +1,6 @@
-// Package generation owns the application use case that reliably claims one
+// Package execution owns the application use case that reliably claims one
 // InterpretationRun for a ReportGeneration.
-package generation
+package execution
 
 import (
 	"context"
