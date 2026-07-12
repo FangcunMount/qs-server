@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	modelcatalogwire "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -12,13 +11,16 @@ import (
 func TestEvaluationModuleRegistersOnlyDeclaredDescriptorFamilies(t *testing.T) {
 	t.Parallel()
 
-	descs := modelcatalogwire.DefaultEvaluationDescriptors()
 	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
 		t.Fatalf("DefaultRuntimeDescriptorRegistry() error = %v", err)
 	}
-	if registry.Len() != len(descs) {
-		t.Fatalf("runtime descriptor count = %d, want %d", registry.Len(), len(descs))
+	paths, err := evalruntime.ExecutionPathsFromRegistry(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registry.Len() != len(paths) {
+		t.Fatalf("runtime descriptor count = %d, paths = %d", registry.Len(), len(paths))
 	}
 	for _, kind := range domain.RuntimeExecutableKinds() {
 		capability, ok := domain.FamilyCapabilityByKind(kind)

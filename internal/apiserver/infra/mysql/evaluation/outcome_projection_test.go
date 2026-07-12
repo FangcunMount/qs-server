@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -22,8 +23,8 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 		Score: &score,
 		Level: level,
 	}
-	if err := a.ApplyScoringProjection(projection); err != nil {
-		t.Fatalf("ApplyScoringProjection returned error: %v", err)
+	if err := a.ApplyScoringProjectionAt(projection, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
@@ -49,9 +50,9 @@ func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
 
 	a := newSubmittedScaleAssessment(t)
 	score := 18.5
-	if err := a.ApplyScoringProjection(assessment.ScoringProjection{
+	if err := a.ApplyScoringProjectionAt(assessment.ScoringProjection{
 		ModelRef: *a.EvaluationModelRef(), Summary: assessment.ResultSummary{PrimaryLabel: "high"}, Score: &score, Level: "high",
-	}); err != nil {
+	}, time.Unix(100, 0)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,10 +91,10 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	score := 92.0
-	if err := a.ApplyScoringProjection(assessment.ScoringProjection{
+	if err := a.ApplyScoringProjectionAt(assessment.ScoringProjection{
 		ModelRef: modelRef, Summary: assessment.ResultSummary{PrimaryLabel: "INTJ", Score: &score}, Score: &score, Level: "INTJ",
-	}); err != nil {
-		t.Fatalf("ApplyScoringProjection returned error: %v", err)
+	}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)

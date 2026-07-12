@@ -2,17 +2,13 @@ package compose
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 )
 
-// EvaluationCatalog carries shared model descriptors for report/evaluation wiring.
+// EvaluationCatalog carries the single runtime registration source for Evaluation wiring.
 type EvaluationCatalog struct {
-	Descriptors               []evaldomain.ModelDescriptor
-	TypologyRegistry          evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 }
 

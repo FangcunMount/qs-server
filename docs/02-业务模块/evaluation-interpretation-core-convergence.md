@@ -142,6 +142,8 @@ PublishedModelSnapshot
 | Domain entry | application `factor_scoring` 经 `domain/evaluation/scoring` entry，不再直引 `scale` |
 | 守卫 | `TestApplicationFactorMechanismsUseDomainEntryPackages` |
 
+> Batch G 已删除该阶段的 `DefaultEvaluationDescriptors` 投影和 typology 算法别名 registry；当前由 `RuntimeDescriptorRegistry → ExecutionPath → InputProvider` 直接物化。上表仅保留迁移历史。
+
 ## Round 9（已完成）
 
 | 交付 | 说明 |
@@ -195,7 +197,7 @@ PublishedModelSnapshot
 | 交付 | 说明 |
 |------|------|
 | 装配拆分 | Evaluation container 不再接收 `ReportBuilder` / `ReportSaver`，也不再导出 report builder materialize |
-| Registry 归属 | Interpretation 按 ModelDescriptor / ExecutionPath 自主物化四类 ReportBuilder |
+| Registry 归属 | Evaluation 从 RuntimeDescriptorRegistry 导出 ExecutionPath 并物化 input provider；Interpretation 按自身已注册 ReportPath 自主物化 ReportBuilder，不共享 ModelDescriptor 或算法别名 registry |
 | Typology 报告迁移 | report builder、adapter registry、模板与 legacy report 兼容映射迁入 `application/interpretation/reporting/typology` |
 | Preview 例外 | Preview 保留进程内组合，但分别调用 Evaluation executor 与 Interpretation builder |
 | 架构守卫 | 禁止 Interpretation container 回调 Evaluation materialize；禁止 Evaluation typology mechanisms 再出现 report 实现 |

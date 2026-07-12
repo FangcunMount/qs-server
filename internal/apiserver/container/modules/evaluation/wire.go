@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
@@ -55,8 +54,6 @@ type WireInput struct {
 	StaticRedisClient                           redis.UniversalClient
 	StaticCacheBuilder                          *keyspace.Builder
 	PublishedModelPolicy                        cachepolicy.CachePolicy
-	ModelDescriptors                            []evaldomain.ModelDescriptor
-	TypologyRegistry                            evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 }
 
@@ -112,13 +109,11 @@ type PublishedModelCatalogInput struct {
 
 // Wire builds and bootstraps the evaluation module from composition inputs.
 func Wire(in WireInput) (WireResult, error) {
-	modelDescriptors := in.ModelDescriptors
-	if len(modelDescriptors) == 0 {
-		return WireResult{}, fmt.Errorf("model descriptors are required")
+	executionPaths, err := evalruntime.ExecutionPathsFromRegistry(in.RuntimeDescriptorRegistry)
+	if err != nil {
+		return WireResult{}, fmt.Errorf("evaluation runtime registry: %w", err)
 	}
-	if in.TypologyRegistry.Len() == 0 {
-		return WireResult{}, fmt.Errorf("typology registry is required")
-	}
+	executionPaths = evalruntime.FilterExecutablePaths(executionPaths)
 
 	catalog := in.PublishedModelCatalog
 	var inputResolver evaluationinput.Resolver
@@ -142,7 +137,7 @@ func Wire(in WireInput) (WireResult, error) {
 			infra.AnswerSheetRepo,
 			infra.QuestionnaireRepo,
 			catalog,
-			modelDescriptors,
+			executionPaths,
 			mongomodelcatalog.NewNormRepository(in.MongoDB, mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}),
 		)
 		if err != nil {
@@ -193,8 +188,7 @@ func Wire(in WireInput) (WireResult, error) {
 		AssessmentOutboxRelayImmediateMaxConcurrent: in.AssessmentOutboxRelayImmediateMaxConcurrent,
 		TesteeAccessChecker:                         in.TesteeAccessChecker,
 		OpsHandle:                                   in.OpsHandle,
-		ModelDescriptors:                            modelDescriptors,
-		TypologyRegistry:                            in.TypologyRegistry,
+		ExecutionPaths:                              executionPaths,
 		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
 		PublishedModelReader:                        publishedModelReader,
 	})

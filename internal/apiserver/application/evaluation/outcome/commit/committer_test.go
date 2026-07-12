@@ -93,7 +93,7 @@ type commitScoreProjectorStub struct {
 	projectErr error
 }
 
-func (p commitScoreProjectorStub) Project(ctx context.Context, _ *domainoutcome.Record, _ evaloutcome.Outcome) error {
+func (p commitScoreProjectorStub) Project(ctx context.Context, _ *domainoutcome.Record, _ *assessment.Assessment, _ *domainoutcome.Execution) error {
 	requireCommitTx(ctx)
 	*p.order = append(*p.order, "score")
 	return p.projectErr
@@ -139,14 +139,12 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	}
 	evaluatedAt := time.Unix(200, 0)
 
-	record, err := c.Commit(context.Background(), Request{
-		Outcome: evaloutcome.Outcome{
-			Assessment:           a,
-			Execution:            execution,
-			RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
-		},
-		Run:         &run,
-		EvaluatedAt: evaluatedAt,
+	record, err := c.Commit(context.Background(), CommitRequest{
+		Assessment:           a,
+		Execution:            execution,
+		RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		Run:                  &run,
+		EvaluatedAt:          evaluatedAt,
 	})
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
@@ -244,14 +242,12 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 				t.Fatal(err)
 			}
 
-			_, err := c.Commit(context.Background(), Request{
-				Outcome: evaloutcome.Outcome{
-					Assessment:           a,
-					Execution:            execution,
-					RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
-				},
-				Run:         &run,
-				EvaluatedAt: time.Unix(200, 0),
+			_, err := c.Commit(context.Background(), CommitRequest{
+				Assessment:           a,
+				Execution:            execution,
+				RuntimeDescriptorKey: evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+				Run:                  &run,
+				EvaluatedAt:          time.Unix(200, 0),
 			})
 			if !errors.Is(err, commitErr) {
 				t.Fatalf("Commit error = %v, want %v", err, commitErr)

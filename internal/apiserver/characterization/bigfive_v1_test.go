@@ -27,8 +27,8 @@ func TestV1BigFivePipelinePreservesTraitScoresAndReportFields(t *testing.T) {
 	}
 
 	a := submittedBigFiveAssessment(t)
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
-		a, nil,
+	report := buildPreviewReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		t, a, nil,
 		domainoutcome.Summary{PrimaryLabel: detail.Traits[0].Code},
 		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))

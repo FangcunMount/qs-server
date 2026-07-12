@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -248,12 +247,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 执行评估成功，可靠提交规范 EvaluationOutcome。
-	err = s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{
+	err = s.persistEvaluationOutcome(ctx, outcomecommit.CommitRequest{
 		Assessment:           a,
 		Input:                input,
 		Execution:            evaluationOutcome,
 		RuntimeDescriptorKey: resolved.DescriptorKey,
-	}, &evaluationRun)
+		Run:                  &evaluationRun,
+		EvaluatedAt:          time.Now(),
+	})
 	if err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
@@ -284,17 +285,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 func (s *service) persistEvaluationOutcome(
 	ctx context.Context,
-	outcome evaloutcome.Outcome,
-	evaluationRun *evalrun.EvaluationRun,
+	request outcomecommit.CommitRequest,
 ) error {
 	if s.evaluationCommitter == nil {
 		return evalerrors.ModuleNotConfigured("evaluation committer is not configured")
 	}
-	_, err := s.evaluationCommitter.Commit(ctx, outcomecommit.Request{
-		Outcome:     outcome,
-		Run:         evaluationRun,
-		EvaluatedAt: time.Now(),
-	})
+	_, err := s.evaluationCommitter.Commit(ctx, request)
 	return err
 }
 

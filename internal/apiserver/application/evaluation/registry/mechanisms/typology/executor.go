@@ -12,45 +12,22 @@ import (
 )
 
 type Executor struct {
-	runner          *algorithmRunner
-	key             evaluation.ExecutionIdentity
-	legacyAlgorithm modelcatalog.Algorithm
-}
-
-// NewTypologyExecutor 构造旧版 算法-scoped 类型学 executor。
-// Deprecated: 新装配使用 NewConfiguredTypologyExecutor；旧 key 仅为兼容解析保留。
-func NewTypologyExecutor(algorithm modelcatalog.Algorithm) (*Executor, error) {
-	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
+	runner *algorithmRunner
+	key    evaluation.ExecutionIdentity
 }
 
 func NewConfiguredTypologyExecutor() (*Executor, error) {
-	return NewConfiguredTypologyExecutorWithRegistry(mustDefaultModuleRegistry())
+	return NewConfiguredTypologyExecutorWithRuntime(DefaultPersonalityRuntime())
 }
 
-func NewConfiguredTypologyExecutorWithRegistry(registry ModuleRegistry) (*Executor, error) {
-	runner, err := registry.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
+func NewConfiguredTypologyExecutorWithRuntime(runtime PersonalityRuntime) (*Executor, error) {
+	runner, err := runtime.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
 	if err != nil {
 		return nil, err
 	}
 	return &Executor{
 		runner: &runner,
 		key:    evaluation.ExecutionIdentityPersonalityTypology,
-	}, nil
-}
-
-func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
-	return newLegacyExecutor(registry, algorithm)
-}
-
-func newLegacyExecutor(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
-	runner, err := algorithmRunnerFor(registry, algorithm)
-	if err != nil {
-		return nil, err
-	}
-	return &Executor{
-		runner:          &runner,
-		key:             evaluation.PersonalityTypologyIdentity(algorithm),
-		legacyAlgorithm: algorithm,
 	}, nil
 }
 
@@ -83,10 +60,6 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	if !ok {
 		return nil, fmt.Errorf("personality typology payload is required")
 	}
-	if e.legacyAlgorithm != "" && payload.Algorithm != e.legacyAlgorithm {
-		return nil, fmt.Errorf("typology algorithm %s does not match executor %s", payload.Algorithm, e.legacyAlgorithm)
-	}
-
 	modelRef := modelRefFromExecutionInput(input, payload)
 	return e.runner.buildOutcome(modelRef, payload, input.Input.AnswerSheet)
 }

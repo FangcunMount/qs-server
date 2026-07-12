@@ -268,47 +268,6 @@ func (c *DefaultAssessmentCreator) validateOrigin(origin Origin) error {
 	}
 }
 
-// ==================== SimpleAssessmentCreator 简单实现 ====================
-
-// SimpleAssessmentCreator 简单测评创建服务
-// 不进行跨聚合验证，适用于测试环境或已在应用层完成验证的场景
-type SimpleAssessmentCreator struct{}
-
-// NewSimpleAssessmentCreator 创建简单测评创建服务
-func NewSimpleAssessmentCreator() *SimpleAssessmentCreator {
-	return &SimpleAssessmentCreator{}
-}
-
-// Create 创建测评（简单实现，不做跨聚合验证）
-func (c *SimpleAssessmentCreator) Create(
-	_ context.Context,
-	req CreateAssessmentRequest,
-) (*Assessment, error) {
-	// 1. 构造选项
-	opts := make([]AssessmentOption, 0)
-	if req.ModelRef != nil {
-		opts = append(opts, WithEvaluationModel(*req.ModelRef))
-	}
-
-	// 2. 创建 pending 测评
-	assessment, err := NewAssessment(
-		req.OrgID,
-		req.TesteeID,
-		req.QuestionnaireRef,
-		req.AnswerSheetRef,
-		req.Origin,
-		opts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return assessment, nil
-}
-
 // ==================== 确保实现接口 ====================
 
-var (
-	_ AssessmentCreator = (*DefaultAssessmentCreator)(nil)
-	_ AssessmentCreator = (*SimpleAssessmentCreator)(nil)
-)
+var _ AssessmentCreator = (*DefaultAssessmentCreator)(nil)

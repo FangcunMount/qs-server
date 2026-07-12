@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -33,10 +34,10 @@ func TestApplyScoringProjectionDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 		t.Fatalf("Submit: %v", err)
 	}
 	score := 92.0
-	if err := a.ApplyScoringProjection(ScoringProjection{
+	if err := a.ApplyScoringProjectionAt(ScoringProjection{
 		ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "INTJ", Score: &score}, Score: &score, Level: "INTJ",
-	}); err != nil {
-		t.Fatalf("ApplyScoringProjection: %v", err)
+	}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt: %v", err)
 	}
 	if a.RiskLevel() != nil {
 		t.Fatalf("risk level = %v, want nil for typology type code", *a.RiskLevel())

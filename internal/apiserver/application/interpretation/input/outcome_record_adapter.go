@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -23,11 +24,11 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 	if record == nil {
 		return interpinput.InterpretationInput{}, fmt.Errorf("evaluation outcome is required")
 	}
-	execution, err := domainoutcome.RestoreExecution(record)
+	execution, err := evaluationfactcodec.DecodeExecution(record)
 	if err != nil {
 		return interpinput.InterpretationInput{}, err
 	}
-	assets, err := domainoutcome.RestoreReportInput(record)
+	assets, err := evaluationfactcodec.DecodeReportInput(record)
 	if err != nil {
 		return interpinput.InterpretationInput{}, err
 	}

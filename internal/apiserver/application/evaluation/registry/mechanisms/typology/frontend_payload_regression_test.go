@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -155,8 +156,9 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
+	assessed := frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm)
 	outcome, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
-		Assessment: frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm),
+		Assessment: assessed,
 		Input:      input,
 	})
 	if err != nil {
@@ -170,11 +172,16 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	interpretationInput, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(evaloutcome.Outcome{
-		Assessment: frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm),
-		Input:      input,
-		Execution:  outcome,
-	}))
+	ref := outcome.ModelRef
+	factModel := evaluationfact.ModelIdentity{Kind: ref.Kind(), SubKind: ref.SubKind(), Algorithm: ref.Algorithm(), Code: ref.Code().String(), Version: ref.Version(), Title: ref.Title()}
+	decoded, err := evaluationfactcodec.DecodeTransientExecution(outcome, factModel, evaluationfact.RuntimeIdentity{})
+	if err != nil {
+		t.Fatalf("decode preview execution: %v", err)
+	}
+	interpretationInput, err := interpretationinput.FromPreviewOutcome(interpretationinput.PreviewOutcome{
+		Association: domainreport.Association{OrgID: assessed.OrgID(), AssessmentID: assessed.ID(), TesteeID: assessed.TesteeID().Uint64()},
+		Input:       input, Execution: decoded,
+	})
 	if err != nil {
 		t.Fatalf("adapt interpretation input: %v", err)
 	}

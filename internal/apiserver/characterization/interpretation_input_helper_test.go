@@ -4,11 +4,9 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 type draftReportBuilder interface {
@@ -41,9 +39,9 @@ func (r *characterizationReport) RiskLevel() report.RiskLevel {
 	return report.RiskLevel(r.content.Level.Code)
 }
 
-func buildLegacyReport(t *testing.T, builder draftReportBuilder, outcome evaloutcome.Outcome) *characterizationReport {
+func buildPreviewReport(t *testing.T, builder draftReportBuilder, outcome interpretationinput.PreviewOutcome) *characterizationReport {
 	t.Helper()
-	input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(outcome))
+	input, err := interpretationinput.FromPreviewOutcome(outcome)
 	if err != nil {
 		t.Fatalf("adapt interpretation input: %v", err)
 	}

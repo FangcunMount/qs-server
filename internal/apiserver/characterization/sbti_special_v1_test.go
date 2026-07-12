@@ -38,8 +38,8 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want hidden trigger", detail.SpecialTrigger)
 	}
 
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
-		submittedSBTIAssessment(t), nil,
+	report := buildPreviewReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		t, submittedSBTIAssessment(t), nil,
 		domainoutcome.Summary{PrimaryLabel: detail.TypeCode},
 		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))
@@ -82,8 +82,8 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want fallback trigger", detail.SpecialTrigger)
 	}
 
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
-		submittedSBTIAssessment(t), nil,
+	report := buildPreviewReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		t, submittedSBTIAssessment(t), nil,
 		domainoutcome.Summary{PrimaryLabel: detail.TypeCode},
 		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))

@@ -16,21 +16,21 @@ import (
 
 type evaluationCommitterStub struct {
 	calls   int
-	request outcomecommit.Request
+	request outcomecommit.CommitRequest
 }
 
 type failingEvaluationCommitter struct {
 	err error
 }
 
-func (c failingEvaluationCommitter) Commit(context.Context, outcomecommit.Request) (*domainoutcome.Record, error) {
+func (c failingEvaluationCommitter) Commit(context.Context, outcomecommit.CommitRequest) (*domainoutcome.Record, error) {
 	return nil, c.err
 }
 
-func (s *evaluationCommitterStub) Commit(_ context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
+func (s *evaluationCommitterStub) Commit(_ context.Context, request outcomecommit.CommitRequest) (*domainoutcome.Record, error) {
 	s.calls++
 	s.request = request
-	if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
+	if err := request.Assessment.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(request.Execution), request.EvaluatedAt); err != nil {
 		return nil, err
 	}
 	if err := request.Run.Succeed(time.Unix(200, 0)); err != nil {
@@ -75,7 +75,7 @@ func TestEvaluateSkipsAlreadyEvaluatedAssessment(t *testing.T) {
 
 	a := splitPhaseAssessment(t)
 	execution := executionForAssessment(a, "ok")
-	if err := a.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(execution)); err != nil {
+	if err := a.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(execution), time.Unix(100, 0)); err != nil {
 		t.Fatal(err)
 	}
 	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: execution}

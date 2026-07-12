@@ -12,7 +12,6 @@ import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -20,10 +19,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -95,8 +94,7 @@ type Deps struct {
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         assessmentApp.TesteeAccessChecker
 	OpsHandle                                   *cacheplane.Handle
-	ModelDescriptors                            []evaldomain.ModelDescriptor
-	TypologyRegistry                            evalregistry.TypologyRegistry
+	ExecutionPaths                              []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader                        rulesetport.PublishedModelReader
 }
@@ -196,10 +194,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) error {
 	if normalized.InputResolver != nil {
-		wiringDeps := WiringDeps{
-			ScaleScorer:      ruleengine.NewScaleFactorScorer(),
-			TypologyRegistry: normalized.TypologyRegistry,
-		}
+		wiringDeps := WiringDeps{ScaleScorer: ruleengine.NewScaleFactorScorer()}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
 				ScaleScorer:          evalruntime.MaterializeFactorScoringPipelineComponents(wiringDeps),
@@ -315,11 +310,8 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		deps.EventPublisher = event.NewNopEventPublisher()
 	}
 	if deps.InputResolver != nil {
-		if len(deps.ModelDescriptors) == 0 {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "model descriptors are required when input resolver is configured")
-		}
-		if deps.TypologyRegistry.Len() == 0 {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "typology registry is required when input resolver is configured")
+		if len(deps.ExecutionPaths) == 0 {
+			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "execution paths are required when input resolver is configured")
 		}
 	}
 	return deps, nil

@@ -1,6 +1,5 @@
-// Package input adapts durable Evaluation facts into the Interpretation-owned
-// input contract. Transient preview compatibility arrives through the explicit
-// evaluationfact anti-corruption contract, never through Evaluation packages.
+// Package input adapts durable Evaluation facts and explicit transient preview
+// values into the Interpretation-owned input contract.
 package input
 
 import (
@@ -15,38 +14,39 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// LegacyTemplateVersion is retained only for preview and characterization
-// compatibility; production uses DefaultTemplateVersion from Outcome records.
-const LegacyTemplateVersion = DefaultTemplateVersion
+const PreviewTemplateVersion = DefaultTemplateVersion
 
-// FromLegacyOutcome is the temporary compatibility boundary for the old report
-// writer. New Generation/Run orchestration will construct the same input from
-// EvaluationOutcome directly and remove this adapter.
-func FromLegacyOutcome(outcome domainoutcome.LegacyOutcome) (interpinput.InterpretationInput, error) {
-	if outcome.Assessment == nil || outcome.Execution == nil {
-		return interpinput.InterpretationInput{}, fmt.Errorf("persisted evaluation outcome context is incomplete")
+// PreviewOutcome is an explicit transient composition input. It is not a
+// committed Evaluation fact and cannot be stored through evaluationfact.Repository.
+type PreviewOutcome struct {
+	Association report.Association
+	Input       *evaluationinput.InputSnapshot
+	Execution   *domainoutcome.Execution
+	Runtime     domainoutcome.RuntimeIdentity
+}
+
+func FromPreviewOutcome(outcome PreviewOutcome) (interpinput.InterpretationInput, error) {
+	if outcome.Execution == nil {
+		return interpinput.InterpretationInput{}, fmt.Errorf("preview evaluation execution is required")
 	}
 	model := modelIdentity(outcome)
 	in := interpinput.InterpretationInput{
-		Association: report.Association{
-			OrgID:        outcome.Assessment.OrgID(),
-			AssessmentID: outcome.Assessment.ID(),
-			TesteeID:     uint64(outcome.Assessment.TesteeID()),
-		},
-		Model: model,
+		Association: outcome.Association,
+		Model:       model,
 		Runtime: interpinput.RuntimeIdentity{
-			AlgorithmFamily: outcome.RuntimeDescriptorKey.AlgorithmFamily,
-			DecisionKind:    outcome.RuntimeDescriptorKey.DecisionKind,
-			PayloadFormat:   outcome.RuntimeDescriptorKey.PayloadFormat,
+			AlgorithmFamily: outcome.Runtime.AlgorithmFamily,
+			DecisionKind:    outcome.Runtime.DecisionKind,
+			PayloadFormat:   outcome.Runtime.PayloadFormat,
 		},
 		Result: interpinput.ResultFacts{Primary: primary(outcome.Execution), Level: level(outcome.Execution)},
 		Report: interpinput.ReportSpec{
 			ReportType:      policy.ReportTypeStandard,
-			TemplateVersion: LegacyTemplateVersion,
+			TemplateVersion: PreviewTemplateVersion,
 			Algorithm:       modelcatalog.Algorithm(model.Algorithm),
 			ProductChannel:  modelcatalog.ProductChannel(model.ProductChannel),
 			Audience:        policy.AudienceParticipant,
@@ -80,38 +80,15 @@ func FromLegacyOutcome(outcome domainoutcome.LegacyOutcome) (interpinput.Interpr
 	return in, nil
 }
 
-func modelIdentity(outcome domainoutcome.LegacyOutcome) report.ModelIdentity {
+func modelIdentity(outcome PreviewOutcome) report.ModelIdentity {
 	var model report.ModelIdentity
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		ref := outcome.Execution.ModelRef
-		identity := ref.ExecutionIdentity()
 		model = report.ModelIdentity{
-			Kind: string(identity.Kind), SubKind: string(identity.SubKind), Algorithm: string(identity.Algorithm),
-			Code: ref.Code().String(), Version: ref.Version(), Title: ref.Title(),
-			ProductChannel:  string(binding.ProductChannelForIdentity(identity.Kind, "")),
-			AlgorithmFamily: binding.AlgorithmFamilyStringFromIdentity(identity.Kind, identity.SubKind, identity.Algorithm),
-		}
-	}
-	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
-		ref := outcome.Assessment.EvaluationModelRef()
-		identity := ref.ExecutionIdentity()
-		if model.Kind == "" {
-			model.Kind = string(identity.Kind)
-		}
-		if model.SubKind == "" {
-			model.SubKind = string(identity.SubKind)
-		}
-		if model.Algorithm == "" {
-			model.Algorithm = string(identity.Algorithm)
-		}
-		if model.Code == "" {
-			model.Code = ref.Code().String()
-		}
-		if model.Version == "" {
-			model.Version = ref.Version()
-		}
-		if model.Title == "" {
-			model.Title = ref.Title()
+			Kind: string(ref.ModelKind), SubKind: string(ref.ModelSubKind), Algorithm: string(ref.ModelAlgorithm),
+			Code: ref.ModelCode, Version: ref.ModelVersion, Title: ref.ModelTitle,
+			ProductChannel:  string(binding.ProductChannelForIdentity(ref.ModelKind, "")),
+			AlgorithmFamily: binding.AlgorithmFamilyStringFromIdentity(ref.ModelKind, ref.ModelSubKind, ref.ModelAlgorithm),
 		}
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
@@ -242,18 +219,18 @@ func populateTypologyFacts(input *interpinput.InterpretationInput, execution *do
 	if execution == nil {
 		return fmt.Errorf("evaluation outcome is required")
 	}
-	if detail, ok := domainoutcome.PersonalityTypeDetailFromPayload(execution.Detail.Payload); ok {
+	if detail, ok := evaluationfactcodec.PersonalityTypeDetailFromPayload(execution.Detail.Payload); ok {
 		setPersonalityTypeFacts(input, detail)
 		return nil
 	}
-	if detail, ok := domainoutcome.TraitProfileDetailFromPayload(execution.Detail.Payload); ok {
+	if detail, ok := evaluationfactcodec.TraitProfileDetailFromPayload(execution.Detail.Payload); ok {
 		setTraitProfileFacts(input, detail)
 		return nil
 	}
 	return fmt.Errorf("unsupported typology evaluation detail %T", execution.Detail.Payload)
 }
 
-func setPersonalityTypeFacts(input *interpinput.InterpretationInput, detail domainoutcome.PersonalityTypeDetail) {
+func setPersonalityTypeFacts(input *interpinput.InterpretationInput, detail evaluationfactcodec.PersonalityTypeDetail) {
 	input.PersonalityType = &interpinput.PersonalityTypeFacts{Detail: reporttypology.PersonalityTypeReportDetail{
 		TypeCode: detail.TypeCode, TypeName: detail.TypeName, OneLiner: detail.OneLiner, MatchPercent: detail.MatchPercent, ImageURL: detail.ImageURL,
 		IsSpecial: detail.IsSpecial, SpecialTrigger: detail.SpecialTrigger, Commentary: detail.Commentary,
@@ -272,7 +249,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func setTraitProfileFacts(input *interpinput.InterpretationInput, detail domainoutcome.TraitProfileDetail) {
+func setTraitProfileFacts(input *interpinput.InterpretationInput, detail evaluationfactcodec.TraitProfileDetail) {
 	traits := make([]reporttypology.TraitProfileFactorReport, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
 		traits = append(traits, reporttypology.TraitProfileFactorReport(trait))
@@ -280,7 +257,7 @@ func setTraitProfileFacts(input *interpinput.InterpretationInput, detail domaino
 	input.TraitProfile = &interpinput.TraitProfileFacts{Detail: reporttypology.TraitProfileReportDetail{Traits: traits, Source: reporttypology.TraitProfileSourceReport{Attribution: detail.Source.Attribution, License: detail.Source.License, NonCommercial: detail.Source.NonCommercial}}}
 }
 
-func personalityDimensions(detail domainoutcome.PersonalityTypeDetail) []reporttypology.PersonalityTypeDimensionReport {
+func personalityDimensions(detail evaluationfactcodec.PersonalityTypeDetail) []reporttypology.PersonalityTypeDimensionReport {
 	dimensions := make([]reporttypology.PersonalityTypeDimensionReport, 0, len(detail.Dimensions))
 	for _, dimension := range detail.Dimensions {
 		dimensions = append(dimensions, reporttypology.PersonalityTypeDimensionReport{Code: dimension.Code, Name: dimension.Name, LeftPole: dimension.LeftPole, RightPole: dimension.RightPole, RawScore: dimension.RawScore, Preference: dimension.Preference, Strength: dimension.Strength, Model: dimension.Model, Level: dimension.Level})

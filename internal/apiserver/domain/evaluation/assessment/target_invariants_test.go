@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -10,10 +11,10 @@ import (
 // These tests protect the accepted Evaluation lifecycle target during the
 // remaining domain refactor batches.
 func TestTargetEvaluatedAssessmentIsSuccessfulTerminalState(t *testing.T) {
-	t.Run("status is terminal", func(t *testing.T) {
+	t.Run("status is evaluated", func(t *testing.T) {
 		a := targetEvaluatedAssessment(t)
-		if !a.Status().IsTerminal() {
-			t.Fatalf("evaluated status must be terminal, got %s", a.Status())
+		if !a.Status().IsEvaluated() {
+			t.Fatalf("status = %s, want evaluated", a.Status())
 		}
 	})
 
@@ -55,8 +56,8 @@ func targetEvaluatedAssessment(t *testing.T) *Assessment {
 		t.Fatalf("Submit: %v", err)
 	}
 	score := 12.0
-	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: *a.EvaluationModelRef(), Summary: ResultSummary{PrimaryLabel: "evaluated"}, Score: &score}); err != nil {
-		t.Fatalf("ApplyScoringProjection: %v", err)
+	if err := a.ApplyScoringProjectionAt(ScoringProjection{ModelRef: *a.EvaluationModelRef(), Summary: ResultSummary{PrimaryLabel: "evaluated"}, Score: &score}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt: %v", err)
 	}
 	return a
 }

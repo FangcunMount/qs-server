@@ -383,8 +383,8 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if capture.CommitCalls != 1 || capture.Outcome.Execution == nil || capture.Outcome.Execution.Primary == nil || capture.Outcome.Execution.Primary.Value != 7 {
-		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
+	if capture.CommitCalls != 1 || capture.Request.Execution == nil || capture.Request.Execution.Primary == nil || capture.Request.Execution.Primary.Value != 7 {
+		t.Fatalf("unexpected evaluation execution: %#v", capture.Request.Execution)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
@@ -462,8 +462,8 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if capture.CommitCalls != 1 || capture.Outcome.Execution == nil || capture.Outcome.Execution.ModelRef.Kind() != modelcatalog.KindTypology {
-		t.Fatalf("unexpected evaluation outcome: %#v", capture.Outcome)
+	if capture.CommitCalls != 1 || capture.Request.Execution == nil || capture.Request.Execution.ModelRef.Kind() != modelcatalog.KindTypology {
+		t.Fatalf("unexpected evaluation execution: %#v", capture.Request.Execution)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)

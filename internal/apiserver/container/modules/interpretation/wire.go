@@ -19,11 +19,5 @@ type WireInput struct {
 
 // Wire builds and bootstraps the report module from composition inputs.
 func Wire(in WireInput) (*Module, error) {
-	return Bootstrap(BootstrapInput{
-		MongoDB:            in.MongoDB,
-		TopicResolver:      in.TopicResolver,
-		MongoLimiter:       in.MongoLimiter,
-		OpsHandle:          in.OpsHandle,
-		ReportStatusConfig: in.ReportStatusConfig,
-	})
+	return Bootstrap(BootstrapInput(in))
 }

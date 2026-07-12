@@ -23,7 +23,7 @@ func TestAllNativeFamiliesUseNativePipelineComponents(t *testing.T) {
 		ScaleScorer:          factorscoring.NewPipelineComponents(nil),
 		FactorNorm:           factornorm.NewPipelineComponents(nil),
 		TaskPerformance:      taskperformance.NewPipelineComponents(nil),
-		FactorClassification: factorclassification.NewPipelineComponents(factorclassification.ModuleRegistry{}),
+		FactorClassification: factorclassification.NewPipelineComponents(),
 	})
 
 	for _, family := range []modelcatalog.AlgorithmFamily{

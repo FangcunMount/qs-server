@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 // V2 contract: scale report builder projects model/primary_score/level and Mongo preserves them.
@@ -22,7 +22,7 @@ func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
+	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
 	if report.Model().Kind != "scale" || report.Model().Algorithm != "scale_default" {
 		t.Fatalf("model = %#v", report.Model())
 	}

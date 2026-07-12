@@ -3,7 +3,6 @@ package evaluationinput
 import (
 	"fmt"
 
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -17,13 +16,13 @@ type InputProviderDeps struct {
 	Questionnaires          port.QuestionnaireReader
 }
 
-func MaterializeInputProviders(descs []evaldomain.ModelDescriptor, deps InputProviderDeps) ([]ModelInputProvider, error) {
+func MaterializeInputProviders(paths []modelcatalog.ExecutionPath, deps InputProviderDeps) ([]ModelInputProvider, error) {
 	if deps.ScaleCatalog == nil || deps.TypologyCatalog == nil || deps.AnswerSheets == nil || deps.Questionnaires == nil {
 		return nil, fmt.Errorf("evaluation input provider dependencies are incomplete")
 	}
-	providers := make([]ModelInputProvider, 0, len(descs))
-	for _, desc := range descs {
-		provider, err := materializeInputProvider(desc, deps)
+	providers := make([]ModelInputProvider, 0, len(paths))
+	for _, path := range paths {
+		provider, err := materializeInputProvider(path, deps)
 		if err != nil {
 			return nil, err
 		}
@@ -32,11 +31,7 @@ func MaterializeInputProviders(descs []evaldomain.ModelDescriptor, deps InputPro
 	return providers, nil
 }
 
-func materializeInputProvider(desc evaldomain.ModelDescriptor, deps InputProviderDeps) (ModelInputProvider, error) {
-	path, err := evaldomain.ExecutionPathForDescriptor(desc)
-	if err != nil {
-		return nil, err
-	}
+func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProviderDeps) (ModelInputProvider, error) {
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:
 		return NewScaleModelInputProvider(

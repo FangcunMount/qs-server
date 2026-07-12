@@ -31,8 +31,8 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 	}
 
 	a := submittedMBTIAssessment(t)
-	report := buildLegacyReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
-		a, nil,
+	report := buildPreviewReport(t, mustConfiguredReportBuilder(t), canonicalOutcome(
+		t, a, nil,
 		domainoutcome.Summary{PrimaryLabel: detail.TypeCode, Tags: []string{detail.TypeName}},
 		domainoutcome.Detail{Kind: modelcatalog.KindTypology, Payload: detail},
 	))

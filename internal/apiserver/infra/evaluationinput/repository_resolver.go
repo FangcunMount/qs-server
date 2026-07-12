@@ -29,11 +29,11 @@ func NewRepositoryResolver(
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 	modelCatalog rulesetport.Catalog,
-	descs []evaldomain.ModelDescriptor,
+	paths []modelcatalog.ExecutionPath,
 	normRepos ...rulesetport.NormRepository,
 ) (*RepositoryResolver, error) {
-	if len(descs) == 0 {
-		return nil, fmt.Errorf("evaluation model descriptors are required")
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("evaluation execution paths are required")
 	}
 	if modelCatalog == nil {
 		return nil, fmt.Errorf("ruleset catalog is required")
@@ -57,7 +57,7 @@ func NewRepositoryResolver(
 	}
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
-	providers, err := MaterializeInputProviders(descs, InputProviderDeps{
+	providers, err := MaterializeInputProviders(paths, InputProviderDeps{
 		ScaleCatalog:            interpretationScaleCatalog,
 		TypologyCatalog:         typologyCatalog,
 		BehavioralRatingCatalog: behavioralRatingCatalog,

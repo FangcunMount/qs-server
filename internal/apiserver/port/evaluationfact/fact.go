@@ -1,22 +1,13 @@
-// Package evaluationfact is the read-only anti-corruption boundary through
-// which other modules consume committed Evaluation outcomes. Unlike the
-// retired alias package, it owns wrappers and adapters and does not re-export
-// Evaluation types as aliases.
+// Package evaluationfact defines the immutable, read-only contract through
+// which downstream modules consume committed Evaluation facts.
 package evaluationfact
 
 import (
 	"context"
 	"encoding/json"
+	"time"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -35,181 +26,170 @@ type RuntimeIdentity struct {
 	PayloadFormat   string
 }
 
-// Record is a read-only view over one committed Evaluation outcome.
-type Record struct{ value *domainoutcome.Record }
-
-func WrapRecord(value *domainoutcome.Record) *Record {
-	if value == nil {
-		return nil
-	}
-	return &Record{value: value}
+type NewRecordInput struct {
+	ID               meta.ID
+	OrgID            int64
+	AssessmentID     meta.ID
+	TesteeID         uint64
+	RunID            string
+	Model            ModelIdentity
+	Runtime          RuntimeIdentity
+	InputSnapshotRef string
+	SchemaVersion    uint
+	Payload          json.RawMessage
+	ReportInput      json.RawMessage
+	EvaluatedAt      time.Time
 }
 
-func (r *Record) ID() meta.ID                  { return r.value.ID() }
-func (r *Record) OrgID() int64                 { return r.value.OrgID() }
-func (r *Record) AssessmentID() meta.ID        { return r.value.AssessmentID() }
-func (r *Record) TesteeID() uint64             { return r.value.TesteeID() }
-func (r *Record) RunID() string                { return r.value.RunID() }
-func (r *Record) InputSnapshotRef() string     { return r.value.InputSnapshotRef() }
-func (r *Record) SchemaVersion() uint          { return r.value.SchemaVersion() }
-func (r *Record) Payload() json.RawMessage     { return r.value.Payload() }
-func (r *Record) ReportInput() json.RawMessage { return r.value.ReportInput() }
-
-func (r *Record) Model() ModelIdentity {
-	v := r.value.Model()
-	return ModelIdentity{Kind: v.Kind, SubKind: v.SubKind, Algorithm: v.Algorithm, Code: v.Code, Version: v.Version, Title: v.Title}
+// Record is an immutable copy of one committed Evaluation outcome.
+type Record struct {
+	id               meta.ID
+	orgID            int64
+	assessmentID     meta.ID
+	testeeID         uint64
+	runID            string
+	model            ModelIdentity
+	runtime          RuntimeIdentity
+	inputSnapshotRef string
+	schemaVersion    uint
+	payload          json.RawMessage
+	reportInput      json.RawMessage
+	evaluatedAt      time.Time
 }
 
-func (r *Record) Runtime() RuntimeIdentity {
-	v := r.value.Runtime()
-	return RuntimeIdentity{AlgorithmFamily: v.AlgorithmFamily, DecisionKind: v.DecisionKind, PayloadFormat: v.PayloadFormat}
-}
-
-// Execution is a distinct port type with the same immutable execution shape.
-// It is deliberately a defined type, not an alias.
-type Execution domainoutcome.Execution
-
-// LegacyOutcome is a concrete transient preview contract. It exists only for
-// in-process model preview and characterization; production reads Record.
-type LegacyOutcome struct {
-	Assessment           *assessment.Assessment
-	Input                *evaluationinput.InputSnapshot
-	Execution            *Execution
-	RuntimeDescriptorKey evalpipeline.RuntimeDescriptorKey
-}
-
-func AdaptLegacyOutcome(value evaloutcome.Outcome) LegacyOutcome {
-	return LegacyOutcome{
-		Assessment: value.Assessment, Input: value.Input,
-		Execution: (*Execution)(value.Execution), RuntimeDescriptorKey: value.RuntimeDescriptorKey,
+func NewRecord(input NewRecordInput) *Record {
+	return &Record{
+		id: input.ID, orgID: input.OrgID, assessmentID: input.AssessmentID,
+		testeeID: input.TesteeID, runID: input.RunID, model: input.Model,
+		runtime: input.Runtime, inputSnapshotRef: input.InputSnapshotRef,
+		schemaVersion: input.SchemaVersion, payload: cloneBytes(input.Payload),
+		reportInput: cloneBytes(input.ReportInput), evaluatedAt: input.EvaluatedAt,
 	}
 }
 
-func RestoreExecution(record *Record) (*Execution, error) {
-	value, err := evaloutcome.RestoreExecution(record.value)
-	if err != nil {
-		return nil, err
-	}
-	return (*Execution)(value), nil
+func (r *Record) ID() meta.ID              { return r.id }
+func (r *Record) OrgID() int64             { return r.orgID }
+func (r *Record) AssessmentID() meta.ID    { return r.assessmentID }
+func (r *Record) TesteeID() uint64         { return r.testeeID }
+func (r *Record) RunID() string            { return r.runID }
+func (r *Record) Model() ModelIdentity     { return r.model }
+func (r *Record) Runtime() RuntimeIdentity { return r.runtime }
+func (r *Record) InputSnapshotRef() string { return r.inputSnapshotRef }
+func (r *Record) SchemaVersion() uint      { return r.schemaVersion }
+func (r *Record) EvaluatedAt() time.Time   { return r.evaluatedAt }
+func (r *Record) Payload() json.RawMessage { return cloneBytes(r.payload) }
+func (r *Record) ReportInput() json.RawMessage {
+	return cloneBytes(r.reportInput)
 }
 
-func RestoreReportInput(record *Record) (*evaluationinput.InputSnapshot, error) {
-	return evaloutcome.RestoreReportInput(record.value)
+func cloneBytes(value []byte) json.RawMessage {
+	return append(json.RawMessage(nil), value...)
 }
+
+// Execution is the version-neutral decoded shape of an Evaluation fact.
+type Execution struct {
+	ModelRef   ModelRef
+	Summary    Summary
+	Detail     Detail
+	Primary    *ScoreValue
+	Level      *ResultLevel
+	Profile    *ProfileResult
+	Dimensions []DimensionResult
+	Validity   []ValidityResult
+}
+
+type ModelRef struct {
+	ModelKind      modelcatalog.Kind      `json:"kind"`
+	ModelSubKind   modelcatalog.SubKind   `json:"sub_kind,omitempty"`
+	ModelAlgorithm modelcatalog.Algorithm `json:"algorithm,omitempty"`
+	ModelCode      string                 `json:"code"`
+	ModelVersion   string                 `json:"version,omitempty"`
+	ModelTitle     string                 `json:"title,omitempty"`
+}
+
+func (r ModelRef) IsEmpty() bool                     { return r.ModelKind == "" && r.ModelCode == "" }
+func (r ModelRef) Kind() modelcatalog.Kind           { return r.ModelKind }
+func (r ModelRef) SubKind() modelcatalog.SubKind     { return r.ModelSubKind }
+func (r ModelRef) Algorithm() modelcatalog.Algorithm { return r.ModelAlgorithm }
+func (r ModelRef) Code() meta.Code                   { return meta.NewCode(r.ModelCode) }
+func (r ModelRef) Version() string                   { return r.ModelVersion }
+func (r ModelRef) Title() string                     { return r.ModelTitle }
+
+type Summary struct {
+	PrimaryLabel string
+	Score        *float64
+	Level        *string
+	Tags         []string
+}
+
+type Detail struct {
+	Kind    modelcatalog.Kind
+	Payload any
+}
+
+type DimensionKind string
+type ScoreKind string
+type ProfileKind string
 
 const (
-	ScoreKindRawTotal     = domainoutcome.ScoreKindRawTotal
-	ScoreKindMatchPercent = domainoutcome.ScoreKindMatchPercent
+	DimensionKindFactor  DimensionKind = "factor"
+	DimensionKindPole    DimensionKind = "pole"
+	DimensionKindTrait   DimensionKind = "trait"
+	DimensionKindIndex   DimensionKind = "index"
+	DimensionKindAbility DimensionKind = "ability"
+
+	ScoreKindRawTotal     ScoreKind = "raw_total"
+	ScoreKindMatchPercent ScoreKind = "match_percent"
+	ScoreKindTScore       ScoreKind = "t_score"
+	ScoreKindPercentile   ScoreKind = "percentile"
+
+	ProfileKindPersonalityType  ProfileKind = "personality_type"
+	ProfileKindPersonalityTrait ProfileKind = "personality_trait"
+	ProfileKindAbilityProfile   ProfileKind = "ability_profile"
 )
 
-type PersonalityDimensionResult struct {
-	Code       string  `json:"code"`
-	Name       string  `json:"name"`
-	Model      string  `json:"model,omitempty"`
-	LeftPole   string  `json:"left_pole,omitempty"`
-	RightPole  string  `json:"right_pole,omitempty"`
-	RawScore   float64 `json:"raw_score"`
-	Preference string  `json:"preference,omitempty"`
-	Strength   float64 `json:"strength,omitempty"`
-	Level      string  `json:"level,omitempty"`
+type ScoreValue struct {
+	Kind  ScoreKind
+	Value float64
+	Label string
+	Max   *float64
 }
 
-type PersonalityTypeDetail struct {
-	TypeCode       string                       `json:"type_code"`
-	TypeName       string                       `json:"type_name"`
-	OneLiner       string                       `json:"one_liner,omitempty"`
-	Summary        string                       `json:"summary,omitempty"`
-	Pattern        string                       `json:"pattern,omitempty"`
-	MatchPercent   float64                      `json:"match_percent,omitempty"`
-	Similarity     float64                      `json:"similarity,omitempty"`
-	ImageURL       string                       `json:"image_url,omitempty"`
-	Rarity         modeltypology.Rarity         `json:"rarity,omitempty"`
-	Dimensions     []PersonalityDimensionResult `json:"dimensions,omitempty"`
-	Strengths      []string                     `json:"strengths,omitempty"`
-	Weaknesses     []string                     `json:"weaknesses,omitempty"`
-	Suggestions    []string                     `json:"suggestions,omitempty"`
-	Outcome        modeltypology.Outcome        `json:"outcome,omitempty"`
-	Source         modeltypology.Source         `json:"source,omitempty"`
-	SpecialTrigger string                       `json:"special_trigger,omitempty"`
-	IsSpecial      bool                         `json:"is_special,omitempty"`
-	Commentary     string                       `json:"commentary,omitempty"`
+type ResultLevel struct {
+	Code     string
+	Label    string
+	Severity string
 }
 
-type TraitProfileFactorResult struct {
-	Code     string  `json:"code"`
-	Name     string  `json:"name"`
-	RawScore float64 `json:"raw_score"`
+type ProfileResult struct {
+	Kind   ProfileKind
+	Code   string
+	Name   string
+	Traits []string
 }
 
-type TraitProfileDetail struct {
-	Traits []TraitProfileFactorResult `json:"traits"`
-	Source modeltypology.Source       `json:"source,omitempty"`
+type DimensionResult struct {
+	Code           string
+	Name           string
+	Kind           DimensionKind
+	Role           string
+	ParentCode     string
+	HierarchyLevel int
+	SortOrder      int
+	Score          *ScoreValue
+	DerivedScores  []ScoreValue
+	Level          *ResultLevel
 }
 
-func PersonalityTypeDetailFromPayload(payload any) (PersonalityTypeDetail, bool) {
-	var source any
-	if detail, err := outcometypology.PersonalityTypeDetailFromPayload(payload); err == nil {
-		source = detail
-	} else if detail, err := typologylegacy.MBTIResultDetailFromPayload(payload); err == nil {
-		source = typologylegacy.PersonalityTypeDetailFromMBTI(detail)
-	} else if detail, err := typologylegacy.SBTIResultDetailFromPayload(payload); err == nil {
-		source = typologylegacy.PersonalityTypeDetailFromSBTI(detail)
-	} else {
-		return PersonalityTypeDetail{}, false
-	}
-	var result PersonalityTypeDetail
-	return result, transcode(source, &result)
+type ValidityResult struct {
+	Code    string
+	Label   string
+	Passed  bool
+	Message string
 }
 
-func TraitProfileDetailFromPayload(payload any) (TraitProfileDetail, bool) {
-	var source any
-	if detail, err := outcometypology.TraitProfileDetailFromPayload(payload); err == nil {
-		source = detail
-	} else if detail, err := typologylegacy.BigFiveResultDetailFromPayload(payload); err == nil {
-		source = typologylegacy.TraitProfileDetailFromBigFive(detail)
-	} else {
-		return TraitProfileDetail{}, false
-	}
-	var result TraitProfileDetail
-	return result, transcode(source, &result)
-}
-
-func transcode(source any, target any) bool {
-	payload, err := json.Marshal(source)
-	if err != nil {
-		return false
-	}
-	return json.Unmarshal(payload, target) == nil
-}
-
-// Repository is intentionally read-only. Interpretation cannot save or mutate
-// Evaluation facts through this boundary.
+// Repository intentionally exposes no mutation operations.
 type Repository interface {
 	FindByID(ctx context.Context, id meta.ID) (*Record, error)
 	FindByAssessmentID(ctx context.Context, assessmentID meta.ID) (*Record, error)
-}
-
-type repositoryAdapter struct{ source domainoutcome.Repository }
-
-func AdaptRepository(source domainoutcome.Repository) Repository {
-	if source == nil {
-		return nil
-	}
-	return &repositoryAdapter{source: source}
-}
-
-func (a *repositoryAdapter) FindByID(ctx context.Context, id meta.ID) (*Record, error) {
-	record, err := a.source.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return WrapRecord(record), nil
-}
-
-func (a *repositoryAdapter) FindByAssessmentID(ctx context.Context, assessmentID meta.ID) (*Record, error) {
-	record, err := a.source.FindByAssessmentID(ctx, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	return WrapRecord(record), nil
 }

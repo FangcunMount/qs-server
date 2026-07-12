@@ -9,7 +9,6 @@ import (
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // V1 contract: typology executor scores legacy MBTI payload identically to domain scorer.
@@ -107,65 +106,5 @@ func TestV1ConfiguredTypologyExecutorKey(t *testing.T) {
 	}
 	if got := executor.Key(); got != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("executor key = %s, want %s", got, evaluation.ExecutionIdentityPersonalityTypology)
-	}
-}
-
-// V1 contract: legacy MBTI executor key resolves to the same outcome as configured executor.
-func TestV1TypologyLegacyMBTIExecutorMatchesConfiguredOutcome(t *testing.T) {
-	input := evaluationexecute.ExecutionInput{
-		Assessment: submittedMBTIAssessment(t),
-		Input:      mbtiInputSnapshot(),
-	}
-	configured, err := typologyeval.NewConfiguredTypologyExecutor()
-	if err != nil {
-		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
-	}
-	legacy, err := typologyeval.NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
-	}
-	if legacy.Key() != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
-		t.Fatalf("legacy key = %s, want %s", legacy.Key(), evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI))
-	}
-	configuredResult, err := configured.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("configured Execute: %v", err)
-	}
-	legacyResult, err := legacy.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("legacy Execute: %v", err)
-	}
-	if configuredResult.Summary.PrimaryLabel != legacyResult.Summary.PrimaryLabel {
-		t.Fatalf("PrimaryLabel configured=%q legacy=%q", configuredResult.Summary.PrimaryLabel, legacyResult.Summary.PrimaryLabel)
-	}
-}
-
-// V1 contract: legacy SBTI executor key resolves to the same outcome as configured executor.
-func TestV1TypologyLegacySBTIExecutorMatchesConfiguredOutcome(t *testing.T) {
-	input := evaluationexecute.ExecutionInput{
-		Assessment: submittedSBTIAssessment(t),
-		Input:      sbtiInputSnapshot(),
-	}
-	configured, err := typologyeval.NewConfiguredTypologyExecutor()
-	if err != nil {
-		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
-	}
-	legacy, err := typologyeval.NewTypologyExecutor(modelcatalog.AlgorithmSBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
-	}
-	configuredResult, err := configured.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("configured Execute: %v", err)
-	}
-	legacyResult, err := legacy.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("legacy Execute: %v", err)
-	}
-	if configuredResult.Summary.PrimaryLabel != legacyResult.Summary.PrimaryLabel {
-		t.Fatalf("PrimaryLabel configured=%q legacy=%q", configuredResult.Summary.PrimaryLabel, legacyResult.Summary.PrimaryLabel)
-	}
-	if configuredResult.Summary.Score == nil || legacyResult.Summary.Score == nil || *configuredResult.Summary.Score != *legacyResult.Summary.Score {
-		t.Fatalf("Score configured=%v legacy=%v", configuredResult.Summary.Score, legacyResult.Summary.Score)
 	}
 }

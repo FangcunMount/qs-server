@@ -102,7 +102,7 @@ func buildCharCrossModuleHarnessCore(
 
 	h.intakeSvc = assessmentapp.NewAnswerSheetAssessmentIntakeService(
 		repo,
-		assessment.NewSimpleAssessmentCreator(),
+		assessment.NewDefaultAssessmentCreator(),
 		&charTxRunner{},
 		submitStager,
 		nil,

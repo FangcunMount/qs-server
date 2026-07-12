@@ -46,8 +46,6 @@ func InstallFrom(host InstallHost) error {
 		StaticRedisClient:                           host.CacheClient(cacheplane.FamilyStatic),
 		StaticCacheBuilder:                          host.CacheBuilder(cacheplane.FamilyStatic),
 		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.PolicyPublishedModel),
-		ModelDescriptors:                            catalog.Descriptors,
-		TypologyRegistry:                            catalog.TypologyRegistry,
 		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
 	})
 	if err != nil {

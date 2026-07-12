@@ -36,14 +36,14 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 		contractDetailAdapter,
 		assembleGenericPersonalityTypeOutcome,
 	)
-	registry := NewPersonalityRuntimeRegistryWith(PersonalityRuntimeOptions{
+	runtime := NewPersonalityRuntime(PersonalityRuntimeOptions{
 		DetailRegistry:  detailRegistry,
 		OutcomeRegistry: outcomeRegistry,
-	}).AsModuleRegistry()
+	})
 
-	executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
+	executor, err := NewConfiguredTypologyExecutorWithRuntime(runtime)
 	if err != nil {
-		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutorWithRuntime: %v", err)
 	}
 	assessmentEntity := contractInjectedAssessment(t)
 	snapshot := contractInjectedInputSnapshot()

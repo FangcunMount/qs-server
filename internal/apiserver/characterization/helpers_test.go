@@ -17,6 +17,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -34,12 +35,13 @@ type v1SplitPhaseConfig struct {
 	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
 }
 
-func canonicalOutcome(a *assessment.Assessment, input *evaluationinput.InputSnapshot, summary domainoutcome.Summary, detail domainoutcome.Detail) evaloutcome.Outcome {
+func canonicalOutcome(t *testing.T, a *assessment.Assessment, input *evaluationinput.InputSnapshot, summary domainoutcome.Summary, detail domainoutcome.Detail) interpretationinput.PreviewOutcome {
+	t.Helper()
 	execution := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(*a.EvaluationModelRef()), summary, detail)
 	if summary.Score != nil {
 		execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: *summary.Score}
 	}
-	return evaloutcome.Outcome{Assessment: a, Input: input, Execution: execution}
+	return previewOutcome(t, a, input, execution, evaluationfact.RuntimeIdentity{})
 }
 
 // buildV1SplitPhaseExecuteService mirrors container/modules/evaluation/assemble.go split-phase wiring.
@@ -83,8 +85,8 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		Engine:       core,
 		capture:      committer,
 		inlineLegacy: !cfg.Async,
-		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
-			input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(outcome))
+		generateReport: func(ctx context.Context, outcome interpretationinput.PreviewOutcome) error {
+			input, err := interpretationinput.FromPreviewOutcome(outcome)
 			if err != nil {
 				return err
 			}
@@ -107,30 +109,36 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 
 type charCapturingEvaluationCommitter struct {
 	stage   func(ctx context.Context, events ...event.DomainEvent) error
-	outcome evaloutcome.Outcome
+	outcome interpretationinput.PreviewOutcome
 }
 
-func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
-	c.outcome = request.Outcome
-	if request.Outcome.Assessment == nil || request.Outcome.Execution == nil {
+func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request outcomecommit.CommitRequest) (*domainoutcome.Record, error) {
+	if request.Assessment == nil || request.Execution == nil {
 		return nil, nil
 	}
-	if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
+	decoded, err := previewOutcomeFromExecution(request.Assessment, request.Input, request.Execution, evaluationfact.RuntimeIdentity{
+		AlgorithmFamily: request.RuntimeDescriptorKey.AlgorithmFamily, DecisionKind: request.RuntimeDescriptorKey.DecisionKind, PayloadFormat: request.RuntimeDescriptorKey.PayloadFormat,
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.outcome = decoded
+	if err := request.Assessment.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(request.Execution), request.EvaluatedAt); err != nil {
 		return nil, err
 	}
 	if request.Run != nil {
 		if err := request.Run.Succeed(request.EvaluatedAt); err != nil {
 			return nil, err
 		}
-		request.Outcome.Assessment.StageEvaluatedEvent(request.EvaluatedAt, meta.FromUint64(1), request.Run.RunID)
+		request.Assessment.StageEvaluatedEvent(request.EvaluatedAt, meta.FromUint64(1), request.Run.RunID)
 	}
 	if c.stage != nil {
-		events := request.Outcome.Assessment.Events()
+		events := request.Assessment.Events()
 		if err := c.stage(ctx, events...); err != nil {
 			return nil, err
 		}
 	}
-	request.Outcome.Assessment.ClearEvents()
+	request.Assessment.ClearEvents()
 	return nil, nil
 }
 
@@ -138,7 +146,7 @@ type charSplitPhaseService struct {
 	evaluationexecute.Engine
 	capture        *charCapturingEvaluationCommitter
 	inlineLegacy   bool
-	generateReport func(context.Context, evaloutcome.Outcome) error
+	generateReport func(context.Context, interpretationinput.PreviewOutcome) error
 }
 
 func (s *charSplitPhaseService) Evaluate(ctx context.Context, assessmentID uint64) error {
@@ -239,14 +247,14 @@ func (r *charInputResolver) Resolve(_ context.Context, ref evaluationinput.Input
 
 type charSplitPhaseCapture struct {
 	interpretationCalls int
-	outcome             evaloutcome.Outcome
+	outcome             interpretationinput.PreviewOutcome
 }
 
 type charRecordingInterpretation struct {
 	cap *charSplitPhaseCapture
 }
 
-func (s *charRecordingInterpretation) GenerateAndPersist(_ context.Context, outcome evaloutcome.Outcome) error {
+func (s *charRecordingInterpretation) GenerateAndPersist(_ context.Context, outcome interpretationinput.PreviewOutcome) error {
 	s.cap.interpretationCalls++
 	s.cap.outcome = outcome
 	return nil
@@ -272,10 +280,32 @@ func newV1RecordingExecuteService(
 		Engine:       core,
 		capture:      recording,
 		inlineLegacy: true,
-		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
+		generateReport: func(ctx context.Context, outcome interpretationinput.PreviewOutcome) error {
 			return (&charRecordingInterpretation{cap: capture}).GenerateAndPersist(ctx, outcome)
 		},
 	}, capture
+}
+
+func previewOutcome(t *testing.T, a *assessment.Assessment, input *evaluationinput.InputSnapshot, execution *domainoutcome.Execution, runtime evaluationfact.RuntimeIdentity) interpretationinput.PreviewOutcome {
+	t.Helper()
+	outcome, err := previewOutcomeFromExecution(a, input, execution, runtime)
+	if err != nil {
+		t.Fatalf("decode preview execution: %v", err)
+	}
+	return outcome
+}
+
+func previewOutcomeFromExecution(a *assessment.Assessment, input *evaluationinput.InputSnapshot, execution *domainoutcome.Execution, runtime evaluationfact.RuntimeIdentity) (interpretationinput.PreviewOutcome, error) {
+	ref := execution.ModelRef
+	model := evaluationfact.ModelIdentity{Kind: ref.Kind(), SubKind: ref.SubKind(), Algorithm: ref.Algorithm(), Code: ref.Code().String(), Version: ref.Version(), Title: ref.Title()}
+	decoded, err := evaluationfactcodec.DecodeTransientExecution(execution, model, runtime)
+	if err != nil {
+		return interpretationinput.PreviewOutcome{}, err
+	}
+	return interpretationinput.PreviewOutcome{
+		Association: domainreport.Association{OrgID: a.OrgID(), AssessmentID: a.ID(), TesteeID: a.TesteeID().Uint64()},
+		Input:       input, Execution: decoded, Runtime: runtime,
+	}, nil
 }
 
 type charSplitPhaseReportSaver struct {

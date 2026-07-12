@@ -1,24 +1,17 @@
 package modelcatalog
 
 import (
-	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 )
 
-// ExportEvaluationCatalog 构建模型目录的描述符和模型算法注册表
+// ExportEvaluationCatalog exposes the single Evaluation runtime registry.
 func ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
-	typologyRegistry, err := evalregistry.DefaultTypologyRegistry()
-	if err != nil {
-		return compose.EvaluationCatalog{}, err
-	}
 	runtimeRegistry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
 		return compose.EvaluationCatalog{}, err
 	}
 	return compose.EvaluationCatalog{
-		Descriptors:               evalregistry.DefaultEvaluationDescriptors(),
-		TypologyRegistry:          typologyRegistry,
 		RuntimeDescriptorRegistry: runtimeRegistry,
 	}, nil
 }

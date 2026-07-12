@@ -4,7 +4,6 @@ import (
 	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -12,10 +11,6 @@ import (
 type algorithmRunner struct {
 	adapter          personalityadapter.ModelAdapter
 	outcomeAssembler OutcomeAssembler
-}
-
-func algorithmRunnerFor(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (algorithmRunner, error) {
-	return registry.runnerFor(algorithm)
 }
 
 func (r algorithmRunner) buildOutcome(

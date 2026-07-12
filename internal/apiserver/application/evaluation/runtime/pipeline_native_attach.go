@@ -80,7 +80,7 @@ func attachFactorClassificationNativePipeline(registry *evalpipeline.RuntimeDesc
 	}
 	components := deps.FactorClassification
 	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
-		components = mechanismtypology.NewPipelineComponents(mechanismtypology.ModuleRegistry{})
+		components = mechanismtypology.NewPipelineComponents()
 	}
 	desc.InputAssembler = components.InputAssembler
 	desc.Calculator = components.Calculator

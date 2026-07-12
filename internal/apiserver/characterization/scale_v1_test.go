@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 // V1 contract: scale executor produces total=7 risk=low; report preserves
@@ -37,7 +37,7 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
-	report := buildLegacyReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
+	report := buildPreviewReport(t, interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultReportBuilder(nil)), previewOutcome(t, a, snapshot, execution, evaluationfact.RuntimeIdentity{}))
 
 	if report.TotalScore() != 5 || report.RiskLevel() != domainreport.RiskLevelLow {
 		t.Fatalf("report summary = score:%v risk:%s", report.TotalScore(), report.RiskLevel())

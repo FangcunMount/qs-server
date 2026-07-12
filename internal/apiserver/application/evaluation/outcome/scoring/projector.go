@@ -11,7 +11,7 @@ import (
 
 // Projector persists Evaluation-owned score query projections derived from a canonical outcome.
 type Projector interface {
-	Project(ctx context.Context, record *domainoutcome.Record, outcome evaloutcome.Outcome) error
+	Project(ctx context.Context, record *domainoutcome.Record, assessed *assessment.Assessment, execution *domainoutcome.Execution) error
 }
 
 type assessmentScoreProjector struct {
@@ -22,15 +22,15 @@ func NewAssessmentScoreProjector(repo assessment.ScoreRepository) Projector {
 	return &assessmentScoreProjector{repo: repo}
 }
 
-func (p *assessmentScoreProjector) Project(ctx context.Context, record *domainoutcome.Record, outcome evaloutcome.Outcome) error {
-	if p == nil || p.repo == nil || record == nil || outcome.Assessment == nil || outcome.Execution == nil {
+func (p *assessmentScoreProjector) Project(ctx context.Context, record *domainoutcome.Record, assessed *assessment.Assessment, execution *domainoutcome.Execution) error {
+	if p == nil || p.repo == nil || record == nil || assessed == nil || execution == nil {
 		return nil
 	}
-	projection := evaloutcome.ScaleScoreProjectionFromExecution(outcome.Assessment.ID(), outcome.Execution)
+	projection := evaloutcome.ScaleScoreProjectionFromExecution(assessed.ID(), execution)
 	if projection == nil {
 		return nil
 	}
-	if err := p.repo.SaveProjectionFromOutcome(ctx, record.ID(), outcome.Assessment, projection); err != nil {
+	if err := p.repo.SaveProjectionFromOutcome(ctx, record.ID(), assessed, projection); err != nil {
 		return evalerrors.Database(err, "保存测评得分失败")
 	}
 	return nil

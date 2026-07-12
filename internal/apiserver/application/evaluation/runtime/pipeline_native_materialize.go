@@ -10,8 +10,7 @@ import (
 
 // WiringDeps groups dependencies used to attach native descriptor pipelines.
 type WiringDeps struct {
-	ScaleScorer      portruleengine.ScaleFactorScorer
-	TypologyRegistry mechanismtypology.ModuleRegistry
+	ScaleScorer portruleengine.ScaleFactorScorer
 }
 
 // MaterializeFactorScoringPipelineComponents builds native factor_scoring pipeline triple from wiring deps.
@@ -31,5 +30,5 @@ func MaterializeTaskPerformancePipelineComponents(deps WiringDeps) mechanismtask
 
 // MaterializeFactorClassificationPipelineComponents builds native factor_classification pipeline triple from wiring deps.
 func MaterializeFactorClassificationPipelineComponents(deps WiringDeps) mechanismtypology.PipelineComponents {
-	return mechanismtypology.NewPipelineComponents(deps.TypologyRegistry)
+	return mechanismtypology.NewPipelineComponents()
 }

@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -58,11 +58,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 		t.Fatalf("MatchPercent = %.2f, want 40", detail.MatchPercent)
 	}
 
-	report := buildLegacyReport(t, reportBuilder, evaloutcome.Outcome{
-		Assessment: assessment,
-		Input:      snapshot,
-		Execution:  outcome,
-	})
+	report := buildPreviewReport(t, reportBuilder, previewOutcome(t, assessment, snapshot, outcome, evaluationfact.RuntimeIdentity{}))
 	if report.Conclusion() == "" {
 		t.Fatal("expected non-empty report conclusion")
 	}

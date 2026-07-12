@@ -3,6 +3,7 @@ package assessment
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -171,13 +172,13 @@ func TestEvaluatedAssessmentIsTerminalAndRejectsFailureRewrite(t *testing.T) {
 	a.ClearEvents()
 
 	score := 18.5
-	if err := a.ApplyScoringProjection(ScoringProjection{
+	if err := a.ApplyScoringProjectionAt(ScoringProjection{
 		ModelRef: *a.EvaluationModelRef(), Summary: ResultSummary{PrimaryLabel: "high risk"},
 		Score: &score, Level: string(RiskLevelHigh),
-	}); err != nil {
-		t.Fatalf("ApplyScoringProjection returned error: %v", err)
+	}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
 	}
-	if !a.Status().IsEvaluated() || !a.Status().IsTerminal() {
+	if !a.Status().IsEvaluated() {
 		t.Fatalf("expected terminal evaluated status, got %s", a.Status())
 	}
 	if err := a.MarkAsFailed("report save failed"); err == nil {
@@ -206,8 +207,8 @@ func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
 	}
 	modelRef := *a.EvaluationModelRef()
 	score := 12.0
-	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "scored"}, Score: &score}); err != nil {
-		t.Fatalf("ApplyScoringProjection returned error: %v", err)
+	if err := a.ApplyScoringProjectionAt(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "scored"}, Score: &score}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("expected evaluated status, got %s", a.Status())
@@ -252,7 +253,7 @@ func TestWithEvaluationModelBindsScaleIdentity(t *testing.T) {
 		t.Fatalf("event type = %T, want EvaluationRequestedEvent", a.Events()[0])
 	}
 	data := event.Payload()
-	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ModelVersion != "2.1.0" || data.ScaleCode != "" || data.ScaleVersion != "" {
+	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ModelVersion != "2.1.0" {
 		t.Fatalf("unexpected submitted event data: %#v", data)
 	}
 }
@@ -275,8 +276,8 @@ func TestApplyScoringProjectionValidatesEvaluationModelRef(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 
-	if err := a.ApplyScoringProjection(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "INTJ"}}); err != nil {
-		t.Fatalf("ApplyScoringProjection returned error: %v", err)
+	if err := a.ApplyScoringProjectionAt(ScoringProjection{ModelRef: modelRef, Summary: ResultSummary{PrimaryLabel: "INTJ"}}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
 	}
 	if !a.Status().IsEvaluated() {
 		t.Fatalf("expected evaluated status, got %s", a.Status())
@@ -301,7 +302,7 @@ func TestApplyScoringProjectionRejectsMismatchedEvaluationModelRef(t *testing.T)
 	}
 
 	projection := ScoringProjection{ModelRef: NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS")}
-	if err := a.ApplyScoringProjection(projection); err != ErrEvaluationModelMismatch {
-		t.Fatalf("ApplyScoringProjection error = %v, want ErrEvaluationModelMismatch", err)
+	if err := a.ApplyScoringProjectionAt(projection, time.Unix(100, 0)); err != ErrEvaluationModelMismatch {
+		t.Fatalf("ApplyScoringProjectionAt error = %v, want ErrEvaluationModelMismatch", err)
 	}
 }

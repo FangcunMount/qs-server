@@ -11,14 +11,15 @@ import (
 	"context"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -53,11 +54,18 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(evaloutcome.Outcome{
-		Assessment: submitted,
-		Input:      req.Input,
-		Execution:  outcome,
-	}))
+	model := evaluationfact.ModelIdentity{
+		Kind: outcome.ModelRef.Kind(), SubKind: outcome.ModelRef.SubKind(), Algorithm: outcome.ModelRef.Algorithm(),
+		Code: outcome.ModelRef.Code().String(), Version: outcome.ModelRef.Version(), Title: outcome.ModelRef.Title(),
+	}
+	previewExecution, err := evaluationfactcodec.DecodeTransientExecution(outcome, model, evaluationfact.RuntimeIdentity{})
+	if err != nil {
+		return nil, err
+	}
+	input, err := interpretationinput.FromPreviewOutcome(interpretationinput.PreviewOutcome{
+		Association: domainreport.Association{OrgID: submitted.OrgID(), AssessmentID: submitted.ID(), TesteeID: submitted.TesteeID().Uint64()},
+		Input:       req.Input, Execution: previewExecution,
+	})
 	if err != nil {
 		return nil, err
 	}

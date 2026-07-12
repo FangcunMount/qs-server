@@ -27,21 +27,6 @@ func TestExecutorKeys(t *testing.T) {
 	if got := configured.Key(); got != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("configured key = %s, want %s", got, evaluation.ExecutionIdentityPersonalityTypology)
 	}
-
-	mbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
-	}
-	if got := mbtiExecutor.Key(); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
-		t.Fatalf("mbti key = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI))
-	}
-	sbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmSBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
-	}
-	if got := sbtiExecutor.Key(); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI) {
-		t.Fatalf("sbti key = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmSBTI))
-	}
 }
 
 func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
@@ -67,24 +52,6 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	}
 	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || outcome.Profile.Kind != domainoutcome.ProfileKindPersonalityType {
 		t.Fatalf("profile = %#v, want INTJ personality_type", outcome.Profile)
-	}
-}
-
-func TestExecutorAlgorithmGuard(t *testing.T) {
-	executor, err := NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
-	}
-	_, err = executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
-	if err == nil {
-		t.Fatal("Execute error = nil, want configuration error")
-	}
-}
-
-func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
-	_, err := NewTypologyExecutor(modelcatalog.Algorithm("typology_unknown"))
-	if err == nil {
-		t.Fatal("NewTypologyExecutor error = nil, want unsupported algorithm")
 	}
 }
 

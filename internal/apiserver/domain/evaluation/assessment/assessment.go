@@ -188,12 +188,6 @@ func (a *Assessment) Submit() error {
 	return nil
 }
 
-// ApplyScoringProjection applies the minimal scoring projection and advances
-// the Assessment to evaluated.
-func (a *Assessment) ApplyScoringProjection(projection ScoringProjection) error {
-	return a.ApplyScoringProjectionAt(projection, time.Now())
-}
-
 // ApplyScoringProjectionAt applies a scoring projection using the reliable
 // commit boundary's canonical completion timestamp.
 func (a *Assessment) ApplyScoringProjectionAt(projection ScoringProjection, evaluatedAt time.Time) error {
@@ -237,8 +231,8 @@ func (a *Assessment) PrepareScoringProjection(projection ScoringProjection, eval
 	return clone, nil
 }
 
-// StageEvaluatedEvent records the durable outcome and run references that
-// Interpretation must consume after scoring completes.
+// StageEvaluatedEvent records the durable outcome and run references emitted
+// after scoring completes.
 func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
 	a.addEvent(NewEvaluationOutcomeCommittedEvent(
 		a.orgID,
@@ -485,11 +479,6 @@ func (a *Assessment) IsSubmitted() bool {
 // IsFailed 是否失败状态
 func (a *Assessment) IsFailed() bool {
 	return a.status.IsFailed()
-}
-
-// IsCompleted 是否已完成（已评分或失败）
-func (a *Assessment) IsCompleted() bool {
-	return a.status.IsTerminal()
 }
 
 // NeedsEvaluation 是否需要评估（已提交且绑定了解释模型）

@@ -59,24 +59,3 @@ func ExecutionIdentityFromLegacyKind(kind modelcatalog.Kind) (ExecutionIdentity,
 	}
 	return ExecutionIdentity{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}, true
 }
-
-// ModelDescriptorFromIdentity 映射路由身份 到 its 运行时描述符。
-func ModelDescriptorFromIdentity(id ExecutionIdentity) ModelDescriptor {
-	switch {
-	case id == ExecutionIdentityScaleDefault:
-		return ScaleModelDescriptor()
-	case id == ExecutionIdentityBehavioralRatingDefault:
-		return BehavioralRatingModelDescriptor()
-	case id == ExecutionIdentityCognitiveDefault:
-		return CognitiveModelDescriptor()
-	case id == ExecutionIdentityPersonalityTypology:
-		return ModelDescriptor{
-			Kind:      ModelKindTypology,
-			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
-		}
-	case id.Kind == modelcatalog.KindTypology && id.SubKind == modelcatalog.SubKindTypology && id.Algorithm != "":
-		return ModelDescriptor{Kind: ModelKindTypology, Algorithm: id.Algorithm}
-	default:
-		return ModelDescriptor{}
-	}
-}

@@ -36,11 +36,7 @@ func reportOutcomeRecord(t *testing.T) *evaluationfact.Record {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{ID: meta.FromUint64(9), OrgID: 11, AssessmentID: meta.FromUint64(7), TesteeID: 8, RunID: "7:1", Model: domainoutcome.ModelIdentity{Kind: modelcatalog.KindScale, Algorithm: modelcatalog.AlgorithmScaleDefault, Code: "S-1", Version: "1.0.0", Title: "Scale"}, Runtime: domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange}, Payload: payload, EvaluatedAt: time.Now()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return evaluationfact.WrapRecord(record)
+	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: meta.FromUint64(9), OrgID: 11, AssessmentID: meta.FromUint64(7), TesteeID: 8, RunID: "7:1", Model: evaluationfact.ModelIdentity{Kind: modelcatalog.KindScale, Algorithm: modelcatalog.AlgorithmScaleDefault, Code: "S-1", Version: "1.0.0", Title: "Scale"}, Runtime: evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange}, SchemaVersion: 1, Payload: payload, EvaluatedAt: time.Now()})
 }
 
 type executorStub struct {

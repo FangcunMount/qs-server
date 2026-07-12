@@ -4,7 +4,6 @@ import evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain
 
 type (
 	ModelKind         = evalpipeline.ModelKind
-	ModelDescriptor   = evalpipeline.ModelDescriptor
 	ExecutionIdentity = evalpipeline.ExecutionIdentity
 )
 
@@ -23,13 +22,6 @@ var (
 )
 
 var (
-	CognitiveModelDescriptor        = evalpipeline.CognitiveModelDescriptor
-	BehavioralRatingModelDescriptor = evalpipeline.BehavioralRatingModelDescriptor
-	ScaleModelDescriptor            = evalpipeline.ScaleModelDescriptor
-	DefaultModelDescriptors         = evalpipeline.DefaultModelDescriptors
-	TypologyAlgorithms              = evalpipeline.TypologyAlgorithms
 	PersonalityTypologyIdentity     = evalpipeline.PersonalityTypologyIdentity
 	ExecutionIdentityFromLegacyKind = evalpipeline.ExecutionIdentityFromLegacyKind
-	ModelDescriptorFromIdentity     = evalpipeline.ModelDescriptorFromIdentity
-	ExecutionPathForDescriptor      = evalpipeline.ExecutionPathForDescriptor
 )

@@ -3,7 +3,6 @@ package evaluationinput
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -20,5 +19,9 @@ func ExecutionPathForProvider(provider ModelInputProvider) (modelcatalog.Executi
 	if pathProvider, ok := provider.(ExecutionPathProvider); ok {
 		return pathProvider.ExecutionPath(), nil
 	}
-	return evaluation.ExecutionPathForDescriptor(evaluation.ModelDescriptorFromIdentity(provider.ExecutionIdentity()))
+	capability, ok := modelcatalog.FamilyCapabilityByKind(provider.ExecutionIdentity().Kind)
+	if !ok || capability.ExecutionPath == modelcatalog.ExecutionPathNone {
+		return "", fmt.Errorf("unsupported evaluation model kind: %s", provider.ExecutionIdentity().Kind)
+	}
+	return capability.ExecutionPath, nil
 }

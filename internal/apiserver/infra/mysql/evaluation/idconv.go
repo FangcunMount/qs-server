@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -23,10 +22,6 @@ func mustMetaIDFromUint64(field string, value uint64) meta.ID {
 		panic(fmt.Errorf("%s: %w", field, err))
 	}
 	return id
-}
-
-func mustAssessmentIDFromUint64(field string, value uint64) assessment.ID {
-	return assessment.ID(mustMetaIDFromUint64(field, value))
 }
 
 func mustTesteeIDFromUint64(field string, value uint64) testee.ID {

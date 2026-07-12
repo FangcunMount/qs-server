@@ -65,7 +65,7 @@ func TestAssessmentScoreProjectorPersistsOutcomeDerivedProjectionInEvaluation(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := projector.Project(context.Background(), record, evaloutcome.Outcome{Assessment: a, Execution: execution}); err != nil {
+	if err := projector.Project(context.Background(), record, a, execution); err != nil {
 		t.Fatal(err)
 	}
 	if repo.assessment != a || repo.outcomeID != record.ID() || repo.score == nil || len(repo.score.FactorScores()) != 1 {

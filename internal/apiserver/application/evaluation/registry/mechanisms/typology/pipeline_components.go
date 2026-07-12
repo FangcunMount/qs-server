@@ -19,13 +19,14 @@ type PipelineComponents struct {
 }
 
 // NewPipelineComponents 构建 factor_classification 原生 descriptor pipeline triple。
-func NewPipelineComponents(registry ModuleRegistry) PipelineComponents {
-	if registry.Len() == 0 {
-		registry = mustDefaultModuleRegistry()
-	}
+func NewPipelineComponents() PipelineComponents {
+	return NewPipelineComponentsWithRuntime(DefaultPersonalityRuntime())
+}
+
+func NewPipelineComponentsWithRuntime(runtime PersonalityRuntime) PipelineComponents {
 	return PipelineComponents{
 		InputAssembler:   typologyInputAssembler{},
-		Calculator:       typologyCalculator{registry: registry},
+		Calculator:       typologyCalculator{runtime: runtime},
 		OutcomeAssembler: typologyPipelineOutcomeAssembler{},
 	}
 }
@@ -37,7 +38,7 @@ func (typologyInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipel
 }
 
 type typologyCalculator struct {
-	registry ModuleRegistry
+	runtime PersonalityRuntime
 }
 
 func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {
@@ -55,7 +56,7 @@ func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.Calcul
 	if !ok {
 		return nil, fmt.Errorf("personality typology payload is required")
 	}
-	runner, err := c.registry.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
+	runner, err := c.runtime.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
 	if err != nil {
 		return nil, err
 	}

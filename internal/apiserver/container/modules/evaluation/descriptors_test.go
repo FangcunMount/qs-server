@@ -12,24 +12,20 @@ import (
 )
 
 func TestAssertExecutionPathParityRejectsMismatchedProviderPath(t *testing.T) {
-	descs := []evaldomain.ModelDescriptor{
-		{Kind: evaldomain.ModelKindScale},
-	}
+	paths := []modelcatalog.ExecutionPath{modelcatalog.ExecutionPathScaleDescriptor}
 	providers := []evaluationinputInfra.ModelInputProvider{
 		parityStubInputProvider{path: modelcatalog.ExecutionPathTypologyDescriptor},
 	}
 
-	err := evalmodule.AssertExecutionPathParity(descs, providers)
+	err := evalmodule.AssertExecutionPathParity(paths, providers)
 	if err == nil {
 		t.Fatal("expected parity error for mismatched provider execution path")
 	}
 }
 
 func TestAssertExecutionPathParityRejectsCountMismatch(t *testing.T) {
-	descs := []evaldomain.ModelDescriptor{
-		{Kind: evaldomain.ModelKindScale},
-	}
-	err := evalmodule.AssertExecutionPathParity(descs, nil)
+	paths := []modelcatalog.ExecutionPath{modelcatalog.ExecutionPathScaleDescriptor}
+	err := evalmodule.AssertExecutionPathParity(paths, nil)
 	if err == nil {
 		t.Fatal("expected parity error for descriptor count mismatch")
 	}

@@ -90,19 +90,9 @@ func (s Status) IsFailed() bool {
 	return s == StatusFailed
 }
 
-// IsTerminal 是否终态（不可再迁移）
-func (s Status) IsTerminal() bool {
-	return s == StatusEvaluated || s == StatusFailed
-}
-
 // CanApplyScoring 是否可应用计分结果
 func (s Status) CanApplyScoring() bool {
 	return s == StatusSubmitted
-}
-
-// CanGenerateReport 是否可以基于已完成的 Evaluation 事实生成报告。
-func (s Status) CanGenerateReport() bool {
-	return s == StatusEvaluated
 }
 
 // ==================== 测评来源类型枚举 ====================
@@ -160,16 +150,6 @@ const (
 
 func (r RiskLevel) String() string {
 	return string(r)
-}
-
-// RiskLevelFromString 从字符串解析风险等级
-func RiskLevelFromString(s string) RiskLevel {
-	return RiskLevel(s)
-}
-
-// IsHighRisk 是否高风险（包含 high 和 severe）
-func IsHighRisk(r RiskLevel) bool {
-	return r == RiskLevelHigh || r == RiskLevelSevere
 }
 
 // IsRiskLevelCode 报告是否 编码 是 旧量表风险等级值。

@@ -13,8 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// scoreQueryService 得分查询服务实现
-// 行为者：报告查询者、数据分析系统
+// scoreQueryService 提供已提交评分事实及其趋势投影。
+// 行为者：受试者查询、后台操作者和数据分析系统。
 type scoreQueryService struct {
 	outcomes         domainoutcome.Repository
 	projectionReader evaluationreadmodel.ScoreProjectionReader

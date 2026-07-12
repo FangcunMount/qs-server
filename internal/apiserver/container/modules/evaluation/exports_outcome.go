@@ -8,5 +8,5 @@ func (m *Module) OutcomeRepository() evaluationfact.Repository {
 	if m == nil {
 		return nil
 	}
-	return evaluationfact.AdaptRepository(m.outcomeRepository)
+	return newEvaluationFactRepository(m.outcomeRepository)
 }

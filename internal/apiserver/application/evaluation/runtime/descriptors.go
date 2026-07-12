@@ -3,13 +3,9 @@ package runtime
 import (
 	"fmt"
 
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
-
-// DescriptorProjector maps execution paths to published model descriptors.
-type DescriptorProjector func(path modelcatalog.ExecutionPath) []evaldomain.ModelDescriptor
 
 var runtimeMaterializationOrder = materializationOrder()
 
@@ -32,25 +28,6 @@ func ExecutionPathsFromRegistry(registry *evalpipeline.RuntimeDescriptorRegistry
 		return nil, fmt.Errorf("runtime descriptor registry has no supported execution paths")
 	}
 	return paths, nil
-}
-
-// EvaluationDescriptorsFromRegistry projects registered paths to model descriptors.
-func EvaluationDescriptorsFromRegistry(
-	registry *evalpipeline.RuntimeDescriptorRegistry,
-	project DescriptorProjector,
-) ([]evaldomain.ModelDescriptor, error) {
-	if project == nil {
-		return nil, fmt.Errorf("descriptor projector is required")
-	}
-	paths, err := ExecutionPathsFromRegistry(registry)
-	if err != nil {
-		return nil, err
-	}
-	descs := make([]evaldomain.ModelDescriptor, 0, len(paths))
-	for _, path := range paths {
-		descs = append(descs, project(path)...)
-	}
-	return descs, nil
 }
 
 // FilterExecutablePaths 保留仅 paths 基于 运行时-可执行 model 能力。

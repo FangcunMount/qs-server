@@ -86,18 +86,18 @@ func (stubInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*ev
 
 type splitPhaseCapture struct {
 	CommitCalls int
-	Outcome     evaloutcome.Outcome
+	Request     outcomecommit.CommitRequest
 }
 
 type recordingEvaluationCommitter struct {
 	capture *splitPhaseCapture
 }
 
-func (c *recordingEvaluationCommitter) Commit(_ context.Context, request outcomecommit.Request) (*domainoutcome.Record, error) {
+func (c *recordingEvaluationCommitter) Commit(_ context.Context, request outcomecommit.CommitRequest) (*domainoutcome.Record, error) {
 	c.capture.CommitCalls++
-	c.capture.Outcome = request.Outcome
-	if request.Outcome.Assessment != nil && request.Outcome.Execution != nil {
-		if err := request.Outcome.Assessment.ApplyScoringProjection(evaloutcome.ScoringProjectionFromExecution(request.Outcome.Execution)); err != nil {
+	c.capture.Request = request
+	if request.Assessment != nil && request.Execution != nil {
+		if err := request.Assessment.ApplyScoringProjectionAt(evaloutcome.ScoringProjectionFromExecution(request.Execution), request.EvaluatedAt); err != nil {
 			return nil, err
 		}
 	}

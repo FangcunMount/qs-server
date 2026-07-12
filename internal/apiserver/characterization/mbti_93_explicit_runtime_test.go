@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -50,11 +50,7 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 				t.Fatalf("detail = %#v, want INTJ@40", detail)
 			}
 
-			report := buildLegacyReport(t, reportBuilder, evaloutcome.Outcome{
-				Assessment: assessmentEntity,
-				Input:      snapshot,
-				Execution:  outcome,
-			})
+			report := buildPreviewReport(t, reportBuilder, previewOutcome(t, assessmentEntity, snapshot, outcome, evaluationfact.RuntimeIdentity{}))
 			if report.Conclusion() == "" {
 				t.Fatal("expected non-empty report conclusion")
 			}

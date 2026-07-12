@@ -4,27 +4,22 @@ import (
 	"fmt"
 
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 )
 
 // WiringDeps groups native descriptor-pipeline wiring dependencies.
 type WiringDeps = evalruntime.WiringDeps
 
-// AssertExecutionPathParity verifies descriptor/provider execution-path alignment.
-// ModelDescriptor slices are the single source of truth for Evaluation input registration.
+// AssertExecutionPathParity verifies runtime-path/provider alignment.
 func AssertExecutionPathParity(
-	descs []evaldomain.ModelDescriptor,
+	paths []modelcatalog.ExecutionPath,
 	providers []evaluationinputInfra.ModelInputProvider,
 ) error {
-	if len(descs) != len(providers) {
-		return fmt.Errorf("evaluation descriptor count mismatch")
+	if len(paths) != len(providers) {
+		return fmt.Errorf("evaluation execution path count mismatch")
 	}
-	for i, desc := range descs {
-		want, err := evaldomain.ExecutionPathForDescriptor(desc)
-		if err != nil {
-			return fmt.Errorf("descriptor execution path at %d: %w", i, err)
-		}
+	for i, want := range paths {
 		providerPath, err := evaluationinputInfra.ExecutionPathForProvider(providers[i])
 		if err != nil {
 			return fmt.Errorf("input provider execution path at %d: %w", i, err)

@@ -67,7 +67,7 @@ func (s *ReconcileService) ReconcileOnce(ctx context.Context, limit int) (int, e
 	detected := 0
 	for _, mismatch := range mismatches {
 		observeMismatch(mismatch.Kind)
-		observeRepair(mismatch.Kind, "deferred")
+		observeDisposition(mismatch.Kind, "deferred")
 		log.Warnf("evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s)",
 			mismatch.AssessmentID, mismatch.Kind)
 		detected++

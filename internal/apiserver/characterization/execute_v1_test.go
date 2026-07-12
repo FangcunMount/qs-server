@@ -25,7 +25,7 @@ func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescript
 		ScaleScorer:          factorscoring.NewPipelineComponents(nil),
 		FactorNorm:           factornorm.NewPipelineComponents(nil),
 		TaskPerformance:      taskperformance.NewPipelineComponents(nil),
-		FactorClassification: factorclassification.NewPipelineComponents(factorclassification.ModuleRegistry{}),
+		FactorClassification: factorclassification.NewPipelineComponents(),
 	})
 	return registry
 }

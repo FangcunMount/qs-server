@@ -167,6 +167,67 @@ func TestProtectedAssessmentQueryDoesNotOwnReportWait(t *testing.T) {
 	}
 }
 
+func TestRetiredEvaluationBatchFAPIsStayDeleted(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{
+		"internal/apiserver/domain/evaluation",
+		"internal/apiserver/application/evaluation",
+	}, []string{
+		"type SimpleAssessmentCreator struct",
+		"func NewSimpleAssessmentCreator(",
+		"func (s Status) CanGenerateReport(",
+		"func (s Status) IsTerminal(",
+		"func (a *Assessment) IsCompleted(",
+		"func (a *Assessment) ApplyScoringProjection(",
+		"func NewAttempt(",
+		"func DefaultModelDescriptors(",
+		"func TypologyAlgorithms(",
+		"func NewTypologyExecutor(",
+		"Name:      \"repair_total\"",
+	})
+	if len(got) != 0 {
+		t.Fatalf("retired Evaluation Batch F APIs reappeared in:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestEvaluationBatchGContractsStayConverged(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	got := collectSourceTokenFiles(t, root, []string{
+		"internal/apiserver/domain/evaluation",
+		"internal/apiserver/application/evaluation",
+		"internal/apiserver/container/modules/evaluation",
+		"internal/apiserver/container/modules/modelcatalog",
+		"internal/apiserver/infra/evaluationinput",
+	}, []string{
+		"type ModelDescriptor struct",
+		"TypologyRegistry",
+		"type LegacyOutcome struct",
+		"func FromLegacyOutcome(",
+		"func AdaptLegacyOutcome(",
+		"type Outcome struct {\n\tAssessment",
+	})
+	if len(got) != 0 {
+		t.Fatalf("retired Evaluation Batch G contracts reappeared in:\n%s", strings.Join(got, "\n"))
+	}
+
+	for _, rel := range []string{"fact.go", filepath.Join("codec", "codec.go")} {
+		factPath := filepath.Join(root, "internal", "apiserver", "port", "evaluationfact", rel)
+		data, err := os.ReadFile(factPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"application/evaluation", "domain/evaluation", "assessment.Assessment"} {
+			if strings.Contains(string(data), forbidden) {
+				t.Fatalf("evaluationfact %s contains implementation dependency %q", rel, forbidden)
+			}
+		}
+	}
+}
+
 func collectCrossModuleImporters(t *testing.T, root string, scanRoots, forbiddenPrefixes []string) []string {
 	t.Helper()
 	found := make(map[string]struct{})

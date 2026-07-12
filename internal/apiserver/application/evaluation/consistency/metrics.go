@@ -15,14 +15,14 @@ var (
 		},
 		[]string{"kind"},
 	)
-	evaluationConsistencyRepairTotal = promauto.NewCounterVec(
+	evaluationConsistencyDispositionTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "qs",
 			Subsystem: "evaluation_consistency",
-			Name:      "repair_total",
-			Help:      "Total evaluation consistency repair attempts by kind and result.",
+			Name:      "disposition_total",
+			Help:      "Total evaluation consistency mismatches by kind and audit disposition.",
 		},
-		[]string{"kind", "result"},
+		[]string{"kind", "disposition"},
 	)
 )
 
@@ -30,6 +30,6 @@ func observeMismatch(kind MismatchKind) {
 	evaluationConsistencyMismatchTotal.WithLabelValues(string(kind)).Inc()
 }
 
-func observeRepair(kind MismatchKind, result string) {
-	evaluationConsistencyRepairTotal.WithLabelValues(string(kind), result).Inc()
+func observeDisposition(kind MismatchKind, disposition string) {
+	evaluationConsistencyDispositionTotal.WithLabelValues(string(kind), disposition).Inc()
 }

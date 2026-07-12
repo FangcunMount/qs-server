@@ -54,8 +54,6 @@ type RequestedInput struct {
 	ModelAlgorithm    string
 	ModelCode         string
 	ModelVersion      string
-	ScaleCode         string
-	ScaleVersion      string
 	RequestedAt       time.Time
 }
 
@@ -74,8 +72,6 @@ func NewRequestedEvent(in RequestedInput) RequestedEvent {
 		ModelAlgorithm:    in.ModelAlgorithm,
 		ModelCode:         in.ModelCode,
 		ModelVersion:      in.ModelVersion,
-		ScaleCode:         in.ScaleCode,
-		ScaleVersion:      in.ScaleVersion,
 	}
 	return event.New(TypeRequested, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
 }
