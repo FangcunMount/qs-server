@@ -593,10 +593,10 @@ oss:
 # 5.1 日志配置（生产环境 - 使用 component-base duplicate 模式）
 # ----------------------------------------------------------------------------
 log:
-  level: info                   # 日志基本级别：debug, info, warn, error, fatal, panic
-  format: json                  # 日志格式（json 适合生产环境，console 适合开发环境）
-  enable-color: false           # 文件输出启用颜色
-  development: false            # 开发模式: true, false
+  level: debug                   # 日志基本级别：debug, info, warn, error, fatal, panic
+  format: console                  # 日志格式（json 适合生产环境，console 适合开发环境）
+  enable-color: true           # 文件输出启用颜色
+  development: true            # 开发模式: true, false
   name: "qs-apiserver"          # 日志名称
   
   # 📊 日志轮转配置
@@ -606,11 +606,11 @@ log:
   compress: true                # 压缩旧文件节省空间
   
   # ⏰ 按时间轮转（推荐生产环境使用）
-  enable-time-rotation: false    # 启用按天轮转
+  enable-time-rotation: true    # 启用按天轮转
   time-rotation-format: "2006-01-02"  # 按天轮转
   
   # 🎯 分级输出（duplicate 模式 - 生产环境推荐）
-  enable-level-output: false       # 启用分级输出
+  enable-level-output: true       # 启用分级输出
   level-output-mode: "duplicate"  # 重复输出模式（推荐）
   level-output-paths:
     all:
