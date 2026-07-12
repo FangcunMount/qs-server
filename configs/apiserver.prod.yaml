@@ -361,12 +361,12 @@ behavior_journey_scan:    # 启用行为轨迹扫描
 
 outbox_relay:
   mongo:
-    interval: "500ms"             # Mongo outbox 主链路事件排水频率: 500ms (生产环境建议调高)
+    interval: "5s"                # Mongo outbox 主链路事件排水频率: 5s (生产环境建议调高)
     batch_size: 1000              # 每轮最多 claim 的 Mongo outbox 事件数: 1000 (生产环境建议调高)
     publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测: 48 (生产环境建议调高)
     immediate_max_concurrent: 24  # mixed_300 chain_probe：略提 immediate 旁路并发
   assessment:
-    interval: "500ms"             # 对齐 Mongo 主链路 tick: 500ms (生产环境建议调高)
+    interval: "5s"                # 对齐 Mongo 主链路 tick: 5s (生产环境建议调高)
     batch_size: 200               # 每轮最多 claim 的 assessment outbox 事件数: 200 (生产环境建议调高)
     publish_workers: 24           # MySQL outbox 并发 publish: 24 (生产环境建议调高)
     immediate_max_concurrent: 24  # evaluation.requested immediate 旁路
