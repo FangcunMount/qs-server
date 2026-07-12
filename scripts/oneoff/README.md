@@ -814,23 +814,52 @@ python3 scripts/oneoff/enroll_testees_after_date.py \
 
 ## Interpretation 报告目录回填
 
-代码先上线 `report_query_catalog` 索引和新报告事务投影，随后手工执行：
+代码先上线 `report_query_catalog` 索引和新报告事务投影，随后手工执行。建议 archive、artifact 分阶段运行；archive 是 120 万历史数据的主要耗时阶段，支持页级并发和 Mongo `BulkWrite`：
 
 ```bash
+# 先用一批 dry-run 验证连接、吞吐与缺失数据；不要把 dry-run 的 checkpoint
+# 当成 apply 的续跑点。
 go run ./scripts/oneoff/backfill_interpretation_report_catalog \
   --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
-  --mysql-dsn "$MYSQL_DSN" --source all --page-size 500
+  --mysql-dsn "$MYSQL_DSN" --source archive \
+  --workers 8 --batch-size 1000 --max-docs 100000
+
+# 第一批 apply，从头处理最多 10 万条。
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --mysql-dsn "$MYSQL_DSN" --source archive \
+  --workers 8 --batch-size 1000 --max-docs 100000 --apply
+
+# 后续批次使用上一批输出的 next_after_id；反复执行直到 complete=true。
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --mysql-dsn "$MYSQL_DSN" --source archive \
+  --workers 8 --batch-size 1000 --max-docs 100000 \
+  --after-id 614332407667044910 --apply
+
+# archive 完成后回填新三对象报告。该阶段仍使用 BulkWrite，但为了保证
+# 同一 Assessment 的最新 artifact 确定性胜出，脚本内部串行推进页面。
+go run ./scripts/oneoff/backfill_interpretation_report_catalog \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
+  --source artifact --batch-size 1000 --max-docs 100000 --apply
 
 go run ./scripts/oneoff/backfill_interpretation_report_catalog \
   --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
-  --mysql-dsn "$MYSQL_DSN" --source all --page-size 500 --apply
-
-go run ./scripts/oneoff/backfill_interpretation_report_catalog \
-  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" \
-  --mysql-dsn "$MYSQL_DSN" --verify-only
+  --verify-only
 ```
 
-默认 dry-run；`--after-id` 可从已确认的 `domain_id` 续跑。必须在 `missing_org`、`missing_testee`、`missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
+默认 dry-run。每批完成会输出 `complete` 和 `next_after_id`；只有整个并发 wave 成功后 checkpoint 才会前移，失败时可以从输出的 checkpoint 安全重跑。写入是幂等的。
+
+关键参数：
+
+- `--workers`：archive 并发页数，默认 8，建议从 4–8 开始观察 Mongo/MySQL 负载。
+- `--batch-size`：单次读取、MySQL `IN` 查询和 Mongo `BulkWrite` 的文档数，默认 1000，最大 10000；旧 `--page-size` 仍作为别名保留。
+- `--max-docs`：本次对每个 source 最多处理的文档数，默认 0 表示不限制；用于按 5 万或 10 万条分批执行。
+- `--after-id` / `--to-id`：按 `domain_id` 指定可续跑的开闭区间 `(after-id, to-id]`。archive 可将互不重叠的区间交给多个进程；artifact 不应多进程并行。
+- `--progress-interval`：进度条刷新间隔，默认 2 秒；`--no-progress` 可关闭。
+- `--timeout`：整次命令超时，默认 24 小时；传 `0` 禁用。
+
+进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。必须在 `missing_org`、`missing_testee`、`missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
 
 ## 验证
 
