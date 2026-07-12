@@ -215,7 +215,7 @@ func toAssessmentQueryGRPCError(err error) error {
 
 	coder := pkgerrors.ParseCoder(err)
 	switch coder.Code() {
-	case errorCode.ErrAssessmentNotFound:
+	case errorCode.ErrAssessmentNotFound, errorCode.ErrInterpretReportNotFound:
 		return status.Error(codes.NotFound, err.Error())
 	case errorCode.ErrPermissionDenied, errorCode.ErrForbidden:
 		return status.Error(codes.PermissionDenied, err.Error())

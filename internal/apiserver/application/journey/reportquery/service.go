@@ -4,6 +4,7 @@ package reportquery
 
 import (
 	"context"
+	"errors"
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	interpretationAdmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
@@ -52,7 +53,7 @@ func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.A
 	}
 	row, err := s.reader.GetReportByAssessmentID(ctx, result.ID)
 	if err != nil {
-		if cberrors.IsCode(err, code.ErrInterpretReportNotFound) {
+		if errors.Is(err, interpretationreadmodel.ErrReportNotFound) || cberrors.IsCode(err, code.ErrInterpretReportNotFound) {
 			return p, nil
 		}
 		return nil, err

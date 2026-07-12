@@ -36,7 +36,7 @@ func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*
 	if row, err := r.findArchive(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, nil); err != nil || row != nil {
 		return row, err
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, evaluationreadmodel.ErrReportNotFound
 }
 
 func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ReportRow, error) {
@@ -50,7 +50,7 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 	if row, err := r.findArchive(ctx, bson.M{"domain_id": assessmentID, "deleted_at": nil}, nil); err != nil || row != nil {
 		return row, err
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, evaluationreadmodel.ErrReportNotFound
 }
 
 func (r *reportReadModel) ListReports(ctx context.Context, filter evaluationreadmodel.ReportFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.ReportRow, int64, error) {

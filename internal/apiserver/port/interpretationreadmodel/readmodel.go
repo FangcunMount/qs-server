@@ -5,8 +5,11 @@ package interpretationreadmodel
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrReportNotFound = errors.New("interpretation report not found")
 
 type PageRequest struct {
 	Page     int

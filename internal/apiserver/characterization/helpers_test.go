@@ -9,7 +9,6 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/input"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -328,7 +327,7 @@ type charEventStagerFunc func(ctx context.Context, events ...event.DomainEvent) 
 func (f charEventStagerFunc) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return f(ctx, events...)
 }
-func mustConfiguredReportBuilder(t *testing.T) typologyreporting.TypologyBuilder {
+func mustConfiguredReportBuilder(t *testing.T) interpretationreporting.TypologyBuilder {
 	t.Helper()
-	return typologyreporting.NewTypologyBuilder()
+	return interpretationreporting.NewTypologyBuilder()
 }

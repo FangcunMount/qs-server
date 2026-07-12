@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
-	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -43,7 +42,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 // V1 contract: personality split-phase path completes with interpreted status and type label.
 func TestV1SplitPhasePipelineMBTISubmitToInterpretedOutcome(t *testing.T) {
 	a := submittedMBTIAssessment(t)
-	reportBuilder := typologyreporting.NewTypologyBuilder()
+	reportBuilder := interpretationreporting.NewTypologyBuilder()
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment:    a,
 		Input:         mbtiInputSnapshot(),

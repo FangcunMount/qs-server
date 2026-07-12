@@ -4,12 +4,9 @@ import (
 	"context"
 	"testing"
 
-	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -57,21 +54,6 @@ func TestEvaluationServiceGetAssessmentReportRequiresTestee(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))
 	}
-}
-
-type fakeTesteeAssessmentQueryService struct {
-	getMyAssessment func(ctx context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error)
-}
-
-func (s *fakeTesteeAssessmentQueryService) GetMine(ctx context.Context, testeeID, assessmentID uint64) (*assessmentApp.AssessmentResult, error) {
-	if s.getMyAssessment == nil {
-		return nil, pkgerrors.WithCode(errorCode.ErrAssessmentNotFound, "assessment not found")
-	}
-	return s.getMyAssessment(ctx, testeeID, assessmentID)
-}
-
-func (s *fakeTesteeAssessmentQueryService) ListMine(context.Context, assessmentApp.ListMyAssessmentsDTO) (*assessmentApp.AssessmentListResult, error) {
-	panic("unexpected ListMine call")
 }
 
 type fakeParticipantReportService struct {

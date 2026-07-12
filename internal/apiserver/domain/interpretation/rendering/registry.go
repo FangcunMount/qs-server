@@ -170,12 +170,7 @@ func KeyFromInput(input interpinput.InterpretationInput) (Key, bool) {
 	if !ok {
 		return Key{}, false
 	}
-	return Key{
-		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind,
-		ReportType: value.ReportType, TemplateVersion: value.TemplateVersion,
-		Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
-		ReportProfile: value.ReportProfile,
-	}, true
+	return Key(value), true
 }
 
 func defaultDecisionKind(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {

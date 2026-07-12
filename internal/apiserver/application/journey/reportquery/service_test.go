@@ -25,6 +25,17 @@ func TestProjectAssessmentMapsGeneratedReportWithoutMutatingEvaluationResult(t *
 	}
 }
 
+func TestProjectAssessmentKeepsEvaluatedWhenReportDoesNotExist(t *testing.T) {
+	original := &assessmentApp.AssessmentResult{ID: 42, Status: "evaluated"}
+	projected, err := NewAdministrationService(&journeyReader{err: interpretationreadmodel.ErrReportNotFound}, adminStub{}).ProjectAssessment(context.Background(), original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected.Status != "evaluated" || projected.InterpretedAt != nil {
+		t.Fatalf("projection=%#v", projected)
+	}
+}
+
 type adminStub struct{}
 
 func (adminStub) GetReport(context.Context, interpretationAdmin.Actor, interpretationAdmin.GetQuery) (*interpretationAdmin.Report, error) {
@@ -36,13 +47,14 @@ func (adminStub) ListReports(context.Context, interpretationAdmin.Actor, interpr
 
 type journeyReader struct {
 	row *interpretationreadmodel.ReportRow
+	err error
 }
 
 func (j *journeyReader) GetReportByID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
 	return j.row, nil
 }
 func (j *journeyReader) GetReportByAssessmentID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
-	return j.row, nil
+	return j.row, j.err
 }
 func (j *journeyReader) ListReports(context.Context, interpretationreadmodel.ReportFilter, interpretationreadmodel.PageRequest) ([]interpretationreadmodel.ReportRow, int64, error) {
 	return nil, 0, nil
