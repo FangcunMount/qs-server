@@ -381,12 +381,6 @@ func NewScoreProjectionReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOption
 	}
 }
 
-// NewScoreReadModel is retained for compatibility with legacy consumers.
-// Deprecated: use NewScoreProjectionReadModel.
-func NewScoreReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) evaluationreadmodel.ScoreProjectionReader {
-	return NewScoreProjectionReadModel(db, opts...)
-}
-
 func (r *scoreReadModel) GetScoreByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ScoreRow, error) {
 	var pos []*AssessmentScorePO
 	err := r.WithContext(ctx).

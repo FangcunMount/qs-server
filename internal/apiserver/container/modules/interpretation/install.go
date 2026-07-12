@@ -13,16 +13,11 @@ type InstallHost interface {
 
 // InstallFrom wires and registers the report module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
-	catalog, err := host.DefaultEvaluationCatalog()
-	if err != nil {
-		return err
-	}
 	module, err := Wire(WireInput{
 		MongoDB:            host.MongoDB(),
 		TopicResolver:      host.TopicResolver(),
 		MongoLimiter:       host.MongoLimiter(),
 		OpsHandle:          host.CacheHandle(cacheplane.FamilyOps),
-		ModelDescriptors:   catalog.Descriptors,
 		ReportStatusConfig: host.ReportStatusConfig(),
 	})
 	if err != nil {

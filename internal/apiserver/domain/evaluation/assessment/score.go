@@ -23,21 +23,6 @@ func NewScaleScoreProjection(
 	}
 }
 
-// ReconstructScaleScoreProjection rebuilds scale score 投影 从 持久化。
-func ReconstructScaleScoreProjection(
-	assessmentID ID,
-	totalScore float64,
-	riskLevel RiskLevel,
-	factorScores []ScaleFactorScore,
-) *ScaleScoreProjection {
-	return &ScaleScoreProjection{
-		assessmentID: assessmentID,
-		totalScore:   totalScore,
-		riskLevel:    riskLevel,
-		factorScores: factorScores,
-	}
-}
-
 func (s *ScaleScoreProjection) AssessmentID() ID {
 	return s.assessmentID
 }
@@ -52,42 +37,6 @@ func (s *ScaleScoreProjection) RiskLevel() RiskLevel {
 
 func (s *ScaleScoreProjection) FactorScores() []ScaleFactorScore {
 	return s.factorScores
-}
-
-func (s *ScaleScoreProjection) IsHighRisk() bool {
-	return IsHighRisk(s.riskLevel)
-}
-
-func (s *ScaleScoreProjection) GetFactorScore(factorCode FactorCode) *ScaleFactorScore {
-	for i := range s.factorScores {
-		if s.factorScores[i].FactorCode().Equals(factorCode) {
-			return &s.factorScores[i]
-		}
-	}
-	return nil
-}
-
-func (s *ScaleScoreProjection) GetHighRiskFactors() []ScaleFactorScore {
-	var highRiskFactors []ScaleFactorScore
-	for _, fs := range s.factorScores {
-		if fs.IsHighRisk() {
-			highRiskFactors = append(highRiskFactors, fs)
-		}
-	}
-	return highRiskFactors
-}
-
-func (s *ScaleScoreProjection) GetTotalScoreFactor() *ScaleFactorScore {
-	for i := range s.factorScores {
-		if s.factorScores[i].IsTotalScore() {
-			return &s.factorScores[i]
-		}
-	}
-	return nil
-}
-
-func (s *ScaleScoreProjection) FactorCount() int {
-	return len(s.factorScores)
 }
 
 // ScaleFactorScore 记录一个因子行 in scale score 投影。
@@ -133,8 +82,4 @@ func (f ScaleFactorScore) RiskLevel() RiskLevel {
 
 func (f ScaleFactorScore) IsTotalScore() bool {
 	return f.isTotalScore
-}
-
-func (f ScaleFactorScore) IsHighRisk() bool {
-	return IsHighRisk(f.riskLevel)
 }

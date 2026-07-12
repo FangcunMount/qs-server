@@ -159,10 +159,9 @@ func (m *AssessmentMapper) ToDomainList(pos []*AssessmentPO) []*assessment.Asses
 
 // ==================== Score Mapper ====================
 
-// ScoreMapper 得分映射器
-// 注意：PO 是按因子扁平化存储的（每行一个 Factor），
-// 而领域对象 AssessmentScore 是聚合的（包含多个 FactorScore）。
-// 因此 ToDomain 需要处理聚合逻辑，ToPO 需要打散为多行。
+// ScoreMapper writes the mutable assessment_score projection. Outcome is the
+// only source from which this projection is built; persisted rows are never
+// mapped back into a domain score fact.
 type ScoreMapper struct{}
 
 // NewScoreMapper 创建得分映射器
@@ -197,67 +196,4 @@ func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID ui
 	}
 
 	return pos
-}
-
-// ToDomain 将持久化对象列表转换为领域对象（多个 PO 聚合为一个 AssessmentScore）
-// 要求输入的 POs 必须属于同一个 Assessment
-func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.ScaleScoreProjection {
-	if len(pos) == 0 {
-		return nil
-	}
-
-	// 取第一个 PO 作为参考（假设同一 Assessment 的 PO 共享这些字段）
-	firstPO := pos[0]
-	assessmentID := mustAssessmentIDFromUint64("assessment_score.assessment_id", firstPO.AssessmentID)
-
-	// 计算总分和风险等级（从总分因子获取）
-	var totalScore float64
-	riskLevel := assessment.RiskLevelNone
-
-	// 构建因子得分列表
-	factorScores := make([]assessment.ScaleFactorScore, 0, len(pos))
-	for _, po := range pos {
-		fs := assessment.NewScaleFactorScore(
-			assessment.FactorCode(po.FactorCode),
-			po.FactorName,
-			po.RawScore,
-			assessment.RiskLevel(po.RiskLevel),
-			po.IsTotalScore,
-		)
-		factorScores = append(factorScores, fs)
-
-		// 如果是总分因子，提取总分和风险等级
-		if po.IsTotalScore {
-			totalScore = po.RawScore
-			riskLevel = assessment.RiskLevel(po.RiskLevel)
-		}
-	}
-
-	return assessment.ReconstructScaleScoreProjection(
-		assessmentID,
-		totalScore,
-		riskLevel,
-		factorScores,
-	)
-}
-
-// GroupByAssessmentID 按 AssessmentID 分组
-func (m *ScoreMapper) GroupByAssessmentID(pos []*AssessmentScorePO) map[uint64][]*AssessmentScorePO {
-	grouped := make(map[uint64][]*AssessmentScorePO)
-	for _, po := range pos {
-		grouped[po.AssessmentID] = append(grouped[po.AssessmentID], po)
-	}
-	return grouped
-}
-
-// ToDomainList 将 PO 列表转换为领域对象列表（按 AssessmentID 聚合）
-func (m *ScoreMapper) ToDomainList(pos []*AssessmentScorePO) []*assessment.ScaleScoreProjection {
-	grouped := m.GroupByAssessmentID(pos)
-	result := make([]*assessment.ScaleScoreProjection, 0, len(grouped))
-	for _, group := range grouped {
-		if score := m.ToDomain(group); score != nil {
-			result = append(result, score)
-		}
-	}
-	return result
 }

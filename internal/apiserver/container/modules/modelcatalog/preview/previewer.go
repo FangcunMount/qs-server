@@ -18,6 +18,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -52,11 +53,11 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	input, err := interpretationinput.FromLegacyOutcome(evaloutcome.Outcome{
+	input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(evaloutcome.Outcome{
 		Assessment: submitted,
 		Input:      req.Input,
 		Execution:  outcome,
-	})
+	}))
 	if err != nil {
 		return nil, err
 	}

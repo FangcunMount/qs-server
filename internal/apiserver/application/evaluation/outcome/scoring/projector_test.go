@@ -25,10 +25,6 @@ func (r *evaluationScoreRepoStub) SaveProjectionFromOutcome(_ context.Context, o
 	r.score = score
 	return nil
 }
-func (*evaluationScoreRepoStub) DeleteByAssessmentID(context.Context, assessment.ID) error {
-	return nil
-}
-
 func TestAssessmentScoreProjectorPersistsOutcomeDerivedProjectionInEvaluation(t *testing.T) {
 	t.Parallel()
 

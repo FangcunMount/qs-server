@@ -61,7 +61,7 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(report.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestRuntimeDescriptorRegistryResolvesLegacyTypologyKeysViaFamilyDescriptor(
 	}
 
 	descs := DefaultEvaluationDescriptors()
-	builders, err := reportmaterialize.ReportBuilders(descs, report.NewDefaultReportBuilder(nil))
+	builders, err := reportmaterialize.ReportBuilders(report.NewDefaultReportBuilder(nil))
 	if err != nil {
 		t.Fatalf("ReportBuilders: %v", err)
 	}

@@ -22,8 +22,7 @@ import (
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
+	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -55,7 +54,6 @@ type Deps struct {
 	MongoDB            *mongo.Database
 	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
-	ModelDescriptors   []evaldomain.ModelDescriptor
 	OpsHandle          *cacheplane.Handle
 	ReportStatusConfig reportstatus.Config
 }
@@ -108,8 +106,8 @@ func New(deps Deps) (*Module, error) {
 	module.readyIndex = outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
 	module.readyIndexer = appEventing.NewPostCommitReadyIndexer(module.readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
-	if len(deps.ModelDescriptors) > 0 {
-		registry, err := buildReportBuilderRegistry(deps.ModelDescriptors)
+	{
+		registry, err := buildReportBuilderRegistry()
 		if err != nil {
 			return nil, err
 		}
@@ -175,8 +173,8 @@ func (m *Module) OutcomeService() interpretationapp.OutcomeReportService {
 	return m.outcomeService
 }
 
-func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor) (interpretationreporting.ReportBuilderRegistry, error) {
-	builders, err := reportmaterialize.ReportBuilders(descs, domainreport.NewDefaultReportBuilder(nil))
+func buildReportBuilderRegistry() (interpretationreporting.ReportBuilderRegistry, error) {
+	builders, err := reportmaterialize.ReportBuilders(domainreport.NewDefaultReportBuilder(nil))
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}

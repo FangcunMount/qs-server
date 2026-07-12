@@ -3,15 +3,17 @@ package input
 import (
 	"testing"
 
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 func TestFactorScoresPreferCanonicalDimensions(t *testing.T) {
-	items := factorScores(&domainoutcome.Execution{Dimensions: []domainoutcome.DimensionResult{
+	execution := &domainoutcome.Execution{Dimensions: []domainoutcome.DimensionResult{
 		{Code: "gec", Name: "GEC", Role: "index", HierarchyLevel: 1, Score: &domainoutcome.ScoreValue{Value: 10}, Level: &domainoutcome.ResultLevel{Code: "medium"}},
 		{Code: "bri", Name: "BRI", Role: "index", ParentCode: "gec", HierarchyLevel: 2, Score: &domainoutcome.ScoreValue{Value: 8}},
-	}}, nil)
+	}}
+	items := factorScores((*evaluationfact.Execution)(execution), nil)
 	if len(items) != 2 {
 		t.Fatalf("factor scores = %d, want 2", len(items))
 	}

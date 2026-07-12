@@ -8,6 +8,7 @@ import (
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/input"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 )
 
 type draftReportBuilder interface {
@@ -42,7 +43,7 @@ func (r *characterizationReport) RiskLevel() report.RiskLevel {
 
 func buildLegacyReport(t *testing.T, builder draftReportBuilder, outcome evaloutcome.Outcome) *characterizationReport {
 	t.Helper()
-	input, err := interpretationinput.FromLegacyOutcome(outcome)
+	input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(outcome))
 	if err != nil {
 		t.Fatalf("adapt interpretation input: %v", err)
 	}

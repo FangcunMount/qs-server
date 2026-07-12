@@ -67,15 +67,6 @@ func (r *scoreRepository) SaveProjectionFromOutcome(ctx context.Context, outcome
 	return r.WithContext(ctx).Create(&pos).Error
 }
 
-// ==================== 删除 ====================
-
-// DeleteByAssessmentID 删除测评的所有得分
-func (r *scoreRepository) DeleteByAssessmentID(ctx context.Context, assessmentID assessment.ID) error {
-	return r.WithContext(ctx).
-		Where("assessment_id = ?", assessmentID.Uint64()).
-		Delete(&AssessmentScorePO{}).Error
-}
-
 // translateScoreError 将数据库错误转换为领域错误
 func translateScoreError(err error) error {
 	if err == nil {

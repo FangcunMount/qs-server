@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -78,7 +77,6 @@ type Module struct {
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
 	MySQLDB                                     *gorm.DB
-	MongoDB                                     *mongo.Database
 	InputResolver                               evaluationinput.Resolver
 	ScaleCatalog                                evaluationinput.ScaleCatalog
 	EventPublisher                              event.EventPublisher
@@ -92,7 +90,6 @@ type Deps struct {
 	Observer                                    *observability.ComponentObserver
 	TopicResolver                               eventcatalog.TopicResolver
 	MySQLLimiter                                backpressure.Acquirer
-	MongoLimiter                                backpressure.Acquirer
 	AssessmentOutboxRelayBatchSize              int
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
@@ -313,9 +310,6 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
-	}
-	if deps.MongoDB == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
 	}
 	if deps.EventPublisher == nil {
 		deps.EventPublisher = event.NewNopEventPublisher()

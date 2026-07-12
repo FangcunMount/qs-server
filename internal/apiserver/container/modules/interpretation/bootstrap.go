@@ -3,7 +3,6 @@ package interpretation
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -15,7 +14,6 @@ type BootstrapInput struct {
 	MongoDB            *mongo.Database
 	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
-	ModelDescriptors   []evaldomain.ModelDescriptor
 	OpsHandle          *cacheplane.Handle
 	ReportStatusConfig reportstatus.Config
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -25,7 +24,6 @@ import (
 // BootstrapInput carries container integration inputs for evaluation module bootstrap.
 type BootstrapInput struct {
 	MySQLDB                                     *gorm.DB
-	MongoDB                                     *mongo.Database
 	InputResolver                               evaluationinput.Resolver
 	ScaleCatalog                                evaluationinput.ScaleCatalog
 	EventPublisher                              event.EventPublisher
@@ -39,7 +37,6 @@ type BootstrapInput struct {
 	Observer                                    *observability.ComponentObserver
 	TopicResolver                               eventcatalog.TopicResolver
 	MySQLLimiter                                backpressure.Acquirer
-	MongoLimiter                                backpressure.Acquirer
 	AssessmentOutboxRelayBatchSize              int
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int

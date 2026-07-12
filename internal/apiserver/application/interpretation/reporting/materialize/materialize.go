@@ -1,13 +1,10 @@
 package materialize
 
 import (
-	"fmt"
-
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	typologyreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type factory func(domainreport.DraftBuilder) (interpretationreporting.ReportBuilder, error)
@@ -27,18 +24,14 @@ var factories = map[modelcatalog.ExecutionPath]factory{
 	},
 }
 
-// ReportBuilders builds Interpretation-owned report builders from model descriptors.
-func ReportBuilders(descs []evaldomain.ModelDescriptor, composer domainreport.DraftBuilder) ([]interpretationreporting.ReportBuilder, error) {
-	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
-	for _, desc := range descs {
-		path, err := evaldomain.ExecutionPathForDescriptor(desc)
-		if err != nil {
-			return nil, err
-		}
-		build, ok := factories[path]
-		if !ok {
-			return nil, fmt.Errorf("unsupported interpretation execution path: %s", path)
-		}
+// ReportBuilders builds the complete Interpretation-owned report builder set.
+// The module owns its supported report paths and no longer mirrors Evaluation's
+// evaluator descriptor registry through an alias contract.
+func ReportBuilders(composer domainreport.DraftBuilder) ([]interpretationreporting.ReportBuilder, error) {
+	paths := RegisteredPaths()
+	builders := make([]interpretationreporting.ReportBuilder, 0, len(paths))
+	for _, path := range paths {
+		build := factories[path]
 		builder, err := build(composer)
 		if err != nil {
 			return nil, err

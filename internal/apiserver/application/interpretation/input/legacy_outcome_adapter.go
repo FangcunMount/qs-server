@@ -1,6 +1,6 @@
 // Package input adapts durable Evaluation facts into the Interpretation-owned
-// input contract. Compatibility with application/evaluation/outcome is kept
-// here so report builders never need a synthetic Assessment.
+// input contract. Transient preview compatibility arrives through the explicit
+// evaluationfact anti-corruption contract, never through Evaluation packages.
 package input
 
 import (
@@ -14,11 +14,8 @@ import (
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationcompat"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypology"
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtypologylegacy"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
@@ -29,7 +26,7 @@ const LegacyTemplateVersion = DefaultTemplateVersion
 // FromLegacyOutcome is the temporary compatibility boundary for the old report
 // writer. New Generation/Run orchestration will construct the same input from
 // EvaluationOutcome directly and remove this adapter.
-func FromLegacyOutcome(outcome evaloutcome.Outcome) (interpinput.InterpretationInput, error) {
+func FromLegacyOutcome(outcome domainoutcome.LegacyOutcome) (interpinput.InterpretationInput, error) {
 	if outcome.Assessment == nil || outcome.Execution == nil {
 		return interpinput.InterpretationInput{}, fmt.Errorf("persisted evaluation outcome context is incomplete")
 	}
@@ -83,7 +80,7 @@ func FromLegacyOutcome(outcome evaloutcome.Outcome) (interpinput.InterpretationI
 	return in, nil
 }
 
-func modelIdentity(outcome evaloutcome.Outcome) report.ModelIdentity {
+func modelIdentity(outcome domainoutcome.LegacyOutcome) report.ModelIdentity {
 	var model report.ModelIdentity
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		ref := outcome.Execution.ModelRef
@@ -245,33 +242,18 @@ func populateTypologyFacts(input *interpinput.InterpretationInput, execution *do
 	if execution == nil {
 		return fmt.Errorf("evaluation outcome is required")
 	}
-	switch detail := execution.Detail.Payload.(type) {
-	case outcometypology.PersonalityTypeDetail:
+	if detail, ok := domainoutcome.PersonalityTypeDetailFromPayload(execution.Detail.Payload); ok {
 		setPersonalityTypeFacts(input, detail)
-	case outcometypology.TraitProfileDetail:
-		setTraitProfileFacts(input, detail)
-	default:
-		if legacy, err := typologylegacy.MBTIResultDetailFromPayload(detail); err == nil {
-			input.Report.AdapterKey = "mbti"
-			setPersonalityTypeFacts(input, typologylegacy.PersonalityTypeDetailFromMBTI(legacy))
-			return nil
-		}
-		if legacy, err := typologylegacy.SBTIResultDetailFromPayload(detail); err == nil {
-			input.Report.AdapterKey = "sbti"
-			setPersonalityTypeFacts(input, typologylegacy.PersonalityTypeDetailFromSBTI(legacy))
-			return nil
-		}
-		if legacy, err := typologylegacy.BigFiveResultDetailFromPayload(detail); err == nil {
-			input.Report.AdapterKey = "bigfive"
-			setTraitProfileFacts(input, typologylegacy.TraitProfileDetailFromBigFive(legacy))
-			return nil
-		}
-		return fmt.Errorf("unsupported typology evaluation detail %T", execution.Detail.Payload)
+		return nil
 	}
-	return nil
+	if detail, ok := domainoutcome.TraitProfileDetailFromPayload(execution.Detail.Payload); ok {
+		setTraitProfileFacts(input, detail)
+		return nil
+	}
+	return fmt.Errorf("unsupported typology evaluation detail %T", execution.Detail.Payload)
 }
 
-func setPersonalityTypeFacts(input *interpinput.InterpretationInput, detail outcometypology.PersonalityTypeDetail) {
+func setPersonalityTypeFacts(input *interpinput.InterpretationInput, detail domainoutcome.PersonalityTypeDetail) {
 	input.PersonalityType = &interpinput.PersonalityTypeFacts{Detail: reporttypology.PersonalityTypeReportDetail{
 		TypeCode: detail.TypeCode, TypeName: detail.TypeName, OneLiner: detail.OneLiner, MatchPercent: detail.MatchPercent, ImageURL: detail.ImageURL,
 		IsSpecial: detail.IsSpecial, SpecialTrigger: detail.SpecialTrigger, Commentary: detail.Commentary,
@@ -290,7 +272,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func setTraitProfileFacts(input *interpinput.InterpretationInput, detail outcometypology.TraitProfileDetail) {
+func setTraitProfileFacts(input *interpinput.InterpretationInput, detail domainoutcome.TraitProfileDetail) {
 	traits := make([]reporttypology.TraitProfileFactorReport, 0, len(detail.Traits))
 	for _, trait := range detail.Traits {
 		traits = append(traits, reporttypology.TraitProfileFactorReport(trait))
@@ -298,7 +280,7 @@ func setTraitProfileFacts(input *interpinput.InterpretationInput, detail outcome
 	input.TraitProfile = &interpinput.TraitProfileFacts{Detail: reporttypology.TraitProfileReportDetail{Traits: traits, Source: reporttypology.TraitProfileSourceReport{Attribution: detail.Source.Attribution, License: detail.Source.License, NonCommercial: detail.Source.NonCommercial}}}
 }
 
-func personalityDimensions(detail outcometypology.PersonalityTypeDetail) []reporttypology.PersonalityTypeDimensionReport {
+func personalityDimensions(detail domainoutcome.PersonalityTypeDetail) []reporttypology.PersonalityTypeDimensionReport {
 	dimensions := make([]reporttypology.PersonalityTypeDimensionReport, 0, len(detail.Dimensions))
 	for _, dimension := range detail.Dimensions {
 		dimensions = append(dimensions, reporttypology.PersonalityTypeDimensionReport{Code: dimension.Code, Name: dimension.Name, LeftPole: dimension.LeftPole, RightPole: dimension.RightPole, RawScore: dimension.RawScore, Preference: dimension.Preference, Strength: dimension.Strength, Model: dimension.Model, Level: dimension.Level})

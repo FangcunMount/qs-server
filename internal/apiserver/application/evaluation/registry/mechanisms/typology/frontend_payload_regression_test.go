@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -169,11 +170,11 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	interpretationInput, err := interpretationinput.FromLegacyOutcome(evaloutcome.Outcome{
+	interpretationInput, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(evaloutcome.Outcome{
 		Assessment: frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm),
 		Input:      input,
 		Execution:  outcome,
-	})
+	}))
 	if err != nil {
 		t.Fatalf("adapt interpretation input: %v", err)
 	}

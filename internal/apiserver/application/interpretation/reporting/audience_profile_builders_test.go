@@ -11,17 +11,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type stubBroadBuilder struct{}
 
-func (stubBroadBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityScaleDefault
-}
-func (stubBroadBuilder) Key() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityScaleDefault
-}
 func (stubBroadBuilder) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
 }

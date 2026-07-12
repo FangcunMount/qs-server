@@ -1,7 +1,6 @@
 package interpretation
 
 import (
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -15,7 +14,6 @@ type WireInput struct {
 	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
 	OpsHandle          *cacheplane.Handle
-	ModelDescriptors   []evaldomain.ModelDescriptor
 	ReportStatusConfig reportstatus.Config
 }
 
@@ -25,7 +23,6 @@ func Wire(in WireInput) (*Module, error) {
 		MongoDB:            in.MongoDB,
 		TopicResolver:      in.TopicResolver,
 		MongoLimiter:       in.MongoLimiter,
-		ModelDescriptors:   in.ModelDescriptors,
 		OpsHandle:          in.OpsHandle,
 		ReportStatusConfig: in.ReportStatusConfig,
 	})

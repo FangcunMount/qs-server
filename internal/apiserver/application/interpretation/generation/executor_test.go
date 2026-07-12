@@ -14,7 +14,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -24,10 +23,6 @@ type executorBuilder struct {
 	calls int
 }
 
-func (b *executorBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentityScaleDefault
-}
-func (b *executorBuilder) Key() evaluation.ExecutionIdentity     { return b.ExecutionIdentity() }
 func (*executorBuilder) ReportType() policy.ReportType           { return policy.ReportTypeStandard }
 func (*executorBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (*executorBuilder) BuilderIdentity() string                 { return "test-executor-builder" }

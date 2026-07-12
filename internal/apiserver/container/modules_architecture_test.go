@@ -342,14 +342,11 @@ func TestModelCatalogRegistersAggregateName(t *testing.T) {
 	}
 }
 
-func TestEvaluationAndReportModulesUseAssessmentModelCatalogPort(t *testing.T) {
+func TestEvaluationUsesCatalogWhileInterpretationOwnsReportPaths(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for _, rel := range []string{
-		"internal/apiserver/container/modules/evaluation/install.go",
-		"internal/apiserver/container/modules/interpretation/install.go",
-	} {
+	for _, rel := range []string{"internal/apiserver/container/modules/evaluation/install.go"} {
 		data, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {
 			t.Fatal(err)
@@ -368,6 +365,15 @@ func TestEvaluationAndReportModulesUseAssessmentModelCatalogPort(t *testing.T) {
 				t.Fatalf("%s contains %s; downstream modules must depend on assessmentmodel catalog ports", rel, token)
 			}
 		}
+	}
+
+	interpretationInstall := filepath.Join(root, "internal/apiserver/container/modules/interpretation/install.go")
+	data, err := os.ReadFile(interpretationInstall)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "DefaultEvaluationCatalog()") {
+		t.Fatal("Interpretation must own report paths instead of mirroring Evaluation descriptors")
 	}
 }
 

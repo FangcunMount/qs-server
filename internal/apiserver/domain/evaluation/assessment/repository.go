@@ -36,11 +36,4 @@ type ScoreRepository interface {
 	// SaveProjectionFromOutcome persists a query projection derived from one
 	// immutable EvaluationOutcome. It is not an independent score fact.
 	SaveProjectionFromOutcome(ctx context.Context, outcomeID meta.ID, assessmentDomain *Assessment, score *ScaleScoreProjection) error
-
-	// === 基础查询 ===
-
-	// === 删除 ===
-
-	// DeleteByAssessmentID 删除测评的所有得分
-	DeleteByAssessmentID(ctx context.Context, assessmentID ID) error
 }

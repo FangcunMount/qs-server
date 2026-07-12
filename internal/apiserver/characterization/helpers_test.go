@@ -16,6 +16,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -83,7 +84,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		capture:      committer,
 		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome evaloutcome.Outcome) error {
-			input, err := interpretationinput.FromLegacyOutcome(outcome)
+			input, err := interpretationinput.FromLegacyOutcome(evaluationfact.AdaptLegacyOutcome(outcome))
 			if err != nil {
 				return err
 			}

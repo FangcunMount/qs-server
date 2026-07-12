@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
 func TestReportRowToResultMapsLegacyReportFields(t *testing.T) {

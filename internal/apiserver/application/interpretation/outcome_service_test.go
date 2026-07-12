@@ -7,28 +7,28 @@ import (
 	"time"
 
 	interpretationgeneration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/generation"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type outcomeRepoForReport struct {
-	record *domainoutcome.Record
+	record *evaluationfact.Record
 	reads  int
 }
 
-func (r *outcomeRepoForReport) Save(context.Context, *domainoutcome.Record) error { return nil }
-func (r *outcomeRepoForReport) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
+func (r *outcomeRepoForReport) FindByID(context.Context, meta.ID) (*evaluationfact.Record, error) {
 	r.reads++
 	return r.record, nil
 }
-func (r *outcomeRepoForReport) FindByAssessmentID(context.Context, meta.ID) (*domainoutcome.Record, error) {
+func (r *outcomeRepoForReport) FindByAssessmentID(context.Context, meta.ID) (*evaluationfact.Record, error) {
 	r.reads++
 	return r.record, nil
 }
 
-func reportOutcomeRecord(t *testing.T) *domainoutcome.Record {
+func reportOutcomeRecord(t *testing.T) *evaluationfact.Record {
 	t.Helper()
 	execution := domainoutcome.NewExecution(domainoutcome.ModelRef{ModelKind: modelcatalog.KindScale, ModelAlgorithm: modelcatalog.AlgorithmScaleDefault, ModelCode: "S-1", ModelVersion: "1.0.0", ModelTitle: "Scale"}, domainoutcome.Summary{PrimaryLabel: "low"}, domainoutcome.Detail{Kind: modelcatalog.KindScale})
 	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 12}
@@ -40,7 +40,7 @@ func reportOutcomeRecord(t *testing.T) *domainoutcome.Record {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return record
+	return evaluationfact.WrapRecord(record)
 }
 
 type executorStub struct {

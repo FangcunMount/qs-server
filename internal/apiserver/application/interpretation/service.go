@@ -14,7 +14,7 @@ import (
 // worker/gRPC. It accepts an immutable EvaluationOutcome reference and returns
 // Generation/InterpretReport state; it never exposes legacy InterpretReport writes.
 type OutcomeReportService interface {
-	GenerateByOutcomeID(ctx context.Context, outcomeID domainoutcome.ID) (*interpretationgeneration.ExecuteResult, error)
+	GenerateByOutcomeID(ctx context.Context, outcomeID meta.ID) (*interpretationgeneration.ExecuteResult, error)
 	GenerateByAssessmentID(ctx context.Context, assessmentID meta.ID) (*interpretationgeneration.ExecuteResult, error)
 }
 
@@ -38,7 +38,7 @@ func (s *outcomeReportService) GenerateByAssessmentID(ctx context.Context, asses
 	return s.generate(ctx, record)
 }
 
-func (s *outcomeReportService) GenerateByOutcomeID(ctx context.Context, outcomeID domainoutcome.ID) (*interpretationgeneration.ExecuteResult, error) {
+func (s *outcomeReportService) GenerateByOutcomeID(ctx context.Context, outcomeID meta.ID) (*interpretationgeneration.ExecuteResult, error) {
 	if s == nil || s.outcomes == nil {
 		return nil, fmt.Errorf("evaluation outcome repository is not configured")
 	}

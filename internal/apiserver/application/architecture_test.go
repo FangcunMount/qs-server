@@ -1287,6 +1287,45 @@ func TestBehavioralPublishedProjectionDoesNotReadLegacyDefinition(t *testing.T) 
 	}
 }
 
+func TestRetiredEvaluationAliasPortsStayDeleted(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, name := range []string{
+		"evaluationassessment",
+		"evaluationcompat",
+		"evaluationroute",
+		"evaluationruntime",
+		"evaluationtypology",
+		"evaluationtypologylegacy",
+	} {
+		path := filepath.Join(root, "internal", "apiserver", "port", name)
+		files, err := filepath.Glob(filepath.Join(path, "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(files) != 0 {
+			t.Fatalf("retired Evaluation alias port was reintroduced: %s", path)
+		}
+	}
+}
+
+func TestEvaluationReadModelDoesNotOwnInterpretationReportAPI(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "port", "evaluationreadmodel", "readmodel.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"type ReportReader", "type ReportRow", "type ReportFilter"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("Evaluation read model reintroduced Interpretation API %q", forbidden)
+		}
+	}
+}
+
 type forbiddenApplicationReferenceError struct {
 	path  string
 	token string

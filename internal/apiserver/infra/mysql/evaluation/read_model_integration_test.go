@@ -224,7 +224,7 @@ func TestScoreReadModelFiltersAndOrdersAgainstDatabase(t *testing.T) {
 		_ = db.Exec("DELETE FROM assessment_score WHERE id IN ?", ids).Error
 	})
 
-	reader := NewScoreReadModel(db)
+	reader := NewScoreProjectionReadModel(db)
 	score, err := reader.GetScoreByAssessmentID(ctx, assessmentID)
 	if err != nil {
 		t.Fatalf("get score: %v", err)

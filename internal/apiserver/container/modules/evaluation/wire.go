@@ -175,7 +175,6 @@ func Wire(in WireInput) (WireResult, error) {
 
 	module, err := Bootstrap(BootstrapInput{
 		MySQLDB:                             in.MySQLDB,
-		MongoDB:                             in.MongoDB,
 		InputResolver:                       inputResolver,
 		ScaleCatalog:                        scaleCatalog,
 		EventPublisher:                      in.EventPublisher,
@@ -189,7 +188,6 @@ func Wire(in WireInput) (WireResult, error) {
 		Observer:                            in.Observer,
 		TopicResolver:                       in.TopicResolver,
 		MySQLLimiter:                        in.MySQLLimiter,
-		MongoLimiter:                        in.MongoLimiter,
 		AssessmentOutboxRelayBatchSize:      in.AssessmentOutboxRelayBatchSize,
 		AssessmentOutboxRelayPublishWorkers: in.AssessmentOutboxRelayPublishWorkers,
 		AssessmentOutboxRelayImmediateMaxConcurrent: in.AssessmentOutboxRelayImmediateMaxConcurrent,

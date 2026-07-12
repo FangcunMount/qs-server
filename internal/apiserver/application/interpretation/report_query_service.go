@@ -3,7 +3,7 @@ package interpretation
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
 // reportQueryService is the Interpretation-owned read use case for completed report projections.

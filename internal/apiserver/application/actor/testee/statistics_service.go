@@ -9,6 +9,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -18,15 +19,15 @@ import (
 type statisticsService struct {
 	testeeRepo       domain.Repository
 	assessmentReader evaluationreadmodel.AssessmentReader
-	scoreReader      evaluationreadmodel.ScoreReader
-	reportReader     evaluationreadmodel.ReportReader
+	scoreReader      evaluationreadmodel.ScoreProjectionReader
+	reportReader     interpretationreadmodel.ReportReader
 }
 
 func NewStatisticsServiceWithReadModels(
 	testeeRepo domain.Repository,
 	assessmentReader evaluationreadmodel.AssessmentReader,
-	scoreReader evaluationreadmodel.ScoreReader,
-	reportReader evaluationreadmodel.ReportReader,
+	scoreReader evaluationreadmodel.ScoreProjectionReader,
+	reportReader interpretationreadmodel.ReportReader,
 ) TesteeStatisticsService {
 	return &statisticsService{
 		testeeRepo:       testeeRepo,

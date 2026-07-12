@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationruntime"
 )
 
 type stubMechanismBuilder struct {
@@ -26,14 +25,6 @@ type namedMechanismBuilder struct {
 	key     reporting.MechanismReportBuilderKey
 	version policy.TemplateVersion
 	name    string
-}
-
-func (b namedMechanismBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
-	return evaluation.ExecutionIdentity{}
-}
-
-func (b namedMechanismBuilder) Key() evaluation.ExecutionIdentity {
-	return b.ExecutionIdentity()
 }
 
 func (b namedMechanismBuilder) ReportType() domainReport.ReportType {

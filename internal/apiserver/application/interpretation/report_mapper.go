@@ -3,7 +3,7 @@ package interpretation
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
 func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
