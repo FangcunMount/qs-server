@@ -2,112 +2,12 @@ package service
 
 import (
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
-	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
-func toInternalOutcomeSummary(result *assessmentApp.AssessmentOutcomeResult) *internalpb.OutcomeSummary {
-	if result == nil {
-		return nil
-	}
-	return &internalpb.OutcomeSummary{
-		Model:        toInternalProtoModelIdentity(result.Model),
-		PrimaryScore: toInternalProtoScoreValue(result.PrimaryScore),
-		Level:        toInternalProtoResultLevel(result.Level),
-	}
-}
-
-func toInternalProtoModelIdentity(model assessmentApp.ModelIdentityResult) *internalpb.ModelIdentity {
-	return &internalpb.ModelIdentity{
-		Kind:            model.Kind,
-		SubKind:         model.SubKind,
-		Algorithm:       model.Algorithm,
-		Code:            model.Code,
-		Version:         model.Version,
-		Title:           model.Title,
-		ProductChannel:  model.ProductChannel,
-		AlgorithmFamily: model.AlgorithmFamily,
-	}
-}
-
-func toInternalProtoScoreValue(score *assessmentApp.ScoreValueResult) *internalpb.ScoreValue {
-	if score == nil {
-		return nil
-	}
-	pbScore := &internalpb.ScoreValue{
-		Kind:  score.Kind,
-		Value: score.Value,
-		Label: score.Label,
-	}
-	if score.Max != nil {
-		pbScore.Max = score.Max
-	}
-	return pbScore
-}
-
-func toInternalProtoResultLevel(level *assessmentApp.ResultLevelResult) *internalpb.ResultLevel {
-	if level == nil {
-		return nil
-	}
-	return &internalpb.ResultLevel{
-		Code:     level.Code,
-		Label:    level.Label,
-		Severity: level.Severity,
-	}
-}
-
-func outcomeSummaryFromAssessmentResult(result *assessmentApp.AssessmentResult) *internalpb.OutcomeSummary {
-	if result == nil {
-		return nil
-	}
-	outcome := legacyAssessmentOutcomeResult(result)
-	return toInternalOutcomeSummary(outcome)
-}
-
-func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *assessmentApp.AssessmentOutcomeResult {
-	if result == nil {
-		return nil
-	}
-	model := assessmentApp.EnrichModelIdentityResult(assessmentApp.ModelIdentityResult{
-		Kind:      derefString(result.ModelKind),
-		SubKind:   derefString(result.ModelSubKind),
-		Algorithm: derefString(result.ModelAlgorithm),
-		Code:      derefString(result.ModelCode),
-		Version:   derefString(result.ModelVersion),
-		Title:     derefString(result.ModelTitle),
-	}, "")
-	var primary *assessmentApp.ScoreValueResult
-	if result.TotalScore != nil {
-		primary = &assessmentApp.ScoreValueResult{Kind: domainreport.ScoreKindRawTotal, Value: *result.TotalScore}
-	}
-	var level *assessmentApp.ResultLevelResult
-	if result.RiskLevel != nil && *result.RiskLevel != "" {
-		if lv := domainreport.LevelFromRisk(domainreport.RiskLevel(*result.RiskLevel)); lv != nil {
-			level = &assessmentApp.ResultLevelResult{Code: lv.Code, Label: lv.Label, Severity: lv.Severity}
-		}
-	}
-	return &assessmentApp.AssessmentOutcomeResult{
-		ID:                   result.ID,
-		OrgID:                result.OrgID,
-		TesteeID:             result.TesteeID,
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        result.AnswerSheetID,
-		Model:                model,
-		PrimaryScore:         primary,
-		Level:                level,
-		OriginType:           result.OriginType,
-		OriginID:             result.OriginID,
-		Status:               result.Status,
-		SubmittedAt:          result.SubmittedAt,
-		FailedAt:             result.FailedAt,
-		FailureReason:        result.FailureReason,
-	}
-}
-
-func toEvaluationProtoModelIdentity(model assessmentApp.ModelIdentityResult) *evaluationpb.ModelIdentity {
+func toEvaluationProtoModelIdentity(model evaluationtestee.ModelIdentity) *evaluationpb.ModelIdentity {
 	return &evaluationpb.ModelIdentity{
 		Kind:            model.Kind,
 		SubKind:         model.SubKind,
@@ -120,7 +20,7 @@ func toEvaluationProtoModelIdentity(model assessmentApp.ModelIdentityResult) *ev
 	}
 }
 
-func toEvaluationProtoScoreValue(score *assessmentApp.ScoreValueResult) *evaluationpb.ScoreValue {
+func toEvaluationProtoScoreValue(score *evaluationtestee.ScoreValue) *evaluationpb.ScoreValue {
 	if score == nil {
 		return nil
 	}
@@ -135,7 +35,7 @@ func toEvaluationProtoScoreValue(score *assessmentApp.ScoreValueResult) *evaluat
 	return pbScore
 }
 
-func toEvaluationProtoResultLevel(level *assessmentApp.ResultLevelResult) *evaluationpb.ResultLevel {
+func toEvaluationProtoResultLevel(level *evaluationtestee.ResultLevel) *evaluationpb.ResultLevel {
 	if level == nil {
 		return nil
 	}
@@ -146,7 +46,7 @@ func toEvaluationProtoResultLevel(level *assessmentApp.ResultLevelResult) *evalu
 	}
 }
 
-func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeResult) *evaluationpb.AssessmentDetail {
+func toProtoAssessmentDetailFromOutcome(result *evaluationtestee.Assessment) *evaluationpb.AssessmentDetail {
 	if result == nil {
 		return nil
 	}
@@ -163,7 +63,7 @@ func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeR
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}
-	if result.SubmittedAt != nil {
+	if result.OriginID != nil {
 		detail.OriginId = *result.OriginID
 	}
 	if result.SubmittedAt != nil {
@@ -178,7 +78,7 @@ func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeR
 	return detail
 }
 
-func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcomeResult) *evaluationpb.AssessmentSummary {
+func toProtoAssessmentSummaryFromOutcome(result *evaluationtestee.Assessment) *evaluationpb.AssessmentSummary {
 	if result == nil {
 		return nil
 	}
@@ -199,11 +99,11 @@ func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcome
 	return summary
 }
 
-func toProtoParticipantReport(result *interpretationParticipant.Report) *evaluationpb.AssessmentReport {
+func toProtoParticipantReport(result *interpretationParticipant.Report) *interpretationpb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
-	report := &evaluationpb.AssessmentReport{
+	report := &interpretationpb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
 		Model:        &evaluationpb.ModelIdentity{Kind: result.Model.Kind, SubKind: result.Model.SubKind, Algorithm: result.Model.Algorithm, Code: result.Model.Code, Version: result.Model.Version, Title: result.Model.Title, ProductChannel: result.Model.ProductChannel, AlgorithmFamily: result.Model.AlgorithmFamily},
 		Conclusion:   result.Conclusion, CreatedAt: result.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -215,19 +115,19 @@ func toProtoParticipantReport(result *interpretationParticipant.Report) *evaluat
 		report.Level = &evaluationpb.ResultLevel{Code: result.Level.Code, Label: result.Level.Label, Severity: result.Level.Severity}
 	}
 	for _, d := range result.Dimensions {
-		report.Dimensions = append(report.Dimensions, &evaluationpb.DimensionInterpret{FactorCode: d.FactorCode, FactorName: d.FactorName, RawScore: d.RawScore, MaxScore: derefFloat64(d.MaxScore), RiskLevel: d.RiskLevel, Description: d.Description, Suggestion: d.Suggestion})
+		report.Dimensions = append(report.Dimensions, &interpretationpb.DimensionInterpret{FactorCode: d.FactorCode, FactorName: d.FactorName, RawScore: d.RawScore, MaxScore: derefFloat64(d.MaxScore), RiskLevel: d.RiskLevel, Description: d.Description, Suggestion: d.Suggestion})
 	}
 	for _, s := range result.Suggestions {
-		item := &evaluationpb.Suggestion{Category: s.Category, Content: s.Content}
+		item := &interpretationpb.Suggestion{Category: s.Category, Content: s.Content}
 		if s.FactorCode != nil {
 			item.FactorCode = *s.FactorCode
 		}
 		report.Suggestions = append(report.Suggestions, item)
 	}
 	if result.ModelExtra != nil {
-		report.ModelExtra = &evaluationpb.ModelExtra{Kind: result.ModelExtra.Kind, TypeCode: result.ModelExtra.TypeCode, TypeName: result.ModelExtra.TypeName, OneLiner: result.ModelExtra.OneLiner, ImageUrl: result.ModelExtra.ImageURL, MatchPercent: result.ModelExtra.MatchPercent, IsSpecial: result.ModelExtra.IsSpecial, SpecialTrigger: result.ModelExtra.SpecialTrigger, Commentary: result.ModelExtra.Commentary}
+		report.ModelExtra = &interpretationpb.ModelExtra{Kind: result.ModelExtra.Kind, TypeCode: result.ModelExtra.TypeCode, TypeName: result.ModelExtra.TypeName, OneLiner: result.ModelExtra.OneLiner, ImageUrl: result.ModelExtra.ImageURL, MatchPercent: result.ModelExtra.MatchPercent, IsSpecial: result.ModelExtra.IsSpecial, SpecialTrigger: result.ModelExtra.SpecialTrigger, Commentary: result.ModelExtra.Commentary}
 		if result.ModelExtra.Rarity != nil {
-			report.ModelExtra.Rarity = &evaluationpb.ModelRarity{Percent: result.ModelExtra.Rarity.Percent, Label: result.ModelExtra.Rarity.Label, OneInX: int32(result.ModelExtra.Rarity.OneInX)}
+			report.ModelExtra.Rarity = &interpretationpb.ModelRarity{Percent: result.ModelExtra.Rarity.Percent, Label: result.ModelExtra.Rarity.Label, OneInX: int32(result.ModelExtra.Rarity.OneInX)}
 		}
 	}
 	return report

@@ -4,21 +4,21 @@ import (
 	"testing"
 	"time"
 
-	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 )
 
 func TestScaleAnalysisResponseMapping(t *testing.T) {
 	earlier := time.Date(2026, 4, 10, 9, 0, 0, 0, time.Local)
 	later := time.Date(2026, 4, 12, 9, 0, 0, 0, time.Local)
 
-	result := toScaleAnalysisResponse(&testeeApp.ScaleAnalysisQueryResult{
+	result := toScaleAnalysisResponse(&evaluationoperator.ScaleAnalysis{
 		TesteeID: 1,
-		Scales: []testeeApp.ScaleTrendQueryResult{
+		Scales: []evaluationoperator.ScaleTrend{
 			{
 				ScaleID:   "9",
 				ScaleCode: "SAS",
 				ScaleName: "Sleep",
-				Tests: []testeeApp.ScaleTestQueryResult{
+				Tests: []evaluationoperator.ScaleTest{
 					{AssessmentID: 1, TestDate: earlier, TotalScore: 10, RiskLevel: "low"},
 					{AssessmentID: 2, TestDate: later, TotalScore: 12, RiskLevel: "medium"},
 				},

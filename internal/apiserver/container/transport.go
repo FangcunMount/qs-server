@@ -71,11 +71,10 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		}
 	}
 	if c.EvaluationModule != nil && c.ReportModule != nil {
-		reportQuery := reportqueryjourney.NewAdministrationService(c.ReportModule.ReportReader(), c.ReportModule.AdministrationService())
+		reportQuery := reportqueryjourney.NewAdministrationService(c.ReportModule.ReportReader(), c.ReportModule.AdministrationService(), c.EvaluationModule.OperatorQuery)
 		deps.Interpretation.ReportQueryJourney = reportQuery
 		deps.Interpretation.ReportWaitJourney = reportwaitjourney.NewService(
-			c.EvaluationModule.AccessQueryService,
-			c.EvaluationModule.WorkerResultReader,
+			c.EvaluationModule.OperatorQuery,
 			reportQuery,
 		)
 	}

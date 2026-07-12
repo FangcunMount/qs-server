@@ -3,7 +3,7 @@ package response
 import (
 	"fmt"
 
-	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 )
 
@@ -110,7 +110,7 @@ type ReportOutcomeListResponse struct {
 }
 
 // NewAssessmentOutcomeResponse maps application outcome result to REST response.
-func NewAssessmentOutcomeResponse(result *assessment.AssessmentOutcomeResult) *AssessmentOutcomeResponse {
+func NewAssessmentOutcomeResponse(result *evaluationoperator.OutcomeAssessment) *AssessmentOutcomeResponse {
 	if result == nil {
 		return nil
 	}
@@ -141,7 +141,7 @@ func NewAssessmentOutcomeResponse(result *assessment.AssessmentOutcomeResult) *A
 }
 
 // NewAssessmentOutcomeListResponse maps application outcome list result to REST response.
-func NewAssessmentOutcomeListResponse(result *assessment.AssessmentOutcomeListResult) *AssessmentOutcomeListResponse {
+func NewAssessmentOutcomeListResponse(result *evaluationoperator.OutcomeAssessmentList) *AssessmentOutcomeListResponse {
 	if result == nil {
 		return nil
 	}
@@ -202,7 +202,7 @@ func NewReportOutcomeListResponse(result *interpretation.ListResult) *ReportOutc
 	}
 }
 
-func newModelIdentityResponse(model assessment.ModelIdentityResult) ModelIdentityResponse {
+func newModelIdentityResponse(model evaluationoperator.ModelIdentity) ModelIdentityResponse {
 	return ModelIdentityResponse{
 		Kind:            model.Kind,
 		SubKind:         model.SubKind,
@@ -215,7 +215,7 @@ func newModelIdentityResponse(model assessment.ModelIdentityResult) ModelIdentit
 	}
 }
 
-func newScoreValueResponse(score *assessment.ScoreValueResult) *ScoreValueResponse {
+func newScoreValueResponse(score *evaluationoperator.ScoreValue) *ScoreValueResponse {
 	if score == nil {
 		return nil
 	}
@@ -227,7 +227,7 @@ func newScoreValueResponse(score *assessment.ScoreValueResult) *ScoreValueRespon
 	}
 }
 
-func newResultLevelResponse(level *assessment.ResultLevelResult) *ResultLevelResponse {
+func newResultLevelResponse(level *evaluationoperator.ResultLevel) *ResultLevelResponse {
 	if level == nil {
 		return nil
 	}

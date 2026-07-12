@@ -3,15 +3,18 @@ package characterization_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
 	"testing"
 	"time"
 
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
@@ -40,7 +43,7 @@ type charScaleBinding struct {
 type charCrossModuleHarness struct {
 	repo               *charAssessmentRepo
 	assessment         *assessment.Assessment
-	intakeSvc          assessmentapp.AnswerSheetAssessmentIntakeService
+	intakeSvc          evaluationintake.Service
 	executeSvc         evaluationexecute.Engine
 	reportSaver        *charSplitPhaseReportSaver
 	submitStaged       *[]event.DomainEvent
@@ -100,7 +103,7 @@ func buildCharCrossModuleHarnessCore(
 	h.executeSvc = executeSvc
 	h.reportSaver = reportSaver
 
-	h.intakeSvc = assessmentapp.NewAnswerSheetAssessmentIntakeService(
+	h.intakeSvc = evaluationintake.NewService(
 		repo,
 		assessment.NewDefaultAssessmentCreator(),
 		&charTxRunner{},
@@ -116,8 +119,11 @@ func buildCharCrossModuleHarnessCore(
 		scaleBinding:   h.scaleBinding,
 	}
 	deps := &workerhandlers.Dependencies{
-		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
-		InternalClient: bridge,
+		Logger:                         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient:                 bridge,
+		AssessmentIntakeClient:         bridge,
+		EvaluationWorkerClient:         bridge,
+		InterpretationAutomationClient: bridge,
 	}
 	registry := workerhandlers.NewRegistry()
 	h.answersheetHandler, _ = registry.Create("answersheet_submitted_handler", deps)
@@ -242,104 +248,79 @@ type charBridgeInternalClient struct {
 	execute        evaluationexecute.Engine
 	generateReport func(context.Context, uint64) error
 	repo           *charAssessmentRepo
-	intakeSvc      assessmentapp.AnswerSheetAssessmentIntakeService
+	intakeSvc      evaluationintake.Service
 	scaleBinding   charScaleBinding
 }
 
 var _ workerhandlers.InternalClient = (*charBridgeInternalClient)(nil)
 
-func (b *charBridgeInternalClient) EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error) {
+func (b *charBridgeInternalClient) ExecuteEvaluation(ctx context.Context, assessmentID uint64) (*evalpb.ExecuteEvaluationResponse, error) {
 	if err := b.execute.Evaluate(ctx, assessmentID); err != nil {
-		return &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "failed",
-			Message: err.Error(),
+		return &evalpb.ExecuteEvaluationResponse{
+			Status: "failed", FailureMessage: err.Error(),
 		}, nil
 	}
 	return b.evaluateResponse(ctx, assessmentID), nil
 }
 
-func (b *charBridgeInternalClient) GenerateReportFromOutcome(ctx context.Context, _ string) (*pb.GenerateReportFromAssessmentResponse, error) {
+func (b *charBridgeInternalClient) GenerateReportFromOutcome(ctx context.Context, _ string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	assessmentID := uint64(0)
 	if b.repo != nil && b.repo.assessment != nil {
 		assessmentID = b.repo.assessment.ID().Uint64()
 	}
 	if b.generateReport == nil {
-		return &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "interpretation use case unavailable"}, nil
+		return &interpretationpb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "interpretation use case unavailable"}, nil
 	}
 	if err := b.generateReport(ctx, assessmentID); err != nil {
-		return &pb.GenerateReportFromAssessmentResponse{
+		return &interpretationpb.GenerateReportFromAssessmentResponse{
 			Success: false,
 			Status:  "failed",
 			Message: err.Error(),
 		}, nil
 	}
-	return &pb.GenerateReportFromAssessmentResponse{
+	return &interpretationpb.GenerateReportFromAssessmentResponse{
 		Success: true,
 		Status:  "interpreted",
 		Message: "报告生成完成",
 	}, nil
 }
 
-func (b *charBridgeInternalClient) evaluateResponse(ctx context.Context, assessmentID uint64) *pb.EvaluateAssessmentResponse {
+func (b *charBridgeInternalClient) evaluateResponse(ctx context.Context, assessmentID uint64) *evalpb.ExecuteEvaluationResponse {
 	a, _ := b.repo.FindByID(ctx, assessment.NewID(assessmentID))
 	status := "interpreted"
 	if a != nil && a.Status().IsEvaluated() {
 		status = "evaluated"
 	}
-	resp := &pb.EvaluateAssessmentResponse{
-		Success: true,
-		Status:  status,
-		Message: "评估完成",
-	}
+	resp := &evalpb.ExecuteEvaluationResponse{Status: status}
 	if a != nil {
-		resp.Outcome = charEvaluateOutcomeSummary(a)
+		if score := a.TotalScore(); score != nil {
+			resp.PrimaryScore = &evalpb.ScoreValue{Kind: domainreport.ScoreKindRawTotal, Value: *score}
+		}
+		if risk := a.RiskLevel(); risk != nil && *risk != "" {
+			if lv := domainreport.LevelFromRisk(domainreport.RiskLevel(*risk)); lv != nil {
+				resp.Level = &evalpb.ResultLevel{Code: lv.Code, Label: lv.Label, Severity: lv.Severity}
+			}
+		}
 	}
 	return resp
 }
 
-func charEvaluateOutcomeSummary(a *assessment.Assessment) *pb.OutcomeSummary {
-	if a == nil {
-		return nil
-	}
-	outcome := &pb.OutcomeSummary{}
-	if score := a.TotalScore(); score != nil {
-		outcome.PrimaryScore = &pb.ScoreValue{
-			Kind:  domainreport.ScoreKindRawTotal,
-			Value: *score,
-		}
-	}
-	if risk := a.RiskLevel(); risk != nil && *risk != "" {
-		if lv := domainreport.LevelFromRisk(domainreport.RiskLevel(*risk)); lv != nil {
-			outcome.Level = &pb.ResultLevel{
-				Code:     lv.Code,
-				Label:    lv.Label,
-				Severity: lv.Severity,
-			}
-		}
-	}
-	return outcome
-}
-
-func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
+func (b *charBridgeInternalClient) EnsureAssessment(
 	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
-	if req == nil || req.AnswersheetId == 0 {
-		return &pb.CreateAssessmentFromAnswerSheetResponse{
-			Success: false,
-			Message: "invalid create assessment request",
-		}, nil
+	req *evalpb.EnsureAssessmentRequest,
+) (*evalpb.EnsureAssessmentResponse, error) {
+	if req == nil || req.AnswerSheetId == 0 {
+		return nil, fmt.Errorf("invalid create assessment request")
 	}
 	scaleCode := b.scaleBinding.scaleCode
 	scaleVersion := b.scaleBinding.scaleVersion
 	modelKind := "scale"
-	dto := assessmentapp.CreateAssessmentDTO{
+	dto := evaluationintake.CreateCommand{
 		OrgID:                req.OrgId,
 		TesteeID:             req.TesteeId,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
-		AnswerSheetID:        req.AnswersheetId,
+		AnswerSheetID:        req.AnswerSheetId,
 		ModelKind:            &modelKind,
 		ModelCode:            &scaleCode,
 		ModelVersion:         &scaleVersion,
@@ -351,46 +332,21 @@ func (b *charBridgeInternalClient) CreateAssessmentFromAnswerSheet(
 
 	result, err := b.intakeSvc.CreateForAnswerSheet(ctx, dto)
 	if err != nil {
-		return &pb.CreateAssessmentFromAnswerSheetResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
+		return nil, err
 	}
 
 	autoSubmitted := false
 	if dto.ModelCode != nil {
 		if _, err := b.intakeSvc.SubmitForEvaluation(ctx, result.ID); err != nil {
-			return &pb.CreateAssessmentFromAnswerSheetResponse{
-				Success: false,
-				Message: err.Error(),
-			}, nil
+			return nil, err
 		}
 		autoSubmitted = true
 	}
 
-	return &pb.CreateAssessmentFromAnswerSheetResponse{
-		Success:       true,
+	return &evalpb.EnsureAssessmentResponse{
 		AssessmentId:  result.ID,
 		Created:       true,
 		AutoSubmitted: autoSubmitted,
-		Message:       "ok",
-	}, nil
-}
-
-func (b *charBridgeInternalClient) CalculateAnswerSheetScore(
-	_ context.Context,
-	req *pb.CalculateAnswerSheetScoreRequest,
-) (*pb.CalculateAnswerSheetScoreResponse, error) {
-	if req == nil || req.AnswersheetId == 0 {
-		return &pb.CalculateAnswerSheetScoreResponse{
-			Success: false,
-			Message: "answersheet_id is required",
-		}, nil
-	}
-	return &pb.CalculateAnswerSheetScoreResponse{
-		Success:    true,
-		Message:    "ok",
-		TotalScore: 5,
 	}, nil
 }
 

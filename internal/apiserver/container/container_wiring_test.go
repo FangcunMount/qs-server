@@ -3,7 +3,6 @@ package container
 import (
 	"testing"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -317,7 +316,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.CodesService = &codesServiceStub{}
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
-	evaluationRecovery := assessmentApp.NewAssessmentOperatorRecoveryService(nil, nil, nil)
+	evaluationRecovery := evaluationoperator.NewRecoveryService(nil, nil, nil)
 	planCommand := planApp.NewCommandService(nil, nil, nil, nil, nil, nil)
 	planQuery := planApp.NewQueryService(nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
@@ -326,7 +325,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 		AnswerSheet:   &AnswerSheetSubModule{},
 	}
 	c.ActorModule = &ActorModule{}
-	c.EvaluationModule = &EvaluationModule{OperatorRecoveryService: evaluationRecovery, OperatorRecovery: evaluationoperator.NewRecoveryService(evaluationRecovery)}
+	c.EvaluationModule = &EvaluationModule{OperatorRecovery: evaluationRecovery}
 	c.PlanModule = &PlanModule{CommandService: planCommand, QueryService: planQuery}
 	c.StatisticsModule = &StatisticsModule{}
 

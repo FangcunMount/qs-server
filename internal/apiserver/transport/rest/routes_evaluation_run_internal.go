@@ -7,10 +7,10 @@ import (
 )
 
 func (r *Router) registerEvaluationRunInternalRoutes(internalV1 *gin.RouterGroup) {
-	if r.deps.Evaluation.RunQueryService == nil {
+	if r.deps.Evaluation.ProtectedQueryService == nil {
 		return
 	}
-	runHandler := handler.NewEvaluationRunInternalHandler(r.deps.Evaluation.RunQueryService)
+	runHandler := handler.NewEvaluationRunInternalHandler(r.deps.Evaluation.ProtectedQueryService)
 	runs := internalV1.Group("/evaluation-runs", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	runs.GET("/failed", r.rateLimitedHandlers(
 		r.rateCfg,

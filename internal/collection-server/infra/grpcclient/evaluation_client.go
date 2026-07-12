@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 )
 
@@ -42,26 +43,20 @@ type TrendPointOutput struct {
 	CreatedAt    string
 }
 
-// EvaluationClient 测评服务 gRPC 客户端封装
-type EvaluationClient struct {
-	client       *Client
-	grpcClient   pb.TesteeEvaluationServiceClient
-	reportClient pb.ParticipantReportServiceClient
-	intakeClient pb.AssessmentIntakeServiceClient
+type TesteeEvaluationClient struct {
+	client     *Client
+	grpcClient pb.TesteeEvaluationServiceClient
 }
 
-// NewEvaluationClient 创建测评服务客户端
-func NewEvaluationClient(client *Client) *EvaluationClient {
-	return &EvaluationClient{
-		client:       client,
-		grpcClient:   pb.NewTesteeEvaluationServiceClient(client.Conn()),
-		reportClient: pb.NewParticipantReportServiceClient(client.Conn()),
-		intakeClient: pb.NewAssessmentIntakeServiceClient(client.Conn()),
+func NewTesteeEvaluationClient(client *Client) *TesteeEvaluationClient {
+	return &TesteeEvaluationClient{
+		client:     client,
+		grpcClient: pb.NewTesteeEvaluationServiceClient(client.Conn()),
 	}
 }
 
 // GetAssessmentScores 获取测评得分详情
-func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error) {
+func (c *TesteeEvaluationClient) GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -90,7 +85,7 @@ func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, testeeID, as
 }
 
 // GetFactorTrend 获取因子得分趋势
-func (c *EvaluationClient) GetFactorTrend(ctx context.Context, testeeID uint64, factorCode string, limit int32) ([]TrendPointOutput, error) {
+func (c *TesteeEvaluationClient) GetFactorTrend(ctx context.Context, testeeID uint64, factorCode string, limit int32) ([]TrendPointOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -119,7 +114,7 @@ func (c *EvaluationClient) GetFactorTrend(ctx context.Context, testeeID uint64, 
 }
 
 // GetHighRiskFactors 获取高风险因子
-func (c *EvaluationClient) GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error) {
+func (c *TesteeEvaluationClient) GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -148,7 +143,7 @@ func (c *EvaluationClient) GetHighRiskFactors(ctx context.Context, testeeID, ass
 }
 
 // fromProtoSuggestions 从 proto 建议列表转换
-func fromProtoSuggestions(protoSuggestions []*pb.Suggestion) []SuggestionOutput {
+func fromProtoSuggestions(protoSuggestions []*interpretationpb.Suggestion) []SuggestionOutput {
 	if len(protoSuggestions) == 0 {
 		return nil
 	}
@@ -263,7 +258,7 @@ type ListAssessmentsOutput struct {
 	TotalPages int32
 }
 
-func (c *EvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error) {
+func (c *TesteeEvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -277,7 +272,7 @@ func (c *EvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assess
 	return convertAssessmentDetail(resp.GetAssessment()), nil
 }
 
-func (c *EvaluationClient) ListMyAssessments(
+func (c *TesteeEvaluationClient) ListMyAssessments(
 	ctx context.Context,
 	testeeID uint64,
 	status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string,
@@ -313,11 +308,19 @@ func (c *EvaluationClient) ListMyAssessments(
 	}, nil
 }
 
-func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error) {
+type ParticipantReportClient struct {
+	client       *Client
+	reportClient interpretationpb.ParticipantReportServiceClient
+}
+
+func NewParticipantReportClient(client *Client) *ParticipantReportClient {
+	return &ParticipantReportClient{client: client, reportClient: interpretationpb.NewParticipantReportServiceClient(client.Conn())}
+}
+func (c *ParticipantReportClient) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.reportClient.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{
+	resp, err := c.reportClient.GetAssessmentReport(ctx, &interpretationpb.GetAssessmentReportRequest{
 		AssessmentId: assessmentID,
 		TesteeId:     testeeID,
 	})
@@ -328,7 +331,15 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, testeeID, as
 }
 
 // ResolveAssessmentByAnswerSheetID resolves ownership keys for a legacy answer-sheet lookup RPC.
-func (c *EvaluationClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error) {
+type AssessmentIntakeClient struct {
+	client       *Client
+	intakeClient pb.AssessmentIntakeServiceClient
+}
+
+func NewAssessmentIntakeClient(client *Client) *AssessmentIntakeClient {
+	return &AssessmentIntakeClient{client: client, intakeClient: pb.NewAssessmentIntakeServiceClient(client.Conn())}
+}
+func (c *AssessmentIntakeClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -341,7 +352,7 @@ func (c *EvaluationClient) ResolveAssessmentByAnswerSheetID(ctx context.Context,
 	return resp.GetTesteeId(), resp.GetAssessmentId(), nil
 }
 
-func (c *EvaluationClient) EnsureAssessment(ctx context.Context, input answersheet.EnsureAssessmentInput) (uint64, error) {
+func (c *AssessmentIntakeClient) EnsureAssessment(ctx context.Context, input answersheet.EnsureAssessmentInput) (uint64, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 	resp, err := c.intakeClient.EnsureAssessment(ctx, &pb.EnsureAssessmentRequest{OrgId: input.OrgID, AnswerSheetId: input.AnswerSheetID, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, TesteeId: input.TesteeID, FillerId: input.FillerID, TaskId: input.TaskID})
@@ -392,7 +403,7 @@ func convertAssessmentSummary(summary *pb.AssessmentSummary) AssessmentSummaryOu
 	}
 }
 
-func convertAssessmentReport(report *pb.AssessmentReport) *AssessmentReportOutput {
+func convertAssessmentReport(report *interpretationpb.AssessmentReport) *AssessmentReportOutput {
 	if report == nil {
 		return nil
 	}
@@ -470,7 +481,7 @@ func convertResultLevel(level *pb.ResultLevel) *ResultLevelOutput {
 	}
 }
 
-func convertModelExtra(extra *pb.ModelExtra) *ModelExtraOutput {
+func convertModelExtra(extra *interpretationpb.ModelExtra) *ModelExtraOutput {
 	if extra == nil {
 		return nil
 	}

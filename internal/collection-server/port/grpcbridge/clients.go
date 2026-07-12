@@ -15,8 +15,12 @@ type EvaluationReader interface {
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error)
 	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*ListAssessmentsOutput, error)
-	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error)
-	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
+}
+type ParticipantReportReader interface {
+	GetAssessmentReport(context.Context, uint64, uint64) (*AssessmentReportOutput, error)
+}
+type AssessmentIntakeReader interface {
+	ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error)
 }
 
 // ActorReader 受试者读端口。

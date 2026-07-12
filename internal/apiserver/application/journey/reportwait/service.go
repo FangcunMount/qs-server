@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
@@ -17,18 +17,12 @@ type Scope struct {
 	AssessmentID   uint64
 }
 
-// AssessmentAccess verifies that a caller can view an Assessment before a wait
-// is registered. It is deliberately narrower than the protected query facade.
-type AssessmentAccess interface {
-	LoadAccessibleAssessment(ctx context.Context, orgID int64, operatorUserID int64, assessmentID uint64) (*assessmentApp.AccessibleAssessmentContext, error)
-}
-
-type AssessmentReader interface {
-	GetByID(ctx context.Context, assessmentID uint64) (*assessmentApp.AssessmentResult, error)
-}
-
 type LegacyProjection interface {
-	ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*reportqueryApp.AssessmentProjection, error)
+	ProjectAssessment(ctx context.Context, result *evaluationoperator.Assessment) (*reportqueryApp.AssessmentProjection, error)
+}
+
+type AssessmentQuery interface {
+	GetAssessment(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error)
 }
 
 // Service is the neutral journey use case for an authorized report wait.
@@ -37,20 +31,19 @@ type Service interface {
 }
 
 type service struct {
-	access     AssessmentAccess
-	reader     AssessmentReader
+	operator   AssessmentQuery
 	projection LegacyProjection
 }
 
-func NewService(access AssessmentAccess, reader AssessmentReader, projection LegacyProjection) Service {
-	return &service{access: access, reader: reader, projection: projection}
+func NewService(operator AssessmentQuery, projection LegacyProjection) Service {
+	return &service{operator: operator, projection: projection}
 }
 
 func (s *service) Wait(ctx context.Context, scope Scope) (evaluationwaiter.StatusSummary, error) {
-	if _, err := s.access.LoadAccessibleAssessment(ctx, scope.OrgID, scope.OperatorUserID, scope.AssessmentID); err != nil {
+	if _, err := s.operator.GetAssessment(ctx, evaluationoperator.Actor{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}, scope.AssessmentID); err != nil {
 		return evaluationwaiter.StatusSummary{}, err
 	}
-	if summary, done := s.loadTerminalSummary(ctx, scope.AssessmentID); done {
+	if summary, done := s.loadTerminalSummary(ctx, scope); done {
 		return summary, nil
 	}
 	ticker := time.NewTicker(time.Second)
@@ -60,18 +53,18 @@ func (s *service) Wait(ctx context.Context, scope Scope) (evaluationwaiter.Statu
 		case <-ctx.Done():
 			return pendingSummary(), nil
 		case <-ticker.C:
-			if summary, done := s.loadTerminalSummary(ctx, scope.AssessmentID); done {
+			if summary, done := s.loadTerminalSummary(ctx, scope); done {
 				return summary, nil
 			}
 		}
 	}
 }
 
-func (s *service) loadTerminalSummary(ctx context.Context, assessmentID uint64) (evaluationwaiter.StatusSummary, bool) {
-	if s.reader == nil {
+func (s *service) loadTerminalSummary(ctx context.Context, scope Scope) (evaluationwaiter.StatusSummary, bool) {
+	if s.operator == nil {
 		return evaluationwaiter.StatusSummary{}, false
 	}
-	result, err := s.reader.GetByID(ctx, assessmentID)
+	result, err := s.operator.GetAssessment(ctx, evaluationoperator.Actor{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}, scope.AssessmentID)
 	if err != nil || result == nil {
 		return evaluationwaiter.StatusSummary{}, false
 	}
@@ -91,7 +84,7 @@ func (s *service) loadTerminalSummary(ctx context.Context, assessmentID uint64) 
 	return statusSummary(result, result.Status), true
 }
 
-func statusSummary(result *assessmentApp.AssessmentResult, status string) evaluationwaiter.StatusSummary {
+func statusSummary(result *evaluationoperator.Assessment, status string) evaluationwaiter.StatusSummary {
 	var totalScore *float64
 	if result.TotalScore != nil {
 		value := *result.TotalScore

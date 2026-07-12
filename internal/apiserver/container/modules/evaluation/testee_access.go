@@ -4,7 +4,7 @@ import (
 	"context"
 
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 )
 
 type testeeAccessChecker struct {
@@ -12,7 +12,7 @@ type testeeAccessChecker struct {
 }
 
 // NewTesteeAccessChecker adapts actor testee access to evaluation assessment checks.
-func NewTesteeAccessChecker(delegate actorAccessApp.TesteeAccessService) assessmentApp.TesteeAccessChecker {
+func NewTesteeAccessChecker(delegate actorAccessApp.TesteeAccessService) evaluationoperator.AccessChecker {
 	if delegate == nil {
 		return nil
 	}
@@ -23,7 +23,7 @@ func (c testeeAccessChecker) ResolveAccessScope(
 	ctx context.Context,
 	orgID int64,
 	operatorUserID int64,
-) (*assessmentApp.TesteeAccessScope, error) {
+) (*evaluationoperator.AccessScope, error) {
 	scope, err := c.delegate.ResolveAccessScope(ctx, orgID, operatorUserID)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (c testeeAccessChecker) ResolveAccessScope(
 	if scope == nil {
 		return nil, nil
 	}
-	return &assessmentApp.TesteeAccessScope{
+	return &evaluationoperator.AccessScope{
 		IsAdmin:     scope.IsAdmin,
 		ClinicianID: scope.ClinicianID,
 	}, nil

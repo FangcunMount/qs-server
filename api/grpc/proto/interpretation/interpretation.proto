@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package interpretation;
+
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation";
+
+import "evaluation/evaluation.proto";
+
+service ParticipantReportService {
+  rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
+  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
+}
+
+service InterpretationAutomationService {
+  rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest) returns (GenerateReportFromAssessmentResponse);
+}
+
+message Suggestion { string category = 1; string content = 2; string factor_code = 3; }
+message DimensionInterpret {
+  string factor_code = 1; string factor_name = 2; double raw_score = 3;
+  string risk_level = 4; string description = 5; double max_score = 6; string suggestion = 7;
+}
+message ModelRarity { double percent = 1; string label = 2; int32 one_in_x = 3; }
+message ModelExtra {
+  string kind = 1; string type_code = 2; string type_name = 3; string one_liner = 4;
+  string image_url = 5; double match_percent = 6; bool is_special = 7;
+  string special_trigger = 8; string commentary = 9; ModelRarity rarity = 10;
+}
+message AssessmentReport {
+  reserved 2, 3, 4, 5;
+  reserved "scale_code", "scale_name", "total_score", "risk_level";
+  uint64 assessment_id = 1;
+  string conclusion = 6;
+  repeated DimensionInterpret dimensions = 7;
+  repeated Suggestion suggestions = 8;
+  string created_at = 9;
+  ModelExtra model_extra = 10;
+  evaluation.ModelIdentity model = 11;
+  evaluation.ScoreValue primary_score = 12;
+  evaluation.ResultLevel level = 13;
+}
+message GetAssessmentReportRequest { uint64 assessment_id = 1; uint64 testee_id = 2; }
+message GetAssessmentReportResponse { AssessmentReport report = 1; }
+message ListMyReportsRequest { uint64 testee_id = 1; int32 page = 2; int32 page_size = 3; }
+message ListMyReportsResponse {
+  repeated AssessmentReport items = 1; int32 total = 2; int32 page = 3;
+  int32 page_size = 4; int32 total_pages = 5;
+}
+message GenerateReportFromAssessmentRequest { uint64 assessment_id = 1; string outcome_id = 2; }
+message GenerateReportFromAssessmentResponse {
+  bool success = 1; string status = 2; string message = 3; bool retryable = 4;
+  string run_id = 5; string failure_kind = 6; string generation_id = 7;
+  string report_id = 8; string failure_code = 9;
+}

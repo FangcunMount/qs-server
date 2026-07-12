@@ -3,7 +3,6 @@ package response
 import (
 	"fmt"
 
-	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	reportquery "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
@@ -170,7 +169,7 @@ type ReportListResponse struct {
 // ============= 转换函数 =============
 
 // NewAssessmentResponse 从应用层 Result 创建响应
-func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentResponse {
+func NewAssessmentResponse(result *evaluationoperator.Assessment) *AssessmentResponse {
 	if result == nil {
 		return nil
 	}
@@ -237,7 +236,7 @@ func NewProjectedAssessmentResponse(result *reportquery.AssessmentProjection) *A
 }
 
 // NewAssessmentListResponse 从应用层 Result 创建列表响应
-func NewAssessmentListResponse(result *assessment.AssessmentListResult) *AssessmentListResponse {
+func NewAssessmentListResponse(result *evaluationoperator.AssessmentList) *AssessmentListResponse {
 	if result == nil {
 		return nil
 	}
@@ -291,7 +290,7 @@ func NewBatchEvaluationResponse(result *evaluationoperator.BatchResult) *BatchEv
 }
 
 // NewScoreResponse 从应用层 Result 创建得分响应
-func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
+func NewScoreResponse(result *evaluationoperator.Score) *ScoreResponse {
 	if result == nil {
 		return nil
 	}
@@ -319,7 +318,7 @@ func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
 }
 
 // NewFactorTrendResponse 从应用层 Result 创建因子趋势响应
-func NewFactorTrendResponse(result *assessment.FactorTrendResult) *FactorTrendResponse {
+func NewFactorTrendResponse(result *evaluationoperator.FactorTrend) *FactorTrendResponse {
 	if result == nil {
 		return nil
 	}
@@ -343,7 +342,7 @@ func NewFactorTrendResponse(result *assessment.FactorTrendResult) *FactorTrendRe
 }
 
 // NewHighRiskFactorsResponse 从应用层 Result 创建高风险因子响应
-func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighRiskFactorsResponse {
+func NewHighRiskFactorsResponse(result *evaluationoperator.HighRiskFactors) *HighRiskFactorsResponse {
 	if result == nil {
 		return nil
 	}

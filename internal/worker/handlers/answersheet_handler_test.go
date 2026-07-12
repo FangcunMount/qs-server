@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
@@ -40,45 +42,26 @@ type fakeWorkerInternalClient struct {
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
 
-func (f *fakeWorkerInternalClient) CreateAssessmentFromAnswerSheet(
+func (f *fakeWorkerInternalClient) EnsureAssessment(
 	_ context.Context,
-	_ *pb.CreateAssessmentFromAnswerSheetRequest,
-) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
+	_ *evalpb.EnsureAssessmentRequest,
+) (*evalpb.EnsureAssessmentResponse, error) {
 	f.createCalls++
 	f.calls = append(f.calls, "create_assessment")
 	if f.calculateScoreMessage != "" && !f.calculateScoreSuccess {
-		return &pb.CreateAssessmentFromAnswerSheetResponse{
-			Success: false,
-			Message: f.calculateScoreMessage,
-		}, nil
+		return nil, errors.New(f.calculateScoreMessage)
 	}
 	success := true
 	if f.createMessage != "" {
 		success = f.createSuccess
 	}
-	return &pb.CreateAssessmentFromAnswerSheetResponse{
-		Success:       success,
+	if !success {
+		return nil, errors.New(firstNonEmpty(f.createMessage, "assessment ensure failed"))
+	}
+	return &evalpb.EnsureAssessmentResponse{
 		AssessmentId:  1001,
 		Created:       true,
 		AutoSubmitted: false,
-		Message:       firstNonEmpty(f.createMessage, "ok"),
-	}, nil
-}
-
-func (f *fakeWorkerInternalClient) CalculateAnswerSheetScore(
-	_ context.Context,
-	_ *pb.CalculateAnswerSheetScoreRequest,
-) (*pb.CalculateAnswerSheetScoreResponse, error) {
-	f.calculateCalls++
-	f.calls = append(f.calls, "calculate_score")
-	success := true
-	if f.calculateScoreMessage != "" {
-		success = f.calculateScoreSuccess
-	}
-	return &pb.CalculateAnswerSheetScoreResponse{
-		Success:    success,
-		Message:    firstNonEmpty(f.calculateScoreMessage, "ok"),
-		TotalScore: 42,
 	}, nil
 }
 
@@ -91,20 +74,20 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (f *fakeWorkerInternalClient) EvaluateAssessment(
+func (f *fakeWorkerInternalClient) ExecuteEvaluation(
 	_ context.Context,
 	_ uint64,
-) (*pb.EvaluateAssessmentResponse, error) {
-	return &pb.EvaluateAssessmentResponse{}, nil
+) (*evalpb.ExecuteEvaluationResponse, error) {
+	return &evalpb.ExecuteEvaluationResponse{}, nil
 }
 
 func (f *fakeWorkerInternalClient) GenerateReportFromOutcome(
 	_ context.Context,
 	_ string,
-) (*pb.GenerateReportFromAssessmentResponse, error) {
+) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++
 	f.calls = append(f.calls, "generate_report")
-	return &pb.GenerateReportFromAssessmentResponse{Success: true}, nil
+	return &interpretationpb.GenerateReportFromAssessmentResponse{Success: true}, nil
 }
 
 func (f *fakeWorkerInternalClient) SyncAssessmentAttention(
@@ -428,7 +411,14 @@ func TestHandleAnswerSheetSubmitted_CreateFailureAfterSuccessfulScore(t *testing
 	}
 }
 
-func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.UniversalClient) *Dependencies {
+type workerTestClient interface {
+	InternalClient
+	AssessmentIntakeClient
+	EvaluationWorkerClient
+	InterpretationAutomationClient
+}
+
+func newAnswerSheetHandlerTestDeps(client workerTestClient, redisClient redis.UniversalClient) *Dependencies {
 	lockBuilder := keyspace.NewBuilderWithNamespace(
 		keyspace.ComposeNamespace("worker-test", "cache:lock"),
 	)
@@ -440,10 +430,13 @@ func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.Univ
 		})
 	}
 	return &Dependencies{
-		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
-		InternalClient: client,
-		LockManager:    lockManager,
-		LockKeyBuilder: lockBuilder,
+		Logger:                         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient:                 client,
+		AssessmentIntakeClient:         client,
+		EvaluationWorkerClient:         client,
+		InterpretationAutomationClient: client,
+		LockManager:                    lockManager,
+		LockKeyBuilder:                 lockBuilder,
 	}
 }
 

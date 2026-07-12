@@ -54,7 +54,9 @@ type Manager struct {
 	// 已注册的客户端
 	answerSheetClient            *AnswerSheetClient
 	questionnaireClient          *QuestionnaireClient
-	evaluationClient             *EvaluationClient
+	testeeEvaluationClient       *TesteeEvaluationClient
+	participantReportClient      *ParticipantReportClient
+	assessmentIntakeClient       *AssessmentIntakeClient
 	actorClient                  *ActorClient
 	assessmentModelCatalogClient *AssessmentModelCatalogClient
 }
@@ -244,9 +246,13 @@ func (m *Manager) RegisterClients() error {
 	log.Info("   📝 Questionnaire client registered")
 
 	// 注册 Evaluation 客户端
-	m.evaluationClient = NewEvaluationClient(baseClient)
-	m.clients["evaluation"] = m.evaluationClient
-	log.Info("   📊 Evaluation client registered")
+	m.testeeEvaluationClient = NewTesteeEvaluationClient(baseClient)
+	m.participantReportClient = NewParticipantReportClient(baseClient)
+	m.assessmentIntakeClient = NewAssessmentIntakeClient(baseClient)
+	m.clients["testeeEvaluation"] = m.testeeEvaluationClient
+	m.clients["participantReport"] = m.participantReportClient
+	m.clients["assessmentIntake"] = m.assessmentIntakeClient
+	log.Info("   📊 actor-oriented Evaluation/Interpretation clients registered")
 
 	// 注册 Actor 客户端
 	m.actorClient = NewActorClient(baseClient)
@@ -272,9 +278,11 @@ func (m *Manager) QuestionnaireClient() *QuestionnaireClient {
 }
 
 // EvaluationClient 获取测评客户端
-func (m *Manager) EvaluationClient() *EvaluationClient {
-	return m.evaluationClient
+func (m *Manager) TesteeEvaluationClient() *TesteeEvaluationClient { return m.testeeEvaluationClient }
+func (m *Manager) ParticipantReportClient() *ParticipantReportClient {
+	return m.participantReportClient
 }
+func (m *Manager) AssessmentIntakeClient() *AssessmentIntakeClient { return m.assessmentIntakeClient }
 
 // ActorClient 获取 Actor 客户端
 func (m *Manager) ActorClient() *ActorClient {

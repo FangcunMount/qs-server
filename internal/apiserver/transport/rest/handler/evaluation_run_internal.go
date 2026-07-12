@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	runquery "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/gin-gonic/gin"
 )
@@ -11,14 +11,14 @@ import (
 // EvaluationRunInternalHandler serves operating endpoints for evaluation runs.
 type EvaluationRunInternalHandler struct {
 	*BaseHandler
-	runQueryService runquery.Service
+	operator evaluationoperator.QueryService
 }
 
 // NewEvaluationRunInternalHandler creates an internal evaluation run handler.
-func NewEvaluationRunInternalHandler(runQueryService runquery.Service) *EvaluationRunInternalHandler {
+func NewEvaluationRunInternalHandler(operator evaluationoperator.QueryService) *EvaluationRunInternalHandler {
 	return &EvaluationRunInternalHandler{
-		BaseHandler:     &BaseHandler{},
-		runQueryService: runQueryService,
+		BaseHandler: &BaseHandler{},
+		operator:    operator,
 	}
 }
 
@@ -34,17 +34,17 @@ func NewEvaluationRunInternalHandler(runQueryService runquery.Service) *Evaluati
 // @Router /internal/v1/evaluation-runs/failed [get]
 func (h *EvaluationRunInternalHandler) ListRetryableFailed(c *gin.Context) {
 	if c.Query("retryable") == "false" {
-		h.Success(c, response.NewRetryableFailedRunListResponse(&runquery.RetryableFailedListResult{}))
+		h.Success(c, response.NewRetryableFailedRunListResponse(&evaluationoperator.RetryableFailedRunList{}))
 		return
 	}
-	orgID, _, err := h.RequireProtectedScope(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	cursor, _ := strconv.ParseUint(c.Query("cursor"), 10, 64)
-	result, err := h.runQueryService.ListRetryableFailed(c.Request.Context(), orgID, limit, cursor)
+	result, err := h.operator.ListRetryableFailedRuns(c.Request.Context(), evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, limit, cursor)
 	if err != nil {
 		h.Error(c, err)
 		return

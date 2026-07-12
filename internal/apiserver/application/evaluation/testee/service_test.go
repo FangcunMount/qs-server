@@ -2,11 +2,13 @@ package testee
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
-	legacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestParseDate(t *testing.T) {
@@ -24,32 +26,33 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
-type ownershipStub struct{ err error }
+type assessmentRepoStub struct {
+	domainassessment.Repository
+	value *domainassessment.Assessment
+}
 
-func (s ownershipStub) GetMine(context.Context, uint64, uint64) (*legacy.AssessmentResult, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return &legacy.AssessmentResult{ID: 1, TesteeID: 7}, nil
+func (s assessmentRepoStub) FindByID(context.Context, domainassessment.ID) (*domainassessment.Assessment, error) {
+	return s.value, nil
 }
 
 type scoreStub struct{ called bool }
 
-func (s *scoreStub) GetByAssessmentID(context.Context, uint64) (*legacy.ScoreResult, error) {
+func (s *scoreStub) Get(context.Context, uint64) (*evaloutcome.ScoreFact, error) {
 	s.called = true
-	return &legacy.ScoreResult{AssessmentID: 1}, nil
+	return &evaloutcome.ScoreFact{AssessmentID: 1}, nil
 }
-func (*scoreStub) GetFactorTrend(context.Context, legacy.GetFactorTrendDTO) (*legacy.FactorTrendResult, error) {
-	return nil, nil
-}
-func (*scoreStub) GetHighRiskFactors(context.Context, uint64) (*legacy.HighRiskFactorsResult, error) {
+func (*scoreStub) Trend(context.Context, uint64, string, int) (*evaloutcome.FactorTrendFact, error) {
 	return nil, nil
 }
 
 func TestGetScoreRejectsNonOwnerBeforeReadingScore(t *testing.T) {
 	t.Parallel()
 	scores := &scoreStub{}
-	svc := NewService(ownershipStub{err: errors.New("forbidden")}, nil, scores)
+	a, err := domainassessment.NewAssessment(9, domaintestee.NewID(7), domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(2)), domainassessment.NewAdhocOrigin(), domainassessment.WithID(meta.FromUint64(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(assessmentRepoStub{value: a}, nil, scores)
 	if _, err := svc.GetScore(context.Background(), Actor{TesteeID: 8}, 1); err == nil {
 		t.Fatal("expected ownership error")
 	}

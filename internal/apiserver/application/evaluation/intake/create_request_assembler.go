@@ -1,4 +1,4 @@
-package assessment
+package intake
 
 import (
 	"strings"
@@ -12,7 +12,7 @@ import (
 
 type assessmentCreateRequestAssembler struct{}
 
-func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domainAssessment.CreateAssessmentRequest, error) {
+func (assessmentCreateRequestAssembler) Assemble(dto CreateCommand) (domainAssessment.CreateAssessmentRequest, error) {
 	if dto.TesteeID == 0 {
 		return domainAssessment.CreateAssessmentRequest{}, evalerrors.InvalidArgument("受试者ID不能为空")
 	}

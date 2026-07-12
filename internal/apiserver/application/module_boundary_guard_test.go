@@ -121,9 +121,7 @@ func TestAssessmentApplicationDoesNotRetainCombinedFacades(t *testing.T) {
 
 	root := repoRoot(t)
 	got := collectSourceTokenFiles(t, root, []string{
-		"internal/apiserver/application/evaluation/assessment/interface.go",
-		"internal/apiserver/application/evaluation/assessment/submission_service.go",
-		"internal/apiserver/application/evaluation/assessment/management_service.go",
+		"internal/apiserver/application/evaluation",
 	}, []string{"AssessmentSubmissionService", "AssessmentManagementService"})
 	if len(got) != 0 {
 		t.Fatalf("Assessment application must expose role-specific ports only, found combined facade in:\n%s", strings.Join(got, "\n"))
@@ -161,7 +159,7 @@ func TestProtectedAssessmentQueryDoesNotOwnReportWait(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/application/evaluation/assessment/protected_query_service.go"}, []string{"WaitReport"})
+	got := collectSourceTokenFiles(t, root, []string{"internal/apiserver/application/evaluation"}, []string{"WaitReport"})
 	if len(got) != 0 {
 		t.Fatalf("protected Assessment query must not own report waiting, found in:\n%s", strings.Join(got, "\n"))
 	}

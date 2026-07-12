@@ -39,8 +39,8 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 		if !data.NeedsEvaluation() {
 			return nil
 		}
-		if deps.InternalClient == nil {
-			return fmt.Errorf("internal client is not available: cannot evaluate request for assessment %d", data.AssessmentID)
+		if deps.EvaluationWorkerClient == nil {
+			return fmt.Errorf("evaluation worker client is not available: cannot evaluate request for assessment %d", data.AssessmentID)
 		}
 
 		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
@@ -54,7 +54,7 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			}
 		}
 
-		resp, err := deps.InternalClient.EvaluateAssessment(ctx, assessmentID)
+		resp, err := deps.EvaluationWorkerClient.ExecuteEvaluation(ctx, assessmentID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate assessment: %w", err)
 		}

@@ -11,6 +11,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -26,7 +27,7 @@ type TesteeHandler struct {
 	clinicianQueryService        clinicianApp.ClinicianQueryService
 	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
 	testeeAccessService          actorAccessApp.TesteeAccessService
-	scaleAnalysisQueryService    testeeApp.ScaleAnalysisQueryService
+	scaleAnalysisQueryService    evaluationoperator.ScaleAnalysisService
 }
 
 type testeeListQuery struct {
@@ -45,7 +46,7 @@ func NewTesteeHandler(
 	clinicianQueryService clinicianApp.ClinicianQueryService,
 	clinicianRelationshipService clinicianApp.ClinicianRelationshipService,
 	testeeAccessService actorAccessApp.TesteeAccessService,
-	scaleAnalysisQueryService testeeApp.ScaleAnalysisQueryService,
+	scaleAnalysisQueryService evaluationoperator.ScaleAnalysisService,
 ) *TesteeHandler {
 	return &TesteeHandler{
 		BaseHandler:                  NewBaseHandler(),
@@ -183,7 +184,7 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	orgID, _, err := h.validateProtectedTesteeAccess(c, id)
+	orgID, operatorUserID, err := h.validateProtectedTesteeAccess(c, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -192,10 +193,7 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.scaleAnalysisQueryService.GetScaleAnalysis(c.Request.Context(), testeeApp.ScaleAnalysisQueryDTO{
-		OrgID:    orgID,
-		TesteeID: id,
-	})
+	result, err := h.scaleAnalysisQueryService.GetScaleAnalysis(c.Request.Context(), evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -708,7 +706,7 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 	}
 }
 
-func toScaleAnalysisResponse(result *testeeApp.ScaleAnalysisQueryResult) *response.ScaleAnalysisResponse {
+func toScaleAnalysisResponse(result *evaluationoperator.ScaleAnalysis) *response.ScaleAnalysisResponse {
 	resp := &response.ScaleAnalysisResponse{Scales: []response.ScaleTrendResponse{}}
 	if result == nil {
 		return resp

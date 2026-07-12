@@ -41,7 +41,7 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 			entryFile:       "internal/apiserver/transport/grpc/service/evaluation.go",
 			entrySymbol:     "GetMyAssessment(",
 			authorityFile:   "internal/apiserver/application/evaluation/testee/service.go",
-			authoritySymbol: "authorizeAssessment(",
+			authoritySymbol: "AuthorizeAssessment(",
 		},
 		{
 			actor:           "backend operator",
@@ -151,24 +151,21 @@ func TestEvaluationTransportBusinessDebtDoesNotSpread(t *testing.T) {
 	})
 }
 
-func TestEvaluationGRPCReportRPCsBelongToParticipantService(t *testing.T) {
+func TestEvaluationGRPCReportRPCsBelongToInterpretation(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "api/grpc/proto/evaluation/evaluation.proto"))
+	data, err := os.ReadFile(filepath.Join(root, "api/grpc/proto/interpretation/interpretation.proto"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	source := string(data)
-	if strings.Contains(source, "service EvaluationService") {
-		t.Fatal("actor-neutral EvaluationService was reintroduced")
-	}
 	if !strings.Contains(source, "service ParticipantReportService") {
 		t.Fatal("participant report service is missing")
 	}
 	for _, rpc := range []string{"rpc GetAssessmentReport(", "rpc ListMyReports("} {
 		if count := strings.Count(source, rpc); count != 1 {
-			t.Fatalf("Evaluation report compatibility RPC %q count = %d, want 1; remove the ratchet entry when the RPC migrates", rpc, count)
+			t.Fatalf("Interpretation participant RPC %q count = %d, want 1", rpc, count)
 		}
 	}
 	for _, forbidden := range []string{"rpc WaitReport(", "rpc RetryReport(", "rpc GenerateReport("} {
@@ -186,11 +183,17 @@ func TestEvaluationWorkerDoesNotReuseOperatorQueryService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "WorkerResultReader = m.OperatorQueryService") {
-		t.Fatal("Worker result reader must not reuse the backend-operator query service")
+	for _, forbidden := range []string{"WorkerResultReader", "NewWorkerAssessmentResultReader("} {
+		if strings.Contains(string(data), forbidden) { t.Fatalf("retired worker result reader remains: %s", forbidden) }
 	}
-	if !strings.Contains(string(data), "NewWorkerAssessmentResultReader(") {
-		t.Fatal("Evaluation assembly must wire the dedicated Worker result reader")
+}
+
+func TestRetiredEvaluationApplicationPackagesStayDeleted(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	for _, name := range []string{"assessment", "runquery", "consistency"} {
+		path := filepath.Join(root, "internal/apiserver/application/evaluation", name)
+		if _, err := os.Stat(path); !os.IsNotExist(err) { t.Fatalf("retired package still exists: %s", path) }
 	}
 }
 

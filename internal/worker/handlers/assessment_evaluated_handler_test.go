@@ -6,18 +6,18 @@ import (
 	"log/slog"
 	"testing"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 type reportGeneratingInternalClient struct {
 	fakeWorkerInternalClient
-	generateReportResp *pb.GenerateReportFromAssessmentResponse
+	generateReportResp *interpretationpb.GenerateReportFromAssessmentResponse
 	generateReportErr  error
 	outcomeID          string
 }
 
-func (f *reportGeneratingInternalClient) GenerateReportFromOutcome(_ context.Context, outcomeID string) (*pb.GenerateReportFromAssessmentResponse, error) {
+func (f *reportGeneratingInternalClient) GenerateReportFromOutcome(_ context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	f.generateReportCalls++
 	f.outcomeID = outcomeID
 	if f.generateReportErr != nil {
@@ -27,8 +27,8 @@ func (f *reportGeneratingInternalClient) GenerateReportFromOutcome(_ context.Con
 }
 
 func TestHandleEvaluationOutcomeCommittedAcksPersistedReportFailure(t *testing.T) {
-	client := &reportGeneratingInternalClient{generateReportResp: &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "report generation failed"}}
-	handler := handleEvaluationOutcomeCommitted(&Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InternalClient: client})
+	client := &reportGeneratingInternalClient{generateReportResp: &interpretationpb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "report generation failed"}}
+	handler := handleEvaluationOutcomeCommitted(&Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InterpretationAutomationClient: client})
 	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 2001)); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
@@ -38,8 +38,8 @@ func TestHandleEvaluationOutcomeCommittedAcksPersistedReportFailure(t *testing.T
 }
 
 func TestHandleEvaluationOutcomeCommittedRetriesTransientReportFailure(t *testing.T) {
-	client := &reportGeneratingInternalClient{generateReportResp: &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "skipped", Message: "temporary unavailable"}}
-	handler := handleEvaluationOutcomeCommitted(&Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InternalClient: client})
+	client := &reportGeneratingInternalClient{generateReportResp: &interpretationpb.GenerateReportFromAssessmentResponse{Success: false, Status: "skipped", Message: "temporary unavailable"}}
+	handler := handleEvaluationOutcomeCommitted(&Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InterpretationAutomationClient: client})
 	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 2002)); err == nil {
 		t.Fatal("expected retryable report generation error")
 	}

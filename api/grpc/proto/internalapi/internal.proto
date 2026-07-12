@@ -56,12 +56,6 @@ service InternalService {
       returns (BootstrapOperatorResponse);
 }
 
-// Interpretation 自动化 actor 的独立入口。
-service InterpretationAutomationService {
-  rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest)
-      returns (GenerateReportFromAssessmentResponse);
-}
-
 // Plan 写侧命令服务 - 供 Worker 和内部系统动作调用
 service PlanCommandService {
   rpc CreatePlan(CreatePlanRequest) returns (CreatePlanResponse);
@@ -248,116 +242,6 @@ message CancelTaskResponse {
   string task_id = 1;
   string plan_id = 2;
   int32 affected_task_count = 3;
-}
-
-// ==================== CalculateAnswerSheetScore ====================
-
-// 计算答卷分数请求
-message CalculateAnswerSheetScoreRequest {
-  uint64 answersheet_id = 1;         // 答卷ID
-}
-
-// 计算答卷分数响应
-message CalculateAnswerSheetScoreResponse {
-  bool success = 1;                  // 是否成功
-  double total_score = 2;            // 总分
-  string message = 3;                // 描述信息
-}
-
-// ==================== CreateAssessmentFromAnswerSheet ====================
-
-// 从答卷创建测评请求
-message CreateAssessmentFromAnswerSheetRequest {
-  uint64 answersheet_id = 1;         // 答卷ID
-  string questionnaire_code = 2;     // 问卷编码
-  string questionnaire_version = 3;  // 问卷版本
-  uint64 testee_id = 4;              // 受试者ID
-  uint64 org_id = 5;                 // 组织ID
-  uint64 filler_id = 6;              // 填写人ID
-  string filler_type = 7;            // 填写人类型：self/proxy
-  string origin_type = 8;            // 来源类型：adhoc/plan（可选）
-  string origin_id = 9;              // 来源ID（可选）
-  string task_id = 10;               // 计划任务ID（可选）
-}
-
-// 从答卷创建测评响应
-message CreateAssessmentFromAnswerSheetResponse {
-  uint64 assessment_id = 1;          // 创建的测评ID（如果有）
-  bool created = 2;                  // 是否创建了测评
-  bool auto_submitted = 3;           // 是否自动提交（关联量表时）
-  string message = 4;                // 描述信息
-  bool success = 5;                  // 业务是否成功（与 gRPC error 分离）
-}
-
-// ==================== EvaluateAssessment ====================
-
-// 执行测评评估请求
-message EvaluateAssessmentRequest {
-  uint64 assessment_id = 1;          // 测评ID
-}
-
-// 执行测评评估响应
-message EvaluateAssessmentResponse {
-  bool success = 1;                  // 是否成功
-  string status = 2;                 // 处理后的状态：evaluated/failed/skipped
-  string message = 3;                // 描述信息
-  reserved 4, 5;
-  reserved "total_score", "risk_level";
-  OutcomeSummary outcome = 6;        // v2 outcome 投影
-  bool retryable = 7;                // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
-  string run_id = 8;                 // 失败时关联的 evaluation_run id
-  string failure_kind = 9;           // 失败分类：validation/calculation/timeout/internal
-  string trace_id = 10;              // 关联 evaluation_run trace_id
-  string input_snapshot_ref = 11;    // 关联 evaluation_run input_snapshot_ref
-}
-
-message OutcomeSummary {
-  ModelIdentity model = 1;
-  ScoreValue primary_score = 2;
-  ResultLevel level = 3;
-}
-
-message ModelIdentity {
-  string kind = 1;
-  string sub_kind = 2;
-  string algorithm = 3;
-  string code = 4;
-  string version = 5;
-  string title = 6;
-  string product_channel = 7;
-  string algorithm_family = 8;
-}
-
-message ScoreValue {
-  string kind = 1;
-  double value = 2;
-  string label = 3;
-  optional double max = 4;
-}
-
-message ResultLevel {
-  string code = 1;
-  string label = 2;
-  string severity = 3;
-}
-
-// ==================== GenerateReportFromAssessment ====================
-
-message GenerateReportFromAssessmentRequest {
-  uint64 assessment_id = 1;
-  string outcome_id = 2;              // assessment.evaluated 携带的 canonical EvaluationOutcome ID
-}
-
-message GenerateReportFromAssessmentResponse {
-  bool success = 1;
-  string status = 2;
-  string message = 3;
-  bool retryable = 4;                // 失败时是否应 nack 重试
-  string run_id = 5;                 // 关联的 interpretation_run id（若有）
-  string failure_kind = 6;           // 失败分类（若有）
-  string generation_id = 7;          // 报告生成聚合 ID
-  string report_id = 8;              // 成功 Artifact ID（若有）
-  string failure_code = 9;           // 失败代码（若有）
 }
 
 // ==================== Assessment Attention Sync ====================

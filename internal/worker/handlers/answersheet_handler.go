@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strconv"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -250,40 +250,34 @@ func answerSheetProcessingLockKey(deps *Dependencies, answerSheetID uint64) stri
 
 // 创建测评
 func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *eventpayload.AnswerSheetSubmittedData) error {
-	if deps.InternalClient == nil {
-		return fmt.Errorf("internal client is not available")
+	if deps.AssessmentIntakeClient == nil {
+		return fmt.Errorf("assessment intake client is not available")
 	}
 	// 构建创建测评请求
-	assessmentReq := &pb.CreateAssessmentFromAnswerSheetRequest{
-		AnswersheetId:        answerSheetID,
+	assessmentReq := &evalpb.EnsureAssessmentRequest{
+		AnswerSheetId:        answerSheetID,
 		QuestionnaireCode:    data.QuestionnaireCode,
 		QuestionnaireVersion: data.QuestionnaireVersion,
 		TesteeId:             data.TesteeID,
 		OrgId:                data.OrgID,
 		FillerId:             data.FillerID,
-		FillerType:           data.FillerType,
 		TaskId:               data.TaskID,
 	}
 	if data.TaskID == "" {
 		assessmentReq.OriginType = "adhoc"
 	}
 	// 创建测评
-	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, assessmentReq)
+	assessmentResp, err := deps.AssessmentIntakeClient.EnsureAssessment(ctx, assessmentReq)
 	if err != nil {
 		return fmt.Errorf("failed to create assessment from answersheet: %w", err)
 	}
-	if assessmentResp == nil || !assessmentResp.Success {
-		message := "unknown assessment creation error"
-		if assessmentResp != nil && assessmentResp.Message != "" {
-			message = assessmentResp.Message
-		}
-		return fmt.Errorf("assessment creation failed: %s", message)
+	if assessmentResp == nil {
+		return fmt.Errorf("assessment creation failed: empty response")
 	}
 	deps.Logger.Debug("assessment creation detail",
 		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
 		"assessment_id", assessmentResp.AssessmentId,
 		"created", assessmentResp.Created,
-		"message", assessmentResp.Message,
 	)
 	return nil
 }

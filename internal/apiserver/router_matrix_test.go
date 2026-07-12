@@ -13,7 +13,6 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -39,6 +38,51 @@ type routerOperatorExecutionStub struct{}
 
 func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, evaluationoperator.Actor, []uint64) (*evaluationoperator.BatchResult, error) {
 	return &evaluationoperator.BatchResult{}, nil
+}
+
+type routerEvaluationQueryStub struct{}
+
+func (*routerEvaluationQueryStub) ValidateTesteeAccess(context.Context, evaluationoperator.Actor, uint64) error {
+	return nil
+}
+func (*routerEvaluationQueryStub) ScopeTesteeList(context.Context, evaluationoperator.Actor, uint64) (evaluationoperator.TesteeListScope, error) {
+	return evaluationoperator.TesteeListScope{}, nil
+}
+func (*routerEvaluationQueryStub) GetAssessment(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error) {
+	return &evaluationoperator.Assessment{}, nil
+}
+func (*routerEvaluationQueryStub) ListAssessments(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error) {
+	return &evaluationoperator.AssessmentList{}, nil
+}
+func (*routerEvaluationQueryStub) GetAssessmentOutcome(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.OutcomeAssessment, error) {
+	return &evaluationoperator.OutcomeAssessment{}, nil
+}
+func (*routerEvaluationQueryStub) ListAssessmentsOutcome(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.OutcomeAssessmentList, error) {
+	return &evaluationoperator.OutcomeAssessmentList{}, nil
+}
+func (*routerEvaluationQueryStub) GetScores(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Score, error) {
+	return &evaluationoperator.Score{}, nil
+}
+func (*routerEvaluationQueryStub) GetHighRiskFactors(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.HighRiskFactors, error) {
+	return &evaluationoperator.HighRiskFactors{}, nil
+}
+func (*routerEvaluationQueryStub) GetFactorTrend(context.Context, evaluationoperator.Actor, evaluationoperator.TrendQuery) (*evaluationoperator.FactorTrend, error) {
+	return &evaluationoperator.FactorTrend{}, nil
+}
+func (*routerEvaluationQueryStub) ListAssessmentRuns(context.Context, evaluationoperator.Actor, uint64, int) (*evaluationoperator.RunList, error) {
+	return &evaluationoperator.RunList{}, nil
+}
+func (*routerEvaluationQueryStub) GetLatestAssessmentRun(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Run, error) {
+	return nil, nil
+}
+func (*routerEvaluationQueryStub) ListRetryableFailedRuns(context.Context, evaluationoperator.Actor, int, uint64) (*evaluationoperator.RetryableFailedRunList, error) {
+	return &evaluationoperator.RetryableFailedRunList{}, nil
+}
+
+type routerEvaluationRecoveryStub struct{}
+
+func (*routerEvaluationRecoveryStub) Retry(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error) {
+	return &evaluationoperator.Assessment{}, nil
 }
 
 func (*routerClinicianQueryStub) GetByID(context.Context, uint64) (*clinicianApp.ClinicianResult, error) {
@@ -326,25 +370,11 @@ func newRouterTestContainer() *container.Container {
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}
-	operatorQuery := assessmentApp.NewAssessmentOperatorQueryService(nil, nil)
-	operatorRecovery := assessmentApp.NewAssessmentOperatorRecoveryService(nil, nil, nil)
 	evaluationModule := &evalmod.Module{
-		OperatorQueryService:     operatorQuery,
-		OperatorRecoveryService:  operatorRecovery,
 		OperatorExecutionService: &routerOperatorExecutionStub{},
-		ScoreQueryService:        assessmentApp.NewScoreQueryService(nil, nil, nil, nil),
-		WorkerResultReader:       operatorQuery,
+		OperatorRecovery:         &routerEvaluationRecoveryStub{},
+		OperatorQuery:            &routerEvaluationQueryStub{},
 	}
-	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.OperatorQueryService, nil)
-	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
-		evaluationModule.OperatorQueryService,
-		evaluationModule.ScoreQueryService,
-		evaluationModule.AccessQueryService,
-		nil,
-		nil,
-	)
-	evaluationModule.OperatorRecovery = evaluationoperator.NewRecoveryService(operatorRecovery)
-	evaluationModule.OperatorQuery = evaluationoperator.NewQueryService(evaluationModule.ProtectedQueryService)
 	return &container.Container{
 		SurveyModule: surveyModule,
 		ActorModule: &actormod.Module{

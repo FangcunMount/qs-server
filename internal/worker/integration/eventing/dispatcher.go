@@ -18,13 +18,16 @@ import (
 
 // HandlerDependencies are dependencies needed to instantiate worker event handlers.
 type HandlerDependencies struct {
-	Logger               *slog.Logger
-	AnswerSheetClient    *grpcclient.AnswerSheetClient
-	InternalClient       handlers.InternalClient
-	LockManager          locklease.Manager
-	LockKeyBuilder       *keyspace.Builder
-	Notifier             port.TaskNotifier
-	ReportStatusReporter *reportstatus.Reporter
+	Logger                         *slog.Logger
+	AnswerSheetClient              *grpcclient.AnswerSheetClient
+	InternalClient                 handlers.InternalClient
+	AssessmentIntakeClient         handlers.AssessmentIntakeClient
+	EvaluationWorkerClient         handlers.EvaluationWorkerClient
+	InterpretationAutomationClient handlers.InterpretationAutomationClient
+	LockManager                    locklease.Manager
+	LockKeyBuilder                 *keyspace.Builder
+	Notifier                       port.TaskNotifier
+	ReportStatusReporter           *reportstatus.Reporter
 }
 
 // HandlerRegistry is the explicit worker handler factory catalog consumed by
@@ -101,13 +104,16 @@ func (d *Dispatcher) validateHandlerBindings(catalog *eventcatalog.Catalog) erro
 
 func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 	return &handlers.Dependencies{
-		Logger:               d.deps.Logger,
-		AnswerSheetClient:    d.deps.AnswerSheetClient,
-		InternalClient:       d.deps.InternalClient,
-		LockManager:          d.deps.LockManager,
-		LockKeyBuilder:       d.deps.LockKeyBuilder,
-		Notifier:             d.deps.Notifier,
-		ReportStatusReporter: d.deps.ReportStatusReporter,
+		Logger:                         d.deps.Logger,
+		AnswerSheetClient:              d.deps.AnswerSheetClient,
+		InternalClient:                 d.deps.InternalClient,
+		AssessmentIntakeClient:         d.deps.AssessmentIntakeClient,
+		EvaluationWorkerClient:         d.deps.EvaluationWorkerClient,
+		InterpretationAutomationClient: d.deps.InterpretationAutomationClient,
+		LockManager:                    d.deps.LockManager,
+		LockKeyBuilder:                 d.deps.LockKeyBuilder,
+		Notifier:                       d.deps.Notifier,
+		ReportStatusReporter:           d.deps.ReportStatusReporter,
 	}
 }
 

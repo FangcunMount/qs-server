@@ -28,8 +28,8 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 			"evaluation_run_id", data.EvaluationRunID,
 		)
 
-		if deps.InternalClient == nil {
-			return fmt.Errorf("internal client is not available: cannot generate report for assessment %d", data.AssessmentID)
+		if deps.InterpretationAutomationClient == nil {
+			return fmt.Errorf("interpretation automation client is not available: cannot generate report for assessment %d", data.AssessmentID)
 		}
 
 		if _, err := safeconv.Int64ToUint64(data.AssessmentID); err != nil {
@@ -40,7 +40,7 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 		}
 
 		callCtx := metadata.AppendToOutgoingContext(ctx, "x-event-id", env.ID)
-		resp, err := deps.InternalClient.GenerateReportFromOutcome(callCtx, data.OutcomeID)
+		resp, err := deps.InterpretationAutomationClient.GenerateReportFromOutcome(callCtx, data.OutcomeID)
 		if err != nil {
 			deps.Logger.Error("failed to generate report from assessment",
 				slog.Int64("assessment_id", data.AssessmentID),

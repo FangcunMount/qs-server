@@ -5,16 +5,17 @@ package reportquery
 import (
 	"context"
 	"errors"
+	"time"
+
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretationAdmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"time"
 )
 
 type AssessmentProjection struct {
-	Assessment    *assessmentApp.AssessmentResult
+	Assessment    *evaluationoperator.Assessment
 	Status        string
 	InterpretedAt *time.Time
 }
@@ -27,23 +28,52 @@ type ListQuery = interpretationAdmin.ListQuery
 type Report = interpretationAdmin.Report
 type ReportList = interpretationAdmin.ListResult
 
+type AssessmentQuery interface {
+	GetAssessment(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error)
+	ListAssessments(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error)
+}
+
 type Service interface {
-	ProjectAssessment(context.Context, *assessmentApp.AssessmentResult) (*AssessmentProjection, error)
-	ProjectAssessmentList(context.Context, *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error)
+	GetAssessmentProjection(context.Context, Scope, uint64) (*AssessmentProjection, error)
+	ListAssessmentProjection(context.Context, Scope, evaluationoperator.ListQuery) (*AssessmentListProjection, error)
+	ProjectAssessment(context.Context, *evaluationoperator.Assessment) (*AssessmentProjection, error)
 	GetReport(context.Context, Scope, uint64) (*Report, error)
 	GetReportOutcome(context.Context, Scope, uint64) (*Report, error)
 	ListReports(context.Context, Scope, ListQuery) (*ReportList, error)
 	ListReportsOutcome(context.Context, Scope, ListQuery) (*ReportList, error)
 }
 type service struct {
-	reader interpretationreadmodel.ReportReader
-	admin  interpretationAdmin.Service
+	reader   interpretationreadmodel.ReportReader
+	admin    interpretationAdmin.Service
+	operator AssessmentQuery
 }
 
-func NewAdministrationService(reader interpretationreadmodel.ReportReader, admin interpretationAdmin.Service) Service {
-	return &service{reader: reader, admin: admin}
+func NewAdministrationService(reader interpretationreadmodel.ReportReader, admin interpretationAdmin.Service, operator AssessmentQuery) Service {
+	return &service{reader: reader, admin: admin, operator: operator}
 }
-func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.AssessmentResult) (*AssessmentProjection, error) {
+func (s *service) GetAssessmentProjection(ctx context.Context, scope Scope, id uint64) (*AssessmentProjection, error) {
+	result, err := s.operator.GetAssessment(ctx, evaluationoperator.Actor{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}, id)
+	if err != nil {
+		return nil, err
+	}
+	return s.ProjectAssessment(ctx, result)
+}
+func (s *service) ListAssessmentProjection(ctx context.Context, scope Scope, query evaluationoperator.ListQuery) (*AssessmentListProjection, error) {
+	result, err := s.operator.ListAssessments(ctx, evaluationoperator.Actor{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}, query)
+	if err != nil {
+		return nil, err
+	}
+	out := &AssessmentListProjection{Items: make([]*AssessmentProjection, 0, len(result.Items)), Total: result.Total, Page: result.Page, PageSize: result.PageSize, TotalPages: result.TotalPages}
+	for _, item := range result.Items {
+		projected, projectErr := s.ProjectAssessment(ctx, item)
+		if projectErr != nil {
+			return nil, projectErr
+		}
+		out.Items = append(out.Items, projected)
+	}
+	return out, nil
+}
+func (s *service) ProjectAssessment(ctx context.Context, result *evaluationoperator.Assessment) (*AssessmentProjection, error) {
 	p := &AssessmentProjection{Assessment: result}
 	if result != nil {
 		p.Status = result.Status
@@ -64,20 +94,6 @@ func (s *service) ProjectAssessment(ctx context.Context, result *assessmentApp.A
 		p.InterpretedAt = &at
 	}
 	return p, nil
-}
-func (s *service) ProjectAssessmentList(ctx context.Context, result *assessmentApp.AssessmentListResult) (*AssessmentListProjection, error) {
-	if result == nil {
-		return nil, nil
-	}
-	out := &AssessmentListProjection{Items: make([]*AssessmentProjection, 0, len(result.Items)), Total: result.Total, Page: result.Page, PageSize: result.PageSize, TotalPages: result.TotalPages}
-	for _, item := range result.Items {
-		p, err := s.ProjectAssessment(ctx, item)
-		if err != nil {
-			return nil, err
-		}
-		out.Items = append(out.Items, p)
-	}
-	return out, nil
 }
 func (s *service) GetReport(ctx context.Context, scope Scope, id uint64) (*Report, error) {
 	return s.admin.GetReport(ctx, actor(scope), interpretationAdmin.GetQuery{AssessmentID: id})

@@ -1,7 +1,7 @@
 package evaluation
 
 import (
-	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )
@@ -15,16 +15,15 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 	deps.OperatorRecoveryService = m.OperatorRecovery
 	deps.OperatorExecutionService = m.OperatorExecutionService
 	deps.ProtectedQueryService = m.OperatorQuery
-	deps.RunQueryService = m.RunQueryService
 	return deps
 }
 
 // ExportTesteeScaleAnalysisService composes actor-facing analysis from evaluation query ports.
-func (m *Module) ExportTesteeScaleAnalysisService() testeeApp.ScaleAnalysisQueryService {
-	if m == nil || m.OperatorQueryService == nil || m.ScoreQueryService == nil {
+func (m *Module) ExportTesteeScaleAnalysisService() evaluationoperator.ScaleAnalysisService {
+	if m == nil {
 		return nil
 	}
-	return testeeApp.NewScaleAnalysisQueryService(m.OperatorQueryService, m.ScoreQueryService)
+	return m.ScaleAnalysis
 }
 
 // ExportRESTEventStatusOutbox exposes the assessment outbox status reader for platform event status.

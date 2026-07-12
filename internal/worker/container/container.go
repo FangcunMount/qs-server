@@ -34,8 +34,11 @@ type Container struct {
 	reportStatus *reportstatus.Reporter
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
-	answerSheetClient *grpcclient.AnswerSheetClient
-	internalClient    *grpcclient.InternalClient
+	answerSheetClient              *grpcclient.AnswerSheetClient
+	internalClient                 *grpcclient.InternalClient
+	assessmentIntakeClient         *grpcclient.AssessmentIntakeClient
+	evaluationWorkerClient         *grpcclient.EvaluationWorkerClient
+	interpretationAutomationClient *grpcclient.InterpretationAutomationClient
 
 	// 事件分发器
 	eventDispatcher *workereventing.Dispatcher
@@ -44,8 +47,11 @@ type Container struct {
 // ClientBundle is the worker runtime client graph produced by the gRPC
 // integration stage and consumed by the container composition root.
 type ClientBundle struct {
-	AnswerSheet *grpcclient.AnswerSheetClient
-	Internal    *grpcclient.InternalClient
+	AnswerSheet              *grpcclient.AnswerSheetClient
+	Internal                 *grpcclient.InternalClient
+	AssessmentIntake         *grpcclient.AssessmentIntakeClient
+	EvaluationWorker         *grpcclient.EvaluationWorkerClient
+	InterpretationAutomation *grpcclient.InterpretationAutomationClient
 }
 
 // NewContainer 创建新的容器
@@ -114,8 +120,8 @@ func (c *Container) Initialize() error {
 }
 
 func (c *Container) validateRuntimeClients() error {
-	if c.internalClient == nil {
-		return fmt.Errorf("internal gRPC client is required for assessment evaluation workflow")
+	if c.internalClient == nil || c.assessmentIntakeClient == nil || c.evaluationWorkerClient == nil || c.interpretationAutomationClient == nil {
+		return fmt.Errorf("worker gRPC actor clients are required")
 	}
 	return nil
 }
@@ -126,13 +132,16 @@ func (c *Container) initEventDispatcher() error {
 
 	// 构建处理器依赖
 	deps := &workereventing.HandlerDependencies{
-		Logger:               c.logger,
-		AnswerSheetClient:    c.answerSheetClient,
-		InternalClient:       c.internalClient,
-		LockManager:          c.lockManager,
-		LockKeyBuilder:       c.lockBuilder,
-		Notifier:             c.buildNotifier(),
-		ReportStatusReporter: c.reportStatus,
+		Logger:                         c.logger,
+		AnswerSheetClient:              c.answerSheetClient,
+		InternalClient:                 c.internalClient,
+		AssessmentIntakeClient:         c.assessmentIntakeClient,
+		EvaluationWorkerClient:         c.evaluationWorkerClient,
+		InterpretationAutomationClient: c.interpretationAutomationClient,
+		LockManager:                    c.lockManager,
+		LockKeyBuilder:                 c.lockBuilder,
+		Notifier:                       c.buildNotifier(),
+		ReportStatusReporter:           c.reportStatus,
 	}
 
 	// 创建事件分发器
@@ -196,6 +205,9 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	}
 	c.answerSheetClient = bundle.AnswerSheet
 	c.internalClient = bundle.Internal
+	c.assessmentIntakeClient = bundle.AssessmentIntake
+	c.evaluationWorkerClient = bundle.EvaluationWorker
+	c.interpretationAutomationClient = bundle.InterpretationAutomation
 }
 
 // ==================== Getters ====================

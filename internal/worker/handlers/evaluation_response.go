@@ -3,37 +3,35 @@ package handlers
 import (
 	"fmt"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 )
 
-func handleEvaluateAssessmentResponse(resp *pb.EvaluateAssessmentResponse) error {
+func handleEvaluateAssessmentResponse(resp *evalpb.ExecuteEvaluationResponse) error {
 	if resp == nil {
 		return fmt.Errorf("evaluate assessment returned nil response")
 	}
-	if resp.Success {
-		if resp.Status == "evaluated" {
-			return nil
-		}
-		return fmt.Errorf("evaluate assessment returned unexpected success status: %s", resp.Status)
+	if resp.Status == "evaluated" {
+		return nil
 	}
 	if resp.GetRetryable() {
 		return fmt.Errorf(
 			"evaluate assessment retryable failure: status=%s message=%s run_id=%s failure_kind=%s",
-			resp.Status, resp.Message, resp.GetRunId(), resp.GetFailureKind(),
+			resp.Status, resp.GetFailureMessage(), resp.GetRunId(), resp.GetFailureKind(),
 		)
 	}
 	if isTerminalEvaluateStatus(resp.Status) {
 		return nil
 	}
 	// Fallback for proto clients that do not populate retryable yet.
-	return fmt.Errorf("evaluate assessment retryable failure: status=%s message=%s", resp.Status, resp.Message)
+	return fmt.Errorf("evaluate assessment retryable failure: status=%s message=%s", resp.Status, resp.GetFailureMessage())
 }
 
 func isTerminalEvaluateStatus(status string) bool {
 	return status == "failed" || status == "already_evaluated"
 }
 
-func handleGenerateReportResponse(resp *pb.GenerateReportFromAssessmentResponse) error {
+func handleGenerateReportResponse(resp *interpretationpb.GenerateReportFromAssessmentResponse) error {
 	if resp == nil {
 		return fmt.Errorf("generate report returned nil response")
 	}

@@ -10,7 +10,9 @@ import (
 	"sort"
 	"time"
 
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -24,12 +26,6 @@ type HandlerFunc func(ctx context.Context, eventType string, payload []byte) err
 
 // InternalClient 抽象 Worker 侧已使用的内部 gRPC 能力，便于 handler 级测试替换。
 type InternalClient interface {
-	CreateAssessmentFromAnswerSheet(
-		ctx context.Context,
-		req *pb.CreateAssessmentFromAnswerSheetRequest,
-	) (*pb.CreateAssessmentFromAnswerSheetResponse, error)
-	EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error)
-	GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*pb.GenerateReportFromAssessmentResponse, error)
 	SyncAssessmentAttention(
 		ctx context.Context,
 		req *pb.SyncAssessmentAttentionRequest,
@@ -57,16 +53,28 @@ type InternalClient interface {
 		openAt time.Time,
 	) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error)
 }
+type AssessmentIntakeClient interface {
+	EnsureAssessment(context.Context, *evalpb.EnsureAssessmentRequest) (*evalpb.EnsureAssessmentResponse, error)
+}
+type EvaluationWorkerClient interface {
+	ExecuteEvaluation(context.Context, uint64) (*evalpb.ExecuteEvaluationResponse, error)
+}
+type InterpretationAutomationClient interface {
+	GenerateReportFromOutcome(context.Context, string) (*interpretationpb.GenerateReportFromAssessmentResponse, error)
+}
 
 // Dependencies 处理器依赖
 type Dependencies struct {
-	Logger               *slog.Logger
-	AnswerSheetClient    *grpcclient.AnswerSheetClient
-	InternalClient       InternalClient
-	LockManager          locklease.Manager
-	LockKeyBuilder       *keyspace.Builder
-	Notifier             port.TaskNotifier
-	ReportStatusReporter *reportstatus.Reporter
+	Logger                         *slog.Logger
+	AnswerSheetClient              *grpcclient.AnswerSheetClient
+	InternalClient                 InternalClient
+	AssessmentIntakeClient         AssessmentIntakeClient
+	EvaluationWorkerClient         EvaluationWorkerClient
+	InterpretationAutomationClient InterpretationAutomationClient
+	LockManager                    locklease.Manager
+	LockKeyBuilder                 *keyspace.Builder
+	Notifier                       port.TaskNotifier
+	ReportStatusReporter           *reportstatus.Reporter
 }
 
 // HandlerFactory 处理器工厂函数

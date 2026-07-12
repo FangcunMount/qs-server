@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -51,4 +51,16 @@ func (s *InterpretationAutomationService) GenerateReportFromAssessment(ctx conte
 		resp.ReportId = result.ReportID.String()
 	}
 	return resp, nil
+}
+
+func generateReportFailureResponse(err error) *pb.GenerateReportFromAssessmentResponse {
+	resp := &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "报告生成失败", Retryable: true, FailureKind: "internal"}
+	if failed, ok := automation.FailureFrom(err); ok {
+		resp.Retryable, resp.GenerationId, resp.RunId = failed.Retryable, failed.GenerationID.String(), failed.RunID.String()
+		resp.FailureKind, resp.FailureCode, resp.Message = string(failed.Kind), failed.Code, failed.SafeMessage
+	}
+	if err != nil && resp.Message == "报告生成失败" {
+		resp.Message = fmt.Sprintf("报告生成失败: %v", err)
+	}
+	return resp
 }

@@ -59,7 +59,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 			profileLinkService,
 			c.opts.SubmitQueue,
 			submitGuard,
-			c.evaluationClient,
+			c.assessmentIntakeClient,
 		),
 	}
 }

@@ -45,9 +45,12 @@ type Manager struct {
 	clients map[string]interface{}
 
 	// 已注册的客户端
-	answerSheetClient *AnswerSheetClient
-	internalClient    *InternalClient
-	planClient        *PlanClient
+	answerSheetClient              *AnswerSheetClient
+	internalClient                 *InternalClient
+	assessmentIntakeClient         *AssessmentIntakeClient
+	evaluationWorkerClient         *EvaluationWorkerClient
+	interpretationAutomationClient *InterpretationAutomationClient
+	planClient                     *PlanClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -163,6 +166,12 @@ func (m *Manager) RegisterClients() error {
 	m.internalClient = NewInternalClient(m)
 	m.clients["internal"] = m.internalClient
 	log.Info("   🔧 Internal client registered")
+	m.assessmentIntakeClient = NewAssessmentIntakeClient(m)
+	m.evaluationWorkerClient = NewEvaluationWorkerClient(m)
+	m.interpretationAutomationClient = NewInterpretationAutomationClient(m)
+	m.clients["assessmentIntake"] = m.assessmentIntakeClient
+	m.clients["evaluationWorker"] = m.evaluationWorkerClient
+	m.clients["interpretationAutomation"] = m.interpretationAutomationClient
 
 	// 注册 PlanCommand 客户端
 	m.planClient = NewPlanClient(m)
@@ -181,6 +190,11 @@ func (m *Manager) AnswerSheetClient() *AnswerSheetClient {
 // InternalClient 获取内部服务客户端
 func (m *Manager) InternalClient() *InternalClient {
 	return m.internalClient
+}
+func (m *Manager) AssessmentIntakeClient() *AssessmentIntakeClient { return m.assessmentIntakeClient }
+func (m *Manager) EvaluationWorkerClient() *EvaluationWorkerClient { return m.evaluationWorkerClient }
+func (m *Manager) InterpretationAutomationClient() *InterpretationAutomationClient {
+	return m.interpretationAutomationClient
 }
 
 // PlanClient 获取 plan 命令客户端

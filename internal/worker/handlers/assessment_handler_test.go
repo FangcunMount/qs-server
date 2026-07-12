@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
@@ -18,7 +19,7 @@ func TestHandleEvaluationRequestedFailsWhenInternalClientMissing(t *testing.T) {
 }
 
 func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
-	client := &assessmentEvaluateClient{resp: &pb.EvaluateAssessmentResponse{Success: true, Status: "evaluated"}}
+	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated"}}
 	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
 	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 42)); err != nil {
 		t.Fatalf("handler: %v", err)
@@ -29,7 +30,7 @@ func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
 }
 
 func TestHandleEvaluationOutcomeCommittedCallsGenerateReport(t *testing.T) {
-	client := &assessmentGenerateReportClient{resp: &pb.GenerateReportFromAssessmentResponse{Success: true, Status: "generated"}}
+	client := &assessmentGenerateReportClient{resp: &interpretationpb.GenerateReportFromAssessmentResponse{Success: true, Status: "generated"}}
 	handler := handleEvaluationOutcomeCommitted(newAnswerSheetHandlerTestDeps(client, nil))
 	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 42)); err != nil {
 		t.Fatalf("handler: %v", err)
@@ -48,24 +49,24 @@ func TestHandleEvaluationFailedRejectsNegativeAssessmentID(t *testing.T) {
 
 type assessmentEvaluateClient struct {
 	fakeWorkerInternalClient
-	resp          *pb.EvaluateAssessmentResponse
+	resp          *evalpb.ExecuteEvaluationResponse
 	err           error
 	evaluateCalls int
 }
 
-func (c *assessmentEvaluateClient) EvaluateAssessment(context.Context, uint64) (*pb.EvaluateAssessmentResponse, error) {
+func (c *assessmentEvaluateClient) ExecuteEvaluation(context.Context, uint64) (*evalpb.ExecuteEvaluationResponse, error) {
 	c.evaluateCalls++
 	return c.resp, c.err
 }
 
 type assessmentGenerateReportClient struct {
 	fakeWorkerInternalClient
-	resp                *pb.GenerateReportFromAssessmentResponse
+	resp                *interpretationpb.GenerateReportFromAssessmentResponse
 	err                 error
 	generateReportCalls int
 }
 
-func (c *assessmentGenerateReportClient) GenerateReportFromOutcome(context.Context, string) (*pb.GenerateReportFromAssessmentResponse, error) {
+func (c *assessmentGenerateReportClient) GenerateReportFromOutcome(context.Context, string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	c.generateReportCalls++
 	return c.resp, c.err
 }

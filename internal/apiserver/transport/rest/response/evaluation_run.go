@@ -3,8 +3,7 @@ package response
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	runquery "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 )
 
 // EvaluationRunResponse is the REST view of one evaluation run attempt.
@@ -40,7 +39,7 @@ type RetryableFailedRunListResponse struct {
 }
 
 // NewEvaluationRunResponse maps an application run result to REST.
-func NewEvaluationRunResponse(result *assessment.AssessmentRunResult) *EvaluationRunResponse {
+func NewEvaluationRunResponse(result *evaluationoperator.Run) *EvaluationRunResponse {
 	if result == nil {
 		return nil
 	}
@@ -60,7 +59,7 @@ func NewEvaluationRunResponse(result *assessment.AssessmentRunResult) *Evaluatio
 }
 
 // NewEvaluationRunListResponse maps a protected query list to REST.
-func NewEvaluationRunListResponse(result *assessment.AssessmentRunListResult) *EvaluationRunListResponse {
+func NewEvaluationRunListResponse(result *evaluationoperator.RunList) *EvaluationRunListResponse {
 	if result == nil {
 		return &EvaluationRunListResponse{Items: []*EvaluationRunResponse{}}
 	}
@@ -72,7 +71,7 @@ func NewEvaluationRunListResponse(result *assessment.AssessmentRunListResult) *E
 }
 
 // NewRetryableFailedRunListResponse maps an operating query page to REST.
-func NewRetryableFailedRunListResponse(result *runquery.RetryableFailedListResult) *RetryableFailedRunListResponse {
+func NewRetryableFailedRunListResponse(result *evaluationoperator.RetryableFailedRunList) *RetryableFailedRunListResponse {
 	if result == nil {
 		return &RetryableFailedRunListResponse{Items: []*RetryableFailedRunResponse{}}
 	}

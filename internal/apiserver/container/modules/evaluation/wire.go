@@ -3,7 +3,7 @@ package evaluation
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -47,7 +47,7 @@ type WireInput struct {
 	AssessmentOutboxRelayBatchSize              int
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
-	TesteeAccessChecker                         assessment.TesteeAccessChecker
+	TesteeAccessChecker                         evaluationoperator.AccessChecker
 	OpsHandle                                   *cacheplane.Handle
 	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog                       rulesetport.Catalog

@@ -147,23 +147,7 @@ func TestInternalProtoEvaluateAssessmentResponseHasNoLegacyFields(t *testing.T) 
 		t.Fatal(err)
 	}
 	source := string(data)
-	msgStart := strings.Index(source, "message EvaluateAssessmentResponse {")
-	if msgStart < 0 {
-		t.Fatal("missing EvaluateAssessmentResponse message")
-	}
-	msgEnd := strings.Index(source[msgStart:], "\n}")
-	if msgEnd < 0 {
-		t.Fatal("unterminated EvaluateAssessmentResponse message")
-	}
-	body := source[msgStart : msgStart+msgEnd]
-	for _, forbidden := range []string{
-		"total_score = 4",
-		"risk_level = 5",
-	} {
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("EvaluateAssessmentResponse still contains legacy field: %s", forbidden)
-		}
-	}
+	if strings.Contains(source, "message EvaluateAssessmentResponse {") { t.Fatal("retired Internal Evaluation response was reintroduced") }
 }
 
 func TestListMyAssessmentsRequestHasNoModelAlgorithmFilter(t *testing.T) {
@@ -196,7 +180,7 @@ func TestEvaluationProtoAssessmentOutcomeHasNoLegacyFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(data)
-	for _, msgName := range []string{"AssessmentSummary", "AssessmentDetail", "AssessmentReport"} {
+	for _, msgName := range []string{"AssessmentSummary", "AssessmentDetail"} {
 		msgStart := strings.Index(source, "message "+msgName+" {")
 		if msgStart < 0 {
 			t.Fatalf("missing %s message", msgName)

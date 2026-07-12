@@ -3,7 +3,8 @@ package handlers
 import (
 	"testing"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 )
 
 func TestHandleEvaluateAssessmentResponseNilResponse(t *testing.T) {
@@ -13,7 +14,7 @@ func TestHandleEvaluateAssessmentResponseNilResponse(t *testing.T) {
 }
 
 func TestHandleEvaluateAssessmentResponseSuccess(t *testing.T) {
-	if err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{Success: true, Status: "evaluated"}); err != nil {
+	if err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{Status: "evaluated"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -21,7 +22,7 @@ func TestHandleEvaluateAssessmentResponseSuccess(t *testing.T) {
 func TestHandleEvaluateAssessmentResponseRejectsInterpretationStatus(t *testing.T) {
 	for _, status := range []string{"interpreted", "already_interpreted", "generated"} {
 		t.Run(status, func(t *testing.T) {
-			if err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{Success: true, Status: status}); err == nil {
+			if err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{Status: status}); err == nil {
 				t.Fatalf("status %q must not be acknowledged as Evaluation success", status)
 			}
 		})
@@ -31,10 +32,9 @@ func TestHandleEvaluateAssessmentResponseRejectsInterpretationStatus(t *testing.
 func TestHandleEvaluateAssessmentResponseTerminalStatusesAck(t *testing.T) {
 	for _, status := range []string{"failed", "already_evaluated"} {
 		t.Run(status, func(t *testing.T) {
-			err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{
-				Success: false,
-				Status:  status,
-				Message: "terminal",
+			err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{
+				Status:         status,
+				FailureMessage: "terminal",
 			})
 			if err != nil {
 				t.Fatalf("status %q: unexpected error: %v", status, err)
@@ -44,13 +44,12 @@ func TestHandleEvaluateAssessmentResponseTerminalStatusesAck(t *testing.T) {
 }
 
 func TestHandleEvaluateAssessmentResponseRetryableFailedNacks(t *testing.T) {
-	err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{
-		Success:     false,
-		Status:      "failed",
-		Message:     "calculation failed",
-		Retryable:   true,
-		RunId:       "42:1",
-		FailureKind: "calculation",
+	err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{
+		Status:         "failed",
+		FailureMessage: "calculation failed",
+		Retryable:      true,
+		RunId:          "42:1",
+		FailureKind:    "calculation",
 	})
 	if err == nil {
 		t.Fatal("expected retryable failed status to nack")
@@ -60,10 +59,9 @@ func TestHandleEvaluateAssessmentResponseRetryableFailedNacks(t *testing.T) {
 func TestHandleEvaluateAssessmentResponseRetryableFailure(t *testing.T) {
 	for _, status := range []string{"", "skipped", "processing"} {
 		t.Run(status, func(t *testing.T) {
-			err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{
-				Success: false,
-				Status:  status,
-				Message: "temporary",
+			err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{
+				Status:         status,
+				FailureMessage: "temporary",
 			})
 			if err == nil {
 				t.Fatalf("status %q: expected retryable error", status)
@@ -81,7 +79,7 @@ func TestHandleGenerateReportResponseNilResponse(t *testing.T) {
 func TestHandleGenerateReportResponseTerminalStatusesAck(t *testing.T) {
 	for _, status := range []string{"failed", "already_generated"} {
 		t.Run(status, func(t *testing.T) {
-			err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+			err := handleGenerateReportResponse(&interpretationpb.GenerateReportFromAssessmentResponse{
 				Success: false,
 				Status:  status,
 				Message: "terminal",
@@ -94,7 +92,7 @@ func TestHandleGenerateReportResponseTerminalStatusesAck(t *testing.T) {
 }
 
 func TestHandleGenerateReportResponseAcksNonRetryableGenerationFailure(t *testing.T) {
-	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+	err := handleGenerateReportResponse(&interpretationpb.GenerateReportFromAssessmentResponse{
 		Success:      false,
 		Status:       "failed",
 		Retryable:    false,
@@ -110,7 +108,7 @@ func TestHandleGenerateReportResponseAcksNonRetryableGenerationFailure(t *testin
 }
 
 func TestHandleGenerateReportResponseRetryableFailedNacks(t *testing.T) {
-	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+	err := handleGenerateReportResponse(&interpretationpb.GenerateReportFromAssessmentResponse{
 		Success:   false,
 		Status:    "failed",
 		Message:   "temporary",
@@ -122,7 +120,7 @@ func TestHandleGenerateReportResponseRetryableFailedNacks(t *testing.T) {
 }
 
 func TestHandleGenerateReportResponseRetryableFailure(t *testing.T) {
-	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+	err := handleGenerateReportResponse(&interpretationpb.GenerateReportFromAssessmentResponse{
 		Success: false,
 		Status:  "skipped",
 		Message: "temporary unavailable",

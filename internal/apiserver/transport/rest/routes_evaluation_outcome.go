@@ -11,10 +11,11 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 		r.deps.Interpretation.ReportQueryJourney == nil {
 		return
 	}
-	evalHandler := handler.NewEvaluationHandler(
-		nil,
-		nil,
+	evalHandler := handler.NewEvaluationOperatorHandler(
+		nil, nil,
 		r.deps.Evaluation.ProtectedQueryService,
+	)
+	journeyHandler := handler.NewAssessmentReportJourneyHandler(
 		r.deps.Interpretation.ReportQueryJourney,
 		nil,
 	)
@@ -45,7 +46,7 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.GetReportOutcome,
+				journeyHandler.GetReportOutcome,
 			)...)
 		}
 
@@ -57,7 +58,7 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.ListReportsOutcome,
+				journeyHandler.ListReportsOutcome,
 			)...)
 		}
 	}

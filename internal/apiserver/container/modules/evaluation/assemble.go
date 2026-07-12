@@ -6,13 +6,12 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
+	evaluationoutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
-	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evaluationscheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
@@ -55,26 +54,18 @@ type Module struct {
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
-	IntakeService           assessmentApp.AnswerSheetAssessmentIntakeService
-	TesteeQueryService      assessmentApp.TesteeAssessmentQueryService
-	TesteeService           evaluationtestee.Service
-	OperatorQueryService    assessmentApp.AssessmentOperatorQueryService
-	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
-	OperatorQuery           evaluationoperator.QueryService
-	OperatorRecovery        evaluationoperator.RecoveryService
-	WorkerResultReader      assessmentApp.AssessmentResultReader
-	ScoreQueryService       assessmentApp.ScoreQueryService
-	AccessQueryService      assessmentApp.AssessmentAccessQueryService
-	ProtectedQueryService   assessmentApp.AssessmentProtectedQueryService
-	RunQueryService         runqueryApp.Service
-	LatestRiskReader        evaluationreadmodel.LatestRiskReader
-	AssessmentReader        evaluationreadmodel.AssessmentReader
+	IntakeService    evaluationintake.Service
+	TesteeService    evaluationtestee.Service
+	OperatorQuery    evaluationoperator.QueryService
+	OperatorRecovery evaluationoperator.RecoveryService
+	ScaleAnalysis    evaluationoperator.ScaleAnalysisService
+	LatestRiskReader evaluationreadmodel.LatestRiskReader
+	AssessmentReader evaluationreadmodel.AssessmentReader
 
-	WorkerExecutionService      execute.WorkerExecutionService
-	WorkerService               evaluationworker.Service
-	OperatorExecutionService    evaluationoperator.BatchExecutionService
-	ConsistencyReconcileService consistencyApp.Service
-	SchedulerService            evaluationscheduler.Service
+	WorkerExecutionService   execute.WorkerExecutionService
+	WorkerService            evaluationworker.Service
+	OperatorExecutionService evaluationoperator.BatchExecutionService
+	SchedulerService         evaluationscheduler.Service
 
 	OutboxReadyIndex              *outboxready.Index
 	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
@@ -100,7 +91,7 @@ type Deps struct {
 	AssessmentOutboxRelayBatchSize              int
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
-	TesteeAccessChecker                         assessmentApp.TesteeAccessChecker
+	TesteeAccessChecker                         evaluationoperator.AccessChecker
 	OpsHandle                                   *cacheplane.Handle
 	ExecutionPaths                              []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
@@ -241,8 +232,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	creatorOpts := make([]assessment.AssessmentCreatorOption, 0, 1)
 	if normalized.PublishedModelReader != nil {
 		creatorOpts = append(creatorOpts, assessment.WithEvaluationModelValidator(
-			assessmentApp.NewCompositeEvaluationModelValidator(
-				assessmentApp.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
+			evaluationintake.NewCompositeEvaluationModelValidator(
+				evaluationintake.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
 			),
 		))
 	}
@@ -255,64 +246,35 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			normalized.AssessmentListPolicy,
 			normalized.Observer,
 		)
-		m.IntakeService = assessmentApp.NewAnswerSheetAssessmentIntakeService(
+		m.IntakeService = evaluationintake.NewService(
 			infra.assessmentRepo,
 			assessmentCreator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			listCache,
-			assessmentApp.WithIntakeImmediateDispatcher(infra.assessmentImmediate),
+			evaluationintake.WithImmediateDispatcher(infra.assessmentImmediate),
 		)
-		m.TesteeQueryService = assessmentApp.NewTesteeAssessmentQueryService(infra.assessmentRepo, infra.assessmentReader, listCache)
 	} else {
-		m.IntakeService = assessmentApp.NewAnswerSheetAssessmentIntakeService(
+		m.IntakeService = evaluationintake.NewService(
 			infra.assessmentRepo,
 			assessmentCreator,
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			nil,
-			assessmentApp.WithIntakeImmediateDispatcher(infra.assessmentImmediate),
+			evaluationintake.WithImmediateDispatcher(infra.assessmentImmediate),
 		)
-		m.TesteeQueryService = assessmentApp.NewTesteeAssessmentQueryService(infra.assessmentRepo, infra.assessmentReader, nil)
 	}
-	m.OperatorQueryService = assessmentApp.NewAssessmentOperatorQueryService(infra.assessmentRepo, infra.assessmentReader)
-	m.OperatorRecoveryService = assessmentApp.NewAssessmentOperatorRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
-	m.WorkerResultReader = assessmentApp.NewWorkerAssessmentResultReader(infra.assessmentRepo)
-	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
-		infra.outcomeRepo,
-		infra.scoreProjectionReader,
-		infra.assessmentReader,
-		normalized.ScaleCatalog,
-	)
-	m.TesteeService = evaluationtestee.NewService(m.TesteeQueryService, infra.assessmentReader, m.ScoreQueryService)
-
-	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
-		m.OperatorQueryService,
-		normalized.TesteeAccessChecker,
-	)
-	m.RunQueryService = runqueryApp.NewService(infra.runRepo)
-	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
-		m.OperatorQueryService,
-		m.ScoreQueryService,
-		m.AccessQueryService,
-		infra.assessmentReader,
-		m.RunQueryService,
-	)
-	m.OperatorQuery = evaluationoperator.NewQueryService(m.ProtectedQueryService)
-	m.OperatorRecovery = evaluationoperator.NewRecoveryService(m.OperatorRecoveryService)
+	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader, infra.assessmentReader, normalized.ScaleCatalog)
+	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
+	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
+	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
+	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.LatestRiskReader = infra.latestRiskReader
 	m.AssessmentReader = infra.assessmentReader
 }
 
 func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
-	reconciler := consistencyApp.NewReconciler(
-		infra.assessmentRepo,
-		consistencyApp.OutcomeExistenceChecker{
-			Repository: infra.outcomeRepo,
-		},
-	)
-	m.ConsistencyReconcileService = consistencyApp.NewReconcileService(reconciler, infra.assessmentReader)
-	m.SchedulerService = evaluationscheduler.NewService(m.ConsistencyReconcileService)
+	m.SchedulerService = evaluationscheduler.NewService(infra.assessmentRepo, infra.outcomeRepo, infra.assessmentReader)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

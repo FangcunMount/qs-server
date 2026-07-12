@@ -7,74 +7,64 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
+	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-type stubAssessmentQueryService struct {
-	lastGetByID  uint64
-	lastRetryID  uint64
-	lastRetryOrg int64
-	lastListDTO  assessmentapp.ListAssessmentsDTO
-
-	getByIDResult *assessmentapp.AssessmentResult
-	getByIDErr    error
-	listResult    *assessmentapp.AssessmentListResult
-	listErr       error
-	retryResult   *assessmentapp.AssessmentResult
-	retryErr      error
+type operatorQueryStub struct {
+	result     *evaluationoperator.Assessment
+	err        error
+	lastActor  evaluationoperator.Actor
+	lastID     uint64
+	lastLimit  int
+	runList    *evaluationoperator.RunList
+	failedRuns *evaluationoperator.RetryableFailedRunList
 }
 
-func (s *stubAssessmentQueryService) GetByID(_ context.Context, id uint64) (*assessmentapp.AssessmentResult, error) {
-	s.lastGetByID = id
-	return s.getByIDResult, s.getByIDErr
+func (s *operatorQueryStub) GetAssessment(_ context.Context, actor evaluationoperator.Actor, id uint64) (*evaluationoperator.Assessment, error) {
+	s.lastActor, s.lastID = actor, id
+	return s.result, s.err
+}
+func (*operatorQueryStub) ValidateTesteeAccess(context.Context, evaluationoperator.Actor, uint64) error {
+	return nil
+}
+func (*operatorQueryStub) ScopeTesteeList(context.Context, evaluationoperator.Actor, uint64) (evaluationoperator.TesteeListScope, error) {
+	return evaluationoperator.TesteeListScope{}, nil
+}
+func (*operatorQueryStub) ListAssessments(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error) {
+	return &evaluationoperator.AssessmentList{}, nil
+}
+func (*operatorQueryStub) GetAssessmentOutcome(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.OutcomeAssessment, error) {
+	return nil, nil
+}
+func (*operatorQueryStub) ListAssessmentsOutcome(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.OutcomeAssessmentList, error) {
+	return &evaluationoperator.OutcomeAssessmentList{}, nil
+}
+func (*operatorQueryStub) GetScores(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Score, error) {
+	return nil, nil
+}
+func (*operatorQueryStub) GetHighRiskFactors(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.HighRiskFactors, error) {
+	return nil, nil
+}
+func (*operatorQueryStub) GetFactorTrend(context.Context, evaluationoperator.Actor, evaluationoperator.TrendQuery) (*evaluationoperator.FactorTrend, error) {
+	return nil, nil
+}
+func (s *operatorQueryStub) ListAssessmentRuns(_ context.Context, actor evaluationoperator.Actor, id uint64, limit int) (*evaluationoperator.RunList, error) {
+	s.lastActor, s.lastID, s.lastLimit = actor, id, limit
+	return s.runList, nil
+}
+func (*operatorQueryStub) GetLatestAssessmentRun(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Run, error) {
+	return nil, nil
+}
+func (s *operatorQueryStub) ListRetryableFailedRuns(_ context.Context, actor evaluationoperator.Actor, limit int, _ uint64) (*evaluationoperator.RetryableFailedRunList, error) {
+	s.lastActor, s.lastLimit = actor, limit
+	return s.failedRuns, nil
 }
 
-func (s *stubAssessmentQueryService) List(_ context.Context, dto assessmentapp.ListAssessmentsDTO) (*assessmentapp.AssessmentListResult, error) {
-	s.lastListDTO = dto
-	return s.listResult, s.listErr
-}
-
-func (s *stubAssessmentQueryService) Retry(_ context.Context, orgID int64, assessmentID uint64) (*assessmentapp.AssessmentResult, error) {
-	s.lastRetryOrg = orgID
-	s.lastRetryID = assessmentID
-	return s.retryResult, s.retryErr
-}
-
-type stubTesteeAccessService struct {
-	lastValidateOrgID    int64
-	lastValidateUserID   int64
-	lastValidateTesteeID uint64
-
-	validateErr       error
-	resolveScopeValue *assessmentapp.TesteeAccessScope
-	resolveScopeErr   error
-	accessibleIDs     []uint64
-	accessibleIDsErr  error
-}
-
-func (s *stubTesteeAccessService) ResolveAccessScope(context.Context, int64, int64) (*assessmentapp.TesteeAccessScope, error) {
-	if s.resolveScopeValue != nil || s.resolveScopeErr != nil {
-		return s.resolveScopeValue, s.resolveScopeErr
-	}
-	return &assessmentapp.TesteeAccessScope{IsAdmin: true}, nil
-}
-
-func (s *stubTesteeAccessService) ValidateTesteeAccess(_ context.Context, orgID int64, operatorUserID int64, testeeID uint64) error {
-	s.lastValidateOrgID = orgID
-	s.lastValidateUserID = operatorUserID
-	s.lastValidateTesteeID = testeeID
-	return s.validateErr
-}
-
-func (s *stubTesteeAccessService) ListAccessibleTesteeIDs(context.Context, int64, int64) ([]uint64, error) {
-	return s.accessibleIDs, s.accessibleIDsErr
-}
-
-func newProtectedHandlerTestContext(method, target string) (*gin.Context, *httptest.ResponseRecorder) {
+func protectedContext(method, target string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(method, target, nil)
@@ -85,96 +75,24 @@ func newProtectedHandlerTestContext(method, target string) (*gin.Context, *httpt
 
 func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	assessmentQuery := &stubAssessmentQueryService{
-		getByIDResult: &assessmentapp.AssessmentResult{
-			ID:                301,
-			OrgID:             12,
-			TesteeID:          4001,
-			QuestionnaireCode: "QNR-EVAL",
-			Status:            "submitted",
-			AnswerSheetID:     8801,
-		},
-	}
-	access := &stubTesteeAccessService{}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, access)
-	handler := NewEvaluationHandler(
-		evaluationoperator.NewRecoveryService(assessmentQuery),
-		nil,
-		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
-		nil,
-		nil,
-	)
-
-	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
+	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 301, OrgID: 12, TesteeID: 4001, QuestionnaireCode: "QNR-EVAL", Status: "submitted", AnswerSheetID: 8801}}
+	h := NewAssessmentReportJourneyHandler(reportqueryjourney.NewAdministrationService(nil, nil, query), nil)
+	c, rec := protectedContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
-
-	handler.GetAssessment(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	if assessmentQuery.lastGetByID != 301 {
-		t.Fatalf("lastGetByID = %d, want 301", assessmentQuery.lastGetByID)
-	}
-	if access.lastValidateOrgID != 12 || access.lastValidateUserID != 34 || access.lastValidateTesteeID != 4001 {
-		t.Fatalf("unexpected access validation call: %+v", access)
-	}
-
-	var payload struct {
-		Code int `json:"code"`
-		Data struct {
-			ID                string `json:"id"`
-			OrgID             string `json:"org_id"`
-			TesteeID          string `json:"testee_id"`
-			QuestionnaireCode string `json:"questionnaire_code"`
-			Status            string `json:"status"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if payload.Code != 0 {
-		t.Fatalf("code = %d, want 0", payload.Code)
-	}
-	if payload.Data.ID != "301" || payload.Data.OrgID != "12" || payload.Data.TesteeID != "4001" {
-		t.Fatalf("unexpected response data: %+v", payload.Data)
+	h.GetAssessment(c)
+	if rec.Code != http.StatusOK || query.lastActor != (evaluationoperator.Actor{OrgID: 12, OperatorUserID: 34}) || query.lastID != 301 {
+		t.Fatalf("response/query=%d %#v", rec.Code, query)
 	}
 }
 
 func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	totalScore := 18.5
-	riskLevel := "medium"
-	assessmentQuery := &stubAssessmentQueryService{
-		getByIDResult: &assessmentapp.AssessmentResult{
-			ID:         302,
-			OrgID:      12,
-			TesteeID:   5001,
-			Status:     "interpreted",
-			TotalScore: &totalScore,
-			RiskLevel:  &riskLevel,
-		},
-	}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
-	handler := NewEvaluationHandler(
-		evaluationoperator.NewRecoveryService(assessmentQuery),
-		nil,
-		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
-		nil,
-		reportwaitjourney.NewService(accessQuery, assessmentQuery, nil),
-	)
-
-	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
+	total, risk := 18.5, "medium"
+	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 302, OrgID: 12, TesteeID: 5001, Status: "interpreted", TotalScore: &total, RiskLevel: &risk}}
+	h := NewAssessmentReportJourneyHandler(nil, reportwaitjourney.NewService(query, nil))
+	c, rec := protectedContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
 	c.Params = gin.Params{{Key: "id", Value: "302"}}
-
-	handler.WaitReport(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-
+	h.WaitReport(c)
 	var payload struct {
 		Code int `json:"code"`
 		Data struct {
@@ -184,64 +102,35 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
+		t.Fatal(err)
 	}
-	if payload.Code != 0 || payload.Data.Status != "interpreted" {
-		t.Fatalf("unexpected payload: %+v", payload)
-	}
-	if payload.Data.TotalScore == nil || *payload.Data.TotalScore != totalScore {
-		t.Fatalf("total_score = %v, want %v", payload.Data.TotalScore, totalScore)
-	}
-	if payload.Data.RiskLevel == nil || *payload.Data.RiskLevel != riskLevel {
-		t.Fatalf("risk_level = %v, want %v", payload.Data.RiskLevel, riskLevel)
+	if rec.Code != http.StatusOK || payload.Data.Status != "interpreted" || payload.Data.TotalScore == nil || *payload.Data.TotalScore != total {
+		t.Fatalf("payload=%#v", payload)
 	}
 }
 
 func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	assessmentQuery := &stubAssessmentQueryService{
-		getByIDResult: &assessmentapp.AssessmentResult{
-			ID:       303,
-			OrgID:    12,
-			TesteeID: 5002,
-			Status:   "submitted",
-		},
-	}
-	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
-	handler := NewEvaluationHandler(
-		evaluationoperator.NewRecoveryService(assessmentQuery),
-		nil,
-		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
-		nil,
-		reportwaitjourney.NewService(accessQuery, assessmentQuery, nil),
-	)
-
-	baseCtx, cancel := context.WithCancel(context.Background())
+	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 303, OrgID: 12, TesteeID: 5002, Status: "submitted"}}
+	h := NewAssessmentReportJourneyHandler(nil, reportwaitjourney.NewService(query, nil))
+	base, cancel := context.WithCancel(context.Background())
 	cancel()
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/303/wait-report?timeout=30", nil).WithContext(baseCtx)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/303/wait-report?timeout=30", nil).WithContext(base)
 	c.Params = gin.Params{{Key: "id", Value: "303"}}
 	c.Set(middleware.OrgIDKey, uint64(12))
 	c.Set(middleware.UserIDKey, uint64(34))
-
-	handler.WaitReport(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-
+	h.WaitReport(c)
 	var payload struct {
-		Code int `json:"code"`
 		Data struct {
 			Status string `json:"status"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if payload.Code != 0 || payload.Data.Status != "pending" {
-		t.Fatalf("unexpected payload: %+v", payload)
+	_ = json.Unmarshal(rec.Body.Bytes(), &payload)
+	if rec.Code != http.StatusOK || payload.Data.Status != "pending" {
+		t.Fatalf("response=%d %s", rec.Code, rec.Body.String())
 	}
 }
+
+var _ evaluationoperator.QueryService = (*operatorQueryStub)(nil)

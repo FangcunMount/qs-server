@@ -9,7 +9,6 @@ import (
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
@@ -78,7 +77,7 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	IntakeService assessmentApp.AnswerSheetAssessmentIntakeService
+	IntakeService evaluationintake.Service
 	TesteeService evaluationtestee.Service
 	WorkerService evaluationworker.Service
 }
@@ -210,18 +209,17 @@ func (r *Registry) registerEvaluationService() error {
 		return nil
 	}
 
-	intake := evaluationintake.Adapt(r.deps.Evaluation.IntakeService)
 	journey := assessmentintakejourney.NewService(
 		r.deps.Survey.AnswerSheetScoringService,
 		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,
-		intake,
+		r.deps.Evaluation.IntakeService,
 		r.deps.Interpretation.ReportStatusReporter,
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
 	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService))
-	r.server.RegisterService(service.NewAssessmentIntakeService(journey, intake))
+	r.server.RegisterService(service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService))
 	r.server.RegisterService(service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService))
 	r.server.RegisterService(service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService))
 	log.Info("   📊 actor-oriented Evaluation/Interpretation services registered")

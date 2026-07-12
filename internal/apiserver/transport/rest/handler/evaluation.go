@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/gin-gonic/gin"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
@@ -17,33 +16,34 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// EvaluationHandler 评估模块 Handler
-// 提供测评管理、得分查询、报告查询等 RESTful API
-type EvaluationHandler struct {
+// EvaluationOperatorHandler exposes backend-operator Evaluation use cases.
+type EvaluationOperatorHandler struct {
 	*BaseHandler
 	operatorRecoveryService  evaluationoperator.RecoveryService
 	operatorExecutionService evaluationoperator.BatchExecutionService
 	protectedQueryService    evaluationoperator.QueryService
-	reportQueryJourney       reportqueryjourney.Service
-	reportWaitJourney        reportwaitjourney.Service
 }
 
-// NewEvaluationHandler 创建评估模块 Handler
-func NewEvaluationHandler(
+// AssessmentReportJourneyHandler exposes cross-module Assessment and Report journeys.
+type AssessmentReportJourneyHandler struct {
+	*BaseHandler
+	reportQueryJourney reportqueryjourney.Service
+	reportWaitJourney  reportwaitjourney.Service
+}
+
+func NewEvaluationOperatorHandler(
 	operatorRecoveryService evaluationoperator.RecoveryService,
 	operatorExecutionService evaluationoperator.BatchExecutionService,
 	protectedQueryService evaluationoperator.QueryService,
+) *EvaluationOperatorHandler {
+	return &EvaluationOperatorHandler{BaseHandler: &BaseHandler{}, operatorRecoveryService: operatorRecoveryService, operatorExecutionService: operatorExecutionService, protectedQueryService: protectedQueryService}
+}
+
+func NewAssessmentReportJourneyHandler(
 	reportQueryJourney reportqueryjourney.Service,
 	reportWaitJourney reportwaitjourney.Service,
-) *EvaluationHandler {
-	return &EvaluationHandler{
-		BaseHandler:              &BaseHandler{},
-		operatorRecoveryService:  operatorRecoveryService,
-		operatorExecutionService: operatorExecutionService,
-		protectedQueryService:    protectedQueryService,
-		reportQueryJourney:       reportQueryJourney,
-		reportWaitJourney:        reportWaitJourney,
-	}
+) *AssessmentReportJourneyHandler {
+	return &AssessmentReportJourneyHandler{BaseHandler: &BaseHandler{}, reportQueryJourney: reportQueryJourney, reportWaitJourney: reportWaitJourney}
 }
 
 // ============= Assessment 查询接口（后台管理）=============
@@ -57,7 +57,7 @@ func NewEvaluationHandler(
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id} [get]
-func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
+func (h *AssessmentReportJourneyHandler) GetAssessment(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
@@ -70,13 +70,8 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		return
 	}
 
-	result, err := h.protectedQueryService.GetAssessment(c.Request.Context(), protectedScope(orgID, operatorUserID), id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
 	if h.reportQueryJourney != nil {
-		projected, projectErr := h.reportQueryJourney.ProjectAssessment(c.Request.Context(), result)
+		projected, projectErr := h.reportQueryJourney.GetAssessmentProjection(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 		err = projectErr
 		if err != nil {
 			h.Error(c, err)
@@ -85,8 +80,7 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		h.Success(c, response.NewProjectedAssessmentResponse(projected))
 		return
 	}
-
-	h.Success(c, response.NewAssessmentResponse(result))
+	h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "Assessment report journey is not configured"))
 }
 
 // ListAssessmentRuns lists evaluation runs for one assessment.
@@ -98,7 +92,7 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 // @Param limit query int false "返回条数" default(20)
 // @Success 200 {object} core.Response{data=response.EvaluationRunListResponse}
 // @Router /api/v1/evaluations/assessments/{id}/runs [get]
-func (h *EvaluationHandler) ListAssessmentRuns(c *gin.Context) {
+func (h *EvaluationOperatorHandler) ListAssessmentRuns(c *gin.Context) {
 	assessmentID, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
@@ -121,7 +115,7 @@ func (h *EvaluationHandler) ListAssessmentRuns(c *gin.Context) {
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.EvaluationRunResponse}
 // @Router /api/v1/evaluations/assessments/{id}/runs/latest [get]
-func (h *EvaluationHandler) GetLatestAssessmentRun(c *gin.Context) {
+func (h *EvaluationOperatorHandler) GetLatestAssessmentRun(c *gin.Context) {
 	assessmentID, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
@@ -151,7 +145,7 @@ func (h *EvaluationHandler) GetLatestAssessmentRun(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.AssessmentListResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments [get]
-func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
+func (h *AssessmentReportJourneyHandler) ListAssessments(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
@@ -168,20 +162,15 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	if req.TesteeID > 0 {
 		testeeID = &req.TesteeID
 	}
-	dto := assessmentApp.ListAssessmentsDTO{
+	dto := evaluationoperator.ListQuery{
 		Page:     req.Page,
 		PageSize: req.PageSize,
 		TesteeID: testeeID,
 		Status:   req.Status,
 	}
 
-	result, err := h.protectedQueryService.ListAssessments(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
 	if h.reportQueryJourney != nil {
-		projected, projectErr := h.reportQueryJourney.ProjectAssessmentList(c.Request.Context(), result)
+		projected, projectErr := h.reportQueryJourney.ListAssessmentProjection(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, dto)
 		err = projectErr
 		if err != nil {
 			h.Error(c, err)
@@ -190,8 +179,7 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		h.Success(c, response.NewProjectedAssessmentListResponse(projected))
 		return
 	}
-
-	h.Success(c, response.NewAssessmentListResponse(result))
+	h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "Assessment report journey is not configured"))
 }
 
 // ============= Score 相关接口 =============
@@ -205,7 +193,7 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ScoreResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
-func (h *EvaluationHandler) GetScores(c *gin.Context) {
+func (h *EvaluationOperatorHandler) GetScores(c *gin.Context) {
 	id, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.Error(c, err)
@@ -232,7 +220,7 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.FactorTrendResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/scores/trend [get]
-func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
+func (h *EvaluationOperatorHandler) GetFactorTrend(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
@@ -245,7 +233,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 		return
 	}
 
-	dto := assessmentApp.GetFactorTrendDTO{
+	dto := evaluationoperator.TrendQuery{
 		TesteeID:   req.TesteeID,
 		FactorCode: req.FactorCode,
 		Limit:      req.Limit,
@@ -269,7 +257,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.HighRiskFactorsResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
-func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
+func (h *EvaluationOperatorHandler) GetHighRiskFactors(c *gin.Context) {
 	id, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.Error(c, err)
@@ -298,14 +286,18 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ReportResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
-func (h *EvaluationHandler) GetReport(c *gin.Context) {
-	id, scope, err := h.parseProtectedAssessmentQuery(c)
+func (h *AssessmentReportJourneyHandler) GetReport(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	result, err := h.reportQueryJourney.GetReport(c.Request.Context(), reportQueryScope(scope), id)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.reportQueryJourney.GetReport(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -325,7 +317,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ReportListResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/reports [get]
-func (h *EvaluationHandler) ListReports(c *gin.Context) {
+func (h *AssessmentReportJourneyHandler) ListReports(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
@@ -366,7 +358,7 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.BatchEvaluationResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/batch-evaluate [post]
-func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
+func (h *EvaluationOperatorHandler) BatchEvaluate(c *gin.Context) {
 	var req request.BatchEvaluateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.BadRequestResponse(c, "请求参数无效", err)
@@ -402,7 +394,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
-func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
+func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
@@ -434,8 +426,8 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/assessments/{id}/wait-report [get]
-func (h *EvaluationHandler) WaitReport(c *gin.Context) {
-	id, err := h.parseAssessmentID(c)
+func (h *AssessmentReportJourneyHandler) WaitReport(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
 		return
@@ -463,11 +455,11 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 
 // ============= 辅助方法 =============
 
-func (h *EvaluationHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
+func (h *EvaluationOperatorHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
 	return strconv.ParseUint(c.Param("id"), 10, 64)
 }
 
-func (h *EvaluationHandler) parseProtectedAssessmentQuery(c *gin.Context) (uint64, evaluationoperator.Actor, error) {
+func (h *EvaluationOperatorHandler) parseProtectedAssessmentQuery(c *gin.Context) (uint64, evaluationoperator.Actor, error) {
 	id, err := h.parseAssessmentID(c)
 	if err != nil {
 		return 0, evaluationoperator.Actor{}, err

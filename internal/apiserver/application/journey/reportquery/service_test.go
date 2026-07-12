@@ -2,18 +2,19 @@ package reportquery
 
 import (
 	"context"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	interpretationAdmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"testing"
 	"time"
+
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
+	interpretationAdmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
 func TestProjectAssessmentMapsGeneratedReportWithoutMutatingEvaluationResult(t *testing.T) {
 	created := time.Unix(123, 0)
 	reader := &journeyReader{row: &interpretationreadmodel.ReportRow{CreatedAt: created}}
-	original := &assessmentApp.AssessmentResult{ID: 42, Status: "evaluated"}
-	projected, err := NewAdministrationService(reader, adminStub{}).ProjectAssessment(context.Background(), original)
+	original := &evaluationoperator.Assessment{ID: 42, Status: "evaluated"}
+	projected, err := NewAdministrationService(reader, adminStub{}, nil).ProjectAssessment(context.Background(), original)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,8 +27,8 @@ func TestProjectAssessmentMapsGeneratedReportWithoutMutatingEvaluationResult(t *
 }
 
 func TestProjectAssessmentKeepsEvaluatedWhenReportDoesNotExist(t *testing.T) {
-	original := &assessmentApp.AssessmentResult{ID: 42, Status: "evaluated"}
-	projected, err := NewAdministrationService(&journeyReader{err: interpretationreadmodel.ErrReportNotFound}, adminStub{}).ProjectAssessment(context.Background(), original)
+	original := &evaluationoperator.Assessment{ID: 42, Status: "evaluated"}
+	projected, err := NewAdministrationService(&journeyReader{err: interpretationreadmodel.ErrReportNotFound}, adminStub{}, nil).ProjectAssessment(context.Background(), original)
 	if err != nil {
 		t.Fatal(err)
 	}

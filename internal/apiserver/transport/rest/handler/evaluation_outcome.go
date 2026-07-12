@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -20,7 +20,7 @@ import (
 // @Success 200 {object} core.Response{data=response.AssessmentOutcomeResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v2/evaluations/assessments/{id} [get]
-func (h *EvaluationHandler) GetAssessmentOutcome(c *gin.Context) {
+func (h *EvaluationOperatorHandler) GetAssessmentOutcome(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
@@ -51,7 +51,7 @@ func (h *EvaluationHandler) GetAssessmentOutcome(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.AssessmentOutcomeListResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v2/evaluations/assessments [get]
-func (h *EvaluationHandler) ListAssessmentsOutcome(c *gin.Context) {
+func (h *EvaluationOperatorHandler) ListAssessmentsOutcome(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
@@ -66,7 +66,7 @@ func (h *EvaluationHandler) ListAssessmentsOutcome(c *gin.Context) {
 	if req.TesteeID > 0 {
 		testeeID = &req.TesteeID
 	}
-	dto := assessmentApp.ListAssessmentsDTO{
+	dto := evaluationoperator.ListQuery{
 		Page:     req.Page,
 		PageSize: req.PageSize,
 		TesteeID: testeeID,
@@ -89,13 +89,18 @@ func (h *EvaluationHandler) ListAssessmentsOutcome(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ReportOutcomeResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v2/evaluations/assessments/{id}/report [get]
-func (h *EvaluationHandler) GetReportOutcome(c *gin.Context) {
-	id, scope, err := h.parseProtectedAssessmentQuery(c)
+func (h *AssessmentReportJourneyHandler) GetReportOutcome(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.reportQueryJourney.GetReportOutcome(c.Request.Context(), reportQueryScope(scope), id)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.reportQueryJourney.GetReportOutcome(c.Request.Context(), reportqueryjourney.Scope{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -114,7 +119,7 @@ func (h *EvaluationHandler) GetReportOutcome(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ReportOutcomeListResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v2/evaluations/reports [get]
-func (h *EvaluationHandler) ListReportsOutcome(c *gin.Context) {
+func (h *AssessmentReportJourneyHandler) ListReportsOutcome(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)

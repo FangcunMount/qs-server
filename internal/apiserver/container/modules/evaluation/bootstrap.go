@@ -5,7 +5,7 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -39,7 +39,7 @@ type BootstrapInput struct {
 	AssessmentOutboxRelayBatchSize              int
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
-	TesteeAccessChecker                         assessment.TesteeAccessChecker
+	TesteeAccessChecker                         evaluationoperator.AccessChecker
 	OpsHandle                                   *cacheplane.Handle
 	ExecutionPaths                              []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry

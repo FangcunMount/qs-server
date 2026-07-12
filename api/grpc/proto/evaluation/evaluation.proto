@@ -29,12 +29,6 @@ service EvaluationWorkerService {
   rpc ExecuteEvaluation(ExecuteEvaluationRequest) returns (ExecuteEvaluationResponse);
 }
 
-// 受试者报告查询。消息将在 Interpretation 契约独立后整体迁移。
-service ParticipantReportService {
-  rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
-  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
-}
-
 // ==================== Outcome 共享类型 ====================
 
 message ModelIdentity {
@@ -117,55 +111,6 @@ message TrendPoint {
   double score = 2;
   string risk_level = 3;
   string created_at = 4;
-}
-
-message Suggestion {
-  string category = 1;
-  string content = 2;
-  string factor_code = 3;
-}
-
-message DimensionInterpret {
-  string factor_code = 1;
-  string factor_name = 2;
-  double raw_score = 3;
-  double max_score = 6;
-  string risk_level = 4;
-  string description = 5;
-  string suggestion = 7;
-}
-
-message ModelExtra {
-  string kind = 1;
-  string type_code = 2;
-  string type_name = 3;
-  string one_liner = 4;
-  string image_url = 5;
-  double match_percent = 6;
-  bool is_special = 7;
-  string special_trigger = 8;
-  string commentary = 9;
-  ModelRarity rarity = 10;
-}
-
-message ModelRarity {
-  double percent = 1;
-  string label = 2;
-  int32 one_in_x = 3;
-}
-
-message AssessmentReport {
-  reserved 2, 3, 4, 5;
-  reserved "scale_code", "scale_name", "total_score", "risk_level";
-  uint64 assessment_id = 1;
-  string conclusion = 6;
-  repeated DimensionInterpret dimensions = 7;
-  repeated Suggestion suggestions = 8;
-  string created_at = 9;
-  ModelExtra model_extra = 10;
-  ModelIdentity model = 11;
-  ScoreValue primary_score = 12;
-  ResultLevel level = 13;
 }
 
 // ==================== 测评查询 ====================
@@ -282,29 +227,4 @@ message GetHighRiskFactorsResponse {
   bool has_high_risk = 2;
   repeated FactorScore high_risk_factors = 3;
   bool needs_urgent_care = 4;
-}
-
-// ==================== 报告查询 ====================
-
-message GetAssessmentReportRequest {
-  uint64 assessment_id = 1;
-  uint64 testee_id = 2;
-}
-
-message GetAssessmentReportResponse {
-  AssessmentReport report = 1;
-}
-
-message ListMyReportsRequest {
-  uint64 testee_id = 1;
-  int32 page = 2;
-  int32 page_size = 3;
-}
-
-message ListMyReportsResponse {
-  repeated AssessmentReport items = 1;
-  int32 total = 2;
-  int32 page = 3;
-  int32 page_size = 4;
-  int32 total_pages = 5;
 }

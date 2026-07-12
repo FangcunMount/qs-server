@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	participant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 )
 

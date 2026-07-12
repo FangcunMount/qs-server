@@ -31,7 +31,9 @@ func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 	bundle := container.ClientBundle{
 		AnswerSheet:            r.answerSheetClient(),
 		Questionnaire:          r.questionnaireClient(),
-		Evaluation:             r.evaluationClient(),
+		TesteeEvaluation:       r.manager.TesteeEvaluationClient(),
+		ParticipantReport:      r.manager.ParticipantReportClient(),
+		AssessmentIntake:       r.manager.AssessmentIntakeClient(),
 		Actor:                  r.actorClient(),
 		AssessmentModelCatalog: r.assessmentModelCatalogClient(),
 	}
@@ -56,16 +58,6 @@ func (r *GRPCClientRegistry) questionnaireClient() *grpcclient.QuestionnaireClie
 		return nil
 	}
 	log.Info("   📝 Questionnaire client added to bundle")
-	return client
-}
-
-func (r *GRPCClientRegistry) evaluationClient() *grpcclient.EvaluationClient {
-	client := r.manager.EvaluationClient()
-	if client == nil {
-		log.Warn("Evaluation client is not initialized, skipping registration")
-		return nil
-	}
-	log.Info("   📊 Evaluation client added to bundle")
 	return client
 }
 

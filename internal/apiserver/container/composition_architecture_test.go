@@ -427,7 +427,7 @@ func TestBatch6RemovesEvaluationCompatibilityStorageAndSwitches(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/container/modules/evaluation/assemble.go",
 		"internal/apiserver/application/evaluation/outcome/commit/committer.go",
-		"internal/apiserver/application/evaluation/consistency/reconciler.go",
+		"internal/apiserver/application/evaluation/scheduler/audit.go",
 	} {
 		data, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {

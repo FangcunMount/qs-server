@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	"google.golang.org/grpc/codes"

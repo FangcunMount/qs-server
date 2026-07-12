@@ -48,7 +48,9 @@ type Container struct {
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient            *grpcclient.AnswerSheetClient
 	questionnaireClient          *grpcclient.QuestionnaireClient
-	evaluationClient             *grpcclient.EvaluationClient
+	testeeEvaluationClient       *grpcclient.TesteeEvaluationClient
+	participantReportClient      *grpcclient.ParticipantReportClient
+	assessmentIntakeClient       *grpcclient.AssessmentIntakeClient
 	actorClient                  *grpcclient.ActorClient
 	assessmentModelCatalogClient *grpcclient.AssessmentModelCatalogClient
 
@@ -91,7 +93,9 @@ type Container struct {
 type ClientBundle struct {
 	AnswerSheet            *grpcclient.AnswerSheetClient
 	Questionnaire          *grpcclient.QuestionnaireClient
-	Evaluation             *grpcclient.EvaluationClient
+	TesteeEvaluation       *grpcclient.TesteeEvaluationClient
+	ParticipantReport      *grpcclient.ParticipantReportClient
+	AssessmentIntake       *grpcclient.AssessmentIntakeClient
 	Actor                  *grpcclient.ActorClient
 	AssessmentModelCatalog *grpcclient.AssessmentModelCatalogClient
 }
@@ -180,7 +184,7 @@ func (c *Container) initApplicationServices() {
 	c.typologyModelQueryService = catalogRuntime.typology
 
 	c.evaluationQueryService = evaluation.NewQueryService(
-		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
+		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
 		c.assessmentModelCatalogQueryService,
 	)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
@@ -190,7 +194,7 @@ func (c *Container) initApplicationServices() {
 	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
 	c.typologyAssessmentQueryService = typologyassessment.NewQueryService(
-		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
+		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
 		c.waitReportService,
 	)
 	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
@@ -439,7 +443,9 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	}
 	c.answerSheetClient = bundle.AnswerSheet
 	c.questionnaireClient = bundle.Questionnaire
-	c.evaluationClient = bundle.Evaluation
+	c.testeeEvaluationClient = bundle.TesteeEvaluation
+	c.participantReportClient = bundle.ParticipantReport
+	c.assessmentIntakeClient = bundle.AssessmentIntake
 	c.actorClient = bundle.Actor
 	c.assessmentModelCatalogClient = bundle.AssessmentModelCatalog
 }

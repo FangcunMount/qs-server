@@ -15,13 +15,19 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		r.deps.Interpretation.ReportWaitJourney == nil {
 		return
 	}
-	evalHandler := handler.NewEvaluationHandler(
+	evalHandler := handler.NewEvaluationOperatorHandler(
 		r.deps.Evaluation.OperatorRecoveryService,
 		r.deps.Evaluation.OperatorExecutionService,
 		r.deps.Evaluation.ProtectedQueryService,
+	)
+	journeyHandler := handler.NewAssessmentReportJourneyHandler(
 		r.deps.Interpretation.ReportQueryJourney,
 		r.deps.Interpretation.ReportWaitJourney,
 	)
+	apiV1.GET("/assessments/:id/wait-report", r.rateLimitedHandlers(
+		r.rateCfg, r.rateCfg.QueryGlobalQPS, r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS, r.rateCfg.QueryUserBurst, journeyHandler.WaitReport,
+	)...)
 
 	evaluations := apiV1.Group("/evaluations")
 	{
@@ -33,7 +39,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.ListAssessments,
+				journeyHandler.ListAssessments,
 			)...)
 			assessments.GET("/:id", r.rateLimitedHandlers(
 				r.rateCfg,
@@ -41,7 +47,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.GetAssessment,
+				journeyHandler.GetAssessment,
 			)...)
 			assessments.GET("/:id/scores", r.rateLimitedHandlers(
 				r.rateCfg,
@@ -57,7 +63,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.GetReport,
+				journeyHandler.GetReport,
 			)...)
 			assessments.GET("/:id/high-risk-factors", r.rateLimitedHandlers(
 				r.rateCfg,
@@ -114,7 +120,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.ListReports,
+				journeyHandler.ListReports,
 			)...)
 		}
 

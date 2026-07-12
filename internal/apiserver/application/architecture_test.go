@@ -1027,7 +1027,7 @@ func TestEvaluationReconcilerIsReadOnlyUntilMigrationAudit(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "consistency", "reconciler.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scheduler", "audit.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -1055,7 +1055,7 @@ func TestR118DeprecatedOutcomeAliasesNotReintroduced(t *testing.T) {
 		"NewPersonalityEvaluationModelValidator",
 	}
 	scanRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "assessment"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "operator"),
 		filepath.Join(root, "internal", "apiserver", "transport", "rest", "response"),
 	}
 	for _, scanRoot := range scanRoots {

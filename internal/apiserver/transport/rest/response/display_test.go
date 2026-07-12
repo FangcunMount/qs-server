@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
 func TestNewAssessmentResponseAddsLabelsAndFormatsTimes(t *testing.T) {
 	submittedAt := time.Date(2026, 4, 17, 13, 25, 27, 0, time.Local)
 	riskLevel := "high"
-	result := &assessmentApp.AssessmentResult{
+	result := &evaluationoperator.Assessment{
 		ID:                   1,
 		OrgID:                2,
 		TesteeID:             3,
