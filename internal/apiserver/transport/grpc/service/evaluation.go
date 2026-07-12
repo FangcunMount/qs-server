@@ -228,15 +228,12 @@ func toAssessmentQueryGRPCError(err error) error {
 
 // GetAssessmentScores 获取测评得分详情
 func (s *EvaluationService) GetAssessmentScores(ctx context.Context, req *pb.GetAssessmentScoresRequest) (*pb.GetAssessmentScoresResponse, error) {
-	if req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	if req.TesteeId == 0 || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
 	}
 
-	// 验证 testee_id 权限：检查该测评是否属于该受试者
-	if req.TesteeId > 0 {
-		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
-			return nil, err
-		}
+	if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
+		return nil, err
 	}
 
 	result, err := s.scoreQueryService.GetByAssessmentID(ctx, req.AssessmentId)
@@ -308,15 +305,12 @@ func (s *EvaluationService) GetFactorTrend(ctx context.Context, req *pb.GetFacto
 
 // GetHighRiskFactors 获取高风险因子
 func (s *EvaluationService) GetHighRiskFactors(ctx context.Context, req *pb.GetHighRiskFactorsRequest) (*pb.GetHighRiskFactorsResponse, error) {
-	if req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	if req.TesteeId == 0 || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
 	}
 
-	// 验证 testee_id 权限：检查该测评是否属于该受试者
-	if req.TesteeId > 0 {
-		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
-			return nil, err
-		}
+	if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
+		return nil, err
 	}
 
 	result, err := s.scoreQueryService.GetHighRiskFactors(ctx, req.AssessmentId)

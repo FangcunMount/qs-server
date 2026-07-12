@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
@@ -301,6 +303,76 @@ func TestCreateAssessmentFromAnswerSheetRejectsNilRequest(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("CreateAssessmentFromAnswerSheet(nil) = %s, want %s", status.Code(err), codes.InvalidArgument)
 	}
+}
+
+func TestCreateAssessmentFromAnswerSheetCharacterizesOrchestrationOrder(t *testing.T) {
+	t.Parallel()
+
+	calls := make([]string, 0, 4)
+	scoring := &answerSheetScoringOrderStub{calls: &calls}
+	intake := &assessmentIntakeOrderStub{calls: &calls, assessmentID: 9001}
+	svc := &InternalService{
+		answerSheetScoringService: scoring,
+		intakeService:             intake,
+		assessmentBindingResolver: stubScaleBindingResolver{
+			binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{
+				Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0", Title: "Scale",
+			}},
+		},
+	}
+
+	resp, err := svc.CreateAssessmentFromAnswerSheet(context.Background(), &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		FillerId:             101,
+		QuestionnaireCode:    "QNR-SCALE",
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	})
+	if err != nil {
+		t.Fatalf("CreateAssessmentFromAnswerSheet: %v", err)
+	}
+	if resp == nil || !resp.Success || !resp.Created || !resp.AutoSubmitted || resp.AssessmentId != 9001 {
+		t.Fatalf("response = %#v", resp)
+	}
+	want := []string{"score", "find", "create", "submit"}
+	if fmt.Sprint(calls) != fmt.Sprint(want) {
+		t.Fatalf("orchestration calls = %v, want %v", calls, want)
+	}
+	if intake.createdDTO.AnswerSheetID != 202 || intake.createdDTO.ModelCode == nil || *intake.createdDTO.ModelCode != "SCL-001" {
+		t.Fatalf("created DTO = %#v", intake.createdDTO)
+	}
+}
+
+type answerSheetScoringOrderStub struct {
+	calls *[]string
+}
+
+func (s *answerSheetScoringOrderStub) CalculateAndSave(context.Context, uint64) error {
+	*s.calls = append(*s.calls, "score")
+	return nil
+}
+
+type assessmentIntakeOrderStub struct {
+	calls        *[]string
+	assessmentID uint64
+	createdDTO   assessmentApp.CreateAssessmentDTO
+}
+
+func (s *assessmentIntakeOrderStub) CreateForAnswerSheet(_ context.Context, dto assessmentApp.CreateAssessmentDTO) (*assessmentApp.AssessmentResult, error) {
+	*s.calls = append(*s.calls, "create")
+	s.createdDTO = dto
+	return &assessmentApp.AssessmentResult{ID: s.assessmentID, TesteeID: dto.TesteeID, AnswerSheetID: dto.AnswerSheetID}, nil
+}
+
+func (s *assessmentIntakeOrderStub) SubmitForEvaluation(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
+	*s.calls = append(*s.calls, "submit")
+	return &assessmentApp.AssessmentResult{ID: s.assessmentID, Status: "submitted"}, nil
+}
+
+func (s *assessmentIntakeOrderStub) FindByAnswerSheetID(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
+	*s.calls = append(*s.calls, "find")
+	return nil, fmt.Errorf("assessment not found")
 }
 
 func TestCalculateAnswerSheetScoreRejectsNilRequest(t *testing.T) {

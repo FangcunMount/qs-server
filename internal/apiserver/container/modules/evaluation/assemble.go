@@ -268,7 +268,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	}
 	m.OperatorQueryService = assessmentApp.NewAssessmentOperatorQueryService(infra.assessmentRepo, infra.assessmentReader)
 	m.OperatorRecoveryService = assessmentApp.NewAssessmentOperatorRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore)
-	m.WorkerResultReader = m.OperatorQueryService
+	m.WorkerResultReader = assessmentApp.NewWorkerAssessmentResultReader(infra.assessmentRepo)
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		infra.outcomeRepo,
 		infra.scoreProjectionReader,

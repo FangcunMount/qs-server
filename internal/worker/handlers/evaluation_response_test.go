@@ -13,13 +13,23 @@ func TestHandleEvaluateAssessmentResponseNilResponse(t *testing.T) {
 }
 
 func TestHandleEvaluateAssessmentResponseSuccess(t *testing.T) {
-	if err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{Success: true, Status: "interpreted"}); err != nil {
+	if err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{Success: true, Status: "evaluated"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
+func TestHandleEvaluateAssessmentResponseRejectsInterpretationStatus(t *testing.T) {
+	for _, status := range []string{"interpreted", "already_interpreted", "generated"} {
+		t.Run(status, func(t *testing.T) {
+			if err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{Success: true, Status: status}); err == nil {
+				t.Fatalf("status %q must not be acknowledged as Evaluation success", status)
+			}
+		})
+	}
+}
+
 func TestHandleEvaluateAssessmentResponseTerminalStatusesAck(t *testing.T) {
-	for _, status := range []string{"failed", "already_interpreted", "already_evaluated"} {
+	for _, status := range []string{"failed", "already_evaluated"} {
 		t.Run(status, func(t *testing.T) {
 			err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{
 				Success: false,
@@ -69,7 +79,7 @@ func TestHandleGenerateReportResponseNilResponse(t *testing.T) {
 }
 
 func TestHandleGenerateReportResponseTerminalStatusesAck(t *testing.T) {
-	for _, status := range []string{"failed", "already_interpreted"} {
+	for _, status := range []string{"failed", "already_generated"} {
 		t.Run(status, func(t *testing.T) {
 			err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
 				Success: false,

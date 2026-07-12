@@ -108,6 +108,31 @@ func TestTesteeAssessmentQueryRejectsAnotherTesteesAssessment(t *testing.T) {
 	}
 }
 
+func TestWorkerAssessmentResultReaderUsesDedicatedTrustedReadPort(t *testing.T) {
+	owner := testee.NewID(22)
+	a, err := domainassessment.NewAssessment(
+		1,
+		owner,
+		domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "v1"),
+		domainassessment.NewAnswerSheetRef(meta.FromUint64(3)),
+		domainassessment.NewAdhocOrigin(),
+		domainassessment.WithID(domainassessment.NewID(7003)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader := NewWorkerAssessmentResultReader(&intakeAssessmentRepo{assessment: a})
+	result, err := reader.GetByID(context.Background(), a.ID().Uint64())
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if result.ID != a.ID().Uint64() || result.TesteeID != owner.Uint64() {
+		t.Fatalf("worker result = %#v", result)
+	}
+}
+
 var _ domainassessment.Repository = (*intakeAssessmentRepo)(nil)
 var _ AnswerSheetAssessmentIntakeService = (*assessmentIntakeService)(nil)
 var _ TesteeAssessmentQueryService = (*testeeAssessmentQueryService)(nil)
+var _ AssessmentResultReader = (*workerAssessmentResultReader)(nil)

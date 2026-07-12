@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"strings"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
@@ -12,7 +11,10 @@ func handleEvaluateAssessmentResponse(resp *pb.EvaluateAssessmentResponse) error
 		return fmt.Errorf("evaluate assessment returned nil response")
 	}
 	if resp.Success {
-		return nil
+		if resp.Status == "evaluated" {
+			return nil
+		}
+		return fmt.Errorf("evaluate assessment returned unexpected success status: %s", resp.Status)
 	}
 	if resp.GetRetryable() {
 		return fmt.Errorf(
@@ -28,10 +30,7 @@ func handleEvaluateAssessmentResponse(resp *pb.EvaluateAssessmentResponse) error
 }
 
 func isTerminalEvaluateStatus(status string) bool {
-	if status == "failed" {
-		return true
-	}
-	return strings.HasPrefix(status, "already_")
+	return status == "failed" || status == "already_evaluated"
 }
 
 func handleGenerateReportResponse(resp *pb.GenerateReportFromAssessmentResponse) error {
@@ -57,5 +56,5 @@ func isTerminalReportGenerationStatus(status string) bool {
 	if status == "failed" {
 		return true
 	}
-	return strings.HasPrefix(status, "already_")
+	return status == "already_generated"
 }

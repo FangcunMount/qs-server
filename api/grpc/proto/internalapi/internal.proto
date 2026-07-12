@@ -321,7 +321,7 @@ message EvaluateAssessmentRequest {
 // 执行测评评估响应
 message EvaluateAssessmentResponse {
   bool success = 1;                  // 是否成功
-  string status = 2;                 // 处理后的状态：interpreted/failed/skipped
+  string status = 2;                 // 处理后的状态：evaluated/failed/skipped
   string message = 3;                // 描述信息
   reserved 4, 5;
   reserved "total_score", "risk_level";

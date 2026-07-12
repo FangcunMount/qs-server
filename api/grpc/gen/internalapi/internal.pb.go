@@ -2067,7 +2067,7 @@ func (x *EvaluateAssessmentRequest) GetAssessmentId() uint64 {
 type EvaluateAssessmentResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Success          bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                             // 是否成功
-	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                                                // 处理后的状态：interpreted/failed/skipped
+	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                                                // 处理后的状态：evaluated/failed/skipped
 	Message          string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                                              // 描述信息
 	Outcome          *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                                              // v2 outcome 投影
 	Retryable        bool                   `protobuf:"varint,7,opt,name=retryable,proto3" json:"retryable,omitempty"`                                         // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
