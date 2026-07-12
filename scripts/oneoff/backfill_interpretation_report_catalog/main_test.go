@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -72,9 +73,52 @@ func TestLatestArtifactsByAssessment(t *testing.T) {
 	}
 }
 
+func TestArchiveCatalogEntryUsesAssessmentAssociation(t *testing.T) {
+	createdAt := time.Date(2021, 12, 30, 16, 5, 30, 0, time.UTC)
+	doc := bson.M{
+		"domain_id":  int64(614332407667044910),
+		"testee_id":  int64(999), // Legacy value must not be trusted.
+		"scale_code": "SNAP-IV",
+		"risk_level": "medium",
+		"created_at": createdAt,
+	}
+	association := assessmentAssociation{TesteeID: 613512251248226862, OrgID: 42}
+
+	entry := archiveCatalogEntry(doc, association)
+	if got := asUint64(entry["assessment_id"]); got != 614332407667044910 {
+		t.Fatalf("assessment_id = %d", got)
+	}
+	if got := asUint64(entry["testee_id"]); got != association.TesteeID {
+		t.Fatalf("testee_id = %d, want assessment association %d", got, association.TesteeID)
+	}
+	if got := asInt64(entry["org_id"]); got != association.OrgID {
+		t.Fatalf("org_id = %d, want %d", got, association.OrgID)
+	}
+}
+
+func TestAssessmentAssociationQueryUsesAssessmentIdentity(t *testing.T) {
+	want := "SELECT id, testee_id, org_id FROM assessment WHERE id IN (?,?,?)"
+	if got := assessmentAssociationQuery(3); got != want {
+		t.Fatalf("query = %q, want %q", got, want)
+	}
+}
+
+func TestArchiveCatalogFilterCannotMatchArtifact(t *testing.T) {
+	want := bson.M{
+		"assessment_id": uint64(7),
+		"$or": bson.A{
+			bson.M{"source_kind": "archive"},
+			bson.M{"source_kind": bson.M{"$exists": false}},
+		},
+	}
+	if got := archiveCatalogFilter(7); !reflect.DeepEqual(got, want) {
+		t.Fatalf("filter = %#v, want %#v", got, want)
+	}
+}
+
 func TestFormatProgressLine(t *testing.T) {
-	line := formatProgressLine("archive", 100, summary{scanned: 25, inserted: 20}, 123, 5*time.Second)
-	for _, want := range []string{"archive", "25.00%", "25/100", "rate=5/s", "checkpoint=123", "ins=20"} {
+	line := formatProgressLine("archive", 100, summary{scanned: 25, inserted: 20, missingAssessment: 2}, 123, 5*time.Second)
+	for _, want := range []string{"archive", "25.00%", "25/100", "rate=5/s", "checkpoint=123", "ins=20", "miss=2"} {
 		if !strings.Contains(line, want) {
 			t.Fatalf("progress line %q does not contain %q", line, want)
 		}

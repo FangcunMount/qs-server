@@ -33,7 +33,8 @@ type config struct {
 
 type summary struct {
 	scanned, inserted, updated, unchanged int64
-	missingTestee, missingOrg             int64
+	missingAssessment, missingTestee      int64
+	missingOrg                            int64
 	conflict, failed                      int64
 }
 
@@ -48,6 +49,7 @@ func (s *concurrentSummary) add(delta summary) {
 	s.s.inserted += delta.inserted
 	s.s.updated += delta.updated
 	s.s.unchanged += delta.unchanged
+	s.s.missingAssessment += delta.missingAssessment
 	s.s.missingTestee += delta.missingTestee
 	s.s.missingOrg += delta.missingOrg
 	s.s.conflict += delta.conflict
@@ -183,7 +185,7 @@ type phaseSpec struct {
 func archivePhase() phaseSpec {
 	return phaseSpec{
 		name: "archive", collection: "archived_reports",
-		projection: bson.M{"domain_id": 1, "testee_id": 1, "scale_code": 1, "risk_level": 1, "created_at": 1},
+		projection: bson.M{"domain_id": 1, "scale_code": 1, "risk_level": 1, "created_at": 1},
 		process:    processArchiveBatch,
 	}
 }
@@ -325,7 +327,7 @@ func sourceExhausted(ctx context.Context, collection *mongo.Collection, afterID,
 
 func processArchiveBatch(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, c config, docs []bson.M) (summary, error) {
 	delta := summary{scanned: int64(len(docs))}
-	orgs, err := loadOrgs(ctx, mysqlDB, docs)
+	associations, err := loadAssessmentAssociations(ctx, mysqlDB, docs)
 	if err != nil {
 		delta.failed = int64(len(docs))
 		return delta, err
@@ -334,21 +336,25 @@ func processArchiveBatch(ctx context.Context, db *mongo.Database, mysqlDB *sql.D
 	now := time.Now().UTC()
 	for _, d := range docs {
 		id := asUint64(d["domain_id"])
-		testeeID := asUint64(d["testee_id"])
-		orgID, ok := orgs[testeeID]
+		association, ok := associations[id]
 		if !ok {
+			delta.missingAssessment++
+			continue
+		}
+		if association.TesteeID == 0 {
 			delta.missingTestee++
 			continue
 		}
-		if orgID == 0 {
+		if association.OrgID == 0 {
 			delta.missingOrg++
 			continue
 		}
 		if !c.apply {
 			continue
 		}
-		entry := bson.M{"assessment_id": id, "org_id": orgID, "testee_id": testeeID, "source_kind": "archive", "source_id": id, "model_code": asString(d["scale_code"]), "risk_level": asString(d["risk_level"]), "sort_at": asTime(d["created_at"]), "sort_report_id": uint64(0), "updated_at": now}
-		models = append(models, mongo.NewUpdateOneModel().SetFilter(bson.M{"assessment_id": id}).SetUpdate(bson.M{"$setOnInsert": entry}).SetUpsert(true))
+		entry := archiveCatalogEntry(d, association)
+		update := bson.M{"$set": entry, "$setOnInsert": bson.M{"updated_at": now}}
+		models = append(models, mongo.NewUpdateOneModel().SetFilter(archiveCatalogFilter(id)).SetUpdate(update).SetUpsert(true))
 	}
 	if !c.apply || len(models) == 0 {
 		return delta, nil
@@ -360,6 +366,36 @@ func processArchiveBatch(ctx context.Context, db *mongo.Database, mysqlDB *sql.D
 		return delta, err
 	}
 	return delta, nil
+}
+
+func archiveCatalogFilter(assessmentID uint64) bson.M {
+	return bson.M{
+		"assessment_id": assessmentID,
+		"$or": bson.A{
+			bson.M{"source_kind": "archive"},
+			bson.M{"source_kind": bson.M{"$exists": false}},
+		},
+	}
+}
+
+type assessmentAssociation struct {
+	TesteeID uint64
+	OrgID    int64
+}
+
+func archiveCatalogEntry(doc bson.M, association assessmentAssociation) bson.M {
+	assessmentID := asUint64(doc["domain_id"])
+	return bson.M{
+		"assessment_id":  assessmentID,
+		"org_id":         association.OrgID,
+		"testee_id":      association.TesteeID,
+		"source_kind":    "archive",
+		"source_id":      assessmentID,
+		"model_code":     asString(doc["scale_code"]),
+		"risk_level":     asString(doc["risk_level"]),
+		"sort_at":        asTime(doc["created_at"]),
+		"sort_report_id": uint64(0),
+	}
 }
 
 func processArtifactBatch(ctx context.Context, db *mongo.Database, _ *sql.DB, c config, docs []bson.M) (summary, error) {
@@ -455,37 +491,43 @@ func onlyDuplicateWriteErrors(err error) bool {
 	return true
 }
 
-func loadOrgs(ctx context.Context, db *sql.DB, docs []bson.M) (map[uint64]int64, error) {
+func loadAssessmentAssociations(ctx context.Context, db *sql.DB, docs []bson.M) (map[uint64]assessmentAssociation, error) {
 	seen := make(map[uint64]struct{}, len(docs))
 	for _, d := range docs {
-		if id := asUint64(d["testee_id"]); id > 0 {
+		if id := asUint64(d["domain_id"]); id > 0 {
 			seen[id] = struct{}{}
 		}
 	}
 	if len(seen) == 0 {
-		return map[uint64]int64{}, nil
+		return map[uint64]assessmentAssociation{}, nil
 	}
-	placeholders := make([]string, 0, len(seen))
 	args := make([]any, 0, len(seen))
 	for id := range seen {
-		placeholders = append(placeholders, "?")
 		args = append(args, id)
 	}
-	rows, err := db.QueryContext(ctx, "SELECT id, org_id FROM testee WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
+	rows, err := db.QueryContext(ctx, assessmentAssociationQuery(len(args)), args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
-	result := make(map[uint64]int64, len(seen))
+	result := make(map[uint64]assessmentAssociation, len(seen))
 	for rows.Next() {
-		var id uint64
+		var assessmentID, testeeID uint64
 		var orgID int64
-		if err := rows.Scan(&id, &orgID); err != nil {
+		if err := rows.Scan(&assessmentID, &testeeID, &orgID); err != nil {
 			return nil, err
 		}
-		result[id] = orgID
+		result[assessmentID] = assessmentAssociation{TesteeID: testeeID, OrgID: orgID}
 	}
 	return result, rows.Err()
+}
+
+func assessmentAssociationQuery(count int) string {
+	placeholders := make([]string, count)
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	return "SELECT id, testee_id, org_id FROM assessment WHERE id IN (" + strings.Join(placeholders, ",") + ")"
 }
 
 type progressReporter struct {
@@ -588,7 +630,7 @@ func formatProgressLine(phase string, total int64, s summary, checkpoint uint64,
 	if rate > 0 && total > processed {
 		eta = formatDuration(time.Duration(float64(total-processed)/rate) * time.Second)
 	}
-	return fmt.Sprintf("%s [%s] %6.2f%% %d/%d rate=%.0f/s eta=%s checkpoint=%d ins=%d upd=%d same=%d miss=%d err=%d", phase, bar, percent*100, processed, total, rate, eta, checkpoint, s.inserted, s.updated, s.unchanged, s.missingTestee+s.missingOrg, s.failed)
+	return fmt.Sprintf("%s [%s] %6.2f%% %d/%d rate=%.0f/s eta=%s checkpoint=%d ins=%d upd=%d same=%d miss=%d err=%d", phase, bar, percent*100, processed, total, rate, eta, checkpoint, s.inserted, s.updated, s.unchanged, s.missingAssessment+s.missingTestee+s.missingOrg, s.failed)
 }
 
 func formatDuration(d time.Duration) string {
@@ -606,7 +648,7 @@ func formatDuration(d time.Duration) string {
 
 func printPhaseResult(c config, result phaseResult) {
 	s := result.summary
-	fmt.Printf("mode=%s phase=%s complete=%t next_after_id=%d scanned=%d inserted=%d updated=%d unchanged=%d missing_testee=%d missing_org=%d conflict=%d failed=%d\n", map[bool]string{true: "apply", false: "dry-run"}[c.apply], result.phase, result.complete, result.checkpoint, s.scanned, s.inserted, s.updated, s.unchanged, s.missingTestee, s.missingOrg, s.conflict, s.failed)
+	fmt.Printf("mode=%s phase=%s complete=%t next_after_id=%d scanned=%d inserted=%d updated=%d unchanged=%d missing_assessment=%d missing_testee=%d missing_org=%d conflict=%d failed=%d\n", map[bool]string{true: "apply", false: "dry-run"}[c.apply], result.phase, result.complete, result.checkpoint, s.scanned, s.inserted, s.updated, s.unchanged, s.missingAssessment, s.missingTestee, s.missingOrg, s.conflict, s.failed)
 }
 
 func ensureIndexes(ctx context.Context, db *mongo.Database) error {

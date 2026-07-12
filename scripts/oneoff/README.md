@@ -814,7 +814,7 @@ python3 scripts/oneoff/enroll_testees_after_date.py \
 
 ## Interpretation 报告目录回填
 
-代码先上线 `report_query_catalog` 索引和新报告事务投影，随后手工执行。建议 archive、artifact 分阶段运行；archive 是 120 万历史数据的主要耗时阶段，支持页级并发和 Mongo `BulkWrite`：
+代码先上线 `report_query_catalog` 索引和新报告事务投影，随后手工执行。建议 archive、artifact 分阶段运行；archive 是 120 万历史数据的主要耗时阶段，支持页级并发和 Mongo `BulkWrite`。历史归属以 `archived_reports.domain_id -> assessment.id` 为准，由 MySQL `assessment.testee_id/org_id` 补齐；不信任 legacy 报告中的冗余 `testee_id`：
 
 ```bash
 # 先用一批 dry-run 验证连接、吞吐与缺失数据；不要把 dry-run 的 checkpoint
@@ -859,7 +859,7 @@ go run ./scripts/oneoff/backfill_interpretation_report_catalog \
 - `--progress-interval`：进度条刷新间隔，默认 2 秒；`--no-progress` 可关闭。
 - `--timeout`：整次命令超时，默认 24 小时；传 `0` 禁用。
 
-进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。必须在 `missing_org`、`missing_testee`、`missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
+进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。最终摘要会把缺失归属区分为 `missing_assessment`、`missing_testee` 和 `missing_org`。必须在这三项以及 `missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
 
 ## 验证
 
