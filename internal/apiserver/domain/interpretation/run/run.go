@@ -34,7 +34,6 @@ const (
 	FailureKindTemplate FailureKind = "template"
 	FailureKindBuild    FailureKind = "build"
 	FailureKindTimeout  FailureKind = "timeout"
-	FailureKindInternal FailureKind = "internal"
 )
 
 // Failure stores only a safe, classifiable cause. Internal error chains stay

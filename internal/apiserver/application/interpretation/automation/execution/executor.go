@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
@@ -34,11 +35,12 @@ type Executor interface {
 }
 
 type executor struct {
-	starter   Starter
-	builders  rendering.Registry
-	committer InterpretationCommitter
-	now       func() time.Time
-	newID     func() meta.ID
+	starter       Starter
+	builders      rendering.Registry
+	committer     InterpretationCommitter
+	now           func() time.Time
+	newID         func() meta.ID
+	logBuildError func(context.Context, error, *domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun, rendering.Builder)
 }
 
 func NewExecutor(
@@ -49,7 +51,10 @@ func NewExecutor(
 	if starter == nil || builders == nil || committer == nil {
 		return nil, fmt.Errorf("interpretation executor dependencies are required")
 	}
-	return &executor{starter: starter, builders: builders, committer: committer, now: time.Now, newID: meta.New}, nil
+	return &executor{
+		starter: starter, builders: builders, committer: committer, now: time.Now, newID: meta.New,
+		logBuildError: logBuilderFailure,
+	}, nil
 }
 
 func (e *executor) Execute(ctx context.Context, input interpinput.InterpretationInput, traceID string) (*ExecuteResult, error) {
@@ -86,6 +91,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 	draft, err := builder.Build(ctx, input)
 	if err != nil {
+		e.logBuildError(ctx, err, generationRecord, runRecord, builder)
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "报告生成失败", Retryable: true})
 	}
 	if draft == nil {
@@ -109,6 +115,20 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		return nil, err
 	}
 	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, InterpretReport: committed.InterpretReport}, nil
+}
+
+func logBuilderFailure(ctx context.Context, err error, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, builder rendering.Builder) {
+	fields := []interface{}{"error", err}
+	if generationRecord != nil {
+		fields = append(fields, "generation_id", generationRecord.ID().String(), "outcome_id", generationRecord.Key().OutcomeID.String(), "template_version", generationRecord.Key().TemplateVersion.String())
+	}
+	if runRecord != nil {
+		fields = append(fields, "run_id", runRecord.ID().String(), "trace_id", runRecord.TraceID())
+	}
+	if builder != nil {
+		fields = append(fields, "builder_identity", builder.BuilderIdentity())
+	}
+	logger.L(ctx).Errorw("interpretation report builder failed", fields...)
 }
 
 func (e *executor) fail(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, input interpinput.InterpretationInput, failure interpretationrun.Failure) error {

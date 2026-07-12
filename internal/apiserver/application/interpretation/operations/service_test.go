@@ -71,9 +71,6 @@ func (runRepo) FindByID(context.Context, meta.ID) (*domainrun.InterpretationRun,
 func (runRepo) FindLatestByGenerationID(context.Context, meta.ID) (*domainrun.InterpretationRun, error) {
 	return nil, nil
 }
-func (runRepo) ListByGenerationID(context.Context, meta.ID) ([]*domainrun.InterpretationRun, error) {
-	return nil, nil
-}
 func (runRepo) Save(context.Context, *domainrun.InterpretationRun) error { return nil }
 
 type reportRepo struct{}

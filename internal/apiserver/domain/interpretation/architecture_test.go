@@ -13,7 +13,7 @@ func TestInterpretationSubpackagesOwnMechanismConcerns(t *testing.T) {
 
 	root := repoRoot(t)
 	interpRoot := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
-	required := []string{"generation", "run", "report", "builder", "rule", "template", "policy"}
+	required := []string{"generation", "run", "report", "builder", "rule", "policy"}
 	for _, pkg := range required {
 		if _, err := os.Stat(filepath.Join(interpRoot, pkg)); err != nil {
 			t.Fatalf("missing interpretation subpackage %q", pkg)
@@ -111,19 +111,15 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
-func TestInterpretationRootPackageOnlyFacadeFiles(t *testing.T) {
+func TestInterpretationRootPackageOnlyContainsTerminalEventFiles(t *testing.T) {
 	t.Parallel()
 
 	interpRoot := filepath.Join(repoRoot(t), "internal", "apiserver", "domain", "interpretation")
 	allowed := map[string]struct{}{
 		"doc.go":            {},
-		"types.go":          {},
-		"export.go":         {},
-		"errors.go":         {},
 		"events.go":         {},
 		"events_outcome.go": {},
 		"event_wire.go":     {},
-		"strategy.go":       {},
 	}
 	entries, err := os.ReadDir(interpRoot)
 	if err != nil {
@@ -138,7 +134,7 @@ func TestInterpretationRootPackageOnlyFacadeFiles(t *testing.T) {
 			continue
 		}
 		if _, ok := allowed[name]; !ok {
-			t.Fatalf("unexpected root file %s; interpretation root must only contain facade files", name)
+			t.Fatalf("unexpected root file %s; interpretation root must only contain terminal event files", name)
 		}
 	}
 }

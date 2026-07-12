@@ -14,9 +14,9 @@ func TestCollectConfiguredSuggestionsUsesOnlyFrozenInputAndDeduplicates(t *testi
 		{FactorCode: "sleep", Suggestion: "rest"},
 	})
 	factorCode := report.FactorCode("sleep")
-	want := []Suggestion{
-		{Category: SuggestionCategoryGeneral, Content: "overall"},
-		{Category: SuggestionCategoryDimension, Content: "rest", FactorCode: &factorCode},
+	want := []report.Suggestion{
+		{Category: report.SuggestionCategoryGeneral, Content: "overall"},
+		{Category: report.SuggestionCategoryDimension, Content: "rest", FactorCode: &factorCode},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("suggestions = %#v, want %#v", got, want)

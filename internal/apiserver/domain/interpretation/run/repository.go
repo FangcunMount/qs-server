@@ -8,6 +8,5 @@ type Repository interface {
 	Create(ctx context.Context, run *InterpretationRun) error
 	FindByID(ctx context.Context, id ID) (*InterpretationRun, error)
 	FindLatestByGenerationID(ctx context.Context, generationID ID) (*InterpretationRun, error)
-	ListByGenerationID(ctx context.Context, generationID ID) ([]*InterpretationRun, error)
 	Save(ctx context.Context, run *InterpretationRun) error
 }

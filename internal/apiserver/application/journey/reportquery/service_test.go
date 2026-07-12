@@ -51,9 +51,6 @@ type journeyReader struct {
 	err error
 }
 
-func (j *journeyReader) GetReportByID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
-	return j.row, nil
-}
 func (j *journeyReader) GetReportByAssessmentID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
 	return j.row, j.err
 }

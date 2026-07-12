@@ -7,10 +7,10 @@ import (
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rule"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
 type FactorScoringBuilder struct {
@@ -167,7 +167,7 @@ func primaryValue(input interpinput.InterpretationInput) float64 {
 	return input.Result.Primary.Value
 }
 func riskLevel(input interpinput.InterpretationInput) report.RiskLevel {
-	if input.Result.Level == nil || !rule.IsRiskLevelCode(input.Result.Level.Code) {
+	if input.Result.Level == nil || !eventoutcome.IsRiskLevelCode(input.Result.Level.Code) {
 		return report.RiskLevelNone
 	}
 	return report.RiskLevel(input.Result.Level.Code)

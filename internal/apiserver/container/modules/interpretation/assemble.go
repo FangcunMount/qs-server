@@ -39,7 +39,6 @@ import (
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
 	reader                evaluationreadmodel.ReportReader
-	builderRegistry       rendering.Registry
 	executionExecutor     interpretationexecution.Executor
 	generationRepo        *mongoEval.GenerationRepository
 	runRepo               *mongoEval.RunRepository
@@ -49,8 +48,6 @@ type Module struct {
 	administrationService interpretationadmin.Service
 	clinicianService      interpretationclinician.Service
 	operationsService     interpretationoperations.Service
-	readyIndexer          *appEventing.PostCommitReadyIndexer
-	readyIndex            *outboxready.Index
 	ReportStatusReporter  *reportstatus.Reporter
 }
 
@@ -111,20 +108,19 @@ func New(deps Deps) (*Module, error) {
 	if deps.OpsHandle != nil {
 		opsClient = deps.OpsHandle.Client
 	}
-	module.readyIndex = outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
-	module.readyIndexer = appEventing.NewPostCommitReadyIndexer(module.readyIndex)
+	readyIndex := outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
+	readyIndexer := appEventing.NewPostCommitReadyIndexer(readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
 	{
 		registry, err := buildReportBuilderRegistry()
 		if err != nil {
 			return nil, err
 		}
-		module.builderRegistry = registry
 		starter, err := interpretationexecution.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, 5*time.Minute)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, module.readyIndexer, catalogProjector)
+		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, readyIndexer, catalogProjector)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}

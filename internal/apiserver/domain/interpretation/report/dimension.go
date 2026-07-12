@@ -1,5 +1,7 @@
 package report
 
+import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+
 // DimensionInterpret 维度解读值对象
 // 记录单个因子/维度的解读信息（含解读与建议）
 type DimensionInterpret struct {
@@ -58,7 +60,7 @@ func NewNeutralDimensionInterpret(
 	severity := ""
 	if level != nil {
 		severity = level.Severity
-		if isRiskLevelCode(level.Code) {
+		if eventoutcome.IsRiskLevelCode(level.Code) {
 			risk = RiskLevel(level.Code)
 		}
 	}
@@ -81,15 +83,6 @@ func severityFromRiskLevel(risk RiskLevel) string {
 		return "none"
 	}
 	return string(risk)
-}
-
-func isRiskLevelCode(code string) bool {
-	switch RiskLevel(code) {
-	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
-		return true
-	default:
-		return false
-	}
 }
 
 // Code 返回中性维度编码。
@@ -162,17 +155,4 @@ func (d DimensionInterpret) WithHierarchy(role, parentCode string, hierarchyLeve
 	d.hierarchyLevel = hierarchyLevel
 	d.sortOrder = sortOrder
 	return d
-}
-
-// IsHighRisk 是否高风险
-func (d DimensionInterpret) IsHighRisk() bool {
-	return IsHighRisk(d.riskLevel)
-}
-
-// IsHighSeverity 报告是否维度 has elevated severity。
-func (d DimensionInterpret) IsHighSeverity() bool {
-	if IsHighSeverity(d.Severity()) {
-		return true
-	}
-	return d.IsHighRisk()
 }

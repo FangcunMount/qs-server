@@ -58,8 +58,8 @@ func NewInterpretReport(input InterpretReportInput) (*InterpretReport, error) {
 	if input.ID.IsZero() || input.GenerationID.IsZero() || input.OutcomeID.IsZero() || input.InterpretationRunID.IsZero() {
 		return nil, fmt.Errorf("report, generation, outcome and interpretation run ids are required")
 	}
-	if input.Association.AssessmentID.IsZero() || input.Association.TesteeID == 0 {
-		return nil, fmt.Errorf("report assessment and testee association are required")
+	if input.Association.OrgID == 0 || input.Association.AssessmentID.IsZero() || input.Association.TesteeID == 0 {
+		return nil, fmt.Errorf("report organization, assessment and testee association are required")
 	}
 	if input.ReportType.IsEmpty() || input.TemplateVersion.IsEmpty() {
 		return nil, fmt.Errorf("report type and template version are required")

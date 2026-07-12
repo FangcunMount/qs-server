@@ -57,9 +57,6 @@ type adminReader struct {
 	filter interpretationreadmodel.ReportFilter
 }
 
-func (r *adminReader) GetReportByID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
-	panic("unexpected")
-}
 func (r *adminReader) GetReportByAssessmentID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
 	r.calls++
 	return &interpretationreadmodel.ReportRow{}, nil

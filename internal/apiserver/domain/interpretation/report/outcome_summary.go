@@ -1,7 +1,5 @@
 package report
 
-import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
-
 const (
 	ScoreKindRawTotal     = "raw_total"
 	ScoreKindMatchPercent = "match_percent"
@@ -52,9 +50,4 @@ func severityFromRisk(risk RiskLevel) string {
 	default:
 		return "none"
 	}
-}
-
-// IsHighSeverity 报告是否 severity 应该 trigger high-risk workflows。
-func IsHighSeverity(severity string) bool {
-	return eventoutcome.IsHighSeverity(severity)
 }

@@ -137,7 +137,6 @@ type ReportModelRarityRow struct {
 }
 
 type ReportReader interface {
-	GetReportByID(ctx context.Context, reportID uint64) (*ReportRow, error)
 	GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportRow, error)
 	ListReports(ctx context.Context, filter ReportFilter, page PageRequest) ([]ReportRow, int64, error)
 }

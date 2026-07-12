@@ -2,11 +2,8 @@ package report
 
 import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
-// ID 报告ID类型（与 AssessmentID 一致，使用 meta.ID）
+// ID is the identifier type used by report composition inputs.
 type ID = meta.ID
-
-// AssessmentID 测评ID类型（用于关联 assessment 聚合）
-type AssessmentID = ID
 
 // RiskLevel 风险等级
 type RiskLevel string
@@ -19,15 +16,6 @@ const (
 	RiskLevelSevere RiskLevel = "severe"
 )
 
-func (r RiskLevel) String() string {
-	return string(r)
-}
-
-// IsHighRisk 是否高风险（包含 high 和 severe）
-func IsHighRisk(r RiskLevel) bool {
-	return r == RiskLevelHigh || r == RiskLevelSevere
-}
-
 // FactorCode 因子编码
 type FactorCode string
 
@@ -36,20 +24,8 @@ func NewFactorCode(code string) FactorCode {
 	return FactorCode(code)
 }
 
-func (c FactorCode) Value() string {
-	return string(c)
-}
-
 func (c FactorCode) String() string {
 	return string(c)
-}
-
-func (c FactorCode) IsEmpty() bool {
-	return c == ""
-}
-
-func (c FactorCode) Equals(other FactorCode) bool {
-	return c == other
 }
 
 // DimensionCode 是中性维度 identifier on reports。
@@ -61,14 +37,6 @@ func NewDimensionCode(code string) DimensionCode {
 
 func (c DimensionCode) String() string {
 	return string(c)
-}
-
-func (c DimensionCode) IsEmpty() bool {
-	return c == ""
-}
-
-func (c DimensionCode) Equals(other DimensionCode) bool {
-	return c == other
 }
 
 // DimensionKind 划分 report 维度，独立于 scale 因子 semantics。

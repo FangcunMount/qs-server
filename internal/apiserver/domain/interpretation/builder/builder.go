@@ -13,9 +13,6 @@ func NewDefaultReportBuilder() *DefaultReportBuilder {
 	return &DefaultReportBuilder{}
 }
 
-// GenerateReportInput 生成报告的输入参数。
-type GenerateReportInput = report.GenerateReportInput
-
 func (b *DefaultReportBuilder) BuildDraft(input report.GenerateReportInput) (*report.Draft, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, report.ErrInvalidArgument

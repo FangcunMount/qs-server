@@ -112,9 +112,19 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 	builder := &executorBuilder{err: errors.New("boom")}
 	service, gens, runs, _, stager, _ := newExecutorFixture(t, builder)
+	var loggedErr error
+	service.logBuildError = func(_ context.Context, err error, generation *domaingeneration.ReportGeneration, run *interpretationrun.InterpretationRun, gotBuilder rendering.Builder) {
+		loggedErr = err
+		if generation == nil || run == nil || gotBuilder != builder {
+			t.Fatal("builder failure log context is incomplete")
+		}
+	}
 	_, executeErr := service.Execute(context.Background(), executorInput(), "trace")
 	if executeErr == nil {
 		t.Fatal("first execution error = nil")
+	}
+	if loggedErr == nil || loggedErr.Error() != "boom" {
+		t.Fatalf("logged builder error = %v", loggedErr)
 	}
 	failedError, ok := FailureFrom(executeErr)
 	if !ok || failedError.Failure.Code != "build_failed" || !failedError.Failure.Retryable || failedError.GenerationID.IsZero() || failedError.RunID.IsZero() {

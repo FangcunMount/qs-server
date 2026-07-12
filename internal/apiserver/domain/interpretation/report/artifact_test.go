@@ -63,3 +63,19 @@ func TestInterpretReportRejectsIncompleteProvenance(t *testing.T) {
 		t.Fatal("artifact accepted incomplete provenance")
 	}
 }
+
+func TestInterpretReportRejectsMissingOrganization(t *testing.T) {
+	_, err := NewInterpretReport(InterpretReportInput{
+		ID:                  meta.FromUint64(1),
+		GenerationID:        meta.FromUint64(2),
+		OutcomeID:           meta.FromUint64(3),
+		InterpretationRunID: meta.FromUint64(4),
+		Association:         Association{AssessmentID: meta.FromUint64(5), TesteeID: 6},
+		ReportType:          policy.ReportTypeStandard,
+		TemplateVersion:     policy.TemplateVersionV1,
+		GeneratedAt:         time.Now(),
+	})
+	if err == nil {
+		t.Fatal("artifact accepted missing organization")
+	}
+}

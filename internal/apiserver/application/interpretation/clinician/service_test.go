@@ -43,9 +43,6 @@ type reader struct {
 	row   interpretationreadmodel.ReportRow
 }
 
-func (r *reader) GetReportByID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
-	panic("unexpected")
-}
 func (r *reader) GetReportByAssessmentID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
 	r.calls++
 	return &r.row, nil

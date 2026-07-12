@@ -189,27 +189,6 @@ func (r *RunRepository) FindLatestByGenerationID(ctx context.Context, generation
 	return r.mapper.RunToDomain(&po)
 }
 
-func (r *RunRepository) ListByGenerationID(ctx context.Context, generationID interpretationrun.ID) ([]*interpretationrun.InterpretationRun, error) {
-	cursor, err := r.Find(ctx, bson.M{"generation_id": generationID.Uint64()}, options.Find().SetSort(bson.D{{Key: "attempt", Value: 1}}))
-	if err != nil {
-		return nil, fmt.Errorf("list interpretation runs: %w", err)
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	runs := make([]*interpretationrun.InterpretationRun, 0)
-	for cursor.Next(ctx) {
-		var po InterpretationRunPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		domain, err := r.mapper.RunToDomain(&po)
-		if err != nil {
-			return nil, err
-		}
-		runs = append(runs, domain)
-	}
-	return runs, cursor.Err()
-}
-
 func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.InterpretationRun) error {
 	po := r.mapper.RunToPO(domain)
 	if po == nil {

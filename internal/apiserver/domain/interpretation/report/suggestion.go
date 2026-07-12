@@ -5,10 +5,6 @@ type SuggestionCategory string
 
 const (
 	SuggestionCategoryGeneral   SuggestionCategory = "general"
-	SuggestionCategoryFamily    SuggestionCategory = "family"
-	SuggestionCategoryStudy     SuggestionCategory = "study"
-	SuggestionCategorySocial    SuggestionCategory = "social"
-	SuggestionCategoryHealth    SuggestionCategory = "health"
 	SuggestionCategoryDimension SuggestionCategory = "dimension"
 )
 

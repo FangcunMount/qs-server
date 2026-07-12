@@ -128,14 +128,6 @@ func (r *memoryRunRepo) FindLatestByGenerationID(_ context.Context, id interpret
 	return items[0], nil
 }
 
-func (r *memoryRunRepo) ListByGenerationID(ctx context.Context, id interpretationrun.ID) ([]*interpretationrun.InterpretationRun, error) {
-	item, err := r.FindLatestByGenerationID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return []*interpretationrun.InterpretationRun{item}, nil
-}
-
 func (r *memoryRunRepo) Save(_ context.Context, item *interpretationrun.InterpretationRun) error {
 	r.saves++
 	if _, ok := r.items[item.ID()]; !ok {
@@ -301,7 +293,7 @@ func testArtifact(t *testing.T, generationRecord *domaingeneration.ReportGenerat
 		GenerationID:        generationRecord.ID(),
 		OutcomeID:           generationRecord.Key().OutcomeID,
 		InterpretationRunID: runRecord.ID(),
-		Association:         domainreport.Association{AssessmentID: meta.FromUint64(7), TesteeID: 8},
+		Association:         domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
 		ReportType:          generationRecord.Key().ReportType,
 		TemplateVersion:     generationRecord.Key().TemplateVersion,
 		GeneratedAt:         at,

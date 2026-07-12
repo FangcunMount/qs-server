@@ -4,25 +4,20 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
-func TestPresenterProjectsOneCanonicalReportByAudience(t *testing.T) {
-	canonical := report.Content{Conclusion: "stable", ModelExtra: &report.ModelExtra{Kind: "personality"}}
+func TestPresenterAppliesAudienceVisibility(t *testing.T) {
 	presenter := Presenter{}
-	participant, err := presenter.Present(canonical, policy.AudienceParticipant)
-	if err != nil || participant.ModelExtra == nil {
+	participant, err := presenter.Allows(policy.AudienceParticipant, SectionModelExtra)
+	if err != nil || !participant {
 		t.Fatalf("participant=%#v err=%v", participant, err)
 	}
-	clinician, err := presenter.Present(canonical, policy.AudienceClinician)
-	if err != nil || clinician.ModelExtra != nil {
+	clinician, err := presenter.Allows(policy.AudienceClinician, SectionModelExtra)
+	if err != nil || clinician {
 		t.Fatalf("clinician=%#v err=%v", clinician, err)
 	}
-	admin, err := presenter.Present(canonical, policy.AudienceAdmin)
-	if err != nil || admin.ModelExtra == nil {
+	admin, err := presenter.Allows(policy.AudienceAdmin, SectionModelExtra)
+	if err != nil || !admin {
 		t.Fatalf("admin=%#v err=%v", admin, err)
-	}
-	if canonical.ModelExtra == nil {
-		t.Fatal("presenter mutated canonical content")
 	}
 }

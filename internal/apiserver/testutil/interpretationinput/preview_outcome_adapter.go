@@ -8,7 +8,6 @@ import (
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	interpretationrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rule"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -17,6 +16,7 @@ import (
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
 const PreviewTemplateVersion = policy.TemplateVersionV1
@@ -138,7 +138,7 @@ func level(execution *domainoutcome.Execution) *report.ResultLevel {
 		return nil
 	}
 	value := execution.Level
-	if interpretationrule.IsRiskLevelCode(value.Code) {
+	if eventoutcome.IsRiskLevelCode(value.Code) {
 		return report.LevelFromRisk(report.RiskLevel(value.Code))
 	}
 	return &report.ResultLevel{Code: value.Code, Label: value.Label, Severity: value.Severity}
@@ -191,7 +191,7 @@ func factorScores(execution *domainoutcome.Execution, model *reportscore.ReportM
 			continue
 		}
 		risk := report.RiskLevelNone
-		if dimension.Level != nil && interpretationrule.IsRiskLevelCode(dimension.Level.Code) {
+		if dimension.Level != nil && eventoutcome.IsRiskLevelCode(dimension.Level.Code) {
 			risk = report.RiskLevel(dimension.Level.Code)
 		}
 		items = append(items, reportscore.FactorReportScore{FactorCode: dimension.Code, FactorName: dimension.Name, RawScore: dimension.Score.Value, RiskLevel: risk, IsTotalScore: totalCodes[dimension.Code] || dimension.Role == "total", Role: dimension.Role, ParentCode: dimension.ParentCode, HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder})

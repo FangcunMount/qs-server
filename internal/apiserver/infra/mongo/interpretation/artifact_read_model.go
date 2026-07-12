@@ -27,18 +27,6 @@ func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) 
 	}
 }
 
-func (r *reportReadModel) GetReportByID(ctx context.Context, reportID uint64) (*readmodel.ReportRow, error) {
-	var po InterpretReportPO
-	if err := r.reports.FindOne(ctx, bson.M{"domain_id": reportID, "deleted_at": nil}, &po); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, readmodel.ErrReportNotFound
-		}
-		return nil, err
-	}
-	row := interpretReportPOToReadRow(&po)
-	return &row, nil
-}
-
 func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*readmodel.ReportRow, error) {
 	var entry ReportCatalogPO
 	if err := r.catalog.FindOne(ctx, bson.M{"assessment_id": assessmentID}, &entry); err != nil {
