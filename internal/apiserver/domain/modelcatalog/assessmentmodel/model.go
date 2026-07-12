@@ -149,6 +149,31 @@ func (m *AssessmentModel) touch(now time.Time) {
 
 // UpdateBasicInfo updates editable metadata on the draft model.
 func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags []string, now time.Time) error {
+	if err := m.updateBasicInfo(title, description, subKind, algorithm, productChannel, category, tags); err != nil {
+		return err
+	}
+	m.touch(now)
+	return nil
+}
+
+// UpdateScaleBasicInfo updates scale metadata and audience metadata as one
+// draft revision. A repository update uses Version for optimistic locking, so
+// a single command must advance that revision only once.
+func (m *AssessmentModel) UpdateScaleBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags, stages, applicableAges, reporters []string, now time.Time) error {
+	if m == nil || m.Kind != binding.KindScale {
+		return fmt.Errorf("%w: scale metadata is only supported by scale models", ErrInvalidArgument)
+	}
+	if err := m.updateBasicInfo(title, description, subKind, algorithm, productChannel, category, tags); err != nil {
+		return err
+	}
+	if err := m.updateAudienceMetadata(stages, applicableAges, reporters); err != nil {
+		return err
+	}
+	m.touch(now)
+	return nil
+}
+
+func (m *AssessmentModel) updateBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags []string) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
@@ -172,20 +197,26 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind bin
 	}
 	m.Category = category
 	m.Tags = append([]string(nil), tags...)
-	m.touch(now)
 	return nil
 }
 
 // UpdateAudienceMetadata updates scale-oriented catalog dimensions that are
 // exposed by legacy scale REST contracts and now live on AssessmentModel.
 func (m *AssessmentModel) UpdateAudienceMetadata(stages, applicableAges, reporters []string, now time.Time) error {
+	if err := m.updateAudienceMetadata(stages, applicableAges, reporters); err != nil {
+		return err
+	}
+	m.touch(now)
+	return nil
+}
+
+func (m *AssessmentModel) updateAudienceMetadata(stages, applicableAges, reporters []string) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
 	m.Stages = append([]string(nil), stages...)
 	m.ApplicableAges = append([]string(nil), applicableAges...)
 	m.Reporters = append([]string(nil), reporters...)
-	m.touch(now)
 	return nil
 }
 

@@ -86,16 +86,15 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 	if err != nil {
 		return nil, err
 	}
-	if err := model.UpdateBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, s.now()); err != nil {
-		return nil, err
-	}
 	if model.Kind == domain.KindScale {
-		if err := model.UpdateAudienceMetadata(input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
+		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
 			return nil, err
 		}
 		if err := appdefinition.RefreshScaleDraftProjection(model); err != nil {
 			return nil, err
 		}
+	} else if err := model.UpdateBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, s.now()); err != nil {
+		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err

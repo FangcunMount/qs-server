@@ -4,10 +4,10 @@ package identity
 type Kind string
 
 const (
-	KindScale            Kind = "scale"
-	KindTypology         Kind = "typology"
-	KindBehavioralRating Kind = "behavioral_rating"
-	KindCognitive        Kind = "cognitive"
+	KindScale            Kind = "scale"             // 量表
+	KindTypology         Kind = "typology"          // 类型学
+	KindBehavioralRating Kind = "behavioral_rating" // 行为评分
+	KindCognitive        Kind = "cognitive"         // 认知测验
 )
 
 func (k Kind) String() string { return string(k) }
