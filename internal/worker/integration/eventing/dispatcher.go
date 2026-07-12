@@ -20,7 +20,6 @@ import (
 type HandlerDependencies struct {
 	Logger               *slog.Logger
 	AnswerSheetClient    *grpcclient.AnswerSheetClient
-	EvaluationClient     *grpcclient.EvaluationClient
 	InternalClient       handlers.InternalClient
 	LockManager          locklease.Manager
 	LockKeyBuilder       *keyspace.Builder
@@ -104,7 +103,6 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 	return &handlers.Dependencies{
 		Logger:               d.deps.Logger,
 		AnswerSheetClient:    d.deps.AnswerSheetClient,
-		EvaluationClient:     d.deps.EvaluationClient,
 		InternalClient:       d.deps.InternalClient,
 		LockManager:          d.deps.LockManager,
 		LockKeyBuilder:       d.deps.LockKeyBuilder,

@@ -59,7 +59,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 			profileLinkService,
 			c.opts.SubmitQueue,
 			submitGuard,
-			grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
+			c.evaluationClient,
 		),
 	}
 }

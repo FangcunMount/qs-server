@@ -5,13 +5,23 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type Service interface {
-	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
+type Actor struct {
+	OrgID          int64
+	OperatorUserID int64
+}
+
+type BatchExecutionService interface {
+	EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error)
+}
+
+// ExecutionEngine is the actor-neutral mechanism used by operator batch
+// execution. It is not the Worker actor application service.
+type ExecutionEngine interface {
+	Evaluate(context.Context, uint64) error
 }
 
 type BatchResult struct {
@@ -23,15 +33,15 @@ type BatchResult struct {
 
 type service struct {
 	assessments assessment.Repository
-	worker      execute.WorkerExecutionService
+	engine      ExecutionEngine
 }
 
-func NewService(assessments assessment.Repository, worker execute.WorkerExecutionService) Service {
-	return &service{assessments: assessments, worker: worker}
+func NewBatchExecutionService(assessments assessment.Repository, engine ExecutionEngine) BatchExecutionService {
+	return &service{assessments: assessments, engine: engine}
 }
 
-func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
-	if orgID == 0 {
+func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error) {
+	if actor.OrgID == 0 {
 		return nil, apperrors.InvalidArgument("机构ID不能为空")
 	}
 	for _, id := range assessmentIDs {
@@ -39,13 +49,13 @@ func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs 
 		if err != nil {
 			return nil, apperrors.AssessmentNotFound(err, "测评不存在")
 		}
-		if a.OrgID() != orgID {
+		if a.OrgID() != actor.OrgID {
 			return nil, apperrors.PermissionDenied("测评不属于当前机构")
 		}
 	}
 	result := &BatchResult{TotalCount: len(assessmentIDs), FailedIDs: make([]uint64, 0)}
 	for _, id := range assessmentIDs {
-		if err := s.worker.Evaluate(ctx, id); err != nil {
+		if err := s.engine.Evaluate(ctx, id); err != nil {
 			result.FailedCount++
 			result.FailedIDs = append(result.FailedIDs, id)
 			continue

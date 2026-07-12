@@ -10,12 +10,12 @@ import (
 )
 
 func TestReportRPCDelegatesDirectlyToInterpretationAutomationUseCase(t *testing.T) {
-	data, err := os.ReadFile("internal_assessment_flow.go")
+	data, err := os.ReadFile("interpretation_automation.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	source := string(data)
-	if !strings.Contains(source, "automationService.Generate(") {
+	if !strings.Contains(source, "s.service.Generate(") {
 		t.Fatal("report RPC must call the Interpretation automation use case")
 	}
 	for _, forbidden := range []string{"executeService.GenerateReport(", "executeService.GenerateReportFromOutcome("} {

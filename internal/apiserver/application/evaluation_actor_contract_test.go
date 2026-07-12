@@ -27,48 +27,48 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 	}{
 		{
 			actor:           "answer-sheet orchestrator",
-			applicationFile: "internal/apiserver/application/evaluation/assessment/interface.go",
-			applicationPort: "type AnswerSheetAssessmentIntakeService interface",
-			entryFile:       "internal/apiserver/transport/grpc/service/internal.go",
-			entrySymbol:     "CreateAssessmentFromAnswerSheet(",
-			authorityFile:   "api/grpc/proto/internalapi/internal.proto",
-			authoritySymbol: "service InternalService",
+			applicationFile: "internal/apiserver/application/journey/assessmentintake/service.go",
+			applicationPort: "type Service interface",
+			entryFile:       "internal/apiserver/transport/grpc/service/assessment_intake.go",
+			entrySymbol:     "EnsureAssessment(",
+			authorityFile:   "api/grpc/proto/evaluation/evaluation.proto",
+			authoritySymbol: "service AssessmentIntakeService",
 		},
 		{
 			actor:           "testee",
-			applicationFile: "internal/apiserver/application/evaluation/assessment/interface.go",
-			applicationPort: "type TesteeAssessmentQueryService interface",
+			applicationFile: "internal/apiserver/application/evaluation/testee/service.go",
+			applicationPort: "type Service interface",
 			entryFile:       "internal/apiserver/transport/grpc/service/evaluation.go",
 			entrySymbol:     "GetMyAssessment(",
-			authorityFile:   "internal/apiserver/application/evaluation/assessment/submission_getter.go",
-			authoritySymbol: "a.TesteeID().Uint64() != testeeID",
+			authorityFile:   "internal/apiserver/application/evaluation/testee/service.go",
+			authoritySymbol: "authorizeAssessment(",
 		},
 		{
 			actor:           "backend operator",
-			applicationFile: "internal/apiserver/application/evaluation/assessment/interface.go",
-			applicationPort: "type AssessmentProtectedQueryService interface",
+			applicationFile: "internal/apiserver/application/evaluation/operator/service.go",
+			applicationPort: "type QueryService interface",
 			entryFile:       "internal/apiserver/transport/rest/handler/evaluation.go",
 			entrySymbol:     "RequireProtectedScope(",
-			authorityFile:   "internal/apiserver/application/evaluation/assessment/protected_query_service.go",
-			authoritySymbol: "ProtectedQueryScope",
+			authorityFile:   "internal/apiserver/application/evaluation/operator/batch.go",
+			authoritySymbol: "type Actor struct",
 		},
 		{
 			actor:           "scoring worker",
-			applicationFile: "internal/apiserver/application/evaluation/execute/interface.go",
-			applicationPort: "type WorkerExecutionService interface",
-			entryFile:       "internal/apiserver/transport/grpc/service/internal.go",
-			entrySymbol:     "EvaluateAssessment(",
-			authorityFile:   "api/grpc/proto/internalapi/internal.proto",
-			authoritySymbol: "service InternalService",
+			applicationFile: "internal/apiserver/application/evaluation/worker/service.go",
+			applicationPort: "type Service interface",
+			entryFile:       "internal/apiserver/transport/grpc/service/evaluation_worker.go",
+			entrySymbol:     "ExecuteEvaluation(",
+			authorityFile:   "api/grpc/proto/evaluation/evaluation.proto",
+			authoritySymbol: "service EvaluationWorkerService",
 		},
 		{
 			actor:           "scheduler",
-			applicationFile: "internal/apiserver/application/evaluation/consistency/reconcile_service.go",
+			applicationFile: "internal/apiserver/application/evaluation/scheduler/audit.go",
 			applicationPort: "type Service interface",
 			entryFile:       "internal/apiserver/runtime/scheduler/evaluation_consistency_reconcile.go",
-			entrySymbol:     "ReconcileOnce(",
-			authorityFile:   "internal/apiserver/application/evaluation/consistency/reconcile_service.go",
-			authoritySymbol: "background schedulers",
+			entrySymbol:     "AuditOnce(",
+			authorityFile:   "internal/apiserver/application/evaluation/scheduler/audit.go",
+			authoritySymbol: "read-only Evaluation maintenance",
 		},
 	}
 
@@ -79,6 +79,36 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 			assertSourceContains(t, root, contract.entryFile, contract.entrySymbol)
 			assertSourceContains(t, root, contract.authorityFile, contract.authoritySymbol)
 		})
+	}
+}
+
+func TestEvaluationTargetActorPackagesExist(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	for _, name := range []string{"intake", "testee", "operator", "worker", "scheduler"} {
+		path := filepath.Join(root, "internal/apiserver/application/evaluation", name)
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() {
+			t.Fatalf("target actor package %s is missing", name)
+		}
+	}
+}
+
+func TestEvaluationTransportCannotImportInternalMechanisms(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	got := collectCrossModuleImporters(t, root,
+		[]string{"internal/apiserver/transport"},
+		[]string{
+			"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute",
+			"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome",
+			"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime",
+			"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry",
+			"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter",
+		},
+	)
+	if len(got) != 0 {
+		t.Fatalf("transport imports Evaluation mechanisms: %v", got)
 	}
 }
 
@@ -95,7 +125,7 @@ func TestEvaluationTransportBusinessDebtDoesNotSpread(t *testing.T) {
 			[]string{"internal/apiserver/transport/grpc/service"},
 			[]string{"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"},
 		)
-		want := []string{"internal/apiserver/transport/grpc/service/evaluation.go"}
+		want := []string{}
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
 			t.Fatalf("direct Evaluation read-model debt changed\n got:\n%s\nwant:\n%s\nmove or shrink the allowlist; do not add transport readers", strings.Join(got, "\n"), strings.Join(want, "\n"))
 		}
@@ -113,10 +143,7 @@ func TestEvaluationTransportBusinessDebtDoesNotSpread(t *testing.T) {
 				"SubmitForEvaluation(",
 			},
 		)
-		want := []string{
-			"internal/apiserver/transport/grpc/service/internal.go",
-			"internal/apiserver/transport/grpc/service/internal_assessment_flow.go",
-		}
+		want := []string{}
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
 			t.Fatalf("answer-sheet orchestration debt changed\n got:\n%s\nwant:\n%s\nmove or shrink the allowlist; do not spread application behavior across transport", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -124,9 +151,7 @@ func TestEvaluationTransportBusinessDebtDoesNotSpread(t *testing.T) {
 	})
 }
 
-// EvaluationService still exposes two report-viewer compatibility RPCs. They
-// may only shrink until Interpretation/Journey owns the replacement service.
-func TestEvaluationGRPCReportCompatibilityDebtDoesNotSpread(t *testing.T) {
+func TestEvaluationGRPCReportRPCsBelongToParticipantService(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -135,6 +160,12 @@ func TestEvaluationGRPCReportCompatibilityDebtDoesNotSpread(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(data)
+	if strings.Contains(source, "service EvaluationService") {
+		t.Fatal("actor-neutral EvaluationService was reintroduced")
+	}
+	if !strings.Contains(source, "service ParticipantReportService") {
+		t.Fatal("participant report service is missing")
+	}
 	for _, rpc := range []string{"rpc GetAssessmentReport(", "rpc ListMyReports("} {
 		if count := strings.Count(source, rpc); count != 1 {
 			t.Fatalf("Evaluation report compatibility RPC %q count = %d, want 1; remove the ratchet entry when the RPC migrates", rpc, count)

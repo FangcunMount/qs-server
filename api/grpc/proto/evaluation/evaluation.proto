@@ -4,14 +4,10 @@ package evaluation;
 
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation";
 
-// 测评服务 - C端用户接口
-// 提供测评结果查询、报告查看等功能
-service EvaluationService {
+// 受试者测评查询。
+service TesteeEvaluationService {
   // 获取我的测评详情（含 model/primary_score/level outcome 投影）
   rpc GetMyAssessment(GetMyAssessmentRequest) returns (GetMyAssessmentResponse);
-
-  // 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
-  rpc ResolveAssessmentByAnswerSheetID(ResolveAssessmentByAnswerSheetIDRequest) returns (ResolveAssessmentByAnswerSheetIDResponse);
 
   // 获取我的测评列表（含 outcome 投影）
   rpc ListMyAssessments(ListMyAssessmentsRequest) returns (ListMyAssessmentsResponse);
@@ -20,7 +16,21 @@ service EvaluationService {
   rpc GetFactorTrend(GetFactorTrendRequest) returns (GetFactorTrendResponse);
   rpc GetHighRiskFactors(GetHighRiskFactorsRequest) returns (GetHighRiskFactorsResponse);
 
-  // testee_id 可选：有值时校验归属并返回 outcome 投影；worker 内部调用可省略
+}
+
+// 答卷编排系统调用的 Evaluation intake Journey。
+service AssessmentIntakeService {
+  rpc EnsureAssessment(EnsureAssessmentRequest) returns (EnsureAssessmentResponse);
+  rpc ResolveAssessmentByAnswerSheetID(ResolveAssessmentByAnswerSheetIDRequest) returns (ResolveAssessmentByAnswerSheetIDResponse);
+}
+
+// 单次评分 Worker 入口。
+service EvaluationWorkerService {
+  rpc ExecuteEvaluation(ExecuteEvaluationRequest) returns (ExecuteEvaluationResponse);
+}
+
+// 受试者报告查询。消息将在 Interpretation 契约独立后整体迁移。
+service ParticipantReportService {
   rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
 }
@@ -63,7 +73,8 @@ message AssessmentSummary {
   string status = 8;
   string created_at = 11;
   string submitted_at = 12;
-  string interpreted_at = 13;
+  reserved 13;
+  reserved "interpreted_at";
   uint64 answer_sheet_id = 14;
   ModelIdentity model = 15;
   ScoreValue primary_score = 16;
@@ -84,7 +95,8 @@ message AssessmentDetail {
   string status = 12;
   string created_at = 15;
   string submitted_at = 16;
-  string interpreted_at = 17;
+  reserved 17;
+  reserved "interpreted_at";
   string failed_at = 18;
   string failure_reason = 19;
   ModelIdentity model = 20;
@@ -174,6 +186,40 @@ message ResolveAssessmentByAnswerSheetIDRequest {
 message ResolveAssessmentByAnswerSheetIDResponse {
   uint64 testee_id = 1;
   uint64 assessment_id = 2;
+}
+
+message EnsureAssessmentRequest {
+  uint64 org_id = 1;
+  uint64 answer_sheet_id = 2;
+  string questionnaire_code = 3;
+  string questionnaire_version = 4;
+  uint64 testee_id = 5;
+  uint64 filler_id = 6;
+  string task_id = 7;
+  string origin_type = 8;
+  string origin_id = 9;
+}
+
+message EnsureAssessmentResponse {
+  uint64 assessment_id = 1;
+  bool created = 2;
+  bool auto_submitted = 3;
+}
+
+message ExecuteEvaluationRequest { uint64 assessment_id = 1; }
+
+message ExecuteEvaluationResponse {
+  string status = 1;
+  ModelIdentity model = 2;
+  ScoreValue primary_score = 3;
+  ResultLevel level = 4;
+  string outcome_id = 5;
+  bool retryable = 6;
+  string run_id = 7;
+  string failure_kind = 8;
+  string failure_message = 9;
+  string trace_id = 10;
+  string input_snapshot_ref = 11;
 }
 
 message ListMyAssessmentsRequest {

@@ -14,6 +14,9 @@ import (
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	evaluationscheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
+	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
+	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
@@ -54,8 +57,11 @@ type Module struct {
 
 	IntakeService           assessmentApp.AnswerSheetAssessmentIntakeService
 	TesteeQueryService      assessmentApp.TesteeAssessmentQueryService
+	TesteeService           evaluationtestee.Service
 	OperatorQueryService    assessmentApp.AssessmentOperatorQueryService
 	OperatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService
+	OperatorQuery           evaluationoperator.QueryService
+	OperatorRecovery        evaluationoperator.RecoveryService
 	WorkerResultReader      assessmentApp.AssessmentResultReader
 	ScoreQueryService       assessmentApp.ScoreQueryService
 	AccessQueryService      assessmentApp.AssessmentAccessQueryService
@@ -65,8 +71,10 @@ type Module struct {
 	AssessmentReader        evaluationreadmodel.AssessmentReader
 
 	WorkerExecutionService      execute.WorkerExecutionService
-	OperatorExecutionService    evaluationoperator.Service
+	WorkerService               evaluationworker.Service
+	OperatorExecutionService    evaluationoperator.BatchExecutionService
 	ConsistencyReconcileService consistencyApp.Service
+	SchedulerService            evaluationscheduler.Service
 
 	OutboxReadyIndex              *outboxready.Index
 	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
@@ -223,7 +231,8 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithEvaluationCommitter(evaluationCommitter),
 		)
 		m.WorkerExecutionService = engine
-		m.OperatorExecutionService = evaluationoperator.NewService(infra.assessmentRepo, engine)
+		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
+		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine)
 	}
 	return nil
 }
@@ -275,6 +284,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		infra.assessmentReader,
 		normalized.ScaleCatalog,
 	)
+	m.TesteeService = evaluationtestee.NewService(m.TesteeQueryService, infra.assessmentReader, m.ScoreQueryService)
 
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
 		m.OperatorQueryService,
@@ -288,6 +298,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		infra.assessmentReader,
 		m.RunQueryService,
 	)
+	m.OperatorQuery = evaluationoperator.NewQueryService(m.ProtectedQueryService)
+	m.OperatorRecovery = evaluationoperator.NewRecoveryService(m.OperatorRecoveryService)
 	m.LatestRiskReader = infra.latestRiskReader
 	m.AssessmentReader = infra.assessmentReader
 }
@@ -300,6 +312,7 @@ func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfr
 		},
 	)
 	m.ConsistencyReconcileService = consistencyApp.NewReconcileService(reconciler, infra.assessmentReader)
+	m.SchedulerService = evaluationscheduler.NewService(m.ConsistencyReconcileService)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

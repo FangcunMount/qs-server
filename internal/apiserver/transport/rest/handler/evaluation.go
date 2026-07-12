@@ -21,18 +21,18 @@ import (
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	operatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
-	operatorExecutionService evaluationoperator.Service
-	protectedQueryService    assessmentApp.AssessmentProtectedQueryService
+	operatorRecoveryService  evaluationoperator.RecoveryService
+	operatorExecutionService evaluationoperator.BatchExecutionService
+	protectedQueryService    evaluationoperator.QueryService
 	reportQueryJourney       reportqueryjourney.Service
 	reportWaitJourney        reportwaitjourney.Service
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
-	operatorRecoveryService assessmentApp.AssessmentOperatorRecoveryService,
-	operatorExecutionService evaluationoperator.Service,
-	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
+	operatorRecoveryService evaluationoperator.RecoveryService,
+	operatorExecutionService evaluationoperator.BatchExecutionService,
+	protectedQueryService evaluationoperator.QueryService,
 	reportQueryJourney reportqueryjourney.Service,
 	reportWaitJourney reportwaitjourney.Service,
 ) *EvaluationHandler {
@@ -372,7 +372,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 		h.BadRequestResponse(c, "请求参数无效", err)
 		return
 	}
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -383,7 +383,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "评估引擎服务未初始化"))
 		return
 	}
-	result, err := h.operatorExecutionService.EvaluateBatch(ctx, orgID, req.AssessmentIDs)
+	result, err := h.operatorExecutionService.EvaluateBatch(ctx, evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, req.AssessmentIDs)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -408,14 +408,14 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 		h.BadRequestResponse(c, "无效的测评ID", err)
 		return
 	}
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
 	ctx := c.Request.Context()
-	result, err := h.operatorRecoveryService.Retry(ctx, orgID, id)
+	result, err := h.operatorRecoveryService.Retry(ctx, evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -467,26 +467,26 @@ func (h *EvaluationHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
 	return strconv.ParseUint(c.Param("id"), 10, 64)
 }
 
-func (h *EvaluationHandler) parseProtectedAssessmentQuery(c *gin.Context) (uint64, assessmentApp.ProtectedQueryScope, error) {
+func (h *EvaluationHandler) parseProtectedAssessmentQuery(c *gin.Context) (uint64, evaluationoperator.Actor, error) {
 	id, err := h.parseAssessmentID(c)
 	if err != nil {
-		return 0, assessmentApp.ProtectedQueryScope{}, err
+		return 0, evaluationoperator.Actor{}, err
 	}
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
-		return 0, assessmentApp.ProtectedQueryScope{}, err
+		return 0, evaluationoperator.Actor{}, err
 	}
 	return id, protectedScope(orgID, operatorUserID), nil
 }
 
-func protectedScope(orgID, operatorUserID int64) assessmentApp.ProtectedQueryScope {
-	return assessmentApp.ProtectedQueryScope{
+func protectedScope(orgID, operatorUserID int64) evaluationoperator.Actor {
+	return evaluationoperator.Actor{
 		OrgID:          orgID,
 		OperatorUserID: operatorUserID,
 	}
 }
 
-func reportQueryScope(scope assessmentApp.ProtectedQueryScope) reportqueryjourney.Scope {
+func reportQueryScope(scope evaluationoperator.Actor) reportqueryjourney.Scope {
 	return reportqueryjourney.Scope{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}
 }
 

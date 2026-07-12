@@ -13,7 +13,6 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -105,9 +104,9 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	OperatorRecoveryService  assessmentApp.AssessmentOperatorRecoveryService
-	OperatorExecutionService evaluationoperator.Service
-	ProtectedQueryService    assessmentApp.AssessmentProtectedQueryService
+	OperatorRecoveryService  evaluationoperator.RecoveryService
+	OperatorExecutionService evaluationoperator.BatchExecutionService
+	ProtectedQueryService    evaluationoperator.QueryService
 	RunQueryService          runqueryApp.Service
 }
 

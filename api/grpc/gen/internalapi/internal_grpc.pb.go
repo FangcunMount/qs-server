@@ -19,10 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InternalService_CalculateAnswerSheetScore_FullMethodName               = "/internalapi.InternalService/CalculateAnswerSheetScore"
-	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName         = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
-	InternalService_EvaluateAssessment_FullMethodName                      = "/internalapi.InternalService/EvaluateAssessment"
-	InternalService_GenerateReportFromAssessment_FullMethodName            = "/internalapi.InternalService/GenerateReportFromAssessment"
 	InternalService_SyncAssessmentAttention_FullMethodName                 = "/internalapi.InternalService/SyncAssessmentAttention"
 	InternalService_GenerateQuestionnaireQRCode_FullMethodName             = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
 	InternalService_HandleQuestionnairePublishedPostActions_FullMethodName = "/internalapi.InternalService/HandleQuestionnairePublishedPostActions"
@@ -40,22 +36,6 @@ const (
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 type InternalServiceClient interface {
-	// 计算答卷分数
-	// 场景：worker 处理 answersheet.submitted 事件后调用
-	// 流程：根据问卷评分规则计算每个答案的分数并保存
-	CalculateAnswerSheetScore(ctx context.Context, in *CalculateAnswerSheetScoreRequest, opts ...grpc.CallOption) (*CalculateAnswerSheetScoreResponse, error)
-	// 从答卷创建测评
-	// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
-	// 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
-	CreateAssessmentFromAnswerSheet(ctx context.Context, in *CreateAssessmentFromAnswerSheetRequest, opts ...grpc.CallOption) (*CreateAssessmentFromAnswerSheetResponse, error)
-	// 执行测评评估
-	// 场景：worker 处理 assessment.submitted 事件后调用
-	// 流程：加载测评和量表，执行计分和解读，保存结果
-	EvaluateAssessment(ctx context.Context, in *EvaluateAssessmentRequest, opts ...grpc.CallOption) (*EvaluateAssessmentResponse, error)
-	// 生成测评报告
-	// 场景：worker 处理 assessment.evaluated 事件后调用
-	// 流程：基于已计分结果生成 InterpretReport
-	GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
@@ -90,46 +70,6 @@ type internalServiceClient struct {
 
 func NewInternalServiceClient(cc grpc.ClientConnInterface) InternalServiceClient {
 	return &internalServiceClient{cc}
-}
-
-func (c *internalServiceClient) CalculateAnswerSheetScore(ctx context.Context, in *CalculateAnswerSheetScoreRequest, opts ...grpc.CallOption) (*CalculateAnswerSheetScoreResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CalculateAnswerSheetScoreResponse)
-	err := c.cc.Invoke(ctx, InternalService_CalculateAnswerSheetScore_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *internalServiceClient) CreateAssessmentFromAnswerSheet(ctx context.Context, in *CreateAssessmentFromAnswerSheetRequest, opts ...grpc.CallOption) (*CreateAssessmentFromAnswerSheetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateAssessmentFromAnswerSheetResponse)
-	err := c.cc.Invoke(ctx, InternalService_CreateAssessmentFromAnswerSheet_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *internalServiceClient) EvaluateAssessment(ctx context.Context, in *EvaluateAssessmentRequest, opts ...grpc.CallOption) (*EvaluateAssessmentResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EvaluateAssessmentResponse)
-	err := c.cc.Invoke(ctx, InternalService_EvaluateAssessment_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *internalServiceClient) GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GenerateReportFromAssessmentResponse)
-	err := c.cc.Invoke(ctx, InternalService_GenerateReportFromAssessment_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *internalServiceClient) SyncAssessmentAttention(ctx context.Context, in *SyncAssessmentAttentionRequest, opts ...grpc.CallOption) (*SyncAssessmentAttentionResponse, error) {
@@ -219,22 +159,6 @@ func (c *internalServiceClient) BootstrapOperator(ctx context.Context, in *Boots
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 type InternalServiceServer interface {
-	// 计算答卷分数
-	// 场景：worker 处理 answersheet.submitted 事件后调用
-	// 流程：根据问卷评分规则计算每个答案的分数并保存
-	CalculateAnswerSheetScore(context.Context, *CalculateAnswerSheetScoreRequest) (*CalculateAnswerSheetScoreResponse, error)
-	// 从答卷创建测评
-	// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
-	// 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
-	CreateAssessmentFromAnswerSheet(context.Context, *CreateAssessmentFromAnswerSheetRequest) (*CreateAssessmentFromAnswerSheetResponse, error)
-	// 执行测评评估
-	// 场景：worker 处理 assessment.submitted 事件后调用
-	// 流程：加载测评和量表，执行计分和解读，保存结果
-	EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error)
-	// 生成测评报告
-	// 场景：worker 处理 assessment.evaluated 事件后调用
-	// 流程：基于已计分结果生成 InterpretReport
-	GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
@@ -271,18 +195,6 @@ type InternalServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInternalServiceServer struct{}
 
-func (UnimplementedInternalServiceServer) CalculateAnswerSheetScore(context.Context, *CalculateAnswerSheetScoreRequest) (*CalculateAnswerSheetScoreResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CalculateAnswerSheetScore not implemented")
-}
-func (UnimplementedInternalServiceServer) CreateAssessmentFromAnswerSheet(context.Context, *CreateAssessmentFromAnswerSheetRequest) (*CreateAssessmentFromAnswerSheetResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateAssessmentFromAnswerSheet not implemented")
-}
-func (UnimplementedInternalServiceServer) EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method EvaluateAssessment not implemented")
-}
-func (UnimplementedInternalServiceServer) GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GenerateReportFromAssessment not implemented")
-}
 func (UnimplementedInternalServiceServer) SyncAssessmentAttention(context.Context, *SyncAssessmentAttentionRequest) (*SyncAssessmentAttentionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncAssessmentAttention not implemented")
 }
@@ -326,78 +238,6 @@ func RegisterInternalServiceServer(s grpc.ServiceRegistrar, srv InternalServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&InternalService_ServiceDesc, srv)
-}
-
-func _InternalService_CalculateAnswerSheetScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CalculateAnswerSheetScoreRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(InternalServiceServer).CalculateAnswerSheetScore(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: InternalService_CalculateAnswerSheetScore_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InternalServiceServer).CalculateAnswerSheetScore(ctx, req.(*CalculateAnswerSheetScoreRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _InternalService_CreateAssessmentFromAnswerSheet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateAssessmentFromAnswerSheetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(InternalServiceServer).CreateAssessmentFromAnswerSheet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: InternalService_CreateAssessmentFromAnswerSheet_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InternalServiceServer).CreateAssessmentFromAnswerSheet(ctx, req.(*CreateAssessmentFromAnswerSheetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _InternalService_EvaluateAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EvaluateAssessmentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(InternalServiceServer).EvaluateAssessment(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: InternalService_EvaluateAssessment_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InternalServiceServer).EvaluateAssessment(ctx, req.(*EvaluateAssessmentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _InternalService_GenerateReportFromAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GenerateReportFromAssessmentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(InternalServiceServer).GenerateReportFromAssessment(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: InternalService_GenerateReportFromAssessment_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InternalServiceServer).GenerateReportFromAssessment(ctx, req.(*GenerateReportFromAssessmentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _InternalService_SyncAssessmentAttention_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -552,22 +392,6 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*InternalServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CalculateAnswerSheetScore",
-			Handler:    _InternalService_CalculateAnswerSheetScore_Handler,
-		},
-		{
-			MethodName: "CreateAssessmentFromAnswerSheet",
-			Handler:    _InternalService_CreateAssessmentFromAnswerSheet_Handler,
-		},
-		{
-			MethodName: "EvaluateAssessment",
-			Handler:    _InternalService_EvaluateAssessment_Handler,
-		},
-		{
-			MethodName: "GenerateReportFromAssessment",
-			Handler:    _InternalService_GenerateReportFromAssessment_Handler,
-		},
-		{
 			MethodName: "SyncAssessmentAttention",
 			Handler:    _InternalService_SyncAssessmentAttention_Handler,
 		},
@@ -598,6 +422,113 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BootstrapOperator",
 			Handler:    _InternalService_BootstrapOperator_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "internalapi/internal.proto",
+}
+
+const (
+	InterpretationAutomationService_GenerateReportFromAssessment_FullMethodName = "/internalapi.InterpretationAutomationService/GenerateReportFromAssessment"
+)
+
+// InterpretationAutomationServiceClient is the client API for InterpretationAutomationService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Interpretation 自动化 actor 的独立入口。
+type InterpretationAutomationServiceClient interface {
+	GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error)
+}
+
+type interpretationAutomationServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewInterpretationAutomationServiceClient(cc grpc.ClientConnInterface) InterpretationAutomationServiceClient {
+	return &interpretationAutomationServiceClient{cc}
+}
+
+func (c *interpretationAutomationServiceClient) GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateReportFromAssessmentResponse)
+	err := c.cc.Invoke(ctx, InterpretationAutomationService_GenerateReportFromAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// InterpretationAutomationServiceServer is the server API for InterpretationAutomationService service.
+// All implementations must embed UnimplementedInterpretationAutomationServiceServer
+// for forward compatibility.
+//
+// Interpretation 自动化 actor 的独立入口。
+type InterpretationAutomationServiceServer interface {
+	GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error)
+	mustEmbedUnimplementedInterpretationAutomationServiceServer()
+}
+
+// UnimplementedInterpretationAutomationServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedInterpretationAutomationServiceServer struct{}
+
+func (UnimplementedInterpretationAutomationServiceServer) GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateReportFromAssessment not implemented")
+}
+func (UnimplementedInterpretationAutomationServiceServer) mustEmbedUnimplementedInterpretationAutomationServiceServer() {
+}
+func (UnimplementedInterpretationAutomationServiceServer) testEmbeddedByValue() {}
+
+// UnsafeInterpretationAutomationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to InterpretationAutomationServiceServer will
+// result in compilation errors.
+type UnsafeInterpretationAutomationServiceServer interface {
+	mustEmbedUnimplementedInterpretationAutomationServiceServer()
+}
+
+func RegisterInterpretationAutomationServiceServer(s grpc.ServiceRegistrar, srv InterpretationAutomationServiceServer) {
+	// If the following call panics, it indicates UnimplementedInterpretationAutomationServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&InterpretationAutomationService_ServiceDesc, srv)
+}
+
+func _InterpretationAutomationService_GenerateReportFromAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateReportFromAssessmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InterpretationAutomationServiceServer).GenerateReportFromAssessment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InterpretationAutomationService_GenerateReportFromAssessment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InterpretationAutomationServiceServer).GenerateReportFromAssessment(ctx, req.(*GenerateReportFromAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// InterpretationAutomationService_ServiceDesc is the grpc.ServiceDesc for InterpretationAutomationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var InterpretationAutomationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "internalapi.InterpretationAutomationService",
+	HandlerType: (*InterpretationAutomationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GenerateReportFromAssessment",
+			Handler:    _InterpretationAutomationService_GenerateReportFromAssessment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

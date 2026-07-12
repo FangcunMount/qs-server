@@ -296,54 +296,6 @@ func TestBootstrapOperatorRejectsNilRequest(t *testing.T) {
 	}
 }
 
-func TestCreateAssessmentFromAnswerSheetRejectsNilRequest(t *testing.T) {
-	svc := &InternalService{}
-
-	_, err := svc.CreateAssessmentFromAnswerSheet(context.Background(), nil)
-	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("CreateAssessmentFromAnswerSheet(nil) = %s, want %s", status.Code(err), codes.InvalidArgument)
-	}
-}
-
-func TestCreateAssessmentFromAnswerSheetCharacterizesOrchestrationOrder(t *testing.T) {
-	t.Parallel()
-
-	calls := make([]string, 0, 4)
-	scoring := &answerSheetScoringOrderStub{calls: &calls}
-	intake := &assessmentIntakeOrderStub{calls: &calls, assessmentID: 9001}
-	svc := &InternalService{
-		answerSheetScoringService: scoring,
-		intakeService:             intake,
-		assessmentBindingResolver: stubScaleBindingResolver{
-			binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{
-				Kind: domainruleset.KindScale, Code: "SCL-001", Version: "1.0.0", Title: "Scale",
-			}},
-		},
-	}
-
-	resp, err := svc.CreateAssessmentFromAnswerSheet(context.Background(), &pb.CreateAssessmentFromAnswerSheetRequest{
-		OrgId:                9,
-		TesteeId:             101,
-		FillerId:             101,
-		QuestionnaireCode:    "QNR-SCALE",
-		QuestionnaireVersion: "1.0.0",
-		AnswersheetId:        202,
-	})
-	if err != nil {
-		t.Fatalf("CreateAssessmentFromAnswerSheet: %v", err)
-	}
-	if resp == nil || !resp.Success || !resp.Created || !resp.AutoSubmitted || resp.AssessmentId != 9001 {
-		t.Fatalf("response = %#v", resp)
-	}
-	want := []string{"score", "find", "create", "submit"}
-	if fmt.Sprint(calls) != fmt.Sprint(want) {
-		t.Fatalf("orchestration calls = %v, want %v", calls, want)
-	}
-	if intake.createdDTO.AnswerSheetID != 202 || intake.createdDTO.ModelCode == nil || *intake.createdDTO.ModelCode != "SCL-001" {
-		t.Fatalf("created DTO = %#v", intake.createdDTO)
-	}
-}
-
 type answerSheetScoringOrderStub struct {
 	calls *[]string
 }
@@ -373,21 +325,6 @@ func (s *assessmentIntakeOrderStub) SubmitForEvaluation(context.Context, uint64)
 func (s *assessmentIntakeOrderStub) FindByAnswerSheetID(context.Context, uint64) (*assessmentApp.AssessmentResult, error) {
 	*s.calls = append(*s.calls, "find")
 	return nil, fmt.Errorf("assessment not found")
-}
-
-func TestCalculateAnswerSheetScoreRejectsNilRequest(t *testing.T) {
-	svc := &InternalService{}
-
-	resp, err := svc.CalculateAnswerSheetScore(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("CalculateAnswerSheetScore(nil) error = %v", err)
-	}
-	if resp.Success {
-		t.Fatalf("CalculateAnswerSheetScore(nil) success = true, want false")
-	}
-	if resp.Message != "answersheet_id 不能为空" {
-		t.Fatalf("message = %q, want answersheet_id 不能为空", resp.Message)
-	}
 }
 
 func TestBootstrapOperatorMessage(t *testing.T) {

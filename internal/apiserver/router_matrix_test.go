@@ -37,7 +37,7 @@ type routerClinicianQueryStub struct{}
 
 type routerOperatorExecutionStub struct{}
 
-func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, int64, []uint64) (*evaluationoperator.BatchResult, error) {
+func (*routerOperatorExecutionStub) EvaluateBatch(context.Context, evaluationoperator.Actor, []uint64) (*evaluationoperator.BatchResult, error) {
 	return &evaluationoperator.BatchResult{}, nil
 }
 
@@ -343,6 +343,8 @@ func newRouterTestContainer() *container.Container {
 		nil,
 		nil,
 	)
+	evaluationModule.OperatorRecovery = evaluationoperator.NewRecoveryService(operatorRecovery)
+	evaluationModule.OperatorQuery = evaluationoperator.NewQueryService(evaluationModule.ProtectedQueryService)
 	return &container.Container{
 		SurveyModule: surveyModule,
 		ActorModule: &actormod.Module{

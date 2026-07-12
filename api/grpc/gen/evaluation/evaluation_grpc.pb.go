@@ -19,381 +19,659 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EvaluationService_GetMyAssessment_FullMethodName                  = "/evaluation.EvaluationService/GetMyAssessment"
-	EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName = "/evaluation.EvaluationService/ResolveAssessmentByAnswerSheetID"
-	EvaluationService_ListMyAssessments_FullMethodName                = "/evaluation.EvaluationService/ListMyAssessments"
-	EvaluationService_GetAssessmentScores_FullMethodName              = "/evaluation.EvaluationService/GetAssessmentScores"
-	EvaluationService_GetFactorTrend_FullMethodName                   = "/evaluation.EvaluationService/GetFactorTrend"
-	EvaluationService_GetHighRiskFactors_FullMethodName               = "/evaluation.EvaluationService/GetHighRiskFactors"
-	EvaluationService_GetAssessmentReport_FullMethodName              = "/evaluation.EvaluationService/GetAssessmentReport"
-	EvaluationService_ListMyReports_FullMethodName                    = "/evaluation.EvaluationService/ListMyReports"
+	TesteeEvaluationService_GetMyAssessment_FullMethodName     = "/evaluation.TesteeEvaluationService/GetMyAssessment"
+	TesteeEvaluationService_ListMyAssessments_FullMethodName   = "/evaluation.TesteeEvaluationService/ListMyAssessments"
+	TesteeEvaluationService_GetAssessmentScores_FullMethodName = "/evaluation.TesteeEvaluationService/GetAssessmentScores"
+	TesteeEvaluationService_GetFactorTrend_FullMethodName      = "/evaluation.TesteeEvaluationService/GetFactorTrend"
+	TesteeEvaluationService_GetHighRiskFactors_FullMethodName  = "/evaluation.TesteeEvaluationService/GetHighRiskFactors"
 )
 
-// EvaluationServiceClient is the client API for EvaluationService service.
+// TesteeEvaluationServiceClient is the client API for TesteeEvaluationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// 测评服务 - C端用户接口
-// 提供测评结果查询、报告查看等功能
-type EvaluationServiceClient interface {
+// 受试者测评查询。
+type TesteeEvaluationServiceClient interface {
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error)
-	// 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
-	ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(ctx context.Context, in *ListMyAssessmentsRequest, opts ...grpc.CallOption) (*ListMyAssessmentsResponse, error)
 	GetAssessmentScores(ctx context.Context, in *GetAssessmentScoresRequest, opts ...grpc.CallOption) (*GetAssessmentScoresResponse, error)
 	GetFactorTrend(ctx context.Context, in *GetFactorTrendRequest, opts ...grpc.CallOption) (*GetFactorTrendResponse, error)
 	GetHighRiskFactors(ctx context.Context, in *GetHighRiskFactorsRequest, opts ...grpc.CallOption) (*GetHighRiskFactorsResponse, error)
-	// testee_id 可选：有值时校验归属并返回 outcome 投影；worker 内部调用可省略
-	GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error)
-	ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error)
 }
 
-type evaluationServiceClient struct {
+type testeeEvaluationServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewEvaluationServiceClient(cc grpc.ClientConnInterface) EvaluationServiceClient {
-	return &evaluationServiceClient{cc}
+func NewTesteeEvaluationServiceClient(cc grpc.ClientConnInterface) TesteeEvaluationServiceClient {
+	return &testeeEvaluationServiceClient{cc}
 }
 
-func (c *evaluationServiceClient) GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error) {
+func (c *testeeEvaluationServiceClient) GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyAssessmentResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_GetMyAssessment_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetMyAssessment_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *evaluationServiceClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ResolveAssessmentByAnswerSheetIDResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *evaluationServiceClient) ListMyAssessments(ctx context.Context, in *ListMyAssessmentsRequest, opts ...grpc.CallOption) (*ListMyAssessmentsResponse, error) {
+func (c *testeeEvaluationServiceClient) ListMyAssessments(ctx context.Context, in *ListMyAssessmentsRequest, opts ...grpc.CallOption) (*ListMyAssessmentsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListMyAssessmentsResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_ListMyAssessments_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_ListMyAssessments_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *evaluationServiceClient) GetAssessmentScores(ctx context.Context, in *GetAssessmentScoresRequest, opts ...grpc.CallOption) (*GetAssessmentScoresResponse, error) {
+func (c *testeeEvaluationServiceClient) GetAssessmentScores(ctx context.Context, in *GetAssessmentScoresRequest, opts ...grpc.CallOption) (*GetAssessmentScoresResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetAssessmentScoresResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_GetAssessmentScores_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetAssessmentScores_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *evaluationServiceClient) GetFactorTrend(ctx context.Context, in *GetFactorTrendRequest, opts ...grpc.CallOption) (*GetFactorTrendResponse, error) {
+func (c *testeeEvaluationServiceClient) GetFactorTrend(ctx context.Context, in *GetFactorTrendRequest, opts ...grpc.CallOption) (*GetFactorTrendResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFactorTrendResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_GetFactorTrend_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetFactorTrend_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *evaluationServiceClient) GetHighRiskFactors(ctx context.Context, in *GetHighRiskFactorsRequest, opts ...grpc.CallOption) (*GetHighRiskFactorsResponse, error) {
+func (c *testeeEvaluationServiceClient) GetHighRiskFactors(ctx context.Context, in *GetHighRiskFactorsRequest, opts ...grpc.CallOption) (*GetHighRiskFactorsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetHighRiskFactorsResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_GetHighRiskFactors_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetHighRiskFactors_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *evaluationServiceClient) GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetAssessmentReportResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_GetAssessmentReport_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *evaluationServiceClient) ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListMyReportsResponse)
-	err := c.cc.Invoke(ctx, EvaluationService_ListMyReports_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// EvaluationServiceServer is the server API for EvaluationService service.
-// All implementations must embed UnimplementedEvaluationServiceServer
+// TesteeEvaluationServiceServer is the server API for TesteeEvaluationService service.
+// All implementations must embed UnimplementedTesteeEvaluationServiceServer
 // for forward compatibility.
 //
-// 测评服务 - C端用户接口
-// 提供测评结果查询、报告查看等功能
-type EvaluationServiceServer interface {
+// 受试者测评查询。
+type TesteeEvaluationServiceServer interface {
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error)
-	// 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
-	ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error)
 	GetAssessmentScores(context.Context, *GetAssessmentScoresRequest) (*GetAssessmentScoresResponse, error)
 	GetFactorTrend(context.Context, *GetFactorTrendRequest) (*GetFactorTrendResponse, error)
 	GetHighRiskFactors(context.Context, *GetHighRiskFactorsRequest) (*GetHighRiskFactorsResponse, error)
-	// testee_id 可选：有值时校验归属并返回 outcome 投影；worker 内部调用可省略
-	GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error)
-	ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error)
-	mustEmbedUnimplementedEvaluationServiceServer()
+	mustEmbedUnimplementedTesteeEvaluationServiceServer()
 }
 
-// UnimplementedEvaluationServiceServer must be embedded to have
+// UnimplementedTesteeEvaluationServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedEvaluationServiceServer struct{}
+type UnimplementedTesteeEvaluationServiceServer struct{}
 
-func (UnimplementedEvaluationServiceServer) GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error) {
+func (UnimplementedTesteeEvaluationServiceServer) GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyAssessment not implemented")
 }
-func (UnimplementedEvaluationServiceServer) ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ResolveAssessmentByAnswerSheetID not implemented")
-}
-func (UnimplementedEvaluationServiceServer) ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error) {
+func (UnimplementedTesteeEvaluationServiceServer) ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMyAssessments not implemented")
 }
-func (UnimplementedEvaluationServiceServer) GetAssessmentScores(context.Context, *GetAssessmentScoresRequest) (*GetAssessmentScoresResponse, error) {
+func (UnimplementedTesteeEvaluationServiceServer) GetAssessmentScores(context.Context, *GetAssessmentScoresRequest) (*GetAssessmentScoresResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAssessmentScores not implemented")
 }
-func (UnimplementedEvaluationServiceServer) GetFactorTrend(context.Context, *GetFactorTrendRequest) (*GetFactorTrendResponse, error) {
+func (UnimplementedTesteeEvaluationServiceServer) GetFactorTrend(context.Context, *GetFactorTrendRequest) (*GetFactorTrendResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFactorTrend not implemented")
 }
-func (UnimplementedEvaluationServiceServer) GetHighRiskFactors(context.Context, *GetHighRiskFactorsRequest) (*GetHighRiskFactorsResponse, error) {
+func (UnimplementedTesteeEvaluationServiceServer) GetHighRiskFactors(context.Context, *GetHighRiskFactorsRequest) (*GetHighRiskFactorsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHighRiskFactors not implemented")
 }
-func (UnimplementedEvaluationServiceServer) GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReport not implemented")
+func (UnimplementedTesteeEvaluationServiceServer) mustEmbedUnimplementedTesteeEvaluationServiceServer() {
 }
-func (UnimplementedEvaluationServiceServer) ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListMyReports not implemented")
-}
-func (UnimplementedEvaluationServiceServer) mustEmbedUnimplementedEvaluationServiceServer() {}
-func (UnimplementedEvaluationServiceServer) testEmbeddedByValue()                           {}
+func (UnimplementedTesteeEvaluationServiceServer) testEmbeddedByValue() {}
 
-// UnsafeEvaluationServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to EvaluationServiceServer will
+// UnsafeTesteeEvaluationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TesteeEvaluationServiceServer will
 // result in compilation errors.
-type UnsafeEvaluationServiceServer interface {
-	mustEmbedUnimplementedEvaluationServiceServer()
+type UnsafeTesteeEvaluationServiceServer interface {
+	mustEmbedUnimplementedTesteeEvaluationServiceServer()
 }
 
-func RegisterEvaluationServiceServer(s grpc.ServiceRegistrar, srv EvaluationServiceServer) {
-	// If the following call panics, it indicates UnimplementedEvaluationServiceServer was
+func RegisterTesteeEvaluationServiceServer(s grpc.ServiceRegistrar, srv TesteeEvaluationServiceServer) {
+	// If the following call panics, it indicates UnimplementedTesteeEvaluationServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&EvaluationService_ServiceDesc, srv)
+	s.RegisterService(&TesteeEvaluationService_ServiceDesc, srv)
 }
 
-func _EvaluationService_GetMyAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TesteeEvaluationService_GetMyAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMyAssessmentRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetMyAssessment(ctx, in)
+		return srv.(TesteeEvaluationServiceServer).GetMyAssessment(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_GetMyAssessment_FullMethodName,
+		FullMethod: TesteeEvaluationService_GetMyAssessment_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetMyAssessment(ctx, req.(*GetMyAssessmentRequest))
+		return srv.(TesteeEvaluationServiceServer).GetMyAssessment(ctx, req.(*GetMyAssessmentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_ResolveAssessmentByAnswerSheetID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResolveAssessmentByAnswerSheetIDRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EvaluationServiceServer).ResolveAssessmentByAnswerSheetID(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).ResolveAssessmentByAnswerSheetID(ctx, req.(*ResolveAssessmentByAnswerSheetIDRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _EvaluationService_ListMyAssessments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TesteeEvaluationService_ListMyAssessments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMyAssessmentsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).ListMyAssessments(ctx, in)
+		return srv.(TesteeEvaluationServiceServer).ListMyAssessments(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_ListMyAssessments_FullMethodName,
+		FullMethod: TesteeEvaluationService_ListMyAssessments_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).ListMyAssessments(ctx, req.(*ListMyAssessmentsRequest))
+		return srv.(TesteeEvaluationServiceServer).ListMyAssessments(ctx, req.(*ListMyAssessmentsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_GetAssessmentScores_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TesteeEvaluationService_GetAssessmentScores_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAssessmentScoresRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetAssessmentScores(ctx, in)
+		return srv.(TesteeEvaluationServiceServer).GetAssessmentScores(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_GetAssessmentScores_FullMethodName,
+		FullMethod: TesteeEvaluationService_GetAssessmentScores_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetAssessmentScores(ctx, req.(*GetAssessmentScoresRequest))
+		return srv.(TesteeEvaluationServiceServer).GetAssessmentScores(ctx, req.(*GetAssessmentScoresRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_GetFactorTrend_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TesteeEvaluationService_GetFactorTrend_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFactorTrendRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetFactorTrend(ctx, in)
+		return srv.(TesteeEvaluationServiceServer).GetFactorTrend(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_GetFactorTrend_FullMethodName,
+		FullMethod: TesteeEvaluationService_GetFactorTrend_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetFactorTrend(ctx, req.(*GetFactorTrendRequest))
+		return srv.(TesteeEvaluationServiceServer).GetFactorTrend(ctx, req.(*GetFactorTrendRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_GetHighRiskFactors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TesteeEvaluationService_GetHighRiskFactors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetHighRiskFactorsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetHighRiskFactors(ctx, in)
+		return srv.(TesteeEvaluationServiceServer).GetHighRiskFactors(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_GetHighRiskFactors_FullMethodName,
+		FullMethod: TesteeEvaluationService_GetHighRiskFactors_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetHighRiskFactors(ctx, req.(*GetHighRiskFactorsRequest))
+		return srv.(TesteeEvaluationServiceServer).GetHighRiskFactors(ctx, req.(*GetHighRiskFactorsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_GetAssessmentReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+// TesteeEvaluationService_ServiceDesc is the grpc.ServiceDesc for TesteeEvaluationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var TesteeEvaluationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "evaluation.TesteeEvaluationService",
+	HandlerType: (*TesteeEvaluationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetMyAssessment",
+			Handler:    _TesteeEvaluationService_GetMyAssessment_Handler,
+		},
+		{
+			MethodName: "ListMyAssessments",
+			Handler:    _TesteeEvaluationService_ListMyAssessments_Handler,
+		},
+		{
+			MethodName: "GetAssessmentScores",
+			Handler:    _TesteeEvaluationService_GetAssessmentScores_Handler,
+		},
+		{
+			MethodName: "GetFactorTrend",
+			Handler:    _TesteeEvaluationService_GetFactorTrend_Handler,
+		},
+		{
+			MethodName: "GetHighRiskFactors",
+			Handler:    _TesteeEvaluationService_GetHighRiskFactors_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "evaluation/evaluation.proto",
+}
+
+const (
+	AssessmentIntakeService_EnsureAssessment_FullMethodName                 = "/evaluation.AssessmentIntakeService/EnsureAssessment"
+	AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_FullMethodName = "/evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID"
+)
+
+// AssessmentIntakeServiceClient is the client API for AssessmentIntakeService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// 答卷编排系统调用的 Evaluation intake Journey。
+type AssessmentIntakeServiceClient interface {
+	EnsureAssessment(ctx context.Context, in *EnsureAssessmentRequest, opts ...grpc.CallOption) (*EnsureAssessmentResponse, error)
+	ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error)
+}
+
+type assessmentIntakeServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAssessmentIntakeServiceClient(cc grpc.ClientConnInterface) AssessmentIntakeServiceClient {
+	return &assessmentIntakeServiceClient{cc}
+}
+
+func (c *assessmentIntakeServiceClient) EnsureAssessment(ctx context.Context, in *EnsureAssessmentRequest, opts ...grpc.CallOption) (*EnsureAssessmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnsureAssessmentResponse)
+	err := c.cc.Invoke(ctx, AssessmentIntakeService_EnsureAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *assessmentIntakeServiceClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveAssessmentByAnswerSheetIDResponse)
+	err := c.cc.Invoke(ctx, AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AssessmentIntakeServiceServer is the server API for AssessmentIntakeService service.
+// All implementations must embed UnimplementedAssessmentIntakeServiceServer
+// for forward compatibility.
+//
+// 答卷编排系统调用的 Evaluation intake Journey。
+type AssessmentIntakeServiceServer interface {
+	EnsureAssessment(context.Context, *EnsureAssessmentRequest) (*EnsureAssessmentResponse, error)
+	ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error)
+	mustEmbedUnimplementedAssessmentIntakeServiceServer()
+}
+
+// UnimplementedAssessmentIntakeServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAssessmentIntakeServiceServer struct{}
+
+func (UnimplementedAssessmentIntakeServiceServer) EnsureAssessment(context.Context, *EnsureAssessmentRequest) (*EnsureAssessmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureAssessment not implemented")
+}
+func (UnimplementedAssessmentIntakeServiceServer) ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveAssessmentByAnswerSheetID not implemented")
+}
+func (UnimplementedAssessmentIntakeServiceServer) mustEmbedUnimplementedAssessmentIntakeServiceServer() {
+}
+func (UnimplementedAssessmentIntakeServiceServer) testEmbeddedByValue() {}
+
+// UnsafeAssessmentIntakeServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AssessmentIntakeServiceServer will
+// result in compilation errors.
+type UnsafeAssessmentIntakeServiceServer interface {
+	mustEmbedUnimplementedAssessmentIntakeServiceServer()
+}
+
+func RegisterAssessmentIntakeServiceServer(s grpc.ServiceRegistrar, srv AssessmentIntakeServiceServer) {
+	// If the following call panics, it indicates UnimplementedAssessmentIntakeServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AssessmentIntakeService_ServiceDesc, srv)
+}
+
+func _AssessmentIntakeService_EnsureAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureAssessmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssessmentIntakeServiceServer).EnsureAssessment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssessmentIntakeService_EnsureAssessment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssessmentIntakeServiceServer).EnsureAssessment(ctx, req.(*EnsureAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveAssessmentByAnswerSheetIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssessmentIntakeServiceServer).ResolveAssessmentByAnswerSheetID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssessmentIntakeServiceServer).ResolveAssessmentByAnswerSheetID(ctx, req.(*ResolveAssessmentByAnswerSheetIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AssessmentIntakeService_ServiceDesc is the grpc.ServiceDesc for AssessmentIntakeService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AssessmentIntakeService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "evaluation.AssessmentIntakeService",
+	HandlerType: (*AssessmentIntakeServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "EnsureAssessment",
+			Handler:    _AssessmentIntakeService_EnsureAssessment_Handler,
+		},
+		{
+			MethodName: "ResolveAssessmentByAnswerSheetID",
+			Handler:    _AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "evaluation/evaluation.proto",
+}
+
+const (
+	EvaluationWorkerService_ExecuteEvaluation_FullMethodName = "/evaluation.EvaluationWorkerService/ExecuteEvaluation"
+)
+
+// EvaluationWorkerServiceClient is the client API for EvaluationWorkerService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// 单次评分 Worker 入口。
+type EvaluationWorkerServiceClient interface {
+	ExecuteEvaluation(ctx context.Context, in *ExecuteEvaluationRequest, opts ...grpc.CallOption) (*ExecuteEvaluationResponse, error)
+}
+
+type evaluationWorkerServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewEvaluationWorkerServiceClient(cc grpc.ClientConnInterface) EvaluationWorkerServiceClient {
+	return &evaluationWorkerServiceClient{cc}
+}
+
+func (c *evaluationWorkerServiceClient) ExecuteEvaluation(ctx context.Context, in *ExecuteEvaluationRequest, opts ...grpc.CallOption) (*ExecuteEvaluationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecuteEvaluationResponse)
+	err := c.cc.Invoke(ctx, EvaluationWorkerService_ExecuteEvaluation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// EvaluationWorkerServiceServer is the server API for EvaluationWorkerService service.
+// All implementations must embed UnimplementedEvaluationWorkerServiceServer
+// for forward compatibility.
+//
+// 单次评分 Worker 入口。
+type EvaluationWorkerServiceServer interface {
+	ExecuteEvaluation(context.Context, *ExecuteEvaluationRequest) (*ExecuteEvaluationResponse, error)
+	mustEmbedUnimplementedEvaluationWorkerServiceServer()
+}
+
+// UnimplementedEvaluationWorkerServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedEvaluationWorkerServiceServer struct{}
+
+func (UnimplementedEvaluationWorkerServiceServer) ExecuteEvaluation(context.Context, *ExecuteEvaluationRequest) (*ExecuteEvaluationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExecuteEvaluation not implemented")
+}
+func (UnimplementedEvaluationWorkerServiceServer) mustEmbedUnimplementedEvaluationWorkerServiceServer() {
+}
+func (UnimplementedEvaluationWorkerServiceServer) testEmbeddedByValue() {}
+
+// UnsafeEvaluationWorkerServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to EvaluationWorkerServiceServer will
+// result in compilation errors.
+type UnsafeEvaluationWorkerServiceServer interface {
+	mustEmbedUnimplementedEvaluationWorkerServiceServer()
+}
+
+func RegisterEvaluationWorkerServiceServer(s grpc.ServiceRegistrar, srv EvaluationWorkerServiceServer) {
+	// If the following call panics, it indicates UnimplementedEvaluationWorkerServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&EvaluationWorkerService_ServiceDesc, srv)
+}
+
+func _EvaluationWorkerService_ExecuteEvaluation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExecuteEvaluationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationWorkerServiceServer).ExecuteEvaluation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationWorkerService_ExecuteEvaluation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationWorkerServiceServer).ExecuteEvaluation(ctx, req.(*ExecuteEvaluationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// EvaluationWorkerService_ServiceDesc is the grpc.ServiceDesc for EvaluationWorkerService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var EvaluationWorkerService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "evaluation.EvaluationWorkerService",
+	HandlerType: (*EvaluationWorkerServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ExecuteEvaluation",
+			Handler:    _EvaluationWorkerService_ExecuteEvaluation_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "evaluation/evaluation.proto",
+}
+
+const (
+	ParticipantReportService_GetAssessmentReport_FullMethodName = "/evaluation.ParticipantReportService/GetAssessmentReport"
+	ParticipantReportService_ListMyReports_FullMethodName       = "/evaluation.ParticipantReportService/ListMyReports"
+)
+
+// ParticipantReportServiceClient is the client API for ParticipantReportService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// 受试者报告查询。消息将在 Interpretation 契约独立后整体迁移。
+type ParticipantReportServiceClient interface {
+	GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error)
+	ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error)
+}
+
+type participantReportServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewParticipantReportServiceClient(cc grpc.ClientConnInterface) ParticipantReportServiceClient {
+	return &participantReportServiceClient{cc}
+}
+
+func (c *participantReportServiceClient) GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAssessmentReportResponse)
+	err := c.cc.Invoke(ctx, ParticipantReportService_GetAssessmentReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantReportServiceClient) ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMyReportsResponse)
+	err := c.cc.Invoke(ctx, ParticipantReportService_ListMyReports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ParticipantReportServiceServer is the server API for ParticipantReportService service.
+// All implementations must embed UnimplementedParticipantReportServiceServer
+// for forward compatibility.
+//
+// 受试者报告查询。消息将在 Interpretation 契约独立后整体迁移。
+type ParticipantReportServiceServer interface {
+	GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error)
+	ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error)
+	mustEmbedUnimplementedParticipantReportServiceServer()
+}
+
+// UnimplementedParticipantReportServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedParticipantReportServiceServer struct{}
+
+func (UnimplementedParticipantReportServiceServer) GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReport not implemented")
+}
+func (UnimplementedParticipantReportServiceServer) ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMyReports not implemented")
+}
+func (UnimplementedParticipantReportServiceServer) mustEmbedUnimplementedParticipantReportServiceServer() {
+}
+func (UnimplementedParticipantReportServiceServer) testEmbeddedByValue() {}
+
+// UnsafeParticipantReportServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ParticipantReportServiceServer will
+// result in compilation errors.
+type UnsafeParticipantReportServiceServer interface {
+	mustEmbedUnimplementedParticipantReportServiceServer()
+}
+
+func RegisterParticipantReportServiceServer(s grpc.ServiceRegistrar, srv ParticipantReportServiceServer) {
+	// If the following call panics, it indicates UnimplementedParticipantReportServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ParticipantReportService_ServiceDesc, srv)
+}
+
+func _ParticipantReportService_GetAssessmentReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAssessmentReportRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetAssessmentReport(ctx, in)
+		return srv.(ParticipantReportServiceServer).GetAssessmentReport(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_GetAssessmentReport_FullMethodName,
+		FullMethod: ParticipantReportService_GetAssessmentReport_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetAssessmentReport(ctx, req.(*GetAssessmentReportRequest))
+		return srv.(ParticipantReportServiceServer).GetAssessmentReport(ctx, req.(*GetAssessmentReportRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_ListMyReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ParticipantReportService_ListMyReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMyReportsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EvaluationServiceServer).ListMyReports(ctx, in)
+		return srv.(ParticipantReportServiceServer).ListMyReports(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EvaluationService_ListMyReports_FullMethodName,
+		FullMethod: ParticipantReportService_ListMyReports_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).ListMyReports(ctx, req.(*ListMyReportsRequest))
+		return srv.(ParticipantReportServiceServer).ListMyReports(ctx, req.(*ListMyReportsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// EvaluationService_ServiceDesc is the grpc.ServiceDesc for EvaluationService service.
+// ParticipantReportService_ServiceDesc is the grpc.ServiceDesc for ParticipantReportService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var EvaluationService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "evaluation.EvaluationService",
-	HandlerType: (*EvaluationServiceServer)(nil),
+var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "evaluation.ParticipantReportService",
+	HandlerType: (*ParticipantReportServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetMyAssessment",
-			Handler:    _EvaluationService_GetMyAssessment_Handler,
-		},
-		{
-			MethodName: "ResolveAssessmentByAnswerSheetID",
-			Handler:    _EvaluationService_ResolveAssessmentByAnswerSheetID_Handler,
-		},
-		{
-			MethodName: "ListMyAssessments",
-			Handler:    _EvaluationService_ListMyAssessments_Handler,
-		},
-		{
-			MethodName: "GetAssessmentScores",
-			Handler:    _EvaluationService_GetAssessmentScores_Handler,
-		},
-		{
-			MethodName: "GetFactorTrend",
-			Handler:    _EvaluationService_GetFactorTrend_Handler,
-		},
-		{
-			MethodName: "GetHighRiskFactors",
-			Handler:    _EvaluationService_GetHighRiskFactors_Handler,
-		},
-		{
 			MethodName: "GetAssessmentReport",
-			Handler:    _EvaluationService_GetAssessmentReport_Handler,
+			Handler:    _ParticipantReportService_GetAssessmentReport_Handler,
 		},
 		{
 			MethodName: "ListMyReports",
-			Handler:    _EvaluationService_ListMyReports_Handler,
+			Handler:    _ParticipantReportService_ListMyReports_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -98,9 +99,9 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	access := &stubTesteeAccessService{}
 	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, access)
 	handler := NewEvaluationHandler(
-		assessmentQuery,
+		evaluationoperator.NewRecoveryService(assessmentQuery),
 		nil,
-		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil),
+		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
 		nil,
 		nil,
 	)
@@ -158,9 +159,9 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 	}
 	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
 	handler := NewEvaluationHandler(
-		assessmentQuery,
+		evaluationoperator.NewRecoveryService(assessmentQuery),
 		nil,
-		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil),
+		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
 		nil,
 		reportwaitjourney.NewService(accessQuery, assessmentQuery, nil),
 	)
@@ -209,9 +210,9 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 	}
 	accessQuery := assessmentapp.NewAssessmentAccessQueryService(assessmentQuery, &stubTesteeAccessService{})
 	handler := NewEvaluationHandler(
-		assessmentQuery,
+		evaluationoperator.NewRecoveryService(assessmentQuery),
 		nil,
-		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil),
+		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, nil)),
 		nil,
 		reportwaitjourney.NewService(accessQuery, assessmentQuery, nil),
 	)

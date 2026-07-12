@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
+	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -15,14 +15,14 @@ import (
 // EvaluationConsistencyReconcileRunner periodically repairs scoring/reporting cross-store drift.
 type EvaluationConsistencyReconcileRunner struct {
 	opts    *apiserveroptions.EvaluationConsistencyReconcileOptions
-	service consistencyApp.Service
+	service evaluationScheduler.Service
 	leader  leaderLeaseRunner
 }
 
 // NewEvaluationConsistencyReconcileRunner creates the reconcile runner when dependencies are available.
 func NewEvaluationConsistencyReconcileRunner(
 	opts *apiserveroptions.EvaluationConsistencyReconcileOptions,
-	service consistencyApp.Service,
+	service evaluationScheduler.Service,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
 ) *EvaluationConsistencyReconcileRunner {
@@ -42,7 +42,7 @@ func NewEvaluationConsistencyReconcileRunner(
 
 func newEvaluationConsistencyReconcileRunnerWithHooks(
 	opts *apiserveroptions.EvaluationConsistencyReconcileOptions,
-	service consistencyApp.Service,
+	service evaluationScheduler.Service,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
 	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
@@ -143,7 +143,7 @@ func (r *EvaluationConsistencyReconcileRunner) runOnce(ctx context.Context) erro
 			log.Warnf("failed to release evaluation consistency reconcile lock (lock_key=%s): %v", lockKey, err)
 		},
 	}, func(ctx context.Context) error {
-		_, err := r.service.ReconcileOnce(ctx, r.opts.BatchLimit)
+		_, err := r.service.AuditOnce(ctx, r.opts.BatchLimit)
 		return err
 	})
 }

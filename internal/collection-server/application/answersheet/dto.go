@@ -73,8 +73,9 @@ type Answer struct {
 
 // SubmitAnswerSheetResponse 提交答卷响应
 type SubmitAnswerSheetResponse struct {
-	ID      string `json:"id"`
-	Message string `json:"message"`
+	ID           string `json:"id"`
+	AssessmentID string `json:"assessment_id,omitempty"`
+	Message      string `json:"message"`
 }
 
 // SubmitAcceptedResponse 提交受理响应
@@ -87,7 +88,7 @@ type SubmitAcceptedResponse struct {
 type SubmitStatusResponse struct {
 	Status        string `json:"status"`
 	AnswerSheetID string `json:"answersheet_id,omitempty"`
-	// AssessmentID 在 status=done 且异步测评已落库后出现；未就绪时省略，客户端可继续轮询 submit-status。
+	// AssessmentID 与 AnswerSheetID 共同构成 status=done 的完成不变量。
 	AssessmentID string `json:"assessment_id,omitempty"`
 	UpdatedAt    int64  `json:"updated_at"`
 }

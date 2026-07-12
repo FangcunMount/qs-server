@@ -67,8 +67,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 		AnswerSheet: &AnswerSheetSubModule{SubmittedEventRelay: answerSheetRelay},
 	}
 	c.EvaluationModule = &EvaluationModule{
-		AssessmentOutboxRelay:       assessmentRelay,
-		ConsistencyReconcileService: consistencyReconcile,
+		AssessmentOutboxRelay: assessmentRelay,
+		SchedulerService:      consistencyReconcile,
 	}
 
 	deps := c.BuildServerRuntimeDeps()
@@ -182,7 +182,7 @@ func (*behaviorProjectorServiceStub) ReconcilePendingBehaviorEvents(context.Cont
 
 type evaluationConsistencyReconcileServiceStub struct{}
 
-func (*evaluationConsistencyReconcileServiceStub) ReconcileOnce(context.Context, int) (int, error) {
+func (*evaluationConsistencyReconcileServiceStub) AuditOnce(context.Context, int) (int, error) {
 	return 0, nil
 }
 

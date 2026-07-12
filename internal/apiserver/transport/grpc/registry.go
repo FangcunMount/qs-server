@@ -10,10 +10,12 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
+	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
+	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	assessmentintakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -22,7 +24,6 @@ import (
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -77,13 +78,9 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	IntakeService          assessmentApp.AnswerSheetAssessmentIntakeService
-	TesteeQueryService     assessmentApp.TesteeAssessmentQueryService
-	WorkerResultReader     assessmentApp.AssessmentResultReader
-	ScoreQueryService      assessmentApp.ScoreQueryService
-	AssessmentReader       evaluationreadmodel.AssessmentReader
-	WorkerExecutionService execute.WorkerExecutionService
-	RunQueryService        runqueryApp.Service
+	IntakeService assessmentApp.AnswerSheetAssessmentIntakeService
+	TesteeService evaluationtestee.Service
+	WorkerService evaluationworker.Service
 }
 
 type InterpretationDeps struct {
@@ -204,22 +201,30 @@ func (r *Registry) registerActorService() error {
 
 func (r *Registry) registerEvaluationService() error {
 	if r.deps.Evaluation.IntakeService == nil ||
-		r.deps.Evaluation.TesteeQueryService == nil ||
+		r.deps.Evaluation.TesteeService == nil ||
+		r.deps.Evaluation.WorkerService == nil ||
 		r.deps.Interpretation.ParticipantService == nil ||
-		r.deps.Evaluation.ScoreQueryService == nil {
+		r.deps.Interpretation.AutomationService == nil ||
+		r.deps.Survey.AnswerSheetScoringService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
 		return nil
 	}
 
-	evaluationService := service.NewEvaluationService(
-		r.deps.Evaluation.IntakeService,
-		r.deps.Evaluation.TesteeQueryService,
-		r.deps.Interpretation.ParticipantService,
-		r.deps.Evaluation.ScoreQueryService,
-		r.deps.Evaluation.AssessmentReader,
+	intake := evaluationintake.Adapt(r.deps.Evaluation.IntakeService)
+	journey := assessmentintakejourney.NewService(
+		r.deps.Survey.AnswerSheetScoringService,
+		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
+		r.deps.Plan.TaskAssessmentResolver,
+		r.deps.Plan.CommandService,
+		intake,
+		r.deps.Interpretation.ReportStatusReporter,
 	)
-	r.server.RegisterService(evaluationService)
-	log.Info("   📊 Evaluation service registered")
+	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
+	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService))
+	r.server.RegisterService(service.NewAssessmentIntakeService(journey, intake))
+	r.server.RegisterService(service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService))
+	r.server.RegisterService(service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService))
+	log.Info("   📊 actor-oriented Evaluation/Interpretation services registered")
 	return nil
 }
 
@@ -234,23 +239,11 @@ func (r *Registry) registerAssessmentModelCatalogService() error {
 }
 
 func (r *Registry) registerInternalService() error {
-	if r.deps.Evaluation.IntakeService == nil || r.deps.Evaluation.WorkerResultReader == nil || r.deps.Evaluation.WorkerExecutionService == nil {
-		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
-		return nil
-	}
-	if r.deps.Survey.AnswerSheetScoringService == nil {
-		log.Warn("SurveyModule is not initialized, skipping internal service registration")
-		return nil
-	}
 	if r.deps.Actor.TesteeAssessmentAttentionService == nil ||
 		r.deps.Actor.OperatorLifecycleService == nil ||
 		r.deps.Actor.OperatorAuthorizationService == nil ||
 		r.deps.Actor.OperatorQueryService == nil {
 		log.Warn("ActorModule is not initialized, skipping internal service registration")
-		return nil
-	}
-	if r.deps.Plan.TaskAssessmentResolver == nil || r.deps.Plan.CommandService == nil {
-		log.Warn("PlanModule is not initialized, skipping internal service registration")
 		return nil
 	}
 	if r.deps.Statistics.BehaviorProjectorService == nil {
@@ -259,16 +252,7 @@ func (r *Registry) registerInternalService() error {
 	}
 
 	internalService := service.NewInternalService(
-		r.deps.Survey.AnswerSheetScoringService,
-		r.deps.Evaluation.IntakeService,
-		r.deps.Evaluation.WorkerResultReader,
-		r.deps.Evaluation.WorkerExecutionService,
-		r.deps.Interpretation.AutomationService,
-		r.deps.Evaluation.RunQueryService,
-		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
-		r.deps.Plan.TaskAssessmentResolver,
-		r.deps.Plan.CommandService,
 		r.deps.Actor.OperatorLifecycleService,
 		r.deps.Actor.OperatorAuthorizationService,
 		r.deps.Actor.OperatorQueryService,
@@ -277,7 +261,6 @@ func (r *Registry) registerInternalService() error {
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
-		r.deps.Interpretation.ReportStatusReporter,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")
@@ -313,10 +296,10 @@ func (r *Registry) GetRegisteredServices() []string {
 		services = append(services, "ActorService")
 	}
 	if r.deps.Evaluation.IntakeService != nil &&
-		r.deps.Evaluation.TesteeQueryService != nil &&
+		r.deps.Evaluation.TesteeService != nil &&
 		r.deps.Interpretation.ParticipantService != nil &&
-		r.deps.Evaluation.ScoreQueryService != nil {
-		services = append(services, "EvaluationService")
+		r.deps.Evaluation.WorkerService != nil {
+		services = append(services, "TesteeEvaluationService", "AssessmentIntakeService", "EvaluationWorkerService", "ParticipantReportService", "InterpretationAutomationService")
 	}
 	if r.deps.Plan.CommandService != nil {
 		services = append(services, "PlanCommandService")

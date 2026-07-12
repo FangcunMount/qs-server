@@ -174,9 +174,11 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 		return
 	}
 
+	existing, _ := q.getStatus(requestID)
 	cleaned := q.statuses.Set(requestID, SubmitStatusResponse{
 		Status:        status,
 		AnswerSheetID: answerSheetID,
+		AssessmentID:  existing.AssessmentID,
 		UpdatedAt:     time.Now().Unix(),
 	})
 	q.observeCleaned(context.Background(), cleaned)
@@ -191,6 +193,19 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	case SubmitStatusFailed:
 		q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
 	}
+}
+
+func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {
+	if q == nil || requestID == "" || assessmentID == "" {
+		return
+	}
+	status, ok := q.getStatus(requestID)
+	if !ok {
+		status = SubmitStatusResponse{}
+	}
+	status.AssessmentID = assessmentID
+	status.UpdatedAt = time.Now().Unix()
+	q.statuses.Set(requestID, status)
 }
 
 func (q *SubmitQueue) getStatus(requestID string) (SubmitStatusResponse, bool) {

@@ -2,7 +2,6 @@ package service
 
 import (
 	"testing"
-	"time"
 )
 
 func TestDecodeAnswerValue(t *testing.T) {
@@ -71,25 +70,5 @@ func TestValueToString(t *testing.T) {
 	}
 	if got := svc.valueToString([]string{"A", "B"}); got != "[A B]" {
 		t.Fatalf("slice encoded as %q", got)
-	}
-}
-
-func TestParseAssessmentListDate(t *testing.T) {
-	t.Parallel()
-
-	got, err := parseAssessmentListDate("2026-04-22", true)
-	if err != nil {
-		t.Fatalf("parseAssessmentListDate returned error: %v", err)
-	}
-	if got == nil || got.Format("2006-01-02") != "2026-04-23" {
-		t.Fatalf("unexpected end-exclusive date: %v", got)
-	}
-
-	got, err = parseAssessmentListDate(time.Date(2026, 4, 22, 8, 0, 0, 0, time.UTC).Format(time.RFC3339), false)
-	if err != nil || got == nil {
-		t.Fatalf("expected RFC3339 date to parse, got %v, %v", got, err)
-	}
-	if _, err := parseAssessmentListDate("bad-date", false); err == nil {
-		t.Fatal("expected invalid date error")
 	}
 }

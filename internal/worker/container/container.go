@@ -35,7 +35,6 @@ type Container struct {
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
-	evaluationClient  *grpcclient.EvaluationClient
 	internalClient    *grpcclient.InternalClient
 
 	// 事件分发器
@@ -46,7 +45,6 @@ type Container struct {
 // integration stage and consumed by the container composition root.
 type ClientBundle struct {
 	AnswerSheet *grpcclient.AnswerSheetClient
-	Evaluation  *grpcclient.EvaluationClient
 	Internal    *grpcclient.InternalClient
 }
 
@@ -130,7 +128,6 @@ func (c *Container) initEventDispatcher() error {
 	deps := &workereventing.HandlerDependencies{
 		Logger:               c.logger,
 		AnswerSheetClient:    c.answerSheetClient,
-		EvaluationClient:     c.evaluationClient,
 		InternalClient:       c.internalClient,
 		LockManager:          c.lockManager,
 		LockKeyBuilder:       c.lockBuilder,
@@ -198,7 +195,6 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 		return
 	}
 	c.answerSheetClient = bundle.AnswerSheet
-	c.evaluationClient = bundle.Evaluation
 	c.internalClient = bundle.Internal
 }
 

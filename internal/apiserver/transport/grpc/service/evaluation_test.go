@@ -12,10 +12,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestEvaluationServiceScoreQueriesRequireTesteeSubject(t *testing.T) {
+func TestTesteeEvaluationServiceScoreQueriesRequireTesteeSubject(t *testing.T) {
 	t.Parallel()
 
-	svc := &EvaluationService{}
+	svc := &TesteeEvaluationService{}
 	tests := []struct {
 		name string
 		call func() error

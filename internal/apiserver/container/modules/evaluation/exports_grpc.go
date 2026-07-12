@@ -9,11 +9,7 @@ func (m *Module) ExportGRPCDeps() grpctransport.EvaluationDeps {
 		return deps
 	}
 	deps.IntakeService = m.IntakeService
-	deps.TesteeQueryService = m.TesteeQueryService
-	deps.WorkerResultReader = m.WorkerResultReader
-	deps.ScoreQueryService = m.ScoreQueryService
-	deps.AssessmentReader = m.AssessmentReader
-	deps.WorkerExecutionService = m.WorkerExecutionService
-	deps.RunQueryService = m.RunQueryService
+	deps.TesteeService = m.TesteeService
+	deps.WorkerService = m.WorkerService
 	return deps
 }

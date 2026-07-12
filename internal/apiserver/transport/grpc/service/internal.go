@@ -7,49 +7,26 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
-	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
-	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用。
 type InternalService struct {
 	pb.UnimplementedInternalServiceServer
-	answerSheetScoringService  answerSheetApp.AnswerSheetScoringService
-	intakeService              assessmentApp.AnswerSheetAssessmentIntakeService
-	assessmentResultReader     assessmentApp.AssessmentResultReader
-	workerExecutionService     execute.WorkerExecutionService
-	automationService          interpretationAutomation.Service
-	runQueryService            runqueryApp.Service
-	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
-	taskAssessmentResolver     planApp.TaskAssessmentResolver
-	planCommandService         planApp.PlanCommandService
 	operatorLifecycleService   operatorApp.OperatorLifecycleService
 	operatorAuthService        operatorApp.OperatorAuthorizationService
 	operatorQueryService       operatorApp.OperatorQueryService
 	operatorRoleSyncer         operatorBootstrapRoleSyncer
 	behaviorProjectorService   statisticsApp.BehaviorProjectorService
 	warmupCoordinator          cachegov.Coordinator
-	reportStatusReporter       *reportstatus.Reporter
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -67,16 +44,7 @@ type operatorBootstrapRoleSyncer interface {
 
 // NewInternalService 创建内部 gRPC 服务
 func NewInternalService(
-	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
-	intakeService assessmentApp.AnswerSheetAssessmentIntakeService,
-	assessmentResultReader assessmentApp.AssessmentResultReader,
-	workerExecutionService execute.WorkerExecutionService,
-	automationService interpretationAutomation.Service,
-	runQueryService runqueryApp.Service,
-	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
-	taskAssessmentResolver planApp.TaskAssessmentResolver,
-	planCommandService planApp.PlanCommandService,
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
 	operatorAuthService operatorApp.OperatorAuthorizationService,
 	operatorQueryService operatorApp.OperatorQueryService,
@@ -85,19 +53,9 @@ func NewInternalService(
 	warmupCoordinator cachegov.Coordinator,
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
-	reportStatusReporter *reportstatus.Reporter,
 ) *InternalService {
 	return &InternalService{
-		answerSheetScoringService:          answerSheetScoringService,
-		intakeService:                      intakeService,
-		assessmentResultReader:             assessmentResultReader,
-		workerExecutionService:             workerExecutionService,
-		automationService:                  automationService,
-		runQueryService:                    runQueryService,
-		assessmentBindingResolver:          assessmentBindingResolver,
 		assessmentAttentionService:         assessmentAttentionService,
-		taskAssessmentResolver:             taskAssessmentResolver,
-		planCommandService:                 planCommandService,
 		operatorLifecycleService:           operatorLifecycleService,
 		operatorAuthService:                operatorAuthService,
 		operatorQueryService:               operatorQueryService,
@@ -106,7 +64,6 @@ func NewInternalService(
 		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
-		reportStatusReporter:               reportStatusReporter,
 	}
 }
 
@@ -120,331 +77,6 @@ func (s *InternalService) ProjectBehaviorEvent(
 	req *pb.ProjectBehaviorEventRequest,
 ) (*pb.ProjectBehaviorEventResponse, error) {
 	return newBehaviorProjectionFlow(s).ProjectBehaviorEvent(ctx, req)
-}
-
-// CalculateAnswerSheetScore 计算答卷分数
-// 场景：worker 处理 answersheet.submitted 事件后调用
-func (s *InternalService) CalculateAnswerSheetScore(
-	ctx context.Context,
-	req *pb.CalculateAnswerSheetScoreRequest,
-) (*pb.CalculateAnswerSheetScoreResponse, error) {
-	return newAssessmentFlow(s).CalculateAnswerSheetScore(ctx, req)
-}
-
-// CreateAssessmentFromAnswerSheet 从答卷创建测评
-// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
-func (s *InternalService) CreateAssessmentFromAnswerSheet(
-	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
-	return newAssessmentFlow(s).CreateAssessmentFromAnswerSheet(ctx, req)
-}
-
-func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFromAnswerSheetRequest) error {
-	switch {
-	case req == nil:
-		return status.Error(codes.InvalidArgument, "request 不能为空")
-	case req.AnswersheetId == 0:
-		return status.Error(codes.InvalidArgument, "answersheet_id 不能为空")
-	case req.QuestionnaireCode == "":
-		return status.Error(codes.InvalidArgument, "questionnaire_code 不能为空")
-	case req.QuestionnaireVersion == "":
-		return status.Error(codes.InvalidArgument, "questionnaire_version 不能为空")
-	case req.TesteeId == 0:
-		return status.Error(codes.InvalidArgument, "testee_id 不能为空")
-	case req.FillerId == 0:
-		return status.Error(codes.InvalidArgument, "filler_id 不能为空")
-	default:
-		return nil
-	}
-}
-
-func buildCreateAssessmentDTO(
-	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	bindingResolver rulesetport.AssessmentBindingResolver,
-) (assessmentApp.CreateAssessmentDTO, error) {
-	dto := assessmentApp.CreateAssessmentDTO{
-		OrgID:                req.OrgId,
-		TesteeID:             req.TesteeId,
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		AnswerSheetID:        req.AnswersheetId,
-		OriginType:           req.OriginType,
-	}
-	if dto.OriginType == "" {
-		dto.OriginType = "adhoc"
-	}
-	if req.OriginId != "" {
-		dto.OriginID = &req.OriginId
-	}
-	if err := applyAssessmentBinding(ctx, req, &dto, bindingResolver); err != nil {
-		return assessmentApp.CreateAssessmentDTO{}, err
-	}
-	return dto, nil
-}
-
-func applyAssessmentBinding(
-	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	dto *assessmentApp.CreateAssessmentDTO,
-	resolver rulesetport.AssessmentBindingResolver,
-) error {
-	if req == nil || dto == nil || resolver == nil {
-		return nil
-	}
-	binding, ok, err := resolver.ResolveAssessmentBinding(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return nil
-	}
-	mappedKind, subKind, algorithm, ok := domainruleset.LegacyKindMapping(binding.Ref.Kind)
-	if !ok {
-		mappedKind = binding.Ref.Kind
-	}
-	if binding.Ref.SubKind != "" {
-		subKind = binding.Ref.SubKind
-	}
-	if binding.Ref.Algorithm != "" {
-		algorithm = binding.Ref.Algorithm
-	}
-	kind := mappedKind.String()
-	dto.ModelKind = &kind
-	if subKind != "" {
-		subKindStr := subKind.String()
-		dto.ModelSubKind = &subKindStr
-	}
-	if algorithm != "" {
-		algorithmStr := algorithm.String()
-		dto.ModelAlgorithm = &algorithmStr
-	}
-	dto.ModelCode = &binding.Ref.Code
-	dto.ModelVersion = &binding.Ref.Version
-	dto.ModelTitle = &binding.Ref.Title
-	return nil
-}
-
-func shouldAutoSubmitAssessment(dto assessmentApp.CreateAssessmentDTO) bool {
-	return dto.ModelCode != nil
-}
-
-func (s *InternalService) applyMatchedTaskOrigin(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	medicalScaleCode *string,
-	dto *assessmentApp.CreateAssessmentDTO,
-) *planApp.TaskAssessmentContext {
-	if s.taskAssessmentResolver == nil {
-		return nil
-	}
-
-	var matchedTask *planApp.TaskAssessmentContext
-	switch {
-	case req.TaskId != "":
-		scaleCode := ""
-		if medicalScaleCode != nil {
-			scaleCode = *medicalScaleCode
-		}
-		matchedTask = s.taskAssessmentResolver.ResolveTaskByIDForAssessment(ctx, planApp.TaskAssessmentResolveInput{
-			TaskID:            req.TaskId,
-			OrgID:             req.OrgId,
-			TesteeID:          req.TesteeId,
-			ScaleCode:         scaleCode,
-			QuestionnaireCode: req.QuestionnaireCode,
-		})
-	case medicalScaleCode != nil:
-		matchedTask = s.taskAssessmentResolver.ResolveOpenedTaskForAssessment(ctx, planApp.OpenedTaskResolveInput{
-			OrgID:     req.OrgId,
-			TesteeID:  req.TesteeId,
-			ScaleCode: *medicalScaleCode,
-		})
-	}
-	if matchedTask == nil {
-		return nil
-	}
-
-	planID := matchedTask.PlanID
-	dto.OriginType = "plan"
-	dto.OriginID = &planID
-	l.Infow("识别到计划任务上下文",
-		"task_id", matchedTask.TaskID,
-		"plan_id", planID,
-		"testee_id", req.TesteeId,
-	)
-	return matchedTask
-}
-
-func (s *InternalService) loadExistingAssessmentResponse(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	answerSheetID uint64,
-	orgID uint64,
-	matchedTask *planApp.TaskAssessmentContext,
-) (*pb.CreateAssessmentFromAnswerSheetResponse, bool) {
-	existing, err := s.intakeService.FindByAnswerSheetID(ctx, answerSheetID)
-	if err != nil || existing == nil {
-		return nil, false
-	}
-
-	l.Infow("检测到答卷已创建测评，直接返回",
-		"answersheet_id", answerSheetID,
-		"assessment_id", existing.ID,
-	)
-	s.completeMatchedTask(ctx, l, orgID, matchedTask, existing.ID)
-	return existingAssessmentResponse(existing.ID), true
-}
-
-func (s *InternalService) createAssessmentFromAnswerSheet(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	dto assessmentApp.CreateAssessmentDTO,
-	matchedTask *planApp.TaskAssessmentContext,
-	shouldAutoSubmit bool,
-) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
-	result, err := s.intakeService.CreateForAnswerSheet(ctx, dto)
-	if err != nil {
-		if errors.IsCode(err, errorCode.ErrAssessmentDuplicate) {
-			if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
-				l.Infow("测评已存在，返回已有结果",
-					"answersheet_id", req.AnswersheetId,
-				)
-				return response, nil
-			}
-		}
-
-		l.Errorw("创建测评失败",
-			"action", "create_assessment_from_answersheet",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, status.Errorf(codes.Internal, "创建测评失败: %v", err)
-	}
-
-	l.Infow("创建测评成功",
-		"action", "create_assessment_from_answersheet",
-		"assessment_id", result.ID,
-		"result", "success",
-	)
-
-	autoSubmitted := false
-	if shouldAutoSubmit {
-		autoSubmitted = s.autoSubmitAssessment(ctx, l, result.ID)
-	}
-
-	s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, result.ID)
-	s.markReportStatusQueued(ctx, result.ID, req.AnswersheetId)
-	return createdAssessmentResponse(result.ID, autoSubmitted), nil
-}
-
-func (s *InternalService) markReportStatusQueued(ctx context.Context, assessmentID, answerSheetID uint64) {
-	if s == nil || s.reportStatusReporter == nil || assessmentID == 0 {
-		return
-	}
-	s.reportStatusReporter.SetQueued(
-		ctx,
-		reportstatus.AssessmentKey(assessmentID),
-		reportstatus.AssessmentKey(answerSheetID),
-	)
-}
-
-func (s *InternalService) autoSubmitAssessment(ctx context.Context, l *logger.RequestLogger, assessmentID uint64) bool {
-	if _, err := s.intakeService.SubmitForEvaluation(ctx, assessmentID); err != nil {
-		l.Warnw("自动提交测评失败",
-			"assessment_id", assessmentID,
-			"error", err.Error(),
-		)
-		return false
-	}
-
-	l.Infow("自动提交测评成功",
-		"assessment_id", assessmentID,
-	)
-	return true
-}
-
-func existingAssessmentResponse(assessmentID uint64) *pb.CreateAssessmentFromAnswerSheetResponse {
-	return &pb.CreateAssessmentFromAnswerSheetResponse{
-		Success:       true,
-		AssessmentId:  assessmentID,
-		Created:       false,
-		AutoSubmitted: false,
-		Message:       "测评已存在",
-	}
-}
-
-func createdAssessmentResponse(assessmentID uint64, autoSubmitted bool) *pb.CreateAssessmentFromAnswerSheetResponse {
-	return &pb.CreateAssessmentFromAnswerSheetResponse{
-		Success:       true,
-		AssessmentId:  assessmentID,
-		Created:       true,
-		AutoSubmitted: autoSubmitted,
-		Message:       "测评创建成功",
-	}
-}
-
-func (s *InternalService) completeMatchedTask(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	orgID uint64,
-	task *planApp.TaskAssessmentContext,
-	assessmentID uint64,
-) {
-	if task == nil || s.planCommandService == nil || assessmentID == 0 {
-		return
-	}
-	if task.Completed {
-		return
-	}
-	targetOrgID, err := safeconv.Uint64ToInt64(orgID)
-	if err != nil {
-		l.Warnw("机构ID超出 int64 范围，跳过计划任务完成回写",
-			"org_id", orgID,
-			"assessment_id", assessmentID,
-			"error", err.Error(),
-		)
-		return
-	}
-
-	if _, err := s.planCommandService.CompleteTask(
-		ctx,
-		targetOrgID,
-		task.TaskID,
-		meta.FromUint64(assessmentID).String(),
-	); err != nil {
-		l.Warnw("回写计划任务完成状态失败",
-			"task_id", task.TaskID,
-			"assessment_id", assessmentID,
-			"error", err.Error(),
-		)
-		return
-	}
-
-	l.Infow("已回写计划任务完成状态",
-		"task_id", task.TaskID,
-		"plan_id", task.PlanID,
-		"assessment_id", assessmentID,
-	)
-}
-
-// EvaluateAssessment 执行测评评估
-// 场景：worker 处理 assessment.submitted 事件后调用
-func (s *InternalService) EvaluateAssessment(
-	ctx context.Context,
-	req *pb.EvaluateAssessmentRequest,
-) (*pb.EvaluateAssessmentResponse, error) {
-	return newAssessmentFlow(s).EvaluateAssessment(ctx, req)
-}
-
-// GenerateReportFromAssessment 基于已计分结果生成报告
-func (s *InternalService) GenerateReportFromAssessment(
-	ctx context.Context,
-	req *pb.GenerateReportFromAssessmentRequest,
-) (*pb.GenerateReportFromAssessmentResponse, error) {
-	return newAssessmentFlow(s).GenerateReportFromAssessment(ctx, req)
 }
 
 // SyncAssessmentAttention 同步测评后置关注状态

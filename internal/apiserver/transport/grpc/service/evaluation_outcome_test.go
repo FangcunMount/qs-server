@@ -11,9 +11,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *testing.T) {
-	svc := &EvaluationService{
-		participantReports: &fakeParticipantReportService{err: evalerrors.Forbidden("无权访问此测评")},
+func TestParticipantReportServiceRejectsWrongTestee(t *testing.T) {
+	svc := &ParticipantReportService{
+		service: &fakeParticipantReportService{err: evalerrors.Forbidden("无权访问此测评")},
 	}
 
 	_, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
@@ -25,12 +25,12 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *tes
 	}
 }
 
-func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *testing.T) {
+func TestParticipantReportServiceReturnsReportForOwner(t *testing.T) {
 	reportSvc := &fakeParticipantReportService{
 		report: &interpretationParticipant.Report{AssessmentID: 42},
 	}
-	svc := &EvaluationService{
-		participantReports: reportSvc,
+	svc := &ParticipantReportService{
+		service: reportSvc,
 	}
 
 	resp, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
@@ -48,8 +48,8 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *
 	}
 }
 
-func TestEvaluationServiceGetAssessmentReportRequiresTestee(t *testing.T) {
-	svc := &EvaluationService{participantReports: &fakeParticipantReportService{}}
+func TestParticipantReportServiceRequiresTestee(t *testing.T) {
+	svc := &ParticipantReportService{service: &fakeParticipantReportService{}}
 	_, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{AssessmentId: 99})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))

@@ -56,13 +56,17 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 	protoRoot := filepath.Clean("../../../../api/grpc/proto")
 	serviceRe := regexp.MustCompile(`(?m)^service\s+(\w+)`)
 	constructorByService := map[string]string{
-		"AssessmentModelCatalogService": "NewAssessmentModelCatalogService",
-		"ActorService":                  "NewActorService",
-		"AnswerSheetService":            "NewAnswerSheetService",
-		"EvaluationService":             "NewEvaluationService",
-		"InternalService":               "NewInternalService",
-		"PlanCommandService":            "NewPlanCommandService",
-		"QuestionnaireService":          "NewQuestionnaireService",
+		"AssessmentModelCatalogService":   "NewAssessmentModelCatalogService",
+		"ActorService":                    "NewActorService",
+		"AnswerSheetService":              "NewAnswerSheetService",
+		"TesteeEvaluationService":         "NewTesteeEvaluationService",
+		"AssessmentIntakeService":         "NewAssessmentIntakeService",
+		"EvaluationWorkerService":         "NewEvaluationWorkerService",
+		"ParticipantReportService":        "NewParticipantReportService",
+		"InterpretationAutomationService": "NewInterpretationAutomationService",
+		"InternalService":                 "NewInternalService",
+		"PlanCommandService":              "NewPlanCommandService",
+		"QuestionnaireService":            "NewQuestionnaireService",
 	}
 
 	err = filepath.WalkDir(protoRoot, func(path string, d os.DirEntry, err error) error {
@@ -108,6 +112,29 @@ func TestInternalProtoHasNoTagTesteeRPC(t *testing.T) {
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("internal.proto still contains legacy TagTestee contract: %s", forbidden)
+		}
+	}
+}
+
+func TestInternalServiceHasNoEvaluationJourneyRPCs(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile("../../../../api/grpc/proto/internalapi/internal.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	start := strings.Index(source, "service InternalService {")
+	if start < 0 {
+		t.Fatal("InternalService is missing")
+	}
+	end := strings.Index(source[start:], "\n}")
+	if end < 0 {
+		t.Fatal("InternalService is unterminated")
+	}
+	body := source[start : start+end]
+	for _, rpc := range []string{"CalculateAnswerSheetScore", "CreateAssessmentFromAnswerSheet", "EvaluateAssessment", "GenerateReportFromAssessment"} {
+		if strings.Contains(body, "rpc "+rpc+"(") {
+			t.Fatalf("InternalService still owns %s", rpc)
 		}
 	}
 }

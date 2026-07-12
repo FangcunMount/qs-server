@@ -30,7 +30,6 @@ func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 	log.Info("🔧 Building worker gRPC client bundle...")
 	bundle := container.ClientBundle{
 		AnswerSheet: r.answerSheetClient(),
-		Evaluation:  r.evaluationClient(),
 		Internal:    r.internalClient(),
 	}
 	log.Info("✅ Worker gRPC client bundle built")
@@ -44,16 +43,6 @@ func (r *GRPCClientRegistry) answerSheetClient() *grpcclient.AnswerSheetClient {
 		return nil
 	}
 	log.Info("   📋 AnswerSheet client added to bundle")
-	return client
-}
-
-func (r *GRPCClientRegistry) evaluationClient() *grpcclient.EvaluationClient {
-	client := r.manager.EvaluationClient()
-	if client == nil {
-		log.Warn("Evaluation client is not initialized, skipping registration")
-		return nil
-	}
-	log.Info("   📊 Evaluation client added to bundle")
 	return client
 }
 

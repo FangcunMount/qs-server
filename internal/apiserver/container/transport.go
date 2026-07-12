@@ -5,7 +5,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
+	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
@@ -303,7 +303,7 @@ type ServerRuntimeDeps struct {
 	StatisticsSyncService                 statisticsApp.StatisticsSyncService
 	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
 	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
-	EvaluationConsistencyReconcileService consistencyApp.Service
+	EvaluationConsistencyReconcileService evaluationScheduler.Service
 	AnswerSheetSubmittedRelay             answersheetApp.SubmittedEventRelay
 	AssessmentOutboxRelay                 appEventing.OutboxRelay
 }
@@ -347,7 +347,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.EvaluationModule != nil {
 		deps.AssessmentOutboxRelay = c.EvaluationModule.AssessmentOutboxRelay
-		deps.EvaluationConsistencyReconcileService = c.EvaluationModule.ConsistencyReconcileService
+		deps.EvaluationConsistencyReconcileService = c.EvaluationModule.SchedulerService
 	}
 
 	return deps

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	consistencyApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/consistency"
+	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
@@ -21,7 +21,7 @@ type fakeEvaluationConsistencyService struct {
 	block   <-chan struct{}
 }
 
-func (f *fakeEvaluationConsistencyService) ReconcileOnce(ctx context.Context, limit int) (int, error) {
+func (f *fakeEvaluationConsistencyService) AuditOnce(ctx context.Context, limit int) (int, error) {
 	f.mu.Lock()
 	f.limits = append(f.limits, limit)
 	err := f.err
@@ -293,7 +293,7 @@ func TestEvaluationConsistencyReconcileMultiInstanceOnlyOneExecutes(t *testing.T
 	}
 }
 
-var _ consistencyApp.Service = (*fakeEvaluationConsistencyService)(nil)
+var _ evaluationScheduler.Service = (*fakeEvaluationConsistencyService)(nil)
 
 func newTestEvaluationConsistencyReconcileOptions() *apiserveroptions.EvaluationConsistencyReconcileOptions {
 	return &apiserveroptions.EvaluationConsistencyReconcileOptions{

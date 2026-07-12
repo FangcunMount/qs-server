@@ -15,8 +15,19 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// SubmitAssessmentResolver resolves assessment_id after answer sheet persistence (internal gRPC).
-type SubmitAssessmentResolver interface {
+type EnsureAssessmentInput struct {
+	OrgID                uint64
+	AnswerSheetID        uint64
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	TesteeID             uint64
+	FillerID             uint64
+	TaskID               string
+}
+
+// SubmitAssessmentIntake synchronously advances accepted submission work to a durable Assessment.
+type SubmitAssessmentIntake interface {
+	EnsureAssessment(ctx context.Context, input EnsureAssessmentInput) (assessmentID uint64, err error)
 	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
 }
 
@@ -48,7 +59,7 @@ type SubmissionService struct {
 	committer          *SubmissionCommitter
 	queue              *SubmitQueue
 	submitGuard        IdempotencyGuard
-	assessmentResolver SubmitAssessmentResolver
+	assessmentIntake   SubmitAssessmentIntake
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -59,7 +70,7 @@ func NewSubmissionService(
 	profileLinkService profileLinkChecker,
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard IdempotencyGuard,
-	assessmentResolver SubmitAssessmentResolver,
+	assessmentIntake SubmitAssessmentIntake,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetWriter:  answerSheetWriter,
@@ -70,7 +81,7 @@ func NewSubmissionService(
 		answerConverter:    AnswerConverter{},
 		committer:          NewSubmissionCommitter(answerSheetWriter),
 		submitGuard:        submitGuard,
-		assessmentResolver: assessmentResolver,
+		assessmentIntake:   assessmentIntake,
 	}
 
 	if queueOptions == nil {
@@ -118,9 +129,23 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 		return nil, err
 	}
 	if doneID != "" {
+		assessmentID := ""
+		if answerSheetID, parseErr := strconv.ParseUint(doneID, 10, 64); parseErr == nil && s.assessmentIntake != nil {
+			_, id, resolveErr := s.assessmentIntake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+			if id != 0 {
+				assessmentID = strconv.FormatUint(id, 10)
+			}
+		}
+		if assessmentID == "" {
+			return nil, fmt.Errorf("completed answer sheet is missing assessment id")
+		}
 		return &SubmitAnswerSheetResponse{
-			ID:      doneID,
-			Message: "already submitted",
+			ID:           doneID,
+			AssessmentID: assessmentID,
+			Message:      "already submitted",
 		}, nil
 	}
 	if !acquired {
@@ -133,6 +158,9 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 		return nil, submitErr
 	}
 	if resp != nil {
+		if s.queue != nil && resp.AssessmentID != "" {
+			s.queue.setAssessmentID(requestID, resp.AssessmentID)
+		}
 		if err := s.submitGuard.Complete(context.Background(), key, lease, resp.ID); err != nil {
 			return nil, err
 		}
@@ -140,7 +168,7 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 	return resp, nil
 }
 
-// GetSubmitStatus 获取提交状态；done 后若测评已创建则附带 assessment_id。
+// GetSubmitStatus 获取提交状态。done 必须已经同时持久化两个 ID。
 func (s *SubmissionService) GetSubmitStatus(ctx context.Context, requestID string) (*SubmitStatusResponse, bool) {
 	if s.queue == nil {
 		return nil, false
@@ -150,26 +178,7 @@ func (s *SubmissionService) GetSubmitStatus(ctx context.Context, requestID strin
 	if !ok {
 		return nil, false
 	}
-	s.enrichAssessmentID(ctx, &status)
 	return &status, true
-}
-
-func (s *SubmissionService) enrichAssessmentID(ctx context.Context, status *SubmitStatusResponse) {
-	if status == nil || status.Status != SubmitStatusDone || status.AnswerSheetID == "" || status.AssessmentID != "" {
-		return
-	}
-	if s.assessmentResolver == nil {
-		return
-	}
-	answerSheetID, err := strconv.ParseUint(status.AnswerSheetID, 10, 64)
-	if err != nil || answerSheetID == 0 {
-		return
-	}
-	_, assessmentID, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
-	if err != nil || assessmentID == 0 {
-		return
-	}
-	status.AssessmentID = strconv.FormatUint(assessmentID, 10)
 }
 
 func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {
@@ -223,6 +232,21 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 		return nil, err
 	}
 
+	if s.assessmentIntake == nil {
+		return nil, fmt.Errorf("assessment intake not configured")
+	}
+	assessmentID, err := s.assessmentIntake.EnsureAssessment(ctx, EnsureAssessmentInput{
+		OrgID: orgID, AnswerSheetID: result.ID, QuestionnaireCode: req.QuestionnaireCode,
+		QuestionnaireVersion: req.QuestionnaireVersion, TesteeID: resolvedTesteeID,
+		FillerID: writerID, TaskID: req.TaskID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if assessmentID == 0 {
+		return nil, fmt.Errorf("assessment intake returned empty assessment id")
+	}
+
 	// 5. 记录成功日志
 	duration := time.Since(startTime)
 	l.Infow("提交答卷成功", "action", "submit_answersheet", "result", "success",
@@ -231,8 +255,9 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	)
 
 	return &SubmitAnswerSheetResponse{
-		ID:      strconv.FormatUint(result.ID, 10),
-		Message: result.Message,
+		ID:           strconv.FormatUint(result.ID, 10),
+		AssessmentID: strconv.FormatUint(assessmentID, 10),
+		Message:      result.Message,
 	}, nil
 }
 

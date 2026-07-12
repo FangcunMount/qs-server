@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 )
 
 // FactorScoreOutput 因子得分输出
@@ -43,15 +44,19 @@ type TrendPointOutput struct {
 
 // EvaluationClient 测评服务 gRPC 客户端封装
 type EvaluationClient struct {
-	client     *Client
-	grpcClient pb.EvaluationServiceClient
+	client       *Client
+	grpcClient   pb.TesteeEvaluationServiceClient
+	reportClient pb.ParticipantReportServiceClient
+	intakeClient pb.AssessmentIntakeServiceClient
 }
 
 // NewEvaluationClient 创建测评服务客户端
 func NewEvaluationClient(client *Client) *EvaluationClient {
 	return &EvaluationClient{
-		client:     client,
-		grpcClient: pb.NewEvaluationServiceClient(client.Conn()),
+		client:       client,
+		grpcClient:   pb.NewTesteeEvaluationServiceClient(client.Conn()),
+		reportClient: pb.NewParticipantReportServiceClient(client.Conn()),
+		intakeClient: pb.NewAssessmentIntakeServiceClient(client.Conn()),
 	}
 }
 
@@ -312,7 +317,7 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, testeeID, as
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{
+	resp, err := c.reportClient.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{
 		AssessmentId: assessmentID,
 		TesteeId:     testeeID,
 	})
@@ -327,13 +332,23 @@ func (c *EvaluationClient) ResolveAssessmentByAnswerSheetID(ctx context.Context,
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.ResolveAssessmentByAnswerSheetID(ctx, &pb.ResolveAssessmentByAnswerSheetIDRequest{
+	resp, err := c.intakeClient.ResolveAssessmentByAnswerSheetID(ctx, &pb.ResolveAssessmentByAnswerSheetIDRequest{
 		AnswerSheetId: answerSheetID,
 	})
 	if err != nil {
 		return 0, 0, err
 	}
 	return resp.GetTesteeId(), resp.GetAssessmentId(), nil
+}
+
+func (c *EvaluationClient) EnsureAssessment(ctx context.Context, input answersheet.EnsureAssessmentInput) (uint64, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	resp, err := c.intakeClient.EnsureAssessment(ctx, &pb.EnsureAssessmentRequest{OrgId: input.OrgID, AnswerSheetId: input.AnswerSheetID, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, TesteeId: input.TesteeID, FillerId: input.FillerID, TaskId: input.TaskID})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetAssessmentId(), nil
 }
 
 func convertAssessmentDetail(assessment *pb.AssessmentDetail) *AssessmentDetailOutput {
@@ -354,7 +369,6 @@ func convertAssessmentDetail(assessment *pb.AssessmentDetail) *AssessmentDetailO
 		OriginID:             assessment.GetOriginId(),
 		Status:               assessment.GetStatus(),
 		SubmittedAt:          assessment.GetSubmittedAt(),
-		InterpretedAt:        assessment.GetInterpretedAt(),
 		FailedAt:             assessment.GetFailedAt(),
 		FailureReason:        assessment.GetFailureReason(),
 	}
@@ -375,7 +389,6 @@ func convertAssessmentSummary(summary *pb.AssessmentSummary) AssessmentSummaryOu
 		OriginType:           summary.GetOriginType(),
 		Status:               summary.GetStatus(),
 		SubmittedAt:          summary.GetSubmittedAt(),
-		InterpretedAt:        summary.GetInterpretedAt(),
 	}
 }
 

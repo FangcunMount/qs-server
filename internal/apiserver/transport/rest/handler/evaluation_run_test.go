@@ -9,6 +9,7 @@ import (
 	"time"
 
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	runquery "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -58,9 +59,9 @@ func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 		},
 	}
 	handler := NewEvaluationHandler(
-		assessmentQuery,
+		evaluationoperator.NewRecoveryService(assessmentQuery),
 		nil,
-		assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, runQuery),
+		evaluationoperator.NewQueryService(assessmentapp.NewProtectedQueryService(assessmentQuery, nil, accessQuery, nil, runQuery)),
 		nil,
 		nil,
 	)

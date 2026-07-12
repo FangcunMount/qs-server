@@ -28,10 +28,6 @@ type InternalClient interface {
 		ctx context.Context,
 		req *pb.CreateAssessmentFromAnswerSheetRequest,
 	) (*pb.CreateAssessmentFromAnswerSheetResponse, error)
-	CalculateAnswerSheetScore(
-		ctx context.Context,
-		req *pb.CalculateAnswerSheetScoreRequest,
-	) (*pb.CalculateAnswerSheetScoreResponse, error)
 	EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error)
 	GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*pb.GenerateReportFromAssessmentResponse, error)
 	SyncAssessmentAttention(
@@ -66,7 +62,6 @@ type InternalClient interface {
 type Dependencies struct {
 	Logger               *slog.Logger
 	AnswerSheetClient    *grpcclient.AnswerSheetClient
-	EvaluationClient     *grpcclient.EvaluationClient
 	InternalClient       InternalClient
 	LockManager          locklease.Manager
 	LockKeyBuilder       *keyspace.Builder

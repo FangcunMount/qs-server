@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -325,7 +326,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 		AnswerSheet:   &AnswerSheetSubModule{},
 	}
 	c.ActorModule = &ActorModule{}
-	c.EvaluationModule = &EvaluationModule{OperatorRecoveryService: evaluationRecovery}
+	c.EvaluationModule = &EvaluationModule{OperatorRecoveryService: evaluationRecovery, OperatorRecovery: evaluationoperator.NewRecoveryService(evaluationRecovery)}
 	c.PlanModule = &PlanModule{CommandService: planCommand, QueryService: planQuery}
 	c.StatisticsModule = &StatisticsModule{}
 
@@ -336,7 +337,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("survey query service not extracted correctly: %#v", deps.Survey)
 	}
-	if deps.Evaluation.OperatorRecoveryService != evaluationRecovery || deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
+	if deps.Evaluation.OperatorRecoveryService == nil || deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
 		t.Fatalf("evaluation/plan/statistics dependencies not extracted correctly")
 	}
 	if deps.CodesService != c.CodesService {

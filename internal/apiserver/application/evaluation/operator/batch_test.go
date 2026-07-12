@@ -42,7 +42,7 @@ func TestEvaluateBatchValidatesEntireOrganizationBeforeExecuting(t *testing.T) {
 	}}
 	worker := &workerStub{}
 
-	if _, err := NewService(repo, worker).EvaluateBatch(context.Background(), 1, []uint64{1, 2}); err == nil {
+	if _, err := NewBatchExecutionService(repo, worker).EvaluateBatch(context.Background(), Actor{OrgID: 1}, []uint64{1, 2}); err == nil {
 		t.Fatal("EvaluateBatch() error = nil, want organization mismatch")
 	}
 	if len(worker.calls) != 0 {
@@ -58,7 +58,7 @@ func TestEvaluateBatchPreservesSynchronousAggregateResult(t *testing.T) {
 	}}
 	worker := &workerStub{fails: map[uint64]error{2: errors.New("failed")}}
 
-	result, err := NewService(repo, worker).EvaluateBatch(context.Background(), 1, []uint64{1, 2, 3})
+	result, err := NewBatchExecutionService(repo, worker).EvaluateBatch(context.Background(), Actor{OrgID: 1}, []uint64{1, 2, 3})
 	if err != nil {
 		t.Fatal(err)
 	}
