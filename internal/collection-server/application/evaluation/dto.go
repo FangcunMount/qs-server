@@ -111,7 +111,7 @@ type ListAssessmentsResponse struct {
 
 // AssessmentStatusResponse 测评状态响应（用于长轮询）
 type AssessmentStatusResponse struct {
-	Status          string   `json:"status"` // pending/submitted/interpreted/failed
+	Status          string   `json:"status" enums:"processing,interpreted,failed"` // 对外报告状态：处理中、已生成、失败
 	Stage           string   `json:"stage,omitempty"`
 	Message         string   `json:"message,omitempty"`
 	Reason          string   `json:"reason,omitempty"`

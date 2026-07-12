@@ -8,13 +8,15 @@ import (
 
 // SubmitAnswerSheetRequest 提交答卷请求
 type SubmitAnswerSheetRequest struct {
-	QuestionnaireCode    string   `json:"questionnaire_code" binding:"required"`
-	QuestionnaireVersion string   `json:"questionnaire_version" binding:"required"`
-	IdempotencyKey       string   `json:"idempotency_key,omitempty"`
-	Title                string   `json:"title"`
-	TesteeID             uint64   `json:"testee_id" binding:"required"`
-	TaskID               string   `json:"task_id,omitempty"`
-	Answers              []Answer `json:"answers" binding:"required"`
+	QuestionnaireCode    string `json:"questionnaire_code" binding:"required"`
+	QuestionnaireVersion string `json:"questionnaire_version" binding:"required"`
+	IdempotencyKey       string `json:"idempotency_key,omitempty"`
+	Title                string `json:"title"`
+	// The decoder accepts both JSON number and string. Publish string to avoid
+	// JavaScript precision loss for uint64 identifiers.
+	TesteeID uint64   `json:"testee_id" binding:"required" swaggertype:"string" example:"618855887087350318"`
+	TaskID   string   `json:"task_id,omitempty"`
+	Answers  []Answer `json:"answers" binding:"required"`
 }
 
 // UnmarshalJSON 自定义 JSON 反序列化，支持 testee_id 为字符串或数字

@@ -13,7 +13,7 @@ type ReportEventsSubscribeFrame struct {
 type ReportEventsStatusFrame struct {
 	Op   string `json:"op" example:"status"`
 	Data struct {
-		Status string `json:"status" example:"interpreted" enums:"pending,submitted,interpreted,failed"`
+		Status string `json:"status" example:"interpreted" enums:"processing,interpreted,failed"`
 	} `json:"data"`
 }
 

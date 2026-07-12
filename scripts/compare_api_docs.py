@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Dict, Iterable, Set, Tuple
@@ -41,18 +42,12 @@ def load_paths_from_openapi(file_path: Path) -> Set[Tuple[str, str]]:
 def load_paths_from_swagger(file_path: Path) -> Set[Tuple[str, str]]:
     data = json.loads(file_path.read_text())
     paths: Dict[str, Dict] = data.get("paths", {}) or {}
-    base_path = data.get("basePath", "") or ""
-    base_path = base_path.rstrip("/")
     items: Set[Tuple[str, str]] = set()
     for path, methods in paths.items():
         for method in methods.keys():
             if method.lower() not in {"get", "post", "put", "delete", "patch", "options", "head"}:
                 continue
-            # Normalize by stripping basePath for comparison
-            normalized = path
-            if base_path and normalized.startswith(base_path):
-                normalized = normalized[len(base_path) :]
-            items.add((method.upper(), normalized))
+            items.add((method.upper(), path))
     return items
 
 
@@ -93,7 +88,62 @@ def compare(service: str) -> bool:
     else:
         print("→ No rest-only paths.")
 
-    return not missing_in_rest and not missing_in_swagger
+    quality_errors = validate_openapi(rest_path)
+    if quality_errors:
+        print("→ OpenAPI quality errors:")
+        for error in quality_errors:
+            print(f"  {error}")
+    else:
+        print("→ OpenAPI operationId, path parameter, description, security and error-response checks passed.")
+
+    return not missing_in_rest and not missing_in_swagger and not quality_errors
+
+
+def validate_openapi(file_path: Path) -> list[str]:
+    """Validate generated-contract invariants that are not covered by path diff."""
+    data = yaml.safe_load(file_path.read_text()) or {}
+    errors: list[str] = []
+    if not data.get("security"):
+        errors.append("missing root security requirement")
+
+    operation_ids: dict[str, tuple[str, str]] = {}
+    paths = data.get("paths", {}) or {}
+    for path, methods in paths.items():
+        expected_path_params = set(re.findall(r"\{([^}]+)\}", path))
+        for method, operation in methods.items():
+            if method.lower() not in {"get", "post", "put", "delete", "patch", "options", "head"}:
+                continue
+            operation = operation or {}
+            operation_id = operation.get("operationId")
+            label = f"{method.upper()} {path}"
+            if not operation_id:
+                errors.append(f"{label}: missing operationId")
+            elif operation_id in operation_ids:
+                errors.append(f"{label}: duplicate operationId {operation_id!r} (also {operation_ids[operation_id][0]} {operation_ids[operation_id][1]})")
+            else:
+                operation_ids[operation_id] = (method.upper(), path)
+
+            actual_path_params = {
+                parameter.get("name")
+                for parameter in operation.get("parameters", []) or []
+                if parameter.get("in") == "path"
+            }
+            if expected_path_params != actual_path_params:
+                errors.append(f"{label}: path parameters {sorted(actual_path_params)} != template {sorted(expected_path_params)}")
+            for parameter in operation.get("parameters", []) or []:
+                if parameter.get("in") == "path" and parameter.get("required") is not True:
+                    errors.append(f"{label}: path parameter {parameter.get('name')!r} must be required")
+
+            if not operation.get("description"):
+                errors.append(f"{label}: missing description")
+            responses = {str(code): value for code, value in (operation.get("responses") or {}).items()}
+            if "500" not in responses:
+                errors.append(f"{label}: missing standard 500 error response")
+            if operation.get("security", data.get("security")):
+                for status in ("401", "403"):
+                    if status not in responses:
+                        errors.append(f"{label}: missing {status} security error response")
+    return errors
 
 
 def main():

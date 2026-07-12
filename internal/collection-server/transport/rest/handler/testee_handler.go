@@ -36,7 +36,7 @@ func NewTesteeHandler(testeeService *testee.Service, profileLinkService *iam.Pro
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees [post]
 func (h *TesteeHandler) Create(c *gin.Context) {
 	var req testee.CreateTesteeRequest
@@ -70,7 +70,7 @@ func (h *TesteeHandler) Create(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees/{id} [get]
 func (h *TesteeHandler) Get(c *gin.Context) {
 	idStr := h.GetPathParam(c, "id")
@@ -99,7 +99,7 @@ func (h *TesteeHandler) Get(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees/{id}/care-context [get]
 func (h *TesteeHandler) GetCareContext(c *gin.Context) {
 	idStr := h.GetPathParam(c, "id")
@@ -130,7 +130,7 @@ func (h *TesteeHandler) GetCareContext(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees/{id} [put]
 func (h *TesteeHandler) Update(c *gin.Context) {
 	idStr := h.GetPathParam(c, "id")
@@ -172,7 +172,7 @@ func (h *TesteeHandler) Update(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees [get]
 func (h *TesteeHandler) List(c *gin.Context) {
 	var req testee.ListTesteesRequest
@@ -225,7 +225,7 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees/exists [get]
 func (h *TesteeHandler) Exists(c *gin.Context) {
 	iamProfileID := h.GetQueryParam(c, "iam_profile_id")

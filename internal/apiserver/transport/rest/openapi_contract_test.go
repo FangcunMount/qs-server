@@ -2,6 +2,7 @@ package rest
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -39,6 +40,58 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/statistics/system", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
+}
+
+func TestApiserverOpenAPIHasExplicitModelAndInterpretationWireSchemas(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/apiserver.yaml")
+	for name, properties := range map[string][]string{
+		"response.DefinitionV2Wire":             {"Measure", "Calibration", "Conclusions", "Outcomes", "ReportMap"},
+		"response.PreviewReportRequestWire":     {"answers", "sample_id"},
+		"response.PreviewReportWire":            {"outcome", "score_detail", "report_sections"},
+		"response.InterpretationGenerationWire": {"ID", "OutcomeID", "LatestRun", "Report"},
+		"response.InterpretationRunWire":        {"ID", "GenerationID", "Status", "Failure"},
+	} {
+		schema, ok := schemas[name].(map[string]any)
+		if !ok {
+			t.Fatalf("missing explicit wire schema %s", name)
+		}
+		actual, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatalf("wire schema %s has no properties", name)
+		}
+		for _, property := range properties {
+			if _, ok := actual[property]; !ok {
+				t.Fatalf("wire schema %s missing property %q", name, property)
+			}
+		}
+	}
+}
+
+func TestApiserverOpenAPIPreservesRootAndOperationSecurity(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../api/rest/apiserver.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := root["security"].([]any); !ok {
+		t.Fatal("OpenAPI must retain root security")
+	}
+	paths := root["paths"].(map[string]any)
+	publicInfo := paths["/api/v1/public/info"].(map[string]any)["get"].(map[string]any)
+	if security, ok := publicInfo["security"].([]any); !ok || len(security) != 0 {
+		t.Fatal("public operation must explicitly override root security")
+	}
+	protected := paths["/api/v1/clinicians/me/workbench/queues/summary"].(map[string]any)["get"].(map[string]any)
+	if _, ok := protected["security"].([]any); !ok {
+		t.Fatal("operation-level security must be retained")
+	}
 }
 
 type openAPISpec struct {
@@ -86,6 +139,9 @@ func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
 
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {
 	t.Helper()
+	if path != "/health" && path != "/ping" && !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/internal/") {
+		path = "/api/v1" + path
+	}
 	ops, ok := spec.Paths[path]
 	if !ok {
 		t.Fatalf("OpenAPI missing path %s", path)

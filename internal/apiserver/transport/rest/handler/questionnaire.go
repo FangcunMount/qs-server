@@ -314,13 +314,13 @@ func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Param questionCode path string true "问题编码"
+// @Param qcode path string true "问题编码"
 // @Param request body request.UpdateQuestionRequest true "更新问题请求"
 // @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/{qcode} [put]
 func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 	qCode := c.Param("code")
-	questionCode := c.Param("questionCode")
+	questionCode := c.Param("qcode")
 	if qCode == "" || questionCode == "" {
 		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
 		return
@@ -369,12 +369,12 @@ func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Param questionCode path string true "问题编码"
+// @Param qcode path string true "问题编码"
 // @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/{qcode} [delete]
 func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 	qCode := c.Param("code")
-	questionCode := c.Param("questionCode")
+	questionCode := c.Param("qcode")
 	if qCode == "" || questionCode == "" {
 		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
 		return

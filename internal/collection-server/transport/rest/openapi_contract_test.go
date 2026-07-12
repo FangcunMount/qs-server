@@ -37,6 +37,43 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/health", "get")
 }
 
+func TestCollectionOpenAPIUsesStringTesteeIDAndCurrentReportStatuses(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
+	submit := schemas["answersheet.SubmitAnswerSheetRequest"].(map[string]any)
+	testeeID := submit["properties"].(map[string]any)["testee_id"].(map[string]any)
+	if testeeID["type"] != "string" {
+		t.Fatalf("testee_id schema type = %v, want string", testeeID["type"])
+	}
+
+	for _, name := range []string{"evaluation.AssessmentStatusResponse", "typologyassessment.AssessmentStatusResponse"} {
+		status := schemas[name].(map[string]any)["properties"].(map[string]any)["status"].(map[string]any)
+		if !openAPIEnumEquals(status["enum"], "processing", "interpreted", "failed") {
+			t.Fatalf("%s.status enum = %v, want processing/interpreted/failed", name, status["enum"])
+		}
+	}
+	frame := schemas["ws.ReportEventsStatusFrame"].(map[string]any)
+	data := frame["properties"].(map[string]any)["data"].(map[string]any)
+	status := data["properties"].(map[string]any)["status"].(map[string]any)
+	if !openAPIEnumEquals(status["enum"], "processing", "interpreted", "failed") {
+		t.Fatalf("websocket status enum = %v, want processing/interpreted/failed", status["enum"])
+	}
+}
+
+func openAPIEnumEquals(raw any, want ...string) bool {
+	values, ok := raw.([]any)
+	if !ok || len(values) != len(want) {
+		return false
+	}
+	for index, value := range values {
+		if value != want[index] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestCollectionOpenAPIHasNoLegacyPersonalityPaths(t *testing.T) {
 	t.Parallel()
 
@@ -53,9 +90,9 @@ func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
-		"/assessments/{id}",
-		"/assessments/{id}/report",
-		"/answersheets/{id}/assessment",
+		"/api/v1/assessments/{id}",
+		"/api/v1/assessments/{id}/report",
+		"/api/v1/answersheets/{id}/assessment",
 	} {
 		if _, ok := spec.Paths[path]; ok {
 			t.Fatalf("legacy v1 assessment read path still in OpenAPI: %s", path)
@@ -68,7 +105,7 @@ func TestCollectionOpenAPIHasNoScaleRoutes(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for path := range spec.Paths {
-		if strings.HasPrefix(path, "/"+"scales") {
+		if strings.HasPrefix(path, "/api/v1/scales") {
 			t.Fatalf("legacy scale path still in OpenAPI: %s", path)
 		}
 	}
@@ -125,7 +162,7 @@ func TestCollectionOpenAPIHasNoLegacyAlgorithmQueryParam(t *testing.T) {
 	t.Parallel()
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
-	for _, path := range []string{"/typology-assessments", "/typology-models"} {
+	for _, path := range []string{"/api/v1/typology-assessments", "/api/v1/typology-models"} {
 		ops, ok := spec.Paths[path]
 		if !ok {
 			t.Fatalf("OpenAPI missing path %s", path)
@@ -302,6 +339,9 @@ func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
 
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {
 	t.Helper()
+	if path != "/health" && path != "/ping" && !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/internal/") {
+		path = "/api/v1" + path
+	}
 	ops, ok := spec.Paths[path]
 	if !ok {
 		t.Fatalf("OpenAPI missing path %s", path)
@@ -319,13 +359,11 @@ func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
 		return false
 	}
 	switch {
-	case strings.HasPrefix(route.Path, "/governance/"):
-		return false
 	case strings.HasPrefix(route.Path, "/api/rest/"):
 		return false
 	case strings.HasPrefix(route.Path, "/swagger-ui/"):
 		return false
-	case route.Path == "/swagger" || route.Path == "/readyz":
+	case route.Path == "/swagger":
 		return false
 	default:
 		return true
@@ -333,11 +371,6 @@ func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
 }
 
 func normalizeCollectionOpenAPIPath(path string) string {
-	// basePath 为 /api/v1，OpenAPI 生成时仅剥离 v1 前缀。
-	path = strings.TrimPrefix(path, "/api/v1")
-	if path == "" {
-		path = "/"
-	}
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
 		if strings.HasPrefix(part, ":") {

@@ -8,9 +8,9 @@ info:
     url: https://github.com/FangcunMount/qs-server
   version: '1.0'
 servers:
-- url: http://localhost:18083/api/v1
+- url: http://localhost:18083
   description: 本地开发
-- url: https://collect.fangcunmount.cn/api/v1
+- url: https://collect.fangcunmount.cn
   description: 生产环境
 tags:
 - name: AssessmentModelCatalog
@@ -31,13 +31,17 @@ tags:
   description: 系统健康检查
 - name: 问卷
   description: 问卷查询
+security:
+- BearerAuth: []
 paths:
-  /answersheets:
+  /api/v1/answersheets:
     post:
       tags:
       - 答卷
       summary: 提交答卷
       description: 用户提交问卷答卷
+      security:
+      - BearerAuth: []
       operationId: 提交答卷
       requestBody:
         required: true
@@ -81,13 +85,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /answersheets/submit-status:
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/answersheets/submit-status:
     get:
       tags:
       - 答卷
       summary: 查询提交状态
       description: 根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带
         assessment_id（人格/医学通用），未就绪可继续轮询。
+      security:
+      - BearerAuth: []
       operationId: 查询提交状态
       parameters:
       - type: string
@@ -131,12 +143,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /answersheets/{id}:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/answersheets/{id}:
     get:
       tags:
       - 答卷
       summary: 获取答卷详情
       description: 根据ID获取答卷详情
+      security:
+      - BearerAuth: []
       operationId: 获取答卷详情
       parameters:
       - type: integer
@@ -180,12 +206,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessment-models:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-models:
     get:
       tags:
       - AssessmentModelCatalog
       summary: 获取已发布测评模型列表
       operationId: 获取已发布测评模型列表
+      description: 获取已发布测评模型列表
+      security: []
       parameters:
       - type: string
         description: 模型类型
@@ -211,12 +251,20 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/modelcatalog.ListResponse'
-  /assessment-models/hot:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-models/hot:
     get:
       tags:
       - AssessmentModelCatalog
       summary: 获取热门已发布测评模型
       operationId: 获取热门已发布测评模型
+      description: 获取热门已发布测评模型
+      security: []
       responses:
         '200':
           description: OK
@@ -229,12 +277,20 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/modelcatalog.HotResponse'
-  /assessment-models/options:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-models/options:
     get:
       tags:
       - AssessmentModelCatalog
       summary: 获取测评模型目录选项
       operationId: 获取测评模型目录选项
+      description: 获取测评模型目录选项
+      security: []
       parameters:
       - type: string
         description: 模型类型
@@ -252,12 +308,19 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/modelcatalog.OptionsResponse'
-  /assessment-models/{code}:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-models/{code}:
     get:
       tags:
       - AssessmentModelCatalog
       summary: 获取已发布测评模型
       operationId: 获取已发布测评模型
+      description: 获取已发布测评模型
       parameters:
       - type: string
         description: 模型编码
@@ -276,12 +339,32 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/modelcatalog.ModelResponse'
-  /assessments:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments:
     get:
       tags:
       - 测评
       summary: 查询医学量表测评列表
       description: 返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。
+      security:
+      - BearerAuth: []
       operationId: 查询医学量表测评列表
       parameters:
       - type: integer
@@ -349,12 +432,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/trend:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/trend:
     get:
       tags:
       - 测评
       summary: 获取因子得分趋势
       description: 获取指定因子的历史得分趋势
+      security:
+      - BearerAuth: []
       operationId: 获取因子得分趋势
       parameters:
       - type: integer
@@ -404,12 +501,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/factors/high-risk:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/factors/high-risk:
     get:
       tags:
       - 测评
       summary: 获取高风险因子
       description: 获取指定测评的高风险因子列表
+      security:
+      - BearerAuth: []
       operationId: 获取高风险因子
       parameters:
       - type: integer
@@ -454,12 +565,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/report-status:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/report-status:
     get:
       tags:
       - 测评
       summary: 查询报告生成状态
       description: 立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试
+      security:
+      - BearerAuth: []
       operationId: 查询报告生成状态
       parameters:
       - type: integer
@@ -502,12 +627,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/scores:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/scores:
     get:
       tags:
       - 测评
       summary: 获取测评得分详情
       description: 获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段
+      security:
+      - BearerAuth: []
       operationId: 获取测评得分详情
       parameters:
       - type: integer
@@ -552,12 +691,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/trend-summary:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/trend-summary:
     get:
       tags:
       - 测评
       summary: 获取测评趋势摘要
       description: 获取指定测评所属同量表、同版本的历史趋势摘要
+      security:
+      - BearerAuth: []
       operationId: 获取测评趋势摘要
       parameters:
       - type: integer
@@ -606,12 +759,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/wait-report:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/wait-report:
     get:
       tags:
       - 测评
       summary: 长轮询等待报告生成
       description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+      security:
+      - BearerAuth: []
       operationId: 长轮询等待报告生成
       parameters:
       - type: integer
@@ -661,13 +828,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /public/info:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/public/info:
     get:
       tags:
       - 系统
       summary: 服务信息
       description: 获取服务基本信息
       operationId: 服务信息
+      security: []
       responses:
         '200':
           description: OK
@@ -675,7 +855,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
-  /questionnaires:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/questionnaires:
     get:
       tags:
       - 问卷
@@ -725,7 +911,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /questionnaires/{code}:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/questionnaires/{code}:
     get:
       tags:
       - 问卷
@@ -773,7 +971,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /report-events:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/report-events:
     get:
       tags:
       - 报告事件
@@ -806,12 +1016,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /testees:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees:
     get:
       tags:
       - 受试者
       summary: 查询我的受试者列表
       description: 查询当前用户（监护人）的所有受试者列表（支持分页）
+      security:
+      - BearerAuth: []
       operationId: 查询我的受试者列表
       parameters:
       - type: integer
@@ -854,11 +1084,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - 受试者
       summary: 创建受试者
       description: 创建新的受试者信息
+      security:
+      - BearerAuth: []
       operationId: 创建受试者
       requestBody:
         required: true
@@ -896,12 +1134,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /testees/exists:
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/exists:
     get:
       tags:
       - 受试者
       summary: 检查受试者是否存在
       description: 根据 IAM ProfileID 检查受试者是否存在
+      security:
+      - BearerAuth: []
       operationId: 检查受试者是否存在
       parameters:
       - type: string
@@ -939,12 +1185,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /testees/{id}:
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/{id}:
     get:
       tags:
       - 受试者
       summary: 获取受试者详情
       description: 根据ID获取受试者详细信息
+      security:
+      - BearerAuth: []
       operationId: 获取受试者详情
       parameters:
       - type: integer
@@ -982,11 +1236,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     put:
       tags:
       - 受试者
       summary: 更新受试者信息
       description: 更新受试者的基本信息
+      security:
+      - BearerAuth: []
       operationId: 更新受试者信息
       parameters:
       - type: integer
@@ -1030,12 +1298,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /testees/{id}/care-context:
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/{id}/care-context:
     get:
       tags:
       - 受试者
       summary: 获取受试者照护上下文
       description: 获取当前受试者关联的临床人员和入口来源摘要
+      security:
+      - BearerAuth: []
       operationId: 获取受试者照护上下文
       parameters:
       - type: integer
@@ -1073,7 +1349,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /typology-assessment-sessions:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessment-sessions:
     post:
       tags:
       - 类型学测评
@@ -1119,7 +1407,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /typology-assessments:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessments:
     get:
       tags:
       - 类型学测评
@@ -1145,12 +1445,31 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologyassessment.ListAssessmentsResponse'
-  /typology-assessments/{id}:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessments/{id}:
     get:
       tags:
       - 类型学测评
       summary: 获取类型学测评详情
       operationId: 获取类型学测评详情
+      description: 获取类型学测评详情
       parameters:
       - type: integer
         description: 测评ID
@@ -1174,7 +1493,25 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologyassessment.AssessmentDetailResponse'
-  /typology-assessments/{id}/report:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessments/{id}/report:
     get:
       tags:
       - 类型学测评
@@ -1223,7 +1560,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /typology-assessments/{id}/report-status:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessments/{id}/report-status:
     get:
       tags:
       - 类型学测评
@@ -1254,7 +1603,25 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologyassessment.AssessmentStatusResponse'
-  /typology-assessments/{id}/wait-report:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-assessments/{id}/wait-report:
     get:
       tags:
       - 类型学测评
@@ -1289,7 +1656,25 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologyassessment.AssessmentStatusResponse'
-  /typology-models:
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-models:
     get:
       tags:
       - 类型学模型
@@ -1297,6 +1682,7 @@ paths:
       description: 浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用
         GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
       operationId: 获取类型学模型列表
+      security: []
       parameters:
       - type: integer
         default: 1
@@ -1320,12 +1706,20 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologymodel.ListTypologyModelsResponse'
-  /typology-models/categories:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-models/categories:
     get:
       tags:
       - 类型学模型
       summary: 获取类型学模型分类
       operationId: 获取类型学模型分类
+      description: 获取类型学模型分类
+      security: []
       responses:
         '200':
           description: OK
@@ -1338,12 +1732,19 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologymodel.TypologyModelCategoriesResponse'
-  /typology-models/{code}:
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/typology-models/{code}:
     get:
       tags:
       - 类型学模型
       summary: 获取类型学模型详情
       operationId: 获取类型学模型详情
+      description: 获取类型学模型详情
       parameters:
       - type: string
         description: 模型编码
@@ -1362,6 +1763,66 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/typologymodel.TypologyModelResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /governance/redis:
+    get:
+      tags:
+      - 系统
+      summary: Redis 治理状态
+      description: 返回 collection-server Redis family 的运行状态。
+      operationId: Redis治理状态
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /governance/resilience:
+    get:
+      tags:
+      - 系统
+      summary: 韧性治理状态
+      description: 返回限流、并发控制与降级能力的运行快照。
+      operationId: 韧性治理状态
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /health:
     get:
       tags:
@@ -1369,6 +1830,7 @@ paths:
       summary: 健康检查
       description: 检查服务健康状态
       operationId: 健康检查
+      security: []
       responses:
         '200':
           description: OK
@@ -1376,6 +1838,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /ping:
     get:
       tags:
@@ -1383,6 +1851,7 @@ paths:
       summary: Ping
       description: 测试服务连通性
       operationId: Ping
+      security: []
       responses:
         '200':
           description: OK
@@ -1390,6 +1859,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /readyz:
+    get:
+      tags:
+      - 系统
+      summary: 就绪检查
+      description: 返回 collection-server 及 Redis 依赖的就绪状态。
+      operationId: 就绪检查
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
     answersheet.AnswerSheetResponse:
@@ -1449,7 +1951,12 @@ components:
         task_id:
           type: string
         testee_id:
-          type: integer
+          description: 'The decoder accepts both JSON number and string. Publish string
+            to avoid
+
+            JavaScript precision loss for uint64 identifiers.'
+          type: string
+          example: '618855887087350318'
         title:
           type: string
     answersheet.SubmitStatusResponse:
@@ -1543,8 +2050,12 @@ components:
         stage:
           type: string
         status:
-          description: pending/submitted/interpreted/failed
+          description: 对外报告状态：处理中、已生成、失败
           type: string
+          enum:
+          - processing
+          - interpreted
+          - failed
         total_score:
           type: number
         updated_at:
@@ -2310,6 +2821,10 @@ components:
           type: string
         status:
           type: string
+          enum:
+          - processing
+          - interpreted
+          - failed
         updated_at:
           type: integer
     typologyassessment.ListAssessmentsResponse:
@@ -2562,8 +3077,7 @@ components:
             status:
               type: string
               enum:
-              - pending
-              - submitted
+              - processing
               - interpreted
               - failed
               example: interpreted

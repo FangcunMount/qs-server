@@ -14,9 +14,6 @@ import (
 // @in header
 // @name Authorization
 // @security BearerAuth
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
 
 func main() {
 	collection.NewApp("collection-server").Run()

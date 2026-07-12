@@ -71,7 +71,7 @@ func NewEvaluationHandler(
 // @Failure 400 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments [get]
 func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	testeeID, ok := h.parseRequiredTesteeID(c)
@@ -106,7 +106,7 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 	testeeIDStr := c.Query("testee_id")
@@ -142,7 +142,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/{id}/report-status [get]
 func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
 	testeeID, assessmentID, ok := h.parseReportStatusRequest(c)
@@ -169,7 +169,7 @@ func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	testeeID, assessmentID, timeout, ok := h.parseWaitReportRequest(c)
@@ -229,7 +229,7 @@ func applyReportPollRetryAfter(c *gin.Context, status *evaluation.AssessmentStat
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	testeeID, ok := h.parseRequiredTesteeID(c)
@@ -260,7 +260,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/{id}/trend-summary [get]
 func (h *EvaluationHandler) GetAssessmentTrendSummary(c *gin.Context) {
 	testeeID, ok := h.parseRequiredTesteeID(c)
@@ -294,7 +294,7 @@ func (h *EvaluationHandler) GetAssessmentTrendSummary(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/assessments/{id}/factors/high-risk [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	testeeID, ok := h.parseRequiredTesteeID(c)

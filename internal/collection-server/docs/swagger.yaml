@@ -51,7 +51,11 @@ definitions:
       task_id:
         type: string
       testee_id:
-        type: integer
+        description: |-
+          The decoder accepts both JSON number and string. Publish string to avoid
+          JavaScript precision loss for uint64 identifiers.
+        example: "618855887087350318"
+        type: string
       title:
         type: string
     required:
@@ -150,7 +154,11 @@ definitions:
       stage:
         type: string
       status:
-        description: pending/submitted/interpreted/failed
+        description: 对外报告状态：处理中、已生成、失败
+        enum:
+        - processing
+        - interpreted
+        - failed
         type: string
       total_score:
         type: number
@@ -916,6 +924,10 @@ definitions:
       stage:
         type: string
       status:
+        enum:
+        - processing
+        - interpreted
+        - failed
         type: string
       updated_at:
         type: integer
@@ -1167,8 +1179,7 @@ definitions:
         properties:
           status:
             enum:
-            - pending
-            - submitted
+            - processing
             - interpreted
             - failed
             example: interpreted
@@ -1225,7 +1236,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 提交答卷
       tags:
       - 答卷
@@ -1267,7 +1278,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取答卷详情
       tags:
       - 答卷
@@ -1310,7 +1321,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 查询提交状态
       tags:
       - 答卷
@@ -1470,7 +1481,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 查询医学量表测评列表
       tags:
       - 测评
@@ -1515,7 +1526,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取高风险因子
       tags:
       - 测评
@@ -1558,7 +1569,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 查询报告生成状态
       tags:
       - 测评
@@ -1603,7 +1614,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取测评得分详情
       tags:
       - 测评
@@ -1650,7 +1661,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取测评趋势摘要
       tags:
       - 测评
@@ -1700,7 +1711,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 长轮询等待报告生成
       tags:
       - 测评
@@ -1750,7 +1761,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取因子得分趋势
       tags:
       - 测评
@@ -1922,7 +1933,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 查询我的受试者列表
       tags:
       - 受试者
@@ -1962,7 +1973,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 创建受试者
       tags:
       - 受试者
@@ -2000,7 +2011,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取受试者详情
       tags:
       - 受试者
@@ -2045,7 +2056,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 更新受试者信息
       tags:
       - 受试者
@@ -2083,7 +2094,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取受试者照护上下文
       tags:
       - 受试者
@@ -2121,7 +2132,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 检查受试者是否存在
       tags:
       - 受试者
@@ -2396,6 +2407,32 @@ paths:
       summary: 获取类型学模型分类
       tags:
       - 类型学模型
+  /governance/redis:
+    get:
+      description: 返回 collection-server Redis family 的运行状态。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: Redis 治理状态
+      tags:
+      - 系统
+  /governance/resilience:
+    get:
+      description: 返回限流、并发控制与降级能力的运行快照。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 韧性治理状态
+      tags:
+      - 系统
   /health:
     get:
       description: 检查服务健康状态
@@ -2420,6 +2457,23 @@ paths:
           schema:
             $ref: '#/definitions/core.Response'
       summary: Ping
+      tags:
+      - 系统
+  /readyz:
+    get:
+      description: 返回 collection-server 及 Redis 依赖的就绪状态。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 就绪检查
       tags:
       - 系统
 schemes:

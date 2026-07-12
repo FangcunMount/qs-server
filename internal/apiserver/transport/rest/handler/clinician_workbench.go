@@ -29,8 +29,8 @@ func NewClinicianWorkbenchHandler(service workbenchApp.Service) *ClinicianWorkbe
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.ClinicianWorkbenchQueueSummaryResponse
-// @Router /clinicians/me/workbench/queues/summary [get]
-// @Router /practitioners/me/workbench/queues/summary [get]
+// @Router /api/v1/clinicians/me/workbench/queues/summary [get]
+// @Router /api/v1/practitioners/me/workbench/queues/summary [get]
 func (h *ClinicianWorkbenchHandler) GetMyClinicianWorkbenchQueueSummary(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -59,8 +59,8 @@ func (h *ClinicianWorkbenchHandler) GetMyClinicianWorkbenchQueueSummary(c *gin.C
 // @Param page query int false "页码，默认 1"
 // @Param page_size query int false "每页数量，默认 20，最大 100"
 // @Success 200 {object} response.ClinicianWorkbenchQueueResponse
-// @Router /clinicians/me/workbench/queues/{queue_type} [get]
-// @Router /practitioners/me/workbench/queues/{queue_type} [get]
+// @Router /api/v1/clinicians/me/workbench/queues/{queue_type} [get]
+// @Router /api/v1/practitioners/me/workbench/queues/{queue_type} [get]
 func (h *ClinicianWorkbenchHandler) ListMyClinicianWorkbenchQueue(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -93,7 +93,7 @@ func (h *ClinicianWorkbenchHandler) ListMyClinicianWorkbenchQueue(c *gin.Context
 // @Produce json
 // @Param clinician_id query int false "从业者 ID，可选"
 // @Success 200 {object} response.ClinicianWorkbenchQueueSummaryResponse
-// @Router /workbench/queues/summary [get]
+// @Router /api/v1/workbench/queues/summary [get]
 func (h *ClinicianWorkbenchHandler) GetOrgWorkbenchQueueSummary(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -128,7 +128,7 @@ func (h *ClinicianWorkbenchHandler) GetOrgWorkbenchQueueSummary(c *gin.Context) 
 // @Param page query int false "页码，默认 1"
 // @Param page_size query int false "每页数量，默认 20，最大 100"
 // @Success 200 {object} response.ClinicianWorkbenchQueueResponse
-// @Router /workbench/queues/{queue_type} [get]
+// @Router /api/v1/workbench/queues/{queue_type} [get]
 func (h *ClinicianWorkbenchHandler) ListOrgWorkbenchQueue(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {

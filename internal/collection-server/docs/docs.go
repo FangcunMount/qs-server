@@ -19,7 +19,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "用户提交问卷答卷",
@@ -94,7 +94,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带 assessment_id（人格/医学通用），未就绪可继续轮询。",
@@ -164,7 +164,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "根据ID获取答卷详情",
@@ -395,7 +395,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "返回受试者医学量表（model_kind=scale）测评列表。人格测评请使用 /api/v1/typology-assessments。",
@@ -503,7 +503,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "获取指定因子的历史得分趋势",
@@ -584,7 +584,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "获取指定测评的高风险因子列表",
@@ -658,7 +658,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试",
@@ -729,7 +729,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段",
@@ -803,7 +803,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "获取指定测评所属同量表、同版本的历史趋势摘要",
@@ -880,7 +880,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒",
@@ -1161,7 +1161,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "查询当前用户（监护人）的所有受试者列表（支持分页）",
@@ -1230,7 +1230,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "创建新的受试者信息",
@@ -1299,7 +1299,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "根据 IAM ProfileID 检查受试者是否存在",
@@ -1363,7 +1363,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "根据ID获取受试者详细信息",
@@ -1425,7 +1425,7 @@ const docTemplate = `{
             "put": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "更新受试者的基本信息",
@@ -1501,7 +1501,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "获取当前受试者关联的临床人员和入口来源摘要",
@@ -2001,6 +2001,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/governance/redis": {
+            "get": {
+                "description": "返回 collection-server Redis family 的运行状态。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "Redis 治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/governance/resilience": {
+            "get": {
+                "description": "返回限流、并发控制与降级能力的运行快照。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "韧性治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "检查服务健康状态",
@@ -2034,6 +2074,32 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/readyz": {
+            "get": {
+                "description": "返回 collection-server 及 Redis 依赖的就绪状态。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "就绪检查",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/core.Response"
                         }
@@ -2126,7 +2192,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "testee_id": {
-                    "type": "integer"
+                    "description": "The decoder accepts both JSON number and string. Publish string to avoid\nJavaScript precision loss for uint64 identifiers.",
+                    "type": "string",
+                    "example": "618855887087350318"
                 },
                 "title": {
                     "type": "string"
@@ -2264,8 +2332,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "description": "pending/submitted/interpreted/failed",
-                    "type": "string"
+                    "description": "对外报告状态：处理中、已生成、失败",
+                    "type": "string",
+                    "enum": [
+                        "processing",
+                        "interpreted",
+                        "failed"
+                    ]
                 },
                 "total_score": {
                     "type": "number"
@@ -3417,7 +3490,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "processing",
+                        "interpreted",
+                        "failed"
+                    ]
                 },
                 "updated_at": {
                     "type": "integer"
@@ -3791,8 +3869,7 @@ const docTemplate = `{
                         "status": {
                             "type": "string",
                             "enum": [
-                                "pending",
-                                "submitted",
+                                "processing",
                                 "interpreted",
                                 "failed"
                             ],

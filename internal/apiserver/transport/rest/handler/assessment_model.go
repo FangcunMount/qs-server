@@ -296,7 +296,7 @@ func (h *AssessmentModelHandler) GetQuestionnaire(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Success 200 {object} core.Response{data=response.AssessmentModelDefinitionResponse}
+// @Success 200 {object} core.Response{data=response.DefinitionV2Wire}
 // @Router /api/v1/assessment-models/{code}/definition [get]
 func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 	actor, err := assessmentModelActorContext(c)
@@ -319,8 +319,8 @@ func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.UpdateAssessmentModelDefinitionRequest true "DefinitionV2"
-// @Success 200 {object} core.Response{data=response.AssessmentModelDefinitionResponse}
+// @Param request body response.DefinitionV2Wire true "DefinitionV2"
+// @Success 200 {object} core.Response{data=response.DefinitionV2Wire}
 // @Router /api/v1/assessment-models/{code}/definition [put]
 func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	var req request.UpdateAssessmentModelDefinitionRequest
@@ -419,8 +419,8 @@ func (h *AssessmentModelHandler) Validate(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param request body request.PreviewAssessmentModelReportRequest true "预览输入"
-// @Success 200 {object} core.Response{data=response.AssessmentModelPreviewReportResponse}
+// @Param request body response.PreviewReportRequestWire true "预览输入"
+// @Success 200 {object} core.Response{data=response.PreviewReportWire}
 // @Router /api/v1/assessment-models/{code}/preview-report [post]
 func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	var req request.PreviewAssessmentModelReportRequest

@@ -161,8 +161,8 @@ docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
 
 docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 	@python -c "import yaml" 2>/dev/null || { echo "缺少 PyYAML，先执行: python -m pip install --quiet pyyaml"; exit 1; }
-	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:18082 --server https://qs.fangcunmount.cn
-	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.fangcunmount.cn
+	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:18082 --server https://qs.fangcunmount.cn --public-operation GET:/health --public-operation GET:/readyz --public-operation GET:/ping --public-operation GET:/governance/redis --public-operation GET:/api/v1/public/info --public-operation GET:/api/v1/public/assessment-entries/{token} --public-operation POST:/api/v1/public/assessment-entries/{token}/intake --public-operation GET:/api/v1/qrcodes/{filename}
+	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.fangcunmount.cn --root-security BearerAuth --public-operation GET:/health --public-operation GET:/readyz --public-operation GET:/ping --public-operation GET:/governance/redis --public-operation GET:/governance/resilience --public-operation GET:/api/v1/public/info --public-operation GET:/api/v1/assessment-models --public-operation GET:/api/v1/assessment-models/hot --public-operation GET:/api/v1/assessment-models/options --public-operation GET:/api/v1/typology-models --public-operation GET:/api/v1/typology-models/categories
 
 docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
 	python scripts/check_docs_hygiene.py

@@ -35,9 +35,9 @@ func TestCollectionOpenAPICoversK6PerfPaths(t *testing.T) {
 		}
 	}
 
-	reportOps, ok := spec.Paths["/report-events"]["get"].(map[string]any)
+	reportOps, ok := spec.Paths["/api/v1/report-events"]["get"].(map[string]any)
 	if !ok {
-		t.Fatal("missing GET /report-events")
+		t.Fatal("missing GET /api/v1/report-events")
 	}
 	desc, _ := reportOps["description"].(string)
 	if !strings.Contains(desc, "subscribe") {
@@ -67,10 +67,10 @@ func TestCollectionOpenAPIHasNoK6RemovedLegacyPaths(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
-		"/answersheets/{id}/assessment",
-		"/personality-models",
-		"/personality-assessment-sessions",
-		"/personality-assessments",
+		"/api/v1/answersheets/{id}/assessment",
+		"/api/v1/personality-models",
+		"/api/v1/personality-assessment-sessions",
+		"/api/v1/personality-assessments",
 	} {
 		if _, ok := spec.Paths[path]; ok {
 			t.Fatalf("legacy path should not be in OpenAPI: %s", path)

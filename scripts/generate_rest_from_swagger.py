@@ -5,9 +5,9 @@
 功能要点：
 1) 从 swagger v2 读取 info/tags/paths/definitions/securityDefinitions。
 2) 自动转换为 OpenAPI 3.1 结构，处理 $ref (#/definitions -> #/components/schemas)。
-3) 剥离 basePath 前缀，保持 api/rest 与 compare 脚本一致的路径形态。
+3) 保留 Swagger 的完整运行时路径；servers 只表示 host，绝不隐式拼接 basePath。
 4) requestBody：将 in: body/formData 合并为 application/json；其他参数直接保留。
-5) servers：可通过 --server 指定多个；若未指定则使用 basePath 或 "/"。
+5) servers：可通过 --server 指定多个；若未指定则使用 "/"。
 6) 输出采用紧凑的新格式：添加 contact、servers 带描述、tags 带描述、operationId 等。
 
 用法示例：
@@ -89,9 +89,39 @@ def to_request_body(params: List[Dict[str, Any]]) -> Tuple[Dict[str, Any] | None
     return None, normal_params
 
 
-def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
-    base_path = swagger.get("basePath", "") or ""
-    base_path = base_path.rstrip("/") or ""
+def error_response(description: str) -> Dict[str, Any]:
+    return {
+        "description": description,
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/core.ErrResponse"}},
+        },
+    }
+
+
+def unique_operation_ids(paths: Dict[str, Dict[str, Any]]) -> None:
+    """Make operationId stable and unique without changing the HTTP contract."""
+    seen: set[str] = set()
+    for path, methods in paths.items():
+        for method, operation in methods.items():
+            base = operation.get("operationId") or f"{method}_{path}"
+            candidate = base
+            if candidate in seen:
+                suffix = re.sub(r"[^A-Za-z0-9]+", "_", f"{method}_{path}").strip("_")
+                candidate = f"{base}_{suffix}"
+                index = 2
+                while candidate in seen:
+                    candidate = f"{base}_{suffix}_{index}"
+                    index += 1
+            operation["operationId"] = candidate
+            seen.add(candidate)
+
+
+def convert(
+    swagger: Dict[str, Any],
+    servers: List[str],
+    public_operations: set[Tuple[str, str]],
+    root_security: List[str],
+) -> Dict[str, Any]:
 
     # 构建 info，添加 contact 信息
     info = deepcopy(swagger.get("info", {}))
@@ -144,12 +174,18 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
         "paths": {},
         "components": {"schemas": rewrite_refs(swagger.get("definitions", {}))},
     }
+    root_requirements = deepcopy(swagger.get("security")) if swagger.get("security") is not None else None
+    if root_requirements is not None:
+        oas["security"] = root_requirements
+    elif root_security:
+        root_requirements = [{name: []} for name in root_security]
+        oas["security"] = root_requirements
 
     # servers - 添加描述
     if servers:
         server_list = []
         for s in servers:
-            url = s.rstrip("/") + (base_path or "")
+            url = s.rstrip("/") or "/"
             # 根据 URL 自动添加描述
             if "localhost" in url or "127.0.0.1" in url:
                 desc = "本地开发"
@@ -160,7 +196,7 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
             server_list.append({"url": url, "description": desc})
         oas["servers"] = server_list
     else:
-        oas["servers"] = [{"url": base_path or "/", "description": "默认服务器"}]
+        oas["servers"] = [{"url": "/", "description": "默认服务器"}]
 
     # tags - 在 servers 之后
     if tags:
@@ -173,11 +209,7 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
 
     # paths
     for raw_path, methods in swagger.get("paths", {}).items():
-        norm_path = raw_path
-        if base_path and norm_path.startswith(base_path):
-            norm_path = norm_path[len(base_path) :] or "/"
-        if not norm_path.startswith("/"):
-            norm_path = "/" + norm_path
+        norm_path = raw_path if raw_path.startswith("/") else "/" + raw_path
 
         oas.setdefault("paths", {}).setdefault(norm_path, {})
 
@@ -187,7 +219,7 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
 
             op = {
                 k: deepcopy(spec.get(k))
-                for k in ["tags", "summary", "description", "operationId", "deprecated"]
+                for k in ["tags", "summary", "description", "operationId", "deprecated", "security"]
                 if spec.get(k) is not None
             }
 
@@ -198,6 +230,13 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
                 op_id = re.sub(r'[^\w\u4e00-\u9fff]', '', summary)
                 if op_id:
                     op["operationId"] = op_id
+
+            if not op.get("description"):
+                op["description"] = op.get("summary", f"{method.upper()} {norm_path}")
+
+            if (method.upper(), norm_path) in public_operations:
+                # OpenAPI 3 uses an empty security requirement to override root security.
+                op["security"] = []
 
             params = deepcopy(spec.get("parameters", []))
             request_body, remain_params = to_request_body(params)
@@ -219,8 +258,19 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
             if responses:
                 op["responses"] = responses
 
+            op.setdefault("responses", {})
+            for code, response in op["responses"].items():
+                response.setdefault("description", f"HTTP {code}")
+
+            operation_security = op.get("security", root_requirements)
+            if operation_security:
+                op["responses"].setdefault("401", error_response("认证失败或访问令牌无效"))
+                op["responses"].setdefault("403", error_response("无权访问该资源"))
+            op["responses"].setdefault("500", error_response("服务内部错误"))
+
             oas["paths"][norm_path][method.lower()] = op
 
+    unique_operation_ids(oas["paths"])
     return oas
 
 
@@ -234,11 +284,31 @@ def main():
         default=[],
         help="Server URL (can be specified multiple times). If omitted, uses basePath or '/'.",
     )
+    parser.add_argument(
+        "--root-security",
+        action="append",
+        default=[],
+        metavar="SCHEME",
+        help="Root security scheme when Swagger does not declare a root security requirement.",
+    )
+    parser.add_argument(
+        "--public-operation",
+        action="append",
+        default=[],
+        metavar="METHOD:/path",
+        help="Operation that explicitly overrides root security (can be specified multiple times).",
+    )
     args = parser.parse_args()
 
     swagger_path = Path(args.swagger)
     swagger_data = json.loads(swagger_path.read_text())
-    oas = convert(swagger_data, args.server)
+    public_operations: set[Tuple[str, str]] = set()
+    for value in args.public_operation:
+        method, separator, path = value.partition(":")
+        if not separator or not method or not path.startswith("/"):
+            parser.error(f"invalid --public-operation {value!r}; expected METHOD:/path")
+        public_operations.add((method.upper(), path))
+    oas = convert(swagger_data, args.server, public_operations, args.root_security)
 
     # 确保输出顺序正确：openapi → info → servers → tags → paths → components
     ordered_oas = {}
@@ -248,6 +318,8 @@ def main():
         ordered_oas["servers"] = oas["servers"]
     if "tags" in oas:
         ordered_oas["tags"] = oas["tags"]
+    if "security" in oas:
+        ordered_oas["security"] = oas["security"]
     ordered_oas["paths"] = oas["paths"]
     ordered_oas["components"] = oas["components"]
 

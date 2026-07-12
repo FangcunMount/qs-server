@@ -21,7 +21,7 @@ type ListAssessmentsRequest struct {
 }
 
 type AssessmentStatusResponse struct {
-	Status          string                 `json:"status"`
+	Status          string                 `json:"status" enums:"processing,interpreted,failed"`
 	Stage           string                 `json:"stage,omitempty"`
 	Message         string                 `json:"message,omitempty"`
 	Reason          string                 `json:"reason,omitempty"`

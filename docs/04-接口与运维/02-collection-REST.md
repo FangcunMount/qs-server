@@ -12,7 +12,7 @@
 | REST 前缀 | 业务 API 在 `/api/v1`，公开信息在 `/api/v1/public` |
 | 健康治理 | `/health`、`/readyz`、`/governance/redis`、`/governance/resilience`、`/ping` |
 | OpenAPI | `/api/rest` 静态挂载，`/swagger-ui` UI，`/swagger` 跳转 |
-| Auth | IAM enabled 时 `/api/v1` 走 JWT + OrgScope + AuthzSnapshot，但已发布模型目录白名单可跳过 |
+| Auth | IAM enabled 时 `/api/v1` 走 JWT + UserIdentity + TenantDomain + AuthzSnapshot；HTTP 入口不解析 OrgScope，已发布目录白名单可跳过 |
 | RateLimit | submit/query/wait-report 走 global + user/ip 双层限流，优先 Redis backend，fallback local |
 | SubmitQueue | `POST /answersheets` 入队后返回 202 + request_id，状态通过 `/answersheets/submit-status` 查 |
 | 不负责 | 后台发布、统计同步、cache governance repair、operator 管理 |
@@ -91,13 +91,13 @@ collection RegisterRoutes 先设置：
 | questionnaire | `GET /api/v1/questionnaires`、`GET /api/v1/questionnaires/:code` |
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
 | assessment（因子/趋势/状态） | `GET /api/v1/assessments/trend`、`/:id/factors/high-risk`、`/:id/scores`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
-| assessment-model | `GET /api/v1/assessment-models?kind=scale`、`/hot?kind=scale`、`/options?kind=scale`、`/:code` |
+| assessment-model | `GET /api/v1/assessment-models`、`/hot`、`/options`、`/:code`；公开读取仅覆盖前三项 |
 | typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code`；由 generic catalog 的 DefinitionV2 投影 |
 | typology-session | `POST /api/v1/typology-assessment-sessions`（**小程序推荐入口**） |
 | typology-assessment | `GET /api/v1/typology-assessments`、`/:id`、`/:id/report`、`/:id/wait-report`（report/wait 需 `testee_id`） |
 | testee | `POST/GET /api/v1/testees`、`/exists`、`/:id`、`/:id/care-context`、`PUT /:id` |
 
-人格测评推荐流程见 **[小程序人格测评接入说明](./03-小程序人格测评接入.md)**。题版读取支持 `GET /questionnaires/:code?version=`；提交仍复用 `POST /answersheets`。
+人格测评推荐流程见 **[小程序接入文档](./15-小程序接入文档.md)**。题版读取支持 `GET /questionnaires/:code?version=`；提交仍复用 `POST /answersheets`。
 
 > **R108**：`/api/v1/personality-*` 已下线；类型学目录与测评统一使用 `/api/v1/typology-*`（见 `api/rest/collection.yaml`）。
 >
@@ -112,9 +112,9 @@ collection RegisterRoutes 先设置：
 collection 中 `isPublicCatalogReadOnly` 允许部分 GET 已发布模型/人格模型接口跳过 auth：
 
 ```text
-GET /api/v1/assessment-models?kind=scale
-GET /api/v1/assessment-models/hot?kind=scale
-GET /api/v1/assessment-models/options?kind=scale
+GET /api/v1/assessment-models
+GET /api/v1/assessment-models/hot
+GET /api/v1/assessment-models/options
 GET /api/v1/typology-models
 GET /api/v1/typology-models/categories
 ```
@@ -133,11 +133,10 @@ GET /api/v1/typology-models/categories
 JWTAuthMiddlewareWithOptions
 UserIdentityMiddleware
 RequireTenantDomainMiddleware
-RequireOrgScopeMiddleware
 AuthzSnapshotMiddleware
 ```
 
-collection 不做 ActiveOperator 校验，因为它面向前台用户，不是后台 operator。
+collection 不做 ActiveOperator 或 HTTP OrgScope 校验，因为它面向前台用户；组织归属由 testee 和业务层决定，不是由请求体的 `org_id` 决定。
 
 ---
 
@@ -221,6 +220,8 @@ collection 静态挂载：
 - `/swagger` redirect。
 
 注意：`/api/rest` 是 OpenAPI 文件，不是业务 API。
+
+OpenAPI 的 `servers` 只表示 host，`paths` 已保留完整 `/api/v1/...` 路径。规范 root 默认使用 `BearerAuth`；健康、服务信息和公开目录接口通过 operation `security: []` 显式匿名。`report-status` 与 WebSocket status 的枚举为 `processing`、`interpreted`、`failed`，前端不得继续判断 `pending` 或 `submitted`。
 
 ---
 

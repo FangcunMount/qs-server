@@ -9,9 +9,9 @@ func TestApiserverOpenAPIAssessmentModelKindSemantics(t *testing.T) {
 	t.Parallel()
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
-	listOps, ok := spec.Paths["/assessment-models"]["get"].(map[string]any)
+	listOps, ok := spec.Paths["/api/v1/assessment-models"]["get"].(map[string]any)
 	if !ok {
-		t.Fatal("missing GET /assessment-models")
+		t.Fatal("missing GET /api/v1/assessment-models")
 	}
 	desc, _ := listOps["description"].(string)
 	if !strings.Contains(desc, "typology") {

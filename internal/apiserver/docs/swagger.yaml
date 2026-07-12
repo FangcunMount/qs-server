@@ -445,22 +445,6 @@ definitions:
       value:
         type: string
     type: object
-  modelcatalog.PreviewOutcome:
-    properties:
-      code:
-        type: string
-      title:
-        type: string
-    type: object
-  modelcatalog.PreviewReportSection:
-    properties:
-      content:
-        type: string
-      kind:
-        type: string
-      title:
-        type: string
-    type: object
   modelcatalog.PublishedModelDetail:
     properties:
       algorithm:
@@ -533,7 +517,62 @@ definitions:
       normTableVersion:
         type: string
     type: object
-  report.Draft:
+  observability.FamilyStatus:
+    properties:
+      allow_warmup:
+        type: boolean
+      available:
+        type: boolean
+      component:
+        type: string
+      configured:
+        type: boolean
+      consecutive_failures:
+        type: integer
+      degraded:
+        type: boolean
+      family:
+        type: string
+      last_error:
+        type: string
+      last_failure_at:
+        type: string
+      last_success_at:
+        type: string
+      mode:
+        type: string
+      namespace:
+        type: string
+      profile:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  observability.RuntimeSnapshot:
+    properties:
+      component:
+        type: string
+      families:
+        items:
+          $ref: '#/definitions/observability.FamilyStatus'
+        type: array
+      generated_at:
+        type: string
+      summary:
+        $ref: '#/definitions/observability.RuntimeSummary'
+    type: object
+  observability.RuntimeSummary:
+    properties:
+      available_count:
+        type: integer
+      degraded_count:
+        type: integer
+      family_total:
+        type: integer
+      ready:
+        type: boolean
+      unavailable_count:
+        type: integer
     type: object
   request.AddQuestionRequest:
     properties:
@@ -860,8 +899,6 @@ definitions:
           type: string
         type: array
     type: object
-  request.PreviewAssessmentModelReportRequest:
-    type: object
   request.ReorderQuestionsRequest:
     properties:
       question_codes:
@@ -923,22 +960,6 @@ definitions:
         type: array
       title:
         type: string
-    type: object
-  request.UpdateAssessmentModelDefinitionRequest:
-    properties:
-      calibration:
-        $ref: '#/definitions/definition.Calibration'
-      conclusions:
-        items: {}
-        type: array
-      measure:
-        $ref: '#/definitions/definition.MeasureSpec'
-      outcomes:
-        items:
-          $ref: '#/definitions/conclusion.Outcome'
-        type: array
-      reportMap:
-        $ref: '#/definitions/definition.ReportMap'
     type: object
   request.UpdateClinicianRequest:
     properties:
@@ -1018,6 +1039,109 @@ definitions:
       name:
         description: 姓名
         type: string
+    type: object
+  resilienceplane.BackpressureSnapshot:
+    properties:
+      component:
+        type: string
+      degraded:
+        type: boolean
+      dependency:
+        type: string
+      enabled:
+        type: boolean
+      in_flight:
+        type: integer
+      max_inflight:
+        type: integer
+      name:
+        type: string
+      reason:
+        type: string
+      strategy:
+        type: string
+      timeout_millis:
+        type: integer
+    type: object
+  resilienceplane.CapabilitySnapshot:
+    properties:
+      configured:
+        type: boolean
+      degraded:
+        type: boolean
+      kind:
+        type: string
+      name:
+        type: string
+      reason:
+        type: string
+      strategy:
+        type: string
+    type: object
+  resilienceplane.QueueSnapshot:
+    properties:
+      capacity:
+        type: integer
+      component:
+        type: string
+      depth:
+        type: integer
+      generated_at:
+        type: string
+      lifecycle_boundary:
+        type: string
+      name:
+        type: string
+      status_counts:
+        additionalProperties:
+          type: integer
+        type: object
+      status_ttl_seconds:
+        type: integer
+      strategy:
+        type: string
+    type: object
+  resilienceplane.RuntimeSnapshot:
+    properties:
+      backpressure:
+        items:
+          $ref: '#/definitions/resilienceplane.BackpressureSnapshot'
+        type: array
+      component:
+        type: string
+      duplicate_suppression:
+        items:
+          $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
+        type: array
+      generated_at:
+        type: string
+      idempotency:
+        items:
+          $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
+        type: array
+      locks:
+        items:
+          $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
+        type: array
+      queues:
+        items:
+          $ref: '#/definitions/resilienceplane.QueueSnapshot'
+        type: array
+      rate_limits:
+        items:
+          $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
+        type: array
+      summary:
+        $ref: '#/definitions/resilienceplane.RuntimeSummary'
+    type: object
+  resilienceplane.RuntimeSummary:
+    properties:
+      capability_count:
+        type: integer
+      degraded_count:
+        type: integer
+      ready:
+        type: boolean
     type: object
   response.AnswerSheetListResponse:
     properties:
@@ -1104,22 +1228,6 @@ definitions:
           type: string
         type: array
     type: object
-  response.AssessmentModelDefinitionResponse:
-    properties:
-      calibration:
-        $ref: '#/definitions/definition.Calibration'
-      conclusions:
-        items: {}
-        type: array
-      measure:
-        $ref: '#/definitions/definition.MeasureSpec'
-      outcomes:
-        items:
-          $ref: '#/definitions/conclusion.Outcome'
-        type: array
-      reportMap:
-        $ref: '#/definitions/definition.ReportMap'
-    type: object
   response.AssessmentModelListResponse:
     properties:
       items:
@@ -1179,25 +1287,6 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
-    type: object
-  response.AssessmentModelPreviewReportResponse:
-    properties:
-      issues:
-        items:
-          $ref: '#/definitions/modelcatalog.ValidationIssue'
-        type: array
-      outcome:
-        $ref: '#/definitions/modelcatalog.PreviewOutcome'
-      raw_report:
-        $ref: '#/definitions/report.Draft'
-      report_sections:
-        items:
-          $ref: '#/definitions/modelcatalog.PreviewReportSection'
-        type: array
-      score_detail:
-        additionalProperties:
-          type: number
-        type: object
     type: object
   response.AssessmentModelQuestionnaireResponse:
     properties:
@@ -1531,6 +1620,317 @@ definitions:
       task_id:
         type: string
     type: object
+  response.DefinitionCalibrationWire:
+    properties:
+      NormRefs:
+        items:
+          $ref: '#/definitions/response.DefinitionNormRefWire'
+        type: array
+    type: object
+  response.DefinitionConclusionWire:
+    properties:
+      Decision:
+        $ref: '#/definitions/response.DefinitionTypeDecisionWire'
+      FactorCode:
+        type: string
+      FactorCodes:
+        items:
+          type: string
+        type: array
+      Kind:
+        enum:
+        - risk
+        - norm
+        - ability
+        - type
+        type: string
+      OutcomeMapping:
+        $ref: '#/definitions/response.DefinitionTypeOutcomeMappingWire'
+      Outcomes:
+        items:
+          $ref: '#/definitions/response.DefinitionOutcomeWire'
+        type: array
+      Primary:
+        type: boolean
+      Profiles:
+        items:
+          $ref: '#/definitions/response.DefinitionTypeProfileWire'
+        type: array
+      Rules:
+        items:
+          $ref: '#/definitions/response.DefinitionScoreRangeWire'
+        type: array
+      ScoreBasis:
+        enum:
+        - raw_score
+        - t_score
+        - percentile
+        type: string
+      SpecialRules:
+        items:
+          $ref: '#/definitions/response.DefinitionTypeSpecialRuleWire'
+        type: array
+    type: object
+  response.DefinitionFactorEdgeWire:
+    properties:
+      ChildCode:
+        type: string
+      ParentCode:
+        type: string
+    type: object
+  response.DefinitionFactorGraphWire:
+    properties:
+      Edges:
+        items:
+          $ref: '#/definitions/response.DefinitionFactorEdgeWire'
+        type: array
+      Roots:
+        items:
+          type: string
+        type: array
+      SortOrders:
+        additionalProperties:
+          type: integer
+        type: object
+    type: object
+  response.DefinitionFactorWire:
+    properties:
+      Code:
+        type: string
+      Role:
+        enum:
+        - dimension
+        - total
+        - index
+        - validity
+        - subtest
+        - task_set
+        - report_group
+        - ability_domain
+        type: string
+      Title:
+        type: string
+    type: object
+  response.DefinitionMeasureWire:
+    properties:
+      FactorGraph:
+        $ref: '#/definitions/response.DefinitionFactorGraphWire'
+      Factors:
+        items:
+          $ref: '#/definitions/response.DefinitionFactorWire'
+        type: array
+      Scoring:
+        items:
+          $ref: '#/definitions/response.DefinitionScoringWire'
+        type: array
+    type: object
+  response.DefinitionNormRefWire:
+    properties:
+      FactorCode:
+        type: string
+      NormTableVersion:
+        type: string
+    type: object
+  response.DefinitionOutcomeWire:
+    properties:
+      Code:
+        type: string
+      Description:
+        type: string
+      Summary:
+        type: string
+      Title:
+        type: string
+    type: object
+  response.DefinitionReportMapWire:
+    properties:
+      Sections:
+        items:
+          $ref: '#/definitions/response.DefinitionReportSectionWire'
+        type: array
+    type: object
+  response.DefinitionReportSectionWire:
+    properties:
+      AdapterKey:
+        type: string
+      CategoryLabel:
+        type: string
+      Code:
+        type: string
+      Kind:
+        type: string
+      SourceRefs:
+        items:
+          type: string
+        type: array
+      TemplateID:
+        type: string
+      Title:
+        type: string
+    type: object
+  response.DefinitionScoreRangeWire:
+    properties:
+      Description:
+        type: string
+      Level:
+        type: string
+      MaxScore:
+        type: number
+      MinScore:
+        type: number
+      OutcomeCode:
+        type: string
+      Summary:
+        type: string
+      Title:
+        type: string
+    type: object
+  response.DefinitionScoringParamsWire:
+    properties:
+      CntOptionContents:
+        items:
+          type: string
+        type: array
+    type: object
+  response.DefinitionScoringSourceWire:
+    properties:
+      Code:
+        type: string
+      Kind:
+        enum:
+        - question
+        - factor
+        type: string
+      OptionScores:
+        additionalProperties:
+          type: number
+        type: object
+      Sign:
+        type: number
+    type: object
+  response.DefinitionScoringWire:
+    properties:
+      Constant:
+        type: number
+      FactorCode:
+        type: string
+      MaxScore:
+        type: number
+      OptionScoring:
+        enum:
+        - strict
+        - compat
+        type: string
+      Params:
+        $ref: '#/definitions/response.DefinitionScoringParamsWire'
+      Sources:
+        items:
+          $ref: '#/definitions/response.DefinitionScoringSourceWire'
+        type: array
+      Strategy:
+        enum:
+        - sum
+        - avg
+        - weighted_sum
+        - weighted_avg
+        - max
+        - min
+        - cnt
+        type: string
+      Weights:
+        additionalProperties:
+          type: number
+        type: object
+    type: object
+  response.DefinitionTypeDecisionWire:
+    properties:
+      FallbackCode:
+        type: string
+      FallbackSimilarityThreshold:
+        type: number
+      Kind:
+        type: string
+    type: object
+  response.DefinitionTypeOutcomeMappingWire:
+    properties:
+      Algorithm:
+        type: string
+      DetailAdapterKey:
+        type: string
+      DetailKind:
+        type: string
+    type: object
+  response.DefinitionTypeProfileWire:
+    properties:
+      Commentary:
+        type: string
+      Image:
+        type: string
+      ImageURL:
+        type: string
+      IsSpecial:
+        type: boolean
+      OutcomeCode:
+        type: string
+      Pattern:
+        type: string
+      Strengths:
+        items:
+          type: string
+        type: array
+      Suggestions:
+        items:
+          type: string
+        type: array
+      Traits:
+        items:
+          type: string
+        type: array
+      Trigger:
+        type: string
+      Weaknesses:
+        items:
+          type: string
+        type: array
+    type: object
+  response.DefinitionTypeSpecialRuleWire:
+    properties:
+      Code:
+        type: string
+      Kind:
+        type: string
+      OptionValues:
+        items:
+          type: string
+        type: array
+      OutcomeCode:
+        type: string
+      Phase:
+        type: string
+      QuestionCodes:
+        items:
+          type: string
+        type: array
+      Trigger:
+        type: string
+    type: object
+  response.DefinitionV2Wire:
+    properties:
+      Calibration:
+        $ref: '#/definitions/response.DefinitionCalibrationWire'
+      Conclusions:
+        items:
+          $ref: '#/definitions/response.DefinitionConclusionWire'
+        type: array
+      Measure:
+        $ref: '#/definitions/response.DefinitionMeasureWire'
+      Outcomes:
+        items:
+          $ref: '#/definitions/response.DefinitionOutcomeWire'
+        type: array
+      ReportMap:
+        $ref: '#/definitions/response.DefinitionReportMapWire'
+    type: object
   response.DimensionItem:
     properties:
       description:
@@ -1690,6 +2090,84 @@ definitions:
         type: integer
       window_days:
         type: integer
+    type: object
+  response.InterpretationFailureWire:
+    properties:
+      Code:
+        type: string
+      Kind:
+        type: string
+      Retryable:
+        type: boolean
+      SafeMessage:
+        type: string
+    type: object
+  response.InterpretationGenerationWire:
+    properties:
+      CreatedAt:
+        type: string
+      ID:
+        type: integer
+      LatestRun:
+        $ref: '#/definitions/response.InterpretationRunWire'
+      LatestRunID:
+        type: integer
+      OutcomeID:
+        type: integer
+      Report:
+        $ref: '#/definitions/response.InterpretationReportWire'
+      ReportID:
+        type: integer
+      ReportType:
+        type: string
+      Status:
+        type: string
+      TemplateVersion:
+        type: string
+      UpdatedAt:
+        type: string
+      Version:
+        type: integer
+    type: object
+  response.InterpretationReportWire:
+    properties:
+      AssessmentID:
+        type: integer
+      GeneratedAt:
+        type: string
+      GenerationID:
+        type: integer
+      ID:
+        type: integer
+      OutcomeID:
+        type: integer
+      ReportType:
+        type: string
+      RunID:
+        type: integer
+      TemplateVersion:
+        type: string
+    type: object
+  response.InterpretationRunWire:
+    properties:
+      Attempt:
+        type: integer
+      Failure:
+        $ref: '#/definitions/response.InterpretationFailureWire'
+      FinishedAt:
+        type: string
+      GenerationID:
+        type: integer
+      ID:
+        type: integer
+      LeaseExpiresAt:
+        type: string
+      StartedAt:
+        type: string
+      Status:
+        type: string
+      TraceID:
+        type: string
     type: object
   response.ModelExtraResponse:
     properties:
@@ -1878,6 +2356,71 @@ definitions:
         type: integer
       trigger_time:
         description: 触发时间：HH:MM:SS
+        type: string
+    type: object
+  response.PreviewAnswerWire:
+    properties:
+      question_code:
+        type: string
+      score:
+        type: number
+      value:
+        type: string
+    type: object
+  response.PreviewOutcomeWire:
+    properties:
+      code:
+        type: string
+      title:
+        type: string
+    type: object
+  response.PreviewReportRequestWire:
+    properties:
+      answers:
+        items:
+          $ref: '#/definitions/response.PreviewAnswerWire'
+        type: array
+      sample_id:
+        type: string
+    type: object
+  response.PreviewReportSectionWire:
+    properties:
+      content:
+        type: string
+      kind:
+        type: string
+      title:
+        type: string
+    type: object
+  response.PreviewReportWire:
+    properties:
+      issues:
+        items:
+          $ref: '#/definitions/response.PreviewValidationIssueWire'
+        type: array
+      outcome:
+        $ref: '#/definitions/response.PreviewOutcomeWire'
+      raw_report:
+        additionalProperties: true
+        type: object
+      report_sections:
+        items:
+          $ref: '#/definitions/response.PreviewReportSectionWire'
+        type: array
+      score_detail:
+        additionalProperties:
+          type: number
+        type: object
+    type: object
+  response.PreviewValidationIssueWire:
+    properties:
+      code:
+        type: string
+      field:
+        type: string
+      level:
+        type: string
+      message:
         type: string
     type: object
   response.PublishedAssessmentModelListResponse:
@@ -2865,6 +3408,23 @@ definitions:
         description: 基础统计
         type: integer
     type: object
+  statistics.RepairCompleteRequest:
+    properties:
+      org_ids:
+        items:
+          type: integer
+        type: array
+      plan_ids:
+        items:
+          type: integer
+        type: array
+      questionnaire_codes:
+        items:
+          type: string
+        type: array
+      repair_kind:
+        type: string
+    type: object
   statistics.StatisticsOverview:
     properties:
       access_funnel:
@@ -3719,7 +4279,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.AssessmentModelDefinitionResponse'
+                  $ref: '#/definitions/response.DefinitionV2Wire'
               type: object
       summary: 获取测评模型定义
       tags:
@@ -3743,7 +4303,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/request.UpdateAssessmentModelDefinitionRequest'
+          $ref: '#/definitions/response.DefinitionV2Wire'
       produces:
       - application/json
       responses:
@@ -3754,7 +4314,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.AssessmentModelDefinitionResponse'
+                  $ref: '#/definitions/response.DefinitionV2Wire'
               type: object
       summary: 更新测评模型定义
       tags:
@@ -3779,7 +4339,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/request.PreviewAssessmentModelReportRequest'
+          $ref: '#/definitions/response.PreviewReportRequestWire'
       produces:
       - application/json
       responses:
@@ -3790,7 +4350,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.AssessmentModelPreviewReportResponse'
+                  $ref: '#/definitions/response.PreviewReportWire'
               type: object
       summary: 预览测评模型报告
       tags:
@@ -4812,6 +5372,51 @@ paths:
       summary: 查询当前临床人员获授权受试者报告详情
       tags:
       - Interpretation-Clinician
+  /api/v1/clinicians/me/workbench/queues/{queue_type}:
+    get:
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
+        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
+      parameters:
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
+        required: true
+        type: string
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列
+      tags:
+      - clinicians
+  /api/v1/clinicians/me/workbench/queues/summary:
+    get:
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列统计
+      tags:
+      - clinicians
   /api/v1/codes/apply:
     post:
       consumes:
@@ -6159,6 +6764,51 @@ paths:
       summary: 查询当前从业者受试者列表
       tags:
       - Clinician
+  /api/v1/practitioners/me/workbench/queues/{queue_type}:
+    get:
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
+        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
+      parameters:
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
+        required: true
+        type: string
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列
+      tags:
+      - clinicians
+  /api/v1/practitioners/me/workbench/queues/summary:
+    get:
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列统计
+      tags:
+      - clinicians
   /api/v1/public/assessment-entries/{token}:
     get:
       parameters:
@@ -6644,7 +7294,7 @@ paths:
         type: string
       - description: 问题编码
         in: path
-        name: questionCode
+        name: qcode
         required: true
         type: string
       produces:
@@ -6679,7 +7329,7 @@ paths:
         type: string
       - description: 问题编码
         in: path
-        name: questionCode
+        name: qcode
         required: true
         type: string
       - description: 更新问题请求
@@ -7632,7 +8282,7 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
-      - Bearer: []
+      - BearerAuth: []
       summary: 获取受试者详情
       tags:
       - 受试者
@@ -7876,6 +8526,60 @@ paths:
       summary: 根据 profile_id 获取受试者
       tags:
       - 受试者
+  /api/v1/workbench/queues/{queue_type}:
+    get:
+      description: queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅
+        qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      parameters:
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
+        required: true
+        type: string
+      - description: 从业者 ID，可选
+        in: query
+        name: clinician_id
+        type: integer
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取管理员全院工作台队列
+      tags:
+      - Workbench
+  /api/v1/workbench/queues/summary:
+    get:
+      description: 返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      parameters:
+      - description: 从业者 ID，可选
+        in: query
+        name: clinician_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取管理员全院工作台队列统计
+      tags:
+      - Workbench
   /api/v2/evaluations/assessments:
     get:
       description: 分页查询测评列表，响应使用 model/primary_score/level 投影
@@ -8011,51 +8715,19 @@ paths:
       summary: 查询 outcome 报告列表
       tags:
       - Evaluation-Report-Outcome
-  /clinicians/me/workbench/queues/{queue_type}:
+  /governance/redis:
     get:
-      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
-        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
-      parameters:
-      - description: 队列类型：high_risk/follow_up/key_focus
-        in: path
-        name: queue_type
-        required: true
-        type: string
-      - description: 页码，默认 1
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量，默认 20，最大 100
-        in: query
-        name: page_size
-        type: integer
+      description: 返回 apiserver Redis family 的运行状态。
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列
+            $ref: '#/definitions/observability.RuntimeSnapshot'
+      summary: Redis 治理状态
       tags:
-      - clinicians
-  /clinicians/me/workbench/queues/summary:
-    get:
-      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列统计
-      tags:
-      - clinicians
+      - health
   /health:
     get:
       description: 返回 apiserver 健康状态
@@ -8070,6 +8742,67 @@ paths:
       summary: 健康检查
       tags:
       - health
+  /internal/v1/cache/governance/hotset:
+    get:
+      description: 按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。
+      parameters:
+      - description: 缓存类型
+        in: query
+        name: kind
+        type: string
+      - description: 最大条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询缓存热集
+      tags:
+      - Statistics-Sync
+  /internal/v1/cache/governance/repair-complete:
+    post:
+      consumes:
+      - application/json
+      description: 内部治理回调，确认指定组织的缓存修复任务完成。
+      parameters:
+      - description: 修复完成事件
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/statistics.RepairCompleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 确认缓存修复完成
+      tags:
+      - Statistics-Sync
+  /internal/v1/cache/governance/status:
+    get:
+      description: 返回缓存治理任务及运行时状态，仅内部管理员可访问。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询缓存治理状态
+      tags:
+      - Statistics-Sync
   /internal/v1/cache/governance/warmup-targets:
     post:
       consumes:
@@ -8143,6 +8876,20 @@ paths:
       summary: 查询可重试失败运行列表
       tags:
       - Evaluation-Run-Internal
+  /internal/v1/events/status:
+    get:
+      description: 返回事件与 outbox 的只读运行快照，仅内部管理员可访问。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 事件投递状态
+      tags:
+      - System-Governance
   /internal/v1/interpretation/assessments/{assessment_id}/lifecycle:
     get:
       parameters:
@@ -8157,7 +8904,14 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.InterpretationGenerationWire'
+                  type: array
+              type: object
       summary: 查询 Assessment 的 Interpretation 生命周期
       tags:
       - Interpretation-Operations
@@ -8175,7 +8929,14 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.InterpretationReportWire'
+                  type: array
+              type: object
       summary: 查询 Assessment 的历史模板报告
       tags:
       - Interpretation-Operations
@@ -8193,7 +8954,14 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.InterpretationGenerationWire'
+                  type: array
+              type: object
       summary: 查询 Outcome 的报告生成历史
       tags:
       - Interpretation-Operations
@@ -8211,7 +8979,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.InterpretationReportWire'
+              type: object
       summary: 按 ReportID 查询 Interpretation 成品元数据
       tags:
       - Interpretation-Operations
@@ -8356,6 +9129,19 @@ paths:
       summary: 查询任务窗口
       tags:
       - Task-Query
+  /internal/v1/resilience/status:
+    get:
+      description: 返回限流、背压和锁的运行时治理快照，仅内部管理员可访问。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/resilienceplane.RuntimeSnapshot'
+      summary: 韧性治理状态
+      tags:
+      - System-Governance
   /internal/v1/statistics/sync/daily:
     post:
       consumes:
@@ -8659,105 +9445,25 @@ paths:
       summary: 连通性测试
       tags:
       - health
-  /practitioners/me/workbench/queues/{queue_type}:
+  /readyz:
     get:
-      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
-        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
-      parameters:
-      - description: 队列类型：high_risk/follow_up/key_focus
-        in: path
-        name: queue_type
-        required: true
-        type: string
-      - description: 页码，默认 1
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量，默认 20，最大 100
-        in: query
-        name: page_size
-        type: integer
+      description: 返回 apiserver 及其 Redis 依赖的就绪状态。
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列
-      tags:
-      - clinicians
-  /practitioners/me/workbench/queues/summary:
-    get:
-      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
           schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列统计
+            additionalProperties: true
+            type: object
+      summary: 就绪检查
       tags:
-      - clinicians
-  /workbench/queues/{queue_type}:
-    get:
-      description: queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅
-        qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
-      parameters:
-      - description: 队列类型：high_risk/follow_up/key_focus
-        in: path
-        name: queue_type
-        required: true
-        type: string
-      - description: 从业者 ID，可选
-        in: query
-        name: clinician_id
-        type: integer
-      - description: 页码，默认 1
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量，默认 20，最大 100
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取管理员全院工作台队列
-      tags:
-      - Workbench
-  /workbench/queues/summary:
-    get:
-      description: 返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
-      parameters:
-      - description: 从业者 ID，可选
-        in: query
-        name: clinician_id
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取管理员全院工作台队列统计
-      tags:
-      - Workbench
+      - health
 schemes:
 - http
 - https

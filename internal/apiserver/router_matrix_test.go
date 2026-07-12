@@ -455,15 +455,11 @@ func routeMustBeDocumented(route gin.RouteInfo) bool {
 		return false
 	}
 	switch {
-	case strings.HasPrefix(route.Path, "/internal/v1/"):
-		return false
-	case strings.HasPrefix(route.Path, "/governance/"):
-		return false
 	case strings.HasPrefix(route.Path, "/api/rest/"):
 		return false
 	case strings.HasPrefix(route.Path, "/swagger-ui/"):
 		return false
-	case route.Path == "/swagger" || route.Path == "/readyz":
+	case route.Path == "/swagger":
 		return false
 	default:
 		return true
@@ -471,11 +467,6 @@ func routeMustBeDocumented(route gin.RouteInfo) bool {
 }
 
 func normalizeOpenAPIPath(path string) string {
-	path = strings.TrimPrefix(path, "/api/v1")
-	path = strings.TrimPrefix(path, "/api/v2")
-	if path == "" {
-		path = "/"
-	}
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
 		if strings.HasPrefix(part, ":") {

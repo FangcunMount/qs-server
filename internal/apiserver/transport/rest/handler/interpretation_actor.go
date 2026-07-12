@@ -100,7 +100,7 @@ func (h *InterpretationOperationsHandler) actor(c *gin.Context) (interpretationo
 // @Tags Interpretation-Operations
 // @Produce json
 // @Param report_id path string true "报告ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=response.InterpretationReportWire}
 // @Router /internal/v1/interpretation/reports/{report_id} [get]
 func (h *InterpretationOperationsHandler) FindReport(c *gin.Context) {
 	a, ok := h.actor(c)
@@ -124,7 +124,7 @@ func (h *InterpretationOperationsHandler) FindReport(c *gin.Context) {
 // @Tags Interpretation-Operations
 // @Produce json
 // @Param outcome_id path string true "OutcomeID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=[]response.InterpretationGenerationWire}
 // @Router /internal/v1/interpretation/outcomes/{outcome_id}/generations [get]
 func (h *InterpretationOperationsHandler) FindOutcomeGenerations(c *gin.Context) {
 	a, ok := h.actor(c)
@@ -148,7 +148,7 @@ func (h *InterpretationOperationsHandler) FindOutcomeGenerations(c *gin.Context)
 // @Tags Interpretation-Operations
 // @Produce json
 // @Param assessment_id path string true "测评ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=[]response.InterpretationGenerationWire}
 // @Router /internal/v1/interpretation/assessments/{assessment_id}/lifecycle [get]
 func (h *InterpretationOperationsHandler) FindAssessmentLifecycle(c *gin.Context) {
 	a, ok := h.actor(c)
@@ -172,7 +172,7 @@ func (h *InterpretationOperationsHandler) FindAssessmentLifecycle(c *gin.Context
 // @Tags Interpretation-Operations
 // @Produce json
 // @Param assessment_id path string true "测评ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=[]response.InterpretationReportWire}
 // @Router /internal/v1/interpretation/assessments/{assessment_id}/reports [get]
 func (h *InterpretationOperationsHandler) ListAssessmentReports(c *gin.Context) {
 	a, ok := h.actor(c)

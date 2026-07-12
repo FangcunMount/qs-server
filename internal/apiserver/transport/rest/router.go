@@ -287,6 +287,14 @@ func (r *Router) ping(c *gin.Context) {
 	})
 }
 
+// readyCheck reports whether apiserver dependencies are ready.
+// @Summary 就绪检查
+// @Description 返回 apiserver 及其 Redis 依赖的就绪状态。
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 503 {object} map[string]interface{}
+// @Router /readyz [get]
 func (r *Router) readyCheck(c *gin.Context) {
 	snapshot := r.runtimeSnapshot(c)
 	statusCode := http.StatusOK
@@ -302,6 +310,13 @@ func (r *Router) readyCheck(c *gin.Context) {
 	})
 }
 
+// redisGovernance returns the Redis family governance snapshot.
+// @Summary Redis 治理状态
+// @Description 返回 apiserver Redis family 的运行状态。
+// @Tags health
+// @Produce json
+// @Success 200 {object} observability.RuntimeSnapshot
+// @Router /governance/redis [get]
 func (r *Router) redisGovernance(c *gin.Context) {
 	c.JSON(http.StatusOK, r.runtimeSnapshot(c))
 }

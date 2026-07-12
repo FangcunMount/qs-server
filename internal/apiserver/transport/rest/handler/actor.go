@@ -71,7 +71,7 @@ func NewTesteeHandler(
 // @Failure 403 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/testees/{id} [get]
 func (h *TesteeHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")

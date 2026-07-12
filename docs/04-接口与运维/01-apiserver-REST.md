@@ -9,8 +9,8 @@
 | 分组 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | Public | `/health`、`/readyz`、`/ping`、`/governance/redis`、`/api/v1/public/*`、`/api/v1/qrcodes/:filename` | 基础健康、公开信息、二维码对象 |
-| Protected | `/api/v1/*` | 后台业务 API：User、Questionnaire、AnswerSheet、Scale、Evaluation、Actor、Plan、Statistics、Codes、Admin |
-| Internal | `/internal/v1/*` | Plan/Statistics/Cache/Event/Resilience 内部治理和手工操作 |
+| Protected | `/api/v1/*`、`/api/v2/*` | 后台业务 API：ModelCatalog、问卷、答卷、Evaluation、Interpretation 查询、Actor、Plan、Statistics、Codes、Admin |
+| Internal | `/internal/v1/*` | Plan/Statistics/Cache/Event/Resilience，以及 Interpretation 生命周期审计 |
 | Auth chain | Protected/Internal group | JWT → UserIdentity → TenantDomain → OrgScope → ActiveOperator → AuthzSnapshot |
 
 一句话概括：
@@ -37,7 +37,7 @@ flowchart TB
     Public --> pubapi["/api/v1/public"]
     Public --> qrcode["/api/v1/qrcodes/:filename"]
 
-    Protected --> api["/api/v1"]
+    Protected --> api["/api/v1 + /api/v2"]
     Internal --> internal["/internal/v1"]
 ```
 
@@ -74,8 +74,9 @@ Protected group：
 - User。
 - Questionnaire。
 - AnswerSheet。
-- Scale。
-- Evaluation。
+- ModelCatalog（`/assessment-models`、DefinitionV2、预览和发布）。
+- Evaluation：兼容读写在 `/api/v1/evaluations*`，新事实读模型在 `/api/v2/evaluations/assessments*`。
+- Interpretation：面向临床人员的报告查询在 `/api/v1`，生命周期审计在 internal。
 - Actor。
 - Plan。
 - Statistics。
@@ -103,6 +104,7 @@ Internal group：
 | Cache governance | cache status、hotset、repair-complete |
 | Event status | event catalog/outbox 只读状态 |
 | Resilience status | rate limit/backpressure/lock 等只读状态 |
+| Interpretation operations | generation、run、report 生命周期审计 |
 
 Internal 并不等于“无认证”。当前 internal group 也会应用 protected group middleware。
 
@@ -162,7 +164,7 @@ internal/apiserver/transport/rest/registrars.go
 internal/apiserver/transport/rest/routes_*.go
 ```
 
-修改路由后必须更新 OpenAPI。
+规范中的 `servers` 只包含 host；`paths` 保留完整运行时路径（包括 `/api/v1`、`/api/v2`、`/internal/v1`）。root `BearerAuth` 适用于默认 operation，公开 operation 用 `security: []` 覆盖；operation 级 security 不会被生成器丢弃。修改路由后必须更新 OpenAPI。
 
 ---
 
@@ -211,6 +213,7 @@ internal/apiserver/transport/rest/routes_*.go
 
 ```bash
 go test ./internal/apiserver/transport/rest
+go test ./internal/apiserver
 make docs-rest
 make docs-verify
 ```

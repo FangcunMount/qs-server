@@ -763,6 +763,16 @@ func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 	h.Success(c, gin.H{"message": "计划统计同步完成"})
 }
 
+// RepairComplete marks an asynchronous cache repair as complete.
+// @Summary 确认缓存修复完成
+// @Description 内部治理回调，确认指定组织的缓存修复任务完成。
+// @Tags Statistics-Sync
+// @Accept json
+// @Produce json
+// @Param request body statistics.RepairCompleteRequest true "修复完成事件"
+// @Success 200 {object} core.Response
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/cache/governance/repair-complete [post]
 func (h *StatisticsHandler) RepairComplete(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -815,6 +825,13 @@ func (h *StatisticsHandler) WarmupTargets(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// CacheGovernanceStatus returns the cache-governance runtime status.
+// @Summary 查询缓存治理状态
+// @Description 返回缓存治理任务及运行时状态，仅内部管理员可访问。
+// @Tags Statistics-Sync
+// @Produce json
+// @Success 200 {object} core.Response
+// @Router /internal/v1/cache/governance/status [get]
 func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
 	result, err := h.governance().GetStatus(c.Request.Context())
 	if err != nil {
@@ -824,6 +841,15 @@ func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// CacheGovernanceHotset returns the active cache hotset.
+// @Summary 查询缓存热集
+// @Description 按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。
+// @Tags Statistics-Sync
+// @Produce json
+// @Param kind query string false "缓存类型"
+// @Param limit query int false "最大条数"
+// @Success 200 {object} core.Response
+// @Router /internal/v1/cache/governance/hotset [get]
 func (h *StatisticsHandler) CacheGovernanceHotset(c *gin.Context) {
 	result, err := h.governance().GetHotset(c.Request.Context(), c.Query("kind"), c.Query("limit"))
 	if err != nil {

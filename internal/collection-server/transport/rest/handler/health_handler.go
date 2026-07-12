@@ -49,6 +49,13 @@ func (h *HealthHandler) Health(c *gin.Context) {
 }
 
 // Ready 就绪检查
+// @Summary 就绪检查
+// @Description 返回 collection-server 及 Redis 依赖的就绪状态。
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} core.Response
+// @Failure 503 {object} core.Response
+// @Router /readyz [get]
 func (h *HealthHandler) Ready(c *gin.Context) {
 	snapshot := observability.SnapshotForComponent(h.serviceName, h.status)
 	statusCode := http.StatusOK
@@ -70,11 +77,23 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 }
 
 // RedisFamilies 返回 Redis family 治理快照
+// @Summary Redis 治理状态
+// @Description 返回 collection-server Redis family 的运行状态。
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} core.Response
+// @Router /governance/redis [get]
 func (h *HealthHandler) RedisFamilies(c *gin.Context) {
 	core.WriteResponse(c, nil, observability.SnapshotForComponent(h.serviceName, h.status))
 }
 
 // Resilience 返回 collection-server 高并发治理只读快照。
+// @Summary 韧性治理状态
+// @Description 返回限流、并发控制与降级能力的运行快照。
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} core.Response
+// @Router /governance/resilience [get]
 func (h *HealthHandler) Resilience(c *gin.Context) {
 	if h != nil && h.resilience != nil {
 		core.WriteResponse(c, nil, h.resilience())

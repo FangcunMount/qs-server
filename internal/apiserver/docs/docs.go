@@ -1041,7 +1041,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelDefinitionResponse"
+                                            "$ref": "#/definitions/response.DefinitionV2Wire"
                                         }
                                     }
                                 }
@@ -1082,7 +1082,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/request.UpdateAssessmentModelDefinitionRequest"
+                            "$ref": "#/definitions/response.DefinitionV2Wire"
                         }
                     }
                 ],
@@ -1098,7 +1098,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelDefinitionResponse"
+                                            "$ref": "#/definitions/response.DefinitionV2Wire"
                                         }
                                     }
                                 }
@@ -1141,7 +1141,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/request.PreviewAssessmentModelReportRequest"
+                            "$ref": "#/definitions/response.PreviewReportRequestWire"
                         }
                     }
                 ],
@@ -1157,7 +1157,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelPreviewReportResponse"
+                                            "$ref": "#/definitions/response.PreviewReportWire"
                                         }
                                     }
                                 }
@@ -2155,6 +2155,77 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me/workbench/queues/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clinicians"
+                ],
+                "summary": "获取当前医生工作台队列统计",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me/workbench/queues/{queue_type}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clinicians"
+                ],
+                "summary": "获取当前医生工作台队列",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "队列类型：high_risk/follow_up/key_focus",
+                        "name": "queue_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，默认 20，最大 100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
                         }
                     }
                 }
@@ -4287,6 +4358,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/practitioners/me/workbench/queues/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clinicians"
+                ],
+                "summary": "获取当前医生工作台队列统计",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/practitioners/me/workbench/queues/{queue_type}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clinicians"
+                ],
+                "summary": "获取当前医生工作台队列",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "队列类型：high_risk/follow_up/key_focus",
+                        "name": "queue_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，默认 20，最大 100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/practitioners/{id}": {
             "get": {
                 "produces": [
@@ -5668,7 +5810,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "问题编码",
-                        "name": "questionCode",
+                        "name": "qcode",
                         "in": "path",
                         "required": true
                     },
@@ -5733,7 +5875,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "问题编码",
-                        "name": "questionCode",
+                        "name": "qcode",
                         "in": "path",
                         "required": true
                     }
@@ -7036,7 +7178,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "Bearer": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "根据受试者 ID 获取受试者详情",
@@ -7433,6 +7575,91 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/workbench/queues/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workbench"
+                ],
+                "summary": "获取管理员全院工作台队列统计",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "从业者 ID，可选",
+                        "name": "clinician_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/workbench/queues/{queue_type}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workbench"
+                ],
+                "summary": "获取管理员全院工作台队列",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "队列类型：high_risk/follow_up/key_focus",
+                        "name": "queue_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "从业者 ID，可选",
+                        "name": "clinician_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，默认 20，最大 100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v2/evaluations/assessments": {
             "get": {
                 "description": "分页查询测评列表，响应使用 model/primary_score/level 投影",
@@ -7654,72 +7881,21 @@ const docTemplate = `{
                 }
             }
         },
-        "/clinicians/me/workbench/queues/summary": {
+        "/governance/redis": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。",
+                "description": "返回 apiserver Redis family 的运行状态。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "clinicians"
+                    "health"
                 ],
-                "summary": "获取当前医生工作台队列统计",
+                "summary": "Redis 治理状态",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/clinicians/me/workbench/queues/{queue_type}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "clinicians"
-                ],
-                "summary": "获取当前医生工作台队列",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "队列类型：high_risk/follow_up/key_focus",
-                        "name": "queue_type",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码，默认 1",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量，默认 20，最大 100",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
+                            "$ref": "#/definitions/observability.RuntimeSnapshot"
                         }
                     }
                 }
@@ -7741,6 +7917,100 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/cache/governance/hotset": {
+            "get": {
+                "description": "按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "查询缓存热集",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "缓存类型",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "最大条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/cache/governance/repair-complete": {
+            "post": {
+                "description": "内部治理回调，确认指定组织的缓存修复任务完成。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "确认缓存修复完成",
+                "parameters": [
+                    {
+                        "description": "修复完成事件",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/statistics.RepairCompleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/cache/governance/status": {
+            "get": {
+                "description": "返回缓存治理任务及运行时状态，仅内部管理员可访问。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "查询缓存治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -7865,6 +8135,27 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/events/status": {
+            "get": {
+                "description": "返回事件与 outbox 的只读运行快照，仅内部管理员可访问。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "事件投递状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/interpretation/assessments/{assessment_id}/lifecycle": {
             "get": {
                 "produces": [
@@ -7887,7 +8178,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/response.InterpretationGenerationWire"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -7915,7 +8221,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/response.InterpretationReportWire"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -7943,7 +8264,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/response.InterpretationGenerationWire"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -7971,7 +8307,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.InterpretationReportWire"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8199,6 +8547,26 @@ const docTemplate = `{
                         "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/resilience/status": {
+            "get": {
+                "description": "返回限流、背压和锁的运行时治理快照，仅内部管理员可访问。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "韧性治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/resilienceplane.RuntimeSnapshot"
                         }
                     }
                 }
@@ -8673,157 +9041,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/practitioners/me/workbench/queues/summary": {
+        "/readyz": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。",
+                "description": "返回 apiserver 及其 Redis 依赖的就绪状态。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "clinicians"
+                    "health"
                 ],
-                "summary": "获取当前医生工作台队列统计",
+                "summary": "就绪检查",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
+                            "type": "object",
+                            "additionalProperties": true
                         }
-                    }
-                }
-            }
-        },
-        "/practitioners/me/workbench/queues/{queue_type}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "clinicians"
-                ],
-                "summary": "获取当前医生工作台队列",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "队列类型：high_risk/follow_up/key_focus",
-                        "name": "queue_type",
-                        "in": "path",
-                        "required": true
                     },
-                    {
-                        "type": "integer",
-                        "description": "页码，默认 1",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量，默认 20，最大 100",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/workbench/queues/summary": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Workbench"
-                ],
-                "summary": "获取管理员全院工作台队列统计",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "从业者 ID，可选",
-                        "name": "clinician_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/workbench/queues/{queue_type}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Workbench"
-                ],
-                "summary": "获取管理员全院工作台队列",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "队列类型：high_risk/follow_up/key_focus",
-                        "name": "queue_type",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "从业者 ID，可选",
-                        "name": "clinician_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码，默认 1",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量，默认 20，最大 100",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -9476,31 +9716,6 @@ const docTemplate = `{
                 }
             }
         },
-        "modelcatalog.PreviewOutcome": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "modelcatalog.PreviewReportSection": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "modelcatalog.PublishedModelDetail": {
             "type": "object",
             "properties": {
@@ -9609,8 +9824,92 @@ const docTemplate = `{
                 }
             }
         },
-        "report.Draft": {
-            "type": "object"
+        "observability.FamilyStatus": {
+            "type": "object",
+            "properties": {
+                "allow_warmup": {
+                    "type": "boolean"
+                },
+                "available": {
+                    "type": "boolean"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "observability.RuntimeSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/observability.FamilyStatus"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/observability.RuntimeSummary"
+                }
+            }
+        },
+        "observability.RuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "available_count": {
+                    "type": "integer"
+                },
+                "degraded_count": {
+                    "type": "integer"
+                },
+                "family_total": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
+                },
+                "unavailable_count": {
+                    "type": "integer"
+                }
+            }
         },
         "request.AddQuestionRequest": {
             "type": "object",
@@ -10095,9 +10394,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.PreviewAssessmentModelReportRequest": {
-            "type": "object"
-        },
         "request.ReorderQuestionsRequest": {
             "type": "object",
             "properties": {
@@ -10189,30 +10485,6 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
-                }
-            }
-        },
-        "request.UpdateAssessmentModelDefinitionRequest": {
-            "type": "object",
-            "properties": {
-                "calibration": {
-                    "$ref": "#/definitions/definition.Calibration"
-                },
-                "conclusions": {
-                    "type": "array",
-                    "items": {}
-                },
-                "measure": {
-                    "$ref": "#/definitions/definition.MeasureSpec"
-                },
-                "outcomes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conclusion.Outcome"
-                    }
-                },
-                "reportMap": {
-                    "$ref": "#/definitions/definition.ReportMap"
                 }
             }
         },
@@ -10329,6 +10601,163 @@ const docTemplate = `{
                 "name": {
                     "description": "姓名",
                     "type": "string"
+                }
+            }
+        },
+        "resilienceplane.BackpressureSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "dependency": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "in_flight": {
+                    "type": "integer"
+                },
+                "max_inflight": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "strategy": {
+                    "type": "string"
+                },
+                "timeout_millis": {
+                    "type": "integer"
+                }
+            }
+        },
+        "resilienceplane.CapabilitySnapshot": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "strategy": {
+                    "type": "string"
+                }
+            }
+        },
+        "resilienceplane.QueueSnapshot": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "depth": {
+                    "type": "integer"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "lifecycle_boundary": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "status_ttl_seconds": {
+                    "type": "integer"
+                },
+                "strategy": {
+                    "type": "string"
+                }
+            }
+        },
+        "resilienceplane.RuntimeSnapshot": {
+            "type": "object",
+            "properties": {
+                "backpressure": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.BackpressureSnapshot"
+                    }
+                },
+                "component": {
+                    "type": "string"
+                },
+                "duplicate_suppression": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.CapabilitySnapshot"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "idempotency": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.CapabilitySnapshot"
+                    }
+                },
+                "locks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.CapabilitySnapshot"
+                    }
+                },
+                "queues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.QueueSnapshot"
+                    }
+                },
+                "rate_limits": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/resilienceplane.CapabilitySnapshot"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/resilienceplane.RuntimeSummary"
+                }
+            }
+        },
+        "resilienceplane.RuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "capability_count": {
+                    "type": "integer"
+                },
+                "degraded_count": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
                 }
             }
         },
@@ -10460,30 +10889,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.AssessmentModelDefinitionResponse": {
-            "type": "object",
-            "properties": {
-                "calibration": {
-                    "$ref": "#/definitions/definition.Calibration"
-                },
-                "conclusions": {
-                    "type": "array",
-                    "items": {}
-                },
-                "measure": {
-                    "$ref": "#/definitions/definition.MeasureSpec"
-                },
-                "outcomes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conclusion.Outcome"
-                    }
-                },
-                "reportMap": {
-                    "$ref": "#/definitions/definition.ReportMap"
-                }
-            }
-        },
         "response.AssessmentModelListResponse": {
             "type": "object",
             "properties": {
@@ -10571,35 +10976,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/modelcatalog.Option"
-                    }
-                }
-            }
-        },
-        "response.AssessmentModelPreviewReportResponse": {
-            "type": "object",
-            "properties": {
-                "issues": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.ValidationIssue"
-                    }
-                },
-                "outcome": {
-                    "$ref": "#/definitions/modelcatalog.PreviewOutcome"
-                },
-                "raw_report": {
-                    "$ref": "#/definitions/report.Draft"
-                },
-                "report_sections": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.PreviewReportSection"
-                    }
-                },
-                "score_detail": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
                     }
                 }
             }
@@ -11092,6 +11468,472 @@ const docTemplate = `{
                 }
             }
         },
+        "response.DefinitionCalibrationWire": {
+            "type": "object",
+            "properties": {
+                "NormRefs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionNormRefWire"
+                    }
+                }
+            }
+        },
+        "response.DefinitionConclusionWire": {
+            "type": "object",
+            "properties": {
+                "Decision": {
+                    "$ref": "#/definitions/response.DefinitionTypeDecisionWire"
+                },
+                "FactorCode": {
+                    "type": "string"
+                },
+                "FactorCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Kind": {
+                    "type": "string",
+                    "enum": [
+                        "risk",
+                        "norm",
+                        "ability",
+                        "type"
+                    ]
+                },
+                "OutcomeMapping": {
+                    "$ref": "#/definitions/response.DefinitionTypeOutcomeMappingWire"
+                },
+                "Outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionOutcomeWire"
+                    }
+                },
+                "Primary": {
+                    "type": "boolean"
+                },
+                "Profiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionTypeProfileWire"
+                    }
+                },
+                "Rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionScoreRangeWire"
+                    }
+                },
+                "ScoreBasis": {
+                    "type": "string",
+                    "enum": [
+                        "raw_score",
+                        "t_score",
+                        "percentile"
+                    ]
+                },
+                "SpecialRules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionTypeSpecialRuleWire"
+                    }
+                }
+            }
+        },
+        "response.DefinitionFactorEdgeWire": {
+            "type": "object",
+            "properties": {
+                "ChildCode": {
+                    "type": "string"
+                },
+                "ParentCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionFactorGraphWire": {
+            "type": "object",
+            "properties": {
+                "Edges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionFactorEdgeWire"
+                    }
+                },
+                "Roots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "SortOrders": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "response.DefinitionFactorWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Role": {
+                    "type": "string",
+                    "enum": [
+                        "dimension",
+                        "total",
+                        "index",
+                        "validity",
+                        "subtest",
+                        "task_set",
+                        "report_group",
+                        "ability_domain"
+                    ]
+                },
+                "Title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionMeasureWire": {
+            "type": "object",
+            "properties": {
+                "FactorGraph": {
+                    "$ref": "#/definitions/response.DefinitionFactorGraphWire"
+                },
+                "Factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionFactorWire"
+                    }
+                },
+                "Scoring": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionScoringWire"
+                    }
+                }
+            }
+        },
+        "response.DefinitionNormRefWire": {
+            "type": "object",
+            "properties": {
+                "FactorCode": {
+                    "type": "string"
+                },
+                "NormTableVersion": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionOutcomeWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Description": {
+                    "type": "string"
+                },
+                "Summary": {
+                    "type": "string"
+                },
+                "Title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionReportMapWire": {
+            "type": "object",
+            "properties": {
+                "Sections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionReportSectionWire"
+                    }
+                }
+            }
+        },
+        "response.DefinitionReportSectionWire": {
+            "type": "object",
+            "properties": {
+                "AdapterKey": {
+                    "type": "string"
+                },
+                "CategoryLabel": {
+                    "type": "string"
+                },
+                "Code": {
+                    "type": "string"
+                },
+                "Kind": {
+                    "type": "string"
+                },
+                "SourceRefs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "TemplateID": {
+                    "type": "string"
+                },
+                "Title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionScoreRangeWire": {
+            "type": "object",
+            "properties": {
+                "Description": {
+                    "type": "string"
+                },
+                "Level": {
+                    "type": "string"
+                },
+                "MaxScore": {
+                    "type": "number"
+                },
+                "MinScore": {
+                    "type": "number"
+                },
+                "OutcomeCode": {
+                    "type": "string"
+                },
+                "Summary": {
+                    "type": "string"
+                },
+                "Title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionScoringParamsWire": {
+            "type": "object",
+            "properties": {
+                "CntOptionContents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "response.DefinitionScoringSourceWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Kind": {
+                    "type": "string",
+                    "enum": [
+                        "question",
+                        "factor"
+                    ]
+                },
+                "OptionScores": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "Sign": {
+                    "type": "number"
+                }
+            }
+        },
+        "response.DefinitionScoringWire": {
+            "type": "object",
+            "properties": {
+                "Constant": {
+                    "type": "number"
+                },
+                "FactorCode": {
+                    "type": "string"
+                },
+                "MaxScore": {
+                    "type": "number"
+                },
+                "OptionScoring": {
+                    "type": "string",
+                    "enum": [
+                        "strict",
+                        "compat"
+                    ]
+                },
+                "Params": {
+                    "$ref": "#/definitions/response.DefinitionScoringParamsWire"
+                },
+                "Sources": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionScoringSourceWire"
+                    }
+                },
+                "Strategy": {
+                    "type": "string",
+                    "enum": [
+                        "sum",
+                        "avg",
+                        "weighted_sum",
+                        "weighted_avg",
+                        "max",
+                        "min",
+                        "cnt"
+                    ]
+                },
+                "Weights": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "response.DefinitionTypeDecisionWire": {
+            "type": "object",
+            "properties": {
+                "FallbackCode": {
+                    "type": "string"
+                },
+                "FallbackSimilarityThreshold": {
+                    "type": "number"
+                },
+                "Kind": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionTypeOutcomeMappingWire": {
+            "type": "object",
+            "properties": {
+                "Algorithm": {
+                    "type": "string"
+                },
+                "DetailAdapterKey": {
+                    "type": "string"
+                },
+                "DetailKind": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionTypeProfileWire": {
+            "type": "object",
+            "properties": {
+                "Commentary": {
+                    "type": "string"
+                },
+                "Image": {
+                    "type": "string"
+                },
+                "ImageURL": {
+                    "type": "string"
+                },
+                "IsSpecial": {
+                    "type": "boolean"
+                },
+                "OutcomeCode": {
+                    "type": "string"
+                },
+                "Pattern": {
+                    "type": "string"
+                },
+                "Strengths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Suggestions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Traits": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Trigger": {
+                    "type": "string"
+                },
+                "Weaknesses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "response.DefinitionTypeSpecialRuleWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Kind": {
+                    "type": "string"
+                },
+                "OptionValues": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "OutcomeCode": {
+                    "type": "string"
+                },
+                "Phase": {
+                    "type": "string"
+                },
+                "QuestionCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Trigger": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionV2Wire": {
+            "type": "object",
+            "properties": {
+                "Calibration": {
+                    "$ref": "#/definitions/response.DefinitionCalibrationWire"
+                },
+                "Conclusions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionConclusionWire"
+                    }
+                },
+                "Measure": {
+                    "$ref": "#/definitions/response.DefinitionMeasureWire"
+                },
+                "Outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionOutcomeWire"
+                    }
+                },
+                "ReportMap": {
+                    "$ref": "#/definitions/response.DefinitionReportMapWire"
+                }
+            }
+        },
         "response.DimensionItem": {
             "type": "object",
             "properties": {
@@ -11320,6 +12162,125 @@ const docTemplate = `{
                 },
                 "window_days": {
                     "type": "integer"
+                }
+            }
+        },
+        "response.InterpretationFailureWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Kind": {
+                    "type": "string"
+                },
+                "Retryable": {
+                    "type": "boolean"
+                },
+                "SafeMessage": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.InterpretationGenerationWire": {
+            "type": "object",
+            "properties": {
+                "CreatedAt": {
+                    "type": "string"
+                },
+                "ID": {
+                    "type": "integer"
+                },
+                "LatestRun": {
+                    "$ref": "#/definitions/response.InterpretationRunWire"
+                },
+                "LatestRunID": {
+                    "type": "integer"
+                },
+                "OutcomeID": {
+                    "type": "integer"
+                },
+                "Report": {
+                    "$ref": "#/definitions/response.InterpretationReportWire"
+                },
+                "ReportID": {
+                    "type": "integer"
+                },
+                "ReportType": {
+                    "type": "string"
+                },
+                "Status": {
+                    "type": "string"
+                },
+                "TemplateVersion": {
+                    "type": "string"
+                },
+                "UpdatedAt": {
+                    "type": "string"
+                },
+                "Version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.InterpretationReportWire": {
+            "type": "object",
+            "properties": {
+                "AssessmentID": {
+                    "type": "integer"
+                },
+                "GeneratedAt": {
+                    "type": "string"
+                },
+                "GenerationID": {
+                    "type": "integer"
+                },
+                "ID": {
+                    "type": "integer"
+                },
+                "OutcomeID": {
+                    "type": "integer"
+                },
+                "ReportType": {
+                    "type": "string"
+                },
+                "RunID": {
+                    "type": "integer"
+                },
+                "TemplateVersion": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.InterpretationRunWire": {
+            "type": "object",
+            "properties": {
+                "Attempt": {
+                    "type": "integer"
+                },
+                "Failure": {
+                    "$ref": "#/definitions/response.InterpretationFailureWire"
+                },
+                "FinishedAt": {
+                    "type": "string"
+                },
+                "GenerationID": {
+                    "type": "integer"
+                },
+                "ID": {
+                    "type": "integer"
+                },
+                "LeaseExpiresAt": {
+                    "type": "string"
+                },
+                "StartedAt": {
+                    "type": "string"
+                },
+                "Status": {
+                    "type": "string"
+                },
+                "TraceID": {
+                    "type": "string"
                 }
             }
         },
@@ -11588,6 +12549,106 @@ const docTemplate = `{
                 },
                 "trigger_time": {
                     "description": "触发时间：HH:MM:SS",
+                    "type": "string"
+                }
+            }
+        },
+        "response.PreviewAnswerWire": {
+            "type": "object",
+            "properties": {
+                "question_code": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.PreviewOutcomeWire": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.PreviewReportRequestWire": {
+            "type": "object",
+            "properties": {
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.PreviewAnswerWire"
+                    }
+                },
+                "sample_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.PreviewReportSectionWire": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.PreviewReportWire": {
+            "type": "object",
+            "properties": {
+                "issues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.PreviewValidationIssueWire"
+                    }
+                },
+                "outcome": {
+                    "$ref": "#/definitions/response.PreviewOutcomeWire"
+                },
+                "raw_report": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "report_sections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.PreviewReportSectionWire"
+                    }
+                },
+                "score_detail": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "response.PreviewValidationIssueWire": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "field": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "message": {
                     "type": "string"
                 }
             }
@@ -13066,6 +14127,32 @@ const docTemplate = `{
                 "total_submissions": {
                     "description": "基础统计",
                     "type": "integer"
+                }
+            }
+        },
+        "statistics.RepairCompleteRequest": {
+            "type": "object",
+            "properties": {
+                "org_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "plan_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "questionnaire_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repair_kind": {
+                    "type": "string"
                 }
             }
         },

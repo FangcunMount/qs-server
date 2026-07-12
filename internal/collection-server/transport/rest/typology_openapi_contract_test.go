@@ -10,25 +10,25 @@ func TestCollectionOpenAPITypologyAssessmentContractFields(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 
-	reportOps, ok := spec.Paths["/typology-assessments/{id}/report"]["get"].(map[string]any)
+	reportOps, ok := spec.Paths["/api/v1/typology-assessments/{id}/report"]["get"].(map[string]any)
 	if !ok {
-		t.Fatal("missing GET /typology-assessments/{id}/report")
+		t.Fatal("missing GET /api/v1/typology-assessments/{id}/report")
 	}
 	if !openAPIHasRequiredQueryParam(reportOps, "testee_id") {
 		t.Fatal("typology report OpenAPI must require testee_id query param")
 	}
 
-	questionnaireOps, ok := spec.Paths["/questionnaires/{code}"]["get"].(map[string]any)
+	questionnaireOps, ok := spec.Paths["/api/v1/questionnaires/{code}"]["get"].(map[string]any)
 	if !ok {
-		t.Fatal("missing GET /questionnaires/{code}")
+		t.Fatal("missing GET /api/v1/questionnaires/{code}")
 	}
 	if !openAPIHasQueryParam(questionnaireOps, "version") {
 		t.Fatal("questionnaire OpenAPI should document version query param")
 	}
 
-	sessionOps, ok := spec.Paths["/typology-assessment-sessions"]["post"].(map[string]any)
+	sessionOps, ok := spec.Paths["/api/v1/typology-assessment-sessions"]["post"].(map[string]any)
 	if !ok {
-		t.Fatal("missing POST /typology-assessment-sessions")
+		t.Fatal("missing POST /api/v1/typology-assessment-sessions")
 	}
 	desc, _ := sessionOps["description"].(string)
 	if !strings.Contains(desc, "session") || !strings.Contains(desc, "answersheets") {

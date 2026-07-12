@@ -23,6 +23,13 @@ func (r *Router) registerEventStatusInternalRoutes(internalV1 *gin.RouterGroup) 
 	)...)
 }
 
+// eventStatus returns the event delivery status.
+// @Summary 事件投递状态
+// @Description 返回事件与 outbox 的只读运行快照，仅内部管理员可访问。
+// @Tags System-Governance
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /internal/v1/events/status [get]
 func (r *Router) eventStatus(c *gin.Context) {
 	snapshot, err := r.deps.EventStatusService.GetStatus(c.Request.Context())
 	if err != nil {

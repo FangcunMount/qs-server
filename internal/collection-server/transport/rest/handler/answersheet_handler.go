@@ -47,7 +47,7 @@ func NewAnswerSheetHandler(submissionService answerSheetSubmissionService) *Answ
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/answersheets [post]
 func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	var req answersheet.SubmitAnswerSheetRequest
@@ -144,7 +144,7 @@ func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/answersheets/submit-status [get]
 func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
 	requestID := h.GetQueryParam(c, "request_id")
@@ -173,7 +173,7 @@ func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
-// @Security Bearer
+// @Security BearerAuth
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) Get(c *gin.Context) {
 	idStr := h.GetPathParam(c, "id")
