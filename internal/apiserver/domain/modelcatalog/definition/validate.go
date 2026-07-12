@@ -27,10 +27,63 @@ func Validate(def Definition) []ValidationIssue {
 		}
 	}
 	issues = append(issues, validateCalibration(def.Calibration, factorCodes)...)
+	issues = append(issues, validateExecution(def.Execution, factorCodes)...)
 	outcomeCodes, outcomeIssues := validateOutcomes(def.Outcomes)
 	issues = append(issues, outcomeIssues...)
 	issues = append(issues, validateConclusions(def.Conclusions, factorCodes, outcomeCodes)...)
 	issues = append(issues, validateReportMap(def.ReportMap)...)
+	return issues
+}
+
+func validateExecution(spec ExecutionSpec, factorCodes map[string]struct{}) []ValidationIssue {
+	issues := make([]ValidationIssue, 0)
+	if spec.Brief2 != nil && spec.SPM != nil {
+		issues = append(issues, ValidationIssue{Field: "execution", Code: "execution.multiple", Message: "only one algorithm execution spec may be configured"})
+	}
+	if brief2 := spec.Brief2; brief2 != nil {
+		if _, ok := factorCodes[brief2.PrimaryFactorCode]; brief2.PrimaryFactorCode == "" || !ok {
+			issues = append(issues, ValidationIssue{Field: "execution.brief2.primary_factor_code", Code: "brief2.primary_factor.not_found", Message: "brief2 primary factor must be defined"})
+		}
+		issues = append(issues, validateExecutionFactorCodes("execution.brief2.index_factor_codes", brief2.IndexFactorCodes, factorCodes)...)
+		issues = append(issues, validateExecutionFactorCodes("execution.brief2.validity_factor_codes", brief2.ValidityFactorCodes, factorCodes)...)
+	}
+	if spm := spec.SPM; spm != nil {
+		if spm.TimeLimitSeconds <= 0 {
+			issues = append(issues, ValidationIssue{Field: "execution.spm.time_limit_seconds", Code: "spm.time_limit.required", Message: "spm time limit must be positive"})
+		}
+		if _, ok := factorCodes[spm.TotalFactorCode]; spm.TotalFactorCode == "" || !ok {
+			issues = append(issues, ValidationIssue{Field: "execution.spm.total_factor_code", Code: "spm.total_factor.not_found", Message: "spm total factor must be defined"})
+		}
+		seenQuestions := makeStringSet()
+		for _, set := range spm.ItemSets {
+			if set.Code == "" || len(set.Items) == 0 {
+				issues = append(issues, ValidationIssue{Field: "execution.spm.item_sets", Code: "spm.item_set.invalid", Message: "spm item sets require code and items"})
+			}
+			for _, item := range set.Items {
+				if item.QuestionCode == "" || item.CorrectOptionCode == "" {
+					issues = append(issues, ValidationIssue{Field: "execution.spm.item_sets", Code: "spm.item.invalid", Message: "spm items require question and correct option codes"})
+					continue
+				}
+				if _, duplicate := seenQuestions[item.QuestionCode]; duplicate {
+					issues = append(issues, ValidationIssue{Field: "execution.spm.item_sets", Code: "spm.question.duplicate", Message: fmt.Sprintf("spm question %s is duplicated", item.QuestionCode)})
+				}
+				seenQuestions[item.QuestionCode] = struct{}{}
+			}
+		}
+		if len(spm.ItemSets) == 0 {
+			issues = append(issues, ValidationIssue{Field: "execution.spm.item_sets", Code: "spm.item_sets.required", Message: "spm requires item sets"})
+		}
+	}
+	return issues
+}
+
+func validateExecutionFactorCodes(field string, codes []string, factorCodes map[string]struct{}) []ValidationIssue {
+	issues := make([]ValidationIssue, 0)
+	for _, code := range codes {
+		if _, ok := factorCodes[code]; code == "" || !ok {
+			issues = append(issues, ValidationIssue{Field: field, Code: "execution.factor.not_found", Message: fmt.Sprintf("execution factor %s is not defined", code)})
+		}
+	}
 	return issues
 }
 
@@ -164,7 +217,7 @@ func validateReportMap(reportMap ReportMap) []ValidationIssue {
 
 func validScoreBasis(value conclusion.ScoreBasis) bool {
 	switch value {
-	case conclusion.ScoreBasisRaw, conclusion.ScoreBasisTScore, conclusion.ScoreBasisPercentile:
+	case conclusion.ScoreBasisRaw, conclusion.ScoreBasisTScore, conclusion.ScoreBasisPercentile, conclusion.ScoreBasisStandardScore:
 		return true
 	default:
 		return false

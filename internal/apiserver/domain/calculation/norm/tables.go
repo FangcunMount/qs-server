@@ -34,10 +34,11 @@ type NormBand struct {
 }
 
 type NormLookupEntry struct {
-	RawMin     float64
-	RawMax     float64
-	TScore     float64
-	Percentile float64
+	RawMin        float64
+	RawMax        float64
+	TScore        float64
+	Percentile    float64
+	StandardScore *float64
 }
 
 type TScoreInterpretRule struct {
@@ -54,8 +55,9 @@ type TScoreRange struct {
 }
 
 type NormScore struct {
-	TScore     float64
-	Percentile float64
+	TScore        float64
+	Percentile    float64
+	StandardScore *float64
 }
 
 // LookupNormScore 解析原始分 到 T 分 和 百分位 using 配置化 tables。
@@ -106,10 +108,18 @@ func factorTable(tables *NormTables, factorCode string) (FactorNormTable, bool) 
 func lookupDirect(table FactorNormTable, rawScore float64) (NormScore, bool) {
 	for _, entry := range table.Lookup {
 		if rawScore >= entry.RawMin && rawScore <= entry.RawMax {
-			return NormScore{TScore: entry.TScore, Percentile: entry.Percentile}, true
+			return NormScore{TScore: entry.TScore, Percentile: entry.Percentile, StandardScore: cloneFloat64(entry.StandardScore)}, true
 		}
 	}
 	return NormScore{}, false
+}
+
+func cloneFloat64(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func lookupParametric(table FactorNormTable, rawScore float64, subject Subject) (NormScore, bool) {

@@ -37,6 +37,12 @@ func brief2ExtensionFromDefinition(def *definition.Definition, table *catalognor
 		return nil, nil
 	}
 	ext := &brief2Extension{}
+	if spec := def.Execution.Brief2; spec != nil {
+		ext.FormVariant = spec.FormVariant
+		ext.PrimaryDimensionCode = spec.PrimaryFactorCode
+		ext.IndexCodes = append(ext.IndexCodes, spec.IndexFactorCodes...)
+		ext.ValidityCodes = append(ext.ValidityCodes, spec.ValidityFactorCodes...)
+	}
 	for _, ref := range def.Calibration.NormRefs {
 		if ref.NormTableVersion != "" {
 			if ext.NormTableVersion != "" && ext.NormTableVersion != ref.NormTableVersion {
@@ -56,6 +62,8 @@ func brief2ExtensionFromDefinition(def *definition.Definition, table *catalognor
 			ext.ValidityCodes = append(ext.ValidityCodes, item.Code)
 		}
 	}
+	ext.IndexCodes = uniqueStrings(ext.IndexCodes)
+	ext.ValidityCodes = uniqueStrings(ext.ValidityCodes)
 	for _, item := range def.Measure.Scoring {
 		children := make([]string, 0)
 		for _, source := range item.Sources {
@@ -93,6 +101,25 @@ func brief2ExtensionFromDefinition(def *definition.Definition, table *catalognor
 		return nil, nil
 	}
 	return ext, nil
+}
+
+func uniqueStrings(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 func brief2NormsFromTable(table *catalognorm.Norm) []brief2FactorPayload {

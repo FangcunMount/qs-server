@@ -212,7 +212,7 @@ func draftListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.ListFil
 	if err != nil {
 		return modelcatalogport.ListFilter{}, err
 	}
-	return modelcatalogport.ListFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Status: domain.ModelStatus(input.Status), Keyword: input.Keyword, Category: input.Category, Algorithm: domain.Algorithm(input.Algorithm), QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
+	return modelcatalogport.ListFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Status: domain.ModelStatus(input.Status), Keyword: input.Keyword, Category: input.Category, Algorithm: domain.Algorithm(input.Algorithm), ProductChannel: domain.ProductChannel(input.ProductChannel), QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
 }
 
 func publishedListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.ListPublishedFilter, error) {
@@ -220,7 +220,7 @@ func publishedListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.Lis
 	if err != nil {
 		return modelcatalogport.ListPublishedFilter{}, err
 	}
-	return modelcatalogport.ListPublishedFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Algorithm: domain.Algorithm(input.Algorithm), Category: input.Category, Keyword: input.Keyword, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
+	return modelcatalogport.ListPublishedFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Algorithm: domain.Algorithm(input.Algorithm), ProductChannel: domain.ProductChannel(input.ProductChannel), Category: input.Category, Keyword: input.Keyword, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
 }
 
 func kindFromListInput(input modelcatalog.ListModelsDTO) (domain.Kind, error) {

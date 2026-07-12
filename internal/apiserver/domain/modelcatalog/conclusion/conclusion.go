@@ -74,9 +74,10 @@ func (AbilityConclusion) conclusionKind() Kind { return KindAbility }
 type ScoreBasis string
 
 const (
-	ScoreBasisRaw        ScoreBasis = "raw_score"
-	ScoreBasisTScore     ScoreBasis = "t_score"
-	ScoreBasisPercentile ScoreBasis = "percentile"
+	ScoreBasisRaw           ScoreBasis = "raw_score"
+	ScoreBasisTScore        ScoreBasis = "t_score"
+	ScoreBasisPercentile    ScoreBasis = "percentile"
+	ScoreBasisStandardScore ScoreBasis = "standard_score"
 )
 
 type TypeDecision struct {

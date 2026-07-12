@@ -61,6 +61,13 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	if !ok || cognitivePayload.Snapshot == nil {
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
+	if cognitivePayload.Snapshot.SPM != nil {
+		outcome, err := CalculateSPM(execInput.Input, cognitivePayload.Snapshot)
+		if err != nil {
+			return nil, err
+		}
+		return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(outcome, cognitivePayload.Snapshot.AbilityConclusions)}, nil
+	}
 	scaleSnapshot := cognitivePayload.Snapshot.ToScaleSnapshot()
 	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,

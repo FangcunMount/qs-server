@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
@@ -23,6 +24,7 @@ type Snapshot struct {
 	Status               string
 	Factors              []FactorSnapshot
 	AbilityConclusions   []conclusion.AbilityConclusion
+	SPM                  *SPMSpec
 }
 
 type FactorSnapshot struct {
@@ -62,8 +64,58 @@ type definitionPayload struct {
 type spmExtension struct {
 	TimeLimitSeconds   int                        `json:"time_limit_seconds,omitempty"`
 	ItemSetCodes       []string                   `json:"item_set_codes,omitempty"`
+	ItemSets           []spmItemSetPayload        `json:"item_sets,omitempty"`
+	TotalFactorCode    string                     `json:"total_factor_code,omitempty"`
 	NormTableVersion   string                     `json:"norm_table_version,omitempty"`
 	AbilityConclusions []abilityConclusionPayload `json:"ability_conclusions,omitempty"`
+}
+
+// SPMSpec is the runtime view of canonical SPM execution rules.
+type SPMSpec struct {
+	TimeLimitSeconds int
+	TotalFactorCode  string
+	ItemSets         []SPMItemSet
+	NormTables       *calcnorm.NormTables
+}
+
+// NormTablesFromCatalog converts the immutable catalog table into the
+// calculation DTO used by native SPM execution.
+func NormTablesFromCatalog(table *catalognorm.Norm) *calcnorm.NormTables {
+	if table == nil {
+		return nil
+	}
+	out := &calcnorm.NormTables{FormVariant: table.FormVariant, NormTableVersion: table.TableVersion, Factors: make([]calcnorm.FactorNormTable, 0, len(table.Factors))}
+	for _, factor := range table.Factors {
+		item := calcnorm.FactorNormTable{FactorCode: factor.FactorCode, Bands: make([]calcnorm.NormBand, 0, len(factor.Bands)), Lookup: make([]calcnorm.NormLookupEntry, 0, len(factor.Lookup))}
+		for _, band := range factor.Bands {
+			item.Bands = append(item.Bands, calcnorm.NormBand{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender, Mean: cloneFloat64(band.Mean), StdDev: cloneFloat64(band.StdDev)})
+		}
+		for _, lookup := range factor.Lookup {
+			item.Lookup = append(item.Lookup, calcnorm.NormLookupEntry{RawMin: lookup.RawScoreMin, RawMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
+		}
+		out.Factors = append(out.Factors, item)
+	}
+	return out
+}
+
+type SPMItemSet struct {
+	Code  string
+	Items []SPMItem
+}
+
+type SPMItem struct {
+	QuestionCode      string
+	CorrectOptionCode string
+}
+
+type spmItemSetPayload struct {
+	Code  string           `json:"code"`
+	Items []spmItemPayload `json:"items"`
+}
+
+type spmItemPayload struct {
+	QuestionCode      string `json:"question_code"`
+	CorrectOptionCode string `json:"correct_option_code"`
 }
 
 type abilityConclusionPayload struct {
@@ -103,9 +155,11 @@ func ImportLegacyDefinition(payload []byte) (sharedpayload.DefinitionMaterializa
 		})
 		conclusions = append(conclusions, abilityConclusionsFromPayload(body.SPM)...)
 	}
-	return sharedpayload.DefinitionMaterialization{Definition: &definition.Definition{
-		Measure: measure, Calibration: calibration, Conclusions: conclusions,
-	}}, nil
+	def := &definition.Definition{Measure: measure, Calibration: calibration, Conclusions: conclusions}
+	if body.SPM != nil {
+		def.Execution.SPM = definitionSPMSpecFromPayload(body.SPM, measure)
+	}
+	return sharedpayload.DefinitionMaterialization{Definition: def}, nil
 }
 
 // DefinitionFromLegacyPayload imports the cognitive wire payload as DefinitionV2.
@@ -134,6 +188,14 @@ func spmExtensionFromDefinition(def *definition.Definition) *spmExtension {
 		return nil
 	}
 	ext := &spmExtension{}
+	if spec := def.Execution.SPM; spec != nil {
+		ext.TimeLimitSeconds = spec.TimeLimitSeconds
+		ext.TotalFactorCode = spec.TotalFactorCode
+		ext.ItemSets = spmItemSetsToPayload(spec.ItemSets)
+		for _, set := range spec.ItemSets {
+			ext.ItemSetCodes = append(ext.ItemSetCodes, set.Code)
+		}
+	}
 	for _, ref := range def.Calibration.NormRefs {
 		if ext.NormTableVersion == "" {
 			ext.NormTableVersion = ref.NormTableVersion
@@ -155,10 +217,48 @@ func spmExtensionFromDefinition(def *definition.Definition) *spmExtension {
 		}
 		ext.AbilityConclusions = append(ext.AbilityConclusions, entry)
 	}
-	if ext.NormTableVersion == "" && len(ext.ItemSetCodes) == 0 && len(ext.AbilityConclusions) == 0 {
+	if ext.NormTableVersion == "" && len(ext.ItemSetCodes) == 0 && len(ext.ItemSets) == 0 && len(ext.AbilityConclusions) == 0 {
 		return nil
 	}
 	return ext
+}
+
+func spmItemSetsToPayload(items []definition.SPMItemSet) []spmItemSetPayload {
+	if items == nil {
+		return nil
+	}
+	out := make([]spmItemSetPayload, 0, len(items))
+	for _, set := range items {
+		values := make([]spmItemPayload, 0, len(set.Items))
+		for _, item := range set.Items {
+			values = append(values, spmItemPayload{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+		}
+		out = append(out, spmItemSetPayload{Code: set.Code, Items: values})
+	}
+	return out
+}
+
+func definitionSPMSpecFromPayload(payload *spmExtension, measure definition.MeasureSpec) *definition.SPMSpec {
+	if payload == nil {
+		return nil
+	}
+	spec := &definition.SPMSpec{TimeLimitSeconds: payload.TimeLimitSeconds, TotalFactorCode: payload.TotalFactorCode}
+	if spec.TotalFactorCode == "" {
+		for _, item := range measure.Factors {
+			if item.ResolvedRole() == factor.FactorRoleTotal {
+				spec.TotalFactorCode = item.Code
+				break
+			}
+		}
+	}
+	for _, set := range payload.ItemSets {
+		out := definition.SPMItemSet{Code: set.Code, Items: make([]definition.SPMItem, 0, len(set.Items))}
+		for _, item := range set.Items {
+			out.Items = append(out.Items, definition.SPMItem{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+		}
+		spec.ItemSets = append(spec.ItemSets, out)
+	}
+	return spec
 }
 
 func abilityConclusionsFromPayload(spm *spmExtension) []conclusion.Conclusion {
@@ -210,7 +310,33 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 		})
 	}
 	out.Factors = factors
+	if body.SPM != nil {
+		out.SPM = runtimeSPMSpecFromPayload(body.SPM, factors)
+	}
 	return out, nil
+}
+
+func runtimeSPMSpecFromPayload(payload *spmExtension, factors []FactorSnapshot) *SPMSpec {
+	if payload == nil {
+		return nil
+	}
+	spec := &SPMSpec{TimeLimitSeconds: payload.TimeLimitSeconds, TotalFactorCode: payload.TotalFactorCode}
+	if spec.TotalFactorCode == "" {
+		for _, item := range factors {
+			if item.ResolvedRole() == factor.FactorRoleTotal {
+				spec.TotalFactorCode = item.Code
+				break
+			}
+		}
+	}
+	for _, set := range payload.ItemSets {
+		out := SPMItemSet{Code: set.Code, Items: make([]SPMItem, 0, len(set.Items))}
+		for _, item := range set.Items {
+			out.Items = append(out.Items, SPMItem{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+		}
+		spec.ItemSets = append(spec.ItemSets, out)
+	}
+	return spec
 }
 
 func (s *Snapshot) IsPublished() bool {

@@ -15,6 +15,7 @@ type ListFilter struct {
 	Keyword              string
 	Category             string
 	Algorithm            domain.Algorithm
+	ProductChannel       domain.ProductChannel
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Page                 int

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
@@ -13,10 +14,15 @@ import (
 // PublishedCognitiveCatalog loads cognitive payloads from v2 published-model snapshots.
 type PublishedCognitiveCatalog struct {
 	reader rulesetport.PublishedModelReader
+	norms  rulesetport.NormRepository
 }
 
-func NewPublishedCognitiveCatalog(reader rulesetport.PublishedModelReader) PublishedCognitiveCatalog {
-	return PublishedCognitiveCatalog{reader: reader}
+func NewPublishedCognitiveCatalog(reader rulesetport.PublishedModelReader, norms ...rulesetport.NormRepository) PublishedCognitiveCatalog {
+	var normRepo rulesetport.NormRepository
+	if len(norms) > 0 {
+		normRepo = norms[0]
+	}
+	return PublishedCognitiveCatalog{reader: reader, norms: normRepo}
 }
 
 func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref port.ModelRef) (*taskperfsnapshot.Snapshot, error) {
@@ -30,7 +36,7 @@ func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref po
 	if err != nil {
 		return nil, err
 	}
-	return decodePublishedCognitiveModel(snapshot)
+	return c.decodePublished(ctx, snapshot)
 }
 
 func (c PublishedCognitiveCatalog) FindCognitiveByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*taskperfsnapshot.Snapshot, error) {
@@ -41,7 +47,30 @@ func (c PublishedCognitiveCatalog) FindCognitiveByQuestionnaire(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	return decodePublishedCognitiveModel(snapshot)
+	return c.decodePublished(ctx, snapshot)
+}
+
+func (c PublishedCognitiveCatalog) decodePublished(ctx context.Context, model *rulesetport.PublishedModel) (*taskperfsnapshot.Snapshot, error) {
+	snapshot, err := decodePublishedCognitiveModel(model)
+	if err != nil || snapshot == nil || snapshot.SPM == nil || len(snapshot.SPM.ItemSets) == 0 || model == nil || model.DefinitionV2 == nil {
+		return snapshot, err
+	}
+	var table *norm.Norm
+	for _, ref := range model.DefinitionV2.Calibration.NormRefs {
+		if ref.FactorCode != snapshot.SPM.TotalFactorCode || ref.NormTableVersion == "" {
+			continue
+		}
+		if c.norms == nil {
+			return nil, fmt.Errorf("cognitive norm repository is not configured")
+		}
+		table, err = c.norms.FindNorm(ctx, ref.NormTableVersion)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+	snapshot.SPM.NormTables = taskperfsnapshot.NormTablesFromCatalog(table)
+	return snapshot, nil
 }
 
 func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {

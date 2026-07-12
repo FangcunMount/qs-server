@@ -33,6 +33,9 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 	if !ok {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}
+	if err := domain.ValidateNewProductChannel(kind, domain.ProductChannel(input.ProductChannel)); err != nil {
+		return nil, err
+	}
 	if err := s.authorize(ctx, actor, modelcatalog.Resource{Kind: kind}); err != nil {
 		return nil, err
 	}

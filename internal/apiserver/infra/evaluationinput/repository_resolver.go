@@ -51,7 +51,7 @@ func NewRepositoryResolver(
 		}
 		typologyCatalog = NewPublishedTypologyCatalog(publishedReader)
 		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader, normRepo)
-		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader)
+		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader, normRepo)
 	} else {
 		return nil, fmt.Errorf("ruleset catalog must implement PublishedModelReader")
 	}

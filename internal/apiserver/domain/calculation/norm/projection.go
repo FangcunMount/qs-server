@@ -30,6 +30,9 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 					calculation.ScoreValue{Kind: calculation.ScoreKindTScore, Value: normScore.TScore},
 					calculation.ScoreValue{Kind: calculation.ScoreKindPercentile, Value: normScore.Percentile},
 				)
+				if normScore.StandardScore != nil {
+					enriched.DerivedScores = append(enriched.DerivedScores, calculation.ScoreValue{Kind: calculation.ScoreKindStandardScore, Value: *normScore.StandardScore})
+				}
 				if level, conclusion, suggestion, interpreted := InterpretTScore(p.Tables, dim.Code, normScore.TScore); interpreted {
 					enriched.Level = &calculation.ResultLevel{Code: level, Label: conclusion}
 					if conclusion != "" {

@@ -10,9 +10,45 @@ import (
 type Definition struct {
 	Measure     MeasureSpec
 	Calibration Calibration
+	Execution   ExecutionSpec
 	Conclusions []conclusion.Conclusion
 	Outcomes    []conclusion.Outcome
 	ReportMap   ReportMap
+}
+
+// ExecutionSpec carries algorithm-specific semantics that cannot be expressed
+// as generic factor scoring. Its populated branch must match model identity.
+type ExecutionSpec struct {
+	Brief2 *Brief2Spec
+	SPM    *SPMSpec
+}
+
+// Brief2Spec declares the form and factor roles used by a BRIEF-2 model.
+// Norm table versions remain in Calibration so they can be versioned centrally.
+type Brief2Spec struct {
+	FormVariant         string
+	PrimaryFactorCode   string
+	IndexFactorCodes    []string
+	ValidityFactorCodes []string
+}
+
+// SPMSpec is the immutable Raven SPM execution contract published with a
+// model. TimeLimitSeconds is supplied to the test-taking client only; this
+// service does not reject a submitted answer sheet based on elapsed time.
+type SPMSpec struct {
+	TimeLimitSeconds int
+	TotalFactorCode  string
+	ItemSets         []SPMItemSet
+}
+
+type SPMItemSet struct {
+	Code  string
+	Items []SPMItem
+}
+
+type SPMItem struct {
+	QuestionCode      string
+	CorrectOptionCode string
 }
 
 // MeasureSpec 描述测什么以及如何从题目得到因子分。

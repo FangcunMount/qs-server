@@ -64,6 +64,20 @@ func CompleteProductChannel(kind Kind, channel ProductChannel) (ProductChannel, 
 	return resolved, nil
 }
 
+// ValidateNewProductChannel applies the current product taxonomy only to new
+// drafts. CompleteProductChannel intentionally remains compatible with old
+// rows whose historical channel was broader than their runtime kind.
+func ValidateNewProductChannel(kind Kind, channel ProductChannel) error {
+	resolved, err := CompleteProductChannel(kind, channel)
+	if err != nil {
+		return err
+	}
+	if (kind == KindBehavioralRating || kind == KindCognitive) && resolved != ProductChannelBehaviorAbility {
+		return fmt.Errorf("%w: product channel %q is incompatible with kind %s", ErrInvalidArgument, resolved, kind)
+	}
+	return nil
+}
+
 // AllProductChannels 返回可配置 产品通道 values 用于 API 选项。
 func AllProductChannels() []ProductChannel {
 	return []ProductChannel{

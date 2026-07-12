@@ -26,11 +26,12 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 			continue
 		}
 		for _, rule := range rules {
-			if rule.ScoreBasis != conclusion.ScoreBasisRaw || rule.FactorCode != dimension.Code {
+			value, ok := scoreForBasis(*dimension, rule.ScoreBasis)
+			if !ok || rule.FactorCode != dimension.Code {
 				continue
 			}
 			for _, item := range rule.Rules {
-				if dimension.Score.Value < item.MinScore || dimension.Score.Value > item.MaxScore {
+				if value < item.MinScore || value > item.MaxScore {
 					continue
 				}
 				dimension.Level = &domainoutcome.ResultLevel{Code: item.Level, Label: item.Title}
@@ -39,4 +40,17 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 		}
 	}
 	return outcome
+}
+
+func scoreForBasis(dimension domainoutcome.DimensionResult, basis conclusion.ScoreBasis) (float64, bool) {
+	if basis == conclusion.ScoreBasisRaw && dimension.Score != nil {
+		return dimension.Score.Value, true
+	}
+	want := domainoutcome.ScoreKind(basis)
+	for _, value := range dimension.DerivedScores {
+		if value.Kind == want {
+			return value.Value, true
+		}
+	}
+	return 0, false
 }

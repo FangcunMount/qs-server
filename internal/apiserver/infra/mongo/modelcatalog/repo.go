@@ -157,6 +157,9 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	if filter.Algorithm != "" {
 		extra["model_algorithm"] = string(filter.Algorithm)
 	}
+	if filter.ProductChannel != "" {
+		extra["model_product_channel"] = string(filter.ProductChannel)
+	}
 	if filter.SubKind != "" {
 		extra["model_sub_kind"] = string(filter.SubKind)
 	}

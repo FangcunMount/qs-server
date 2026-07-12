@@ -1,0 +1,29 @@
+package task_performance
+
+import (
+	"testing"
+
+	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
+)
+
+func TestCalculateSPMUsesFrozenAnswerKeys(t *testing.T) {
+	t.Parallel()
+	snapshot := &taskperfsnapshot.Snapshot{Code: "SPM", Version: "1", Title: "SPM", SPM: &taskperfsnapshot.SPMSpec{
+		TimeLimitSeconds: 2400, TotalFactorCode: "total",
+		ItemSets: []taskperfsnapshot.SPMItemSet{{Code: "A", Items: []taskperfsnapshot.SPMItem{{QuestionCode: "A1", CorrectOptionCode: "1"}, {QuestionCode: "A2", CorrectOptionCode: "3"}}}},
+	}}
+	input := &portevaluationinput.InputSnapshot{AnswerSheet: &portevaluationinput.AnswerSheetSnapshot{Answers: []portevaluationinput.AnswerSnapshot{
+		{QuestionCode: "A1", Value: "1"}, {QuestionCode: "A2", Value: "2"}, {QuestionCode: "A3", Value: "1"},
+	}}}
+	got, err := CalculateSPM(input, snapshot)
+	if err != nil {
+		t.Fatalf("CalculateSPM: %v", err)
+	}
+	if got.Primary == nil || got.Primary.Value != 1 || got.Primary.Max == nil || *got.Primary.Max != 2 {
+		t.Fatalf("primary = %#v, want 1/2", got.Primary)
+	}
+	if len(got.Dimensions) != 2 || got.Dimensions[0].Score == nil || got.Dimensions[0].Score.Value != 1 || got.Dimensions[1].Code != "total" {
+		t.Fatalf("dimensions = %#v", got.Dimensions)
+	}
+}

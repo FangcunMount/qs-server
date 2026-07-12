@@ -58,6 +58,11 @@ type (
 	Definition                = definitionpkg.Definition
 	MeasureSpec               = definitionpkg.MeasureSpec
 	Calibration               = definitionpkg.Calibration
+	ExecutionSpec             = definitionpkg.ExecutionSpec
+	Brief2Spec                = definitionpkg.Brief2Spec
+	SPMSpec                   = definitionpkg.SPMSpec
+	SPMItemSet                = definitionpkg.SPMItemSet
+	SPMItem                   = definitionpkg.SPMItem
 	ReportMap                 = definitionpkg.ReportMap
 	ReportSection             = definitionpkg.ReportSection
 	Norm                      = normpkg.Norm
@@ -115,9 +120,10 @@ const (
 	OptionScoringStrict        = factorpkg.OptionScoringStrict
 	OptionScoringCompat        = factorpkg.OptionScoringCompat
 
-	ScoreBasisRaw        = conclusionpkg.ScoreBasisRaw
-	ScoreBasisTScore     = conclusionpkg.ScoreBasisTScore
-	ScoreBasisPercentile = conclusionpkg.ScoreBasisPercentile
+	ScoreBasisRaw           = conclusionpkg.ScoreBasisRaw
+	ScoreBasisTScore        = conclusionpkg.ScoreBasisTScore
+	ScoreBasisPercentile    = conclusionpkg.ScoreBasisPercentile
+	ScoreBasisStandardScore = conclusionpkg.ScoreBasisStandardScore
 
 	ProductChannelMedicalScale    = binding.ProductChannelMedicalScale
 	ProductChannelTypology        = binding.ProductChannelTypology
@@ -172,15 +178,16 @@ const (
 )
 
 var (
-	DefaultProductChannelFor = binding.DefaultProductChannelFor
-	ResolveProductChannel    = binding.ResolveProductChannel
-	CompleteProductChannel   = binding.CompleteProductChannel
-	AllProductChannels       = binding.AllProductChannels
-	LegacyKindMapping        = binding.LegacyKindMapping
-	ProductFromChannel       = binding.ProductFromChannel
-	NewIdentity              = identitypkg.New
-	FamilyFromDecisionKind   = identitypkg.FamilyFromDecisionKind
-	FamilyFromIdentity       = identitypkg.FamilyFromIdentity
+	DefaultProductChannelFor  = binding.DefaultProductChannelFor
+	ResolveProductChannel     = binding.ResolveProductChannel
+	CompleteProductChannel    = binding.CompleteProductChannel
+	ValidateNewProductChannel = binding.ValidateNewProductChannel
+	AllProductChannels        = binding.AllProductChannels
+	LegacyKindMapping         = binding.LegacyKindMapping
+	ProductFromChannel        = binding.ProductFromChannel
+	NewIdentity               = identitypkg.New
+	FamilyFromDecisionKind    = identitypkg.FamilyFromDecisionKind
+	FamilyFromIdentity        = identitypkg.FamilyFromIdentity
 
 	AlgorithmFamilyFromDecisionKind = identitypkg.AlgorithmFamilyFromDecisionKind
 	DecisionKindForIdentity         = binding.DecisionKindForIdentity

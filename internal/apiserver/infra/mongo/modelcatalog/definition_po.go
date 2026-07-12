@@ -8,11 +8,40 @@ import (
 
 // DefinitionPO is the BSON shape for the target ModelCatalog definition.
 type DefinitionPO struct {
-	Measure     MeasureSpecPO  `bson:"measure,omitempty"`
-	Calibration CalibrationPO  `bson:"calibration,omitempty"`
-	Conclusions []ConclusionPO `bson:"conclusions,omitempty"`
-	Outcomes    []OutcomePO    `bson:"outcomes,omitempty"`
-	ReportMap   ReportMapPO    `bson:"report_map,omitempty"`
+	Measure     MeasureSpecPO   `bson:"measure,omitempty"`
+	Calibration CalibrationPO   `bson:"calibration,omitempty"`
+	Execution   ExecutionSpecPO `bson:"execution,omitempty"`
+	Conclusions []ConclusionPO  `bson:"conclusions,omitempty"`
+	Outcomes    []OutcomePO     `bson:"outcomes,omitempty"`
+	ReportMap   ReportMapPO     `bson:"report_map,omitempty"`
+}
+
+type ExecutionSpecPO struct {
+	Brief2 *Brief2SpecPO `bson:"brief2,omitempty"`
+	SPM    *SPMSpecPO    `bson:"spm,omitempty"`
+}
+
+type Brief2SpecPO struct {
+	FormVariant         string   `bson:"form_variant,omitempty"`
+	PrimaryFactorCode   string   `bson:"primary_factor_code,omitempty"`
+	IndexFactorCodes    []string `bson:"index_factor_codes,omitempty"`
+	ValidityFactorCodes []string `bson:"validity_factor_codes,omitempty"`
+}
+
+type SPMSpecPO struct {
+	TimeLimitSeconds int            `bson:"time_limit_seconds,omitempty"`
+	TotalFactorCode  string         `bson:"total_factor_code,omitempty"`
+	ItemSets         []SPMItemSetPO `bson:"item_sets,omitempty"`
+}
+
+type SPMItemSetPO struct {
+	Code  string      `bson:"code,omitempty"`
+	Items []SPMItemPO `bson:"items,omitempty"`
+}
+
+type SPMItemPO struct {
+	QuestionCode      string `bson:"question_code,omitempty"`
+	CorrectOptionCode string `bson:"correct_option_code,omitempty"`
 }
 
 type MeasureSpecPO struct {
@@ -179,6 +208,7 @@ func definitionToPO(def *domain.Definition) *DefinitionPO {
 	return &DefinitionPO{
 		Measure:     measureSpecToPO(def.Measure),
 		Calibration: calibrationToPO(def.Calibration),
+		Execution:   executionSpecToPO(def.Execution),
 		Conclusions: conclusionsToPO(def.Conclusions),
 		Outcomes:    outcomesToPO(def.Outcomes),
 		ReportMap:   reportMapToPO(def.ReportMap),
@@ -199,10 +229,49 @@ func definitionFromPO(po *DefinitionPO) *domain.Definition {
 	return &domain.Definition{
 		Measure:     measureSpecFromPO(po.Measure),
 		Calibration: calibrationFromPO(po.Calibration),
+		Execution:   executionSpecFromPO(po.Execution),
 		Conclusions: conclusionsFromPO(po.Conclusions),
 		Outcomes:    outcomesFromPO(po.Outcomes),
 		ReportMap:   reportMapFromPO(po.ReportMap),
 	}
+}
+
+func executionSpecToPO(spec domain.ExecutionSpec) ExecutionSpecPO {
+	out := ExecutionSpecPO{}
+	if spec.Brief2 != nil {
+		out.Brief2 = &Brief2SpecPO{FormVariant: spec.Brief2.FormVariant, PrimaryFactorCode: spec.Brief2.PrimaryFactorCode, IndexFactorCodes: append([]string(nil), spec.Brief2.IndexFactorCodes...), ValidityFactorCodes: append([]string(nil), spec.Brief2.ValidityFactorCodes...)}
+	}
+	if spec.SPM != nil {
+		spm := &SPMSpecPO{TimeLimitSeconds: spec.SPM.TimeLimitSeconds, TotalFactorCode: spec.SPM.TotalFactorCode, ItemSets: make([]SPMItemSetPO, 0, len(spec.SPM.ItemSets))}
+		for _, set := range spec.SPM.ItemSets {
+			items := make([]SPMItemPO, 0, len(set.Items))
+			for _, item := range set.Items {
+				items = append(items, SPMItemPO{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+			}
+			spm.ItemSets = append(spm.ItemSets, SPMItemSetPO{Code: set.Code, Items: items})
+		}
+		out.SPM = spm
+	}
+	return out
+}
+
+func executionSpecFromPO(po ExecutionSpecPO) domain.ExecutionSpec {
+	out := domain.ExecutionSpec{}
+	if po.Brief2 != nil {
+		out.Brief2 = &domain.Brief2Spec{FormVariant: po.Brief2.FormVariant, PrimaryFactorCode: po.Brief2.PrimaryFactorCode, IndexFactorCodes: append([]string(nil), po.Brief2.IndexFactorCodes...), ValidityFactorCodes: append([]string(nil), po.Brief2.ValidityFactorCodes...)}
+	}
+	if po.SPM != nil {
+		spm := &domain.SPMSpec{TimeLimitSeconds: po.SPM.TimeLimitSeconds, TotalFactorCode: po.SPM.TotalFactorCode, ItemSets: make([]domain.SPMItemSet, 0, len(po.SPM.ItemSets))}
+		for _, set := range po.SPM.ItemSets {
+			items := make([]domain.SPMItem, 0, len(set.Items))
+			for _, item := range set.Items {
+				items = append(items, domain.SPMItem{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+			}
+			spm.ItemSets = append(spm.ItemSets, domain.SPMItemSet{Code: set.Code, Items: items})
+		}
+		out.SPM = spm
+	}
+	return out
 }
 
 func measureSpecToPO(measure domain.MeasureSpec) MeasureSpecPO {

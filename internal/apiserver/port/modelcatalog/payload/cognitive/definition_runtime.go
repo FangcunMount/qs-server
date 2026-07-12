@@ -47,7 +47,22 @@ func SnapshotFromDefinition(env DefinitionEnvelope, def *definition.Definition) 
 		}
 		factors = append(factors, result)
 	}
-	return &Snapshot{Code: env.Code, Version: env.Version, Title: env.Title, QuestionnaireCode: env.QuestionnaireCode, QuestionnaireVersion: env.QuestionnaireVersion, Status: env.Status, Factors: factors, AbilityConclusions: AbilityConclusions(def)}, nil
+	return &Snapshot{Code: env.Code, Version: env.Version, Title: env.Title, QuestionnaireCode: env.QuestionnaireCode, QuestionnaireVersion: env.QuestionnaireVersion, Status: env.Status, Factors: factors, AbilityConclusions: AbilityConclusions(def), SPM: runtimeSPMSpecFromDefinition(def.Execution.SPM)}, nil
+}
+
+func runtimeSPMSpecFromDefinition(spec *definition.SPMSpec) *SPMSpec {
+	if spec == nil {
+		return nil
+	}
+	out := &SPMSpec{TimeLimitSeconds: spec.TimeLimitSeconds, TotalFactorCode: spec.TotalFactorCode, ItemSets: make([]SPMItemSet, 0, len(spec.ItemSets))}
+	for _, set := range spec.ItemSets {
+		items := make([]SPMItem, 0, len(set.Items))
+		for _, item := range set.Items {
+			items = append(items, SPMItem{QuestionCode: item.QuestionCode, CorrectOptionCode: item.CorrectOptionCode})
+		}
+		out.ItemSets = append(out.ItemSets, SPMItemSet{Code: set.Code, Items: items})
+	}
+	return out
 }
 
 func normRefByFactor(refs []norm.Ref, factorCode string) (norm.Ref, bool) {

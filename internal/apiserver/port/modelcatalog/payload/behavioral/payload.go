@@ -205,7 +205,7 @@ func normTablesFromPayload(body *brief2Extension) *calcnorm.NormTables {
 			})
 		}
 		for _, entry := range factor.Lookup {
-			table.Lookup = append(table.Lookup, calcnorm.NormLookupEntry(entry))
+			table.Lookup = append(table.Lookup, calcnorm.NormLookupEntry{RawMin: entry.RawMin, RawMax: entry.RawMax, TScore: entry.TScore, Percentile: entry.Percentile})
 		}
 		tables.Factors = append(tables.Factors, table)
 	}

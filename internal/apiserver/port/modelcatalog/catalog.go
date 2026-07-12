@@ -26,6 +26,7 @@ type ListPublishedFilter struct {
 	Kind                 domain.Kind
 	SubKind              domain.SubKind
 	Algorithm            domain.Algorithm
+	ProductChannel       domain.ProductChannel
 	Category             string
 	Keyword              string
 	QuestionnaireCode    string

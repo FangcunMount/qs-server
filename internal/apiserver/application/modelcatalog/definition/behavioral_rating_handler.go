@@ -28,6 +28,9 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, h.NormRepo)...)
+	if model.Algorithm == domain.AlgorithmBrief2 && model.DefinitionV2 != nil && model.DefinitionV2.Execution.Brief2 == nil {
+		issues = append(issues, domain.DomainValidationIssue{Field: "execution.brief2", Code: "brief2.execution.required", Message: "BRIEF-2 execution spec is required", Level: domain.ValidationLevelError})
+	}
 	if _, err := model.DecisionKindForDefinition(); err != nil {
 		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
 	}

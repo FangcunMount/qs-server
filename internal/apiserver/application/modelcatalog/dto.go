@@ -34,6 +34,7 @@ type ListModelsDTO struct {
 	Keyword              string
 	Category             string
 	Algorithm            string
+	ProductChannel       string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Page                 int

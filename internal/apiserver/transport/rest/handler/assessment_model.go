@@ -45,6 +45,7 @@ func NewAssessmentModelHandler(
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param kind query string false "模型类型"
 // @Param status query string false "状态"
+// @Param product_channel query string false "产品通道"
 // @Param questionnaire_code query string false "问卷编码"
 // @Param questionnaire_version query string false "问卷版本"
 // @Param page query int false "页码"
@@ -580,7 +581,7 @@ func modelListInput(c *gin.Context) (modelcatalog.ListModelsDTO, error) {
 	if err != nil {
 		return modelcatalog.ListModelsDTO{}, err
 	}
-	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
+	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), ProductChannel: c.Query("product_channel"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
 }
 
 func queryPositiveInt(c *gin.Context, key string, fallback int) (int, error) {

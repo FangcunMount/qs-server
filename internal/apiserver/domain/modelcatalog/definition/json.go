@@ -18,6 +18,7 @@ func (d Definition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(definitionJSON{
 		Measure:     d.Measure,
 		Calibration: d.Calibration,
+		Execution:   d.Execution,
 		Conclusions: items,
 		Outcomes:    d.Outcomes,
 		ReportMap:   d.ReportMap,
@@ -39,6 +40,7 @@ func (d *Definition) UnmarshalJSON(data []byte) error {
 	*d = Definition{
 		Measure:     raw.Measure,
 		Calibration: raw.Calibration,
+		Execution:   raw.Execution,
 		Conclusions: items,
 		Outcomes:    raw.Outcomes,
 		ReportMap:   raw.ReportMap,
@@ -49,6 +51,7 @@ func (d *Definition) UnmarshalJSON(data []byte) error {
 type definitionJSON struct {
 	Measure     MeasureSpec          `json:"Measure"`
 	Calibration Calibration          `json:"Calibration"`
+	Execution   ExecutionSpec        `json:"Execution"`
 	Conclusions []conclusionJSON     `json:"Conclusions"`
 	Outcomes    []conclusion.Outcome `json:"Outcomes"`
 	ReportMap   ReportMap            `json:"ReportMap"`

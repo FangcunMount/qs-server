@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
@@ -15,6 +16,8 @@ type NormPO struct {
 
 	TableVersion string         `bson:"table_version"`
 	FormVariant  string         `bson:"form_variant,omitempty"`
+	Kind         string         `bson:"kind,omitempty"`
+	Algorithm    string         `bson:"algorithm,omitempty"`
 	Factors      []NormFactorPO `bson:"factors,omitempty"`
 }
 
@@ -33,10 +36,11 @@ type NormBandPO struct {
 }
 
 type NormLookupPO struct {
-	RawScoreMin float64 `bson:"raw_score_min"`
-	RawScoreMax float64 `bson:"raw_score_max"`
-	TScore      float64 `bson:"t_score"`
-	Percentile  float64 `bson:"percentile"`
+	RawScoreMin   float64  `bson:"raw_score_min"`
+	RawScoreMax   float64  `bson:"raw_score_max"`
+	TScore        float64  `bson:"t_score"`
+	Percentile    float64  `bson:"percentile"`
+	StandardScore *float64 `bson:"standard_score,omitempty"`
 }
 
 func (NormPO) CollectionName() string { return "assessment_norms" }
@@ -67,7 +71,7 @@ func normToPO(value *norm.Norm) *NormPO {
 	if value == nil {
 		return nil
 	}
-	out := &NormPO{TableVersion: value.TableVersion, FormVariant: value.FormVariant}
+	out := &NormPO{TableVersion: value.TableVersion, FormVariant: value.FormVariant, Kind: string(value.Kind), Algorithm: string(value.Algorithm)}
 	if value.Factors != nil {
 		out.Factors = make([]NormFactorPO, 0, len(value.Factors))
 		for _, factor := range value.Factors {
@@ -81,7 +85,7 @@ func normToPO(value *norm.Norm) *NormPO {
 			if factor.Lookup != nil {
 				item.Lookup = make([]NormLookupPO, 0, len(factor.Lookup))
 				for _, lookup := range factor.Lookup {
-					item.Lookup = append(item.Lookup, NormLookupPO{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile})
+					item.Lookup = append(item.Lookup, NormLookupPO{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
 				}
 			}
 			out.Factors = append(out.Factors, item)
@@ -94,7 +98,7 @@ func normFromPO(value *NormPO) *norm.Norm {
 	if value == nil {
 		return nil
 	}
-	out := &norm.Norm{TableVersion: value.TableVersion, FormVariant: value.FormVariant}
+	out := &norm.Norm{TableVersion: value.TableVersion, FormVariant: value.FormVariant, Kind: identity.Kind(value.Kind), Algorithm: identity.Algorithm(value.Algorithm)}
 	if value.Factors != nil {
 		out.Factors = make([]norm.FactorTable, 0, len(value.Factors))
 		for _, factor := range value.Factors {
@@ -108,7 +112,7 @@ func normFromPO(value *NormPO) *norm.Norm {
 			if factor.Lookup != nil {
 				item.Lookup = make([]norm.LookupEntry, 0, len(factor.Lookup))
 				for _, lookup := range factor.Lookup {
-					item.Lookup = append(item.Lookup, norm.LookupEntry{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile})
+					item.Lookup = append(item.Lookup, norm.LookupEntry{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
 				}
 			}
 			out.Factors = append(out.Factors, item)

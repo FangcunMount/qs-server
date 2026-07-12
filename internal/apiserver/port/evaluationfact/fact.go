@@ -138,10 +138,11 @@ const (
 	DimensionKindIndex   DimensionKind = "index"
 	DimensionKindAbility DimensionKind = "ability"
 
-	ScoreKindRawTotal     ScoreKind = "raw_total"
-	ScoreKindMatchPercent ScoreKind = "match_percent"
-	ScoreKindTScore       ScoreKind = "t_score"
-	ScoreKindPercentile   ScoreKind = "percentile"
+	ScoreKindRawTotal      ScoreKind = "raw_total"
+	ScoreKindMatchPercent  ScoreKind = "match_percent"
+	ScoreKindTScore        ScoreKind = "t_score"
+	ScoreKindPercentile    ScoreKind = "percentile"
+	ScoreKindStandardScore ScoreKind = "standard_score"
 
 	ProfileKindPersonalityType  ProfileKind = "personality_type"
 	ProfileKindPersonalityTrait ProfileKind = "personality_trait"

@@ -140,6 +140,9 @@ func (r *DraftRepository) List(ctx context.Context, filter port.ListFilter) ([]*
 	if filter.Algorithm != "" {
 		extra["algorithm"] = string(filter.Algorithm)
 	}
+	if filter.ProductChannel != "" {
+		extra["product_channel"] = string(filter.ProductChannel)
+	}
 	if filter.QuestionnaireCode != "" {
 		extra["questionnaire_code"] = filter.QuestionnaireCode
 	}

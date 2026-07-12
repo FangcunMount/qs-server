@@ -15,10 +15,11 @@ const (
 type ScoreKind string
 
 const (
-	ScoreKindRawTotal     ScoreKind = "raw_total"
-	ScoreKindMatchPercent ScoreKind = "match_percent"
-	ScoreKindTScore       ScoreKind = "t_score"
-	ScoreKindPercentile   ScoreKind = "percentile"
+	ScoreKindRawTotal      ScoreKind = "raw_total"
+	ScoreKindMatchPercent  ScoreKind = "match_percent"
+	ScoreKindTScore        ScoreKind = "t_score"
+	ScoreKindPercentile    ScoreKind = "percentile"
+	ScoreKindStandardScore ScoreKind = "standard_score"
 )
 
 // ScoreValue 是规范 score re呈现 on 计算结果。
