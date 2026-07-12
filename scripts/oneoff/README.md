@@ -35,6 +35,7 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `audit_evaluation_cleanup.sql` | Batch E 清理前只读审计 Outcome/Run/Assessment 一致性、schema 版本与 legacy payload 存量 | 无写入 |
 | `dedupe_interpret_reports_domain/` | 清理 `interpret_reports` 未删除重复 `domain_id`，解除 `uk_report_domain_deleted` 建索引阻塞 | Mongo `interpret_reports`（软删除重复行） |
 | `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
+| `cleanup_orphaned_assessment_documents/` | 直接扫描 Mongo，清理不存在 MySQL Assessment 的历史报告和旧答卷 | Mongo `archived_reports` / `interpret_reports` / `report_query_catalog` / `answersheets` / `answersheet_submit_idempotency` |
 | `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/reports/outbox |
 | `rewrite_seeddata_assessment_times/main.go` | 将 seeddata plan task 测评从错误集中日期改回任务计划日期 | MySQL `assessment` / `assessment_task` / `assessment_score` / `testee` |
 | `rebuild_access_funnel_from_sources/main.go` | 从接入业务源重建接入漏斗统计源和聚合 | MySQL `assessment_entry_intake_log` / `statistics_journey_daily.access_*` |
@@ -860,6 +861,36 @@ go run ./scripts/oneoff/backfill_interpretation_report_catalog \
 - `--timeout`：整次命令超时，默认 24 小时；传 `0` 禁用。
 
 进度条显示当前阶段、百分比、处理速率、ETA、最近安全 checkpoint，以及插入、更新、跳过、缺失和失败数。最终摘要会把缺失归属区分为 `missing_assessment`、`missing_testee` 和 `missing_org`。必须在这三项以及 `missing_archive`、`wrong_priority`、`dangling_source` 全为 0 后切换目录读取版本。
+
+## Assessment 孤岛 Mongo 文档清理
+
+`cleanup_orphaned_assessment_documents` 使用两条权威关系：
+
+- `archived_reports.domain_id -> assessment.id`；不存在时清理 archive、同 ID legacy report 和 catalog。
+- `answersheets.domain_id -> assessment.answer_sheet_id`；不存在时清理答卷和提交幂等记录。
+
+默认 dry-run。答卷可能短暂处于“已保存但 Assessment 尚未创建”状态，因此 answersheets 阶段强制要求 `--answersheet-created-before` 截止线。
+
+```bash
+# 先核对报告孤岛数量。
+go run ./scripts/oneoff/cleanup_orphaned_assessment_documents \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" --mysql-dsn "$MYSQL_DSN" \
+  --source reports --workers 16 --batch-size 1000
+
+# 核对 2026-07-01 之前的孤立答卷。
+go run ./scripts/oneoff/cleanup_orphaned_assessment_documents \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" --mysql-dsn "$MYSQL_DSN" \
+  --source answersheets --answersheet-created-before 2026-07-01 \
+  --workers 16 --batch-size 1000
+
+# 默认 apply 会先备份，再软删除报告/答卷正文；catalog 和幂等记录物理删除。
+go run ./scripts/oneoff/cleanup_orphaned_assessment_documents \
+  --mongo-uri "$MONGO_URI" --mongo-db "$MONGO_DB" --mysql-dsn "$MYSQL_DSN" \
+  --source all --answersheet-created-before 2026-07-01 \
+  --workers 16 --batch-size 1000 --apply
+```
+
+备份集合使用 `cleanup_bak_orphans_<collection>_<backup-suffix>` 命名。只有确认备份和 dry-run 数量后，才可传 `--hard-delete` 物理删除 report/answersheet 正文；该模式也会扫描此前已经软删除的孤岛，因此应先带 `--hard-delete` 做一次 dry-run，再增加 `--apply`。`--max-docs`、`--after-id` 和 `--to-id` 可用于分批与续跑；续跑 checkpoint 必须取自 apply 输出，不能使用 dry-run checkpoint。
 
 ## 验证
 

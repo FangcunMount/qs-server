@@ -52,6 +52,13 @@ func TestRangeFilter(t *testing.T) {
 	}
 }
 
+func TestSourceRangeFilterExcludesSoftDeletedDocuments(t *testing.T) {
+	filter := sourceRangeFilter(archivePhase(), 100, 200)
+	if value, ok := filter["deleted_at"]; !ok || value != nil {
+		t.Fatalf("deleted_at filter = %#v, want explicit nil", value)
+	}
+}
+
 func TestLatestArtifactsByAssessment(t *testing.T) {
 	t0 := time.Date(2026, 7, 12, 1, 0, 0, 0, time.UTC)
 	docs := []bson.M{

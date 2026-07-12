@@ -203,7 +203,7 @@ func runPhase(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, c config
 	if !c.noProgress {
 		fmt.Printf("phase=%s counting source range...\n", spec.name)
 	}
-	total, err := collection.CountDocuments(ctx, rangeFilter(c.afterID, c.toID))
+	total, err := collection.CountDocuments(ctx, sourceRangeFilter(spec, c.afterID, c.toID))
 	if err != nil {
 		return phaseResult{phase: spec.name, checkpoint: c.afterID}, fmt.Errorf("count %s source: %w", spec.name, err)
 	}
@@ -234,7 +234,7 @@ func runPhase(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, c config
 			if remaining > 0 && remaining < limit {
 				limit = remaining
 			}
-			docs, fetchErr := fetchPage(ctx, collection, cursorID, c.toID, limit, spec.projection)
+			docs, fetchErr := fetchPage(ctx, collection, sourceRangeFilter(spec, cursorID, c.toID), limit, spec.projection)
 			if fetchErr != nil {
 				progress.abort()
 				return phaseResult{phase: spec.name, checkpoint: checkpoint, summary: stats.snapshot()}, fetchErr
@@ -278,7 +278,7 @@ func runPhase(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, c config
 		checkpoint = waveLastID
 		progress.setCheckpoint(checkpoint)
 		if remaining == 0 && c.maxDocs > 0 {
-			complete, err = sourceExhausted(ctx, collection, checkpoint, c.toID)
+			complete, err = sourceExhausted(ctx, collection, sourceRangeFilter(spec, checkpoint, c.toID))
 			if err != nil {
 				progress.abort()
 				return phaseResult{phase: spec.name, checkpoint: checkpoint, summary: stats.snapshot()}, err
@@ -295,8 +295,8 @@ func runPhase(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, c config
 	return result, nil
 }
 
-func fetchPage(ctx context.Context, collection *mongo.Collection, afterID, toID uint64, limit int64, projection bson.M) ([]bson.M, error) {
-	cur, err := collection.Find(ctx, rangeFilter(afterID, toID), options.Find().
+func fetchPage(ctx context.Context, collection *mongo.Collection, filter bson.M, limit int64, projection bson.M) ([]bson.M, error) {
+	cur, err := collection.Find(ctx, filter, options.Find().
 		SetProjection(projection).
 		SetSort(bson.D{{Key: "domain_id", Value: 1}}).
 		SetLimit(limit).
@@ -320,8 +320,14 @@ func rangeFilter(afterID, toID uint64) bson.M {
 	return bson.M{"domain_id": rangeQuery}
 }
 
-func sourceExhausted(ctx context.Context, collection *mongo.Collection, afterID, toID uint64) (bool, error) {
-	count, err := collection.CountDocuments(ctx, rangeFilter(afterID, toID), options.Count().SetLimit(1))
+func sourceRangeFilter(spec phaseSpec, afterID, toID uint64) bson.M {
+	filter := rangeFilter(afterID, toID)
+	filter["deleted_at"] = nil
+	return filter
+}
+
+func sourceExhausted(ctx context.Context, collection *mongo.Collection, filter bson.M) (bool, error) {
+	count, err := collection.CountDocuments(ctx, filter, options.Count().SetLimit(1))
 	return count == 0, err
 }
 
@@ -696,7 +702,7 @@ func verify(ctx context.Context, db *mongo.Database) error {
 	if err != nil {
 		return err
 	}
-	missingArchive, err := aggregateCount(ctx, db.Collection("archived_reports"), mongo.Pipeline{{{Key: "$lookup", Value: bson.M{"from": "report_query_catalog", "localField": "domain_id", "foreignField": "assessment_id", "as": "catalog"}}}, {{Key: "$match", Value: bson.M{"catalog": bson.M{"$size": 0}}}}})
+	missingArchive, err := aggregateCount(ctx, db.Collection("archived_reports"), mongo.Pipeline{{{Key: "$match", Value: bson.M{"deleted_at": nil}}}, {{Key: "$lookup", Value: bson.M{"from": "report_query_catalog", "localField": "domain_id", "foreignField": "assessment_id", "as": "catalog"}}}, {{Key: "$match", Value: bson.M{"catalog": bson.M{"$size": 0}}}}})
 	if err != nil {
 		return err
 	}
