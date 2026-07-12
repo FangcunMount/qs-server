@@ -6,7 +6,6 @@ import (
 
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -63,7 +62,7 @@ func (c factorNormCalculator) Calculate(ctx context.Context, _ evalpipeline.Calc
 	if !ok || scaleSnapshot == nil {
 		return nil, fmt.Errorf("behavioral_rating model payload is required")
 	}
-	outcome, err := c.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
+	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
 	})

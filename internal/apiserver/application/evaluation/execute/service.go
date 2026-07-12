@@ -231,7 +231,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"model_code", evaluationModelCode(a, input),
 	)
 
-	evaluationOutcome, _, err := s.runtimeResolver.Execute(ctx, a, input)
+	evaluationOutcome, err := s.runtimeResolver.ExecuteResolved(ctx, resolved, a, input)
 	if err != nil {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,

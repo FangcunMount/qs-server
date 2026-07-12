@@ -2,6 +2,7 @@ package runtime
 
 import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	evalrouting "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -31,7 +32,7 @@ func materializationOrder() []modelcatalog.ExecutionPath {
 func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.RuntimeDescriptor, error) {
 	descs := make([]evalpipeline.RuntimeDescriptor, 0, len(specs))
 	for _, spec := range specs {
-		decisionKind := defaultDecisionKindForFamily(spec.family)
+		decisionKind := evalrouting.DecisionKindForFamily(spec.family)
 		descs = append(descs, evalpipeline.RuntimeDescriptor{
 			Key: evalpipeline.DescriptorKey{
 				AlgorithmFamily: spec.family,
@@ -42,21 +43,6 @@ func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.Ru
 		})
 	}
 	return descs, nil
-}
-
-func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
-	switch family {
-	case modelcatalog.AlgorithmFamilyFactorScoring:
-		return modelcatalog.DecisionKindScoreRange
-	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return modelcatalog.DecisionKindPoleComposition
-	case modelcatalog.AlgorithmFamilyFactorNorm:
-		return modelcatalog.DecisionKindNormLookup
-	case modelcatalog.AlgorithmFamilyTaskPerformance:
-		return modelcatalog.DecisionKindAbilityLevel
-	default:
-		return ""
-	}
 }
 
 func algorithmFamilyForExecutionPath(path modelcatalog.ExecutionPath) (modelcatalog.AlgorithmFamily, bool) {

@@ -10,8 +10,8 @@ import (
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -43,7 +43,7 @@ type service struct {
 	relationshipService clinicianAssignmentReader
 	assignmentHydrator  assignmentHydrator
 	testeeReader        testeeReader
-	latestRiskReader    evaluationreadmodel.LatestRiskReader
+	latestRiskReader    workbenchreadmodel.LatestRiskReader
 	followUpQueueReader planreadmodel.FollowUpQueueReader
 }
 
@@ -53,7 +53,7 @@ func NewService(
 	relationshipService clinicianAssignmentReader,
 	assignmentHydrator assignmentHydrator,
 	testeeReader testeeReader,
-	latestRiskReader evaluationreadmodel.LatestRiskReader,
+	latestRiskReader workbenchreadmodel.LatestRiskReader,
 	followUpQueueReader planreadmodel.FollowUpQueueReader,
 ) Service {
 	return &service{
@@ -79,7 +79,7 @@ func (s *service) GetSummary(ctx context.Context, scope Scope) (*SummaryResult, 
 		return &SummaryResult{}, nil
 	}
 
-	highRiskPage, err := s.latestRiskReader.ListLatestRiskQueue(ctx, latestRiskQueueFilter(resolved), evaluationreadmodel.PageRequest{Page: 1, PageSize: 1})
+	highRiskPage, err := s.latestRiskReader.ListLatestRiskQueue(ctx, latestRiskQueueFilter(resolved), workbenchreadmodel.PageRequest{Page: 1, PageSize: 1})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count high risk queue")
 	}
@@ -135,7 +135,7 @@ func (s *service) ListQueue(ctx context.Context, dto ListQueueDTO) (*QueuePage, 
 }
 
 func (s *service) listHighRiskQueue(ctx context.Context, resolved resolvedScope, page, pageSize int) (*QueuePage, error) {
-	riskPage, err := s.latestRiskReader.ListLatestRiskQueue(ctx, latestRiskQueueFilter(resolved), evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
+	riskPage, err := s.latestRiskReader.ListLatestRiskQueue(ctx, latestRiskQueueFilter(resolved), workbenchreadmodel.PageRequest{Page: page, PageSize: pageSize})
 	if err != nil {
 		return nil, err
 	}
@@ -334,8 +334,8 @@ func (s *service) keyFocusFilter(scope resolvedScope, offset, limit int) actorre
 	return filter
 }
 
-func latestRiskQueueFilter(scope resolvedScope) evaluationreadmodel.LatestRiskQueueFilter {
-	return evaluationreadmodel.LatestRiskQueueFilter{
+func latestRiskQueueFilter(scope resolvedScope) workbenchreadmodel.LatestRiskQueueFilter {
+	return workbenchreadmodel.LatestRiskQueueFilter{
 		OrgID:               scope.OrgID,
 		TesteeIDs:           scope.TesteeIDs,
 		RestrictToTesteeIDs: scope.RestrictToTesteeIDs,
@@ -527,7 +527,7 @@ func testeeFromRow(row actorreadmodel.TesteeRow) Testee {
 	}
 }
 
-func latestRiskTesteeIDs(rows []evaluationreadmodel.LatestRiskRow) []uint64 {
+func latestRiskTesteeIDs(rows []workbenchreadmodel.LatestRiskRow) []uint64 {
 	ids := make([]uint64, 0, len(rows))
 	for _, row := range rows {
 		ids = append(ids, row.TesteeID)

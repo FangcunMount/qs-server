@@ -80,4 +80,19 @@ func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testin
 	}
 }
 
+func TestServiceRejectsBoundModelWhenValidatorIsMissing(t *testing.T) {
+	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
+	modelCode := "MODEL-1"
+	service := NewService(repo, nil, tx, stager, nil)
+	if _, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
+		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3,
+		ModelCode: &modelCode, OriginType: "adhoc",
+	}); err == nil {
+		t.Fatal("expected missing evaluation model validator error")
+	}
+	if repo.saves != 0 || tx.calls != 0 || len(stager.types) != 0 {
+		t.Fatalf("invalid configuration produced side effects: saves=%d tx=%d events=%v", repo.saves, tx.calls, stager.types)
+	}
+}
+
 var _ domainassessment.Repository = (*intakeRepoStub)(nil)

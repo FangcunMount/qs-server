@@ -6,9 +6,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// ExecutionRoutingFromRoute 是单一 来源 用于 运行时 和 report 机制 路由。
-// Legacy 建模类型 路由 按 执行路径家族; 判定类型For身份 保持 用于 publish matrices。
-func ExecutionRoutingFromRoute(route ModelRoute) (DescriptorKey, error) {
+// DescriptorKeyFromRoute derives the single runtime routing key from a model route.
+func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 	family, ok := ExecutionFamilyFromRoute(route)
 	if !ok {
 		return DescriptorKey{}, fmt.Errorf("unsupported model route for runtime descriptor: %s/%s", route.Kind, route.Algorithm)
@@ -18,11 +17,6 @@ func ExecutionRoutingFromRoute(route ModelRoute) (DescriptorKey, error) {
 		DecisionKind:    ExecutionDecisionFromRoute(route, family),
 		PayloadFormat:   route.PayloadFormat,
 	}, nil
-}
-
-// DescriptorKeyFromRoute 推导机制 路由 键 从 模型路由。
-func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
-	return ExecutionRoutingFromRoute(route)
 }
 
 // ExecutionFamilyFromRoute 解析执行家族 using modelcatalog identity as the primary route.
@@ -46,7 +40,7 @@ func ExecutionDecisionFromRoute(route ModelRoute, family modelcatalog.AlgorithmF
 			return route.DecisionKind
 		}
 	}
-	return defaultDecisionKindForFamily(family)
+	return DecisionKindForFamily(family)
 }
 
 func legacyTypologyFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
@@ -59,7 +53,9 @@ func legacyTypologyFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFami
 	return "", false
 }
 
-func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+// DecisionKindForFamily is the canonical pure mapping from an algorithm family
+// to its default decision kind.
+func DecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
 	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
 		return modelcatalog.DecisionKindScoreRange
@@ -71,21 +67,5 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 		return modelcatalog.DecisionKindAbilityLevel
 	default:
 		return ""
-	}
-}
-
-// ExecutionPathForFamily 映射算法家族 到 its 物化路径。
-func ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, error) {
-	switch family {
-	case modelcatalog.AlgorithmFamilyFactorScoring:
-		return modelcatalog.ExecutionPathScaleDescriptor, nil
-	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return modelcatalog.ExecutionPathTypologyDescriptor, nil
-	case modelcatalog.AlgorithmFamilyFactorNorm:
-		return modelcatalog.ExecutionPathBehavioralRatingDescriptor, nil
-	case modelcatalog.AlgorithmFamilyTaskPerformance:
-		return modelcatalog.ExecutionPathCognitiveDescriptor, nil
-	default:
-		return "", fmt.Errorf("unsupported algorithm family: %s", family)
 	}
 }

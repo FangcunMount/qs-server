@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	mysqlDriver "gorm.io/driver/mysql"
@@ -214,7 +215,7 @@ func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 }
 
 func TestLatestRiskQueueArgsMatchDerivedLatestSQLPlaceholders(t *testing.T) {
-	restricted := latestRiskQueueArgs(evaluationreadmodel.LatestRiskQueueFilter{
+	restricted := latestRiskQueueArgs(workbenchreadmodel.LatestRiskQueueFilter{
 		OrgID:               9,
 		TesteeIDs:           []uint64{3002, 3001, 3001},
 		RestrictToTesteeIDs: true,
@@ -233,7 +234,7 @@ func TestLatestRiskQueueArgsMatchDerivedLatestSQLPlaceholders(t *testing.T) {
 		t.Fatalf("restricted risk args = %#v, want normalized risks", restricted[5])
 	}
 
-	allOrg := latestRiskQueueArgs(evaluationreadmodel.LatestRiskQueueFilter{OrgID: 9})
+	allOrg := latestRiskQueueArgs(workbenchreadmodel.LatestRiskQueueFilter{OrgID: 9})
 	if len(allOrg) != 5 || allOrg[0] != int64(9) || allOrg[1] != "evaluated" || allOrg[2] != int64(9) || allOrg[3] != "evaluated" {
 		t.Fatalf("all-org args = %#v, want inner org/status then outer org/status", allOrg)
 	}

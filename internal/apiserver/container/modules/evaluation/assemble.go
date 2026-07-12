@@ -38,6 +38,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -54,15 +55,11 @@ type Module struct {
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
-	IntakeService    evaluationintake.Service
-	TesteeService    evaluationtestee.Service
-	OperatorQuery    evaluationoperator.QueryService
-	OperatorRecovery evaluationoperator.RecoveryService
-	ScaleAnalysis    evaluationoperator.ScaleAnalysisService
-	LatestRiskReader evaluationreadmodel.LatestRiskReader
-	AssessmentReader evaluationreadmodel.AssessmentReader
-
-	WorkerExecutionService   execute.WorkerExecutionService
+	IntakeService            evaluationintake.Service
+	TesteeService            evaluationtestee.Service
+	OperatorQuery            evaluationoperator.QueryService
+	OperatorRecovery         evaluationoperator.RecoveryService
+	ScaleAnalysis            evaluationoperator.ScaleAnalysisService
 	WorkerService            evaluationworker.Service
 	OperatorExecutionService evaluationoperator.BatchExecutionService
 	SchedulerService         evaluationscheduler.Service
@@ -70,6 +67,7 @@ type Module struct {
 	OutboxReadyIndex              *outboxready.Index
 	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
 	outcomeRepository             domainoutcome.Repository
+	workbenchLatestRiskReader     workbenchreadmodel.LatestRiskReader
 }
 
 // Deps defines explicit constructor dependencies for the evaluation module.
@@ -120,7 +118,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 	module.wireAssessmentApplications(normalized, infra)
-	module.wireConsistencyReconcile(normalized, infra)
+	module.wireScheduler(infra)
 
 	return module, nil
 }
@@ -132,7 +130,7 @@ type evaluationInfra struct {
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
 	submittedCandidateReader     evaluationscheduler.SubmittedCandidateReader
-	latestRiskReader             evaluationreadmodel.LatestRiskReader
+	latestRiskReader             workbenchreadmodel.LatestRiskReader
 	scoreProjectionReader        evaluationreadmodel.ScoreProjectionReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
 	txRunner                     apptransaction.Runner
@@ -197,12 +195,14 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 	if normalized.InputResolver != nil {
 		wiringDeps := WiringDeps{ScaleScorer: ruleengine.NewScaleFactorScorer()}
 		if normalized.RuntimeDescriptorRegistry != nil {
-			evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
+			if err := evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
 				ScaleScorer:          evalruntime.MaterializeFactorScoringPipelineComponents(wiringDeps),
 				FactorNorm:           evalruntime.MaterializeFactorNormPipelineComponents(wiringDeps),
 				TaskPerformance:      evalruntime.MaterializeTaskPerformancePipelineComponents(wiringDeps),
 				FactorClassification: evalruntime.MaterializeFactorClassificationPipelineComponents(wiringDeps),
-			})
+			}); err != nil {
+				return err
+			}
 		}
 		scoreProjector := outcomescoring.NewAssessmentScoreProjector(infra.scoreRepo)
 		evaluationCommitter := outcomecommit.NewCommitter(
@@ -223,7 +223,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithEvaluationCommitter(evaluationCommitter),
 		)
-		m.WorkerExecutionService = engine
 		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
 		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine, normalized.TesteeAccessChecker)
 	}
@@ -268,11 +267,10 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
 	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
-	m.LatestRiskReader = infra.latestRiskReader
-	m.AssessmentReader = infra.assessmentReader
+	m.workbenchLatestRiskReader = infra.latestRiskReader
 }
 
-func (m *Module) wireConsistencyReconcile(normalized Deps, infra *evaluationInfra) {
+func (m *Module) wireScheduler(infra *evaluationInfra) {
 	m.SchedulerService = evaluationscheduler.NewService(infra.assessmentRepo, infra.outcomeRepo, infra.submittedCandidateReader)
 }
 

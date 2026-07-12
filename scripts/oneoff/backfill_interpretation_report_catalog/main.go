@@ -52,7 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mysqlDB.Close()
+	defer func() { _ = mysqlDB.Close() }()
 	db := client.Database(c.mongoDB)
 	if err := ensureIndexes(ctx, db); err != nil {
 		log.Fatal(err)
@@ -209,7 +209,7 @@ func loadOrgs(ctx context.Context, db *sql.DB, docs []bson.M) (map[uint64]int64,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id uint64
 		var org int64
@@ -269,7 +269,7 @@ func aggregateCount(ctx context.Context, c *mongo.Collection, p mongo.Pipeline) 
 	if err != nil {
 		return 0, err
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	if !cur.Next(ctx) {
 		return 0, cur.Err()
 	}

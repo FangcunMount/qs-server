@@ -264,7 +264,4 @@ func TestClaimEvaluationRunSkipsActiveAndTerminalAttempts(t *testing.T) {
 		t.Fatalf("claim = %#v, err=%v; want terminal duplicate skip", claim, err)
 	}
 }
-
-func ptrTime(value time.Time) *time.Time { return &value }
-
 func ptrRun(value evalrun.EvaluationRun) *evalrun.EvaluationRun { return &value }

@@ -17,7 +17,6 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 		"assessment": {},
 		"run":        {},
 		"input":      {},
-		"policy":     {},
 		"routing":    {},
 		"event":      {},
 		"outcome":    {},
@@ -37,7 +36,7 @@ func TestEvaluationRootOnlyAllowsExecutionPackages(t *testing.T) {
 			rel, _ := filepath.Rel(evalRoot, path)
 			if !strings.Contains(rel, string(filepath.Separator)) {
 				if _, ok := allowedTopLevel[entry.Name()]; !ok {
-					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/policy/routing/event/outcome", entry.Name())
+					t.Fatalf("unexpected top-level evaluation package %q; allowed: assessment/run/input/routing/event/outcome", entry.Name())
 				}
 			}
 			if entry.Name() == "norming" || entry.Name() == "task_performance" {

@@ -76,7 +76,10 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 	if err != nil {
 		return nil, err
 	}
-	if req.ModelRef != nil && s.validator != nil {
+	if req.ModelRef != nil {
+		if s.validator == nil {
+			return nil, evalerrors.ModuleNotConfigured("evaluation model validator is not configured")
+		}
 		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef); err != nil {
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 		}

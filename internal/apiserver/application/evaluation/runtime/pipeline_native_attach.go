@@ -18,20 +18,24 @@ type NativePipelineDeps struct {
 }
 
 // AttachNativePipelines wires native descriptor pipeline triple for supported algorithm families.
-func AttachNativePipelines(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+func AttachNativePipelines(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
 	if registry == nil {
-		return
+		return nil
 	}
-	attachFactorScoringNativePipeline(registry, deps)
-	attachFactorNormNativePipeline(registry, deps)
-	attachTaskPerformanceNativePipeline(registry, deps)
-	attachFactorClassificationNativePipeline(registry, deps)
+	for _, attach := range []func(*evalpipeline.RuntimeDescriptorRegistry, NativePipelineDeps) error{
+		attachFactorScoringNativePipeline, attachFactorNormNativePipeline, attachTaskPerformanceNativePipeline, attachFactorClassificationNativePipeline,
+	} {
+		if err := attach(registry, deps); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
 	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyFactorScoring)
 	if !ok {
-		return
+		return nil
 	}
 	components := deps.ScaleScorer
 	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
@@ -40,13 +44,13 @@ func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorR
 	desc.InputAssembler = components.InputAssembler
 	desc.Calculator = components.Calculator
 	desc.OutcomeAssembler = components.OutcomeAssembler
-	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorScoring, desc)
+	return registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorScoring, desc)
 }
 
-func attachFactorNormNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+func attachFactorNormNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
 	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyFactorNorm)
 	if !ok {
-		return
+		return nil
 	}
 	components := deps.FactorNorm
 	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
@@ -55,13 +59,13 @@ func attachFactorNormNativePipeline(registry *evalpipeline.RuntimeDescriptorRegi
 	desc.InputAssembler = components.InputAssembler
 	desc.Calculator = components.Calculator
 	desc.OutcomeAssembler = components.OutcomeAssembler
-	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorNorm, desc)
+	return registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorNorm, desc)
 }
 
-func attachTaskPerformanceNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+func attachTaskPerformanceNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
 	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyTaskPerformance)
 	if !ok {
-		return
+		return nil
 	}
 	components := deps.TaskPerformance
 	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
@@ -70,13 +74,13 @@ func attachTaskPerformanceNativePipeline(registry *evalpipeline.RuntimeDescripto
 	desc.InputAssembler = components.InputAssembler
 	desc.Calculator = components.Calculator
 	desc.OutcomeAssembler = components.OutcomeAssembler
-	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyTaskPerformance, desc)
+	return registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyTaskPerformance, desc)
 }
 
-func attachFactorClassificationNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) {
+func attachFactorClassificationNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
 	desc, ok := registry.DescriptorForFamily(modelcatalog.AlgorithmFamilyFactorClassification)
 	if !ok {
-		return
+		return nil
 	}
 	components := deps.FactorClassification
 	if components.InputAssembler == nil && components.Calculator == nil && components.OutcomeAssembler == nil {
@@ -85,5 +89,5 @@ func attachFactorClassificationNativePipeline(registry *evalpipeline.RuntimeDesc
 	desc.InputAssembler = components.InputAssembler
 	desc.Calculator = components.Calculator
 	desc.OutcomeAssembler = components.OutcomeAssembler
-	_ = registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorClassification, desc)
+	return registry.ReplaceFamilyDescriptor(modelcatalog.AlgorithmFamilyFactorClassification, desc)
 }

@@ -139,10 +139,3 @@ func derefFloat64(v *float64) float64 {
 	}
 	return *v
 }
-
-func derefString(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
-}

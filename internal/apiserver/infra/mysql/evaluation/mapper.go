@@ -139,7 +139,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 
 // SyncID 同步ID
 func (m *AssessmentMapper) SyncID(po *AssessmentPO, domain *assessment.Assessment) {
-	assessment.SyncIDFromRepository(domain, mustUint64FromMetaID("assessment.id", po.ID))
+	domain.AssignID(assessment.NewID(mustUint64FromMetaID("assessment.id", po.ID)))
 }
 
 // ToDomainList 批量转换持久化对象为领域对象

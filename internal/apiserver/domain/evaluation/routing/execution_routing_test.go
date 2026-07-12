@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestExecutionRoutingFromRouteUsesKindPrimaryFamilies(t *testing.T) {
+func TestDescriptorKeyFromRouteUsesKindPrimaryFamilies(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -52,9 +52,9 @@ func TestExecutionRoutingFromRouteUsesKindPrimaryFamilies(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			key, err := evalpipeline.ExecutionRoutingFromRoute(tc.route)
+			key, err := evalpipeline.DescriptorKeyFromRoute(tc.route)
 			if err != nil {
-				t.Fatalf("ExecutionRoutingFromRoute: %v", err)
+				t.Fatalf("DescriptorKeyFromRoute: %v", err)
 			}
 			if key.AlgorithmFamily != tc.family {
 				t.Fatalf("family=%s want=%s", key.AlgorithmFamily, tc.family)

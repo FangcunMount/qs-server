@@ -269,7 +269,7 @@ func composeRESTWorkbenchDeps(c *Container) resttransport.WorkbenchDeps {
 		c.ActorModule.ClinicianQueryService == nil ||
 		c.ActorModule.ClinicianRelationshipService == nil ||
 		c.ActorModule.ReadModel == nil ||
-		c.EvaluationModule.LatestRiskReader == nil ||
+		c.workbenchLatestRiskReader == nil ||
 		c.PlanModule.FollowUpQueueReader == nil {
 		return deps
 	}
@@ -279,7 +279,7 @@ func composeRESTWorkbenchDeps(c *Container) resttransport.WorkbenchDeps {
 		c.ActorModule.ClinicianRelationshipService,
 		c.ActorModule.ReadModel,
 		c.ActorModule.ReadModel,
-		c.EvaluationModule.LatestRiskReader,
+		c.workbenchLatestRiskReader,
 		c.PlanModule.FollowUpQueueReader,
 	)
 	return deps

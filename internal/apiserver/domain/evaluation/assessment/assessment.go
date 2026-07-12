@@ -466,24 +466,9 @@ func (a *Assessment) FailureReason() *string {
 
 // ==================== 状态判断辅助方法 ====================
 
-// IsPending 是否待提交状态
-func (a *Assessment) IsPending() bool {
-	return a.status.IsPending()
-}
-
-// IsSubmitted 是否已提交状态
-func (a *Assessment) IsSubmitted() bool {
-	return a.status.IsSubmitted()
-}
-
-// IsFailed 是否失败状态
-func (a *Assessment) IsFailed() bool {
-	return a.status.IsFailed()
-}
-
 // NeedsEvaluation 是否需要评估（已提交且绑定了解释模型）
 func (a *Assessment) NeedsEvaluation() bool {
-	return a.IsSubmitted() && a.HasEvaluationModel()
+	return a.status.IsSubmitted() && a.HasEvaluationModel()
 }
 
 // ==================== 领域事件管理 ====================
@@ -501,16 +486,6 @@ func (a *Assessment) ClearEvents() {
 // addEvent 添加领域事件（私有方法）
 func (a *Assessment) addEvent(event DomainEvent) {
 	a.events = append(a.events, event)
-}
-
-// setID 设置ID（仓储层使用，用于持久化后同步自增ID）
-func (a *Assessment) setID(id ID) {
-	a.id = id
-}
-
-// SyncIDFromRepository 从仓储层同步ID（供仓储层使用）
-func SyncIDFromRepository(a *Assessment, id uint64) {
-	a.setID(NewID(id))
 }
 
 func summaryFromLegacyResult(totalScore *float64, riskLevel *RiskLevel) *ResultSummary {

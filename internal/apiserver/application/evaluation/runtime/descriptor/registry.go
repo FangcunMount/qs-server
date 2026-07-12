@@ -93,18 +93,6 @@ func (r *RuntimeDescriptorRegistry) HasAlgorithmFamily(family modelcatalog.Algor
 	return ok
 }
 
-// ExecutionPathForFamily returns the registered execution path for a family.
-func (r *RuntimeDescriptorRegistry) ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, bool) {
-	if r == nil {
-		return "", false
-	}
-	desc, ok := r.descriptorForFamily(family)
-	if !ok {
-		return "", false
-	}
-	return desc.ExecutionPath, true
-}
-
 // DescriptorForFamily returns the family-level runtime descriptor when registered.
 func (r *RuntimeDescriptorRegistry) DescriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
 	if r == nil {

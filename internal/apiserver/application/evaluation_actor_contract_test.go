@@ -36,7 +36,7 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 		},
 		{
 			actor:           "testee",
-			applicationFile: "internal/apiserver/application/evaluation/testee/service.go",
+			applicationFile: "internal/apiserver/application/evaluation/testee/types.go",
 			applicationPort: "type Service interface",
 			entryFile:       "internal/apiserver/transport/grpc/service/evaluation.go",
 			entrySymbol:     "GetMyAssessment(",
@@ -45,7 +45,7 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 		},
 		{
 			actor:           "backend operator",
-			applicationFile: "internal/apiserver/application/evaluation/operator/service.go",
+			applicationFile: "internal/apiserver/application/evaluation/operator/types.go",
 			applicationPort: "type QueryService interface",
 			entryFile:       "internal/apiserver/transport/rest/handler/evaluation.go",
 			entrySymbol:     "RequireProtectedScope(",
@@ -184,7 +184,9 @@ func TestEvaluationWorkerDoesNotReuseOperatorQueryService(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, forbidden := range []string{"WorkerResultReader", "NewWorkerAssessmentResultReader("} {
-		if strings.Contains(string(data), forbidden) { t.Fatalf("retired worker result reader remains: %s", forbidden) }
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("retired worker result reader remains: %s", forbidden)
+		}
 	}
 }
 
@@ -193,7 +195,9 @@ func TestRetiredEvaluationApplicationPackagesStayDeleted(t *testing.T) {
 	root := repoRoot(t)
 	for _, name := range []string{"assessment", "runquery", "consistency"} {
 		path := filepath.Join(root, "internal/apiserver/application/evaluation", name)
-		if _, err := os.Stat(path); !os.IsNotExist(err) { t.Fatalf("retired package still exists: %s", path) }
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("retired package still exists: %s", path)
+		}
 	}
 }
 

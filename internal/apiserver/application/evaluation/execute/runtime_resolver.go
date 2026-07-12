@@ -79,6 +79,20 @@ func (r *RuntimeResolver) Execute(
 	if err != nil {
 		return nil, ResolvedExecution{}, err
 	}
-	outcome, err := r.executor.Execute(ctx, resolved.Descriptor, evalpipeline.ExecutionInput{Assessment: a, Input: input})
+	outcome, err := r.ExecuteResolved(ctx, resolved, a, input)
 	return outcome, resolved, err
+}
+
+// ExecuteResolved executes exactly the descriptor selected by ResolveExecution.
+func (r *RuntimeResolver) ExecuteResolved(
+	ctx context.Context,
+	resolved ResolvedExecution,
+	a *assessment.Assessment,
+	input *evaluationinput.InputSnapshot,
+) (*domainoutcome.Execution, error) {
+	if r == nil || r.executor == nil {
+		return nil, fmt.Errorf("evaluation runtime resolver is not configured")
+	}
+	outcome, err := r.executor.Execute(ctx, resolved.Descriptor, evalpipeline.ExecutionInput{Assessment: a, Input: input})
+	return outcome, err
 }

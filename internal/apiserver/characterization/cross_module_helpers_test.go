@@ -40,6 +40,12 @@ type charScaleBinding struct {
 	scaleVersion string
 }
 
+type charEvaluationModelValidator struct{}
+
+func (charEvaluationModelValidator) ValidateEvaluationModel(context.Context, assessment.EvaluationModelRef, assessment.QuestionnaireRef) error {
+	return nil
+}
+
 type charCrossModuleHarness struct {
 	repo               *charAssessmentRepo
 	assessment         *assessment.Assessment
@@ -105,7 +111,7 @@ func buildCharCrossModuleHarnessCore(
 
 	h.intakeSvc = evaluationintake.NewService(
 		repo,
-		nil,
+		charEvaluationModelValidator{},
 		&charTxRunner{},
 		submitStager,
 		nil,

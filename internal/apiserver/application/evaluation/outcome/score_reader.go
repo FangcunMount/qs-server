@@ -2,8 +2,10 @@ package outcome
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -76,7 +78,24 @@ func (r *scoreFactReader) Get(ctx context.Context, assessmentID uint64) (*ScoreF
 	if projection == nil {
 		return nil, fmt.Errorf("evaluation outcome does not project scale scores")
 	}
-	return scoreFactFromProjection(projection, r.loadScale(ctx, assessmentID)), nil
+	names, maxScores, frozen := scoreMetadataFromRecord(record, execution)
+	if !frozen {
+		log.Warnf("evaluation score fact uses legacy current-catalog metadata fallback (assessment_id=%d)", assessmentID)
+		legacyScale := r.loadLegacyScale(ctx, assessmentID)
+		for code, value := range factorMaxScores(legacyScale) {
+			if _, exists := maxScores[code]; !exists {
+				maxScores[code] = value
+			}
+		}
+		if legacyScale != nil {
+			for _, factor := range legacyScale.Factors {
+				if names[factor.Code] == "" {
+					names[factor.Code] = factor.Title
+				}
+			}
+		}
+	}
+	return scoreFactFromProjection(projection, names, maxScores), nil
 }
 
 func (r *scoreFactReader) Trend(ctx context.Context, testeeID uint64, factorCode string, limit int) (*FactorTrendFact, error) {
@@ -110,7 +129,7 @@ func (r *scoreFactReader) Trend(ctx context.Context, testeeID uint64, factorCode
 	return result, nil
 }
 
-func (r *scoreFactReader) loadScale(ctx context.Context, assessmentID uint64) *scalesnapshot.ScaleSnapshot {
+func (r *scoreFactReader) loadLegacyScale(ctx context.Context, assessmentID uint64) *scalesnapshot.ScaleSnapshot {
 	if r.scales == nil || r.assessments == nil {
 		return nil
 	}
@@ -125,14 +144,50 @@ func (r *scoreFactReader) loadScale(ctx context.Context, assessmentID uint64) *s
 	return scale
 }
 
-func scoreFactFromProjection(projection *domainassessment.ScaleScoreProjection, scale *scalesnapshot.ScaleSnapshot) *ScoreFact {
+func scoreFactFromProjection(projection *domainassessment.ScaleScoreProjection, names map[string]string, maxScores map[string]*float64) *ScoreFact {
 	result := &ScoreFact{AssessmentID: projection.AssessmentID().Uint64(), TotalScore: projection.TotalScore(), RiskLevel: projection.RiskLevel().String(), FactorScores: make([]FactorScoreFact, 0, len(projection.FactorScores()))}
-	maxScores := factorMaxScores(scale)
 	for _, factor := range projection.FactorScores() {
 		factorCode := string(factor.FactorCode())
-		result.FactorScores = append(result.FactorScores, FactorScoreFact{FactorCode: factorCode, FactorName: factor.FactorName(), RawScore: factor.RawScore(), MaxScore: maxScores[factorCode], RiskLevel: factor.RiskLevel().String(), IsTotalScore: factor.IsTotalScore()})
+		factorName := factor.FactorName()
+		if names[factorCode] != "" {
+			factorName = names[factorCode]
+		}
+		result.FactorScores = append(result.FactorScores, FactorScoreFact{FactorCode: factorCode, FactorName: factorName, RawScore: factor.RawScore(), MaxScore: maxScores[factorCode], RiskLevel: factor.RiskLevel().String(), IsTotalScore: factor.IsTotalScore()})
 	}
 	return result
+}
+
+func scoreMetadataFromRecord(record *domainoutcome.Record, execution *domainoutcome.Execution) (map[string]string, map[string]*float64, bool) {
+	names := map[string]string{}
+	maxScores := map[string]*float64{}
+	if execution != nil {
+		for _, dimension := range execution.Dimensions {
+			if dimension.Name != "" {
+				names[dimension.Code] = dimension.Name
+			}
+			if dimension.Score != nil && dimension.Score.Max != nil {
+				value := *dimension.Score.Max
+				maxScores[dimension.Code] = &value
+			}
+		}
+	}
+	if record == nil || len(record.ReportInput()) == 0 {
+		return names, maxScores, false
+	}
+	var frozen evaluationinput.ScaleModelPayload
+	if err := json.Unmarshal(record.ReportInput(), &frozen); err != nil || frozen.Scale == nil {
+		return names, maxScores, false
+	}
+	for _, factor := range frozen.Scale.Factors {
+		if names[factor.Code] == "" {
+			names[factor.Code] = factor.Title
+		}
+		if _, exists := maxScores[factor.Code]; !exists && factor.MaxScore != nil {
+			value := *factor.MaxScore
+			maxScores[factor.Code] = &value
+		}
+	}
+	return names, maxScores, true
 }
 
 func factorMaxScores(scale *scalesnapshot.ScaleSnapshot) map[string]*float64 {

@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -12,6 +13,7 @@ type InstallHost interface {
 	compose.Host
 	SurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra
 	SetEvaluationModule(*Module)
+	SetWorkbenchLatestRiskReader(workbenchreadmodel.LatestRiskReader)
 }
 
 // InstallFrom wires and registers the evaluation module using composition-root host inputs.
@@ -55,6 +57,7 @@ func InstallFrom(host InstallHost) error {
 		host.SetPublishedModelCatalog(result.PublishedModelCatalog)
 	}
 	host.SetEvaluationModule(result.Module)
+	host.SetWorkbenchLatestRiskReader(result.WorkbenchLatestRiskReader)
 	host.RegisterModule("evaluation", result.Module)
 	host.Printf("📦 Evaluation module initialized\n")
 	return nil

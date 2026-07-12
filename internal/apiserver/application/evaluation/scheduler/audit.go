@@ -3,7 +3,6 @@ package scheduler
 
 import (
 	"context"
-	stderrors "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,16 +13,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"gorm.io/gorm"
 )
 
-type MismatchKind string
+type mismatchKind string
 
-const MismatchOutcomeWithoutEvaluatedStatus MismatchKind = "outcome_without_evaluated_status"
+const mismatchOutcomeWithoutEvaluatedStatus mismatchKind = "outcome_without_evaluated_status"
 
-type Mismatch struct {
+type mismatch struct {
 	AssessmentID uint64
-	Kind         MismatchKind
+	Kind         mismatchKind
 	DetectedAt   time.Time
 }
 
@@ -87,7 +85,7 @@ func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
 	return detected, nil
 }
 
-func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*Mismatch, error) {
+func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*mismatch, error) {
 	a, err := s.assessments.FindByID(ctx, domainassessment.NewID(assessmentID))
 	if err != nil || a == nil {
 		return nil, err
@@ -96,16 +94,13 @@ func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*Mismatch, 
 		return nil, nil
 	}
 	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
-	if stderrors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
 	if record == nil {
 		return nil, nil
 	}
-	return &Mismatch{AssessmentID: assessmentID, Kind: MismatchOutcomeWithoutEvaluatedStatus, DetectedAt: time.Now()}, nil
+	return &mismatch{AssessmentID: assessmentID, Kind: mismatchOutcomeWithoutEvaluatedStatus, DetectedAt: time.Now()}, nil
 }
 
 var (
@@ -113,9 +108,9 @@ var (
 	evaluationConsistencyDispositionTotal = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "disposition_total", Help: "Total evaluation consistency mismatches by kind and audit disposition."}, []string{"kind", "disposition"})
 )
 
-func observeMismatch(kind MismatchKind) {
+func observeMismatch(kind mismatchKind) {
 	evaluationConsistencyMismatchTotal.WithLabelValues(string(kind)).Inc()
 }
-func observeDisposition(kind MismatchKind, disposition string) {
+func observeDisposition(kind mismatchKind, disposition string) {
 	evaluationConsistencyDispositionTotal.WithLabelValues(string(kind), disposition).Inc()
 }

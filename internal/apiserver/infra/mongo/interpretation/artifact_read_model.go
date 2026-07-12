@@ -107,11 +107,12 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 	}
 	artifactIDs, archiveIDs := make([]uint64, 0, len(entries)), make([]uint64, 0, len(entries))
 	for _, e := range entries {
-		if e.SourceKind == ReportCatalogSourceArtifact {
+		switch e.SourceKind {
+		case ReportCatalogSourceArtifact:
 			artifactIDs = append(artifactIDs, e.SourceID)
-		} else if e.SourceKind == ReportCatalogSourceArchive {
+		case ReportCatalogSourceArchive:
 			archiveIDs = append(archiveIDs, e.SourceID)
-		} else {
+		default:
 			return nil, fmt.Errorf("unknown report catalog source %q", e.SourceKind)
 		}
 	}

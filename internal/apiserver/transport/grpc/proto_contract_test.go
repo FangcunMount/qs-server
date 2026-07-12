@@ -147,7 +147,9 @@ func TestInternalProtoEvaluateAssessmentResponseHasNoLegacyFields(t *testing.T) 
 		t.Fatal(err)
 	}
 	source := string(data)
-	if strings.Contains(source, "message EvaluateAssessmentResponse {") { t.Fatal("retired Internal Evaluation response was reintroduced") }
+	if strings.Contains(source, "message EvaluateAssessmentResponse {") {
+		t.Fatal("retired Internal Evaluation response was reintroduced")
+	}
 }
 
 func TestListMyAssessmentsRequestHasNoModelAlgorithmFilter(t *testing.T) {

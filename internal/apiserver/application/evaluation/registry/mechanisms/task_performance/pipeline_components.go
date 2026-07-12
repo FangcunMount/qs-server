@@ -6,7 +6,6 @@ import (
 
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -63,7 +62,7 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
 	scaleSnapshot := cognitivePayload.Snapshot.ToScaleSnapshot()
-	outcome, err := c.scoring.Execute(ctx, evaluationexecute.ExecutionInput{
+	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
 	})

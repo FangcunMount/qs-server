@@ -8,6 +8,7 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
@@ -84,7 +85,7 @@ const latestRiskQueueUnrestrictedTesteePredicate = ``
 
 func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
 	evaluationreadmodel.AssessmentReader
-	evaluationreadmodel.LatestRiskReader
+	workbenchreadmodel.LatestRiskReader
 	ListSubmittedAssessmentIDsAfter(context.Context, uint64, int) ([]uint64, error)
 } {
 	return &assessmentReadModel{
@@ -177,10 +178,10 @@ func (r *assessmentReadModel) ListSubmittedAssessmentIDsAfter(ctx context.Contex
 
 func (r *assessmentReadModel) ListLatestRisksByTesteeIDs(
 	ctx context.Context,
-	filter evaluationreadmodel.LatestRiskFilter,
-) ([]evaluationreadmodel.LatestRiskRow, error) {
+	filter workbenchreadmodel.LatestRiskFilter,
+) ([]workbenchreadmodel.LatestRiskRow, error) {
 	if len(filter.TesteeIDs) == 0 {
-		return []evaluationreadmodel.LatestRiskRow{}, nil
+		return []workbenchreadmodel.LatestRiskRow{}, nil
 	}
 
 	var rows []latestRiskPO
@@ -196,12 +197,12 @@ func (r *assessmentReadModel) ListLatestRisksByTesteeIDs(
 
 func (r *assessmentReadModel) ListLatestRiskQueue(
 	ctx context.Context,
-	filter evaluationreadmodel.LatestRiskQueueFilter,
-	page evaluationreadmodel.PageRequest,
-) (evaluationreadmodel.LatestRiskPage, error) {
+	filter workbenchreadmodel.LatestRiskQueueFilter,
+	page workbenchreadmodel.PageRequest,
+) (workbenchreadmodel.LatestRiskPage, error) {
 	if filter.RestrictToTesteeIDs && len(filter.TesteeIDs) == 0 {
-		return evaluationreadmodel.LatestRiskPage{
-			Items:    []evaluationreadmodel.LatestRiskRow{},
+		return workbenchreadmodel.LatestRiskPage{
+			Items:    []workbenchreadmodel.LatestRiskRow{},
 			Page:     normalizedLatestRiskPage(page.Page),
 			PageSize: page.Limit(),
 		}, nil
@@ -212,7 +213,7 @@ func (r *assessmentReadModel) ListLatestRiskQueue(
 	if err := r.WithContext(ctx).
 		Raw(latestRiskQueueCountQuery(filter.RestrictToTesteeIDs), args...).
 		Scan(&total).Error; err != nil {
-		return evaluationreadmodel.LatestRiskPage{}, err
+		return workbenchreadmodel.LatestRiskPage{}, err
 	}
 
 	rowArgs := append(args, page.Limit(), page.Offset())
@@ -220,10 +221,10 @@ func (r *assessmentReadModel) ListLatestRiskQueue(
 	if err := r.WithContext(ctx).
 		Raw(latestRiskQueueRowsQuery(filter.RestrictToTesteeIDs), rowArgs...).
 		Scan(&rows).Error; err != nil {
-		return evaluationreadmodel.LatestRiskPage{}, err
+		return workbenchreadmodel.LatestRiskPage{}, err
 	}
 
-	return evaluationreadmodel.LatestRiskPage{
+	return workbenchreadmodel.LatestRiskPage{
 		Items:    latestRiskRowsFromPOs(rows),
 		Total:    total,
 		Page:     normalizedLatestRiskPage(page.Page),
@@ -298,7 +299,7 @@ func latestRiskQueueTesteePredicate(restrictToTesteeIDs bool) string {
 	return latestRiskQueueUnrestrictedTesteePredicate
 }
 
-func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []interface{} {
+func latestRiskQueueArgs(filter workbenchreadmodel.LatestRiskQueueFilter) []interface{} {
 	riskLevels := normalizeRiskLevels(filter.RiskLevels)
 	args := []interface{}{filter.OrgID}
 	if filter.RestrictToTesteeIDs {
@@ -331,10 +332,10 @@ func normalizeRiskLevels(values []string) []string {
 	return result
 }
 
-func latestRiskRowsFromPOs(rows []latestRiskPO) []evaluationreadmodel.LatestRiskRow {
-	result := make([]evaluationreadmodel.LatestRiskRow, 0, len(rows))
+func latestRiskRowsFromPOs(rows []latestRiskPO) []workbenchreadmodel.LatestRiskRow {
+	result := make([]workbenchreadmodel.LatestRiskRow, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, evaluationreadmodel.LatestRiskRow{
+		result = append(result, workbenchreadmodel.LatestRiskRow{
 			AssessmentID: row.AssessmentID,
 			OrgID:        row.OrgID,
 			TesteeID:     row.TesteeID,

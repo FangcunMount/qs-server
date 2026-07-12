@@ -35,3 +35,38 @@ func TestOperatorCommandsUseSharedAuthorizer(t *testing.T) {
 		}
 	}
 }
+
+func TestTerminalEvaluationSourcesDoNotRestoreRetiredAPIs(t *testing.T) {
+	checks := map[string][]string{
+		filepath.Join("..", "..", "domain", "evaluation", "routing", "resolve.go"): {"ExecutionRoutingFromRoute", "ExecutionPathForFamily"},
+		filepath.Join("runtime", "descriptor", "contracts.go"):                     {"func PersonalityTypologyIdentity", "func ExecutionIdentityFromLegacyKind"},
+		filepath.Join("runtime", "descriptor", "registry.go"):                      {"ExecutionPathForFamily"},
+		filepath.Join("scheduler", "audit.go"):                                     {"gorm.io/gorm", "gorm.ErrRecordNotFound"},
+	}
+	for path, forbidden := range checks {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range forbidden {
+			if strings.Contains(string(data), token) {
+				t.Fatalf("%s restored retired Evaluation API %q", path, token)
+			}
+		}
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "domain", "evaluation", "input", "ref.go")); !os.IsNotExist(err) {
+		t.Fatal("retired evaluation input SnapshotRef exists")
+	}
+}
+
+func TestEvaluationModuleDoesNotExposeMechanismOrWorkbenchReaders(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "container", "modules", "evaluation", "assemble.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"WorkerExecutionService", "LatestRiskReader evaluationreadmodel", "AssessmentReader evaluationreadmodel"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("Evaluation Module exposes retired field %q", forbidden)
+		}
+	}
+}

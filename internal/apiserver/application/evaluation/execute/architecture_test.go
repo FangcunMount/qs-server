@@ -68,3 +68,17 @@ func TestEngineServiceHasNoScoringWriterSuccessPath(t *testing.T) {
 		t.Fatal("service.go must reject a successful evaluation when no EvaluationCommitter is configured")
 	}
 }
+
+func TestEngineExecutesTheAlreadyResolvedDescriptor(t *testing.T) {
+	data, err := os.ReadFile("service.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "ExecuteResolved(ctx, resolved") {
+		t.Fatal("production execute path must reuse its resolved RuntimeDescriptor")
+	}
+	if strings.Contains(text, "runtimeResolver.Execute(ctx") {
+		t.Fatal("production execute path resolves RuntimeDescriptor twice")
+	}
+}

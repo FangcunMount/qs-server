@@ -14,6 +14,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
@@ -63,7 +64,8 @@ type Container struct {
 	IAMModule             *IAMModule             // IAM 集成模块
 	CodesService          codesapp.CodesService  // CodesService 应用服务（code 申请）
 
-	publishedModelCatalog rulesetport.Catalog
+	publishedModelCatalog     rulesetport.Catalog
+	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
 	surveyRuntimeInfra *surveymod.SurveyRuntimeInfra

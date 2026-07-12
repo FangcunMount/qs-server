@@ -10,7 +10,7 @@ import (
 // MarshalRecordV2 serializes only durable scoring/classification facts. The
 // legacy Summary/Tags projection is intentionally not part of schema v2.
 func MarshalRecordV2(source *domainoutcome.Execution) ([]byte, error) {
-	execution := ExecutionForRecordV2(source)
+	execution := executionForRecordV2(source)
 	if execution == nil {
 		return json.Marshal(nil)
 	}
@@ -30,16 +30,18 @@ func MarshalRecordV2(source *domainoutcome.Execution) ([]byte, error) {
 	})
 }
 
-// ExecutionForRecordV2 returns the pure-fact representation written by new
+// executionForRecordV2 returns the pure-fact representation written by new
 // Outcome records. The caller's in-memory Execution is never mutated.
-func ExecutionForRecordV2(source *domainoutcome.Execution) *domainoutcome.Execution {
+func executionForRecordV2(source *domainoutcome.Execution) *domainoutcome.Execution {
 	if source == nil {
 		return nil
 	}
 	result := *source
+	result.ModelRef.ModelTitle = ""
 	result.Summary.Tags = nil
 	if source.Primary != nil {
 		primary := *source.Primary
+		primary.Label = ""
 		result.Primary = &primary
 	}
 	if source.Level != nil {
@@ -53,8 +55,8 @@ func ExecutionForRecordV2(source *domainoutcome.Execution) *domainoutcome.Execut
 		profile.Traits = append([]string(nil), source.Profile.Traits...)
 		result.Profile = &profile
 	}
-	result.Dimensions = append([]domainoutcome.DimensionResult(nil), source.Dimensions...)
-	result.Validity = append([]domainoutcome.ValidityResult(nil), source.Validity...)
+	result.Dimensions = pureFactDimensions(source.Dimensions)
+	result.Validity = pureFactValidity(source.Validity)
 
 	switch detail := source.Detail.Payload.(type) {
 	case outcometypology.PersonalityTypeDetail:
@@ -83,6 +85,39 @@ func ExecutionForRecordV2(source *domainoutcome.Execution) *domainoutcome.Execut
 	return &result
 }
 
+func pureFactDimensions(source []domainoutcome.DimensionResult) []domainoutcome.DimensionResult {
+	result := make([]domainoutcome.DimensionResult, 0, len(source))
+	for _, dimension := range source {
+		item := dimension
+		item.Name, item.LeftPole, item.RightPole, item.Model = "", "", "", ""
+		if dimension.Score != nil {
+			score := *dimension.Score
+			score.Label = ""
+			item.Score = &score
+		}
+		item.DerivedScores = append([]domainoutcome.ScoreValue(nil), dimension.DerivedScores...)
+		for i := range item.DerivedScores {
+			item.DerivedScores[i].Label = ""
+		}
+		if dimension.Level != nil {
+			level := *dimension.Level
+			level.Label = ""
+			item.Level = &level
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func pureFactValidity(source []domainoutcome.ValidityResult) []domainoutcome.ValidityResult {
+	result := make([]domainoutcome.ValidityResult, 0, len(source))
+	for _, validity := range source {
+		validity.Label, validity.Message = "", ""
+		result = append(result, validity)
+	}
+	return result
+}
+
 func classificationFact(detail outcometypology.PersonalityTypeDetail) outcometypology.ClassificationFact {
 	return outcometypology.ClassificationFact{
 		TypeCode: detail.TypeCode, Pattern: detail.Pattern,
@@ -96,13 +131,14 @@ func personalityDimensions(source []outcometypology.PersonalityDimensionResult) 
 	for _, dimension := range source {
 		raw, strength := dimension.RawScore, dimension.Strength
 		item := domainoutcome.DimensionResult{
-			Code: dimension.Code, Name: dimension.Name, Kind: domainoutcome.DimensionKindPole,
-			Score:      &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: raw, Label: dimension.Preference},
-			Preference: dimension.Preference, Strength: &strength, LeftPole: dimension.LeftPole,
-			RightPole: dimension.RightPole, Model: dimension.Model,
+			Code:       dimension.Code,
+			Kind:       domainoutcome.DimensionKindPole,
+			Score:      &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: raw},
+			Preference: dimension.Preference,
+			Strength:   &strength,
 		}
 		if dimension.Level != "" {
-			item.Level = &domainoutcome.ResultLevel{Code: dimension.Level, Label: dimension.Level}
+			item.Level = &domainoutcome.ResultLevel{Code: dimension.Level}
 		}
 		result = append(result, item)
 	}
@@ -113,7 +149,7 @@ func traitDimensions(source []outcometypology.TraitProfileFactorResult) []domain
 	result := make([]domainoutcome.DimensionResult, 0, len(source))
 	for _, trait := range source {
 		result = append(result, domainoutcome.DimensionResult{
-			Code: trait.Code, Name: trait.Name, Kind: domainoutcome.DimensionKindTrait,
+			Code: trait.Code, Kind: domainoutcome.DimensionKindTrait,
 			Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: trait.RawScore},
 		})
 	}

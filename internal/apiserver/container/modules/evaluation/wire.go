@@ -5,9 +5,9 @@ import (
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
@@ -16,6 +16,7 @@ import (
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -59,8 +60,9 @@ type WireInput struct {
 
 // WireResult carries evaluation module and shared catalog side effects.
 type WireResult struct {
-	Module                *Module
-	PublishedModelCatalog rulesetport.Catalog
+	Module                    *Module
+	PublishedModelCatalog     rulesetport.Catalog
+	WorkbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
 }
 
 // EnsurePublishedModelCatalog builds the shared published-model catalog used by evaluation and gRPC export.
@@ -195,5 +197,5 @@ func Wire(in WireInput) (WireResult, error) {
 	if err != nil {
 		return WireResult{}, err
 	}
-	return WireResult{Module: module, PublishedModelCatalog: catalog}, nil
+	return WireResult{Module: module, PublishedModelCatalog: catalog, WorkbenchLatestRiskReader: module.workbenchLatestRiskReader}, nil
 }

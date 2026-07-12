@@ -21,12 +21,14 @@ func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescript
 	if err != nil {
 		t.Fatalf("DefaultRuntimeDescriptorRegistry: %v", err)
 	}
-	evalruntime.AttachNativePipelines(registry, evalruntime.NativePipelineDeps{
+	if err := evalruntime.AttachNativePipelines(registry, evalruntime.NativePipelineDeps{
 		ScaleScorer:          factorscoring.NewPipelineComponents(nil),
 		FactorNorm:           factornorm.NewPipelineComponents(nil),
 		TaskPerformance:      taskperformance.NewPipelineComponents(nil),
 		FactorClassification: factorclassification.NewPipelineComponents(),
-	})
+	}); err != nil {
+		t.Fatalf("AttachNativePipelines: %v", err)
+	}
 	return registry
 }
 

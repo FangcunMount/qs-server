@@ -49,6 +49,7 @@ func dimensionResultsFromScoring(result *scoring.Result) []domainoutcome.Dimensi
 			Score: &domainoutcome.ScoreValue{
 				Kind:  domainoutcome.ScoreKindRawTotal,
 				Value: score.RawScore,
+				Max:   cloneFloat64(score.MaxScore),
 			},
 		}
 		if score.IsTotalScore {
@@ -60,4 +61,12 @@ func dimensionResultsFromScoring(result *scoring.Result) []domainoutcome.Dimensi
 		dimensions = append(dimensions, dim)
 	}
 	return dimensions
+}
+
+func cloneFloat64(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

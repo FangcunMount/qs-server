@@ -478,10 +478,6 @@ func protectedScope(orgID, operatorUserID int64) evaluationoperator.Actor {
 	}
 }
 
-func reportQueryScope(scope evaluationoperator.Actor) reportqueryjourney.Scope {
-	return reportqueryjourney.Scope{OrgID: scope.OrgID, OperatorUserID: scope.OperatorUserID}
-}
-
 func parseWaitReportTimeout(raw string) time.Duration {
 	timeoutSeconds, err := strconv.Atoi(raw)
 	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {

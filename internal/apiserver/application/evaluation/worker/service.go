@@ -4,8 +4,10 @@ package worker
 
 import (
 	"context"
+	"errors"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -62,7 +64,7 @@ func (s *service) Execute(ctx context.Context, command Command) (*Result, error)
 	if command.AssessmentID == 0 {
 		return nil, evalerrors.InvalidArgument("assessment id is required")
 	}
-	if s.engine == nil || s.assessments == nil || s.runs == nil {
+	if s.engine == nil || s.assessments == nil || s.outcomes == nil || s.runs == nil {
 		return nil, evalerrors.ModuleNotConfigured("evaluation worker is not configured")
 	}
 	executionErr := s.engine.Evaluate(ctx, command.AssessmentID)
@@ -107,26 +109,33 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 	if !a.Status().IsEvaluated() {
 		return result, nil
 	}
-	out := &Outcome{TotalScore: a.TotalScore()}
-	if risk := a.RiskLevel(); risk != nil {
-		out.RiskLevel = risk.String()
+	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
+	if err != nil {
+		return nil, err
 	}
-	if ref := a.EvaluationModelRef(); ref != nil {
-		out.ModelKind = string(ref.Kind())
-		out.SubKind = string(ref.SubKind())
-		out.Algorithm = string(ref.Algorithm())
-		out.ModelCode = ref.Code().String()
-		out.Version = ref.Version()
-		out.Title = ref.Title()
+	if record == nil {
+		return nil, evalerrors.AssessmentScoreNotFound(errors.New("canonical evaluation outcome is missing"), "测评已完成但评分事实不存在")
 	}
-	if s.outcomes != nil {
-		record, findErr := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
-		if findErr != nil {
-			return nil, findErr
-		}
-		if record != nil {
-			out.ID = record.ID().String()
-		}
+	execution, err := evaloutcome.RestoreExecution(record)
+	if err != nil {
+		return nil, err
+	}
+	model := record.Model()
+	out := &Outcome{
+		ID: record.ID().String(), ModelKind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm),
+		ModelCode: model.Code, Version: model.Version, Title: model.Title,
+	}
+	if execution.Primary != nil {
+		value := execution.Primary.Value
+		out.TotalScore = &value
+	} else if execution.Summary.Score != nil {
+		value := *execution.Summary.Score
+		out.TotalScore = &value
+	}
+	if execution.Level != nil {
+		out.RiskLevel = execution.Level.Code
+	} else if execution.Summary.Level != nil {
+		out.RiskLevel = *execution.Summary.Level
 	}
 	result.Outcome = out
 	return result, nil

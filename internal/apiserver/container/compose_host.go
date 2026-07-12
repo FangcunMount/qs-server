@@ -23,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -153,6 +154,10 @@ func (c *Container) PublishedModelCatalog() rulesetport.Catalog {
 
 func (c *Container) SetPublishedModelCatalog(catalog rulesetport.Catalog) {
 	c.publishedModelCatalog = catalog
+}
+
+func (c *Container) SetWorkbenchLatestRiskReader(reader workbenchreadmodel.LatestRiskReader) {
+	c.workbenchLatestRiskReader = reader
 }
 
 func (c *Container) SurveyPorts() compose.SurveyPorts {

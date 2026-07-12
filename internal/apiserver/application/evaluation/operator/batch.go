@@ -31,13 +31,12 @@ type BatchResult struct {
 }
 
 type service struct {
-	assessments assessment.Repository
-	engine      ExecutionEngine
-	authorizer  authorizer
+	engine     ExecutionEngine
+	authorizer authorizer
 }
 
 func NewBatchExecutionService(assessments assessment.Repository, engine ExecutionEngine, access AccessChecker) BatchExecutionService {
-	return &service{assessments: assessments, engine: engine, authorizer: authorizer{assessments: assessments, access: access}}
+	return &service{engine: engine, authorizer: authorizer{assessments: assessments, access: access}}
 }
 
 func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error) {

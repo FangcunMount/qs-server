@@ -3,91 +3,14 @@ package testee
 
 import (
 	"context"
-	"time"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modelbinding "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
-
-type Actor struct{ TesteeID uint64 }
-type ListQuery struct {
-	Page, PageSize                                                       int
-	Status, ScaleCode, RiskLevel, ModelKind, ModelCode, DateFrom, DateTo string
-}
-type TrendQuery struct {
-	FactorCode string
-	Limit      int
-}
-
-type ModelIdentity struct{ Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily string }
-type ScoreValue struct {
-	Kind  string
-	Value float64
-	Label string
-	Max   *float64
-}
-type ResultLevel struct{ Code, Label, Severity string }
-type Assessment struct {
-	ID, OrgID, TesteeID, AnswerSheetID      uint64
-	QuestionnaireCode, QuestionnaireVersion string
-	Model                                   ModelIdentity
-	PrimaryScore                            *ScoreValue
-	Level                                   *ResultLevel
-	OriginType                              string
-	OriginID                                *string
-	Status                                  string
-	SubmittedAt, FailedAt                   *time.Time
-	FailureReason                           *string
-}
-type AssessmentList struct {
-	Items                             []*Assessment
-	Total, Page, PageSize, TotalPages int
-}
-type FactorScore struct {
-	FactorCode, FactorName string
-	RawScore               float64
-	MaxScore               *float64
-	RiskLevel              string
-	IsTotalScore           bool
-}
-type Score struct {
-	AssessmentID uint64
-	TotalScore   float64
-	RiskLevel    string
-	FactorScores []FactorScore
-}
-type TrendPoint struct {
-	AssessmentID uint64
-	RawScore     float64
-	RiskLevel    string
-}
-type FactorTrend struct {
-	TesteeID               uint64
-	FactorCode, FactorName string
-	DataPoints             []TrendPoint
-}
-type HighRiskFactors struct {
-	AssessmentID    uint64
-	HasHighRisk     bool
-	HighRiskFactors []FactorScore
-	NeedsUrgentCare bool
-}
-
-type Service interface {
-	AuthorizeAssessment(context.Context, Actor, uint64) error
-	GetAssessment(context.Context, Actor, uint64) (*Assessment, error)
-	ListAssessments(context.Context, Actor, ListQuery) (*AssessmentList, error)
-	GetScore(context.Context, Actor, uint64) (*Score, error)
-	GetFactorTrend(context.Context, Actor, TrendQuery) (*FactorTrend, error)
-	GetHighRiskFactors(context.Context, Actor, uint64) (*HighRiskFactors, error)
-}
 
 type service struct {
 	assessments domainassessment.Repository
@@ -166,6 +89,9 @@ func (s *service) GetScore(ctx context.Context, actor Actor, id uint64) (*Score,
 	if err := s.AuthorizeAssessment(ctx, actor, id); err != nil {
 		return nil, err
 	}
+	if s.scores == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation score fact reader is not configured")
+	}
 	fact, err := s.scores.Get(ctx, id)
 	if err != nil {
 		return nil, evalerrors.AssessmentScoreNotFound(err, "得分不存在")
@@ -175,6 +101,9 @@ func (s *service) GetScore(ctx context.Context, actor Actor, id uint64) (*Score,
 func (s *service) GetFactorTrend(ctx context.Context, actor Actor, q TrendQuery) (*FactorTrend, error) {
 	if actor.TesteeID == 0 {
 		return nil, evalerrors.InvalidArgument("受试者ID不能为空")
+	}
+	if s.scores == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation score fact reader is not configured")
 	}
 	fact, err := s.scores.Trend(ctx, actor.TesteeID, q.FactorCode, q.Limit)
 	if err != nil {
@@ -190,6 +119,9 @@ func (s *service) GetHighRiskFactors(ctx context.Context, actor Actor, id uint64
 	if err := s.AuthorizeAssessment(ctx, actor, id); err != nil {
 		return nil, err
 	}
+	if s.scores == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation score fact reader is not configured")
+	}
 	fact, err := s.scores.Get(ctx, id)
 	if err != nil {
 		return &HighRiskFactors{AssessmentID: id}, nil
@@ -204,108 +136,4 @@ func (s *service) GetHighRiskFactors(ctx context.Context, actor Actor, id uint64
 	result.HasHighRisk = len(result.HighRiskFactors) > 0 || score.RiskLevel == "high" || score.RiskLevel == "severe"
 	result.NeedsUrgentCare = score.RiskLevel == "severe"
 	return result, nil
-}
-
-func assessmentFromRow(row evaluationreadmodel.AssessmentRow) (*Assessment, error) {
-	org, err := safeconv.Int64ToUint64(row.OrgID)
-	if err != nil {
-		return nil, evalerrors.DatabaseMessage("机构ID超出 uint64 范围")
-	}
-	return &Assessment{ID: row.ID, OrgID: org, TesteeID: row.TesteeID, QuestionnaireCode: row.QuestionnaireCode, QuestionnaireVersion: row.QuestionnaireVersion, AnswerSheetID: row.AnswerSheetID, Model: modelFromRow(row), PrimaryScore: primaryScoreFromRow(row), Level: levelFromRow(row), OriginType: row.OriginType, OriginID: row.OriginID, Status: row.Status, SubmittedAt: row.SubmittedAt, FailedAt: row.FailedAt, FailureReason: row.FailureReason}, nil
-}
-func modelFromRow(row evaluationreadmodel.AssessmentRow) ModelIdentity {
-	kind, sub, algorithm := deref(row.EvaluationModelKind), deref(row.EvaluationModelSubKind), deref(row.EvaluationModelAlgorithm)
-	if algorithm == "" && kind != "" {
-		if k, s, a, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(kind)); ok {
-			kind = string(k)
-			if sub == "" {
-				sub = string(s)
-			}
-			algorithm = string(a)
-		}
-	}
-	result := ModelIdentity{Kind: kind, SubKind: sub, Algorithm: algorithm, Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
-	k := modelbinding.Kind(result.Kind)
-	result.ProductChannel = modelbinding.ProductChannelForIdentity(k, result.ProductChannel)
-	result.AlgorithmFamily = modelbinding.AlgorithmFamilyStringFromIdentity(k, modelbinding.SubKind(result.SubKind), modelbinding.Algorithm(result.Algorithm))
-	return result
-}
-func primaryScoreFromRow(row evaluationreadmodel.AssessmentRow) *ScoreValue {
-	if row.PrimaryScoreKind != nil && row.PrimaryScoreValue != nil {
-		return &ScoreValue{Kind: *row.PrimaryScoreKind, Value: *row.PrimaryScoreValue, Label: deref(row.PrimaryScoreLabel), Max: row.PrimaryScoreMax}
-	}
-	if row.TotalScore != nil {
-		return &ScoreValue{Kind: string(domainoutcome.ScoreKindRawTotal), Value: *row.TotalScore}
-	}
-	return nil
-}
-func levelFromRow(row evaluationreadmodel.AssessmentRow) *ResultLevel {
-	if row.LevelCode != nil {
-		return &ResultLevel{Code: *row.LevelCode, Label: deref(row.LevelLabel), Severity: deref(row.Severity)}
-	}
-	if row.RiskLevel == nil || !domainassessment.IsRiskLevelCode(*row.RiskLevel) {
-		return nil
-	}
-	severity := "none"
-	switch domainassessment.RiskLevel(*row.RiskLevel) {
-	case domainassessment.RiskLevelSevere, domainassessment.RiskLevelHigh:
-		severity = "high"
-	case domainassessment.RiskLevelMedium:
-		severity = "medium"
-	case domainassessment.RiskLevelLow:
-		severity = "low"
-	}
-	return &ResultLevel{Code: *row.RiskLevel, Label: *row.RiskLevel, Severity: severity}
-}
-func scoreFromFact(f *evaloutcome.ScoreFact) *Score {
-	factors := make([]FactorScore, 0, len(f.FactorScores))
-	for _, v := range f.FactorScores {
-		factors = append(factors, FactorScore{FactorCode: v.FactorCode, FactorName: v.FactorName, RawScore: v.RawScore, MaxScore: v.MaxScore, RiskLevel: v.RiskLevel, IsTotalScore: v.IsTotalScore})
-	}
-	return &Score{AssessmentID: f.AssessmentID, TotalScore: f.TotalScore, RiskLevel: f.RiskLevel, FactorScores: factors}
-}
-func deref(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
-}
-func normalizePagination(page, size int) (int, int) {
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 {
-		size = 10
-	}
-	if size > 100 {
-		size = 100
-	}
-	return page, size
-}
-func parseDate(raw string, end bool) (*time.Time, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	for _, layout := range []string{time.RFC3339, "2006-01-02"} {
-		v, err := time.Parse(layout, raw)
-		if err == nil {
-			if layout == "2006-01-02" && end {
-				v = v.Add(24 * time.Hour)
-			}
-			return &v, nil
-		}
-	}
-	return nil, evalerrors.InvalidArgument("日期格式不正确")
-}
-func normalizeStatuses(raw string) []string {
-	switch raw {
-	case "":
-		return nil
-	case "pending":
-		return []string{"pending", "submitted"}
-	case "done":
-		return []string{"evaluated"}
-	default:
-		return []string{raw}
-	}
 }

@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -59,6 +60,9 @@ func (r *outcomeRepository) Save(ctx context.Context, record *domainoutcome.Reco
 func (r *outcomeRepository) FindByID(ctx context.Context, id domainoutcome.ID) (*domainoutcome.Record, error) {
 	var po EvaluationOutcomePO
 	if err := dbWithTransactionContext(ctx, r.db).First(&po, id.Uint64()).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return outcomeFromPO(&po)
@@ -67,6 +71,9 @@ func (r *outcomeRepository) FindByID(ctx context.Context, id domainoutcome.ID) (
 func (r *outcomeRepository) FindByAssessmentID(ctx context.Context, assessmentID meta.ID) (*domainoutcome.Record, error) {
 	var po EvaluationOutcomePO
 	if err := dbWithTransactionContext(ctx, r.db).Where("assessment_id = ?", assessmentID.Uint64()).First(&po).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return outcomeFromPO(&po)

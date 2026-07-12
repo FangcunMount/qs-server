@@ -27,14 +27,6 @@ var (
 	ExecutionIdentityCognitiveDefault        = evalrouting.ExecutionIdentityCognitiveDefault
 )
 
-func PersonalityTypologyIdentity(algorithm modelcatalog.Algorithm) ExecutionIdentity {
-	return evalrouting.PersonalityTypologyIdentity(algorithm)
-}
-
-func ExecutionIdentityFromLegacyKind(kind modelcatalog.Kind) (ExecutionIdentity, bool) {
-	return evalrouting.ExecutionIdentityFromLegacyKind(kind)
-}
-
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 	return evalrouting.DescriptorKeyFromRoute(route)
 }
