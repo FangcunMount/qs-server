@@ -1076,7 +1076,7 @@ Worker
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
 - `docs/02-业务模块/30-evaluation/README.md`
-- `docs/02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
+- `docs/02-业务模块/30-evaluation/20-核心设计-执行身份与运行时扩展.md`
 
 ### Cross-cutting
 

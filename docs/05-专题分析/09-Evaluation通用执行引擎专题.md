@@ -934,8 +934,8 @@ report_save_failed
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
 - `docs/02-业务模块/30-evaluation/README.md`
-- `docs/02-业务模块/30-evaluation/01-Evaluation模型--Assessment-EvaluationRun-Result-Report模型设计.md`
-- `docs/02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
+- `docs/02-业务模块/30-evaluation/10-领域模型.md`
+- `docs/02-业务模块/30-evaluation/31-关键链路-Worker执行与报告驱动.md`
 
 ### Interpretation Model
 
@@ -994,5 +994,5 @@ git diff --check
 | 多解释模型扩展专题 | `08-多解释模型扩展专题--从Scale到MBTI.md` |
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
 | Evaluation 模块 README | `../02-业务模块/30-evaluation/README.md` |
-| Evaluation 引擎链路 | `../02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |
+| Evaluation 执行链路 | `../02-业务模块/30-evaluation/31-关键链路-Worker执行与报告驱动.md` |
 | Interpretation Model README | `../02-业务模块/40-interpretation/README.md` |

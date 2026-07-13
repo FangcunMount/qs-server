@@ -87,7 +87,7 @@ Engine 先根据 Assessment 状态决定是否需要执行：
 
 Run claim 成功后才解析输入。如果另一 worker 持有有效 lease，Repository 返回 `Claimed=false`，Engine 跳过重复计算。这个顺序避免多个 Worker 并发加载大型模型快照。
 
-failed Assessment 的红交付会在新 Run claim 成功后调用 `ResumeForExecutionRetry`，确保不是先恢复 Assessment 再争抢执行权。
+failed Assessment 的消息重投会在新 Run claim 成功后调用 `ResumeForExecutionRetry`，确保不是先恢复 Assessment 再争抢执行权。
 
 ## 6. 阶段三：精确解析执行输入
 
@@ -150,9 +150,9 @@ Worker 使用持久化回执决定 ACK/NACK：
 | 回执 | Handler 行为 | 后续 |
 | --- | --- | --- |
 | `status=evaluated` | ACK | 等待 outcome committed 事件驱动报告 |
-| `status=failed, retryable=true` | 返回 error / NACK | MQ 红交付，新 attempt |
+| `status=failed, retryable=true` | 返回 error / NACK | MQ 重投递，新 attempt |
 | `status=failed, retryable=false` | ACK | 终态失败，不无限重投 |
-| `status=already_evaluated` | ACK | 幂等成功 |
+| `status=already_evaluated`（兼容回执） | ACK | 当前 Worker Service 通常重读为 `evaluated` |
 | nil/未知回执 | error / NACK | 防止不确定状态被误 ACK |
 
 gRPC transport 将 application error 映射为 Internal，但 Worker Service 会在 Engine 返回失败后尽量读取已持久化 Run，从而把 Retryable、FailureKind 和 RunID 交给 handler 做 settlement。

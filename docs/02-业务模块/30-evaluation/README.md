@@ -25,7 +25,7 @@ AnswerSheet + Published Model
 | EvaluationRun 尝试、claim、lease、失败与重试 | AssessmentModel 草稿、Definition 编辑和发布 |
 | 执行输入解析、运行时路由和计算机制 | 报告模板、文案、Report 和 InterpretationRun |
 | canonical Outcome、Assessment 摘要与 score 查询投影 | Plan 调度、Statistics 聚合和工作台组合读模型 |
-| `evaluation.requested / outcome.committed / failed` 可靠事件 | 客户端 `completed / interpreted` 组合进度 |
+| `evaluation.requested / evaluation.outcome.committed / evaluation.failed` 可靠事件 | 客户端 `completed / interpreted` 组合进度 |
 
 必须区分：
 
