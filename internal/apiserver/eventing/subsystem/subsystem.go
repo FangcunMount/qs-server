@@ -2,6 +2,7 @@ package subsystem
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -39,6 +40,15 @@ type ProfileOptions struct {
 	ImmediateMaxConcurrent int
 }
 
+type reconcilerRuntime interface {
+	Start(context.Context)
+	Close()
+}
+
+type immediateRuntime interface {
+	Close()
+}
+
 type Options struct {
 	MySQLDB           *gorm.DB
 	MongoDB           *mongo.Database
@@ -59,9 +69,9 @@ type profileRuntime struct {
 	name       string
 	binding    appEventing.ProfileBinding
 	relay      appEventing.OutboxRelay
-	immediate  *appEventing.ImmediateDispatcher
+	immediate  immediateRuntime
 	readyIndex *outboxready.Index
-	reconciler *outboxready.Reconciler
+	reconciler reconcilerRuntime
 	status     appEventing.NamedOutboxStatusReader
 	interval   time.Duration
 }
@@ -90,6 +100,14 @@ type Subsystem struct {
 	closed            bool
 	cancel            context.CancelFunc
 	wg                sync.WaitGroup
+	closeStarted      bool
+	closeDone         chan struct{}
+	closeErr          error
+}
+
+var profileStartOrder = []eventcatalog.OutboxProfile{
+	eventcatalog.OutboxProfileMongoDomain,
+	eventcatalog.OutboxProfileAssessmentMySQL,
 }
 
 func New(opts Options) (*Subsystem, error) {
@@ -108,7 +126,8 @@ func New(opts Options) (*Subsystem, error) {
 		catalog: opts.Catalog, registry: registry, publisher: publisher,
 		profiles:  make(map[eventcatalog.OutboxProfile]*profileRuntime),
 		consumers: make(map[string]*consumerRuntime), subscriberFactory: opts.SubscriberFactory,
-		observer: opts.Observer,
+		observer:  opts.Observer,
+		closeDone: make(chan struct{}),
 	}
 	if err := s.buildMongoProfile(opts); err != nil {
 		return nil, err
@@ -233,6 +252,9 @@ func (s *Subsystem) RegisterConsumer(id string, handler ConsumerHandler) error {
 }
 
 func (s *Subsystem) Start(parent context.Context) error {
+	if parent == nil {
+		parent = context.Background()
+	}
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -242,7 +264,8 @@ func (s *Subsystem) Start(parent context.Context) error {
 		s.mu.Unlock()
 		return nil
 	}
-	for id, consumer := range s.consumers {
+	for _, id := range s.orderedConsumerIDs() {
+		consumer := s.consumers[id]
 		if s.consumerEnabled(consumer) && consumer.handler == nil {
 			s.mu.Unlock()
 			return fmt.Errorf("event consumer %q has no runtime binding", id)
@@ -259,11 +282,17 @@ func (s *Subsystem) Start(parent context.Context) error {
 			return err
 		}
 	}
-	for _, profile := range s.profiles {
+	profiles := s.orderedProfiles()
+	for _, profile := range profiles {
 		if profile.reconciler != nil {
 			profile.reconciler.Start(ctx)
 		}
-		if profile.relay != nil {
+	}
+	if s.publisher.IsMQBacked() {
+		for _, profile := range profiles {
+			if profile.relay == nil {
+				continue
+			}
 			s.startRelay(ctx, profile)
 		}
 	}
@@ -274,7 +303,8 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 	if s.subscriberFactory == nil && s.hasEnabledConsumers() {
 		return fmt.Errorf("event consumer subscriber factory is not configured")
 	}
-	for _, consumer := range s.consumers {
+	for _, id := range s.orderedConsumerIDs() {
+		consumer := s.consumers[id]
 		if !s.consumerEnabled(consumer) {
 			continue
 		}
@@ -283,7 +313,9 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("create subscriber for %s: %w", consumer.spec.ID, err)
 		}
+		s.mu.Lock()
 		consumer.subscriber = subscriber
+		s.mu.Unlock()
 		if err := subscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerMessageHandler(consumer)); err != nil {
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("subscribe consumer %s: %w", consumer.spec.ID, err)
@@ -338,23 +370,38 @@ func (s *Subsystem) startRelay(ctx context.Context, profile *profileRuntime) {
 }
 
 func (s *Subsystem) Close() error {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
+	if s == nil {
 		return nil
 	}
+	s.mu.Lock()
+	if s.closeDone == nil {
+		s.closeDone = make(chan struct{})
+	}
+	if s.closeStarted {
+		done := s.closeDone
+		s.mu.Unlock()
+		<-done
+		s.mu.Lock()
+		err := s.closeErr
+		s.mu.Unlock()
+		return err
+	}
+	s.closeStarted = true
 	s.closed = true
 	cancel := s.cancel
-	consumers := make([]*consumerRuntime, 0, len(s.consumers))
-	for _, consumer := range s.consumers {
-		consumers = append(consumers, consumer)
+	profiles := s.orderedProfiles()
+	consumerIDs := s.orderedConsumerIDs()
+	consumers := make([]*consumerRuntime, 0, len(consumerIDs))
+	for _, id := range consumerIDs {
+		consumers = append(consumers, s.consumers[id])
 	}
 	s.mu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
 	s.wg.Wait()
-	for _, profile := range s.profiles {
+	for i := len(profiles) - 1; i >= 0; i-- {
+		profile := profiles[i]
 		if profile.reconciler != nil {
 			profile.reconciler.Close()
 		}
@@ -362,15 +409,44 @@ func (s *Subsystem) Close() error {
 			profile.immediate.Close()
 		}
 	}
-	for _, consumer := range consumers {
+	var closeErrors []error
+	for i := len(consumers) - 1; i >= 0; i-- {
+		consumer := consumers[i]
 		if consumer.subscriber != nil {
 			consumer.subscriber.Stop()
 			if err := consumer.subscriber.Close(); err != nil {
-				return err
+				closeErrors = append(closeErrors, fmt.Errorf("close event consumer %s: %w", consumer.spec.ID, err))
 			}
 		}
 	}
-	return nil
+	closeErr := errors.Join(closeErrors...)
+	s.mu.Lock()
+	for _, consumer := range consumers {
+		consumer.healthy = false
+	}
+	s.closeErr = closeErr
+	close(s.closeDone)
+	s.mu.Unlock()
+	return closeErr
+}
+
+func (s *Subsystem) orderedProfiles() []*profileRuntime {
+	profiles := make([]*profileRuntime, 0, len(s.profiles))
+	for _, profile := range profileStartOrder {
+		if runtime := s.profiles[profile]; runtime != nil {
+			profiles = append(profiles, runtime)
+		}
+	}
+	return profiles
+}
+
+func (s *Subsystem) orderedConsumerIDs() []string {
+	ids := make([]string, 0, len(s.consumers))
+	for id := range s.consumers {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func (s *Subsystem) StatusService() appEventing.StatusService {
@@ -384,7 +460,7 @@ func (s *Subsystem) StatusService() appEventing.StatusService {
 }
 
 func (s *Subsystem) consumerEnabled(consumer *consumerRuntime) bool {
-	return consumer != nil && consumer.enabled && s.publisher.IsMQBacked()
+	return consumer != nil && consumer.enabled && s.publisher != nil && s.publisher.IsMQBacked()
 }
 
 func (s *Subsystem) hasEnabledConsumers() bool {
@@ -421,7 +497,7 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 	}
 	for profile, runtime := range s.profiles {
 		result.Profiles[profile] = appEventing.ProfileRuntimeStatus{
-			Running: s.started && !s.closed, RelayEnabled: runtime.relay != nil,
+			Running: s.started && !s.closed, RelayEnabled: runtime.relay != nil && s.publisher.IsMQBacked(),
 			ReconcilerEnabled: runtime.reconciler != nil, ImmediateEnabled: s.publisher.IsMQBacked(),
 		}
 	}
