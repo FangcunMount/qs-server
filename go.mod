@@ -3,12 +3,11 @@ module github.com/FangcunMount/qs-server
 go 1.25.12
 
 require (
-	github.com/FangcunMount/component-base v0.6.2
+	github.com/FangcunMount/component-base v0.6.3
 	github.com/FangcunMount/iam/v2 v2.0.8
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/coder/websocket v1.8.15
-	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
@@ -47,7 +46,6 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.3 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
