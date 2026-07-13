@@ -1,11 +1,11 @@
-package localttlcache
+package local
 
 import (
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheutil"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 )
 
 // Options 进程内 TTL 缓存配置。
@@ -15,6 +15,16 @@ type Options struct {
 	TTLJitterRatio float64
 	OnHit          func()
 	OnMiss         func()
+}
+
+func (o Options) withDefaults(defaultTTL time.Duration, defaultEntries int) Options {
+	if o.TTL <= 0 {
+		o.TTL = defaultTTL
+	}
+	if o.MaxEntries <= 0 {
+		o.MaxEntries = defaultEntries
+	}
+	return o
 }
 
 type cacheEntry[T any] struct {
@@ -100,7 +110,7 @@ func (c *Cache[T]) Set(key string, value T) {
 
 	entry := cacheEntry[T]{
 		value:     c.clone(value),
-		expiresAt: time.Now().Add(cacheutil.JitterTTL(c.opts.TTL, c.opts.TTLJitterRatio)),
+		expiresAt: time.Now().Add(sharedcache.JitterTTL(c.opts.TTL, c.opts.TTLJitterRatio)),
 	}
 
 	c.mu.Lock()

@@ -1,11 +1,9 @@
-package catalogl1
+package local
 
 import (
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/FangcunMount/qs-server/internal/pkg/localttlcache"
 )
 
 const defaultTTL = 180 * time.Second
@@ -27,28 +25,27 @@ type MultiHooks[TDetail, TList, TCategories, THot any] struct {
 // MultiCache 量表/人格模型等多桶 catalog L1。
 type MultiCache[TDetail, TList, TCategories, THot any] struct {
 	hooks      MultiHooks[TDetail, TList, TCategories, THot]
-	detail     *localttlcache.Cache[TDetail]
-	list       *localttlcache.Cache[TList]
-	categories *localttlcache.Cache[TCategories]
-	hot        *localttlcache.Cache[THot]
+	detail     *Cache[TDetail]
+	list       *Cache[TList]
+	categories *Cache[TCategories]
+	hot        *Cache[THot]
 }
 
 // NewMultiCache 创建多桶 catalog L1。
 func NewMultiCache[TDetail, TList, TCategories, THot any](opts Options, hooks MultiHooks[TDetail, TList, TCategories, THot]) *MultiCache[TDetail, TList, TCategories, THot] {
 	opts = opts.withDefaults(defaultTTL, 256)
-	base := opts.localTTL(nil)
 	c := &MultiCache[TDetail, TList, TCategories, THot]{hooks: hooks}
 	if hooks.CloneDetail != nil {
-		c.detail = localttlcache.New(base, hooks.CloneDetail)
+		c.detail = New(opts, hooks.CloneDetail)
 	}
 	if hooks.CloneList != nil {
-		c.list = localttlcache.New(base, hooks.CloneList)
+		c.list = New(opts, hooks.CloneList)
 	}
 	if hooks.CloneCategories != nil {
-		c.categories = localttlcache.New(base, hooks.CloneCategories)
+		c.categories = New(opts, hooks.CloneCategories)
 	}
 	if hooks.CloneHot != nil {
-		c.hot = localttlcache.New(base, hooks.CloneHot)
+		c.hot = New(opts, hooks.CloneHot)
 	}
 	return c
 }
@@ -166,7 +163,7 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) Stats() (hits, misses ui
 	if c == nil {
 		return 0, 0
 	}
-	for _, part := range []*localttlcache.Cache[TDetail]{c.detail} {
+	for _, part := range []*Cache[TDetail]{c.detail} {
 		if part == nil {
 			continue
 		}
@@ -174,7 +171,7 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) Stats() (hits, misses ui
 		hits += h
 		misses += m
 	}
-	for _, part := range []*localttlcache.Cache[TList]{c.list} {
+	for _, part := range []*Cache[TList]{c.list} {
 		if part == nil {
 			continue
 		}
@@ -182,7 +179,7 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) Stats() (hits, misses ui
 		hits += h
 		misses += m
 	}
-	for _, part := range []*localttlcache.Cache[TCategories]{c.categories} {
+	for _, part := range []*Cache[TCategories]{c.categories} {
 		if part == nil {
 			continue
 		}
@@ -190,7 +187,7 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) Stats() (hits, misses ui
 		hits += h
 		misses += m
 	}
-	for _, part := range []*localttlcache.Cache[THot]{c.hot} {
+	for _, part := range []*Cache[THot]{c.hot} {
 		if part == nil {
 			continue
 		}

@@ -46,6 +46,8 @@ flowchart LR
 | TTL 分层与防击穿 | [06-TTL分层与防击穿设计.md](06-TTL分层与防击穿设计.md) |
 | 一致性与降级 | [07-缓存一致性与降级策略.md](07-缓存一致性与降级策略.md) |
 | 方案取舍 | [08-方案取舍.md](08-方案取舍.md) |
+| Cache Capability Registry | [09-Cache能力注册表.md](09-Cache能力注册表.md) |
+| Cache 终局设计 | [10-Cache终局设计.md](10-Cache终局设计.md) |
 
 ## 5. 为什么选择当前方案
 

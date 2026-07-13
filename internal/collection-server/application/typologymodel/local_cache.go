@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 
 // LocalCatalogCache 类型学模型目录进程内 TTL 缓存。
 type LocalCatalogCache struct {
-	inner *catalogl1.MultiCache[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]
+	inner *localcache.MultiCache[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]
 }
 
 // LocalCatalogCacheOptions 类型学模型目录 L1 配置。
@@ -31,13 +31,13 @@ type LocalCatalogCacheOptions struct {
 // NewLocalCatalogCache 创建类型学模型目录 L1 缓存。
 func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
 	return &LocalCatalogCache{
-		inner: catalogl1.NewMultiCache(catalogl1.Options{
+		inner: localcache.NewMultiCache(localcache.Options{
 			TTL:            opts.TTL,
 			MaxEntries:     opts.MaxEntries,
 			TTLJitterRatio: opts.TTLJitterRatio,
 			OnHit:          opts.OnHit,
 			OnMiss:         opts.OnMiss,
-		}, catalogl1.MultiHooks[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]{
+		}, localcache.MultiHooks[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]{
 			DetailKey:       detailCacheKey,
 			ListKey:         func(req any) string { return listCacheKey(req.(*ListTypologyModelsRequest)) },
 			CategoriesKey:   cacheKeyCategories,

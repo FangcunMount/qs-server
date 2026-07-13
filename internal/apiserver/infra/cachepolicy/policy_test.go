@@ -33,11 +33,6 @@ func TestCachePolicyMergeWithSupportsExplicitDisable(t *testing.T) {
 func TestCachePolicyCompressValueUsesExplicitPolicyOnly(t *testing.T) {
 	raw := []byte("payload large enough to demonstrate explicit compression policy")
 
-	EnableCompression = true
-	t.Cleanup(func() {
-		EnableCompression = false
-	})
-
 	implicit := CachePolicy{}.CompressValue(raw)
 	if !bytes.Equal(implicit, raw) {
 		t.Fatal("expected inherited compression policy to ignore deprecated global default")

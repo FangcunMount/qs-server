@@ -1,4 +1,4 @@
-package catalogl1
+package local
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package cacheentry
+package redisstore
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -21,15 +21,13 @@ func TestPayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 		mr.Close()
 	})
 
-	store := NewPayloadStore(NewRedisCache(client), cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{
-		Compress: cachepolicy.PolicySwitchEnabled,
-	})
+	store := NewPayloadStore(NewStore(client), sharedcache.Policy{Compress: sharedcache.PolicySwitchEnabled}, nil)
 	ctx := context.Background()
 	raw := []byte(`{"value":"compressed"}`)
 	if err := store.Set(ctx, "payload:compressed", raw, time.Minute); err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
-	stored, err := NewRedisCache(client).Get(ctx, "payload:compressed")
+	stored, err := NewStore(client).Get(ctx, "payload:compressed")
 	if err != nil {
 		t.Fatalf("redis Get() error = %v", err)
 	}
@@ -49,10 +47,10 @@ func TestPayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 func TestPayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	t.Parallel()
 
-	nilStore := NewPayloadStore(nil, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
+	nilStore := NewPayloadStore(nil, sharedcache.Policy{}, nil)
 	ctx := context.Background()
-	if _, err := nilStore.Get(ctx, "payload:nil"); !errors.Is(err, ErrCacheNotFound) {
-		t.Fatalf("nil Get() error = %v, want ErrCacheNotFound", err)
+	if _, err := nilStore.Get(ctx, "payload:nil"); !errors.Is(err, sharedcache.ErrMiss) {
+		t.Fatalf("nil Get() error = %v, want ErrMiss", err)
 	}
 	if err := nilStore.Set(ctx, "payload:nil", []byte("value"), time.Minute); err != nil {
 		t.Fatalf("nil Set() error = %v", err)
@@ -68,7 +66,7 @@ func TestPayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	}
 
 	boom := errors.New("redis unavailable")
-	errorStore := NewPayloadStore(errorCache{err: boom}, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
+	errorStore := NewPayloadStore(errorCache{err: boom}, sharedcache.Policy{}, nil)
 	if _, err := errorStore.Get(ctx, "payload:error"); !errors.Is(err, boom) {
 		t.Fatalf("error Get() error = %v, want %v", err, boom)
 	}

@@ -1,4 +1,4 @@
-package catalogl1_test
+package local_test
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
@@ -14,7 +14,7 @@ func TestReadThroughCacheHitSkipsLoad(t *testing.T) {
 	t.Parallel()
 
 	var loads atomic.Int32
-	got, err := catalogl1.ReadThrough("k", func() (string, bool) {
+	got, err := localcache.ReadThrough("k", func() (string, bool) {
 		return "cached", true
 	}, func(string) {
 		t.Fatal("set must not be called on cache hit")
@@ -62,7 +62,7 @@ func TestReadThroughSingleflightCoalescesMiss(t *testing.T) {
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
 		go func() {
-			_, err := catalogl1.ReadThrough("k", get, set, load, func(v string) string { return v }, coalescer, true)
+			_, err := localcache.ReadThrough("k", get, set, load, func(v string) string { return v }, coalescer, true)
 			errCh <- err
 		}()
 	}
@@ -89,7 +89,7 @@ func TestReadThroughForgetNilMiss(t *testing.T) {
 	cache := make(map[string]*string)
 	set := func(v *string) { cache["k"] = v }
 	for i := 0; i < 2; i++ {
-		if _, err := catalogl1.ReadThrough("k", func() (*string, bool) {
+		if _, err := localcache.ReadThrough("k", func() (*string, bool) {
 			v, ok := cache["k"]
 			return v, ok
 		}, set, load, func(v *string) *string { return v }, coalescer, true); err != nil {
@@ -115,7 +115,7 @@ func TestReadThroughClonesLoadedValueBeforeReturn(t *testing.T) {
 		return &response{values: append([]string(nil), v.values...)}
 	}
 
-	got, err := catalogl1.ReadThrough("k", func() (*response, bool) {
+	got, err := localcache.ReadThrough("k", func() (*response, bool) {
 		v, ok := cache["k"]
 		return v, ok
 	}, func(v *response) {
@@ -148,7 +148,7 @@ func TestReadThroughLoaderErrorDoesNotPolluteCache(t *testing.T) {
 		return "", want
 	}
 	for i := 0; i < 2; i++ {
-		if _, err := catalogl1.ReadThrough("k", func() (string, bool) {
+		if _, err := localcache.ReadThrough("k", func() (string, bool) {
 			v, ok := cache["k"]
 			return v, ok
 		}, func(v string) { cache["k"] = v }, load, func(v string) string { return v }, coalescer, true); !errors.Is(err, want) {
@@ -170,7 +170,7 @@ func TestReadThroughWithoutSingleflightSkipsCoalescer(t *testing.T) {
 		return "v", nil
 	}
 	for i := 0; i < 2; i++ {
-		if _, err := catalogl1.ReadThrough("k", func() (string, bool) {
+		if _, err := localcache.ReadThrough("k", func() (string, bool) {
 			return "", false
 		}, nil, load, func(v string) string { return v }, nil, false); err != nil {
 			t.Fatalf("readThrough: %v", err)

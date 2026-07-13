@@ -3,7 +3,7 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 )
 
 // LocalCacheOptions 进程内 L1 缓存配置。
@@ -17,19 +17,19 @@ type LocalCacheOptions struct {
 
 // LocalCache 已发布问卷 REST DTO 的进程内 TTL 缓存。
 type LocalCache struct {
-	inner *catalogl1.DetailCache[*QuestionnaireResponse]
+	inner *localcache.DetailCache[*QuestionnaireResponse]
 }
 
 // NewLocalCache 创建进程内问卷详情缓存。
 func NewLocalCache(opts LocalCacheOptions) *LocalCache {
 	return &LocalCache{
-		inner: catalogl1.NewDetailCache(catalogl1.Options{
+		inner: localcache.NewDetailCache(localcache.Options{
 			TTL:            opts.TTL,
 			MaxEntries:     opts.MaxEntries,
 			TTLJitterRatio: opts.TTLJitterRatio,
 			OnHit:          opts.OnHit,
 			OnMiss:         opts.OnMiss,
-		}, catalogl1.DetailHooks[*QuestionnaireResponse]{
+		}, localcache.DetailHooks[*QuestionnaireResponse]{
 			KeyFn:  cacheKey,
 			Clone:  cloneResponse,
 			Prefix: "published:",

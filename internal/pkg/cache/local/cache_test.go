@@ -1,4 +1,4 @@
-package localttlcache
+package local
 
 import (
 	"testing"

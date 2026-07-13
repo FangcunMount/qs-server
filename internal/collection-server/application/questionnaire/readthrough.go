@@ -1,8 +1,6 @@
 package questionnaire
 
-import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
-)
+import localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 
 func (s *QueryService) readThroughDetail(
 	key string,
@@ -14,5 +12,5 @@ func (s *QueryService) readThroughDetail(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogl1.ReadThrough(key, get, setFn, load, cloneResponse, s.coalescer, s.cache != nil && s.useSingleflight)
+	return localcache.ReadThrough(key, get, setFn, load, cloneResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }

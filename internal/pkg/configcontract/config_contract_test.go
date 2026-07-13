@@ -127,6 +127,27 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 	}
 }
 
+func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
+	t.Parallel()
+
+	for _, suffix := range []string{"dev", "prod"} {
+		api := apiserveroptions.NewOptions()
+		loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver."+suffix+".yaml"), api)
+		collection := collectionoptions.NewOptions()
+		loadConfig(t, filepath.Join(repoRoot(t), "configs", "collection-server."+suffix+".yaml"), collection)
+		worker := workeroptions.NewOptions()
+		loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker."+suffix+".yaml"), worker)
+
+		want := api.ReportStatus.TTLSeconds
+		if collection.ReportStatus.TTLSeconds != want || worker.ReportStatus.TTLSeconds != want {
+			t.Fatalf("%s report status TTL mismatch: api=%d collection=%d worker=%d", suffix, want, collection.ReportStatus.TTLSeconds, worker.ReportStatus.TTLSeconds)
+		}
+		if collection.WaitReport.StatusTTLSeconds != want {
+			t.Fatalf("%s wait-report fallback TTL=%d, want report status TTL=%d", suffix, collection.WaitReport.StatusTTLSeconds, want)
+		}
+	}
+}
+
 func loadConfig(t *testing.T, path string, target any) {
 	t.Helper()
 	v := viper.New()

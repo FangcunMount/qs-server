@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
@@ -39,7 +39,7 @@ func (f *catalogFixture) load(_ context.Context, key string) (string, error) {
 }
 
 func (f *catalogFixture) readThrough(ctx context.Context, key string, useSF bool) (string, error) {
-	return catalogl1.ReadThrough(
+	return localcache.ReadThrough(
 		key,
 		func() (string, bool) { return f.get(key) },
 		func(v string) { f.set(key, v) },

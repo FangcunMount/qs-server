@@ -1,9 +1,7 @@
-package catalogl1
+package local
 
 import (
 	"strings"
-
-	"github.com/FangcunMount/qs-server/internal/pkg/localttlcache"
 )
 
 // DetailHooks 单桶详情 L1（问卷等）。
@@ -16,7 +14,7 @@ type DetailHooks[T any] struct {
 // DetailCache 单桶详情 L1。
 type DetailCache[T any] struct {
 	hooks DetailHooks[T]
-	inner *localttlcache.Cache[T]
+	inner *Cache[T]
 }
 
 // NewDetailCache 创建单桶详情 L1。
@@ -27,7 +25,7 @@ func NewDetailCache[T any](opts Options, hooks DetailHooks[T]) *DetailCache[T] {
 	}
 	return &DetailCache[T]{
 		hooks: hooks,
-		inner: localttlcache.New(opts.localTTL(nil), hooks.Clone),
+		inner: New(opts, hooks.Clone),
 	}
 }
 
