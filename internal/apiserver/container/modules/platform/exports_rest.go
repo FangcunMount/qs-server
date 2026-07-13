@@ -4,7 +4,7 @@ import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -17,7 +17,7 @@ type RESTIntegrationDeps struct {
 	CodesService            codesapp.CodesService
 	QRCodeObjectStore       objectstorageport.PublicObjectStore
 	QRCodeObjectKeyPrefix   string
-	GovernanceStatusService cachegov.StatusService
+	GovernanceStatusService statisticsApp.GovernanceStatusReader
 	EventStatusService      appEventing.StatusService
 	Backpressure            []resilienceplane.BackpressureSnapshot
 	IAM                     RESTIAMDeps

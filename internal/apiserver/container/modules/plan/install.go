@@ -16,7 +16,8 @@ type InstallHost interface {
 
 // InstallFrom wires and registers the plan module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
-	binding := host.CacheCapability(cachepolicy.CapabilityPlanDetail)
+	provider := host.CachePolicyProvider()
+	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityPlanDetail)
 	redisClient := host.CacheClient(redisruntime.FamilyObject)
 	if !binding.Enabled {
 		redisClient = nil
@@ -27,7 +28,7 @@ func InstallFrom(host InstallHost) error {
 		PublishedModels: host.PublishedModelLister(),
 		RedisClient:     redisClient,
 		CacheBuilder:    host.CacheBuilder(redisruntime.FamilyObject),
-		PlanPolicy:      binding.Policy,
+		CachePolicies:   provider,
 		EntryBaseURL:    host.PlanEntryBaseURL(),
 		Observer:        host.CacheObserver(),
 		MySQLLimiter:    host.MySQLLimiter(),

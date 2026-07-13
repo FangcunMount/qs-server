@@ -26,12 +26,11 @@ import (
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
@@ -63,7 +62,7 @@ type Deps struct {
 	CodesService            codesapp.CodesService
 	QRCodeObjectStore       objectstorageport.PublicObjectStore
 	QRCodeObjectKeyPrefix   string
-	GovernanceStatusService cachegov.StatusService
+	GovernanceStatusService statisticsApp.GovernanceStatusReader
 	EventStatusService      appEventing.StatusService
 	SystemGovernanceFacade  systemgovApp.Facade
 	Backpressure            []resilienceplane.BackpressureSnapshot
@@ -138,8 +137,8 @@ type StatisticsDeps struct {
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	TesteeAccessService            statisticsApp.TesteeAccessValidator
-	WarmupCoordinator              cachegov.Coordinator
-	CacheGovernanceStatusService   cachegov.StatusService
+	WarmupCoordinator              statisticsApp.WarmupCoordinator
+	CacheGovernanceStatusService   statisticsApp.GovernanceStatusReader
 }
 
 type IAMDeps struct {
@@ -315,24 +314,24 @@ func (r *Router) readyCheck(c *gin.Context) {
 // @Description 返回 apiserver Redis family 的运行状态。
 // @Tags health
 // @Produce json
-// @Success 200 {object} observability.RuntimeSnapshot
+// @Success 200 {object} cachemodel.RuntimeSnapshot
 // @Router /governance/redis [get]
 func (r *Router) redisGovernance(c *gin.Context) {
 	c.JSON(http.StatusOK, r.runtimeSnapshot(c))
 }
 
-func (r *Router) runtimeSnapshot(c *gin.Context) observability.RuntimeSnapshot {
+func (r *Router) runtimeSnapshot(c *gin.Context) cachemodel.RuntimeSnapshot {
 	if r != nil && r.deps.GovernanceStatusService != nil {
 		snapshot, err := r.deps.GovernanceStatusService.GetRuntime(c.Request.Context())
 		if err == nil && snapshot != nil {
 			return *snapshot
 		}
 	}
-	return observability.RuntimeSnapshot{
+	return cachemodel.RuntimeSnapshot{
 		GeneratedAt: time.Now(),
 		Component:   "apiserver",
-		Families:    []observability.FamilyStatus{},
-		Summary: observability.RuntimeSummary{
+		Families:    []cachemodel.FamilyStatus{},
+		Summary: cachemodel.RuntimeSummary{
 			Ready: true,
 		},
 	}

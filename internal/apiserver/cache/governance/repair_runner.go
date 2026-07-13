@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 )
 
-func (c *coordinator) HandleRepairComplete(ctx context.Context, req RepairCompleteRequest) error {
+func (c *coordinator) HandleRepairComplete(ctx context.Context, req cachetarget.RepairCompleteRequest) error {
 	if c == nil || !c.cfg.Enable {
 		return nil
 	}
@@ -26,7 +26,7 @@ func (c *coordinator) HandleRepairComplete(ctx context.Context, req RepairComple
 	return err
 }
 
-func (c *coordinator) repairQueryTargets(req RepairCompleteRequest) []cachetarget.WarmupTarget {
+func (c *coordinator) repairQueryTargets(req cachetarget.RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if len(req.OrgIDs) == 0 {
 		return nil
 	}

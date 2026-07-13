@@ -1,9 +1,9 @@
 package actor
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
@@ -15,7 +15,7 @@ type WireInput struct {
 	MySQLDB             *gorm.DB
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder
-	TesteePolicy        cachepolicy.CachePolicy
+	CachePolicies       sharedcache.PolicyProvider
 	Observer            *observability.ComponentObserver
 	MySQLLimiter        backpressure.Acquirer
 	IAMEnabled          bool
@@ -32,7 +32,7 @@ func Wire(in WireInput) (*Module, error) {
 		MySQLDB:             in.MySQLDB,
 		RedisClient:         in.RedisClient,
 		CacheBuilder:        in.CacheBuilder,
-		TesteePolicy:        in.TesteePolicy,
+		CachePolicies:       in.CachePolicies,
 		Observer:            in.Observer,
 		MySQLLimiter:        in.MySQLLimiter,
 		ProfileLinkService:  in.ProfileLinkService,

@@ -2,7 +2,6 @@ package survey
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -10,6 +9,7 @@ import (
 	questionnaireMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -28,13 +28,13 @@ type SurveyRuntimeInfra struct {
 
 // SurveyRuntimeInfraDeps collects infrastructure inputs for EnsureSurveyRuntimeInfra.
 type SurveyRuntimeInfraDeps struct {
-	MongoDB             *mongo.Database
-	EventCatalog        *eventcatalog.Catalog
-	MongoLimiter        backpressure.Acquirer
-	StaticRedis         redis.UniversalClient
-	StaticBuilder       *keyspace.Builder
-	QuestionnairePolicy cachepolicy.CachePolicy
-	Observer            *observability.ComponentObserver
+	MongoDB       *mongo.Database
+	EventCatalog  *eventcatalog.Catalog
+	MongoLimiter  backpressure.Acquirer
+	StaticRedis   redis.UniversalClient
+	StaticBuilder *keyspace.Builder
+	CachePolicies sharedcache.PolicyProvider
+	Observer      *observability.ComponentObserver
 }
 
 // EnsureSurveyRuntimeInfraCached returns cached survey runtime infrastructure or builds it once.
@@ -57,11 +57,11 @@ func EnsureSurveyRuntimeInfra(deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra,
 	questionnaireReader := questionnaireMongo.NewQuestionnaireReadModel(questionnaireBaseRepo)
 	var questionnaireRepo questionnaire.Repository = questionnaireBaseRepo
 	if deps.StaticRedis != nil {
-		questionnaireRepo = surveycache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(
+		questionnaireRepo = surveycache.NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(
 			questionnaireBaseRepo,
 			deps.StaticRedis,
 			deps.StaticBuilder,
-			deps.QuestionnairePolicy,
+			deps.CachePolicies,
 			deps.Observer,
 		)
 	}

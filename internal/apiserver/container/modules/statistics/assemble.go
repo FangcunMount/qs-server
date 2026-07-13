@@ -3,8 +3,6 @@ package statistics
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -14,6 +12,7 @@ import (
 	statisticsQueryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -47,7 +46,7 @@ type Deps struct {
 	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
 	MongoDB                *mongo.Database
 	RepairWindowDays       int
-	QueryPolicy            cachepolicy.CachePolicy
+	CachePolicies          sharedcache.PolicyProvider
 	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
 	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
 	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
@@ -56,8 +55,8 @@ type Deps struct {
 	VersionStore           querycache.VersionTokenStore
 	Observer               *observability.ComponentObserver
 	MySQLLimiter           backpressure.Acquirer
-	WarmupCoordinator      cachegov.Coordinator
-	StatusService          cachegov.StatusService
+	WarmupCoordinator      statisticsApp.WarmupCoordinator
+	StatusService          statisticsApp.GovernanceStatusReader
 }
 
 // New assembles the statistics module.
@@ -74,10 +73,10 @@ func New(deps Deps) (*Module, error) {
 
 	var cache *statisticsCache.StatisticsCache
 	if normalized.RedisClient != nil {
-		cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+		cache = statisticsCache.NewStatisticsCacheWithBuilderProviderVersionStoreAndObserver(
 			normalized.RedisClient,
 			normalized.CacheBuilder,
-			normalized.QueryPolicy,
+			normalized.CachePolicies,
 			normalized.VersionStore,
 			normalized.Observer,
 		)

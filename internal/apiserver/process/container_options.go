@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"

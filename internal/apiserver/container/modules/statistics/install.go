@@ -24,7 +24,8 @@ func InstallFrom(host InstallHost) error {
 		answerSheetReader = infra.AnswerSheetReader
 		answerSheetScanSource = infra.AnswerSheetRepo
 	}
-	binding := host.CacheCapability(cachepolicy.CapabilityStatisticsQuery)
+	provider := host.CachePolicyProvider()
+	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityStatisticsQuery)
 	queryRedis := host.CacheClient(redisruntime.FamilyQuery)
 	if !binding.Enabled {
 		queryRedis = nil
@@ -37,7 +38,7 @@ func InstallFrom(host InstallHost) error {
 		AnswerSheetScanSource:  answerSheetScanSource,
 		MongoDB:                host.MongoDB(),
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
-		QueryPolicy:            binding.Policy,
+		CachePolicies:          provider,
 		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
 		OverviewGuardOpts:      host.StatisticsOverviewGuardOptions(),
 		QuestionnaireGuardOpts: host.StatisticsQuestionnaireGuardOptions(),

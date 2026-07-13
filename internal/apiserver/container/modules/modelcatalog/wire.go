@@ -3,7 +3,6 @@ package modelcatalog
 import (
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
@@ -12,6 +11,7 @@ import (
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -32,7 +32,7 @@ type WireInput struct {
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService
 	StaticRedisClient      redis.UniversalClient
 	StaticCacheBuilder     *keyspace.Builder
-	PublishedModelPolicy   cachepolicy.CachePolicy
+	CachePolicies          sharedcache.PolicyProvider
 	CacheObserver          *observability.ComponentObserver
 }
 
@@ -67,7 +67,7 @@ func buildLifecycleDeps(in WireInput) LifecycleDeps {
 type catalogCacheWireConfig struct {
 	Redis    redis.UniversalClient
 	Builder  *keyspace.Builder
-	Policy   cachepolicy.CachePolicy
+	Policies sharedcache.PolicyProvider
 	Observer *observability.ComponentObserver
 	Notifier TypologyCacheSignalNotifier
 }
@@ -80,7 +80,7 @@ func catalogCacheConfig(in WireInput) catalogCacheWireConfig {
 	}
 	return catalogCacheWireConfig{
 		Redis: in.StaticRedisClient, Builder: in.StaticCacheBuilder,
-		Policy: in.PublishedModelPolicy, Observer: in.CacheObserver,
+		Policies: in.CachePolicies, Observer: in.CacheObserver,
 		Notifier: notifier,
 	}
 }
@@ -106,7 +106,7 @@ func buildCatalogDeps(
 		port.PublishedModelLister
 	} = dualStore
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
-		cached := modelcatalogcache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
+		cached := modelcatalogcache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policies, cacheCfg.Observer)
 		publishedStore = cached
 		publishedRepo = modelcatalogcache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}

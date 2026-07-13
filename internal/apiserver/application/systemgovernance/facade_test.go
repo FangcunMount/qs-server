@@ -10,7 +10,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -127,7 +127,7 @@ func (c *countingMetricsClient) Query(_ context.Context, spec govprom.QuerySpec,
 }
 
 type cacheGovernanceForFacade struct {
-	status      *cachegov.StatusSnapshot
+	status      *cachemodel.StatusSnapshot
 	hotset      *statisticsApp.GovernanceHotsetResponse
 	hotsetCalls int
 }
@@ -138,11 +138,11 @@ func (c *cacheGovernanceForFacade) HandleRepairComplete(context.Context, int64, 
 	return nil
 }
 
-func (c *cacheGovernanceForFacade) HandleManualWarmup(context.Context, int64, statisticsApp.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (c *cacheGovernanceForFacade) HandleManualWarmup(context.Context, int64, statisticsApp.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	return nil, nil
 }
 
-func (c *cacheGovernanceForFacade) GetStatus(context.Context) (*cachegov.StatusSnapshot, error) {
+func (c *cacheGovernanceForFacade) GetStatus(context.Context) (*cachemodel.StatusSnapshot, error) {
 	return c.status, nil
 }
 
@@ -151,13 +151,13 @@ func (c *cacheGovernanceForFacade) GetHotset(context.Context, string, string) (*
 	return c.hotset, nil
 }
 
-func healthyCacheStatus(component string) *cachegov.StatusSnapshot {
-	return &cachegov.StatusSnapshot{
-		RuntimeSnapshot: observability.RuntimeSnapshot{
+func healthyCacheStatus(component string) *cachemodel.StatusSnapshot {
+	return &cachemodel.StatusSnapshot{
+		RuntimeSnapshot: cachemodel.RuntimeSnapshot{
 			GeneratedAt: time.Now(),
 			Component:   component,
-			Summary:     observability.RuntimeSummary{FamilyTotal: 1, AvailableCount: 1, Ready: true},
-			Families: []observability.FamilyStatus{
+			Summary:     cachemodel.RuntimeSummary{FamilyTotal: 1, AvailableCount: 1, Ready: true},
+			Families: []cachemodel.FamilyStatus{
 				{
 					Component:   component,
 					Family:      "query_result",

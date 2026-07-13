@@ -12,7 +12,7 @@ import (
 )
 
 type stubCoordinator struct {
-	snapshot WarmupStatusSnapshot
+	snapshot cachemodel.WarmupStatusSnapshot
 }
 
 func (s stubCoordinator) WarmStartup(context.Context) error { return nil }
@@ -27,15 +27,15 @@ func (s stubCoordinator) HandleQuestionnairePublished(context.Context, string, s
 
 func (s stubCoordinator) HandleStatisticsSync(context.Context, int64) error { return nil }
 
-func (s stubCoordinator) HandleRepairComplete(context.Context, RepairCompleteRequest) error {
+func (s stubCoordinator) HandleRepairComplete(context.Context, cachetarget.RepairCompleteRequest) error {
 	return nil
 }
 
-func (s stubCoordinator) HandleManualWarmup(context.Context, ManualWarmupRequest) (*ManualWarmupResult, error) {
+func (s stubCoordinator) HandleManualWarmup(context.Context, cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	return nil, nil
 }
 
-func (s stubCoordinator) Snapshot() WarmupStatusSnapshot { return s.snapshot }
+func (s stubCoordinator) Snapshot() cachemodel.WarmupStatusSnapshot { return s.snapshot }
 
 type stubHotsetInspector struct {
 	items []cachetarget.HotsetItem
@@ -83,7 +83,7 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 		AllowWarmup: false,
 	})
 
-	expectedRun := WarmupRunSnapshot{
+	expectedRun := cachemodel.WarmupRunSnapshot{
 		Trigger:      "startup",
 		StartedAt:    time.Unix(10, 0),
 		FinishedAt:   time.Unix(11, 0),
@@ -94,11 +94,11 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 		SkippedCount: 0,
 	}
 	service := NewStatusService("apiserver", registry, nil, stubCoordinator{
-		snapshot: WarmupStatusSnapshot{
+		snapshot: cachemodel.WarmupStatusSnapshot{
 			Enabled: true,
-			Startup: WarmupStartupStatus{Static: true, Query: true},
-			Hotset:  WarmupHotsetStatus{Enable: true, TopN: 20, MaxItemsPerKind: 200},
-			LatestRuns: []WarmupRunSnapshot{
+			Startup: cachemodel.WarmupStartupStatus{Static: true, Query: true},
+			Hotset:  cachemodel.WarmupHotsetStatus{Enable: true, TopN: 20, MaxItemsPerKind: 200},
+			LatestRuns: []cachemodel.WarmupRunSnapshot{
 				expectedRun,
 			},
 		},

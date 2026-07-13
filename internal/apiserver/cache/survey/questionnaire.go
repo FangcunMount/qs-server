@@ -4,38 +4,32 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
 )
 
-const (
-	defaultQuestionnaireCacheTTL         = 12 * time.Hour
-	defaultNegativeQuestionnaireCacheTTL = 5 * time.Minute
-)
-
 type CachedQuestionnaireRepository struct {
 	repo     domainQuestionnaire.Repository
 	client   redis.UniversalClient
-	ttl      time.Duration
 	keys     *keyspace.Builder
-	policy   cachepolicy.CachePolicy
+	policies sharedcache.PolicyProvider
 	observer *observability.ComponentObserver
 	store    *adapterkit.ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
-	return NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+func NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) domainQuestionnaire.Repository {
+	return NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
@@ -43,17 +37,13 @@ func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQue
 	return &CachedQuestionnaireRepository{
 		repo:     repo,
 		client:   client,
-		ttl:      policy.TTLOr(defaultQuestionnaireCacheTTL),
 		keys:     builder,
-		policy:   policy,
+		policies: policies,
 		observer: observer,
 		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[domainQuestionnaire.Questionnaire]{
-			Cache:       adapterkit.NewRedisStoreIfAvailable(client),
-			PolicyKey:   cachepolicy.CapabilitySurveyQuestionnaire,
-			Policy:      policy,
-			TTL:         policy.TTLOr(defaultQuestionnaireCacheTTL),
-			NegativeTTL: policy.NegativeTTLOr(defaultNegativeQuestionnaireCacheTTL),
-			Codec:       newQuestionnaireCacheEntryCodec(mapper),
+			Cache:     adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey: cachepolicy.CapabilitySurveyQuestionnaire,
+			Codec:     newQuestionnaireCacheEntryCodec(mapper),
 		}),
 	}
 }
@@ -73,20 +63,12 @@ func newQuestionnaireCacheEntryCodec(mapper *questionnaireInfra.QuestionnaireMap
 	}
 }
 
-func (r *CachedQuestionnaireRepository) WithTTL(ttl time.Duration) *CachedQuestionnaireRepository {
-	r.ttl = ttl
-	if r.store != nil {
-		r.store.SetTTL(ttl)
-	}
-	return r
-}
-
 func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	if err := r.repo.Create(ctx, qDomain); err != nil {
 		return err
 	}
 	if r.client != nil {
-		_ = r.setCache(ctx, r.headKey(qDomain.GetCode().Value()), qDomain, r.ttl)
+		_ = r.setCache(ctx, r.headKey(qDomain.GetCode().Value()), qDomain)
 	}
 	return nil
 }
@@ -96,9 +78,9 @@ func (r *CachedQuestionnaireRepository) CreatePublishedSnapshot(ctx context.Cont
 		return err
 	}
 	if r.client != nil {
-		_ = r.setCache(ctx, r.versionKey(qDomain.GetCode().Value(), qDomain.GetVersion().Value()), qDomain, r.ttl)
+		_ = r.setCache(ctx, r.versionKey(qDomain.GetCode().Value(), qDomain.GetVersion().Value()), qDomain)
 		if active {
-			_ = r.setCache(ctx, r.publishedKey(qDomain.GetCode().Value()), qDomain, r.ttl)
+			_ = r.setCache(ctx, r.publishedKey(qDomain.GetCode().Value()), qDomain)
 		}
 	}
 	return nil
@@ -226,8 +208,14 @@ func (r *CachedQuestionnaireRepository) versionKey(code, version string) string 
 	return r.keys.BuildQuestionnaireKey(strings.ToLower(code), version)
 }
 
-func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire, ttl time.Duration) error {
-	return r.store.SetWithTTL(ctx, key, qDomain, ttl)
+func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire) error {
+	policy := sharedcache.Policy{}
+	if r.policies != nil {
+		if effective, ok := r.policies.Resolve(cachepolicy.CapabilitySurveyQuestionnaire); ok {
+			policy = effective.Policy
+		}
+	}
+	return r.store.Set(ctx, key, qDomain, policy)
 }
 
 func (r *CachedQuestionnaireRepository) loadWithCache(
@@ -238,7 +226,7 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[domainQuestionnaire.Questionnaire]{
 		PolicyKey:      cachepolicy.CapabilitySurveyQuestionnaire,
 		CacheKey:       key,
-		Policy:         r.policy,
+		PolicyProvider: r.policies,
 		Observer:       r.observer,
 		Store:          r.store,
 		Load:           fallback,
@@ -277,13 +265,13 @@ func (r *CachedQuestionnaireRepository) WarmupCache(ctx context.Context, codes [
 		headExists, _ := r.store.Exists(ctx, r.headKey(code))
 		if !headExists {
 			if qDomain, err := r.repo.FindByCode(ctx, code); err == nil && qDomain != nil {
-				_ = r.setCache(ctx, r.headKey(code), qDomain, r.ttl)
+				_ = r.setCache(ctx, r.headKey(code), qDomain)
 			}
 		}
 		publishedExists, _ := r.store.Exists(ctx, r.publishedKey(code))
 		if !publishedExists {
 			if qDomain, err := r.repo.FindPublishedByCode(ctx, code); err == nil && qDomain != nil {
-				_ = r.setCache(ctx, r.publishedKey(code), qDomain, r.ttl)
+				_ = r.setCache(ctx, r.publishedKey(code), qDomain)
 			}
 		}
 	}

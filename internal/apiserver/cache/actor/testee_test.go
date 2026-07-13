@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestCachedTesteeRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedTesteeRepositoryWithBuilderAndPolicy(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), cachepolicy.CachePolicy{})
+	repo := NewCachedTesteeRepositoryWithBuilderAndProvider(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), testeePolicyProvider(sharedcache.Policy{}))
 	cached, ok := repo.(*CachedTesteeRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)
@@ -35,14 +36,14 @@ func TestCachedTesteeRepositoryCachesNegativeResult(t *testing.T) {
 	})
 
 	repo := &testeeNegativeRepo{}
-	cached := NewCachedTesteeRepositoryWithBuilderAndPolicy(
+	cached := NewCachedTesteeRepositoryWithBuilderAndProvider(
 		repo,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{
+		testeePolicyProvider(cachepolicy.CachePolicy{
 			Negative:    cachepolicy.PolicySwitchEnabled,
 			NegativeTTL: time.Minute,
-		},
+		}),
 	).(*CachedTesteeRepository)
 
 	ctx := context.Background()
@@ -70,6 +71,10 @@ func TestCachedTesteeRepositoryCachesNegativeResult(t *testing.T) {
 	if repo.findByIDCalls != 1 {
 		t.Fatalf("FindByID() repo calls = %d, want 1", repo.findByIDCalls)
 	}
+}
+
+func testeePolicyProvider(policy sharedcache.Policy) sharedcache.PolicyProvider {
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityActorTestee, Policy: policy})
 }
 
 type testeeNegativeRepo struct {

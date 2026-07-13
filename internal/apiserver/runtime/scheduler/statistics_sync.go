@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -23,7 +22,7 @@ type statisticsSyncService interface {
 type StatisticsSyncRunner struct {
 	opts              *apiserveroptions.StatisticsSyncOptions
 	syncService       statisticsSyncService
-	warmupCoordinator cachegov.Coordinator
+	warmupCoordinator statisticsApp.WarmupCoordinator
 	leader            leaderLeaseRunner
 	clock             DailyClock
 	now               func() time.Time
@@ -33,7 +32,7 @@ type StatisticsSyncRunner struct {
 func NewStatisticsSyncRunner(
 	opts *apiserveroptions.StatisticsSyncOptions,
 	syncService statisticsSyncService,
-	warmupCoordinator cachegov.Coordinator,
+	warmupCoordinator statisticsApp.WarmupCoordinator,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
 ) *StatisticsSyncRunner {
@@ -55,7 +54,7 @@ func NewStatisticsSyncRunner(
 func newStatisticsSyncRunnerWithHooks(
 	opts *apiserveroptions.StatisticsSyncOptions,
 	syncService statisticsSyncService,
-	warmupCoordinator cachegov.Coordinator,
+	warmupCoordinator statisticsApp.WarmupCoordinator,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
 	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),

@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 )
 
 type stubGovernanceCoordinator struct {
 	lastSyncOrgID int64
-	lastRepair    cachegov.RepairCompleteRequest
-	lastManual    cachegov.ManualWarmupRequest
-	manualResult  *cachegov.ManualWarmupResult
+	lastRepair    cachetarget.RepairCompleteRequest
+	lastManual    cachetarget.ManualWarmupRequest
+	manualResult  *cachemodel.ManualWarmupResult
 	manualErr     error
 }
 
@@ -34,12 +34,12 @@ func (s *stubGovernanceCoordinator) HandleStatisticsSync(_ context.Context, orgI
 	return nil
 }
 
-func (s *stubGovernanceCoordinator) HandleRepairComplete(_ context.Context, req cachegov.RepairCompleteRequest) error {
+func (s *stubGovernanceCoordinator) HandleRepairComplete(_ context.Context, req cachetarget.RepairCompleteRequest) error {
 	s.lastRepair = req
 	return nil
 }
 
-func (s *stubGovernanceCoordinator) HandleManualWarmup(_ context.Context, req cachegov.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (s *stubGovernanceCoordinator) HandleManualWarmup(_ context.Context, req cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	s.lastManual = req
 	if s.manualErr != nil {
 		return nil, s.manualErr
@@ -47,28 +47,28 @@ func (s *stubGovernanceCoordinator) HandleManualWarmup(_ context.Context, req ca
 	if s.manualResult != nil {
 		return s.manualResult, nil
 	}
-	return &cachegov.ManualWarmupResult{
+	return &cachemodel.ManualWarmupResult{
 		Trigger:    "manual",
 		StartedAt:  time.Unix(1, 0),
 		FinishedAt: time.Unix(2, 0),
-		Summary: cachegov.ManualWarmupSummary{
+		Summary: cachemodel.ManualWarmupSummary{
 			TargetCount: 1,
 			OkCount:     1,
 			Result:      "ok",
 		},
-		Items: []cachegov.ManualWarmupItemResult{
+		Items: []cachemodel.ManualWarmupItemResult{
 			{
 				Family: "static_meta",
-				Kind:   cachetarget.WarmupKindStaticScale,
+				Kind:   string(cachetarget.WarmupKindStaticScale),
 				Scope:  "scale:S-001",
-				Status: cachegov.ManualWarmupItemStatusOK,
+				Status: cachemodel.ManualWarmupItemStatusOK,
 			},
 		},
 	}, nil
 }
 
-func (s *stubGovernanceCoordinator) Snapshot() cachegov.WarmupStatusSnapshot {
-	return cachegov.WarmupStatusSnapshot{}
+func (s *stubGovernanceCoordinator) Snapshot() cachemodel.WarmupStatusSnapshot {
+	return cachemodel.WarmupStatusSnapshot{}
 }
 
 func TestGovernanceFacadeGetStatusReturnsDefaultSnapshotWhenServiceUnavailable(t *testing.T) {
@@ -108,7 +108,7 @@ func TestGovernanceFacadeHandleManualWarmupRejectsCrossOrgTarget(t *testing.T) {
 	facade := NewGovernanceFacade("apiserver", &stubGovernanceCoordinator{}, nil)
 
 	_, err := facade.HandleManualWarmup(context.Background(), 1, ManualWarmupRequest{
-		Targets: []cachegov.ManualWarmupTarget{
+		Targets: []cachetarget.ManualWarmupTarget{
 			{Kind: cachetarget.WarmupKindQueryStatsSystem, Scope: "org:2"},
 		},
 	})

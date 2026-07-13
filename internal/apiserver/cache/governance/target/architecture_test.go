@@ -3,109 +3,121 @@ package cachetarget
 import (
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
-func TestApplicationHotsetPathsDoNotImportInfraCache(t *testing.T) {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to resolve current file")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", ".."))
-	applicationRoot := filepath.Join(repoRoot, "internal", "apiserver", "application")
-	for _, dir := range []string{
-		filepath.Join(applicationRoot, "cachegovernance"),
-		filepath.Join(applicationRoot, "statistics"),
-		filepath.Join(applicationRoot, "scale"),
-		filepath.Join(applicationRoot, "survey", "questionnaire"),
-	} {
-		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
-		if err != nil {
-			t.Fatalf("glob %s: %v", dir, err)
+const modulePrefix = "github.com/FangcunMount/qs-server/"
+
+func TestApplicationCacheGovernanceBoundary(t *testing.T) {
+	root := findRepoRoot(t)
+	matched := scanProductionImports(t, filepath.Join(root, "internal", "apiserver", "application"), func(file, imported string) {
+		if imported == modulePrefix+"internal/apiserver/cache/governance/model" ||
+			imported == modulePrefix+"internal/apiserver/cache/governance/target" ||
+			imported == modulePrefix+"internal/pkg/cache" {
+			return
 		}
-		for _, file := range files {
-			if strings.HasSuffix(file, "_test.go") {
-				continue
+		if strings.HasPrefix(imported, modulePrefix+"internal/pkg/redisruntime/observability") && strings.Contains(filepath.ToSlash(file), "/application/systemgovernance/") {
+			return
+		}
+		for _, forbidden := range []string{
+			modulePrefix + "internal/apiserver/cache/governance",
+			modulePrefix + "internal/apiserver/cache/survey",
+			modulePrefix + "internal/apiserver/cache/modelcatalog",
+			modulePrefix + "internal/apiserver/cache/evaluation",
+			modulePrefix + "internal/apiserver/cache/actor",
+			modulePrefix + "internal/apiserver/cache/plan",
+			modulePrefix + "internal/apiserver/cache/statistics",
+			modulePrefix + "internal/pkg/redisruntime",
+			"github.com/redis/go-redis",
+		} {
+			if imported == forbidden || strings.HasPrefix(imported, forbidden+"/") {
+				t.Fatalf("%s imports forbidden cache implementation %s", rel(t, root, file), imported)
 			}
-			checkNoInfraCacheImport(t, file)
 		}
+	})
+	if matched == 0 {
+		t.Fatal("application cache boundary scan matched zero production files")
 	}
 }
 
-func TestRuntimeCacheBoundaryCallersDoNotImportInfraCacheFacade(t *testing.T) {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to resolve current file")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", ".."))
+func TestGovernanceContractsStayInfrastructureFree(t *testing.T) {
+	root := findRepoRoot(t)
+	matched := 0
 	for _, dir := range []string{
-		filepath.Join(repoRoot, "internal", "apiserver", "cachebootstrap"),
-		filepath.Join(repoRoot, "internal", "apiserver", "infra", "statistics"),
+		filepath.Join(root, "internal", "apiserver", "cache", "governance", "model"),
+		filepath.Join(root, "internal", "apiserver", "cache", "governance", "target"),
 	} {
-		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
-		if err != nil {
-			t.Fatalf("glob %s: %v", dir, err)
-		}
-		for _, file := range files {
-			if strings.HasSuffix(file, "_test.go") {
-				continue
+		matched += scanProductionImports(t, dir, func(file, imported string) {
+			for _, forbidden := range []string{
+				modulePrefix + "internal/pkg/redisruntime",
+				"github.com/redis/go-redis",
+				modulePrefix + "internal/apiserver/domain",
+				modulePrefix + "internal/apiserver/port",
+				modulePrefix + "internal/apiserver/infra",
+			} {
+				if imported == forbidden || strings.HasPrefix(imported, forbidden+"/") {
+					t.Fatalf("%s imports forbidden infrastructure/business package %s", rel(t, root, file), imported)
+				}
 			}
-			checkNoInfraCacheImport(t, file)
-		}
+		})
+	}
+	if matched == 0 {
+		t.Fatal("governance contract scan matched zero production files")
 	}
 }
 
-func TestCacheDomainAndGovernanceDoNotImportRedisRuntime(t *testing.T) {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to resolve current file")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", ".."))
-	for _, dir := range []string{
-		filepath.Join(repoRoot, "internal", "apiserver", "cachetarget"),
-		filepath.Join(repoRoot, "internal", "apiserver", "infra", "cachepolicy"),
-		filepath.Join(repoRoot, "internal", "apiserver", "application", "cachegovernance"),
-	} {
-		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
-		if err != nil {
-			t.Fatalf("glob %s: %v", dir, err)
-		}
-		for _, file := range files {
-			if strings.HasSuffix(file, "_test.go") {
-				continue
-			}
-			checkNoRedisRuntimeImport(t, file)
-		}
-	}
-}
-
-func checkNoInfraCacheImport(t *testing.T, file string) {
+func scanProductionImports(t *testing.T, root string, visit func(file, imported string)) int {
 	t.Helper()
-
-	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
-	if err != nil {
-		t.Fatalf("parse imports for %s: %v", file, err)
-	}
-	for _, imported := range parsed.Imports {
-		if strings.HasPrefix(strings.Trim(imported.Path.Value, `"`), "github.com/FangcunMount/qs-server/internal/apiserver/cache/") {
-			t.Fatalf("%s imports infra/cache; hotset-facing application code should depend on cachetarget interfaces", file)
+	matched := 0
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		matched++
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, spec := range parsed.Imports {
+			visit(path, strings.Trim(spec.Path.Value, `"`))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan %s: %v", root, err)
+	}
+	return matched
+}
+
+func findRepoRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			t.Fatal("repository root not found")
+		}
+		wd = parent
 	}
 }
 
-func checkNoRedisRuntimeImport(t *testing.T, file string) {
+func rel(t *testing.T, root, file string) string {
 	t.Helper()
-
-	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+	value, err := filepath.Rel(root, file)
 	if err != nil {
-		t.Fatalf("parse imports for %s: %v", file, err)
+		t.Fatal(err)
 	}
-	for _, imported := range parsed.Imports {
-		if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/pkg/redisruntime" {
-			t.Fatalf("%s imports cache runtime; cache domain/governance code should use Redis-free cachemodel types", file)
-		}
-	}
+	return filepath.ToSlash(value)
 }

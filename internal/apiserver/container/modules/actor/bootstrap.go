@@ -5,9 +5,9 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
@@ -21,7 +21,7 @@ type BootstrapInput struct {
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder
-	TesteePolicy        cachepolicy.CachePolicy
+	CachePolicies       sharedcache.PolicyProvider
 	Observer            *observability.ComponentObserver
 	MySQLLimiter        backpressure.Acquirer
 }
@@ -34,7 +34,7 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 		IdentityService:     in.IdentityService,
 		RedisClient:         in.RedisClient,
 		CacheBuilder:        in.CacheBuilder,
-		TesteePolicy:        in.TesteePolicy,
+		CachePolicies:       in.CachePolicies,
 		OperatorAuthz:       in.OperatorAuthz,
 		OperationAccountSvc: in.OperationAccountSvc,
 		Observer:            in.Observer,

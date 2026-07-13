@@ -20,7 +20,7 @@ func NewTargetPlanner(cfg Config, deps Dependencies) *TargetPlanner {
 	return &TargetPlanner{cfg: cfg, deps: deps}
 }
 
-func (p *TargetPlanner) MergeQueryTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
+func (p *TargetPlanner) MergeQueryTargets(ctx context.Context, orgFilter []int64, repair *cachetarget.RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if p == nil {
 		return nil
 	}
@@ -84,7 +84,7 @@ func overviewSeedPresets(configured []string) []string {
 	return result
 }
 
-func (p *TargetPlanner) queryHotTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
+func (p *TargetPlanner) queryHotTargets(ctx context.Context, orgFilter []int64, repair *cachetarget.RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if !p.cfg.HotsetEnable || p.deps.Hotset == nil {
 		return nil
 	}
@@ -116,7 +116,7 @@ func (p *TargetPlanner) queryHotTargets(ctx context.Context, orgFilter []int64, 
 	return targets
 }
 
-func allowQueryTarget(target cachetarget.WarmupTarget, orgFilter map[int64]struct{}, repair *RepairCompleteRequest) bool {
+func allowQueryTarget(target cachetarget.WarmupTarget, orgFilter map[int64]struct{}, repair *cachetarget.RepairCompleteRequest) bool {
 	if len(orgFilter) == 0 && repair == nil {
 		return true
 	}

@@ -16,8 +16,6 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-const defaultAssessmentListCacheTTL = 10 * time.Minute
-
 const defaultAssessmentListLocalMaxEntries = 512
 
 func NewVersionTokenStore(client redis.UniversalClient, health cacheobserve.FamilyObserver) querycache.VersionTokenStore {
@@ -31,11 +29,11 @@ type MyAssessmentListCache struct {
 	keyBuilder *keyspace.Builder
 }
 
-func NewMyAssessmentListCacheWithBuilderAndPolicy(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policy sharedcache.Policy) *MyAssessmentListCache {
-	return NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c, versionStore, keyBuilder, policy, nil)
+func NewMyAssessmentListCacheWithBuilderAndProvider(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider) *MyAssessmentListCache {
+	return NewMyAssessmentListCacheWithBuilderProviderAndObserver(c, versionStore, keyBuilder, policies, nil)
 }
 
-func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policy sharedcache.Policy, observer cacheobserve.FamilyObserver) *MyAssessmentListCache {
+func NewMyAssessmentListCacheWithBuilderProviderAndObserver(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider, observer cacheobserve.FamilyObserver) *MyAssessmentListCache {
 	if c == nil {
 		return nil
 	}
@@ -50,8 +48,7 @@ func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c sharedcache.Store, v
 			Store:      c,
 			Version:    versionStore,
 			Capability: sharedcache.Capability(cachepolicy.CapabilityEvaluationAssessmentList),
-			Policy:     policy,
-			TTL:        policy.TTLOr(defaultAssessmentListCacheTTL),
+			Policies:   policies,
 			Memory:     querycache.NewLocalHotCache[[]byte](30*time.Second, defaultAssessmentListLocalMaxEntries),
 			Observer:   adapterkit.NewCapabilityObserver(cachepolicy.CapabilityEvaluationAssessmentList, observer),
 		}),

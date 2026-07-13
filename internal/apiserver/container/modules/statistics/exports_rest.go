@@ -2,15 +2,15 @@ package statistics
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )
 
 // RESTExportOptions carries container integration inputs for REST export.
 type RESTExportOptions struct {
 	TesteeAccessService          actorAccessApp.TesteeAccessService
-	WarmupCoordinator            cachegov.Coordinator
-	CacheGovernanceStatusService cachegov.StatusService
+	WarmupCoordinator            statisticsApp.WarmupCoordinator
+	CacheGovernanceStatusService statisticsApp.GovernanceStatusReader
 }
 
 // ExportRESTDeps exposes statistics capabilities to REST transport.

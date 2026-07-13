@@ -31,10 +31,10 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 	queryCache := redisstore.NewStore(queryClient)
 	versionStore := querycache.NewRedisVersionTokenStore(metaClient, nil)
 	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, versionStore, keyBuilder, cachepolicy.CachePolicy{
+	listCache := NewMyAssessmentListCacheWithBuilderAndProvider(queryCache, versionStore, keyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
-	})
+	}))
 
 	ctx := context.Background()
 	payload := &assessmentListPayload{Total: 1}
@@ -107,13 +107,17 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 
 	queryCache := redisstore.NewStore(queryClient)
 	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, failingVersionStore{}, keyBuilder, cachepolicy.CachePolicy{
+	listCache := NewMyAssessmentListCacheWithBuilderAndProvider(queryCache, failingVersionStore{}, keyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
-	})
+	}))
 
 	var cached assessmentListPayload
 	if err := listCache.Get(context.Background(), 42, 1, 10, "done", "SDS", "high", "", "", &cached); err != sharedcache.ErrMiss {
 		t.Fatalf("Get() error = %v, want %v", err, sharedcache.ErrMiss)
 	}
+}
+
+func assessmentListPolicies(policy sharedcache.Policy) sharedcache.PolicyProvider {
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityEvaluationAssessmentList, Policy: policy})
 }

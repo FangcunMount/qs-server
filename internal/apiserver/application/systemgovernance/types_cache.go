@@ -3,7 +3,6 @@ package systemgovernance
 import (
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -11,15 +10,15 @@ import (
 
 // CacheView 暴露缓存 governance detail。
 type CacheView struct {
-	GeneratedAt time.Time                 `json:"generated_at"`
-	Window      string                    `json:"window"`
-	Metrics     MetricsSummary            `json:"metrics"`
-	Signals     []Signal                  `json:"signals"`
-	Snapshot    *cachegov.StatusSnapshot  `json:"snapshot,omitempty"`
-	Components  map[string]ComponentCache `json:"components,omitempty"`
-	FamilyRows  []CacheFamilyRow          `json:"family_rows,omitempty"`
-	WarmupKinds []CacheWarmupKind         `json:"warmup_kinds,omitempty"`
-	Hotsets     []CacheHotsetView         `json:"hotsets,omitempty"`
+	GeneratedAt time.Time                  `json:"generated_at"`
+	Window      string                     `json:"window"`
+	Metrics     MetricsSummary             `json:"metrics"`
+	Signals     []Signal                   `json:"signals"`
+	Snapshot    *cachemodel.StatusSnapshot `json:"snapshot,omitempty"`
+	Components  map[string]ComponentCache  `json:"components,omitempty"`
+	FamilyRows  []CacheFamilyRow           `json:"family_rows,omitempty"`
+	WarmupKinds []CacheWarmupKind          `json:"warmup_kinds,omitempty"`
+	Hotsets     []CacheHotsetView          `json:"hotsets,omitempty"`
 }
 
 // ComponentCache 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。

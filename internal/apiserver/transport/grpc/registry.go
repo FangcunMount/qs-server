@@ -20,7 +20,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -47,7 +46,7 @@ type Deps struct {
 	IAM                    IAMDeps
 	PublishedModelCatalog  rulesetport.Catalog
 
-	WarmupCoordinator                  cachegov.Coordinator
+	WarmupCoordinator                  statisticsApp.WarmupCoordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 }

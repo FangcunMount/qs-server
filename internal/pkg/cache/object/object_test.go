@@ -40,14 +40,15 @@ func TestStorePreservesPayloadNegativeAndDeleteContracts(t *testing.T) {
 	ctx := context.Background()
 
 	want := &contractValue{ID: 42, Name: "cached"}
-	if err := store.Set(ctx, "object:42", want); err != nil {
+	policy := sharedcache.Policy{TTL: time.Minute, NegativeTTL: time.Minute, Compress: sharedcache.PolicySwitchEnabled}
+	if err := store.Set(ctx, "object:42", want, policy); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 	got, err := store.Get(ctx, "object:42")
 	if err != nil || got == nil || *got != *want {
 		t.Fatalf("Get = %#v, %v", got, err)
 	}
-	if err := store.SetNegative(ctx, "object:missing"); err != nil {
+	if err := store.SetNegative(ctx, "object:missing", policy); err != nil {
 		t.Fatalf("SetNegative: %v", err)
 	}
 	if got, err := store.Get(ctx, "object:missing"); err != nil || got != nil {
@@ -64,6 +65,7 @@ func TestStorePreservesPayloadNegativeAndDeleteContracts(t *testing.T) {
 func TestReadThroughCoalescesMissAndWritesCache(t *testing.T) {
 	policy := sharedcache.Policy{Singleflight: sharedcache.PolicySwitchEnabled}
 	store, _, cleanup := newContractStore(t, policy)
+	policies := sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: "assessment_detail", Policy: policy})
 	defer cleanup()
 	var loads atomic.Int32
 	load := func(context.Context) (*contractValue, error) {
@@ -76,11 +78,11 @@ func TestReadThroughCoalescesMissAndWritesCache(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		go func() {
 			_, err := ReadThrough(context.Background(), ReadThroughOptions[contractValue]{
-				Capability: "assessment_detail",
-				CacheKey:   "object:miss",
-				Policy:     policy,
-				Store:      store,
-				Load:       load,
+				Capability:     "assessment_detail",
+				CacheKey:       "object:miss",
+				PolicyProvider: policies,
+				Store:          store,
+				Load:           load,
 			})
 			errCh <- err
 		}()
@@ -101,10 +103,8 @@ func TestReadThroughCoalescesMissAndWritesCache(t *testing.T) {
 func TestReadThroughFailsOpenOnStoreError(t *testing.T) {
 	boom := errors.New("redis unavailable")
 	store := NewStore(StoreOptions[contractValue]{
-		Store:  errorStore{err: boom},
-		Policy: sharedcache.Policy{},
-		TTL:    time.Minute,
-		Codec:  contractCodec,
+		Store: errorStore{err: boom},
+		Codec: contractCodec,
 	})
 	got, err := ReadThrough(context.Background(), ReadThroughOptions[contractValue]{
 		Capability: "assessment_detail",
@@ -124,12 +124,8 @@ func newContractStore(t *testing.T, policy sharedcache.Policy) (*Store[contractV
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	store := NewStore(StoreOptions[contractValue]{
-		Store:       redisstore.NewStore(client),
-		Policy:      policy,
-		TTL:         time.Minute,
-		NegativeTTL: time.Minute,
-		Codec:       contractCodec,
-		Coalescer:   loadguard.NewCoalescer(policy.SingleflightEnabled(false)),
+		Store: redisstore.NewStore(client), Codec: contractCodec,
+		Coalescer: loadguard.NewCoalescer(true),
 	})
 	return store, client, func() { _ = client.Close(); mr.Close() }
 }

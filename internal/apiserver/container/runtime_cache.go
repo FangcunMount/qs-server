@@ -6,7 +6,6 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
@@ -44,11 +43,11 @@ func (c *Container) CacheBuilder(family redisruntime.Family) *keyspace.Builder {
 	return c.cache.Builder(family)
 }
 
-func (c *Container) CacheCapability(key sharedcache.Capability) cachepolicy.Binding {
+func (c *Container) CachePolicyProvider() sharedcache.PolicyProvider {
 	if c == nil || c.cache == nil {
-		return cachepolicy.Binding{}
+		return nil
 	}
-	return c.cache.Capability(key)
+	return c.cache.EffectiveRegistry()
 }
 
 func (c *Container) cacheObserver() *observability.ComponentObserver {
@@ -79,14 +78,14 @@ func (c *Container) CacheLockManager() locklease.Manager {
 	return c.cache.LockManager()
 }
 
-func (c *Container) WarmupCoordinator() cachegov.Coordinator {
+func (c *Container) WarmupCoordinator() statisticsApp.WarmupCoordinator {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.WarmupCoordinator()
 }
 
-func (c *Container) CacheGovernanceStatusService() cachegov.StatusService {
+func (c *Container) CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader {
 	if c == nil || c.cache == nil {
 		return nil
 	}
@@ -148,7 +147,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	var warmStatsOverview func(context.Context, int64, string) error
 	var warmStatsQuestionnaire func(context.Context, int64, string) error
 	var warmStatsPlan func(context.Context, int64, uint64) error
-	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Enabled {
+	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && capabilityEnabled(c.CachePolicyProvider(), cachepolicy.CapabilityStatisticsQuery) {
 		warmStatsOverview = a.warmOverviewStatsTarget
 		warmStatsSystem = a.warmSystemStatsTarget
 		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget
@@ -167,6 +166,14 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
 		WarmStatsPlan:                   warmStatsPlan,
 	}
+}
+
+func capabilityEnabled(provider sharedcache.PolicyProvider, capability sharedcache.Capability) bool {
+	if provider == nil {
+		return false
+	}
+	effective, ok := provider.Resolve(capability)
+	return ok && effective.Enabled
 }
 
 func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]string, error) {

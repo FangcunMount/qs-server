@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+const manualWarmupTrigger = "manual"
 
 type Coordinator interface {
 	WarmStartup(ctx context.Context) error
@@ -20,16 +23,9 @@ type Coordinator interface {
 	HandleQuestionnairePublished(ctx context.Context, code, version string) error
 	HandleTypologyModelPublished(ctx context.Context, code string) error
 	HandleStatisticsSync(ctx context.Context, orgID int64) error
-	HandleRepairComplete(ctx context.Context, req RepairCompleteRequest) error
-	HandleManualWarmup(ctx context.Context, req ManualWarmupRequest) (*ManualWarmupResult, error)
-	Snapshot() WarmupStatusSnapshot
-}
-
-type RepairCompleteRequest struct {
-	RepairKind         string
-	OrgIDs             []int64
-	QuestionnaireCodes []string
-	PlanIDs            []uint64
+	HandleRepairComplete(ctx context.Context, req cachetarget.RepairCompleteRequest) error
+	HandleManualWarmup(ctx context.Context, req cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error)
+	Snapshot() cachemodel.WarmupStatusSnapshot
 }
 
 type WarmFunc func(context.Context, cachetarget.WarmupTarget) error
@@ -85,41 +81,12 @@ type Dependencies struct {
 	WarmStatsPlan                   func(context.Context, int64, uint64) error
 }
 
-type WarmupRunSnapshot struct {
-	Trigger      string    `json:"trigger"`
-	StartedAt    time.Time `json:"started_at"`
-	FinishedAt   time.Time `json:"finished_at"`
-	Result       string    `json:"result"`
-	TargetCount  int       `json:"target_count"`
-	OkCount      int       `json:"ok_count"`
-	ErrorCount   int       `json:"error_count"`
-	SkippedCount int       `json:"skipped_count"`
-}
-
-type WarmupStatusSnapshot struct {
-	Enabled    bool                `json:"enabled"`
-	Startup    WarmupStartupStatus `json:"startup"`
-	Hotset     WarmupHotsetStatus  `json:"hotset"`
-	LatestRuns []WarmupRunSnapshot `json:"latest_runs"`
-}
-
-type WarmupStartupStatus struct {
-	Static bool `json:"static"`
-	Query  bool `json:"query"`
-}
-
-type WarmupHotsetStatus struct {
-	Enable          bool  `json:"enable"`
-	TopN            int64 `json:"top_n"`
-	MaxItemsPerKind int64 `json:"max_items_per_kind"`
-}
-
 type coordinator struct {
 	cfg      Config
 	deps     Dependencies
 	registry *WarmupRegistry
 	mu       sync.RWMutex
-	runs     map[string]WarmupRunSnapshot
+	runs     map[string]cachemodel.WarmupRunSnapshot
 }
 
 var (
@@ -150,32 +117,32 @@ func NewCoordinator(cfg Config, deps Dependencies) Coordinator {
 		cfg:      cfg,
 		deps:     deps,
 		registry: ExecutorRegistryBuilder{}.Build(deps),
-		runs:     make(map[string]WarmupRunSnapshot),
+		runs:     make(map[string]cachemodel.WarmupRunSnapshot),
 	}
 	return c
 }
 
-func (c *coordinator) Snapshot() WarmupStatusSnapshot {
+func (c *coordinator) Snapshot() cachemodel.WarmupStatusSnapshot {
 	if c == nil {
-		return WarmupStatusSnapshot{}
+		return cachemodel.WarmupStatusSnapshot{}
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	runs := make([]WarmupRunSnapshot, 0, len(c.runs))
+	runs := make([]cachemodel.WarmupRunSnapshot, 0, len(c.runs))
 	for _, run := range c.runs {
 		runs = append(runs, run)
 	}
 	sort.Slice(runs, func(i, j int) bool {
 		return runs[i].StartedAt.After(runs[j].StartedAt)
 	})
-	return WarmupStatusSnapshot{
+	return cachemodel.WarmupStatusSnapshot{
 		Enabled: c.cfg.Enable,
-		Startup: WarmupStartupStatus{
+		Startup: cachemodel.WarmupStartupStatus{
 			Static: c.cfg.StartupStatic,
 			Query:  c.cfg.StartupQuery,
 		},
-		Hotset: WarmupHotsetStatus{
+		Hotset: cachemodel.WarmupHotsetStatus{
 			Enable:          c.cfg.HotsetEnable,
 			TopN:            c.cfg.HotsetTopN,
 			MaxItemsPerKind: c.cfg.MaxItemsPerKind,
@@ -184,16 +151,16 @@ func (c *coordinator) Snapshot() WarmupStatusSnapshot {
 	}
 }
 
-func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRequest) (*ManualWarmupResult, error) {
+func (c *coordinator) HandleManualWarmup(ctx context.Context, req cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	if c == nil || !c.cfg.Enable {
-		return &ManualWarmupResult{
+		return &cachemodel.ManualWarmupResult{
 			Trigger:    manualWarmupTrigger,
 			StartedAt:  time.Now(),
 			FinishedAt: time.Now(),
-			Summary: ManualWarmupSummary{
+			Summary: cachemodel.ManualWarmupSummary{
 				Result: "skipped",
 			},
-			Items: []ManualWarmupItemResult{},
+			Items: []cachemodel.ManualWarmupItemResult{},
 		}, nil
 	}
 	if len(req.Targets) == 0 {
@@ -202,7 +169,7 @@ func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRe
 
 	targets := make([]cachetarget.WarmupTarget, 0, len(req.Targets))
 	for _, item := range req.Targets {
-		target, err := ParseManualWarmupTarget(item)
+		target, err := cachetarget.ParseManualWarmupTarget(item)
 		if err != nil {
 			return nil, err
 		}
@@ -215,23 +182,23 @@ func (c *coordinator) planner() *TargetPlanner {
 	return NewTargetPlanner(c.cfg, c.deps)
 }
 
-func (c *coordinator) mergeQueryTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
+func (c *coordinator) mergeQueryTargets(ctx context.Context, orgFilter []int64, repair *cachetarget.RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if c == nil {
 		return nil
 	}
 	return c.planner().MergeQueryTargets(ctx, orgFilter, repair)
 }
 
-func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cachetarget.WarmupTarget) (*ManualWarmupResult, error) {
+func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cachetarget.WarmupTarget) (*cachemodel.ManualWarmupResult, error) {
 	if c == nil || !c.cfg.Enable {
-		return &ManualWarmupResult{
+		return &cachemodel.ManualWarmupResult{
 			Trigger:    trigger,
 			StartedAt:  time.Now(),
 			FinishedAt: time.Now(),
-			Summary: ManualWarmupSummary{
+			Summary: cachemodel.ManualWarmupSummary{
 				Result: "skipped",
 			},
-			Items: []ManualWarmupItemResult{},
+			Items: []cachemodel.ManualWarmupItemResult{},
 		}, nil
 	}
 	startedAt := time.Now()
@@ -240,7 +207,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 		warmupRunTotal.WithLabelValues(trigger, "skipped").Inc()
 		finishedAt := time.Now()
 		cacheobserve.ObserveWarmupDuration(trigger, "skipped", finishedAt.Sub(startedAt))
-		run := WarmupRunSnapshot{
+		run := cachemodel.WarmupRunSnapshot{
 			Trigger:      trigger,
 			StartedAt:    startedAt,
 			FinishedAt:   finishedAt,
@@ -249,14 +216,14 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 			SkippedCount: 0,
 		}
 		c.recordRun(run)
-		return &ManualWarmupResult{
+		return &cachemodel.ManualWarmupResult{
 			Trigger:    trigger,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
-			Summary: ManualWarmupSummary{
+			Summary: cachemodel.ManualWarmupSummary{
 				Result: "skipped",
 			},
-			Items: []ManualWarmupItemResult{},
+			Items: []cachemodel.ManualWarmupItemResult{},
 		}, nil
 	}
 
@@ -265,15 +232,15 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 	okCount := 0
 	errorCount := 0
 	skippedCount := 0
-	items := make([]ManualWarmupItemResult, 0, len(targets))
+	items := make([]cachemodel.ManualWarmupItemResult, 0, len(targets))
 	for _, target := range targets {
 		if c.deps.Runtime != nil && !c.deps.Runtime.AllowWarmup(target.Family) {
 			skippedCount++
-			items = append(items, ManualWarmupItemResult{
+			items = append(items, cachemodel.ManualWarmupItemResult{
 				Family:  string(target.Family),
-				Kind:    target.Kind,
+				Kind:    string(target.Kind),
 				Scope:   target.Scope,
-				Status:  ManualWarmupItemStatusSkipped,
+				Status:  cachemodel.ManualWarmupItemStatusSkipped,
 				Message: "该缓存族未开启预热",
 			})
 			continue
@@ -281,11 +248,11 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 		if err := c.registry.Execute(runCtx, target); err != nil {
 			warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "error").Inc()
 			errorCount++
-			items = append(items, ManualWarmupItemResult{
+			items = append(items, cachemodel.ManualWarmupItemResult{
 				Family:  string(target.Family),
-				Kind:    target.Kind,
+				Kind:    string(target.Kind),
 				Scope:   target.Scope,
-				Status:  ManualWarmupItemStatusError,
+				Status:  cachemodel.ManualWarmupItemStatusError,
 				Message: err.Error(),
 			})
 			logger.L(ctx).Warnw("cache governance warmup target failed",
@@ -299,11 +266,11 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 		}
 		warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "ok").Inc()
 		okCount++
-		items = append(items, ManualWarmupItemResult{
+		items = append(items, cachemodel.ManualWarmupItemResult{
 			Family: string(target.Family),
-			Kind:   target.Kind,
+			Kind:   string(target.Kind),
 			Scope:  target.Scope,
-			Status: ManualWarmupItemStatusOK,
+			Status: cachemodel.ManualWarmupItemStatusOK,
 		})
 	}
 	result := "ok"
@@ -318,7 +285,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 	finishedAt := time.Now()
 	warmupRunTotal.WithLabelValues(trigger, result).Inc()
 	cacheobserve.ObserveWarmupDuration(trigger, result, finishedAt.Sub(startedAt))
-	c.recordRun(WarmupRunSnapshot{
+	c.recordRun(cachemodel.WarmupRunSnapshot{
 		Trigger:      trigger,
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
@@ -328,11 +295,11 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 		ErrorCount:   errorCount,
 		SkippedCount: skippedCount,
 	})
-	return &ManualWarmupResult{
+	return &cachemodel.ManualWarmupResult{
 		Trigger:    trigger,
 		StartedAt:  startedAt,
 		FinishedAt: finishedAt,
-		Summary: ManualWarmupSummary{
+		Summary: cachemodel.ManualWarmupSummary{
 			TargetCount:  len(targets),
 			OkCount:      okCount,
 			SkippedCount: skippedCount,
@@ -343,7 +310,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 	}, nil
 }
 
-func (c *coordinator) recordRun(run WarmupRunSnapshot) {
+func (c *coordinator) recordRun(run cachemodel.WarmupRunSnapshot) {
 	if c == nil {
 		return
 	}

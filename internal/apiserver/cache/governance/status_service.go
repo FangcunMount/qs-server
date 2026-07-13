@@ -10,24 +10,9 @@ import (
 )
 
 type StatusService interface {
-	GetRuntime(context.Context) (*observability.RuntimeSnapshot, error)
-	GetStatus(context.Context) (*StatusSnapshot, error)
-	GetHotset(context.Context, cachetarget.WarmupKind, int64) (*HotsetSnapshot, error)
-}
-
-type StatusSnapshot struct {
-	observability.RuntimeSnapshot
-	Warmup WarmupStatusSnapshot `json:"warmup"`
-}
-
-type HotsetSnapshot struct {
-	Family    cachemodel.Family        `json:"family"`
-	Kind      cachetarget.WarmupKind   `json:"kind"`
-	Limit     int64                    `json:"limit"`
-	Available bool                     `json:"available"`
-	Degraded  bool                     `json:"degraded"`
-	Message   string                   `json:"message,omitempty"`
-	Items     []cachetarget.HotsetItem `json:"items"`
+	GetRuntime(context.Context) (*cachemodel.RuntimeSnapshot, error)
+	GetStatus(context.Context) (*cachemodel.StatusSnapshot, error)
+	GetHotset(context.Context, cachetarget.WarmupKind, int64) (*cachetarget.HotsetSnapshot, error)
 }
 
 type governanceStatusService struct {
@@ -46,42 +31,42 @@ func NewStatusService(component string, status *observability.FamilyStatusRegist
 	}
 }
 
-func (s *governanceStatusService) GetRuntime(ctx context.Context) (*observability.RuntimeSnapshot, error) {
+func (s *governanceStatusService) GetRuntime(ctx context.Context) (*cachemodel.RuntimeSnapshot, error) {
 	_ = ctx
 	component := ""
 	if s != nil {
 		component = s.component
 	}
-	result := observability.RuntimeSnapshot{
+	result := cachemodel.RuntimeSnapshot{
 		GeneratedAt: time.Now(),
 		Component:   component,
-		Families:    []observability.FamilyStatus{},
-		Summary: observability.RuntimeSummary{
+		Families:    []cachemodel.FamilyStatus{},
+		Summary: cachemodel.RuntimeSummary{
 			Ready: true,
 		},
 	}
 	if s == nil {
 		return &result, nil
 	}
-	snapshot := observability.SnapshotForComponent(s.component, s.status)
+	snapshot := projectRuntimeSnapshot(observability.SnapshotForComponent(s.component, s.status))
 	return &snapshot, nil
 }
 
-func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapshot, error) {
+func (s *governanceStatusService) GetStatus(ctx context.Context) (*cachemodel.StatusSnapshot, error) {
 	runtimeSnapshot, err := s.GetRuntime(ctx)
 	if err != nil {
 		return nil, err
 	}
-	result := &StatusSnapshot{RuntimeSnapshot: *runtimeSnapshot}
+	result := &cachemodel.StatusSnapshot{RuntimeSnapshot: *runtimeSnapshot}
 	if s.coord != nil {
 		result.Warmup = s.coord.Snapshot()
 	}
 	return result, nil
 }
 
-func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarget.WarmupKind, limit int64) (*HotsetSnapshot, error) {
+func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarget.WarmupKind, limit int64) (*cachetarget.HotsetSnapshot, error) {
 	family := cachetarget.FamilyForKind(kind)
-	result := &HotsetSnapshot{
+	result := &cachetarget.HotsetSnapshot{
 		Family: family,
 		Kind:   kind,
 		Limit:  limit,
@@ -114,6 +99,32 @@ func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarge
 	result.Available = true
 	result.Items = items
 	return result, nil
+}
+
+func projectRuntimeSnapshot(in observability.RuntimeSnapshot) cachemodel.RuntimeSnapshot {
+	out := cachemodel.RuntimeSnapshot{
+		GeneratedAt: in.GeneratedAt,
+		Component:   in.Component,
+		Summary: cachemodel.RuntimeSummary{
+			FamilyTotal:      in.Summary.FamilyTotal,
+			AvailableCount:   in.Summary.AvailableCount,
+			DegradedCount:    in.Summary.DegradedCount,
+			UnavailableCount: in.Summary.UnavailableCount,
+			Ready:            in.Summary.Ready,
+		},
+		Families: make([]cachemodel.FamilyStatus, 0, len(in.Families)),
+	}
+	for _, family := range in.Families {
+		out.Families = append(out.Families, cachemodel.FamilyStatus{
+			Component: family.Component, Family: family.Family, Profile: family.Profile,
+			Namespace: family.Namespace, AllowWarmup: family.AllowWarmup,
+			Configured: family.Configured, Available: family.Available,
+			Degraded: family.Degraded, Mode: family.Mode, LastError: family.LastError,
+			LastSuccessAt: family.LastSuccessAt, LastFailureAt: family.LastFailureAt,
+			ConsecutiveFailures: family.ConsecutiveFailures, UpdatedAt: family.UpdatedAt,
+		})
+	}
+	return out
 }
 
 func (s *governanceStatusService) familyStatus(family cachemodel.Family) *observability.FamilyStatus {

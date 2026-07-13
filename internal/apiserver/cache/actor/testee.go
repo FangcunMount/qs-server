@@ -3,20 +3,15 @@ package actorcache
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
-)
-
-const (
-	defaultTesteeCacheTTL         = 30 * time.Minute
-	defaultNegativeTesteeCacheTTL = 5 * time.Minute
 )
 
 // CachedTesteeRepository 带缓存的受试者 Repository 装饰器
@@ -24,17 +19,17 @@ const (
 type CachedTesteeRepository struct {
 	repo     testee.Repository
 	keys     *keyspace.Builder
-	policy   cachepolicy.CachePolicy
+	policies sharedcache.PolicyProvider
 	observer *observability.ComponentObserver
 	store    *adapterkit.ObjectCacheStore[testee.Testee]
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
-func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) testee.Repository {
-	return NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+func NewCachedTesteeRepositoryWithBuilderAndProvider(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) testee.Repository {
+	return NewCachedTesteeRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
 }
 
-func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) testee.Repository {
+func NewCachedTesteeRepositoryWithBuilderProviderAndObserver(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
@@ -42,15 +37,12 @@ func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repositor
 	return &CachedTesteeRepository{
 		repo:     repo,
 		keys:     builder,
-		policy:   policy,
+		policies: policies,
 		observer: observer,
 		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[testee.Testee]{
-			Cache:       adapterkit.NewRedisStoreIfAvailable(client),
-			PolicyKey:   cachepolicy.CapabilityActorTestee,
-			Policy:      policy,
-			TTL:         policy.TTLOr(defaultTesteeCacheTTL),
-			NegativeTTL: policy.NegativeTTLOr(defaultNegativeTesteeCacheTTL),
-			Codec:       newTesteeCacheEntryCodec(mapper),
+			Cache:     adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey: cachepolicy.CapabilityActorTestee,
+			Codec:     newTesteeCacheEntryCodec(mapper),
 		}),
 	}
 }
@@ -80,7 +72,7 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 	domain, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[testee.Testee]{
 		PolicyKey:        cachepolicy.CapabilityActorTestee,
 		CacheKey:         r.buildCacheKey(id),
-		Policy:           r.policy,
+		PolicyProvider:   r.policies,
 		Observer:         r.observer,
 		Store:            r.store,
 		Load:             func(ctx context.Context) (*testee.Testee, error) { return r.repo.FindByID(ctx, id) },

@@ -9,10 +9,15 @@ import (
 
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
+
+func statisticsPolicies(policy sharedcache.Policy) sharedcache.PolicyProvider {
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityStatisticsQuery, Policy: policy})
+}
 
 func TestStatisticsCacheUsesNamespacedQueryKeys(t *testing.T) {
 	mr := miniredis.RunT(t)
@@ -21,10 +26,10 @@ func TestStatisticsCacheUsesNamespacedQueryKeys(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("stats-test"), statisticsPolicies(cachepolicy.CachePolicy{}))
 	ctx := context.Background()
 
-	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
+	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}"); err != nil {
 		t.Fatalf("set query cache failed: %v", err)
 	}
 	value, err := cache.GetQueryCache(ctx, "system:1")
@@ -49,10 +54,10 @@ func TestStatisticsCacheUsesExplicitBuilderNamespace(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), statisticsPolicies(cachepolicy.CachePolicy{}))
 	ctx := context.Background()
 
-	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
+	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}"); err != nil {
 		t.Fatalf("set query cache failed: %v", err)
 	}
 	if !mr.Exists("prod:cache:query:query:stats:query:system:1:v0") {
@@ -67,17 +72,17 @@ func TestStatisticsCacheAppliesPolicyTTLAndCompression(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(
+	cache := NewStatisticsCacheWithBuilderAndProvider(
 		client,
 		keyspace.NewBuilderWithNamespace("prod:cache:query"),
-		cachepolicy.CachePolicy{
+		statisticsPolicies(cachepolicy.CachePolicy{
 			TTL:      3 * time.Minute,
 			Compress: cachepolicy.PolicySwitchEnabled,
-		},
+		}),
 	)
 	ctx := context.Background()
 
-	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", 0); err != nil {
+	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}"); err != nil {
 		t.Fatalf("set query cache failed: %v", err)
 	}
 
@@ -101,7 +106,7 @@ func TestStatisticsCacheDegradesRedisReadErrorToMiss(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), statisticsPolicies(cachepolicy.CachePolicy{}))
 	value, err := cache.GetQueryCache(context.Background(), "system:1")
 	if err != nil {
 		t.Fatalf("GetQueryCache() error = %v", err)
@@ -118,16 +123,16 @@ func TestStatisticsCacheSupportsMissingVersionTokenStoreKey(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+	cache := NewStatisticsCacheWithBuilderProviderVersionStoreAndObserver(
 		client,
 		keyspace.NewBuilderWithNamespace("prod:cache:query"),
-		cachepolicy.CachePolicy{TTL: time.Minute},
+		statisticsPolicies(cachepolicy.CachePolicy{TTL: time.Minute}),
 		nil,
 		nil,
 	)
 	ctx := context.Background()
 
-	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
+	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}"); err != nil {
 		t.Fatalf("SetQueryCache() error = %v", err)
 	}
 	got, err := cache.GetQueryCache(ctx, "system:1")
@@ -146,7 +151,7 @@ func TestStatisticsTypedCacheOwnsStatisticsQueryKeys(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("stats-test"), statisticsPolicies(cachepolicy.CachePolicy{}))
 	ctx := context.Background()
 
 	cache.StoreQuestionnaireStatistics(ctx, 12, "PHQ9", &domainStatistics.QuestionnaireStatistics{})
@@ -167,10 +172,10 @@ func TestStatisticsCacheSystemSingleflightCoalescesConcurrentMiss(t *testing.T) 
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(
+	cache := NewStatisticsCacheWithBuilderAndProvider(
 		client,
 		keyspace.NewBuilderWithNamespace("stats-test"),
-		cachepolicy.CachePolicy{Singleflight: cachepolicy.PolicySwitchEnabled},
+		statisticsPolicies(cachepolicy.CachePolicy{Singleflight: cachepolicy.PolicySwitchEnabled}),
 	)
 	ctx := context.Background()
 
@@ -211,10 +216,10 @@ func TestStatisticsTypedCacheDegradesInvalidJSONToMiss(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("stats-test"), statisticsPolicies(cachepolicy.CachePolicy{}))
 	ctx := context.Background()
 
-	if err := cache.SetQueryCache(ctx, "system:12", "{", time.Minute); err != nil {
+	if err := cache.SetQueryCache(ctx, "system:12", "{"); err != nil {
 		t.Fatalf("SetQueryCache() error = %v", err)
 	}
 	if stats, ok := cache.LoadSystemStatistics(ctx, 12); ok || stats != nil {

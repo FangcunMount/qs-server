@@ -31,20 +31,20 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 			cachepolicy.CapabilityActorTestee: {Enabled: true, Policy: sharedcache.Policy{TTL: 5}},
 		},
 	}, nil)
-	binding := c.CacheCapability(cachepolicy.CapabilityActorTestee)
+	provider := c.CachePolicyProvider()
 
 	wire := actormod.WireInput{
-		RedisClient:  c.CacheClient(redisruntime.FamilyObject),
-		CacheBuilder: c.CacheBuilder(redisruntime.FamilyObject),
-		TesteePolicy: binding.Policy,
-		Observer:     c.cacheObserver(),
-		MySQLLimiter: c.backpressure.MySQL,
+		RedisClient:   c.CacheClient(redisruntime.FamilyObject),
+		CacheBuilder:  c.CacheBuilder(redisruntime.FamilyObject),
+		CachePolicies: provider,
+		Observer:      c.cacheObserver(),
+		MySQLLimiter:  c.backpressure.MySQL,
 	}
 	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyObject) {
 		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyObject))
 	}
-	if wire.TesteePolicy != binding.Policy {
-		t.Fatalf("policy = %#v, want %#v", wire.TesteePolicy, binding.Policy)
+	if wire.CachePolicies != provider {
+		t.Fatalf("policy provider = %#v, want %#v", wire.CachePolicies, provider)
 	}
 	if wire.ProfileLinkService != nil || wire.IdentityService != nil || wire.IAMClient != nil || wire.OperationAccountSvc != nil {
 		t.Fatalf("unexpected IAM deps in actor wire input: %#v", wire)
@@ -127,7 +127,7 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	wire := statmod.WireInput{
 		FallbackRedisClient: c.CacheClient(redisruntime.FamilyQuery),
 		CacheBuilder:        c.CacheBuilder(redisruntime.FamilyQuery),
-		QueryPolicy:         c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy,
+		CachePolicies:       c.CachePolicyProvider(),
 		LockManager:         c.CacheLockManager(),
 		Observer:            c.cacheObserver(),
 		MetaRedisClient:     c.CacheClient(redisruntime.FamilyMeta),
@@ -138,8 +138,8 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyQuery) {
 		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyQuery))
 	}
-	if wire.QueryPolicy != c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy {
-		t.Fatalf("policy = %#v, want %#v", wire.QueryPolicy, c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy)
+	if wire.CachePolicies != c.CachePolicyProvider() {
+		t.Fatalf("policy provider = %#v, want %#v", wire.CachePolicies, c.CachePolicyProvider())
 	}
 	if wire.LockManager == nil {
 		t.Fatalf("lock manager = %#v, want *redisadapter.Manager", wire.LockManager)

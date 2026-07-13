@@ -220,6 +220,9 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 		if err := viper.Unmarshal(a.options); err != nil {
 			return err
 		}
+		if aware, ok := a.options.(RawSettingsSourceAware); ok {
+			aware.SetRawSettingsSource(newRawSettingsSource(viper.ConfigFileUsed(), envPrefix, cmd.Flags()))
+		}
 
 		// 打印选项信息
 		fmt.Printf("Options: %s\n", configmask.String(a.options))

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/hotset"
@@ -44,7 +45,6 @@ type Subsystem struct {
 	statusRegistry *observability.FamilyStatusRegistry
 	runtime        *redisruntime.Runtime
 	handles        map[redisruntime.Family]*redisruntime.Handle
-	policyCatalog  *cachepolicy.PolicyCatalog
 	effective      *sharedcache.Registry
 	observer       *observability.ComponentObserver
 
@@ -102,8 +102,7 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 		handles:        handles,
 		observer:       observability.NewComponentObserver(component, statusRegistry),
 	}
-	s.policyCatalog = newPolicyCatalog(cacheConfig)
-	s.effective = cachepolicy.NewEffectiveRegistry(s.policyCatalog)
+	s.effective = cachepolicy.NewEffectiveRegistry(newPolicyCatalog(cacheConfig))
 	s.hotsetRecorder = cachehotset.NewRedisStoreWithObserver(
 		s.Client(redisruntime.FamilyMeta),
 		s.Builder(redisruntime.FamilyMeta),
@@ -285,14 +284,6 @@ func (s *Subsystem) Builder(family redisruntime.Family) *keyspace.Builder {
 	return handle.Builder
 }
 
-func (s *Subsystem) Capability(key sharedcache.Capability) cachepolicy.Binding {
-	if s == nil || s.policyCatalog == nil {
-		return cachepolicy.Binding{}
-	}
-	binding, _ := s.policyCatalog.Resolve(key)
-	return binding
-}
-
 func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
 	if s == nil {
 		return nil
@@ -328,14 +319,14 @@ func (s *Subsystem) LockManager() locklease.Manager {
 	return s.lockManager
 }
 
-func (s *Subsystem) WarmupCoordinator() cachegov.Coordinator {
+func (s *Subsystem) WarmupCoordinator() statisticsApp.WarmupCoordinator {
 	if s == nil {
 		return nil
 	}
 	return s.warmupCoordinator
 }
 
-func (s *Subsystem) StatusService() cachegov.StatusService {
+func (s *Subsystem) StatusService() statisticsApp.GovernanceStatusReader {
 	if s == nil {
 		return nil
 	}
@@ -380,38 +371,32 @@ func (s *Subsystem) warmupFamilies() map[cachemodel.Family]bool {
 }
 
 func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
-	return cachepolicy.NewPolicyCatalog(map[cachemodel.Family]cachepolicy.CachePolicy{
+	return cachepolicy.NewPolicyCatalog(cachepolicy.CachePolicy{
+		Compress:    cachepolicy.PolicySwitchFromBool(cacheConfig.CompressPayload),
+		JitterRatio: cacheConfig.TTLJitterRatio,
+	}, map[cachemodel.Family]cachepolicy.CachePolicy{
 		cachemodel.FamilyStatic: {
-			Compress:     resolvePolicySwitch(cacheConfig.Static.Compress, cacheConfig.CompressPayload),
+			Compress:     cachepolicy.PolicySwitchFromBoolPtr(cacheConfig.Static.Compress),
 			Singleflight: resolvePolicySwitch(cacheConfig.Static.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Static.Negative, false),
 			NegativeTTL:  cacheConfig.Static.NegativeTTL,
-			JitterRatio:  firstPositiveFloat(cacheConfig.Static.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+			JitterRatio:  cacheConfig.Static.TTLJitterRatio,
 		},
 		cachemodel.FamilyObject: {
-			Compress:     resolvePolicySwitch(cacheConfig.Object.Compress, cacheConfig.CompressPayload),
+			Compress:     cachepolicy.PolicySwitchFromBoolPtr(cacheConfig.Object.Compress),
 			Singleflight: resolvePolicySwitch(cacheConfig.Object.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Object.Negative, false),
 			NegativeTTL:  cacheConfig.Object.NegativeTTL,
-			JitterRatio:  firstPositiveFloat(cacheConfig.Object.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+			JitterRatio:  cacheConfig.Object.TTLJitterRatio,
 		},
 		cachemodel.FamilyQuery: {
 			NegativeTTL:  cacheConfig.Query.NegativeTTL,
-			Compress:     resolvePolicySwitch(cacheConfig.Query.Compress, cacheConfig.CompressPayload),
+			Compress:     cachepolicy.PolicySwitchFromBoolPtr(cacheConfig.Query.Compress),
 			Singleflight: resolvePolicySwitch(cacheConfig.Query.Singleflight, false),
 			Negative:     resolvePolicySwitch(cacheConfig.Query.Negative, false),
-			JitterRatio:  firstPositiveFloat(cacheConfig.Query.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+			JitterRatio:  cacheConfig.Query.TTLJitterRatio,
 		},
 	}, cacheConfig.Capabilities)
-}
-
-func firstPositiveFloat(values ...float64) float64 {
-	for _, value := range values {
-		if value > 0 {
-			return value
-		}
-	}
-	return 0
 }
 
 func resolvePolicySwitch(explicit *bool, defaultValue bool) cachepolicy.PolicySwitch {

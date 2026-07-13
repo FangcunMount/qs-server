@@ -9,10 +9,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
+var ErrCoalescerRequired = errors.New("cache object read-through requires a coalescer when singleflight is enabled")
+
 type ReadThroughOptions[T any] struct {
 	Capability       sharedcache.Capability
 	CacheKey         string
-	Policy           sharedcache.Policy
+	PolicyProvider   sharedcache.PolicyProvider
 	Observer         sharedcache.Observer
 	Coalescer        loadguard.Coalescer
 	Store            *Store[T]
@@ -23,6 +25,12 @@ type ReadThroughOptions[T any] struct {
 }
 
 func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, error) {
+	policy := sharedcache.Policy{}
+	if opts.PolicyProvider != nil {
+		if effective, ok := opts.PolicyProvider.Resolve(opts.Capability); ok {
+			policy = effective.Policy
+		}
+	}
 	if opts.Store != nil {
 		start := time.Now()
 		cached, err := opts.Store.Get(ctx, opts.CacheKey)
@@ -48,13 +56,13 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 	}
 
 	var value *T
-	if opts.Policy.SingleflightEnabled(false) {
+	if policy.SingleflightEnabled(false) {
 		coalescer := opts.Coalescer
 		if coalescer == nil && opts.Store != nil {
 			coalescer = opts.Store.Coalescer()
 		}
 		if coalescer == nil {
-			coalescer = loadguard.NewCoalescer(true)
+			return nil, ErrCoalescerRequired
 		}
 		loaded, err := coalescer.Do(ctx, string(opts.Capability)+":"+opts.CacheKey, load)
 		if err != nil {
@@ -72,12 +80,12 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 	}
 
 	if value == nil {
-		if opts.CacheNegative && opts.Policy.NegativeEnabled(false) {
+		if opts.CacheNegative && policy.NegativeEnabled(false) {
 			write(ctx, opts.Observer, opts.AsyncSetNegative, func(writeCtx context.Context) error {
 				if opts.Store == nil {
 					return nil
 				}
-				return opts.Store.SetNegative(writeCtx, opts.CacheKey)
+				return opts.Store.SetNegative(writeCtx, opts.CacheKey, policy)
 			})
 		}
 		return nil, nil
@@ -87,7 +95,7 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 		if opts.Store == nil {
 			return nil
 		}
-		return opts.Store.Set(writeCtx, opts.CacheKey, value)
+		return opts.Store.Set(writeCtx, opts.CacheKey, value, policy)
 	})
 	return value, nil
 }

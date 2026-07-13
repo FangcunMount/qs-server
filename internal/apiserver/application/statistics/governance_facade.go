@@ -8,20 +8,19 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
 type governanceFacade struct {
 	component     string
-	coordinator   cachegov.Coordinator
-	statusService cachegov.StatusService
+	coordinator   WarmupCoordinator
+	statusService GovernanceStatusReader
 }
 
 // NewGovernanceFacade 创建统计治理 门面。
-func NewGovernanceFacade(component string, coordinator cachegov.Coordinator, statusService cachegov.StatusService) GovernanceFacade {
+func NewGovernanceFacade(component string, coordinator WarmupCoordinator, statusService GovernanceStatusReader) GovernanceFacade {
 	return &governanceFacade{
 		component:     component,
 		coordinator:   coordinator,
@@ -60,7 +59,7 @@ func (f *governanceFacade) HandleRepairComplete(ctx context.Context, protectedOr
 	return nil
 }
 
-func (f *governanceFacade) HandleManualWarmup(ctx context.Context, protectedOrgID int64, req ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (f *governanceFacade) HandleManualWarmup(ctx context.Context, protectedOrgID int64, req ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	if err := validateManualWarmupTargets(protectedOrgID, req.Targets); err != nil {
 		return nil, err
 	}
@@ -75,18 +74,18 @@ func (f *governanceFacade) HandleManualWarmup(ctx context.Context, protectedOrgI
 	return result, nil
 }
 
-func (f *governanceFacade) GetStatus(ctx context.Context) (*cachegov.StatusSnapshot, error) {
+func (f *governanceFacade) GetStatus(ctx context.Context) (*cachemodel.StatusSnapshot, error) {
 	if f == nil || f.statusService == nil {
-		return &cachegov.StatusSnapshot{
-			RuntimeSnapshot: observability.RuntimeSnapshot{
+		return &cachemodel.StatusSnapshot{
+			RuntimeSnapshot: cachemodel.RuntimeSnapshot{
 				GeneratedAt: time.Now(),
 				Component:   f.componentName(),
-				Families:    []observability.FamilyStatus{},
-				Summary: observability.RuntimeSummary{
+				Families:    []cachemodel.FamilyStatus{},
+				Summary: cachemodel.RuntimeSummary{
 					Ready: true,
 				},
 			},
-			Warmup: cachegov.WarmupStatusSnapshot{},
+			Warmup: cachemodel.WarmupStatusSnapshot{},
 		}, nil
 	}
 	return f.statusService.GetStatus(ctx)
@@ -133,17 +132,17 @@ func (f *governanceFacade) componentName() string {
 	return "apiserver"
 }
 
-func normalizeRepairCompleteRequest(protectedOrgID int64, req RepairCompleteRequest) (cachegov.RepairCompleteRequest, error) {
+func normalizeRepairCompleteRequest(protectedOrgID int64, req RepairCompleteRequest) (cachetarget.RepairCompleteRequest, error) {
 	orgIDs := req.OrgIDs
 	if len(orgIDs) == 0 {
 		orgIDs = []int64{protectedOrgID}
 	}
 	for _, candidate := range orgIDs {
 		if candidate != protectedOrgID {
-			return cachegov.RepairCompleteRequest{}, errors.WithCode(code.ErrInvalidArgument, "org_ids must stay within the protected org scope")
+			return cachetarget.RepairCompleteRequest{}, errors.WithCode(code.ErrInvalidArgument, "org_ids must stay within the protected org scope")
 		}
 	}
-	return cachegov.RepairCompleteRequest{
+	return cachetarget.RepairCompleteRequest{
 		RepairKind:         req.RepairKind,
 		OrgIDs:             orgIDs,
 		QuestionnaireCodes: req.QuestionnaireCodes,
@@ -151,16 +150,16 @@ func normalizeRepairCompleteRequest(protectedOrgID int64, req RepairCompleteRequ
 	}, nil
 }
 
-func validateManualWarmupTargets(protectedOrgID int64, targets []cachegov.ManualWarmupTarget) error {
+func validateManualWarmupTargets(protectedOrgID int64, targets []cachetarget.ManualWarmupTarget) error {
 	if len(targets) == 0 {
 		return errors.WithCode(code.ErrInvalidArgument, "targets cannot be empty")
 	}
 	for _, item := range targets {
-		target, err := cachegov.ParseManualWarmupTarget(item)
+		target, err := cachetarget.ParseManualWarmupTarget(item)
 		if err != nil {
 			return errors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
 		}
-		if orgID, ok := cachegov.WarmupTargetOrgID(target); ok && orgID != protectedOrgID {
+		if orgID, ok := cachetarget.WarmupTargetOrgID(target); ok && orgID != protectedOrgID {
 			return errors.WithCode(code.ErrInvalidArgument, "query warmup target org must stay within the protected org scope")
 		}
 	}

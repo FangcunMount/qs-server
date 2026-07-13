@@ -2,9 +2,9 @@ package plan
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -19,7 +19,7 @@ type WireInput struct {
 	PublishedModels modelcatalogport.PublishedModelLister
 	RedisClient     redis.UniversalClient
 	CacheBuilder    *keyspace.Builder
-	PlanPolicy      cachepolicy.CachePolicy
+	CachePolicies   sharedcache.PolicyProvider
 	EntryBaseURL    string
 	Observer        *observability.ComponentObserver
 	MySQLLimiter    backpressure.Acquirer

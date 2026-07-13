@@ -11,7 +11,7 @@ import (
 type ObjectReadThroughOptions[T any] struct {
 	PolicyKey        sharedcache.Capability
 	CacheKey         string
-	Policy           sharedcache.Policy
+	PolicyProvider   sharedcache.PolicyProvider
 	Observer         *observability.ComponentObserver
 	Store            *objectcache.Store[T]
 	Load             func(context.Context) (*T, error)
@@ -24,7 +24,7 @@ func ReadThroughObject[T any](ctx context.Context, opts ObjectReadThroughOptions
 	return objectcache.ReadThrough(ctx, objectcache.ReadThroughOptions[T]{
 		Capability:       sharedcache.Capability(opts.PolicyKey),
 		CacheKey:         opts.CacheKey,
-		Policy:           opts.Policy,
+		PolicyProvider:   opts.PolicyProvider,
 		Observer:         NewCapabilityObserver(opts.PolicyKey, opts.Observer),
 		Store:            opts.Store,
 		Load:             opts.Load,

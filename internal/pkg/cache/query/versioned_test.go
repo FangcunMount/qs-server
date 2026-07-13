@@ -33,9 +33,10 @@ func TestVersionedQueryCacheObserverUsesInjectedComponent(t *testing.T) {
 		Store:      redisstore.NewStore(client),
 		Version:    NewStaticVersionTokenStore(0),
 		Capability: "assessment_list",
-		Policy:     sharedcache.Policy{TTL: time.Minute},
-		TTL:        time.Minute,
-		Observer:   cacheobserve.NewPrometheus("query_result", "assessment_list", testFamilyObserver{registry: registry}),
+		Policies: sharedcache.NewRegistry(sharedcache.EffectiveCapability{
+			Capability: "assessment_list", Policy: sharedcache.Policy{TTL: time.Minute},
+		}),
+		Observer: cacheobserve.NewPrometheus("query_result", "assessment_list", testFamilyObserver{registry: registry}),
 	})
 	cache.Set(context.Background(), "query:version:assessment:list:42", func(version uint64) string {
 		return "query:assessment:list:42:v0"

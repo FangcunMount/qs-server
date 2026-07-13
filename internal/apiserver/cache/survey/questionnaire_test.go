@@ -10,9 +10,14 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
+
+func questionnairePolicies(policy sharedcache.Policy) sharedcache.PolicyProvider {
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilitySurveyQuestionnaire, Policy: policy})
+}
 
 type questionnaireRepoStub struct {
 	head                   map[string]*domainQuestionnaire.Questionnaire
@@ -202,10 +207,10 @@ func TestCachedQuestionnaireRepositoryDeleteCacheByCodeRemovesAllKeys(t *testing
 	head := newTestQuestionnaire(t, "Q-001", "1.0.2", domainQuestionnaire.RecordRoleHead, false)
 	published := newTestQuestionnaire(t, "Q-001", "1.0.1", domainQuestionnaire.RecordRolePublishedSnapshot, true)
 
-	if err := cachedRepo.setCache(ctx, cachedRepo.headKey("Q-001"), head, cachedRepo.ttl); err != nil {
+	if err := cachedRepo.setCache(ctx, cachedRepo.headKey("Q-001"), head); err != nil {
 		t.Fatalf("set head cache error = %v", err)
 	}
-	if err := cachedRepo.setCache(ctx, cachedRepo.publishedKey("Q-001"), published, cachedRepo.ttl); err != nil {
+	if err := cachedRepo.setCache(ctx, cachedRepo.publishedKey("Q-001"), published); err != nil {
 		t.Fatalf("set published cache error = %v", err)
 	}
 	if err := cachedRepo.client.Set(ctx, cachedRepo.versionKey("Q-001", "9.9.9"), []byte{}, time.Minute).Err(); err != nil {
@@ -267,9 +272,9 @@ func TestCachedQuestionnaireRepositorySupportsExplicitBuilderNamespace(t *testin
 		},
 	}
 
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, keyspace.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo, client, keyspace.NewBuilderWithNamespace("prod:cache:static"), questionnairePolicies(cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
-	}).(*CachedQuestionnaireRepository)
+	})).(*CachedQuestionnaireRepository)
 	if _, err := cachedRepo.FindPublishedByCode(context.Background(), "Q-001"); err != nil {
 		t.Fatalf("FindPublishedByCode() error = %v", err)
 	}
@@ -304,9 +309,9 @@ func newQuestionnaireCacheTestRepoWithNamespace(t *testing.T, namespace string) 
 			"Q-001:1.0.2": head,
 		},
 	}
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, keyspace.NewBuilderWithNamespace(namespace), cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo, client, keyspace.NewBuilderWithNamespace(namespace), questionnairePolicies(cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
-	}).(*CachedQuestionnaireRepository)
+	})).(*CachedQuestionnaireRepository)
 
 	cleanup := func() {
 		_ = client.Close()

@@ -25,6 +25,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
@@ -115,10 +117,55 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, lockMan
 		lockManager:    lockManager,
 		familyStatus:   familyStatus,
 		initialized:    false,
-		cacheSubsystem: collectioncache.NewSubsystem(opts, opsHandle),
+		cacheSubsystem: collectioncache.NewSubsystem(collectionCacheConfig(opts), opsHandle),
 	}
 	c.initConcurrencyGates()
 	return c
+}
+
+func collectionCacheConfig(opts *options.Options) collectioncache.Config {
+	config := collectioncache.Config{Signaling: cachesignal.ConfigFromOptions(nil, "collection-server")}
+	if opts == nil {
+		return config
+	}
+	config.Signaling = cachesignal.ConfigFromOptions(opts.Signaling, "collection-server")
+	if opts.Cache == nil || opts.Cache.Capabilities == nil {
+		return config
+	}
+	capabilities := opts.Cache.Capabilities
+	if capabilities.ReportStatus != nil {
+		config.ReportStatusTTL = time.Duration(capabilities.ReportStatus.TTLSeconds) * time.Second
+	}
+	if capabilities.Catalog == nil {
+		return config
+	}
+	var questionnaireOptions *options.CatalogL1CacheOptions
+	if capabilities.Catalog.Questionnaire != nil {
+		questionnaireOptions = &capabilities.Catalog.Questionnaire.CatalogL1CacheOptions
+	}
+	var typologyOptions *options.CatalogL1CacheOptions
+	if capabilities.Catalog.Typology != nil {
+		typologyOptions = &capabilities.Catalog.Typology.CatalogL1CacheOptions
+	}
+	config.Questionnaire = catalogBinding("catalog.questionnaire", "cache.capabilities.catalog.questionnaire", questionnaireOptions)
+	config.Typology = catalogBinding("catalog.typology", "cache.capabilities.catalog.typology", typologyOptions)
+	return config
+}
+
+func catalogBinding(id, source string, cfg *options.CatalogL1CacheOptions) collectioncache.CatalogBinding {
+	binding := collectioncache.CatalogBinding{Capability: sharedcache.Capability(id), Source: source}
+	if cfg == nil {
+		return binding
+	}
+	binding.Enabled = cfg.Enabled
+	binding.Policy = sharedcache.Policy{
+		TTL: time.Duration(cfg.TTLSeconds) * time.Second, JitterRatio: cfg.TTLJitterRatio,
+		Singleflight: sharedcache.PolicySwitchFromBool(cfg.Singleflight),
+	}
+	binding.MaxEntries = cfg.MaxEntries
+	binding.Singleflight = cfg.Singleflight
+	binding.SignalEvict = cfg.SignalEvictEnabled
+	return binding
 }
 
 func (c *Container) initConcurrencyGates() {

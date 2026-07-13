@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 )
 
 func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *testing.T) {
@@ -32,8 +33,8 @@ func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *te
 		},
 	})
 
-	result, err := coord.HandleManualWarmup(context.Background(), ManualWarmupRequest{
-		Targets: []ManualWarmupTarget{
+	result, err := coord.HandleManualWarmup(context.Background(), cachetarget.ManualWarmupRequest{
+		Targets: []cachetarget.ManualWarmupTarget{
 			{Kind: "static.scale", Scope: "scale:S-001"},
 			{Kind: "query.stats_overview", Scope: "org:2:preset:30d"},
 			{Kind: "query.stats_system", Scope: "org:1"},
@@ -58,7 +59,7 @@ func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *te
 		t.Fatalf("items len = %d, want 3", len(result.Items))
 	}
 	for _, item := range result.Items {
-		if item.Status != ManualWarmupItemStatusOK {
+		if item.Status != cachemodel.ManualWarmupItemStatusOK {
 			t.Fatalf("unexpected item statuses: %+v", result.Items)
 		}
 	}
@@ -177,7 +178,7 @@ func TestCoordinatorHandleRepairCompleteStillUsesStructuredExecutor(t *testing.T
 		},
 	})
 
-	if err := coord.HandleRepairComplete(context.Background(), RepairCompleteRequest{
+	if err := coord.HandleRepairComplete(context.Background(), cachetarget.RepairCompleteRequest{
 		RepairKind:         "statistics_backfill",
 		OrgIDs:             []int64{1},
 		QuestionnaireCodes: []string{"Q-001"},

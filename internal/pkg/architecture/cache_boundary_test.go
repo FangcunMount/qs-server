@@ -25,6 +25,7 @@ func TestSharedCacheKernelDoesNotImportBusinessProcesses(t *testing.T) {
 
 func TestDomainPackagesDoNotImportCache(t *testing.T) {
 	root := repoRoot(t)
+	matched := 0
 	for _, rel := range []string{
 		"internal/apiserver/domain",
 		"internal/collection-server/domain",
@@ -34,11 +35,16 @@ func TestDomainPackagesDoNotImportCache(t *testing.T) {
 			continue
 		}
 		walkGoFiles(t, path, func(file, text string) {
+			matched++
 			if strings.Contains(text, "github.com/FangcunMount/qs-server/internal/pkg/cache") ||
 				strings.Contains(text, "github.com/FangcunMount/qs-server/internal/apiserver/cache") ||
-				strings.Contains(text, "github.com/FangcunMount/qs-server/internal/collection-server/cache") {
+				strings.Contains(text, "github.com/FangcunMount/qs-server/internal/collection-server/cache") ||
+				strings.Contains(text, "github.com/FangcunMount/qs-server/internal/pkg/redisruntime") {
 				t.Fatalf("%s imports cache package", mustRel(t, root, file))
 			}
 		})
+	}
+	if matched == 0 {
+		t.Fatal("domain cache boundary scan matched zero production files")
 	}
 }

@@ -12,7 +12,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -278,7 +277,7 @@ type ServerGRPCBootstrapDeps struct {
 type ServerRuntimeDeps struct {
 	LockBuilder                           *keyspace.Builder
 	LockManager                           locklease.Manager
-	WarmupCoordinator                     cachegov.Coordinator
+	WarmupCoordinator                     statisticsApp.WarmupCoordinator
 	PlanCommandService                    planApp.PlanCommandService
 	StatisticsSyncService                 statisticsApp.StatisticsSyncService
 	BehaviorProjectorService              statisticsApp.BehaviorProjectorService

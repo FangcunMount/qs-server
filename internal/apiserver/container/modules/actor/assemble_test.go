@@ -2,10 +2,10 @@ package actor_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -26,10 +26,10 @@ func TestNewAcceptsRedisConfiguredTesteeCache(t *testing.T) {
 	t.Cleanup(func() { _ = redisClient.Close() })
 
 	module, err := actor.New(actor.Deps{
-		MySQLDB:      &gorm.DB{},
-		RedisClient:  redisClient,
-		CacheBuilder: keyspace.NewBuilderWithNamespace("test"),
-		TesteePolicy: cachepolicy.CachePolicy{TTL: time.Minute},
+		MySQLDB:       &gorm.DB{},
+		RedisClient:   redisClient,
+		CacheBuilder:  keyspace.NewBuilderWithNamespace("test"),
+		CachePolicies: sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityActorTestee}),
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)

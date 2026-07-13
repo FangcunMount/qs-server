@@ -12,7 +12,6 @@ import (
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	actorcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/actor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
@@ -24,6 +23,7 @@ import (
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -58,7 +58,7 @@ type Deps struct {
 	IdentityService     *iam.IdentityService
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder
-	TesteePolicy        cachepolicy.CachePolicy
+	CachePolicies       sharedcache.PolicyProvider
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
 	Observer            *observability.ComponentObserver
@@ -95,7 +95,7 @@ func New(deps Deps) (*Module, error) {
 
 	var testeeRepo testee.Repository
 	if deps.RedisClient != nil {
-		testeeRepo = actorcache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
+		testeeRepo = actorcache.NewCachedTesteeRepositoryWithBuilderProviderAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.CachePolicies, deps.Observer)
 	} else {
 		testeeRepo = baseTesteeRepo
 	}

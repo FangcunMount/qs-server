@@ -21,10 +21,11 @@ func TestPayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 		mr.Close()
 	})
 
-	store := NewPayloadStore(NewStore(client), sharedcache.Policy{Compress: sharedcache.PolicySwitchEnabled}, nil)
+	policy := sharedcache.Policy{Compress: sharedcache.PolicySwitchEnabled}
+	store := NewPayloadStore(NewStore(client), nil)
 	ctx := context.Background()
 	raw := []byte(`{"value":"compressed"}`)
-	if err := store.Set(ctx, "payload:compressed", raw, time.Minute); err != nil {
+	if err := store.Set(ctx, "payload:compressed", raw, time.Minute, policy); err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
 	stored, err := NewStore(client).Get(ctx, "payload:compressed")
@@ -47,15 +48,15 @@ func TestPayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 func TestPayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	t.Parallel()
 
-	nilStore := NewPayloadStore(nil, sharedcache.Policy{}, nil)
+	nilStore := NewPayloadStore(nil, nil)
 	ctx := context.Background()
 	if _, err := nilStore.Get(ctx, "payload:nil"); !errors.Is(err, sharedcache.ErrMiss) {
 		t.Fatalf("nil Get() error = %v, want ErrMiss", err)
 	}
-	if err := nilStore.Set(ctx, "payload:nil", []byte("value"), time.Minute); err != nil {
+	if err := nilStore.Set(ctx, "payload:nil", []byte("value"), time.Minute, sharedcache.Policy{}); err != nil {
 		t.Fatalf("nil Set() error = %v", err)
 	}
-	if err := nilStore.SetNegative(ctx, "payload:nil", time.Minute); err != nil {
+	if err := nilStore.SetNegative(ctx, "payload:nil", time.Minute, sharedcache.Policy{}); err != nil {
 		t.Fatalf("nil SetNegative() error = %v", err)
 	}
 	if err := nilStore.Delete(ctx, "payload:nil"); err != nil {
@@ -66,11 +67,11 @@ func TestPayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	}
 
 	boom := errors.New("redis unavailable")
-	errorStore := NewPayloadStore(errorCache{err: boom}, sharedcache.Policy{}, nil)
+	errorStore := NewPayloadStore(errorCache{err: boom}, nil)
 	if _, err := errorStore.Get(ctx, "payload:error"); !errors.Is(err, boom) {
 		t.Fatalf("error Get() error = %v, want %v", err, boom)
 	}
-	if err := errorStore.Set(ctx, "payload:error", []byte("value"), time.Minute); !errors.Is(err, boom) {
+	if err := errorStore.Set(ctx, "payload:error", []byte("value"), time.Minute, sharedcache.Policy{}); !errors.Is(err, boom) {
 		t.Fatalf("error Set() error = %v, want %v", err, boom)
 	}
 	if err := errorStore.Delete(ctx, "payload:error"); !errors.Is(err, boom) {

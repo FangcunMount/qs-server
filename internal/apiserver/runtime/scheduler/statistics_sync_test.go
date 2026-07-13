@@ -9,7 +9,8 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -97,16 +98,16 @@ func (f *fakeStatisticsWarmupCoordinator) HandleStatisticsSync(_ context.Context
 	return f.errByOrg[orgID]
 }
 
-func (f *fakeStatisticsWarmupCoordinator) HandleRepairComplete(context.Context, cachegov.RepairCompleteRequest) error {
+func (f *fakeStatisticsWarmupCoordinator) HandleRepairComplete(context.Context, cachetarget.RepairCompleteRequest) error {
 	return nil
 }
 
-func (f *fakeStatisticsWarmupCoordinator) HandleManualWarmup(context.Context, cachegov.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (f *fakeStatisticsWarmupCoordinator) HandleManualWarmup(context.Context, cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	return nil, nil
 }
 
-func (f *fakeStatisticsWarmupCoordinator) Snapshot() cachegov.WarmupStatusSnapshot {
-	return cachegov.WarmupStatusSnapshot{}
+func (f *fakeStatisticsWarmupCoordinator) Snapshot() cachemodel.WarmupStatusSnapshot {
+	return cachemodel.WarmupStatusSnapshot{}
 }
 
 func (f *fakeStatisticsWarmupCoordinator) calls() []int64 {

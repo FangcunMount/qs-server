@@ -2,12 +2,11 @@ package statistics
 
 import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -26,7 +25,7 @@ type WireInput struct {
 	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
 	MongoDB                *mongo.Database
 	RepairWindowDays       int
-	QueryPolicy            cachepolicy.CachePolicy
+	CachePolicies          sharedcache.PolicyProvider
 	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
 	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
 	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
@@ -34,8 +33,8 @@ type WireInput struct {
 	LockManager            locklease.Manager
 	Observer               *observability.ComponentObserver
 	MySQLLimiter           backpressure.Acquirer
-	WarmupCoordinator      cachegov.Coordinator
-	StatusService          cachegov.StatusService
+	WarmupCoordinator      statisticsApp.WarmupCoordinator
+	StatusService          statisticsApp.GovernanceStatusReader
 	MetaRedisClient        redis.UniversalClient
 }
 
@@ -56,7 +55,7 @@ func Wire(in WireInput) (*Module, error) {
 		AnswerSheetScanSource:  in.AnswerSheetScanSource,
 		MongoDB:                in.MongoDB,
 		RepairWindowDays:       in.RepairWindowDays,
-		QueryPolicy:            in.QueryPolicy,
+		CachePolicies:          in.CachePolicies,
 		SystemStatisticsOpts:   in.SystemStatisticsOpts,
 		OverviewGuardOpts:      in.OverviewGuardOpts,
 		QuestionnaireGuardOpts: in.QuestionnaireGuardOpts,

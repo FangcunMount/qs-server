@@ -3,8 +3,11 @@ package cache
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 )
 
 func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
@@ -14,7 +17,7 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = true
 	opts.Cache.Capabilities.Catalog.Typology.Singleflight = true
 
-	s := NewSubsystem(opts, nil)
+	s := NewSubsystem(testConfig(opts), nil)
 	if s.Questionnaire() == nil {
 		t.Fatal("questionnaire cache = nil, want configured cache")
 	}
@@ -27,7 +30,7 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	if !s.TypologySingleflight() {
 		t.Fatal("typology singleflight = false, want true")
 	}
-	entries := s.EffectiveRegistry().Snapshot()
+	entries := s.EffectiveRegistry().All()
 	if len(entries) != 3 || entries[0].Capability != "catalog.questionnaire" || entries[1].Capability != "catalog.typology" || entries[2].Kind != "operational_state" {
 		t.Fatalf("effective registry = %#v", entries)
 	}
@@ -38,14 +41,14 @@ func TestSubsystemDisabledCachesStayNil(t *testing.T) {
 	opts.Cache.Capabilities.Catalog.Questionnaire.Enabled = false
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = false
 
-	s := NewSubsystem(opts, nil)
+	s := NewSubsystem(testConfig(opts), nil)
 	if s.Questionnaire() != nil || s.Typology() != nil {
 		t.Fatal("disabled cache was constructed")
 	}
 }
 
 func TestSubsystemStartCloseAreIdempotent(t *testing.T) {
-	s := NewSubsystem(options.NewOptions(), nil)
+	s := NewSubsystem(testConfig(options.NewOptions()), nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -74,10 +77,30 @@ func TestSubsystemStartCloseAreIdempotent(t *testing.T) {
 }
 
 func TestSignalEvictRequiresEnabledCache(t *testing.T) {
-	if signalEvict(&options.CatalogL1CacheOptions{Enabled: false, SignalEvictEnabled: true}) {
+	if (CatalogBinding{Enabled: false, SignalEvict: true}).Enabled {
 		t.Fatal("signal eviction enabled for disabled cache")
 	}
-	if !signalEvict(&options.CatalogL1CacheOptions{Enabled: true, SignalEvictEnabled: true}) {
+	if binding := (CatalogBinding{Enabled: true, SignalEvict: true}); !binding.Enabled || !binding.SignalEvict {
 		t.Fatal("signal eviction disabled for enabled cache")
+	}
+}
+
+func testConfig(opts *options.Options) Config {
+	config := Config{Signaling: cachesignal.ConfigFromOptions(opts.Signaling, "collection-server")}
+	catalog := opts.Cache.Capabilities.Catalog
+	config.Questionnaire = testBinding("catalog.questionnaire", &catalog.Questionnaire.CatalogL1CacheOptions)
+	config.Typology = testBinding("catalog.typology", &catalog.Typology.CatalogL1CacheOptions)
+	config.ReportStatusTTL = time.Duration(opts.Cache.Capabilities.ReportStatus.TTLSeconds) * time.Second
+	return config
+}
+
+func testBinding(id string, cfg *options.CatalogL1CacheOptions) CatalogBinding {
+	return CatalogBinding{
+		Capability: sharedcache.Capability(id), Source: "cache.capabilities." + id,
+		Enabled: cfg.Enabled, Policy: sharedcache.Policy{
+			TTL: time.Duration(cfg.TTLSeconds) * time.Second, JitterRatio: cfg.TTLJitterRatio,
+			Singleflight: sharedcache.PolicySwitchFromBool(cfg.Singleflight),
+		},
+		MaxEntries: cfg.MaxEntries, Singleflight: cfg.Singleflight, SignalEvict: cfg.SignalEvictEnabled,
 	}
 }

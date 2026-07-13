@@ -267,19 +267,20 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
-	binding := c.CacheCapability(cachepolicy.CapabilitySurveyQuestionnaire)
+	provider := c.CachePolicyProvider()
+	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilitySurveyQuestionnaire)
 	staticRedis := c.CacheClient(redisruntime.FamilyStatic)
 	if !binding.Enabled {
 		staticRedis = nil
 	}
 	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
-		MongoDB:             c.mongoDB,
-		EventCatalog:        c.eventCatalog,
-		MongoLimiter:        c.backpressure.Mongo,
-		StaticRedis:         staticRedis,
-		StaticBuilder:       c.CacheBuilder(redisruntime.FamilyStatic),
-		QuestionnairePolicy: binding.Policy,
-		Observer:            c.cacheObserver(),
+		MongoDB:       c.mongoDB,
+		EventCatalog:  c.eventCatalog,
+		MongoLimiter:  c.backpressure.Mongo,
+		StaticRedis:   staticRedis,
+		StaticBuilder: c.CacheBuilder(redisruntime.FamilyStatic),
+		CachePolicies: provider,
+		Observer:      c.cacheObserver(),
 	})
 	if err != nil {
 		return nil, err

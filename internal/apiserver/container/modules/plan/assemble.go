@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	plancache "github.com/FangcunMount/qs-server/internal/apiserver/cache/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
@@ -19,6 +18,7 @@ import (
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -45,7 +45,7 @@ type Deps struct {
 	PublishedModels modelcatalogport.PublishedModelLister
 	RedisClient     redis.UniversalClient
 	CacheBuilder    *keyspace.Builder
-	PlanPolicy      cachepolicy.CachePolicy
+	CachePolicies   sharedcache.PolicyProvider
 	EntryBaseURL    string
 	Observer        *observability.ComponentObserver
 	MySQLLimiter    backpressure.Acquirer
@@ -68,7 +68,7 @@ func New(deps Deps) (*Module, error) {
 
 	planRepo := basePlanRepo
 	if normalized.RedisClient != nil {
-		planRepo = plancache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
+		planRepo = plancache.NewCachedPlanRepositoryWithBuilderProviderAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.CachePolicies, normalized.Observer)
 	}
 
 	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)

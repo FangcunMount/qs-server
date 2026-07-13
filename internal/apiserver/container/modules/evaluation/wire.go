@@ -7,7 +7,6 @@ import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
@@ -17,6 +16,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -36,8 +36,7 @@ type WireInput struct {
 	QueryRedisClient          redis.UniversalClient
 	QueryCacheBuilder         *keyspace.Builder
 	MetaRedisClient           redis.UniversalClient
-	AssessmentPolicy          cachepolicy.CachePolicy
-	AssessmentListPolicy      cachepolicy.CachePolicy
+	CachePolicies             sharedcache.PolicyProvider
 	Observer                  *observability.ComponentObserver
 	MySQLLimiter              backpressure.Acquirer
 	MongoLimiter              backpressure.Acquirer
@@ -100,10 +99,9 @@ func Wire(in WireInput) (WireResult, error) {
 		EventPublisher:            in.EventPublisher,
 		RedisClient:               in.RedisClient,
 		CacheBuilder:              in.CacheBuilder,
-		AssessmentPolicy:          in.AssessmentPolicy,
+		CachePolicies:             in.CachePolicies,
 		QueryRedisClient:          in.QueryRedisClient,
 		QueryCacheBuilder:         in.QueryCacheBuilder,
-		AssessmentListPolicy:      in.AssessmentListPolicy,
 		VersionStore:              versionStore,
 		Observer:                  in.Observer,
 		MySQLLimiter:              in.MySQLLimiter,

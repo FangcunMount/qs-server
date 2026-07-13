@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/pkg/app"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -41,6 +42,20 @@ type Options struct {
 	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	rawSettingsSource              app.RawSettingsSource
+}
+
+func (o *Options) SetRawSettingsSource(source app.RawSettingsSource) {
+	if o != nil {
+		o.rawSettingsSource = source
+	}
+}
+
+func (o *Options) RawSettingsSource() app.RawSettingsSource {
+	if o == nil {
+		return nil
+	}
+	return o.rawSettingsSource
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数

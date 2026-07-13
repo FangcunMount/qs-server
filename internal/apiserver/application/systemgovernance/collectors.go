@@ -6,7 +6,8 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -47,7 +48,7 @@ type cacheGovernanceCollector struct {
 }
 
 func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluationContext, includeHotsets bool) (*CacheView, error) {
-	var snapshot *cachegov.StatusSnapshot
+	var snapshot *cachemodel.StatusSnapshot
 	var err error
 	if c.governance != nil {
 		snapshot, err = c.governance.GetStatus(ctx)
@@ -75,10 +76,10 @@ func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 	}, nil
 }
 
-func (c cacheGovernanceCollector) collectComponents(ctx context.Context, snapshot *cachegov.StatusSnapshot) map[string]ComponentCache {
+func (c cacheGovernanceCollector) collectComponents(ctx context.Context, snapshot *cachemodel.StatusSnapshot) map[string]ComponentCache {
 	components := map[string]ComponentCache{}
 	if snapshot != nil {
-		runtimeSnapshot := snapshot.RuntimeSnapshot
+		runtimeSnapshot := projectRedisRuntimeSnapshot(snapshot.RuntimeSnapshot)
 		name := nonEmpty(runtimeSnapshot.Component, "apiserver")
 		components[name] = ComponentCache{Available: true, Snapshot: &runtimeSnapshot}
 	}
@@ -103,7 +104,7 @@ func (c cacheGovernanceCollector) collectHotsets(ctx context.Context) []CacheHot
 	return hotsets
 }
 
-func latestWarmupRun(snapshot *cachegov.StatusSnapshot) *observabilityWarmupLatestRun {
+func latestWarmupRun(snapshot *cachemodel.StatusSnapshot) *observabilityWarmupLatestRun {
 	if snapshot == nil || len(snapshot.Warmup.LatestRuns) == 0 {
 		return nil
 	}
@@ -113,6 +114,30 @@ func latestWarmupRun(snapshot *cachegov.StatusSnapshot) *observabilityWarmupLate
 		ErrorCount:  latest.ErrorCount,
 		TargetCount: latest.TargetCount,
 	}
+}
+
+func projectRedisRuntimeSnapshot(in cachemodel.RuntimeSnapshot) observability.RuntimeSnapshot {
+	out := observability.RuntimeSnapshot{
+		GeneratedAt: in.GeneratedAt,
+		Component:   in.Component,
+		Summary: observability.RuntimeSummary{
+			FamilyTotal: in.Summary.FamilyTotal, AvailableCount: in.Summary.AvailableCount,
+			DegradedCount: in.Summary.DegradedCount, UnavailableCount: in.Summary.UnavailableCount,
+			Ready: in.Summary.Ready,
+		},
+		Families: make([]observability.FamilyStatus, 0, len(in.Families)),
+	}
+	for _, family := range in.Families {
+		out.Families = append(out.Families, observability.FamilyStatus{
+			Component: family.Component, Family: family.Family, Profile: family.Profile,
+			Namespace: family.Namespace, AllowWarmup: family.AllowWarmup,
+			Configured: family.Configured, Available: family.Available, Degraded: family.Degraded,
+			Mode: family.Mode, LastError: family.LastError, LastSuccessAt: family.LastSuccessAt,
+			LastFailureAt: family.LastFailureAt, ConsecutiveFailures: family.ConsecutiveFailures,
+			UpdatedAt: family.UpdatedAt,
+		})
+	}
+	return out
 }
 
 type resilienceGovernanceCollector struct {

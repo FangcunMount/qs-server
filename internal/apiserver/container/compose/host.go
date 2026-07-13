@@ -3,8 +3,6 @@ package compose
 import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -48,12 +46,12 @@ type Host interface {
 	CacheClient(family redisruntime.Family) redis.UniversalClient
 	CacheBuilder(family redisruntime.Family) *keyspace.Builder
 	CacheHandle(family redisruntime.Family) *redisruntime.Handle
-	CacheCapability(key sharedcache.Capability) cachepolicy.Binding
+	CachePolicyProvider() sharedcache.PolicyProvider
 	CacheObserver() *observability.ComponentObserver
 	HotsetRecorder() cachetarget.HotsetRecorder
 	CacheLockManager() locklease.Manager
-	WarmupCoordinator() cachegov.Coordinator
-	CacheGovernanceStatusService() cachegov.StatusService
+	WarmupCoordinator() statisticsApp.WarmupCoordinator
+	CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader
 	CacheSignalNotifier() *cachesignal.Notifier
 
 	IdentityService() *iam.IdentityService

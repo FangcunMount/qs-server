@@ -19,7 +19,6 @@ import (
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -34,6 +33,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -66,10 +66,9 @@ type Deps struct {
 	EventPublisher            event.EventPublisher
 	RedisClient               redis.UniversalClient
 	CacheBuilder              *keyspace.Builder
-	AssessmentPolicy          cachepolicy.CachePolicy
+	CachePolicies             sharedcache.PolicyProvider
 	QueryRedisClient          redis.UniversalClient
 	QueryCacheBuilder         *keyspace.Builder
-	AssessmentListPolicy      cachepolicy.CachePolicy
 	VersionStore              querycache.VersionTokenStore
 	Observer                  *observability.ComponentObserver
 	MySQLLimiter              backpressure.Acquirer
@@ -120,7 +119,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(normalized.MySQLDB, mysqlOptions)
 	if normalized.RedisClient != nil {
-		infra.assessmentRepo = evaluationcache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
+		infra.assessmentRepo = evaluationcache.NewCachedAssessmentRepositoryWithBuilderProviderAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.CachePolicies, normalized.Observer)
 	} else {
 		infra.assessmentRepo = baseAssessmentRepo
 	}
@@ -189,11 +188,11 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := evaluationcache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
+		listCache := evaluationcache.NewMyAssessmentListCacheWithBuilderProviderAndObserver(
 			redisstore.NewStore(normalized.QueryRedisClient),
 			normalized.VersionStore,
 			normalized.QueryCacheBuilder,
-			normalized.AssessmentListPolicy,
+			normalized.CachePolicies,
 			normalized.Observer,
 		)
 		m.IntakeService = evaluationintake.NewService(

@@ -13,7 +13,6 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用
@@ -26,7 +25,7 @@ type InternalService struct {
 	operatorQueryService       operatorApp.OperatorQueryService
 	operatorRoleSyncer         operatorBootstrapRoleSyncer
 	behaviorProjectorService   statisticsApp.BehaviorProjectorService
-	warmupCoordinator          cachegov.Coordinator
+	warmupCoordinator          statisticsApp.WarmupCoordinator
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -50,7 +49,7 @@ func NewInternalService(
 	operatorQueryService operatorApp.OperatorQueryService,
 	operatorRoleSyncer operatorBootstrapRoleSyncer,
 	behaviorProjectorService statisticsApp.BehaviorProjectorService,
-	warmupCoordinator cachegov.Coordinator,
+	warmupCoordinator statisticsApp.WarmupCoordinator,
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {

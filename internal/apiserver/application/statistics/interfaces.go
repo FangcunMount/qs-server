@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
@@ -58,9 +57,27 @@ type PeriodicStatsService interface {
 type GovernanceFacade interface {
 	TriggerStatisticsWarmup(ctx context.Context, orgID int64, action string)
 	HandleRepairComplete(ctx context.Context, protectedOrgID int64, req RepairCompleteRequest) error
-	HandleManualWarmup(ctx context.Context, protectedOrgID int64, req ManualWarmupRequest) (*cachegov.ManualWarmupResult, error)
-	GetStatus(ctx context.Context) (*cachegov.StatusSnapshot, error)
+	HandleManualWarmup(ctx context.Context, protectedOrgID int64, req ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error)
+	GetStatus(ctx context.Context) (*cachemodel.StatusSnapshot, error)
 	GetHotset(ctx context.Context, kindRaw, limitRaw string) (*GovernanceHotsetResponse, error)
+}
+
+// WarmupCoordinator is the application-owned port consumed by statistics.
+type WarmupCoordinator interface {
+	WarmStartup(context.Context) error
+	HandleScalePublished(context.Context, string) error
+	HandleQuestionnairePublished(context.Context, string, string) error
+	HandleTypologyModelPublished(context.Context, string) error
+	HandleStatisticsSync(context.Context, int64) error
+	HandleRepairComplete(context.Context, cachetarget.RepairCompleteRequest) error
+	HandleManualWarmup(context.Context, cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error)
+}
+
+// GovernanceStatusReader is the application-owned cache status port.
+type GovernanceStatusReader interface {
+	GetRuntime(context.Context) (*cachemodel.RuntimeSnapshot, error)
+	GetStatus(context.Context) (*cachemodel.StatusSnapshot, error)
+	GetHotset(context.Context, cachetarget.WarmupKind, int64) (*cachetarget.HotsetSnapshot, error)
 }
 
 // RepairCompleteRequest 描述 repair complete 治理请求。
@@ -72,7 +89,7 @@ type RepairCompleteRequest struct {
 }
 
 // ManualWarmupRequest 描述手工治理预热请求。
-type ManualWarmupRequest = cachegov.ManualWarmupRequest
+type ManualWarmupRequest = cachetarget.ManualWarmupRequest
 
 // GovernanceHotsetResponse 描述治理热集响应。
 type GovernanceHotsetResponse struct {

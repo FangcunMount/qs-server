@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 )
 
 func (c *StatisticsCache) LoadSystemStatistics(ctx context.Context, orgID int64) (*domainStatistics.SystemStatistics, bool) {
@@ -101,8 +103,9 @@ func (c *StatisticsCache) LoadSystemStatisticsCoalesced(
 		return stats, nil
 	}
 
-	if c.policy.SingleflightEnabled(false) {
-		value, err, _ := c.sfGroup.Do(systemStatsCacheKey(orgID), load)
+	policy := c.currentPolicy()
+	if policy.SingleflightEnabled(false) {
+		value, err := c.coalescer.Do(ctx, string(cachepolicy.CapabilityStatisticsQuery)+":"+systemStatsCacheKey(orgID), load)
 		if err != nil {
 			return nil, err
 		}
@@ -143,9 +146,17 @@ func (c *StatisticsCache) storeJSON(ctx context.Context, cacheKey, label string,
 		logger.L(ctx).Warnw("序列化统计查询缓存失败", "cache_key", cacheKey, "label", label, "error", err)
 		return
 	}
-	if err := c.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
+	if err := c.SetQueryCache(ctx, cacheKey, string(data)); err != nil {
 		logger.L(ctx).Warnw("写入统计查询缓存失败", "cache_key", cacheKey, "label", label, "error", err)
 	}
+}
+
+func (c *StatisticsCache) currentPolicy() sharedcache.Policy {
+	if c == nil || c.policies == nil {
+		return sharedcache.Policy{}
+	}
+	effective, _ := c.policies.Resolve(cachepolicy.CapabilityStatisticsQuery)
+	return effective.Policy
 }
 
 func systemStatsCacheKey(orgID int64) string {

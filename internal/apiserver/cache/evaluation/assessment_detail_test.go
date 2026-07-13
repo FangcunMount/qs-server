@@ -5,12 +5,13 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
 
 func TestCachedAssessmentRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedAssessmentRepositoryWithBuilderAndPolicy(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), cachepolicy.CachePolicy{})
+	repo := NewCachedAssessmentRepositoryWithBuilderAndProvider(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityEvaluationAssessmentDetail}))
 	cached, ok := repo.(*CachedAssessmentRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)

@@ -20,7 +20,8 @@ func InstallFrom(host InstallHost) error {
 	if err != nil {
 		return err
 	}
-	binding := host.CacheCapability(cachepolicy.CapabilityModelCatalogPublished)
+	provider := host.CachePolicyProvider()
+	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityModelCatalogPublished)
 	staticRedis := host.CacheClient(redisruntime.FamilyStatic)
 	if !binding.Enabled {
 		staticRedis = nil
@@ -37,7 +38,7 @@ func InstallFrom(host InstallHost) error {
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
 		StaticRedisClient:      staticRedis,
 		StaticCacheBuilder:     host.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy:   binding.Policy,
+		CachePolicies:          provider,
 		CacheObserver:          host.CacheObserver(),
 	})
 	if err != nil {

@@ -7,11 +7,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -27,7 +26,7 @@ type BootstrapInput struct {
 	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
 	MongoDB                *mongo.Database
 	RepairWindowDays       int
-	QueryPolicy            cachepolicy.CachePolicy
+	CachePolicies          sharedcache.PolicyProvider
 	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
 	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
 	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
@@ -36,8 +35,8 @@ type BootstrapInput struct {
 	VersionStore           querycache.VersionTokenStore
 	Observer               *observability.ComponentObserver
 	MySQLLimiter           backpressure.Acquirer
-	WarmupCoordinator      cachegov.Coordinator
-	StatusService          cachegov.StatusService
+	WarmupCoordinator      statisticsApp.WarmupCoordinator
+	StatusService          statisticsApp.GovernanceStatusReader
 }
 
 // Bootstrap assembles the statistics module from container integration inputs.

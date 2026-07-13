@@ -1,8 +1,25 @@
 package app
 
 import (
+	"context"
+
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 )
+
+type RawSettings struct {
+	Values map[string]any
+	Source string
+}
+
+// RawSettingsSource re-reads the startup configuration without mutating the
+// process-global Viper instance or the already-decoded Options value.
+type RawSettingsSource interface {
+	Read(context.Context) (RawSettings, error)
+}
+
+type RawSettingsSourceAware interface {
+	SetRawSettingsSource(RawSettingsSource)
+}
 
 // CliOptions 命令行选项
 type CliOptions interface {

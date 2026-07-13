@@ -13,10 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
-	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -26,7 +24,7 @@ const warmupTimeout = 30 * time.Second
 // Subsystem owns collection-server catalog L1 caches, signal watchers, and
 // startup warmup. Construction is side-effect free; Start owns all goroutines.
 type Subsystem struct {
-	opts      *options.Options
+	config    Config
 	opsHandle *redisruntime.Handle
 
 	questionnaire questionnaire.PublishedDetailCache
@@ -39,23 +37,40 @@ type Subsystem struct {
 	cancel  context.CancelFunc
 }
 
-func NewSubsystem(opts *options.Options, opsHandle *redisruntime.Handle) *Subsystem {
-	s := &Subsystem{opts: opts, opsHandle: opsHandle}
-	if cfg := questionnaireConfig(opts); enabled(cfg) {
-		base := catalogcache.LocalTTLCacheOptions("questionnaire", time.Duration(cfg.TTLSeconds)*time.Second, cfg.MaxEntries, cfg.TTLJitterRatio)
+type CatalogBinding struct {
+	Capability   sharedcache.Capability
+	Source       string
+	Enabled      bool
+	Policy       sharedcache.Policy
+	MaxEntries   int
+	Singleflight bool
+	SignalEvict  bool
+}
+
+type Config struct {
+	Questionnaire   CatalogBinding
+	Typology        CatalogBinding
+	ReportStatusTTL time.Duration
+	Signaling       cachesignal.Config
+}
+
+func NewSubsystem(config Config, opsHandle *redisruntime.Handle) *Subsystem {
+	s := &Subsystem{config: config, opsHandle: opsHandle}
+	if cfg := config.Questionnaire; cfg.Enabled {
+		base := catalogcache.LocalTTLCacheOptions("questionnaire", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio)
 		s.questionnaire = questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
 			TTL: base.TTL, MaxEntries: base.MaxEntries, TTLJitterRatio: base.TTLJitterRatio,
 			OnHit: base.OnHit, OnMiss: base.OnMiss,
 		})
 	}
-	if cfg := typologyConfig(opts); enabled(cfg) {
-		base := catalogcache.LocalTTLCacheOptions("typology", time.Duration(cfg.TTLSeconds)*time.Second, cfg.MaxEntries, cfg.TTLJitterRatio)
+	if cfg := config.Typology; cfg.Enabled {
+		base := catalogcache.LocalTTLCacheOptions("typology", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio)
 		s.typology = typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{
 			TTL: base.TTL, MaxEntries: base.MaxEntries, TTLJitterRatio: base.TTLJitterRatio,
 			OnHit: base.OnHit, OnMiss: base.OnMiss,
 		})
 	}
-	s.effective = buildEffectiveRegistry(opts)
+	s.effective = buildEffectiveRegistry(config)
 	return s
 }
 
@@ -74,11 +89,11 @@ func (s *Subsystem) Typology() typologymodel.CatalogCache {
 }
 
 func (s *Subsystem) QuestionnaireSingleflight() bool {
-	return s != nil && singleflight(questionnaireConfig(s.opts))
+	return s != nil && s.config.Questionnaire.Singleflight
 }
 
 func (s *Subsystem) TypologySingleflight() bool {
-	return s != nil && singleflight(typologyConfig(s.opts))
+	return s != nil && s.config.Typology.Singleflight
 }
 
 func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
@@ -141,8 +156,8 @@ func (s *Subsystem) Close() error {
 }
 
 func (s *Subsystem) startQuestionnaireWatcher(ctx context.Context) {
-	cfg := questionnaireConfig(s.opts)
-	if s.questionnaire == nil || !signalEvict(cfg) {
+	cfg := s.config.Questionnaire
+	if s.questionnaire == nil || !cfg.Enabled || !cfg.SignalEvict {
 		return
 	}
 	client, signaling, ok := s.signaling("questionnaire cache signal watcher")
@@ -168,8 +183,8 @@ func (s *Subsystem) startQuestionnaireWatcher(ctx context.Context) {
 }
 
 func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
-	cfg := typologyConfig(s.opts)
-	if s.typology == nil || !signalEvict(cfg) {
+	cfg := s.config.Typology
+	if s.typology == nil || !cfg.Enabled || !cfg.SignalEvict {
 		return
 	}
 	client, signaling, ok := s.signaling("typology model cache signal watcher")
@@ -189,11 +204,7 @@ func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
 }
 
 func (s *Subsystem) signaling(label string) (*redis.Client, cachesignal.SignalingOptions, bool) {
-	var sigOpts *genericoptions.SignalingOptions
-	if s.opts != nil {
-		sigOpts = s.opts.Signaling
-	}
-	cfg := cachesignal.ConfigFromOptions(sigOpts, "collection-server")
+	cfg := s.config.Signaling
 	if !cfg.Signaling.Enabled || s.opsHandle == nil || s.opsHandle.Client == nil {
 		return nil, cachesignal.SignalingOptions{}, false
 	}
@@ -217,55 +228,23 @@ func warmCatalog(ctx context.Context, service *typologymodel.QueryService) {
 	log.Info("catalog L1 warmup finished")
 }
 
-func questionnaireConfig(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.Cache == nil || opts.Cache.Capabilities == nil || opts.Cache.Capabilities.Catalog == nil || opts.Cache.Capabilities.Catalog.Questionnaire == nil {
-		return nil
-	}
-	return &opts.Cache.Capabilities.Catalog.Questionnaire.CatalogL1CacheOptions
-}
-
-func typologyConfig(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.Cache == nil || opts.Cache.Capabilities == nil || opts.Cache.Capabilities.Catalog == nil || opts.Cache.Capabilities.Catalog.Typology == nil {
-		return nil
-	}
-	return &opts.Cache.Capabilities.Catalog.Typology.CatalogL1CacheOptions
-}
-
-func enabled(cfg *options.CatalogL1CacheOptions) bool      { return cfg != nil && cfg.Enabled }
-func singleflight(cfg *options.CatalogL1CacheOptions) bool { return cfg != nil && cfg.Singleflight }
-func signalEvict(cfg *options.CatalogL1CacheOptions) bool {
-	return enabled(cfg) && cfg.SignalEvictEnabled
-}
-
-func buildEffectiveRegistry(opts *options.Options) *sharedcache.Registry {
-	type configured struct {
-		id, source string
-		cfg        *options.CatalogL1CacheOptions
-	}
-	configuredCapabilities := []configured{
-		{"catalog.questionnaire", "cache.capabilities.catalog.questionnaire", questionnaireConfig(opts)},
-		{"catalog.typology", "cache.capabilities.catalog.typology", typologyConfig(opts)},
-	}
-	entries := make([]sharedcache.EffectiveCapability, 0, len(configuredCapabilities))
+func buildEffectiveRegistry(config Config) *sharedcache.Registry {
+	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.Typology}
+	entries := make([]sharedcache.EffectiveCapability, 0, len(configuredCapabilities)+1)
 	for _, item := range configuredCapabilities {
-		policy := sharedcache.Policy{}
-		if item.cfg != nil {
-			policy.TTL = time.Duration(item.cfg.TTLSeconds) * time.Second
-			policy.JitterRatio = item.cfg.TTLJitterRatio
-			policy.Singleflight = sharedcache.PolicySwitchFromBool(item.cfg.Singleflight)
-		}
 		entries = append(entries, sharedcache.EffectiveCapability{
-			Capability: sharedcache.Capability(item.id), Owner: "collection", Kind: sharedcache.KindCache,
-			Layer: sharedcache.LayerL1, Family: "local", Enabled: enabled(item.cfg), Policy: policy,
-			Source: item.source, Version: "v2", MetricLabel: item.id,
+			Capability: item.Capability, Owner: "collection", Kind: sharedcache.KindCache,
+			Layer: sharedcache.LayerL1, Family: "local", Enabled: item.Enabled, Policy: item.Policy,
+			Layers: sharedcache.PolicyLayers{Override: item.Policy},
+			Source: item.Source, CatalogVersion: "v2", MetricLabel: string(item.Capability),
 		})
 	}
-	if opts != nil && opts.Cache != nil && opts.Cache.Capabilities != nil && opts.Cache.Capabilities.ReportStatus != nil {
+	if config.ReportStatusTTL > 0 {
 		entries = append(entries, sharedcache.EffectiveCapability{
 			Capability: "report_status", Owner: "interpretation", Kind: sharedcache.KindOperationalState,
 			Layer: sharedcache.LayerRuntime, Family: "ops_runtime", Enabled: true,
-			Policy: sharedcache.Policy{TTL: time.Duration(opts.Cache.Capabilities.ReportStatus.TTLSeconds) * time.Second},
-			Source: "cache.capabilities.report_status", Version: "v2", MetricLabel: "report_status",
+			Policy: sharedcache.Policy{TTL: config.ReportStatusTTL},
+			Source: "cache.capabilities.report_status", CatalogVersion: "v2", MetricLabel: "report_status",
 		})
 	}
 	return sharedcache.NewRegistry(entries...)

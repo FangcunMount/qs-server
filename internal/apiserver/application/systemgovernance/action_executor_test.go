@@ -6,7 +6,7 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 )
 
 func TestActionExecutorRequiresConfirmForManualWarmup(t *testing.T) {
@@ -64,22 +64,22 @@ func (f *fakeStatisticsGovernance) HandleRepairComplete(_ context.Context, orgID
 	return nil
 }
 
-func (f *fakeStatisticsGovernance) HandleManualWarmup(_ context.Context, orgID int64, req statisticsApp.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (f *fakeStatisticsGovernance) HandleManualWarmup(_ context.Context, orgID int64, req statisticsApp.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	f.manualOrgID = orgID
 	f.manualReq = req
 	now := time.Now()
-	return &cachegov.ManualWarmupResult{
+	return &cachemodel.ManualWarmupResult{
 		Trigger:    "manual",
 		StartedAt:  now,
 		FinishedAt: now,
-		Summary: cachegov.ManualWarmupSummary{
+		Summary: cachemodel.ManualWarmupSummary{
 			TargetCount: len(req.Targets),
 			Result:      "ok",
 		},
 	}, nil
 }
 
-func (f *fakeStatisticsGovernance) GetStatus(context.Context) (*cachegov.StatusSnapshot, error) {
+func (f *fakeStatisticsGovernance) GetStatus(context.Context) (*cachemodel.StatusSnapshot, error) {
 	return nil, nil
 }
 

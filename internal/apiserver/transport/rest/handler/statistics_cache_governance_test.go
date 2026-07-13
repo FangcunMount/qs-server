@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
 type fakeManualWarmupCoordinator struct {
-	lastRequest cachegov.ManualWarmupRequest
-	result      *cachegov.ManualWarmupResult
+	lastRequest cachetarget.ManualWarmupRequest
+	result      *cachemodel.ManualWarmupResult
 	err         error
 }
 
@@ -35,11 +35,11 @@ func (f *fakeManualWarmupCoordinator) HandleQuestionnairePublished(context.Conte
 
 func (f *fakeManualWarmupCoordinator) HandleStatisticsSync(context.Context, int64) error { return nil }
 
-func (f *fakeManualWarmupCoordinator) HandleRepairComplete(context.Context, cachegov.RepairCompleteRequest) error {
+func (f *fakeManualWarmupCoordinator) HandleRepairComplete(context.Context, cachetarget.RepairCompleteRequest) error {
 	return nil
 }
 
-func (f *fakeManualWarmupCoordinator) HandleManualWarmup(_ context.Context, req cachegov.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+func (f *fakeManualWarmupCoordinator) HandleManualWarmup(_ context.Context, req cachetarget.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	f.lastRequest = req
 	if f.err != nil {
 		return nil, f.err
@@ -47,28 +47,28 @@ func (f *fakeManualWarmupCoordinator) HandleManualWarmup(_ context.Context, req 
 	if f.result != nil {
 		return f.result, nil
 	}
-	return &cachegov.ManualWarmupResult{
+	return &cachemodel.ManualWarmupResult{
 		Trigger:    "manual",
 		StartedAt:  time.Unix(1, 0),
 		FinishedAt: time.Unix(2, 0),
-		Summary: cachegov.ManualWarmupSummary{
+		Summary: cachemodel.ManualWarmupSummary{
 			TargetCount: 1,
 			OkCount:     1,
 			Result:      "ok",
 		},
-		Items: []cachegov.ManualWarmupItemResult{
+		Items: []cachemodel.ManualWarmupItemResult{
 			{
 				Family: string(cachetarget.NewStaticScaleWarmupTarget("S-001").Family),
-				Kind:   cachetarget.WarmupKindStaticScale,
+				Kind:   string(cachetarget.WarmupKindStaticScale),
 				Scope:  cachetarget.NewStaticScaleWarmupTarget("S-001").Scope,
-				Status: cachegov.ManualWarmupItemStatusOK,
+				Status: cachemodel.ManualWarmupItemStatusOK,
 			},
 		},
 	}, nil
 }
 
-func (f *fakeManualWarmupCoordinator) Snapshot() cachegov.WarmupStatusSnapshot {
-	return cachegov.WarmupStatusSnapshot{}
+func (f *fakeManualWarmupCoordinator) Snapshot() cachemodel.WarmupStatusSnapshot {
+	return cachemodel.WarmupStatusSnapshot{}
 }
 
 func TestCacheGovernanceStatusReturnsNormalizedEmptySnapshotWhenServiceUnavailable(t *testing.T) {
@@ -140,19 +140,19 @@ func TestWarmupTargetsReturnsManualWarmupResult(t *testing.T) {
 	c.Set(middleware.OrgIDKey, uint64(1))
 
 	coord := &fakeManualWarmupCoordinator{
-		result: &cachegov.ManualWarmupResult{
+		result: &cachemodel.ManualWarmupResult{
 			Trigger:    "manual",
 			StartedAt:  time.Unix(10, 0),
 			FinishedAt: time.Unix(12, 0),
-			Summary: cachegov.ManualWarmupSummary{
+			Summary: cachemodel.ManualWarmupSummary{
 				TargetCount:  2,
 				OkCount:      1,
 				SkippedCount: 1,
 				Result:       "partial",
 			},
-			Items: []cachegov.ManualWarmupItemResult{
-				{Family: "static_meta", Kind: "static.scale", Scope: "scale:s-001", Status: cachegov.ManualWarmupItemStatusOK},
-				{Family: "query_result", Kind: "query.stats_system", Scope: "org:1", Status: cachegov.ManualWarmupItemStatusSkipped, Message: "该缓存族未开启预热"},
+			Items: []cachemodel.ManualWarmupItemResult{
+				{Family: "static_meta", Kind: "static.scale", Scope: "scale:s-001", Status: cachemodel.ManualWarmupItemStatusOK},
+				{Family: "query_result", Kind: "query.stats_system", Scope: "org:1", Status: cachemodel.ManualWarmupItemStatusSkipped, Message: "该缓存族未开启预热"},
 			},
 		},
 	}
@@ -164,8 +164,8 @@ func TestWarmupTargetsReturnsManualWarmupResult(t *testing.T) {
 	}
 
 	var payload struct {
-		Code int                         `json:"code"`
-		Data cachegov.ManualWarmupResult `json:"data"`
+		Code int                           `json:"code"`
+		Data cachemodel.ManualWarmupResult `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)

@@ -10,12 +10,11 @@ import (
 // PayloadStore owns compression, TTL jitter and negative-sentinel bytes.
 type PayloadStore struct {
 	store    sharedcache.Store
-	policy   sharedcache.Policy
 	observer sharedcache.Observer
 }
 
-func NewPayloadStore(store sharedcache.Store, policy sharedcache.Policy, observer sharedcache.Observer) *PayloadStore {
-	return &PayloadStore{store: store, policy: policy, observer: observer}
+func NewPayloadStore(store sharedcache.Store, observer sharedcache.Observer) *PayloadStore {
+	return &PayloadStore{store: store, observer: observer}
 }
 
 func (s *PayloadStore) Get(ctx context.Context, key string) ([]byte, error) {
@@ -29,27 +28,27 @@ func (s *PayloadStore) Get(ctx context.Context, key string) ([]byte, error) {
 	if len(payload) == 0 {
 		return nil, nil
 	}
-	raw := s.policy.DecompressValue(payload)
+	raw := sharedcache.DecompressData(payload)
 	sharedcache.Observe(s.observer, sharedcache.Event{Operation: sharedcache.OperationPayloadRaw, Size: len(raw)})
 	sharedcache.Observe(s.observer, sharedcache.Event{Operation: sharedcache.OperationPayloadSet, Size: len(payload)})
 	return raw, nil
 }
 
-func (s *PayloadStore) Set(ctx context.Context, key string, raw []byte, ttl time.Duration) error {
+func (s *PayloadStore) Set(ctx context.Context, key string, raw []byte, ttl time.Duration, policy sharedcache.Policy) error {
 	if s == nil || s.store == nil {
 		return nil
 	}
-	payload := s.policy.CompressValue(raw)
+	payload := policy.CompressValue(raw)
 	sharedcache.Observe(s.observer, sharedcache.Event{Operation: sharedcache.OperationPayloadRaw, Size: len(raw)})
 	sharedcache.Observe(s.observer, sharedcache.Event{Operation: sharedcache.OperationPayloadSet, Size: len(payload)})
-	return s.store.Set(ctx, key, payload, s.policy.JitterTTL(ttl))
+	return s.store.Set(ctx, key, payload, policy.JitterTTL(ttl))
 }
 
-func (s *PayloadStore) SetNegative(ctx context.Context, key string, ttl time.Duration) error {
+func (s *PayloadStore) SetNegative(ctx context.Context, key string, ttl time.Duration, policy sharedcache.Policy) error {
 	if s == nil || s.store == nil {
 		return nil
 	}
-	return s.store.Set(ctx, key, []byte{}, s.policy.JitterTTL(ttl))
+	return s.store.Set(ctx, key, []byte{}, policy.JitterTTL(ttl))
 }
 
 func (s *PayloadStore) Delete(ctx context.Context, key string) error {

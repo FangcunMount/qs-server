@@ -7,10 +7,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
+
+func publishedModelPolicies(policy sharedcache.Policy) sharedcache.PolicyProvider {
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityModelCatalogPublished, Policy: policy})
+}
 
 type publishedModelStoreStub struct {
 	findByQuestionnaireCalls int
@@ -78,7 +83,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 		inner,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{},
+		publishedModelPolicies(cachepolicy.CachePolicy{}),
 		nil,
 	)
 
@@ -125,7 +130,7 @@ func TestCachedPublishedModelStoreUpsertPublishedModelDelegatesToInner(t *testin
 		inner,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{},
+		publishedModelPolicies(cachepolicy.CachePolicy{}),
 		nil,
 	)
 
@@ -150,7 +155,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 		inner,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{},
+		publishedModelPolicies(cachepolicy.CachePolicy{}),
 		nil,
 	)
 
@@ -190,7 +195,7 @@ func TestCachedPublishedModelStoreInvalidatePublishedModelClearsModelByCodeCache
 		inner,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
-		cachepolicy.CachePolicy{},
+		publishedModelPolicies(cachepolicy.CachePolicy{}),
 		nil,
 	)
 

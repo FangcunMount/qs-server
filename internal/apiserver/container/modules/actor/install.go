@@ -15,7 +15,8 @@ type InstallHost interface {
 // InstallFrom wires and registers the actor module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
 	iamPorts := host.ActorIAMPorts()
-	binding := host.CacheCapability(cachepolicy.CapabilityActorTestee)
+	provider := host.CachePolicyProvider()
+	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityActorTestee)
 	redisClient := host.CacheClient(redisruntime.FamilyObject)
 	if !binding.Enabled {
 		redisClient = nil
@@ -24,7 +25,7 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:             host.MySQLDB(),
 		RedisClient:         redisClient,
 		CacheBuilder:        host.CacheBuilder(redisruntime.FamilyObject),
-		TesteePolicy:        binding.Policy,
+		CachePolicies:       provider,
 		Observer:            host.CacheObserver(),
 		MySQLLimiter:        host.MySQLLimiter(),
 		IAMEnabled:          iamPorts.Enabled,

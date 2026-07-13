@@ -9,7 +9,7 @@ import (
 )
 
 func TestPolicyCatalogMergesFamilyAndCapabilityDefaults(t *testing.T) {
-	catalog := NewPolicyCatalog(map[cachemodel.Family]sharedcache.Policy{
+	catalog := NewPolicyCatalog(sharedcache.Policy{}, map[cachemodel.Family]sharedcache.Policy{
 		cachemodel.FamilyQuery: {Compress: PolicySwitchEnabled, Singleflight: PolicySwitchEnabled},
 	}, map[sharedcache.Capability]Binding{
 		CapabilityStatisticsQuery: {Enabled: true},
@@ -21,8 +21,17 @@ func TestPolicyCatalogMergesFamilyAndCapabilityDefaults(t *testing.T) {
 	if !binding.Policy.Compress.Enabled(false) {
 		t.Fatal("expected family compression")
 	}
-	if binding.Policy.Singleflight.Enabled(true) {
-		t.Fatal("expected capability default to disable singleflight")
+	if !binding.Policy.Singleflight.Enabled(false) {
+		t.Fatal("expected family default to override spec default")
+	}
+	catalog = NewPolicyCatalog(
+		sharedcache.Policy{Compress: PolicySwitchDisabled},
+		map[cachemodel.Family]sharedcache.Policy{cachemodel.FamilyQuery: {Compress: PolicySwitchEnabled}},
+		map[sharedcache.Capability]Binding{CapabilityStatisticsQuery: {Enabled: true, Policy: sharedcache.Policy{Compress: PolicySwitchDisabled}}},
+	)
+	binding, _ = catalog.Resolve(CapabilityStatisticsQuery)
+	if binding.Policy.Compress.Enabled(true) {
+		t.Fatal("expected capability override to win")
 	}
 }
 
@@ -43,20 +52,20 @@ func TestSpecsHaveUniqueModuleOwnedIdentity(t *testing.T) {
 }
 
 func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
-	registry := NewEffectiveRegistry(NewPolicyCatalog(nil, nil))
-	entries := registry.Snapshot()
+	registry := NewEffectiveRegistry(NewPolicyCatalog(sharedcache.Policy{}, nil, nil))
+	entries := registry.All()
 	if len(entries) != 8 {
 		t.Fatalf("registry entries = %d, want 8", len(entries))
 	}
-	first := entries[0]
-	if first.Capability != CapabilitySurveyQuestionnaire || first.Owner != "survey" || first.Source != "cache.capabilities.survey.questionnaire" || first.MetricLabel != "questionnaire" || first.Version != "v2" {
-		t.Fatalf("first entry = %#v", first)
+	questionnaire, ok := registry.Resolve(CapabilitySurveyQuestionnaire)
+	if !ok || questionnaire.Owner != "survey" || questionnaire.Source != "cache.capabilities.survey.questionnaire" || questionnaire.MetricLabel != "questionnaire" || questionnaire.CatalogVersion != "v2" {
+		t.Fatalf("questionnaire entry = %#v", questionnaire)
 	}
-	last := entries[len(entries)-1]
-	if last.Capability != CapabilityReportStatus || last.Kind != sharedcache.KindOperationalState || last.Layer != sharedcache.LayerRuntime {
-		t.Fatalf("report status entry = %#v", last)
+	reportStatus, ok := registry.Resolve(CapabilityReportStatus)
+	if !ok || reportStatus.Kind != sharedcache.KindOperationalState || reportStatus.Layer != sharedcache.LayerRuntime {
+		t.Fatalf("report status entry = %#v", reportStatus)
 	}
-	if last.Policy.TTL != 48*time.Hour {
-		t.Fatalf("report status TTL = %v, want 48h", last.Policy.TTL)
+	if reportStatus.Policy.TTL != 48*time.Hour {
+		t.Fatalf("report status TTL = %v, want 48h", reportStatus.Policy.TTL)
 	}
 }

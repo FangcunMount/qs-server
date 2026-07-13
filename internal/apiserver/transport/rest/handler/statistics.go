@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
@@ -25,8 +24,8 @@ type StatisticsHandler struct {
 	periodicStatsService           statisticsApp.PeriodicStatsService
 	syncService                    statisticsApp.StatisticsSyncService
 	testeeAccessService            statisticsApp.TesteeAccessValidator
-	warmupCoordinator              cachegov.Coordinator
-	cacheGovernanceStatusService   cachegov.StatusService
+	warmupCoordinator              statisticsApp.WarmupCoordinator
+	cacheGovernanceStatusService   statisticsApp.GovernanceStatusReader
 	governanceFacade               statisticsApp.GovernanceFacade
 }
 
@@ -56,12 +55,12 @@ func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService statistic
 	h.testeeAccessService = testeeAccessService
 }
 
-func (h *StatisticsHandler) SetWarmupCoordinator(coordinator cachegov.Coordinator) {
+func (h *StatisticsHandler) SetWarmupCoordinator(coordinator statisticsApp.WarmupCoordinator) {
 	h.warmupCoordinator = coordinator
 	h.governanceFacade = nil
 }
 
-func (h *StatisticsHandler) SetCacheGovernanceStatusService(service cachegov.StatusService) {
+func (h *StatisticsHandler) SetCacheGovernanceStatusService(service statisticsApp.GovernanceStatusReader) {
 	h.cacheGovernanceStatusService = service
 	h.governanceFacade = nil
 }

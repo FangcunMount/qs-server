@@ -14,8 +14,7 @@ import (
 type Versioned struct {
 	version    VersionTokenStore
 	capability sharedcache.Capability
-	policy     sharedcache.Policy
-	ttl        time.Duration
+	policies   sharedcache.PolicyProvider
 	memory     *LocalHotCache[[]byte]
 	observer   sharedcache.Observer
 	payload    *redisstore.PayloadStore
@@ -25,8 +24,7 @@ type VersionedOptions struct {
 	Store      sharedcache.Store
 	Version    VersionTokenStore
 	Capability sharedcache.Capability
-	Policy     sharedcache.Policy
-	TTL        time.Duration
+	Policies   sharedcache.PolicyProvider
 	Memory     *LocalHotCache[[]byte]
 	Observer   sharedcache.Observer
 }
@@ -38,11 +36,10 @@ func NewVersioned(opts VersionedOptions) *Versioned {
 	return &Versioned{
 		version:    opts.Version,
 		capability: opts.Capability,
-		policy:     opts.Policy,
-		ttl:        opts.TTL,
+		policies:   opts.Policies,
 		memory:     opts.Memory,
 		observer:   opts.Observer,
-		payload:    redisstore.NewPayloadStore(opts.Store, opts.Policy, opts.Observer),
+		payload:    redisstore.NewPayloadStore(opts.Store, opts.Observer),
 	}
 }
 
@@ -118,7 +115,13 @@ func (c *Versioned) Set(ctx context.Context, versionKey string, buildDataKey fun
 		c.memory.Set(key, raw)
 	}
 	start := time.Now()
-	err = c.payload.Set(ctx, key, raw, c.policy.TTLOr(c.ttl))
+	policy := sharedcache.Policy{}
+	if c.policies != nil {
+		if effective, ok := c.policies.Resolve(c.capability); ok {
+			policy = effective.Policy
+		}
+	}
+	err = c.payload.Set(ctx, key, raw, policy.TTL, policy)
 	result := sharedcache.ResultOK
 	if err != nil {
 		result = sharedcache.ResultError
