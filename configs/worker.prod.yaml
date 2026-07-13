@@ -145,6 +145,7 @@ cache:
     report_status:
       ttl_seconds: 172800
 
+# Worker 仅发布 report_status_changed；Redis Pub/Sub 不是可靠业务事件通道。
 signaling:
   redis:
     enabled: true

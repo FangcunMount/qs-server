@@ -3,6 +3,8 @@
 # ============================================================================
 # 这些信令不走 Outbox/NSQ，仅用于在线唤醒、本地缓存失效与预热。
 # 丢失可接受：订阅方可通过 TTL、查询或下次变更兜底。
+# 这是一份说明性清单，不由进程在启动时加载；internal/pkg/signalcatalog
+# 的契约测试会校验其名称、delivery 和 transport 与代码常量保持同步。
 # ============================================================================
 
 version: "1.0"
@@ -17,7 +19,7 @@ signals:
     delivery: ephemeral_signal
     transport: redis_pubsub
     description: "报告状态变更唤醒（collection-server wait-report）"
-    publisher: apiserver
+    publisher: apiserver, worker
     subscribers:
       - collection-server
 
@@ -28,7 +30,6 @@ signals:
     publisher: apiserver
     subscribers:
       - apiserver
-      - worker
       - collection-server
 
   scale_cache_changed:
@@ -38,7 +39,6 @@ signals:
     publisher: apiserver
     subscribers:
       - apiserver
-      - worker
       - collection-server
 
   typology_model_cache_changed:

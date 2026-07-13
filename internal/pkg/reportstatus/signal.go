@@ -1,8 +1,12 @@
 package reportstatus
 
-import "time"
+import (
+	"time"
 
-const SignalNameReportStatusChanged = "report_status_changed"
+	"github.com/FangcunMount/qs-server/internal/pkg/signalcatalog"
+)
+
+const SignalNameReportStatusChanged = signalcatalog.ReportStatusChanged
 
 // ChangedSignal 报告状态变更唤醒信号（best-effort，非业务事实）。
 type ChangedSignal struct {

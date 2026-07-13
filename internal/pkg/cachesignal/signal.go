@@ -1,11 +1,15 @@
 package cachesignal
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/signalcatalog"
+)
 
 const (
-	SignalNameQuestionnaireCacheChanged = "questionnaire_cache_changed"
-	SignalNameScaleCacheChanged         = "scale_cache_changed"
-	SignalNameTypologyModelCacheChanged = "typology_model_cache_changed"
+	SignalNameQuestionnaireCacheChanged = signalcatalog.QuestionnaireCacheChanged
+	SignalNameScaleCacheChanged         = signalcatalog.ScaleCacheChanged
+	SignalNameTypologyModelCacheChanged = signalcatalog.TypologyModelCacheChanged
 )
 
 // QuestionnaireCacheChangedSignal 问卷缓存失效唤醒信号（best-effort，非业务事实）。

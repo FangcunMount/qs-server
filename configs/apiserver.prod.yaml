@@ -214,6 +214,8 @@ redis_runtime:
       namespace_suffix: "ops:runtime"
       allow_fallback_default: true
 
+# Redis Pub/Sub 仅承载 report-status 唤醒和缓存失效；失败不回滚业务状态，
+# 也绝不能替代 durable_outbox。
 signaling:
   redis:
     enabled: true
@@ -318,7 +320,7 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
   lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
 
-behavior_journey_scan:    # 启用行为轨迹扫描
+behavior_journey_scan:    # behavior_footprint 的唯一常规写入路径；不消费 Event/Outbox/MQ
   enable: true            # 启用行为轨迹扫描
   org_ids: [1]            # 组织ID列表（从配置读取，默认扫描所有组织）
   initial_delay: "2m"     # 启动后首次扫描延迟
@@ -327,7 +329,7 @@ behavior_journey_scan:    # 启用行为轨迹扫描
   lookback: "2h"          # 扫描时间窗口
   lock_key: "qs:behavior-journey-scan:leader" # 分布式锁键，确保单实例执行
   lock_ttl: "25m"         # 锁过期时间，略长于扫描间隔，避免死锁
-  dry_run: false          # 禁用行为轨迹扫描
+  dry_run: false          # false 时写入扫描投影；true 时只演练不写入
   window_recalc: true     # 启用窗口重新计算
   sources:
     - entry_resolve_log   # 扫描入口解析日志
@@ -336,6 +338,8 @@ behavior_journey_scan:    # 启用行为轨迹扫描
     - assessment          # 扫描测评日志
     - report              # 扫描报告日志
 
+# durable_outbox 只排空 configs/events.yaml 中的可靠业务事件；
+# 禁止用它驱动 behavior_footprint，行为轨迹由 behavior_journey_scan 重建。
 outbox_relay:
   mongo:
     interval: "15s"                # Mongo outbox 主链路事件排水频率: 5s (生产环境建议调高)

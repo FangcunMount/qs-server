@@ -6,11 +6,9 @@ import (
 	"log/slog"
 	"strconv"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const evaluationRunRetryHint = "check runtime_checkpoint table (scope=evaluation_run) for latest attempt and retryable flag"
@@ -69,7 +67,7 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 // handleEvaluationFailed projects a failed Evaluation without treating it as a
 // report failure.
 func handleEvaluationFailed(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		var data eventpayload.EvaluationFailedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
@@ -92,17 +90,6 @@ func handleEvaluationFailed(deps *Dependencies) HandlerFunc {
 		}
 		if deps.ReportStatusReporter != nil {
 			deps.ReportStatusReporter.SetFailed(ctx, reportstatus.AssessmentKey(assessmentID), "", "evaluation_failed", data.Reason)
-		}
-		if _, err := deps.InternalClient.ProjectBehaviorEvent(ctx, &pb.ProjectBehaviorEventRequest{
-			EventId:       env.ID,
-			EventType:     eventType,
-			OrgId:         data.OrgID,
-			TesteeId:      data.TesteeID,
-			AssessmentId:  assessmentID,
-			FailureReason: data.Reason,
-			OccurredAt:    timestamppb.New(data.FailedAt),
-		}); err != nil {
-			return fmt.Errorf("failed to project evaluation failed behavior: %w", err)
 		}
 		return nil
 	}

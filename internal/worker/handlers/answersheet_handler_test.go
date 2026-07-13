@@ -30,10 +30,6 @@ type fakeWorkerInternalClient struct {
 	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
 	questionnaireQRCodeCalls       int
 	scaleQRCodeCalls               int
-	projectBehaviorCalls           int
-	projectBehaviorRequest         *pb.ProjectBehaviorEventRequest
-	projectBehaviorErr             error
-	projectBehaviorResp            *pb.ProjectBehaviorEventResponse
 	calculateScoreSuccess          bool
 	calculateScoreMessage          string
 	createSuccess                  bool
@@ -129,21 +125,6 @@ func (f *fakeWorkerInternalClient) HandleScalePublishedPostActions(
 ) (*pb.GenerateScaleQRCodeResponse, error) {
 	f.scaleQRCodeCalls++
 	return &pb.GenerateScaleQRCodeResponse{Success: true}, nil
-}
-
-func (f *fakeWorkerInternalClient) ProjectBehaviorEvent(
-	_ context.Context,
-	req *pb.ProjectBehaviorEventRequest,
-) (*pb.ProjectBehaviorEventResponse, error) {
-	f.projectBehaviorCalls++
-	f.projectBehaviorRequest = req
-	if f.projectBehaviorErr != nil {
-		return nil, f.projectBehaviorErr
-	}
-	if f.projectBehaviorResp != nil {
-		return f.projectBehaviorResp, nil
-	}
-	return &pb.ProjectBehaviorEventResponse{Status: "completed"}, nil
 }
 
 func (f *fakeWorkerInternalClient) SendTaskOpenedMiniProgramNotification(

@@ -40,10 +40,6 @@ type InternalClient interface {
 		code, version string,
 	) (*pb.GenerateQuestionnaireQRCodeResponse, error)
 	HandleScalePublishedPostActions(ctx context.Context, code string) (*pb.GenerateScaleQRCodeResponse, error)
-	ProjectBehaviorEvent(
-		ctx context.Context,
-		req *pb.ProjectBehaviorEventRequest,
-	) (*pb.ProjectBehaviorEventResponse, error)
 	SendTaskOpenedMiniProgramNotification(
 		ctx context.Context,
 		orgID int64,

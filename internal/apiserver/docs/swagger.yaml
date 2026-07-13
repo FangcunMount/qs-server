@@ -122,12 +122,34 @@ definitions:
         description: Reference 返回参考文档（错误时使用）
         type: string
     type: object
+  definition.Brief2Spec:
+    properties:
+      formVariant:
+        type: string
+      indexFactorCodes:
+        items:
+          type: string
+        type: array
+      primaryFactorCode:
+        type: string
+      validityFactorCodes:
+        items:
+          type: string
+        type: array
+    type: object
   definition.Calibration:
     properties:
       normRefs:
         items:
           $ref: '#/definitions/norm.Ref'
         type: array
+    type: object
+  definition.ExecutionSpec:
+    properties:
+      brief2:
+        $ref: '#/definitions/definition.Brief2Spec'
+      spm:
+        $ref: '#/definitions/definition.SPMSpec'
     type: object
   definition.MeasureSpec:
     properties:
@@ -166,6 +188,33 @@ definitions:
       templateID:
         type: string
       title:
+        type: string
+    type: object
+  definition.SPMItem:
+    properties:
+      correctOptionCode:
+        type: string
+      questionCode:
+        type: string
+    type: object
+  definition.SPMItemSet:
+    properties:
+      code:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/definition.SPMItem'
+        type: array
+    type: object
+  definition.SPMSpec:
+    properties:
+      itemSets:
+        items:
+          $ref: '#/definitions/definition.SPMItemSet'
+        type: array
+      timeLimitSeconds:
+        type: integer
+      totalFactorCode:
         type: string
     type: object
   factor.Factor:
@@ -321,6 +370,8 @@ definitions:
       conclusions:
         items: {}
         type: array
+      execution:
+        $ref: '#/definitions/definition.ExecutionSpec'
       measure:
         $ref: '#/definitions/definition.MeasureSpec'
       outcomes:
@@ -4046,6 +4097,10 @@ paths:
       - description: 状态
         in: query
         name: status
+        type: string
+      - description: 产品通道
+        in: query
+        name: product_channel
         type: string
       - description: 问卷编码
         in: query

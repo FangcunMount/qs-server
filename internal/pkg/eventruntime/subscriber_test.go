@@ -64,3 +64,22 @@ func TestSubscriberRegisterHandlersFailsOnMissingHandler(t *testing.T) {
 		t.Fatalf("expected error to mention %q, got %v", missingHandler, err)
 	}
 }
+
+func TestSubscriberDispatchUnknownEventSkipsWithoutError(t *testing.T) {
+	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	sub := NewSubscriber(SubscriberOptions{
+		Catalog: eventcatalog.NewCatalog(cfg),
+		HandlerFactory: func(_ string) (HandlerFunc, error) {
+			return func(context.Context, string, []byte) error { return nil }, nil
+		},
+	})
+	if err := sub.RegisterHandlers(); err != nil {
+		t.Fatalf("register handlers: %v", err)
+	}
+	if err := sub.Dispatch(t.Context(), "unknown.event", []byte(`{}`)); err != nil {
+		t.Fatalf("unknown event dispatch = %v, want nil so messaging can ACK", err)
+	}
+}
