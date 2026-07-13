@@ -8204,7 +8204,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/observability.RuntimeSnapshot'
+                $ref: '#/components/schemas/cachemodel.RuntimeSnapshot'
         '500':
           description: 服务内部错误
           content:
@@ -8368,7 +8368,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/cachegovernance.ManualWarmupRequest'
+              $ref: '#/components/schemas/cachetarget.ManualWarmupRequest'
       responses:
         '200':
           description: OK
@@ -8380,7 +8380,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/cachegovernance.ManualWarmupResult'
+                      $ref: '#/components/schemas/cachemodel.ManualWarmupResult'
         '400':
           description: Bad Request
           content:
@@ -9123,8 +9123,8 @@ paths:
       tags:
       - System-Governance
       summary: 执行治理动作
-      description: 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅 qs:admin
-        可访问
+      description: 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅
+        qs:admin 可访问
       operationId: 执行治理动作
       parameters:
       - type: string
@@ -9463,20 +9463,51 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
-    cachegovernance.ManualWarmupItemResult:
+    cachemodel.FamilyStatus:
+      type: object
+      properties:
+        allow_warmup:
+          type: boolean
+        available:
+          type: boolean
+        component:
+          type: string
+        configured:
+          type: boolean
+        consecutive_failures:
+          type: integer
+        degraded:
+          type: boolean
+        family:
+          type: string
+        last_error:
+          type: string
+        last_failure_at:
+          type: string
+        last_success_at:
+          type: string
+        mode:
+          type: string
+        namespace:
+          type: string
+        profile:
+          type: string
+        updated_at:
+          type: string
+    cachemodel.ManualWarmupItemResult:
       type: object
       properties:
         family:
           type: string
         kind:
-          $ref: '#/components/schemas/cachetarget.WarmupKind'
+          type: string
         message:
           type: string
         scope:
           type: string
         status:
-          $ref: '#/components/schemas/cachegovernance.ManualWarmupItemStatus'
-    cachegovernance.ManualWarmupItemStatus:
+          $ref: '#/components/schemas/cachemodel.ManualWarmupItemStatus'
+    cachemodel.ManualWarmupItemStatus:
       type: string
       enum:
       - ok
@@ -9486,14 +9517,7 @@ components:
       - ManualWarmupItemStatusOK
       - ManualWarmupItemStatusSkipped
       - ManualWarmupItemStatusError
-    cachegovernance.ManualWarmupRequest:
-      type: object
-      properties:
-        targets:
-          type: array
-          items:
-            $ref: '#/components/schemas/cachegovernance.ManualWarmupTarget'
-    cachegovernance.ManualWarmupResult:
+    cachemodel.ManualWarmupResult:
       type: object
       properties:
         finished_at:
@@ -9501,14 +9525,14 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/cachegovernance.ManualWarmupItemResult'
+            $ref: '#/components/schemas/cachemodel.ManualWarmupItemResult'
         started_at:
           type: string
         summary:
-          $ref: '#/components/schemas/cachegovernance.ManualWarmupSummary'
+          $ref: '#/components/schemas/cachemodel.ManualWarmupSummary'
         trigger:
           type: string
-    cachegovernance.ManualWarmupSummary:
+    cachemodel.ManualWarmupSummary:
       type: object
       properties:
         error_count:
@@ -9521,7 +9545,40 @@ components:
           type: integer
         target_count:
           type: integer
-    cachegovernance.ManualWarmupTarget:
+    cachemodel.RuntimeSnapshot:
+      type: object
+      properties:
+        component:
+          type: string
+        families:
+          type: array
+          items:
+            $ref: '#/components/schemas/cachemodel.FamilyStatus'
+        generated_at:
+          type: string
+        summary:
+          $ref: '#/components/schemas/cachemodel.RuntimeSummary'
+    cachemodel.RuntimeSummary:
+      type: object
+      properties:
+        available_count:
+          type: integer
+        degraded_count:
+          type: integer
+        family_total:
+          type: integer
+        ready:
+          type: boolean
+        unavailable_count:
+          type: integer
+    cachetarget.ManualWarmupRequest:
+      type: object
+      properties:
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/cachetarget.ManualWarmupTarget'
+    cachetarget.ManualWarmupTarget:
       type: object
       properties:
         kind:
@@ -10031,63 +10088,6 @@ components:
           type: string
         normTableVersion:
           type: string
-    observability.FamilyStatus:
-      type: object
-      properties:
-        allow_warmup:
-          type: boolean
-        available:
-          type: boolean
-        component:
-          type: string
-        configured:
-          type: boolean
-        consecutive_failures:
-          type: integer
-        degraded:
-          type: boolean
-        family:
-          type: string
-        last_error:
-          type: string
-        last_failure_at:
-          type: string
-        last_success_at:
-          type: string
-        mode:
-          type: string
-        namespace:
-          type: string
-        profile:
-          type: string
-        updated_at:
-          type: string
-    observability.RuntimeSnapshot:
-      type: object
-      properties:
-        component:
-          type: string
-        families:
-          type: array
-          items:
-            $ref: '#/components/schemas/observability.FamilyStatus'
-        generated_at:
-          type: string
-        summary:
-          $ref: '#/components/schemas/observability.RuntimeSummary'
-    observability.RuntimeSummary:
-      type: object
-      properties:
-        available_count:
-          type: integer
-        degraded_count:
-          type: integer
-        family_total:
-          type: integer
-        ready:
-          type: boolean
-        unavailable_count:
-          type: integer
     request.AddQuestionRequest:
       type: object
       properties:

@@ -14,7 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
+	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"
 )

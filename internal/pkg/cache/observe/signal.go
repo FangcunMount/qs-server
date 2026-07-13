@@ -1,4 +1,4 @@
-package cachesignal
+package observe
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,14 +22,14 @@ var (
 	)
 )
 
-func IncNotify(signalName, service string) {
+func IncSignalNotify(signalName, service string) {
 	if service == "" {
 		service = "unknown"
 	}
 	signalNotifyTotal.WithLabelValues(signalName, service).Inc()
 }
 
-func IncNotifyFailed(signalName, service string) {
+func IncSignalNotifyFailed(signalName, service string) {
 	if service == "" {
 		service = "unknown"
 	}

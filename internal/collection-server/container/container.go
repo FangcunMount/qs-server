@@ -26,7 +26,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
+	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"

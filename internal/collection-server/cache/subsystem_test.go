@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
+	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 )
 
 func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
