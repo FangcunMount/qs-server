@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -88,6 +89,12 @@ func (s *catalogQueryService) GetPublished(ctx context.Context, actor modelcatal
 			return publishedDetailFromModel(item)
 		}
 	}
+	logger.L(ctx).Warnw("published assessment model was not found in catalog lookup",
+		"action", "get_published_assessment_model",
+		"model_code", codeValue,
+		"requested_version", version,
+		"returned_item_count", len(items),
+	)
 	return nil, domain.ErrNotFound
 }
 

@@ -186,6 +186,69 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	}
 }
 
+func TestCachedPublishedModelStoreListCatalogCacheKeyIncludesAllQueryPredicates(t *testing.T) {
+	cached := NewCachedPublishedModelStore(
+		&publishedModelStoreStub{},
+		nil,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		publishedModelPolicies(cachepolicy.CachePolicy{}),
+		nil,
+	)
+	base := port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Page: 1, PageSize: 100}
+	cases := []struct {
+		name   string
+		filter port.ListPublishedFilter
+	}{
+		{name: "code", filter: port.ListPublishedFilter{Code: "model-b", Kind: domain.KindScale, Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "kind", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindTypology, Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "sub kind", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, SubKind: domain.SubKindTypology, Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "algorithm", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Algorithm: domain.AlgorithmMBTI, Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "product channel", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, ProductChannel: "collection", Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "category", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "slp", Page: 1, PageSize: 100}},
+		{name: "keyword", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Keyword: "attention", Page: 1, PageSize: 100}},
+		{name: "questionnaire", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", QuestionnaireCode: "q-001", QuestionnaireVersion: "1.0.0", Page: 1, PageSize: 100}},
+		{name: "page", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Page: 2, PageSize: 100}},
+		{name: "page size", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Page: 1, PageSize: 50}},
+	}
+	baseKey := cached.listCatalogCacheKey(base)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if key := cached.listCatalogCacheKey(tc.filter); key == baseKey {
+				t.Fatalf("cache key collision: base=%+v filter=%+v key=%q", base, tc.filter, key)
+			}
+		})
+	}
+}
+
+func TestCachedPublishedModelStoreInvalidatePublishedModelClearsExactGetPublishedPage(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+	cached := NewCachedPublishedModelStore(
+		&publishedModelStoreStub{},
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}),
+		nil,
+	)
+	filter := port.ListPublishedFilter{Code: "model-a", Page: 1, PageSize: 100}
+	key := cached.listCatalogCacheKey(filter)
+	if err := cached.catalogList.Set(context.Background(), key, &publishedModelCatalogListPage{}, sharedcache.Policy{TTL: time.Hour}); err != nil {
+		t.Fatalf("populate exact GetPublished cache entry: %v", err)
+	}
+	if !mr.Exists(key) {
+		t.Fatalf("expected exact GetPublished cache entry %q", key)
+	}
+
+	cached.invalidatePublishedModel(context.Background(), &port.PublishedModel{Code: "model-a"})
+	if mr.Exists(key) {
+		t.Fatalf("exact GetPublished cache entry %q was not invalidated", key)
+	}
+}
+
 func TestCachedPublishedModelStoreInvalidatePublishedModelClearsModelByCodeCache(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})

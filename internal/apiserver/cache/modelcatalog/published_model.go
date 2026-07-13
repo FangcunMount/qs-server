@@ -2,12 +2,13 @@ package modelcatalogcache
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -283,17 +284,27 @@ func (c *CachedPublishedModelStore) ListPublishedAlgorithms(ctx context.Context)
 }
 
 func (c *CachedPublishedModelStore) listCatalogCacheKey(filter port.ListPublishedFilter) string {
+	// A catalog-list entry must vary by every query predicate. In particular,
+	// GetPublished uses this list path with Code set, so omitting Code here can
+	// make one model's cached page appear as another model's not-found result.
+	raw := fmt.Sprintf(
+		"code=%q&kind=%q&sub_kind=%q&algorithm=%q&product_channel=%q&category=%q&keyword=%q&questionnaire_code=%q&questionnaire_version=%q&page=%d&page_size=%d",
+		filter.Code,
+		filter.Kind,
+		filter.SubKind,
+		filter.Algorithm,
+		filter.ProductChannel,
+		filter.Category,
+		filter.Keyword,
+		filter.QuestionnaireCode,
+		filter.QuestionnaireVersion,
+		filter.Page,
+		filter.PageSize,
+	)
+	hash := sha256.Sum256([]byte(raw))
 	return c.refCacheKey(port.Ref{
-		Kind:      filter.Kind,
-		SubKind:   filter.SubKind,
-		Algorithm: filter.Algorithm,
-		Code:      "catalog-list",
-		Version: fmt.Sprintf(
-			"p%d-ps%d-c%s",
-			filter.Page,
-			filter.PageSize,
-			strings.ToLower(strings.TrimSpace(filter.Category)),
-		),
+		Code:    "catalog-list",
+		Version: fmt.Sprintf("v2-%x", hash[:8]),
 	})
 }
 
@@ -329,6 +340,10 @@ func (c *CachedPublishedModelStore) invalidatePublishedModel(ctx context.Context
 			logger.L(ctx).Warnw("failed to invalidate latest published model cache", "error", err)
 		}
 	}
+	// GetPublished is implemented as a code-filtered page with PageSize 100.
+	// Clear its exact entry when a model is republished so a previous snapshot
+	// cannot survive until the catalog-list TTL expires.
+	c.invalidateCatalogListCache(ctx, port.ListPublishedFilter{Code: model.Code, Page: 1, PageSize: 100})
 	c.invalidateCatalogListCaches(ctx)
 }
 
@@ -342,12 +357,20 @@ func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Cont
 		{Page: 1, PageSize: 50},
 	}
 	for _, filter := range filters {
-		if err := c.catalogList.Delete(ctx, c.listCatalogCacheKey(filter)); err != nil {
-			logger.L(ctx).Warnw("failed to invalidate published model catalog list cache",
-				"key", c.listCatalogCacheKey(filter),
-				"error", err,
-			)
-		}
+		c.invalidateCatalogListCache(ctx, filter)
+	}
+}
+
+func (c *CachedPublishedModelStore) invalidateCatalogListCache(ctx context.Context, filter port.ListPublishedFilter) {
+	if c.catalogList == nil || !c.catalogList.Available() {
+		return
+	}
+	key := c.listCatalogCacheKey(filter)
+	if err := c.catalogList.Delete(ctx, key); err != nil {
+		logger.L(ctx).Warnw("failed to invalidate published model catalog list cache",
+			"key", key,
+			"error", err,
+		)
 	}
 }
 
