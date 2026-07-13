@@ -37,10 +37,14 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 		State:  &r.state,
 		Stages: r.stages,
 		BuildPrepared: func(state *prepareState) preparedServer {
-			return preparedServer{
+			prepared := preparedServer{
 				startShutdown: r.server.gs.Start,
 				httpServer:    state.transport.httpServer,
 			}
+			if state.container.container != nil {
+				prepared.startCache = state.container.container.StartCacheSubsystem
+			}
+			return prepared
 		},
 	}.Run()
 }

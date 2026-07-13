@@ -24,15 +24,6 @@ const (
 	ReportGenerated              = InterpretationReportGenerated
 	ReportGeneratedOutcome       = InterpretationReportGenerated
 
-	FootprintEntryOpened                 = "footprint.entry_opened"
-	FootprintIntakeConfirmed             = "footprint.intake_confirmed"
-	FootprintTesteeProfileCreated        = "footprint.testee_profile_created"
-	FootprintCareRelationshipEstablished = "footprint.care_relationship_established"
-	FootprintCareRelationshipTransferred = "footprint.care_relationship_transferred"
-	FootprintAnswerSheetSubmitted        = "footprint.answersheet_submitted"
-	FootprintAssessmentCreated           = "footprint.assessment_created"
-	FootprintReportGenerated             = "footprint.report_generated"
-
 	AssessmentModelChanged = "assessment_model.changed"
 
 	TaskOpened    = "task.opened"
@@ -51,14 +42,6 @@ func EventTypes() []string {
 		EvaluationFailed,
 		InterpretationReportGenerated,
 		InterpretationReportFailed,
-		FootprintEntryOpened,
-		FootprintIntakeConfirmed,
-		FootprintTesteeProfileCreated,
-		FootprintCareRelationshipEstablished,
-		FootprintCareRelationshipTransferred,
-		FootprintAnswerSheetSubmitted,
-		FootprintAssessmentCreated,
-		FootprintReportGenerated,
 		AssessmentModelChanged,
 		TaskOpened,
 		TaskCompleted,

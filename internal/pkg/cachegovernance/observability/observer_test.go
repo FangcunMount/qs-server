@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachehotset"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
-var _ cachequery.FamilyObserver = (*observability.ComponentObserver)(nil)
+var _ cacheobserve.FamilyObserver = (*observability.ComponentObserver)(nil)
 var _ cachehotset.FamilyObserver = (*observability.ComponentObserver)(nil)
 
 func TestComponentObserverReportsConfiguredComponent(t *testing.T) {

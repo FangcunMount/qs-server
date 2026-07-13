@@ -11,7 +11,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	planCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"

@@ -333,16 +333,6 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"
   lock_ttl: "30s"
 
-behavior_footprint:
-  disable_durable_event_types:
-    - footprint.entry_opened
-    - footprint.intake_confirmed
-    - footprint.testee_profile_created
-    - footprint.care_relationship_established
-    - footprint.answersheet_submitted
-    - footprint.assessment_created
-    - footprint.report_generated
-
 behavior_journey_scan:
   enable: true
   org_ids: [1]

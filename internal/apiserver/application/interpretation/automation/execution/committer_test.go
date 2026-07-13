@@ -85,7 +85,7 @@ func TestInterpretationCommitterCommitsReportTerminalStateAndOutbox(t *testing.T
 	if generationRecord.Status() != domaingeneration.StatusGenerating || runRecord.Status() != interpretationrun.StatusRunning {
 		t.Fatalf("caller records were not updated only after commit: generation=%s run=%s", generationRecord.Status(), runRecord.Status())
 	}
-	if len(reports.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 2 || tx.calls != 2 {
+	if len(reports.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 1 || tx.calls != 2 {
 		t.Fatalf("reports=%d events=%#v tx=%d", len(reports.items), stager.events, tx.calls)
 	}
 	generated, ok := stager.events[0][0].(domaininterpretation.ReportGeneratedOutcomeEvent)

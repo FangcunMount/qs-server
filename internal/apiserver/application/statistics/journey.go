@@ -4,11 +4,8 @@ import (
 	"context"
 	"time"
 
-	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
-	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 const (
@@ -46,54 +43,6 @@ type BehaviorProjectEventResult struct {
 type BehaviorProjectorService interface {
 	ProjectBehaviorEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventResult, error)
 	ReconcilePendingBehaviorEvents(ctx context.Context, limit int) (int, error)
-}
-
-type behaviorEventStager struct {
-	outboxStore behaviorEventOutboxStore
-}
-
-type behaviorEventOutboxStore interface {
-	Stage(ctx context.Context, events ...event.DomainEvent) error
-}
-
-func NewBehaviorEventStager(outboxStore behaviorEventOutboxStore) interface {
-	assessmentEntryApp.BehaviorEventStager
-	clinicianApp.BehaviorEventStager
-} {
-	if outboxStore == nil {
-		return nil
-	}
-	return &behaviorEventStager{outboxStore: outboxStore}
-}
-
-func (s *behaviorEventStager) stage(ctx context.Context, evt event.DomainEvent) error {
-	if s == nil || s.outboxStore == nil || evt == nil {
-		return nil
-	}
-	if !FootprintEventAllowed(evt.EventType()) {
-		return nil
-	}
-	return s.outboxStore.Stage(ctx, evt)
-}
-
-func (s *behaviorEventStager) StageEntryOpened(ctx context.Context, orgID int64, clinicianID, entryID uint64, occurredAt time.Time) error {
-	return s.stage(ctx, domainStatistics.NewFootprintEntryOpenedEvent(orgID, clinicianID, entryID, occurredAt))
-}
-
-func (s *behaviorEventStager) StageIntakeConfirmed(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error {
-	return s.stage(ctx, domainStatistics.NewFootprintIntakeConfirmedEvent(orgID, clinicianID, entryID, testeeID, occurredAt))
-}
-
-func (s *behaviorEventStager) StageTesteeProfileCreated(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error {
-	return s.stage(ctx, domainStatistics.NewFootprintTesteeProfileCreatedEvent(orgID, clinicianID, entryID, testeeID, occurredAt))
-}
-
-func (s *behaviorEventStager) StageCareRelationshipEstablished(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error {
-	return s.stage(ctx, domainStatistics.NewFootprintCareRelationshipEstablishedEvent(orgID, clinicianID, entryID, testeeID, occurredAt))
-}
-
-func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Context, orgID int64, fromClinicianID, toClinicianID, testeeID uint64, occurredAt time.Time) error {
-	return s.stage(ctx, domainStatistics.NewFootprintCareRelationshipTransferredEvent(orgID, fromClinicianID, toClinicianID, testeeID, occurredAt))
 }
 
 type assessmentEpisodeProjector struct {

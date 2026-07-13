@@ -331,16 +331,6 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
   lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
 
-behavior_footprint:
-  disable_durable_event_types:
-    - footprint.entry_opened
-    - footprint.intake_confirmed
-    - footprint.testee_profile_created
-    - footprint.care_relationship_established
-    - footprint.answersheet_submitted
-    - footprint.assessment_created
-    - footprint.report_generated
-
 behavior_journey_scan:    # 启用行为轨迹扫描
   enable: true            # 启用行为轨迹扫描
   org_ids: [1]            # 组织ID列表（从配置读取，默认扫描所有组织）

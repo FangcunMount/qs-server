@@ -18,18 +18,17 @@ import (
 )
 
 type service struct {
-	repo           domainAssessmentEntry.Repository
-	clinicianRepo  domainClinician.Repository
-	relationRepo   domainRelation.Repository
-	testeeRepo     domainTestee.Repository
-	entryReader    actorreadmodel.AssessmentEntryReader
-	testeeFactory  domainTestee.Factory
-	validator      domainAssessmentEntry.Validator
-	profileReader  iambridge.ProfileReader
-	resolveLog     ResolveLogWriter
-	intakeLog      IntakeLogWriter
-	behaviorEvents BehaviorEventStager
-	uow            apptransaction.Runner
+	repo          domainAssessmentEntry.Repository
+	clinicianRepo domainClinician.Repository
+	relationRepo  domainRelation.Repository
+	testeeRepo    domainTestee.Repository
+	entryReader   actorreadmodel.AssessmentEntryReader
+	testeeFactory domainTestee.Factory
+	validator     domainAssessmentEntry.Validator
+	profileReader iambridge.ProfileReader
+	resolveLog    ResolveLogWriter
+	intakeLog     IntakeLogWriter
+	uow           apptransaction.Runner
 }
 
 type intakeState struct {
@@ -54,7 +53,6 @@ func NewService(
 	profileReader iambridge.ProfileReader,
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
-	behaviorEvents BehaviorEventStager,
 	uow apptransaction.Runner,
 	entryReaders ...actorreadmodel.AssessmentEntryReader,
 ) AssessmentEntryService {
@@ -63,18 +61,17 @@ func NewService(
 		entryReader = entryReaders[0]
 	}
 	return &service{
-		repo:           repo,
-		clinicianRepo:  clinicianRepo,
-		relationRepo:   relationRepo,
-		testeeRepo:     testeeRepo,
-		entryReader:    entryReader,
-		testeeFactory:  testeeFactory,
-		validator:      validator,
-		profileReader:  profileReader,
-		resolveLog:     resolveLog,
-		intakeLog:      intakeLog,
-		behaviorEvents: behaviorEvents,
-		uow:            uow,
+		repo:          repo,
+		clinicianRepo: clinicianRepo,
+		relationRepo:  relationRepo,
+		testeeRepo:    testeeRepo,
+		entryReader:   entryReader,
+		testeeFactory: testeeFactory,
+		validator:     validator,
+		profileReader: profileReader,
+		resolveLog:    resolveLog,
+		intakeLog:     intakeLog,
+		uow:           uow,
 	}
 }
 
@@ -203,11 +200,6 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 		}
 		if err := s.logResolveSuccess(txCtx, entry, resolvedAt); err != nil {
 			return err
-		}
-		if s.behaviorEvents != nil {
-			if err := s.behaviorEvents.StageEntryOpened(txCtx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
-				return errors.Wrap(err, "failed to stage assessment entry opened behavior event")
-			}
 		}
 		return nil
 	})
@@ -376,32 +368,6 @@ func (s *service) logResolveSuccess(ctx context.Context, entry *domainAssessment
 	}
 	if err := s.resolveLog.LogResolve(ctx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
 		return errors.Wrap(err, "failed to log assessment entry resolve")
-	}
-	return nil
-}
-
-func (s *service) stageIntakeBehaviorEvents(ctx context.Context, state *intakeState) error {
-	if s.behaviorEvents == nil {
-		return nil
-	}
-
-	orgID := state.entry.OrgID()
-	clinicianID := state.entry.ClinicianID().Uint64()
-	entryID := state.entry.ID().Uint64()
-	testeeID := state.testee.ID().Uint64()
-
-	if err := s.behaviorEvents.StageIntakeConfirmed(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
-		return errors.Wrap(err, "failed to stage intake confirmed behavior event")
-	}
-	if state.testeeCreated {
-		if err := s.behaviorEvents.StageTesteeProfileCreated(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
-			return errors.Wrap(err, "failed to stage testee profile created behavior event")
-		}
-	}
-	if state.assignmentCreated {
-		if err := s.behaviorEvents.StageCareRelationshipEstablished(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
-			return errors.Wrap(err, "failed to stage care relationship established behavior event")
-		}
 	}
 	return nil
 }

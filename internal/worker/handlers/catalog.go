@@ -15,9 +15,6 @@ func NewRegistry() *Registry {
 		"evaluation_failed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleEvaluationFailed(deps)
 		},
-		"behavior_projector_handler": func(deps *Dependencies) HandlerFunc {
-			return handleBehaviorProjector(deps)
-		},
 		"questionnaire_changed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleQuestionnaireChanged(deps)
 		},

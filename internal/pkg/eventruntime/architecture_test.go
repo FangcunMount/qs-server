@@ -137,46 +137,6 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			"ReportFailedOutcome",
 			"NewInterpretationReportFailedEvent",
 		},
-		eventcatalog.FootprintEntryOpened: {
-			eventcatalog.FootprintEntryOpened,
-			"FootprintEntryOpened",
-			"NewFootprintEntryOpenedEvent",
-		},
-		eventcatalog.FootprintIntakeConfirmed: {
-			eventcatalog.FootprintIntakeConfirmed,
-			"FootprintIntakeConfirmed",
-			"NewFootprintIntakeConfirmedEvent",
-		},
-		eventcatalog.FootprintTesteeProfileCreated: {
-			eventcatalog.FootprintTesteeProfileCreated,
-			"FootprintTesteeProfileCreated",
-			"NewFootprintTesteeProfileCreatedEvent",
-		},
-		eventcatalog.FootprintCareRelationshipEstablished: {
-			eventcatalog.FootprintCareRelationshipEstablished,
-			"FootprintCareRelationshipEstablished",
-			"NewFootprintCareRelationshipEstablishedEvent",
-		},
-		eventcatalog.FootprintCareRelationshipTransferred: {
-			eventcatalog.FootprintCareRelationshipTransferred,
-			"FootprintCareRelationshipTransferred",
-			"NewFootprintCareRelationshipTransferredEvent",
-		},
-		eventcatalog.FootprintAnswerSheetSubmitted: {
-			eventcatalog.FootprintAnswerSheetSubmitted,
-			"FootprintAnswerSheetSubmitted",
-			"NewFootprintAnswerSheetSubmittedEvent",
-		},
-		eventcatalog.FootprintAssessmentCreated: {
-			eventcatalog.FootprintAssessmentCreated,
-			"FootprintAssessmentCreated",
-			"NewFootprintAssessmentCreatedEvent",
-		},
-		eventcatalog.FootprintReportGenerated: {
-			eventcatalog.FootprintReportGenerated,
-			"FootprintReportGenerated",
-			"NewFootprintReportGeneratedEvent",
-		},
 	}
 
 	cfg := catalog.Config()

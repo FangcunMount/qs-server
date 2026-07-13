@@ -11,18 +11,16 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
 	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -30,8 +28,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 )
 
 // Module assembles actor application services.
@@ -66,7 +62,6 @@ type Deps struct {
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
 	Observer            *observability.ComponentObserver
-	TopicResolver       eventcatalog.TopicResolver
 	MySQLLimiter        backpressure.Acquirer
 }
 
@@ -114,12 +109,6 @@ func New(deps Deps) (*Module, error) {
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
-	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(
-		mysqlDB,
-		deps.TopicResolver,
-		mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
-	))
-
 	testeeValidator := testee.NewValidator(testeeRepo)
 	testeeFactory := testee.NewFactory(testeeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)
@@ -192,7 +181,6 @@ func New(deps Deps) (*Module, error) {
 		relationRepo,
 		clinicianRepo,
 		testeeRepo,
-		behaviorEvents,
 		txRunner,
 		actorReadModel,
 	)
@@ -213,7 +201,6 @@ func New(deps Deps) (*Module, error) {
 		profileLinkSvc,
 		resolveLogWriter,
 		intakeLogWriter,
-		behaviorEvents,
 		txRunner,
 		actorReadModel,
 	)

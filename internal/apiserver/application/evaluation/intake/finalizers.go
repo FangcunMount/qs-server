@@ -9,8 +9,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // assessmentCreateFinalizer 测评创建最终化器
@@ -29,18 +27,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
-	occurredAt := time.Now()
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, func(saved *domainAssessment.Assessment) []event.DomainEvent {
-		return []event.DomainEvent{
-			footprintevent.NewFootprintAssessmentCreatedEvent(
-				req.OrgID,
-				dto.TesteeID,
-				dto.AnswerSheetID,
-				saved.ID().Uint64(),
-				occurredAt,
-			),
-		}
-	}, f.immediate); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.immediate); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
@@ -62,7 +49,7 @@ type assessmentSubmitFinalizer struct {
 
 // SaveAndStage 保存并阶段测评
 func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAssessment.Assessment) error {
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, nil, f.immediate); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.immediate); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil

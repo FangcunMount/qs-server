@@ -16,18 +16,6 @@ var P1 = []string{
 	eventcatalog.InterpretationReportFailed,
 }
 
-// P2 行为足迹类事件（可靠但不应抢占核心链路）。
-var P2 = []string{
-	eventcatalog.FootprintEntryOpened,
-	eventcatalog.FootprintIntakeConfirmed,
-	eventcatalog.FootprintTesteeProfileCreated,
-	eventcatalog.FootprintCareRelationshipEstablished,
-	eventcatalog.FootprintCareRelationshipTransferred,
-	eventcatalog.FootprintAnswerSheetSubmitted,
-	eventcatalog.FootprintAssessmentCreated,
-	eventcatalog.FootprintReportGenerated,
-}
-
 // ClaimOrder 返回 claim 优先级顺序：先 P0，再 P1，最后 fallback 全量 pending。
 func ClaimOrder(customP0, customP1 []string) [][]string {
 	p0 := coalesce(customP0, P0)

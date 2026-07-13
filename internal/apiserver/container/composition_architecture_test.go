@@ -609,7 +609,7 @@ func TestActorTransportsDoNotDependOnActorRepositoryImplementations(t *testing.T
 				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"):
 					rel := filepath.ToSlash(mustRel(t, root, path))
 					t.Fatalf("%s imports %s; actor transport must consume application ports/read models, not actor infra repositories", rel, importPath)
-				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"):
+				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"):
 					rel := filepath.ToSlash(mustRel(t, root, path))
 					t.Fatalf("%s imports %s; actor transport must not depend on cached actor repositories", rel, importPath)
 				}

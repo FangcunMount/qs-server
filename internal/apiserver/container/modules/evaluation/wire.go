@@ -7,9 +7,9 @@ import (
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
+	cacheadapter "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
@@ -18,6 +18,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -156,11 +157,11 @@ func Wire(in WireInput) (WireResult, error) {
 		queryRedisClient = nil
 	}
 
-	var versionStore cachequery.VersionTokenStore
+	var versionStore querycache.VersionTokenStore
 	if queryRedisClient != nil {
-		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
+		versionStore = cacheadapter.NewVersionTokenStore(
 			in.MetaRedisClient,
-			string(cachepolicy.PolicyAssessmentList),
+			cachepolicy.PolicyAssessmentList,
 			in.Observer,
 		)
 	}

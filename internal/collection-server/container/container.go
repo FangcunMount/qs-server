@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -16,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
+	collectioncache "github.com/FangcunMount/qs-server/internal/collection-server/cache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
@@ -68,7 +68,7 @@ type Container struct {
 	reportNotifier                     reportnotify.Notifier
 	waitWatcherCancel                  context.CancelFunc
 	reportEventsHandler                *ws.ReportEventsHandler
-	catalogCacheWatcherCancels         []context.CancelFunc
+	cacheSubsystem                     *collectioncache.Subsystem
 	l1PeekRegistry                     *catalogpeek.Registry
 
 	// 接口层处理器
@@ -110,11 +110,12 @@ func (c *Container) TesteeService() *testee.Service {
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
 	c := &Container{
-		opts:         opts,
-		opsHandle:    opsHandle,
-		lockManager:  lockManager,
-		familyStatus: familyStatus,
-		initialized:  false,
+		opts:           opts,
+		opsHandle:      opsHandle,
+		lockManager:    lockManager,
+		familyStatus:   familyStatus,
+		initialized:    false,
+		cacheSubsystem: collectioncache.NewSubsystem(opts, opsHandle),
 	}
 	c.initConcurrencyGates()
 	return c
@@ -166,8 +167,8 @@ func (c *Container) Initialize() error {
 	// 2. 初始化接口层
 	c.initHandlers()
 
-	if c.assessmentModelCatalogClient != nil {
-		catalogcache.WarmCatalogOnStartup(c.typologyModelQueryService)
+	if c.cacheSubsystem != nil {
+		c.cacheSubsystem.BindWarmup(c.typologyModelQueryService)
 	}
 
 	c.initialized = true
@@ -241,10 +242,20 @@ func (c *Container) Cleanup() {
 		c.waitWatcherCancel()
 		c.waitWatcherCancel = nil
 	}
-	c.cleanupCatalogCaches()
+	if c.cacheSubsystem != nil {
+		_ = c.cacheSubsystem.Close()
+	}
 
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
+}
+
+// StartCacheSubsystem starts collection cache lifecycle after composition completes.
+func (c *Container) StartCacheSubsystem(ctx context.Context) error {
+	if c == nil || c.cacheSubsystem == nil {
+		return nil
+	}
+	return c.cacheSubsystem.Start(ctx)
 }
 
 // IsInitialized 检查容器是否已初始化

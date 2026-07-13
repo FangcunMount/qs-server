@@ -19,16 +19,14 @@ import (
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
@@ -40,6 +38,8 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
+	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -82,7 +82,7 @@ type Deps struct {
 	QueryRedisClient                            redis.UniversalClient
 	QueryCacheBuilder                           *keyspace.Builder
 	AssessmentListPolicy                        cachepolicy.CachePolicy
-	VersionStore                                cachequery.VersionTokenStore
+	VersionStore                                querycache.VersionTokenStore
 	Observer                                    *observability.ComponentObserver
 	TopicResolver                               eventcatalog.TopicResolver
 	MySQLLimiter                                backpressure.Acquirer
@@ -237,8 +237,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := cachequery.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
-			cacheentry.NewRedisCache(normalized.QueryRedisClient),
+		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
+			redisstore.NewStore(normalized.QueryRedisClient),
 			normalized.VersionStore,
 			normalized.QueryCacheBuilder,
 			normalized.AssessmentListPolicy,

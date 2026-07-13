@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	redis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -18,7 +17,6 @@ type WireInput struct {
 	CacheBuilder        *keyspace.Builder
 	TesteePolicy        cachepolicy.CachePolicy
 	Observer            *observability.ComponentObserver
-	TopicResolver       eventcatalog.TopicResolver
 	MySQLLimiter        backpressure.Acquirer
 	IAMEnabled          bool
 	ProfileLinkService  *iam.ProfileLinkService
@@ -36,7 +34,6 @@ func Wire(in WireInput) (*Module, error) {
 		CacheBuilder:        in.CacheBuilder,
 		TesteePolicy:        in.TesteePolicy,
 		Observer:            in.Observer,
-		TopicResolver:       in.TopicResolver,
 		MySQLLimiter:        in.MySQLLimiter,
 		ProfileLinkService:  in.ProfileLinkService,
 		IdentityService:     in.IdentityService,

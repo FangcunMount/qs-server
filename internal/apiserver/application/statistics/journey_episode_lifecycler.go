@@ -78,18 +78,6 @@ func (l episodeLifecycler) applyCareRelationshipEstablished(ctx context.Context,
 	})
 }
 
-func (l episodeLifecycler) applyCareRelationshipTransferred(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipTransferred, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
-		return err
-	}
-	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
-		OrgID:                            input.OrgID,
-		ClinicianID:                      input.ClinicianID,
-		StatDate:                         input.OccurredAt,
-		CareRelationshipTransferredCount: 1,
-	})
-}
-
 func (l episodeLifecycler) applyAnswerSheetSubmitted(ctx context.Context, input BehaviorProjectEventInput) error {
 	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAnswerSheetSubmitted, "answersheet", input.AnswerSheetID, "testee", input.TesteeID); err != nil {
 		return err

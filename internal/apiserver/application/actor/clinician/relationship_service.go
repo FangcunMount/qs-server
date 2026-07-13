@@ -20,7 +20,6 @@ type relationshipService struct {
 	relationReader actorreadmodel.RelationReader
 	entryReader    actorreadmodel.AssessmentEntryReader
 	assignmentRule domainRelation.AssignmentPolicy
-	behaviorEvents BehaviorEventStager
 	uow            apptransaction.Runner
 }
 
@@ -51,7 +50,6 @@ func NewRelationshipService(
 	relationRepo domainRelation.Repository,
 	clinicianRepo domainClinician.Repository,
 	testeeRepo domainTestee.Repository,
-	behaviorEvents BehaviorEventStager,
 	uow apptransaction.Runner,
 	readModels ...actorreadmodel.ReadModel,
 ) ClinicianRelationshipService {
@@ -66,7 +64,6 @@ func NewRelationshipService(
 		relationReader: readModel,
 		entryReader:    readModel,
 		assignmentRule: domainRelation.NewAssignmentPolicy(),
-		behaviorEvents: behaviorEvents,
 		uow:            uow,
 	}
 }
@@ -100,20 +97,13 @@ func (s *relationshipService) TransferPrimary(ctx context.Context, dto TransferP
 	if sourceType == "" {
 		sourceType = string(domainRelation.SourceTypeTransfer)
 	}
-	testeeID, err := testeeIDFromUint64("testee_id", dto.TesteeID)
+	_, err := testeeIDFromUint64("testee_id", dto.TesteeID)
 	if err != nil {
 		return nil, err
 	}
 	var result *domainRelation.ClinicianTesteeRelation
 	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		var fromClinicianID uint64
-		existingPrimary, err := s.relationRepo.FindActivePrimaryByTestee(txCtx, dto.OrgID, testeeID)
-		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-			return errors.Wrap(err, "failed to find active primary relation before transfer")
-		}
-		if err == nil && existingPrimary != nil {
-			fromClinicianID = existingPrimary.ClinicianID().Uint64()
-		}
+		var err error
 		result, err = s.assignRelationTx(txCtx, AssignTesteeDTO{
 			OrgID:        dto.OrgID,
 			ClinicianID:  dto.ToClinicianID,
@@ -124,11 +114,6 @@ func (s *relationshipService) TransferPrimary(ctx context.Context, dto TransferP
 		})
 		if err != nil {
 			return err
-		}
-		if s.behaviorEvents != nil {
-			if err := s.behaviorEvents.StageCareRelationshipTransferred(txCtx, dto.OrgID, fromClinicianID, dto.ToClinicianID, dto.TesteeID, time.Now()); err != nil {
-				return errors.Wrap(err, "failed to stage care relationship transferred event")
-			}
 		}
 		return nil
 	})

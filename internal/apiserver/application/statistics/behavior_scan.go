@@ -5,7 +5,6 @@ import (
 	"time"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 type behaviorJourneyScanner struct {
@@ -368,7 +367,7 @@ func (s *behaviorJourneyScanner) scanReports(
 func (s *behaviorJourneyScanner) projectEntryResolve(ctx context.Context, lc episodeLifecycler, fact domainStatistics.EntryResolveFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:     domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventEntryOpened, fact.LogID),
-		EventType:   eventcatalog.FootprintEntryOpened,
+		EventType:   string(domainStatistics.BehaviorEventEntryOpened),
 		OrgID:       fact.OrgID,
 		ClinicianID: fact.ClinicianID,
 		EntryID:     fact.EntryID,
@@ -387,14 +386,14 @@ func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, lc epis
 	}
 	intakeInput := base
 	intakeInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventIntakeConfirmed, fact.LogID)
-	intakeInput.EventType = eventcatalog.FootprintIntakeConfirmed
+	intakeInput.EventType = string(domainStatistics.BehaviorEventIntakeConfirmed)
 	if err := lc.applyIntakeConfirmed(ctx, intakeInput); err != nil {
 		return err
 	}
 	if fact.TesteeCreated {
 		testeeInput := base
 		testeeInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventTesteeProfileCreated, fact.LogID)
-		testeeInput.EventType = eventcatalog.FootprintTesteeProfileCreated
+		testeeInput.EventType = string(domainStatistics.BehaviorEventTesteeProfileCreated)
 		if err := lc.applyTesteeProfileCreated(ctx, testeeInput); err != nil {
 			return err
 		}
@@ -402,7 +401,7 @@ func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, lc epis
 	if fact.AssignmentCreated {
 		relationshipInput := base
 		relationshipInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventCareRelationshipEstablished, fact.LogID)
-		relationshipInput.EventType = eventcatalog.FootprintCareRelationshipEstablished
+		relationshipInput.EventType = string(domainStatistics.BehaviorEventCareRelationshipEstablished)
 		if err := lc.applyCareRelationshipEstablished(ctx, relationshipInput); err != nil {
 			return err
 		}
@@ -413,7 +412,7 @@ func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, lc epis
 func (s *behaviorJourneyScanner) projectAnswerSheetSubmitted(ctx context.Context, lc episodeLifecycler, fact domainStatistics.AnswerSheetSubmittedFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:       domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventAnswerSheetSubmitted, fact.AnswerSheetID),
-		EventType:     eventcatalog.FootprintAnswerSheetSubmitted,
+		EventType:     string(domainStatistics.BehaviorEventAnswerSheetSubmitted),
 		OrgID:         fact.OrgID,
 		TesteeID:      fact.TesteeID,
 		AnswerSheetID: fact.AnswerSheetID,
@@ -425,7 +424,7 @@ func (s *behaviorJourneyScanner) projectAnswerSheetSubmitted(ctx context.Context
 func (s *behaviorJourneyScanner) projectAssessmentCreated(ctx context.Context, lc episodeLifecycler, fact domainStatistics.AssessmentCreatedFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:       domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventAssessmentCreated, fact.AssessmentID),
-		EventType:     eventcatalog.FootprintAssessmentCreated,
+		EventType:     string(domainStatistics.BehaviorEventAssessmentCreated),
 		OrgID:         fact.OrgID,
 		TesteeID:      fact.TesteeID,
 		AnswerSheetID: fact.AnswerSheetID,
@@ -439,7 +438,7 @@ func (s *behaviorJourneyScanner) projectAssessmentCreated(ctx context.Context, l
 func (s *behaviorJourneyScanner) projectReportGenerated(ctx context.Context, lc episodeLifecycler, fact domainStatistics.ReportGeneratedFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:      domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventReportGenerated, fact.ReportID),
-		EventType:    eventcatalog.FootprintReportGenerated,
+		EventType:    string(domainStatistics.BehaviorEventReportGenerated),
 		OrgID:        fact.OrgID,
 		TesteeID:     fact.TesteeID,
 		AssessmentID: fact.AssessmentID,

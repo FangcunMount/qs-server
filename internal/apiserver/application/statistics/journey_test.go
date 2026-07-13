@@ -187,7 +187,7 @@ func TestBehaviorProjectorAnswerSheetSubmittedCreatesEpisodeFootprintAndJourneyD
 
 	result, err := projector.ProjectBehaviorEvent(t.Context(), BehaviorProjectEventInput{
 		EventID:       "evt-answer",
-		EventType:     domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
+		EventType:     string(domainStatistics.BehaviorEventAnswerSheetSubmitted),
 		OrgID:         1,
 		TesteeID:      2,
 		AnswerSheetID: 3,
@@ -223,7 +223,7 @@ func TestBehaviorProjectorAssessmentCreatedWithoutEpisodeQueuesPending(t *testin
 
 	result, err := projector.ProjectBehaviorEvent(t.Context(), BehaviorProjectEventInput{
 		EventID:       "evt-assessment",
-		EventType:     domainStatistics.EventTypeFootprintAssessmentCreated,
+		EventType:     string(domainStatistics.BehaviorEventAssessmentCreated),
 		OrgID:         1,
 		TesteeID:      2,
 		AnswerSheetID: 3,
@@ -248,7 +248,7 @@ func TestBehaviorProjectorReconcileInvalidPayloadReschedules(t *testing.T) {
 	repo := &behaviorProjectorRepoStub{
 		pendingRows: []*domainStatistics.AnalyticsPendingEvent{{
 			EventID:      "evt-bad",
-			EventType:    domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
+			EventType:    string(domainStatistics.BehaviorEventAnswerSheetSubmitted),
 			PayloadJSON:  "{bad-json",
 			AttemptCount: 1,
 		}},
@@ -270,7 +270,7 @@ func TestBehaviorProjectorReconcileInvalidPayloadReschedules(t *testing.T) {
 func TestBehaviorProjectorReconcileCompletedDeletesPendingAndMarksCheckpoint(t *testing.T) {
 	payload, err := marshalBehaviorProjectEventInput(BehaviorProjectEventInput{
 		EventID:       "evt-pending",
-		EventType:     domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
+		EventType:     string(domainStatistics.BehaviorEventAnswerSheetSubmitted),
 		OrgID:         1,
 		TesteeID:      2,
 		AnswerSheetID: 3,
@@ -282,7 +282,7 @@ func TestBehaviorProjectorReconcileCompletedDeletesPendingAndMarksCheckpoint(t *
 	repo := &behaviorProjectorRepoStub{
 		pendingRows: []*domainStatistics.AnalyticsPendingEvent{{
 			EventID:      "evt-pending",
-			EventType:    domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
+			EventType:    string(domainStatistics.BehaviorEventAnswerSheetSubmitted),
 			PayloadJSON:  payload,
 			AttemptCount: 1,
 		}},

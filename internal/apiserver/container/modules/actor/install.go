@@ -21,7 +21,6 @@ func InstallFrom(host InstallHost) error {
 		CacheBuilder:        host.CacheBuilder(cacheplane.FamilyObject),
 		TesteePolicy:        host.CachePolicy(cachepolicy.PolicyTestee),
 		Observer:            host.CacheObserver(),
-		TopicResolver:       host.TopicResolver(),
 		MySQLLimiter:        host.MySQLLimiter(),
 		IAMEnabled:          iamPorts.Enabled,
 		ProfileLinkService:  iamPorts.ProfileLinkService,

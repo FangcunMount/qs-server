@@ -50,9 +50,9 @@ type InternalServiceClient interface {
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
 	HandleScalePublishedPostActions(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
-	// 投影行为足迹事件
-	// 场景：worker 处理 qs.analytics.behavior 事件后调用
-	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+	// 投影测评服务过程事件
+	// 场景：worker 处理 evaluation.failed 后调用
+	// 流程：幂等更新测评服务过程，必要时进入 pending 重试
 	ProjectBehaviorEvent(ctx context.Context, in *ProjectBehaviorEventRequest, opts ...grpc.CallOption) (*ProjectBehaviorEventResponse, error)
 	// 发送 task.opened 小程序订阅消息
 	// 场景：worker 处理 task.opened 事件后调用
@@ -173,9 +173,9 @@ type InternalServiceServer interface {
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
 	HandleScalePublishedPostActions(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
-	// 投影行为足迹事件
-	// 场景：worker 处理 qs.analytics.behavior 事件后调用
-	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+	// 投影测评服务过程事件
+	// 场景：worker 处理 evaluation.failed 后调用
+	// 流程：幂等更新测评服务过程，必要时进入 pending 重试
 	ProjectBehaviorEvent(context.Context, *ProjectBehaviorEventRequest) (*ProjectBehaviorEventResponse, error)
 	// 发送 task.opened 小程序订阅消息
 	// 场景：worker 处理 task.opened 事件后调用

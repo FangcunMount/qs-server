@@ -546,8 +546,7 @@ assessment.created
 assessment.completed
 interpretation.completed
 interpretation.failed
-report.generated
-footprint.*
+interpretation.report.generated
 ```
 
 ### 12.3 这层设计的价值
@@ -774,23 +773,15 @@ answersheet.submitted
 
 ## 19. 事件系统和 Statistics 怎么串
 
-统计读侧依赖行为投影事件。
+统计读侧的行为旅程由后台扫描器重建。
 
-典型事件：
-
-```text
-footprint.answer_sheet_submitted
-footprint.report_generated
-footprint.entry_opened
-footprint.intake_confirmed
-```
+扫描事实：入口解析/接入日志、答卷、测评和报告。
 
 链路：
 
 ```text
-domain event
-  -> analytics-behavior topic
-  -> behavior_projector_handler
+业务事实表
+  -> behavior_journey_scan
   -> BehaviorProjector
   -> checkpoint / pending retry
   -> statistics read model
@@ -798,7 +789,7 @@ domain event
 
 讲法：
 
-> **统计不是每次实时扫业务写模型，而是通过行为事件投影形成读侧视图。事件系统给统计提供了低耦合的数据进入方式。**
+> **统计行为旅程由后台轮询器按固定窗口扫描业务事实形成读侧视图；它不依赖 MQ 行为事件。**
 
 ---
 

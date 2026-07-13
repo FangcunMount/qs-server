@@ -131,9 +131,9 @@ Mongo transaction:
 
 | Outbox | 存储 | 典型事件 | 作用 |
 | ------ | ---- | -------- | ---- |
-| mongo-domain-events | Mongo | `answersheet.submitted`、`footprint.*` 等 | 从 Survey 答卷事实和行为足迹出站 |
+| mongo-domain-events | Mongo | `answersheet.submitted`、Interpretation 报告事件等 | 从 Survey 答卷事实和报告状态出站 |
 | assessment-mysql-outbox | MySQL | `assessment.created`、`assessment.completed`、`interpretation.completed`、`interpretation.failed`、`assessment.failed` | 从 Evaluation / Assessment / Interpretation 状态出站 |
-| report mongo outbox | Mongo | `report.generated`、`footprint.report_generated` | 从 Report durable save 出站 |
+| report mongo outbox | Mongo | `interpretation.report.generated` | 从 Report durable save 出站 |
 
 它们都不是“单独的消息表”那么简单，而是和各自业务事实存储绑定。
 

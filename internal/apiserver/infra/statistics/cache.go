@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
+	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
@@ -18,8 +20,8 @@ const statsQueryCacheKind = "stats:query"
 // StatisticsCache 统计查询缓存（Redis 操作封装）。
 // 只保留查询结果缓存，不再承担事件去重和日计数写入。
 type StatisticsCache struct {
-	cache        cacheentry.Cache
-	versionStore cachequery.VersionTokenStore
+	cache        sharedcache.Store
+	versionStore querycache.VersionTokenStore
 	policy       cachepolicy.CachePolicy
 	observer     *observability.ComponentObserver
 	keys         *keyspace.Builder
@@ -32,7 +34,7 @@ func NewStatisticsCacheWithBuilderAndPolicy(client redis.UniversalClient, builde
 		client,
 		builder,
 		policy,
-		cachequery.NewStaticVersionTokenStore(0),
+		querycache.NewStaticVersionTokenStore(0),
 		nil,
 	)
 }
@@ -41,17 +43,17 @@ func NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 	client redis.UniversalClient,
 	builder *keyspace.Builder,
 	policy cachepolicy.CachePolicy,
-	versionStore cachequery.VersionTokenStore,
+	versionStore querycache.VersionTokenStore,
 	observer *observability.ComponentObserver,
 ) *StatisticsCache {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	if versionStore == nil {
-		versionStore = cachequery.NewStaticVersionTokenStore(0)
+		versionStore = querycache.NewStaticVersionTokenStore(0)
 	}
 	return &StatisticsCache{
-		cache:        cacheentry.NewRedisCache(client),
+		cache:        redisstore.NewStore(client),
 		versionStore: versionStore,
 		policy:       policy,
 		observer:     observer,
@@ -68,7 +70,7 @@ func (c *StatisticsCache) GetQueryCache(ctx context.Context, cacheKey string) (s
 	err := c.queryCache(0).Get(ctx, c.versionKey(cacheKey), func(version uint64) string {
 		return c.dataKey(cacheKey, version)
 	}, &value)
-	if err == cacheentry.ErrCacheNotFound {
+	if err == sharedcache.ErrMiss {
 		return "", nil
 	}
 	if err != nil {
@@ -88,19 +90,22 @@ func (c *StatisticsCache) SetQueryCache(ctx context.Context, cacheKey string, va
 	return nil
 }
 
-func (c *StatisticsCache) queryCache(ttl time.Duration) *cachequery.VersionedQueryCache {
+func (c *StatisticsCache) queryCache(ttl time.Duration) *querycache.Versioned {
 	if c == nil || c.cache == nil || c.versionStore == nil {
 		return nil
 	}
-	return cachequery.NewVersionedQueryCacheWithObserver(
-		c.cache,
-		c.versionStore,
-		cachepolicy.PolicyStatsQuery,
-		c.policy,
-		ttl,
-		nil,
-		c.observer,
-	)
+	return querycache.NewVersioned(querycache.VersionedOptions{
+		Store:      c.cache,
+		Version:    c.versionStore,
+		Capability: sharedcache.Capability(cachepolicy.PolicyStatsQuery),
+		Policy:     c.policy,
+		TTL:        ttl,
+		Observer: cacheobserve.NewPrometheus(
+			string(cachepolicy.FamilyFor(cachepolicy.PolicyStatsQuery)),
+			string(cachepolicy.PolicyStatsQuery),
+			c.observer,
+		),
+	})
 }
 
 func (c *StatisticsCache) versionKey(cacheKey string) string {

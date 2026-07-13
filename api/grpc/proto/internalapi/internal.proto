@@ -35,9 +35,9 @@ service InternalService {
   rpc HandleScalePublishedPostActions(GenerateScaleQRCodeRequest)
       returns (GenerateScaleQRCodeResponse);
 
-  // 投影行为足迹事件
-  // 场景：worker 处理 qs.analytics.behavior 事件后调用
-  // 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+  // 投影测评服务过程事件
+  // 场景：worker 处理 evaluation.failed 后调用
+  // 流程：幂等更新测评服务过程，必要时进入 pending 重试
   rpc ProjectBehaviorEvent(ProjectBehaviorEventRequest)
       returns (ProjectBehaviorEventResponse);
 

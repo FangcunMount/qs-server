@@ -440,6 +440,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "产品通道",
+                        "name": "product_channel",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "问卷编码",
                         "name": "questionnaire_code",
                         "in": "query"
@@ -9244,6 +9250,29 @@ const docTemplate = `{
                 }
             }
         },
+        "definition.Brief2Spec": {
+            "type": "object",
+            "properties": {
+                "formVariant": {
+                    "type": "string"
+                },
+                "indexFactorCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "primaryFactorCode": {
+                    "type": "string"
+                },
+                "validityFactorCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "definition.Calibration": {
             "type": "object",
             "properties": {
@@ -9252,6 +9281,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/norm.Ref"
                     }
+                }
+            }
+        },
+        "definition.ExecutionSpec": {
+            "type": "object",
+            "properties": {
+                "brief2": {
+                    "$ref": "#/definitions/definition.Brief2Spec"
+                },
+                "spm": {
+                    "$ref": "#/definitions/definition.SPMSpec"
                 }
             }
         },
@@ -9311,6 +9351,48 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "definition.SPMItem": {
+            "type": "object",
+            "properties": {
+                "correctOptionCode": {
+                    "type": "string"
+                },
+                "questionCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "definition.SPMItemSet": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/definition.SPMItem"
+                    }
+                }
+            }
+        },
+        "definition.SPMSpec": {
+            "type": "object",
+            "properties": {
+                "itemSets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/definition.SPMItemSet"
+                    }
+                },
+                "timeLimitSeconds": {
+                    "type": "integer"
+                },
+                "totalFactorCode": {
                     "type": "string"
                 }
             }
@@ -9530,6 +9612,9 @@ const docTemplate = `{
                 "conclusions": {
                     "type": "array",
                     "items": {}
+                },
+                "execution": {
+                    "$ref": "#/definitions/definition.ExecutionSpec"
                 },
                 "measure": {
                     "$ref": "#/definitions/definition.MeasureSpec"

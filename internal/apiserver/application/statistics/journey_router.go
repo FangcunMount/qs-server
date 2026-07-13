@@ -14,21 +14,19 @@ type behaviorEventRouter struct {
 
 func (r behaviorEventRouter) projectEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
 	switch input.EventType {
-	case domainStatistics.EventTypeFootprintEntryOpened:
+	case string(domainStatistics.BehaviorEventEntryOpened):
 		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyEntryOpened(ctx, input)
-	case domainStatistics.EventTypeFootprintIntakeConfirmed:
+	case string(domainStatistics.BehaviorEventIntakeConfirmed):
 		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyIntakeConfirmed(ctx, input)
-	case domainStatistics.EventTypeFootprintTesteeProfileCreated:
+	case string(domainStatistics.BehaviorEventTesteeProfileCreated):
 		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyTesteeProfileCreated(ctx, input)
-	case domainStatistics.EventTypeFootprintCareRelationshipEstablished:
+	case string(domainStatistics.BehaviorEventCareRelationshipEstablished):
 		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyCareRelationshipEstablished(ctx, input)
-	case domainStatistics.EventTypeFootprintCareRelationshipTransferred:
-		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyCareRelationshipTransferred(ctx, input)
-	case domainStatistics.EventTypeFootprintAnswerSheetSubmitted:
+	case string(domainStatistics.BehaviorEventAnswerSheetSubmitted):
 		return BehaviorProjectEventStatusCompleted, r.lifecycler.applyAnswerSheetSubmitted(ctx, input)
-	case domainStatistics.EventTypeFootprintAssessmentCreated:
+	case string(domainStatistics.BehaviorEventAssessmentCreated):
 		return r.lifecycler.applyAssessmentCreated(ctx, input)
-	case domainStatistics.EventTypeFootprintReportGenerated:
+	case string(domainStatistics.BehaviorEventReportGenerated):
 		return r.lifecycler.applyReportGenerated(ctx, input)
 	case domainAssessment.EventTypeFailed:
 		return r.lifecycler.applyAssessmentFailed(ctx, input)

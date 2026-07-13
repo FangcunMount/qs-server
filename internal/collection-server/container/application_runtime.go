@@ -66,18 +66,26 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 
 func (c *Container) buildCatalogRuntime() catalogRuntime {
 	// catalog 读路径不经 acl：grpcbridge catalog reader 直接产出 application DTO。
-	catalogCaches := c.initCatalogCaches()
+	var questionnaireCache questionnaire.PublishedDetailCache
+	var typologyCache typologymodel.CatalogCache
+	var questionnaireSingleflight, typologySingleflight bool
+	if c.cacheSubsystem != nil {
+		questionnaireCache = c.cacheSubsystem.Questionnaire()
+		typologyCache = c.cacheSubsystem.Typology()
+		questionnaireSingleflight = c.cacheSubsystem.QuestionnaireSingleflight()
+		typologySingleflight = c.cacheSubsystem.TypologySingleflight()
+	}
 	rt := catalogRuntime{
 		questionnaire: questionnaire.NewQueryService(
 			grpcbridge.NewQuestionnaireCatalogReader(c.questionnaireClient),
-			catalogCaches.questionnaire,
-			catalogL1SingleflightEnabled(c.opts, catalogKindQuestionnaire),
+			questionnaireCache,
+			questionnaireSingleflight,
 		),
 		assessmentModels: appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient)),
 		typology: typologymodel.NewQueryService(
 			grpcbridge.NewTypologyCatalogProjector(appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient))),
-			catalogCaches.typology,
-			catalogL1SingleflightEnabled(c.opts, catalogKindTypology),
+			typologyCache,
+			typologySingleflight,
 		),
 	}
 	c.l1PeekRegistry = catalogpeek.NewRegistry()

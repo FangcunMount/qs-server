@@ -33,15 +33,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		ReportStatus:               s.config.ReportStatus,
 		Signaling:                  s.config.Signaling,
 		SystemGovernance:           s.config.SystemGovernance,
-		BehaviorFootprintDisableDurableEventTypes: behaviorFootprintDisableDurableEventTypes(s.config),
 	}
-}
-
-func behaviorFootprintDisableDurableEventTypes(cfg *config.Config) []string {
-	if cfg == nil || cfg.BehaviorFootprint == nil {
-		return nil
-	}
-	return cfg.BehaviorFootprint.DisableDurableEventTypes
 }
 
 func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOutboxRelayOptions {

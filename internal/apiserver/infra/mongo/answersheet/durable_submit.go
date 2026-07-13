@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -127,11 +124,6 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	if err != nil {
 		return nil, err
 	}
-	orgID, err := safeconv.MetaIDToUint64(submissionContext.OrgID())
-	if err != nil {
-		return nil, err
-	}
-
 	var idempotencyDoc *AnswerSheetSubmitIdempotencyPO
 	if metaInfo.IdempotencyKey != "" {
 		code, version, _ := sheet.QuestionnaireInfo()
@@ -160,19 +152,6 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	}
 
 	events := append([]event.DomainEvent{}, sheet.Events()...)
-	orgIDInt64, err := safeconv.Uint64ToInt64(orgID)
-	if err != nil {
-		return nil, err
-	}
-	if statisticsApp.FootprintEventAllowed(eventcatalog.FootprintAnswerSheetSubmitted) {
-		events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
-			orgIDInt64,
-			testeeID,
-			sheet.ID().Uint64(),
-			sheet.FilledAt(),
-		))
-	}
-
 	return events, nil
 }
 

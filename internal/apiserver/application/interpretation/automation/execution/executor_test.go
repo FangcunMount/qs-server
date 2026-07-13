@@ -98,7 +98,7 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	if run, err := runs.FindByID(context.Background(), result.InterpretReport.InterpretationRunID()); err != nil || run.Status() != interpretationrun.StatusSucceeded {
 		t.Fatalf("run=%#v err=%v", run, err)
 	}
-	if len(reports.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 2 || tx.calls != 2 {
+	if len(reports.items) != 1 || len(stager.events) != 1 || len(stager.events[0]) != 1 || tx.calls != 2 {
 		t.Fatalf("reports=%d events=%#v tx=%d", len(reports.items), stager.events, tx.calls)
 	}
 	if _, err := service.Execute(context.Background(), executorInput(), "duplicate"); err != nil {

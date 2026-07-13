@@ -10,9 +10,9 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -33,7 +33,7 @@ type BootstrapInput struct {
 	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
 	HotsetRecorder         cachetarget.HotsetRecorder
 	LockManager            locklease.Manager
-	VersionStore           cachequery.VersionTokenStore
+	VersionStore           querycache.VersionTokenStore
 	Observer               *observability.ComponentObserver
 	MySQLLimiter           backpressure.Acquirer
 	WarmupCoordinator      cachegov.Coordinator

@@ -8,7 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -40,7 +39,6 @@ type Container struct {
 	outboxRelay                ContainerOutboxRelayOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
-	behaviorFootprintDisabled  []string
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
 	cacheSignalNotifier        *cachesignal.Notifier
@@ -145,7 +143,6 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.outboxRelay = opts.OutboxRelay
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
-	c.behaviorFootprintDisabled = opts.BehaviorFootprintDisableDurableEventTypes
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
 	c.systemGovernanceOptions = opts.SystemGovernance
 	c.silent = opts.Silent
@@ -160,13 +157,9 @@ func (c *Container) Initialize() error {
 	}
 
 	// 确保 cache singleflight coordinator 初始化
-	ensureCacheSingleflightCoordinator()
 
 	// 初始化事件发布器（所有模块共享）
 	c.initEventPublisher()
-	statisticsApp.InstallFootprintDurableStagingPolicy(
-		statisticsApp.NewFootprintDurableStagingPolicy(c.behaviorFootprintDisabled),
-	)
 	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
 
 	if err := c.initCacheSignalNotifier(); err != nil {

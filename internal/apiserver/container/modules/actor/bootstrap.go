@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 // BootstrapInput carries container integration inputs for actor module bootstrap.
@@ -24,7 +23,6 @@ type BootstrapInput struct {
 	CacheBuilder        *keyspace.Builder
 	TesteePolicy        cachepolicy.CachePolicy
 	Observer            *observability.ComponentObserver
-	TopicResolver       eventcatalog.TopicResolver
 	MySQLLimiter        backpressure.Acquirer
 }
 
@@ -40,7 +38,6 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 		OperatorAuthz:       in.OperatorAuthz,
 		OperationAccountSvc: in.OperationAccountSvc,
 		Observer:            in.Observer,
-		TopicResolver:       in.TopicResolver,
 		MySQLLimiter:        in.MySQLLimiter,
 	})
 }

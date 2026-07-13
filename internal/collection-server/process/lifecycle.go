@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
@@ -37,8 +38,10 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 			return integrationOutput.iamSync.authzVersionSubscriber.Close()
 		}
 	}
-	if containerOutput.container != nil && containerOutput.container.IAMModule != nil {
-		deps.closeIAM = containerOutput.container.IAMModule.Close
+	if containerOutput.container != nil {
+		if containerOutput.container.IAMModule != nil {
+			deps.closeIAM = containerOutput.container.IAMModule.Close
+		}
 		deps.cleanupContainer = func() error {
 			containerOutput.container.Cleanup()
 			return nil
@@ -66,6 +69,11 @@ func runCollectionLifecycle(deps lifecycleDeps) {
 }
 
 func (s preparedServer) Run() error {
+	if s.startCache != nil {
+		if err := s.startCache(context.Background()); err != nil {
+			return err
+		}
+	}
 	if s.startShutdown != nil {
 		if err := s.startShutdown(); err != nil {
 			log.Fatalf("start shutdown manager failed: %s", err.Error())

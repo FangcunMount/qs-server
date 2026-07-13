@@ -3,15 +3,14 @@ package container
 import (
 	"context"
 	"strings"
-	"sync"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
@@ -22,15 +21,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
 )
-
-var initCacheSingleflight sync.Once
-
-// ensureCacheSingleflightCoordinator 确保 cache singleflight coordinator 初始化
-func ensureCacheSingleflightCoordinator() {
-	initCacheSingleflight.Do(func() {
-		cacheinfra.SetDefaultSingleflightCoordinator(cacheinfra.NewSingleflightCoordinator())
-	})
-}
 
 func (c *Container) CacheHandle(family cacheplane.Family) *cacheplane.Handle {
 	if c == nil || c.cache == nil {

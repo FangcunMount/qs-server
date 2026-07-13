@@ -118,14 +118,6 @@ func TestCatalogDeliveryClass(t *testing.T) {
 		{EvaluationFailed, DeliveryClassDurableOutbox, true},
 		{InterpretationReportGenerated, DeliveryClassDurableOutbox, true},
 		{InterpretationReportFailed, DeliveryClassDurableOutbox, true},
-		{FootprintEntryOpened, DeliveryClassDurableOutbox, true},
-		{FootprintIntakeConfirmed, DeliveryClassDurableOutbox, true},
-		{FootprintTesteeProfileCreated, DeliveryClassDurableOutbox, true},
-		{FootprintCareRelationshipEstablished, DeliveryClassDurableOutbox, true},
-		{FootprintCareRelationshipTransferred, DeliveryClassDurableOutbox, true},
-		{FootprintAnswerSheetSubmitted, DeliveryClassDurableOutbox, true},
-		{FootprintAssessmentCreated, DeliveryClassDurableOutbox, true},
-		{FootprintReportGenerated, DeliveryClassDurableOutbox, true},
 	}
 
 	if len(tests) != len(EventTypes()) {

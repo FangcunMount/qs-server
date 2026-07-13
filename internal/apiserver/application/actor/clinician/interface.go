@@ -39,11 +39,6 @@ type ClinicianRelationshipService interface {
 	GetTesteeCareContext(ctx context.Context, orgID int64, testeeID uint64) (*TesteeCareContextResult, error)
 }
 
-// BehaviorEventStager 将看护关系行为事件暂存到 outbox。
-type BehaviorEventStager interface {
-	StageCareRelationshipTransferred(ctx context.Context, orgID int64, fromClinicianID, toClinicianID, testeeID uint64, occurredAt time.Time) error
-}
-
 // RegisterClinicianDTO 注册从业者。
 type RegisterClinicianDTO struct {
 	OrgID         int64

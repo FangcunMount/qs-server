@@ -15,8 +15,6 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
-const analyticsBehaviorTopicName = "qs.analytics.behavior"
-
 type TopicSubscriptionSource interface {
 	GetTopicSubscriptions() []eventcatalog.TopicSubscription
 }
@@ -284,10 +282,7 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 	}
 }
 
-func dispatchLogLevel(topicName string) slog.Level {
-	if topicName == analyticsBehaviorTopicName {
-		return slog.LevelInfo
-	}
+func dispatchLogLevel(_ string) slog.Level {
 	return slog.LevelDebug
 }
 

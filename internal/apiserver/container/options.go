@@ -36,8 +36,6 @@ type ContainerOptions struct {
 	// ReportStatus report_status 与 signaling YAML 配置
 	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
 	Signaling    *genericoptions.SignalingOptions    `json:"signaling" mapstructure:"signaling"`
-	// BehaviorFootprintDisableDurableEventTypes disables durable staging for selected footprint events.
-	BehaviorFootprintDisableDurableEventTypes []string `json:"behavior_footprint_disable_durable_event_types" mapstructure:"behavior_footprint_disable_durable_event_types"`
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
 	// SystemGovernance unified governance facade configuration.

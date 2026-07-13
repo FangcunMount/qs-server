@@ -35,7 +35,7 @@ func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByA
 		if err := u.service.logIntakeSuccess(txCtx, state); err != nil {
 			return err
 		}
-		return u.service.stageIntakeBehaviorEvents(txCtx, state)
+		return nil
 	})
 	if err != nil {
 		return nil, err

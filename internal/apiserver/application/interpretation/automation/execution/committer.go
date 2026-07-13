@@ -11,8 +11,6 @@ import (
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
-	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpolicy"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -111,7 +109,7 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 	if err := generationToCommit.Succeed(runToCommit.ID(), request.InterpretReport.ID(), completedAt); err != nil {
 		return nil, err
 	}
-	events := outboxpolicy.Filter(generatedEvents(request.InterpretReport, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion))
+	events := generatedEvents(request.InterpretReport, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion)
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.reports.Insert(txCtx, request.InterpretReport); err != nil {
 			return err
@@ -157,13 +155,13 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 		return nil, err
 	}
 	key := generationToCommit.Key()
-	events := outboxpolicy.Filter([]event.DomainEvent{domaininterpretation.NewInterpretationReportFailedEvent(domaininterpretation.ReportFailedEventInput{
+	events := []event.DomainEvent{domaininterpretation.NewInterpretationReportFailedEvent(domaininterpretation.ReportFailedEventInput{
 		OrgID: request.Association.OrgID, GenerationID: generationToCommit.ID().String(), RunID: runToCommit.ID().String(),
 		AssessmentID: request.Association.AssessmentID.String(), OutcomeID: request.OutcomeID.String(), TesteeID: request.Association.TesteeID,
 		Attempt: uint(runToCommit.Attempt()), ReportType: key.ReportType.String(), TemplateVersion: key.TemplateVersion.String(),
 		FailureKind: string(request.Failure.Kind), FailureCode: request.Failure.Code, Retryable: request.Failure.Retryable,
 		SafeReason: request.Failure.SafeMessage, FailedAt: failedAt,
-	})})
+	})}
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.runs.Save(txCtx, runToCommit); err != nil {
 			return err
@@ -262,6 +260,5 @@ func generatedEvents(artifact *domainreport.InterpretReport, attempt int, builde
 		ContentSchemaVersion: contentSchemaVersion, Model: domaininterpretation.EventModelIdentityFrom(content.Model),
 		PrimaryScore: domaininterpretation.EventScoreValueFrom(content.PrimaryScore), Level: domaininterpretation.EventResultLevelFrom(content.Level), GeneratedAt: artifact.GeneratedAt(),
 	})
-	footprint := footprintevent.NewFootprintReportGeneratedEvent(association.OrgID, association.TesteeID, association.AssessmentID.Uint64(), artifact.ID().Uint64(), artifact.GeneratedAt())
-	return []event.DomainEvent{generated, footprint}
+	return []event.DomainEvent{generated}
 }

@@ -9,10 +9,10 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -32,7 +32,7 @@ type BootstrapInput struct {
 	QueryRedisClient                            redis.UniversalClient
 	QueryCacheBuilder                           *keyspace.Builder
 	AssessmentListPolicy                        cachepolicy.CachePolicy
-	VersionStore                                cachequery.VersionTokenStore
+	VersionStore                                querycache.VersionTokenStore
 	Observer                                    *observability.ComponentObserver
 	TopicResolver                               eventcatalog.TopicResolver
 	MySQLLimiter                                backpressure.Acquirer

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
@@ -21,6 +22,7 @@ type server struct {
 
 type preparedServer struct {
 	startShutdown func() error
+	startCache    func(context.Context) error
 	httpServer    *genericapiserver.GenericAPIServer
 }
 

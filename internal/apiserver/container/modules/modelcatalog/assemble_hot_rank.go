@@ -4,7 +4,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 )

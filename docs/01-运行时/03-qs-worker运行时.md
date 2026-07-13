@@ -246,7 +246,6 @@ dispatcher 初始化时会检查：`events.yaml` 里每个事件声明的 `handl
 | `assessment_interpreted_handler` | `assessment.interpreted` |
 | `assessment_failed_handler` | `assessment.failed` |
 | `report_generated_handler` | `report.generated` |
-| `behavior_projector_handler` | `footprint.*` |
 | `questionnaire_changed_handler` | `questionnaire.changed` |
 | `assessment_model_changed_handler` | `assessment_model.changed` |
 | `task_opened_handler` | `task.opened` |
@@ -361,7 +360,6 @@ sequenceDiagram
 | `assessment.interpreted` | `assessment_interpreted_handler` | 评估完成后的后处理 |
 | `assessment.failed` | `assessment_failed_handler` | 评估失败后的后处理 |
 | `report.generated` | `report_generated_handler` | 打标签、报告相关副作用 |
-| `footprint.*` | `behavior_projector_handler` | 投影行为足迹与服务过程 |
 | `questionnaire.changed` | `questionnaire_changed_handler` | 发布后二维码等动作 |
 | `assessment_model.changed` | `assessment_model_changed_handler` | 发布后二维码等动作 |
 | `task.opened` | `task_opened_handler` | 任务开放通知 |

@@ -32,7 +32,6 @@ type Options struct {
 	BehaviorPendingReconcile       *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
 	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
 	BehaviorJourneyScan            *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
-	BehaviorFootprint              *BehaviorFootprintOptions               `json:"behavior_footprint" mapstructure:"behavior_footprint"`
 	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure                   *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
@@ -66,7 +65,6 @@ func NewOptions() *Options {
 		BehaviorPendingReconcile:       NewBehaviorPendingReconcileOptions(),
 		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
 		BehaviorJourneyScan:            NewBehaviorJourneyScanOptions(),
-		BehaviorFootprint:              NewBehaviorFootprintOptions(),
 		OutboxRelay:                    NewOutboxRelayOptions(),
 		RateLimit:                      NewRateLimitOptions(),
 		Backpressure:                   NewBackpressureOptions(),
@@ -342,34 +340,6 @@ func (b *BehaviorJourneyScanOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&b.WindowRecalc, "behavior_journey_scan.window-recalc", b.WindowRecalc, "Rebuild statistics_journey_daily for the lookback window after each org scan.")
 }
 
-// BehaviorFootprintOptions controls durable footprint event staging.
-type BehaviorFootprintOptions struct {
-	DisableDurableEventTypes []string `json:"disable_durable_event_types" mapstructure:"disable_durable_event_types"`
-}
-
-// NewBehaviorFootprintOptions creates default footprint staging options.
-func NewBehaviorFootprintOptions() *BehaviorFootprintOptions {
-	return &BehaviorFootprintOptions{
-		DisableDurableEventTypes: []string{
-			"footprint.entry_opened",
-			"footprint.intake_confirmed",
-			"footprint.testee_profile_created",
-			"footprint.care_relationship_established",
-			"footprint.answersheet_submitted",
-			"footprint.assessment_created",
-			"footprint.report_generated",
-		},
-	}
-}
-
-// AddFlags registers footprint staging flags.
-func (b *BehaviorFootprintOptions) AddFlags(fs *pflag.FlagSet) {
-	if b == nil {
-		return
-	}
-	fs.StringSliceVar(&b.DisableDurableEventTypes, "behavior_footprint.disable-durable-event-types", b.DisableDurableEventTypes, "Footprint event types that must not enter durable outbox.")
-}
-
 // OutboxRelayOptions controls durable outbox relay loops inside qs-apiserver.
 type OutboxRelayOptions struct {
 	Mongo      *OutboxRelayStoreOptions `json:"mongo" mapstructure:"mongo"`
@@ -482,7 +452,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
 	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
 	o.BehaviorJourneyScan.AddFlags(fss.FlagSet("behavior_journey_scan"))
-	o.BehaviorFootprint.AddFlags(fss.FlagSet("behavior_footprint"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
