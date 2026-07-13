@@ -9,14 +9,13 @@ import (
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -101,24 +100,7 @@ func (c *Container) CachePolicyReloader() systemgovApp.CachePolicyReloader {
 	return c.cache.PolicyReloader()
 }
 
-func (c *Container) initCacheSignalNotifier() error {
-	if c == nil {
-		return nil
-	}
-	notifier, err := cachesignal.NewNotifier(
-		c.CacheHandle(redisruntime.FamilyOps),
-		cachesignal.ConfigFromReportStatus(c.reportStatusConfig),
-	)
-	if err != nil {
-		return err
-	}
-	if c.cache != nil {
-		c.cache.BindSignalNotifier(notifier)
-	}
-	return nil
-}
-
-func (c *Container) CacheSignalNotifier() *cachesignal.Notifier {
+func (c *Container) CacheSignalNotifier() cachebootstrap.SignalNotifier {
 	if c == nil {
 		return nil
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -55,7 +54,7 @@ type Subsystem struct {
 	warmupCoordinator cachegov.Coordinator
 	statusService     cachegov.StatusService
 	policyReloader    *cachegov.PolicyReloader
-	notifier          *cachesignal.Notifier
+	signals           *signalRuntime
 
 	lifecycleMu sync.Mutex
 	started     bool
@@ -121,6 +120,7 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 	if s.lockManager == nil {
 		s.lockManager = redisadapter.NewManagerWithObservers(component, "lock_lease", s.Handle(redisruntime.FamilyLock), nil, s.observer)
 	}
+	s.signals = newSignalRuntime(s.Client(redisruntime.FamilyOps), cacheConfig.Signal, component)
 	s.warnMetaCacheAvailability()
 	return s
 }
@@ -175,23 +175,11 @@ func (s *Subsystem) PolicyReloader() *cachegov.PolicyReloader {
 	return s.policyReloader
 }
 
-// BindSignalNotifier transfers signal-watcher ownership to the cache subsystem.
-func (s *Subsystem) BindSignalNotifier(notifier *cachesignal.Notifier) {
-	if s == nil {
-		return
-	}
-	s.lifecycleMu.Lock()
-	s.notifier = notifier
-	s.lifecycleMu.Unlock()
-}
-
-func (s *Subsystem) SignalNotifier() *cachesignal.Notifier {
+func (s *Subsystem) SignalNotifier() SignalNotifier {
 	if s == nil {
 		return nil
 	}
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
-	return s.notifier
+	return s.signals
 }
 
 // Start starts signal watching and startup warmup. It is safe to call repeatedly.
@@ -210,18 +198,12 @@ func (s *Subsystem) Start(ctx context.Context) error {
 	runCtx, cancel := context.WithCancel(ctx)
 	s.started = true
 	s.cancel = cancel
-	notifier := s.notifier
+	signals := s.signals
 	coordinator := s.warmupCoordinator
 	s.lifecycleMu.Unlock()
 
-	if notifier != nil {
-		cachegov.StartCacheSignalWatcher(
-			runCtx,
-			coordinator,
-			notifier.QuestionnaireSignaler(),
-			notifier.ScaleSignaler(),
-			notifier.TypologyModelSignaler(),
-		)
+	if signals != nil {
+		signals.Start(runCtx, coordinator)
 	}
 	if coordinator != nil {
 		go func() {

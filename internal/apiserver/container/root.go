@@ -168,10 +168,6 @@ func (c *Container) Initialize() error {
 	}
 	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
 
-	if err := c.initCacheSignalNotifier(); err != nil {
-		return fmt.Errorf("failed to initialize cache signal notifier: %w", err)
-	}
-
 	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
 	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入
 	// 暂时留空，在 InitializeWithOptions 方法中初始化

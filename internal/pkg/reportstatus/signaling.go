@@ -40,22 +40,10 @@ func (o SignalingOptions) RedisOptions() signalredis.Options {
 
 // NewSignaler 基于 Redis 客户端创建 signaling Signaler。
 func NewSignaler(client goredis.UniversalClient, opts SignalingOptions) (*signalredis.Signaler[ChangedSignal], error) {
-	standalone, err := AsStandaloneClient(client)
-	if err != nil {
-		return nil, err
-	}
-	return signalredis.NewSignaler[ChangedSignal](standalone, opts.RedisOptions()), nil
-}
-
-// AsStandaloneClient signaling/redis 当前仅支持 standalone *Client。
-func AsStandaloneClient(client goredis.UniversalClient) (*goredis.Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("redis client is nil")
 	}
-	if c, ok := client.(*goredis.Client); ok {
-		return c, nil
-	}
-	return nil, fmt.Errorf("signaling redis requires standalone *redis.Client")
+	return signalredis.NewSignaler[ChangedSignal](client, opts.RedisOptions()), nil
 }
 
 var (

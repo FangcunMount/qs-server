@@ -51,7 +51,30 @@ type Config struct {
 	Questionnaire   CatalogBinding
 	Typology        CatalogBinding
 	ReportStatusTTL time.Duration
-	Signaling       cachesignal.Config
+	Signaling       SignalOptions
+}
+
+// SignalOptions controls collection-server's Redis Pub/Sub cache watchers.
+type SignalOptions struct {
+	Enabled    bool
+	Prefix     string
+	Channel    string
+	BufferSize int
+}
+
+func (o SignalOptions) redisOptions() signalredis.Options {
+	opts := signalredis.DefaultOptions()
+	opts.Prefix = "qs:signal"
+	if o.Prefix != "" {
+		opts.Prefix = o.Prefix
+	}
+	if o.Channel != "" {
+		opts.Channel = o.Channel
+	}
+	if o.BufferSize > 0 {
+		opts.BufferSize = o.BufferSize
+	}
+	return opts
 }
 
 func NewSubsystem(config Config, opsHandle *redisruntime.Handle) *Subsystem {
@@ -160,15 +183,11 @@ func (s *Subsystem) startQuestionnaireWatcher(ctx context.Context) {
 	if s.questionnaire == nil || !cfg.Enabled || !cfg.SignalEvict {
 		return
 	}
-	client, signaling, ok := s.signaling("questionnaire cache signal watcher")
+	client, signaling, ok := s.signaling()
 	if !ok {
 		return
 	}
-	signaler, err := cachesignal.NewQuestionnaireSignaler(client, signaling)
-	if err != nil {
-		log.Warnf("questionnaire cache signal watcher disabled: %v", err)
-		return
-	}
+	signaler := signalredis.NewSignaler[cachesignal.QuestionnaireCacheChangedSignal](client, signaling)
 	watchSignals(ctx, signaler, func(signal cachesignal.QuestionnaireCacheChangedSignal) {
 		if signal.Code == "" {
 			return
@@ -187,15 +206,11 @@ func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
 	if s.typology == nil || !cfg.Enabled || !cfg.SignalEvict {
 		return
 	}
-	client, signaling, ok := s.signaling("typology model cache signal watcher")
+	client, signaling, ok := s.signaling()
 	if !ok {
 		return
 	}
-	signaler, err := cachesignal.NewTypologyModelSignaler(client, signaling)
-	if err != nil {
-		log.Warnf("typology model cache signal watcher disabled: %v", err)
-		return
-	}
+	signaler := signalredis.NewSignaler[cachesignal.TypologyModelCacheChangedSignal](client, signaling)
 	watchSignals(ctx, signaler, func(signal cachesignal.TypologyModelCacheChangedSignal) {
 		if signal.Code != "" {
 			s.typology.EvictOnSignal(signal.Code)
@@ -203,17 +218,12 @@ func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
 	}, "typology model cache signal evicted")
 }
 
-func (s *Subsystem) signaling(label string) (*redis.Client, cachesignal.SignalingOptions, bool) {
+func (s *Subsystem) signaling() (redis.UniversalClient, signalredis.Options, bool) {
 	cfg := s.config.Signaling
-	if !cfg.Signaling.Enabled || s.opsHandle == nil || s.opsHandle.Client == nil {
-		return nil, cachesignal.SignalingOptions{}, false
+	if !cfg.Enabled || s.opsHandle == nil || s.opsHandle.Client == nil {
+		return nil, signalredis.Options{}, false
 	}
-	client, err := cachesignal.AsStandaloneClient(s.opsHandle.Client)
-	if err != nil {
-		log.Warnf("%s disabled: %v", label, err)
-		return nil, cachesignal.SignalingOptions{}, false
-	}
-	return client, cfg.Signaling, true
+	return s.opsHandle.Client, cfg.redisOptions(), true
 }
 
 func warmCatalog(ctx context.Context, service *typologymodel.QueryService) {

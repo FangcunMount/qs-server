@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 )
 
 func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
@@ -85,8 +84,30 @@ func TestSignalEvictRequiresEnabledCache(t *testing.T) {
 	}
 }
 
+func TestSignalOptionsRedisOptions(t *testing.T) {
+	defaults := (SignalOptions{}).redisOptions()
+	if defaults.Prefix != "qs:signal" || defaults.BufferSize != 100 || defaults.Channel != "" {
+		t.Fatalf("default Redis options = %+v", defaults)
+	}
+	overrides := (SignalOptions{Prefix: "custom", Channel: "cache-events", BufferSize: 9}).redisOptions()
+	if overrides.Prefix != "custom" || overrides.Channel != "cache-events" || overrides.BufferSize != 9 {
+		t.Fatalf("overridden Redis options = %+v", overrides)
+	}
+}
+
 func testConfig(opts *options.Options) Config {
-	config := Config{Signaling: cachesignal.ConfigFromOptions(opts.Signaling, "collection-server")}
+	config := Config{Signaling: SignalOptions{Prefix: "qs:signal", BufferSize: 100}}
+	if opts.Signaling != nil && opts.Signaling.Redis != nil {
+		redis := opts.Signaling.Redis
+		config.Signaling.Enabled = redis.Enabled
+		if redis.Prefix != "" {
+			config.Signaling.Prefix = redis.Prefix
+		}
+		config.Signaling.Channel = redis.Channel
+		if redis.BufferSize > 0 {
+			config.Signaling.BufferSize = redis.BufferSize
+		}
+	}
 	catalog := opts.Cache.Capabilities.Catalog
 	config.Questionnaire = testBinding("catalog.questionnaire", &catalog.Questionnaire.CatalogL1CacheOptions)
 	config.Typology = testBinding("catalog.typology", &catalog.Typology.CatalogL1CacheOptions)

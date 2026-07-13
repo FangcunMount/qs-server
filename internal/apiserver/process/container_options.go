@@ -14,6 +14,7 @@ import (
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 type containerOptionsInput struct {
@@ -81,7 +82,26 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 	if s == nil || s.config == nil {
 		return container.ContainerCacheOptions{}
 	}
-	return buildContainerCacheOptions(s.config.Cache)
+	options := buildContainerCacheOptions(s.config.Cache)
+	options.Signal = buildCacheSignalOptions(s.config.Signaling)
+	return options
+}
+
+func buildCacheSignalOptions(signaling *genericoptions.SignalingOptions) cachebootstrap.SignalOptions {
+	options := cachebootstrap.SignalOptions{Prefix: "qs:signal", BufferSize: 100}
+	if signaling == nil || signaling.Redis == nil {
+		return options
+	}
+	redis := signaling.Redis
+	options.Enabled = redis.Enabled
+	if redis.Prefix != "" {
+		options.Prefix = redis.Prefix
+	}
+	options.Channel = redis.Channel
+	if redis.BufferSize > 0 {
+		options.BufferSize = redis.BufferSize
+	}
+	return options
 }
 
 func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerCacheOptions {

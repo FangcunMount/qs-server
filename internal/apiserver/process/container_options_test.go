@@ -68,6 +68,10 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 		Singleflight:   boolPtr(true),
 		Negative:       boolPtr(true),
 	}
+	opts.Signaling.Redis.Enabled = true
+	opts.Signaling.Redis.Prefix = "custom:signal"
+	opts.Signaling.Redis.Channel = "cache-events"
+	opts.Signaling.Redis.BufferSize = 17
 
 	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
 	if err != nil {
@@ -117,6 +121,16 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	}
 	if got.Query.NegativeTTL != 6*time.Second || got.Query.Compress == nil || !*got.Query.Compress {
 		t.Fatalf("Query family mapping mismatch: %+v", got.Query)
+	}
+	if !got.Signal.Enabled || got.Signal.Prefix != "custom:signal" || got.Signal.Channel != "cache-events" || got.Signal.BufferSize != 17 {
+		t.Fatalf("Signal options mapping mismatch: %+v", got.Signal)
+	}
+}
+
+func TestBuildCacheSignalOptionsUsesStableDefaults(t *testing.T) {
+	got := buildCacheSignalOptions(nil)
+	if got.Enabled || got.Prefix != "qs:signal" || got.Channel != "" || got.BufferSize != 100 {
+		t.Fatalf("default signal options = %+v", got)
 	}
 }
 

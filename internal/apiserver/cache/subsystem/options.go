@@ -1,6 +1,7 @@
 package cachebootstrap
 
 import (
+	"context"
 	"time"
 
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -17,10 +18,26 @@ type CacheOptions struct {
 	StatisticsOverview      StatisticsReadGuardOptions
 	StatisticsQuestionnaire StatisticsReadGuardOptions
 	Warmup                  WarmupOptions
+	Signal                  SignalOptions
 	CompressPayload         bool
 	Static                  CacheFamilyOptions
 	Object                  CacheFamilyOptions
 	Query                   CacheFamilyOptions
+}
+
+// SignalOptions controls the best-effort Redis Pub/Sub cache invalidation signals.
+type SignalOptions struct {
+	Enabled    bool
+	Prefix     string
+	Channel    string
+	BufferSize int
+}
+
+// SignalNotifier is the narrow cache-signal port exposed to business modules.
+type SignalNotifier interface {
+	NotifyQuestionnaireCacheChanged(context.Context, string, string, string)
+	NotifyScaleCacheChanged(context.Context, string, string)
+	NotifyTypologyModelCacheChanged(context.Context, string, string)
 }
 
 // StatisticsReadGuardOptions 统计读路径并发合并与降级（overview/questionnaire 等）。

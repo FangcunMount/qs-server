@@ -5,12 +5,12 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -52,7 +52,7 @@ type Host interface {
 	CacheLockManager() locklease.Manager
 	WarmupCoordinator() statisticsApp.WarmupCoordinator
 	CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader
-	CacheSignalNotifier() *cachesignal.Notifier
+	CacheSignalNotifier() cachebootstrap.SignalNotifier
 
 	IdentityService() *iam.IdentityService
 	ActorIAMPorts() ActorIAMPorts

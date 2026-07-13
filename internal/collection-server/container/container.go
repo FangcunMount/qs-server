@@ -26,7 +26,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
@@ -124,11 +123,21 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, lockMan
 }
 
 func collectionCacheConfig(opts *options.Options) collectioncache.Config {
-	config := collectioncache.Config{Signaling: cachesignal.ConfigFromOptions(nil, "collection-server")}
+	config := collectioncache.Config{Signaling: collectioncache.SignalOptions{Prefix: "qs:signal", BufferSize: 100}}
 	if opts == nil {
 		return config
 	}
-	config.Signaling = cachesignal.ConfigFromOptions(opts.Signaling, "collection-server")
+	if opts.Signaling != nil && opts.Signaling.Redis != nil {
+		redis := opts.Signaling.Redis
+		config.Signaling.Enabled = redis.Enabled
+		if redis.Prefix != "" {
+			config.Signaling.Prefix = redis.Prefix
+		}
+		config.Signaling.Channel = redis.Channel
+		if redis.BufferSize > 0 {
+			config.Signaling.BufferSize = redis.BufferSize
+		}
+	}
 	if opts.Cache == nil || opts.Cache.Capabilities == nil {
 		return config
 	}

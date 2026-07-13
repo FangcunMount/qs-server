@@ -24,16 +24,11 @@ func NewReporter(opsHandle *redisruntime.Handle, cfg Config) (*Reporter, error) 
 	cache := NewCache(opsHandle)
 	var signaler signaling.Notifier[ChangedSignal]
 	if cfg.Signaling.Enabled && opsHandle != nil && opsHandle.Client != nil {
-		standalone, err := AsStandaloneClient(opsHandle.Client)
+		s, err := NewSignaler(opsHandle.Client, cfg.Signaling)
 		if err != nil {
 			log.Warnf("report status signaling disabled: %v", err)
 		} else {
-			s, err := NewSignaler(standalone, cfg.Signaling)
-			if err != nil {
-				log.Warnf("report status signaling disabled: %v", err)
-			} else {
-				signaler = s
-			}
+			signaler = s
 		}
 	}
 	return &Reporter{
