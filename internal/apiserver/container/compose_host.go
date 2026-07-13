@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -51,29 +52,16 @@ func (c *Container) RedisCache() redis.UniversalClient { return c.redisCache }
 
 func (c *Container) EventPublisher() event.EventPublisher { return c.eventPublisher }
 
-func (c *Container) TopicResolver() eventcatalog.TopicResolver { return c.eventCatalog }
+func (c *Container) EventProfile(profile eventcatalog.OutboxProfile) appEventing.ProfileBinding {
+	if c == nil || c.eventSubsystem == nil {
+		return appEventing.ProfileBinding{}
+	}
+	return c.eventSubsystem.Profile(profile)
+}
 
 func (c *Container) MySQLLimiter() backpressure.Acquirer { return c.backpressure.MySQL }
 
 func (c *Container) MongoLimiter() backpressure.Acquirer { return c.backpressure.Mongo }
-
-func (c *Container) OutboxRelayMongoBatchSize() int { return c.outboxRelay.MongoBatchSize }
-
-func (c *Container) OutboxRelayMongoPublishWorkers() int { return c.outboxRelay.MongoPublishWorkers }
-
-func (c *Container) OutboxRelayMongoImmediateMaxConcurrent() int {
-	return c.outboxRelay.MongoImmediateMaxConcurrent
-}
-
-func (c *Container) OutboxRelayAssessmentBatchSize() int { return c.outboxRelay.AssessmentBatchSize }
-
-func (c *Container) OutboxRelayAssessmentPublishWorkers() int {
-	return c.outboxRelay.AssessmentPublishWorkers
-}
-
-func (c *Container) OutboxRelayAssessmentImmediateMaxConcurrent() int {
-	return c.outboxRelay.AssessmentImmediateMaxConcurrent
-}
 
 func (c *Container) PlanEntryBaseURL() string { return c.planEntryURL }
 
@@ -174,9 +162,6 @@ func (c *Container) ActorPorts() compose.ActorPorts {
 
 func (c *Container) SetSurveyModule(module *surveymod.Module) {
 	c.SurveyModule = module
-	if module != nil {
-		c.mongoDomainEventRelay = module.MongoDomainEventRelay
-	}
 }
 
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {

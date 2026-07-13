@@ -10,20 +10,26 @@ import (
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 )
 
 type fakeDispatcher struct {
 	eventType string
 	payload   []byte
 	err       error
+	outcome   eventruntime.DispatchOutcome
 	calls     int
 }
 
-func (d *fakeDispatcher) DispatchEvent(_ context.Context, eventType string, payload []byte) error {
+func (d *fakeDispatcher) DispatchEvent(_ context.Context, eventType string, payload []byte) (eventruntime.DispatchResult, error) {
 	d.calls++
 	d.eventType = eventType
 	d.payload = payload
-	return d.err
+	outcome := d.outcome
+	if outcome == "" {
+		outcome = eventruntime.DispatchHandled
+	}
+	return eventruntime.DispatchResult{Outcome: outcome}, d.err
 }
 
 type fakeSubscriptionRuntime struct {
@@ -137,7 +143,7 @@ func TestMessageSettlementPolicyAckSuccess(t *testing.T) {
 		return nil
 	})
 
-	policy := MessageSettlementPolicy{logger: testLogger(), topic: "topic"}
+	policy := eventruntime.NewMessageSettlementPolicy(testLogger(), "worker", "topic", nil)
 	outcome, err := policy.AckSuccess(msg)
 	if err != nil {
 		t.Fatalf("AckSuccess: %v", err)
@@ -291,6 +297,22 @@ func TestDispatchHandlerObservesAcked(t *testing.T) {
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeAcked)
 	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeAcked)
+}
+
+func TestDispatchHandlerObservesUnknownAcked(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{outcome: eventruntime.DispatchUnknown}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetAckFunc(func() error { return nil })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
 }
 
 func TestDispatchHandlerObservesAckFailed(t *testing.T) {

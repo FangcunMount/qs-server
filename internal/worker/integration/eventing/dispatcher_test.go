@@ -118,7 +118,7 @@ func TestDispatcherUsesInjectedRegistry(t *testing.T) {
 	if got := dispatcher.GetTopicSubscriptions(); len(got) != 1 || got[0].TopicName != "sample.topic" {
 		t.Fatalf("subscriptions = %#v, want sample.topic", got)
 	}
-	if err := dispatcher.DispatchEvent(context.Background(), "sample.created", []byte("payload")); err != nil {
+	if _, err := dispatcher.DispatchEvent(context.Background(), "sample.created", []byte("payload")); err != nil {
 		t.Fatalf("DispatchEvent: %v", err)
 	}
 	if !dispatched {
@@ -140,7 +140,7 @@ func TestDispatcherReturnsHandlerError(t *testing.T) {
 	if err := dispatcher.Initialize(sampleCatalog("sample_handler")); err != nil {
 		t.Fatalf("Initialize: %v", err)
 	}
-	if err := dispatcher.DispatchEvent(context.Background(), "sample.created", []byte("payload")); !errors.Is(err, wantErr) {
+	if _, err := dispatcher.DispatchEvent(context.Background(), "sample.created", []byte("payload")); !errors.Is(err, wantErr) {
 		t.Fatalf("DispatchEvent error = %v, want %v", err, wantErr)
 	}
 }

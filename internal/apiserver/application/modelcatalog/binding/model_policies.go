@@ -12,16 +12,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// TypologyPolicy keeps the typology contract that a bound
-// questionnaire must already be published and contain questions.
+// TypologyPolicy 保持类型合同，即绑定的问卷必须已经发布并包含问题
 type TypologyPolicy struct {
 	Questionnaires questionnaireapp.QuestionnaireQueryService
 }
 
+// Supports 支持
 func (p TypologyPolicy) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindTypology
 }
 
+// Validate 验证
 func (p TypologyPolicy) Validate(ctx context.Context, _ *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
 	if binding.QuestionnaireCode == "" {
 		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "questionnaire code is required")
@@ -47,23 +48,24 @@ func (p TypologyPolicy) Validate(ctx context.Context, _ *domain.AssessmentModel,
 	return domain.QuestionnaireBinding{QuestionnaireCode: result.Code, QuestionnaireVersion: result.Version}, nil
 }
 
+// BeforePublish 发布前
 func (TypologyPolicy) BeforePublish(context.Context, *domain.AssessmentModel) error {
 	return nil
 }
 
-// ScalePolicy keeps the scale-only questionnaire type,
-// uniqueness, and publish-version synchronization rules at the application
-// boundary rather than in the scale lifecycle command service.
+// ScalePolicy 保持量表特定的问卷类型、唯一性和发布版本同步规则
 type ScalePolicy struct {
 	Models               modelcatalogport.ModelRepository
 	Questionnaires       questionnairecatalog.Catalog
 	PublishQuestionnaire func(context.Context, string) (string, error)
 }
 
+// Supports 支持
 func (p ScalePolicy) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindScale
 }
 
+// Validate 验证
 func (p ScalePolicy) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
 	if binding.QuestionnaireCode == "" {
 		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "questionnaire code is required")
@@ -97,6 +99,7 @@ func (p ScalePolicy) Validate(ctx context.Context, model *domain.AssessmentModel
 	return binding, nil
 }
 
+// BeforePublish 发布前
 func (p ScalePolicy) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
 	if model == nil || model.Binding.QuestionnaireCode == "" {
 		return nil

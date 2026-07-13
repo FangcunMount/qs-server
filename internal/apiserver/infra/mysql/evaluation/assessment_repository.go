@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"gorm.io/gorm"
 )
 
@@ -19,10 +18,6 @@ type assessmentRepository struct {
 
 // NewAssessmentRepository 创建测评仓储
 func NewAssessmentRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assessment.Repository {
-	return NewAssessmentRepositoryWithTopicResolver(db, nil, opts...)
-}
-
-func NewAssessmentRepositoryWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver, opts ...mysql.BaseRepositoryOptions) assessment.Repository {
 	repo := &assessmentRepository{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db, opts...),
 		mapper:         NewAssessmentMapper(),

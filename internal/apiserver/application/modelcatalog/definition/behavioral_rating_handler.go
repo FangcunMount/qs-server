@@ -9,16 +9,17 @@ import (
 	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
-// BehavioralRatingDefinitionHandler owns behavioral-rating DefinitionV2
-// validation and its published payload projection.
+// BehavioralRatingDefinitionHandler 行为评定模型定义处理程序
 type BehavioralRatingDefinitionHandler struct {
 	NormRepo port.NormRepository
 }
 
+// Supports 支持
 func (BehavioralRatingDefinitionHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindBehavioralRating
 }
 
+// ValidateForPublish 验证发布
 func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
@@ -37,6 +38,7 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 	return issues
 }
 
+// BuildSnapshotPayload 构建快照负载
 func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
 	if model == nil || model.DefinitionV2 == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("behavioral_rating definition_v2 is required")
@@ -60,6 +62,7 @@ func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Cont
 	return SnapshotBuildResult{Kind: domain.KindBehavioralRating, Algorithm: algorithm, PayloadFormat: domain.PayloadFormatForBehavioralRating(algorithm), DecisionKind: decisionKind, Payload: encoded}, nil
 }
 
+// brief2NormTable 构建BRIEF-2规范表
 func (h BehavioralRatingDefinitionHandler) brief2NormTable(ctx context.Context, value *domain.Definition) (*domain.Norm, error) {
 	if value == nil {
 		return nil, nil

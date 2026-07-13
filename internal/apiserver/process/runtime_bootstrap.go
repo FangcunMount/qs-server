@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
@@ -11,19 +10,10 @@ import (
 )
 
 type runtimeStageDeps struct {
-	hasMongo               bool
-	startCache             func()
-	startOutboxReconcilers func()
-	startSchedulers        func(*runtimeOutput)
-	relays                 []relayRuntimeDeps
-}
-
-type relayRuntimeDeps struct {
-	stopHookName string
-	startLogName string
-	failureLog   string
-	interval     time.Duration
-	dispatch     func(context.Context) error
+	hasMongo        bool
+	startCache      func()
+	startEvents     func() error
+	startSchedulers func(*runtimeOutput)
 }
 
 func logInitialization(hasMongo bool) {
@@ -47,8 +37,8 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		deps.startCache = func() {
 			startCacheSignalWatcher(containerOutput.container)
 		}
-		deps.startOutboxReconcilers = func() {
-			startOutboxReadyReconcilers(containerOutput.container)
+		deps.startEvents = func() error {
+			return containerOutput.container.StartEventSubsystem(context.Background())
 		}
 	}
 
@@ -58,56 +48,23 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 			startSchedulerManager(manager, runtimeOutput)
 		}
 	}
-	durableRelayEnabled := resources.messaging.mqPublisher != nil
-	if serverDeps.MongoDomainEventRelay != nil && durableRelayEnabled {
-		deps.relays = append(deps.relays, relayRuntimeDeps{
-			stopHookName: "stop mongo outbox relay",
-			startLogName: "mongo outbox relay",
-			failureLog:   "mongo domain event outbox relay",
-			interval:     mongoOutboxRelayInterval(s.config),
-			dispatch:     serverDeps.MongoDomainEventRelay.DispatchDue,
-		})
-	}
-	if serverDeps.AssessmentOutboxRelay != nil && durableRelayEnabled {
-		deps.relays = append(deps.relays, relayRuntimeDeps{
-			stopHookName: "stop assessment outbox relay",
-			startLogName: "assessment outbox relay",
-			failureLog:   "assessment outbox relay",
-			interval:     assessmentOutboxRelayInterval(s.config),
-			dispatch:     serverDeps.AssessmentOutboxRelay.DispatchDue,
-		})
-	}
 	return deps
 }
 
-func mongoOutboxRelayInterval(cfg *config.Config) time.Duration {
-	if cfg == nil || cfg.OutboxRelay == nil || cfg.OutboxRelay.Mongo == nil || cfg.OutboxRelay.Mongo.Interval <= 0 {
-		return 500 * time.Millisecond
-	}
-	return cfg.OutboxRelay.Mongo.Interval
-}
-
-func assessmentOutboxRelayInterval(cfg *config.Config) time.Duration {
-	if cfg == nil || cfg.OutboxRelay == nil || cfg.OutboxRelay.Assessment == nil || cfg.OutboxRelay.Assessment.Interval <= 0 {
-		return 2 * time.Second
-	}
-	return cfg.OutboxRelay.Assessment.Interval
-}
-
-func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) {
+func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) error {
 	logInitialization(deps.hasMongo)
+	if deps.startEvents != nil {
+		if err := deps.startEvents(); err != nil {
+			return err
+		}
+	}
 	if deps.startCache != nil {
 		deps.startCache()
-	}
-	if deps.startOutboxReconcilers != nil {
-		deps.startOutboxReconcilers()
 	}
 	if deps.startSchedulers != nil {
 		deps.startSchedulers(runtimeOutput)
 	}
-	for _, relay := range deps.relays {
-		startRelayLoop(relay, runtimeOutput)
-	}
+	return nil
 }
 
 func startCacheSignalWatcher(c *container.Container) {
@@ -115,13 +72,6 @@ func startCacheSignalWatcher(c *container.Container) {
 		return
 	}
 	c.StartCacheSignalWatcher(context.Background())
-}
-
-func startOutboxReadyReconcilers(c *container.Container) {
-	if c == nil {
-		return
-	}
-	c.StartOutboxReadyReconcilers(context.Background())
 }
 
 func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps) *runtimescheduler.Manager {
@@ -180,37 +130,6 @@ func startSchedulerManager(manager *runtimescheduler.Manager, runtimeOutput *run
 
 	manager.Start(ctx)
 	log.Infof("apiserver scheduler manager started (runner_count=%d)", manager.Len())
-}
-
-func startRelayLoop(deps relayRuntimeDeps, runtimeOutput *runtimeOutput) {
-	if deps.dispatch == nil || runtimeOutput == nil {
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	runtimeOutput.lifecycle.AddShutdownHook(deps.stopHookName, func() error {
-		cancel()
-		return nil
-	})
-
-	go func() {
-		ticker := time.NewTicker(deps.interval)
-		defer ticker.Stop()
-
-		for {
-			if err := deps.dispatch(ctx); err != nil {
-				log.Warnf("%s failed: %v", deps.failureLog, err)
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
-
-	log.Infof("%s started (interval=%s)", deps.startLogName, deps.interval)
 }
 
 func buildServerRuntimeDeps(containerOutput containerOutput) container.ServerRuntimeDeps {

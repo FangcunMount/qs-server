@@ -416,13 +416,13 @@ apiserver 有两类事件发布路径：
 | 类型 | 说明 |
 | ---- | ---- |
 | best effort | 适合问卷/量表生命周期或任务通知类弱一致事件 |
-| durable outbox | 适合答卷提交、测评提交、报告生成、行为投影等不能随便丢的事件 |
+| durable outbox | 适合答卷提交、测评执行和报告生成等不能随便丢的业务事件；不承载 behavior footprint |
 
-runtime stage 会在 MQ publisher 存在时启动 outbox relay loop：
+runtime stage 会启动 EventSubsystem；MQ-backed publisher 可用时，两个 profile 各启动一个 relay：
 
 ```text
-AnswerSheetSubmittedRelay.DispatchDue
-AssessmentOutboxRelay.DispatchDue
+mongo_domain_events.DispatchDue
+assessment_mysql_events.DispatchDue
 ```
 
 它们以固定 interval 扫描 due events 并投递。这说明：

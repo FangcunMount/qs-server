@@ -3,9 +3,6 @@ package container
 import (
 	"context"
 	"fmt"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
-	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
 // HealthCheck 健康检查
@@ -63,6 +60,11 @@ func (c *Container) checkModulesHealth(_ context.Context) error {
 // Cleanup 清理资源
 func (c *Container) Cleanup() error {
 	c.printf("🧹 Cleaning up container resources...\n")
+	if c.eventSubsystem != nil {
+		if err := c.eventSubsystem.Close(); err != nil {
+			return fmt.Errorf("failed to close event subsystem: %w", err)
+		}
+	}
 	if c.cache != nil {
 		if err := c.cache.Close(); err != nil {
 			return fmt.Errorf("failed to close cache subsystem: %w", err)
@@ -88,6 +90,13 @@ func (c *Container) Cleanup() error {
 	c.printf("🏁 Container cleanup completed\n")
 
 	return nil
+}
+
+func (c *Container) StartEventSubsystem(ctx context.Context) error {
+	if c == nil || c.eventSubsystem == nil {
+		return nil
+	}
+	return c.eventSubsystem.Start(ctx)
 }
 
 // GetContainerInfo 获取容器信息
@@ -168,47 +177,4 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 		return nil
 	}
 	return fmt.Errorf("cache governance warmup coordinator is unavailable")
-}
-
-func (c *Container) StartOutboxReadyReconcilers(ctx context.Context) {
-	if c == nil {
-		return
-	}
-	startReconciler(ctx, c.mongoOutboxReadyIndex(), c.mongoOutboxPendingLister())
-	startReconciler(ctx, c.assessmentOutboxReadyIndex(), c.assessmentOutboxPendingLister())
-}
-
-func startReconciler(ctx context.Context, index *outboxready.Index, lister outboxport.PendingEventRefLister) {
-	if index == nil || lister == nil {
-		return
-	}
-	outboxready.NewReconciler(index, lister, 0).Start(ctx)
-}
-
-func (c *Container) mongoOutboxReadyIndex() *outboxready.Index {
-	if c == nil || c.SurveyModule == nil || c.SurveyModule.AnswerSheet == nil {
-		return nil
-	}
-	return c.SurveyModule.AnswerSheet.OutboxReadyIndex
-}
-
-func (c *Container) assessmentOutboxReadyIndex() *outboxready.Index {
-	if c == nil || c.EvaluationModule == nil {
-		return nil
-	}
-	return c.EvaluationModule.OutboxReadyIndex
-}
-
-func (c *Container) mongoOutboxPendingLister() outboxport.PendingEventRefLister {
-	if c == nil || c.surveyRuntimeInfra == nil || c.surveyRuntimeInfra.AnswerSheetRepo == nil {
-		return nil
-	}
-	return c.surveyRuntimeInfra.AnswerSheetRepo
-}
-
-func (c *Container) assessmentOutboxPendingLister() outboxport.PendingEventRefLister {
-	if c == nil || c.EvaluationModule == nil {
-		return nil
-	}
-	return c.EvaluationModule.AssessmentOutboxPendingLister
 }

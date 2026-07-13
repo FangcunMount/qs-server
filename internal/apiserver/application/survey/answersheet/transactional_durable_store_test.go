@@ -64,6 +64,18 @@ type durableStoreStagerStub struct {
 	eventTypes []string
 }
 
+type durableStorePostCommitStub struct {
+	calls      int
+	eventTypes []string
+}
+
+func (s *durableStorePostCommitStub) AfterCommit(_ context.Context, events []event.DomainEvent, _ time.Time) {
+	s.calls++
+	for _, evt := range events {
+		s.eventTypes = append(s.eventTypes, evt.EventType())
+	}
+}
+
 func (s *durableStoreStagerStub) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	s.called = true
 	s.sawTxCtx = ctx.Value(durableStoreTxMarkerKey{}) == "tx"
@@ -117,7 +129,8 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{"id": "1"})},
 	}
 	stager := &durableStoreStagerStub{}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
+	postCommit := &durableStorePostCommitStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, postCommit)
 
 	got, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{})
 	if err != nil {
@@ -132,6 +145,9 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 	if len(sheet.Events()) != 0 {
 		t.Fatalf("events were not cleared after successful durable save")
 	}
+	if postCommit.calls != 1 || len(postCommit.eventTypes) != 1 {
+		t.Fatalf("post-commit calls=%d event types=%v, want one notification", postCommit.calls, postCommit.eventTypes)
+	}
 }
 
 func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *testing.T) {
@@ -142,7 +158,8 @@ func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *te
 		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
 	}
 	stager := &durableStoreStagerStub{err: stageErr}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
+	postCommit := &durableStorePostCommitStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, postCommit)
 
 	_, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{})
 	if !errors.Is(err, stageErr) {
@@ -153,6 +170,9 @@ func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *te
 	}
 	if len(sheet.Events()) == 0 {
 		t.Fatalf("events should remain on stage failure")
+	}
+	if postCommit.calls != 0 {
+		t.Fatalf("rollback notified post-commit %d times", postCommit.calls)
 	}
 }
 

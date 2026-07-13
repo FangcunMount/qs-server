@@ -1,8 +1,8 @@
 package interpretation
 
 import (
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -11,10 +11,10 @@ import (
 // WireInput carries composition-root inputs for report module installation.
 type WireInput struct {
 	MongoDB            *mongo.Database
-	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
 	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
+	OutboxProfile      appEventing.ProfileBinding
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

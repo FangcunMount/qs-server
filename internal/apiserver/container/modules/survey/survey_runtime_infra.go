@@ -66,7 +66,7 @@ func EnsureSurveyRuntimeInfra(deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra,
 		)
 	}
 
-	answerSheetRepo, err := answerSheetMongo.NewRepositoryWithTopicResolver(deps.MongoDB, deps.EventCatalog, mongoOpts)
+	answerSheetRepo, err := answerSheetMongo.NewRepository(deps.MongoDB, mongoOpts)
 	if err != nil {
 		return nil, err
 	}

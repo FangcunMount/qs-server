@@ -20,6 +20,19 @@ type fakeTopicResolver struct {
 	deliveries map[string]eventcatalog.DeliveryClass
 }
 
+func loadEventRegistry(t *testing.T) *eventcatalog.EffectiveRegistry {
+	t.Helper()
+	cfg, err := eventcatalog.Load("../../../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := eventcatalog.NewEffectiveRegistry(eventcatalog.NewCatalog(cfg), eventcatalog.DefaultSpecs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
 func (r fakeTopicResolver) GetTopicForEvent(eventType string) (string, bool) {
 	topic, ok := r.topics[eventType]
 	return topic, ok
@@ -139,23 +152,20 @@ func TestMongoOutboxIndexModelsCoverHotRelayAndStatusQueries(t *testing.T) {
 func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 	now := time.Date(2026, 6, 15, 19, 30, 0, 0, time.UTC)
 
-	queries := pendingClaimQueries(now, defaultPriorityTiers())
+	registry := loadEventRegistry(t)
+	queries := pendingClaimQueries(now, registry.PriorityTiers(eventcatalog.OutboxProfileMongoDomain))
 
 	if len(queries) != 3 {
 		t.Fatalf("query count = %d, want 3", len(queries))
 	}
 	wantPriority := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.EvaluationRequested,
 	}
 	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
 	wantP1 := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.EvaluationRequested,
-		eventcatalog.EvaluationOutcomeCommitted,
-		eventcatalog.EvaluationFailed,
-		eventcatalog.InterpretationReportGenerated,
 		eventcatalog.InterpretationReportFailed,
+		eventcatalog.InterpretationReportGenerated,
 	}
 	assertEventTypeOperator(t, queries[1].filter, "$in", wantP1)
 	if _, ok := queries[2].filter["event_type"]; ok {

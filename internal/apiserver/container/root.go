@@ -8,14 +8,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
@@ -45,9 +46,12 @@ type Container struct {
 	mqPublisher messaging.Publisher
 
 	// 事件发布器（统一管理）
-	eventPublisher event.EventPublisher
-	eventCatalog   *eventcatalog.Catalog
-	publisherMode  eventruntime.PublishMode
+	eventPublisher         event.EventPublisher
+	eventCatalog           *eventcatalog.Catalog
+	publisherMode          eventruntime.PublishMode
+	eventSubsystem         *eventsubsystem.Subsystem
+	eventSubscriberFactory eventsubsystem.SubscriberFactory
+	eventConsumers         map[string]eventsubsystem.ConsumerOptions
 
 	// 业务模块
 	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
@@ -63,8 +67,7 @@ type Container struct {
 	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
-	surveyRuntimeInfra    *surveymod.SurveyRuntimeInfra
-	mongoDomainEventRelay appEventing.OutboxRelay
+	surveyRuntimeInfra *surveymod.SurveyRuntimeInfra
 
 	// 基础设施服务
 	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
@@ -135,6 +138,9 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	}
 
 	c.eventCatalog = opts.EventCatalog
+	c.eventSubsystem = opts.EventSubsystem
+	c.eventSubscriberFactory = opts.EventSubscriberFactory
+	c.eventConsumers = opts.EventConsumers
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.backpressure = opts.Backpressure
@@ -156,8 +162,10 @@ func (c *Container) Initialize() error {
 
 	// 确保 cache singleflight coordinator 初始化
 
-	// 初始化事件发布器（所有模块共享）
-	c.initEventPublisher()
+	// 初始化事件子系统（所有模块共享）
+	if err := c.initEventSubsystem(); err != nil {
+		return fmt.Errorf("failed to initialize event subsystem: %w", err)
+	}
 	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
 
 	if err := c.initCacheSignalNotifier(); err != nil {
@@ -223,13 +231,28 @@ func (c *Container) printf(format string, args ...interface{}) {
 }
 
 // initEventPublisher 初始化事件发布器
-func (c *Container) initEventPublisher() {
-	c.eventPublisher = eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
-		Mode:        c.publisherMode,
-		Source:      event.SourceAPIServer,
-		MQPublisher: c.mqPublisher,
-		Catalog:     c.eventCatalog,
+func (c *Container) initEventSubsystem() error {
+	if c.eventSubsystem != nil {
+		c.eventPublisher = c.eventSubsystem.Publisher()
+		c.eventCatalog = c.eventSubsystem.Catalog()
+		return nil
+	}
+	s, err := eventsubsystem.New(eventsubsystem.Options{
+		MySQLDB: c.mysqlDB, MongoDB: c.mongoDB,
+		OpsRedis: c.CacheClient(redisruntime.FamilyOps), Catalog: c.eventCatalog,
+		MQPublisher: c.mqPublisher, PublisherMode: c.publisherMode,
+		MySQLLimiter: c.backpressure.MySQL, MongoLimiter: c.backpressure.Mongo,
+		Mongo:             eventsubsystem.ProfileOptions{Interval: c.outboxRelay.MongoInterval, BatchSize: c.outboxRelay.MongoBatchSize, PublishWorkers: c.outboxRelay.MongoPublishWorkers, ImmediateMaxConcurrent: c.outboxRelay.MongoImmediateMaxConcurrent},
+		Assessment:        eventsubsystem.ProfileOptions{Interval: c.outboxRelay.AssessmentInterval, BatchSize: c.outboxRelay.AssessmentBatchSize, PublishWorkers: c.outboxRelay.AssessmentPublishWorkers, ImmediateMaxConcurrent: c.outboxRelay.AssessmentImmediateMaxConcurrent},
+		SubscriberFactory: c.eventSubscriberFactory, Consumers: c.eventConsumers,
 	})
+	if err != nil {
+		return err
+	}
+	c.eventSubsystem = s
+	c.eventPublisher = s.Publisher()
+	c.eventCatalog = s.Catalog()
+	return nil
 }
 
 // GetEventPublisher 获取事件发布器（供模块使用）

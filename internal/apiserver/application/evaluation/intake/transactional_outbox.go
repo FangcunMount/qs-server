@@ -2,6 +2,7 @@ package intake
 
 import (
 	"context"
+	"time"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -26,7 +27,7 @@ func saveAssessmentAndStageEvents(
 	txRunner apptransaction.Runner,
 	stager EventStager,
 	a *domainAssessment.Assessment,
-	immediate *appEventing.ImmediateDispatcher,
+	postCommit appEventing.PostCommitDispatcher,
 ) error {
 	if txRunner == nil || stager == nil {
 		return evalerrors.ModuleNotConfigured("assessment transactional outbox requires transaction runner and event stager")
@@ -51,8 +52,8 @@ func saveAssessmentAndStageEvents(
 	if err != nil {
 		return err
 	}
-	if immediate != nil && len(stagedEvents) > 0 {
-		immediate.TryDispatchAfterCommit(ctx, stagedEvents)
+	if postCommit != nil && len(stagedEvents) > 0 {
+		postCommit.AfterCommit(ctx, stagedEvents, time.Now())
 	}
 	a.ClearEvents()
 	return nil

@@ -87,12 +87,59 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 		defer publisher.mu.Unlock()
 		return len(publisher.published) == 1
 	})
+	dispatcher.Close()
 
 	publisher.mu.Lock()
 	published := append([]string(nil), publisher.published...)
 	publisher.mu.Unlock()
 	if len(published) != 1 || published[0] != eventcatalog.AnswerSheetSubmitted {
 		t.Fatalf("published = %#v, want one answersheet.submitted", published)
+	}
+}
+
+func TestImmediateDispatcherRequiresMQBackedPublisherForDurableEvents(t *testing.T) {
+	store := &immediateTestStore{}
+	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
+		Name:                    "test-durable-immediate",
+		Store:                   store,
+		Publisher:               &durableFakePublisher{mqBacked: false},
+		Enabled:                 true,
+		RequireDurablePublisher: true,
+		ImmediateEventTypes:     []string{eventcatalog.AnswerSheetSubmitted},
+	})
+
+	submitted := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-non-mq", struct{}{})
+	dispatcher.TryDispatchAfterCommit(context.Background(), []event.DomainEvent{submitted})
+	time.Sleep(20 * time.Millisecond)
+
+	store.mu.Lock()
+	getCalls := store.getCalls
+	store.mu.Unlock()
+	if getCalls != 0 {
+		t.Fatalf("GetPublishableEvent calls = %d, want 0", getCalls)
+	}
+	if len(store.published) != 0 {
+		t.Fatalf("published = %#v, want durable event to remain pending", store.published)
+	}
+}
+
+func TestImmediateDispatcherAllowsMQBackedPublisherForDurableEvents(t *testing.T) {
+	store := &immediateTestStore{}
+	publisher := &durableFakePublisher{mqBacked: true}
+	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
+		Name:                    "test-durable-immediate",
+		Store:                   store,
+		Publisher:               publisher,
+		Enabled:                 true,
+		RequireDurablePublisher: true,
+		ImmediateEventTypes:     []string{eventcatalog.AnswerSheetSubmitted},
+	})
+
+	submitted := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-mq", struct{}{})
+	dispatcher.TryDispatchAfterCommit(context.Background(), []event.DomainEvent{submitted})
+	dispatcher.Close()
+	if len(store.published) != 1 {
+		t.Fatalf("published = %#v, want one event", store.published)
 	}
 }
 

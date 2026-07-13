@@ -17,28 +17,33 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
+// Command 评估入库命令
 type Command struct {
-	OrgID                uint64
-	AnswerSheetID        uint64
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	TesteeID             uint64
-	FillerID             uint64
-	TaskID               string
-	OriginType           string
-	OriginID             string
+	OrgID                uint64 // 组织ID
+	AnswerSheetID        uint64 // 答案卡ID
+	QuestionnaireCode    string // 问卷编码
+	QuestionnaireVersion string // 问卷版本
+	TesteeID             uint64 // 被试ID
+	FillerID             uint64 // 填表人ID
+	TaskID               string // 任务ID
+	OriginType           string // 来源类型
+	OriginID             string // 来源ID
 }
 
+// Result 评估入库结果
 type Result struct {
-	AssessmentID  uint64
-	Created       bool
-	AutoSubmitted bool
+	AssessmentID  uint64 // 评估ID
+	Created       bool   // 是否创建
+	AutoSubmitted bool   // 是否自动提交
 }
 
+// Service 评估入库服务
 type Service interface {
+	// Ensure 确保评估入库
 	Ensure(context.Context, Command) (*Result, error)
 }
 
+// service 评估入库服务实现
 type service struct {
 	scoring      answersheetapp.AnswerSheetScoringService
 	binding      rulesetport.AssessmentBindingResolver
@@ -48,11 +53,14 @@ type service struct {
 	reportStatus *reportstatus.Reporter
 }
 
+// NewService 创建评估入库服务
 func NewService(scoring answersheetapp.AnswerSheetScoringService, binding rulesetport.AssessmentBindingResolver, plans planapp.TaskAssessmentResolver, planCommands planapp.PlanCommandService, intake evaluationintake.Service, reportStatus *reportstatus.Reporter) Service {
 	return &service{scoring: scoring, binding: binding, plans: plans, planCommands: planCommands, intake: intake, reportStatus: reportStatus}
 }
 
+// Ensure 确保评估入库
 func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) {
+	// 验证命令参数
 	if command.OrgID == 0 || command.AnswerSheetID == 0 || command.QuestionnaireCode == "" || command.QuestionnaireVersion == "" || command.TesteeID == 0 || command.FillerID == 0 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "assessment intake command is incomplete")
 	}
@@ -64,6 +72,8 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			return nil, err
 		}
 	}
+
+	// 创建评估入库命令
 	dto := evaluationintake.CreateCommand{OrgID: command.OrgID, TesteeID: command.TesteeID, QuestionnaireCode: command.QuestionnaireCode, QuestionnaireVersion: command.QuestionnaireVersion, AnswerSheetID: command.AnswerSheetID, OriginType: command.OriginType}
 	if dto.OriginType == "" {
 		dto.OriginType = "adhoc"
@@ -71,19 +81,27 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	if command.OriginID != "" {
 		dto.OriginID = &command.OriginID
 	}
+
+	// 应用绑定
 	bound, err := s.applyBinding(ctx, command, &dto)
 	if err != nil {
 		return nil, err
 	}
+
+	// 匹配计划
 	matched := s.matchPlan(ctx, command, dto.ModelCode)
 	if matched != nil {
 		dto.OriginType = "plan"
 		dto.OriginID = &matched.PlanID
 	}
+
+	// 查找已存在的评估
 	if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
 		s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
 		return &Result{AssessmentID: existing.ID}, nil
 	}
+
+	// 创建评估
 	created, err := s.intake.CreateForAnswerSheet(ctx, dto)
 	if err != nil {
 		if errors.IsCode(err, code.ErrAssessmentDuplicate) {
@@ -94,19 +112,27 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		}
 		return nil, err
 	}
+
+	// 创建结果
 	result := &Result{AssessmentID: created.ID, Created: true}
 	if bound {
+		// 自动提交评估
 		if _, submitErr := s.intake.SubmitForEvaluation(ctx, created.ID); submitErr == nil {
 			result.AutoSubmitted = true
 		}
 	}
+
+	// 完成计划最佳实践
 	s.completePlanBestEffort(ctx, command.OrgID, matched, created.ID)
+
+	// 设置报告状态
 	if s.reportStatus != nil {
 		s.reportStatus.SetQueued(ctx, reportstatus.AssessmentKey(created.ID), reportstatus.AssessmentKey(command.AnswerSheetID))
 	}
 	return result, nil
 }
 
+// applyBinding 应用绑定
 func (s *service) applyBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bool, error) {
 	if s.binding == nil {
 		return false, nil
@@ -141,6 +167,7 @@ func (s *service) applyBinding(ctx context.Context, command Command, dto *evalua
 	return true, nil
 }
 
+// matchPlan 匹配计划
 func (s *service) matchPlan(ctx context.Context, command Command, modelCode *string) *planapp.TaskAssessmentContext {
 	if s.plans == nil {
 		return nil
@@ -158,6 +185,7 @@ func (s *service) matchPlan(ctx context.Context, command Command, modelCode *str
 	return nil
 }
 
+// completePlanBestEffort 完成计划最佳实践
 func (s *service) completePlanBestEffort(ctx context.Context, orgID uint64, task *planapp.TaskAssessmentContext, assessmentID uint64) {
 	if task == nil || task.Completed || s.planCommands == nil {
 		return

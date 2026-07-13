@@ -1,49 +1,34 @@
 package survey
 
 import (
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // WireInput carries composition-root inputs for survey module installation.
 type WireInput struct {
-	MongoDB                           *mongo.Database
-	EventPublisher                    event.EventPublisher
-	RankRedisClient                   redis.UniversalClient
-	RankCacheBuilder                  *keyspace.Builder
-	IdentityService                   *iam.IdentityService
-	HotsetRecorder                    cachetarget.HotsetRecorder
-	TopicResolver                     eventcatalog.TopicResolver
-	OutboxRelayBatchSize              int
-	OutboxRelayPublishWorkers         int
-	OutboxRelayImmediateMaxConcurrent int
-	CacheSignalNotifier               quesApp.CacheSignalNotifier
-	OpsHandle                         *redisruntime.Handle
-	SurveyRuntimeInfra                *SurveyRuntimeInfra
+	MongoDB             *mongo.Database
+	EventPublisher      event.EventPublisher
+	IdentityService     *iam.IdentityService
+	HotsetRecorder      cachetarget.HotsetRecorder
+	CacheSignalNotifier quesApp.CacheSignalNotifier
+	SurveyRuntimeInfra  *SurveyRuntimeInfra
+	OutboxProfile       appEventing.ProfileBinding
 }
 
 // Wire builds and bootstraps the survey module from composition inputs.
 func Wire(in WireInput) (*Module, error) {
 	bootstrap := BootstrapInput{
-		MongoDB:                           in.MongoDB,
-		EventPublisher:                    in.EventPublisher,
-		RankRedisClient:                   in.RankRedisClient,
-		RankCacheBuilder:                  in.RankCacheBuilder,
-		IdentityService:                   in.IdentityService,
-		HotsetRecorder:                    in.HotsetRecorder,
-		TopicResolver:                     in.TopicResolver,
-		OutboxRelayBatchSize:              in.OutboxRelayBatchSize,
-		OutboxRelayPublishWorkers:         in.OutboxRelayPublishWorkers,
-		OutboxRelayImmediateMaxConcurrent: in.OutboxRelayImmediateMaxConcurrent,
-		CacheSignalNotifier:               in.CacheSignalNotifier,
-		OpsHandle:                         in.OpsHandle,
+		MongoDB:             in.MongoDB,
+		EventPublisher:      in.EventPublisher,
+		IdentityService:     in.IdentityService,
+		HotsetRecorder:      in.HotsetRecorder,
+		CacheSignalNotifier: in.CacheSignalNotifier,
+		OutboxProfile:       in.OutboxProfile,
 	}
 	if infra := in.SurveyRuntimeInfra; infra != nil {
 		bootstrap.QuestionnaireRepo = infra.QuestionnaireRepo

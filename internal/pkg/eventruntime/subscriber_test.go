@@ -79,7 +79,11 @@ func TestSubscriberDispatchUnknownEventSkipsWithoutError(t *testing.T) {
 	if err := sub.RegisterHandlers(); err != nil {
 		t.Fatalf("register handlers: %v", err)
 	}
-	if err := sub.Dispatch(t.Context(), "unknown.event", []byte(`{}`)); err != nil {
+	result, err := sub.Dispatch(t.Context(), "unknown.event", []byte(`{}`))
+	if err != nil {
 		t.Fatalf("unknown event dispatch = %v, want nil so messaging can ACK", err)
+	}
+	if result.Outcome != DispatchUnknown {
+		t.Fatalf("outcome = %q, want unknown", result.Outcome)
 	}
 }

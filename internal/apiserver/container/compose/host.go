@@ -1,6 +1,7 @@
 package compose
 
 import (
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
@@ -33,16 +34,10 @@ type Host interface {
 	MongoDB() *mongo.Database
 	RedisCache() redis.UniversalClient
 	EventPublisher() event.EventPublisher
-	TopicResolver() eventcatalog.TopicResolver
+	EventProfile(eventcatalog.OutboxProfile) appEventing.ProfileBinding
 	MySQLLimiter() backpressure.Acquirer
 	MongoLimiter() backpressure.Acquirer
 
-	OutboxRelayMongoBatchSize() int
-	OutboxRelayMongoPublishWorkers() int
-	OutboxRelayMongoImmediateMaxConcurrent() int
-	OutboxRelayAssessmentBatchSize() int
-	OutboxRelayAssessmentPublishWorkers() int
-	OutboxRelayAssessmentImmediateMaxConcurrent() int
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config

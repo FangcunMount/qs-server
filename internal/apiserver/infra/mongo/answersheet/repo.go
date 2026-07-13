@@ -9,10 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -21,36 +18,16 @@ type Repository struct {
 	mongoBase.BaseRepository
 	mapper          *AnswerSheetMapper
 	idempotencyColl *mongo.Collection
-	outboxStore     *mongoEventOutbox.Store
 }
 
 // NewRepository 创建答卷MongoDB存储库
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
-	return NewRepositoryWithTopicResolver(db, nil, opts...)
-}
-
-func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
 	po := &AnswerSheetPO{}
 	repo := &Repository{
 		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
 	}
-	outboxOpts := []mongoEventOutbox.StoreOption{
-		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
-	}
-	if len(opts) > 0 && opts[0].Limiter != nil {
-		outboxOpts = append(outboxOpts, mongoEventOutbox.WithLimiter(opts[0].Limiter))
-	}
-	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(
-		db,
-		resolver,
-		outboxOpts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	repo.outboxStore = outboxStore
 	if err := repo.ensureIndexes(context.Background()); err != nil {
 		return nil, err
 	}

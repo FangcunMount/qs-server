@@ -109,8 +109,7 @@ type runtimeStage struct {
 func (runtimeStage) Name() string { return "start background runtimes" }
 
 func (s runtimeStage) Run(state *prepareState) error {
-	runRuntimeStage(s.server.buildRuntimeStageDeps(state.resources, state.container), &state.runtime)
-	return nil
+	return runRuntimeStage(s.server.buildRuntimeStageDeps(state.resources, state.container), &state.runtime)
 }
 
 type shutdownStage struct {

@@ -12,7 +12,8 @@ import (
 // HotRank assembles the catalog hot-rank read model. It contains no authoring
 // or lifecycle command service.
 type HotRank struct {
-	ReadModel hotrank.ReadModel
+	ReadModel  hotrank.ReadModel
+	Projection hotrank.Projection
 }
 
 type HotRankDeps struct {
@@ -21,7 +22,8 @@ type HotRankDeps struct {
 }
 
 func NewHotRank(deps HotRankDeps) *HotRank {
-	return &HotRank{ReadModel: modelcatalogHotRankInfra.NewRedisScaleHotRankProjection(deps.RedisClient, deps.KeyBuilder)}
+	projection := modelcatalogHotRankInfra.NewRedisScaleHotRankProjection(deps.RedisClient, deps.KeyBuilder)
+	return &HotRank{ReadModel: projection, Projection: projection}
 }
 
 func (*HotRank) Cleanup() error     { return nil }

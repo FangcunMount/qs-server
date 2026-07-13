@@ -401,22 +401,11 @@ report.generated 更准确表达“报告事实已保存”。
 
 ---
 
-## 10. BeforePublish Hook 的作用
+## 10. 派生投影不能成为发布前置条件
 
-OutboxRelay 支持 `BeforePublishHook`。
+Outbox relay 只负责运输，不再提供业务 `BeforePublishHook`。原 Survey hot-rank 投影已迁移为同 Topic、独立 channel 的 apiserver consumer。
 
-当前 Survey 的 answersheet submitted relay 使用 hook 做 Scale 热度投影之类的发布前副作用。
-
-Hook 的语义是：
-
-```text
-在 publish 前执行；
-失败则当前 event MarkFailed；
-不 publish；
-等待后续重试。
-```
-
-这说明 hook 是事件出站前的可重试前置动作，不能随意放不可重试或高副作用逻辑。
+因此 Redis 派生读模型失败只会 NACK 该 projection channel，不会阻断 `answersheet.submitted` 发往主 worker channel。需要可靠重试的派生副作用应建模为独立 consumer，而不是挂在 durable publish 之前。
 
 ---
 
@@ -630,7 +619,7 @@ Outbox 不保证：
 
 - MQ publish 失败。
 - EventCatalog topic 配置错误。
-- BeforePublishHook 失败。
+- Outbox claim 或状态回写失败。
 - payload decode 失败。
 - 下游 topic 不存在。
 

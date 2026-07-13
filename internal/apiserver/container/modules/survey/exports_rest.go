@@ -1,7 +1,6 @@
 package survey
 
 import (
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -29,12 +28,4 @@ func (m *Module) ExportRESTDeps(opts RESTExportOptions) resttransport.SurveyDeps
 		deps.AnswerSheetSubmissionService = m.AnswerSheet.SubmissionService
 	}
 	return deps
-}
-
-// ExportRESTEventStatusOutbox exposes the answer-sheet outbox status reader for platform event status.
-func (m *Module) ExportRESTEventStatusOutbox() appEventing.NamedOutboxStatusReader {
-	if m == nil || m.AnswerSheet == nil {
-		return appEventing.NamedOutboxStatusReader{}
-	}
-	return m.AnswerSheet.SubmittedEventStatusReader
 }

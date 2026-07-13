@@ -142,11 +142,11 @@ func inputResolveFailureReason(err error) string {
 
 // evaluationFailureFinalizer 评估失败标记器
 type evaluationFailureFinalizer struct {
-	repo         assessment.Repository
-	runRepo      evaluationrun.Repository
-	txRunner     apptransaction.Runner
-	eventStager  EventStager
-	readyIndexer *appEventing.PostCommitReadyIndexer
+	repo        assessment.Repository
+	runRepo     evaluationrun.Repository
+	txRunner    apptransaction.Runner
+	eventStager EventStager
+	postCommit  appEventing.PostCommitDispatcher
 }
 
 // Finalize atomically persists the Assessment failure, terminal Run and failure event.
@@ -209,8 +209,8 @@ func (f evaluationFailureFinalizer) Finalize(
 	assessmentToCommit.ClearEvents()
 	*a = *assessmentToCommit
 	*run = runToCommit
-	if f.readyIndexer != nil && len(eventsToStage) > 0 {
-		f.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, time.Now())
+	if f.postCommit != nil && len(eventsToStage) > 0 {
+		f.postCommit.AfterCommit(ctx, eventsToStage, time.Now())
 	}
 	return nil
 }

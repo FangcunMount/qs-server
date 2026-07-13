@@ -41,10 +41,9 @@ func TestStatisticsApplicationDoesNotDependOnMySQLInfrastructure(t *testing.T) {
 func TestOutboxStagingCompatibilityEntrypointsStayContained(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/apiserver/infra/mysql/eventoutbox/store.go":          {},
-		"internal/apiserver/infra/mongo/eventoutbox/store.go":          {},
-		"internal/apiserver/infra/mongo/answersheet/durable_submit.go": {},
-		"internal/apiserver/infra/mongo/interpretation/repo.go":        {},
+		"internal/apiserver/infra/mysql/eventoutbox/store.go":   {},
+		"internal/apiserver/infra/mongo/eventoutbox/store.go":   {},
+		"internal/apiserver/infra/mongo/interpretation/repo.go": {},
 	}
 	walkGoFiles(t, filepath.Join(root, "internal/apiserver"), func(path string, text string) {
 		if strings.HasSuffix(path, "_test.go") || !strings.Contains(text, "StageEventsTx(") {
@@ -106,9 +105,8 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	required := []string{
 		"asApp.NewTransactionalSubmissionDurableStore(",
 		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)",
-		"outboxruntime.Build(",
-		"RequireDurablePublisher: true",
-		"modelcatalogHotRank.NewProjectionHook(hotRankProjection)",
+		"profile.Stager",
+		"profile.PostCommit",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {
@@ -117,6 +115,9 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	}
 	if strings.Contains(text, "asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)") {
 		t.Fatalf("survey production assembler must not pass repository-owned durable store to submission service")
+	}
+	if strings.Contains(text, "NewProjectionHook") || strings.Contains(text, "NewStoreWithTopicResolver") {
+		t.Fatalf("survey assembler must not own publish hooks or outbox stores")
 	}
 }
 
@@ -173,6 +174,44 @@ func TestContainerUsesDurableOutboxRelayConstructor(t *testing.T) {
 		}
 		if strings.Contains(text, "NewOutboxRelay(") {
 			t.Fatalf("%s must use NewDurableOutboxRelay for durable outbox relays", mustRel(t, root, path))
+		}
+	})
+}
+
+func TestBusinessModulesDoNotOwnEventTransportRuntime(t *testing.T) {
+	root := repoRoot(t)
+	forbidden := []string{
+		"NewOutboxRelayWithOptions(",
+		"NewDurableOutboxRelay",
+		"NewReconciler(",
+		"NewImmediateDispatcher(",
+		"NewStoreWithTopicResolver(",
+		"BeforePublishHooks:",
+	}
+	walkGoFiles(t, filepath.Join(root, "internal/apiserver/container/modules"), func(path string, text string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s must obtain a narrow event profile from EventSubsystem instead of owning %q", mustRel(t, root, path), token)
+			}
+		}
+	})
+}
+
+func TestAnswerSheetRepositoryDoesNotProxyOutbox(t *testing.T) {
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal/apiserver/infra/mongo/answersheet")
+	forbidden := []string{"outboxStore", "ClaimDueEvents(", "MarkEventPublished(", "OutboxStatusSnapshot(", "NewRepositoryWithTopicResolver("}
+	walkGoFiles(t, dir, func(path string, text string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s still exposes repository-owned outbox compatibility token %q", mustRel(t, root, path), token)
+			}
 		}
 	})
 }

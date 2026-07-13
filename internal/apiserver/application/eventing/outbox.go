@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -34,19 +33,6 @@ type OutboxStatusReporter interface {
 	ReportOutboxStatus(ctx context.Context)
 }
 
-type OutboxBeforePublishHook interface {
-	BeforePublish(ctx context.Context, pending PendingOutboxEvent) error
-}
-
-type OutboxBeforePublishFunc func(context.Context, PendingOutboxEvent) error
-
-func (f OutboxBeforePublishFunc) BeforePublish(ctx context.Context, pending PendingOutboxEvent) error {
-	if f == nil {
-		return nil
-	}
-	return f(ctx, pending)
-}
-
 // OutboxRelay 分发due outbox 事件。
 type OutboxRelay interface {
 	DispatchDue(ctx context.Context) error
@@ -62,8 +48,8 @@ type outboxRelay struct {
 	batchSize      int
 	publishWorkers int
 	retryDelay     time.Duration
-	hooks          []OutboxBeforePublishHook
 	readyIndex     ReadyIndex
+	readyBuckets   []string
 }
 
 type relayPublishResult struct {
@@ -91,8 +77,8 @@ type OutboxRelayOptions struct {
 	RetryDelay              time.Duration
 	PublishWorkers          int
 	RequireDurablePublisher bool
-	BeforePublishHooks      []OutboxBeforePublishHook
 	ReadyIndex              ReadyIndex
+	ReadyBuckets            []string
 }
 
 func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
@@ -126,8 +112,8 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 		batchSize:      opts.BatchSize,
 		publishWorkers: opts.PublishWorkers,
 		retryDelay:     opts.RetryDelay,
-		hooks:          compactBeforePublishHooks(opts.BeforePublishHooks),
 		readyIndex:     opts.ReadyIndex,
+		readyBuckets:   append([]string(nil), opts.ReadyBuckets...),
 	}
 }
 
@@ -145,16 +131,6 @@ func NewDurableOutboxRelay(name string, store OutboxStore, publisher event.Event
 		Store:                   store,
 		Publisher:               publisher,
 		RequireDurablePublisher: true,
-	})
-}
-
-func NewDurableOutboxRelayWithHooks(name string, store OutboxStore, publisher event.EventPublisher, hooks ...OutboxBeforePublishHook) OutboxRelay {
-	return NewOutboxRelayWithOptions(OutboxRelayOptions{
-		Name:                    name,
-		Store:                   store,
-		Publisher:               publisher,
-		RequireDurablePublisher: true,
-		BeforePublishHooks:      hooks,
 	})
 }
 
@@ -347,7 +323,7 @@ func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]Pend
 
 	if r.readyIndex != nil {
 		if byIDClaimer, ok := r.store.(outboxport.EventIDClaimer); ok {
-			for _, bucket := range outboxpriority.ReadyIndexBuckets {
+			for _, bucket := range r.readyBuckets {
 				if len(claimed) >= limit {
 					break
 				}
@@ -399,15 +375,6 @@ func pendingEventForFailure(failure outboxport.FailedMark) PendingOutboxEvent {
 }
 
 func (r *outboxRelay) publishOne(ctx context.Context, l *logger.RequestLogger, pending PendingOutboxEvent) relayPublishResult {
-	if err := r.runBeforePublishHooks(ctx, pending); err != nil {
-		l.Warnw("outbox before publish hook failed",
-			"relay", r.name,
-			"event_id", pending.EventID,
-			"event_type", eventTypeOf(pending),
-			"error", err.Error(),
-		)
-		return relayPublishResult{pending: pending, err: err}
-	}
 	if err := r.publisher.Publish(ctx, pending.Event); err != nil {
 		l.Warnw("outbox publish failed",
 			"relay", r.name,
@@ -418,31 +385,6 @@ func (r *outboxRelay) publishOne(ctx context.Context, l *logger.RequestLogger, p
 		return relayPublishResult{pending: pending, err: err}
 	}
 	return relayPublishResult{pending: pending, published: true}
-}
-
-func compactBeforePublishHooks(hooks []OutboxBeforePublishHook) []OutboxBeforePublishHook {
-	if len(hooks) == 0 {
-		return nil
-	}
-	compacted := make([]OutboxBeforePublishHook, 0, len(hooks))
-	for _, hook := range hooks {
-		if hook != nil {
-			compacted = append(compacted, hook)
-		}
-	}
-	return compacted
-}
-
-func (r *outboxRelay) runBeforePublishHooks(ctx context.Context, pending PendingOutboxEvent) error {
-	for _, hook := range r.hooks {
-		if hook == nil {
-			continue
-		}
-		if err := hook.BeforePublish(ctx, pending); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogger, pending PendingOutboxEvent, cause error) {

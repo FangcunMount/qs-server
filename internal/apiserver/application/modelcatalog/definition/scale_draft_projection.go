@@ -9,8 +9,7 @@ import (
 	scalepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// InitializeScaleDefinition creates the canonical empty scale definition and
-// refreshes its compatibility payload projection.
+// InitializeScaleDefinition 创建规范空量表定义并刷新其兼容性负载投影
 func InitializeScaleDefinition(model *domain.AssessmentModel, now time.Time) error {
 	if model == nil || model.Kind != domain.KindScale {
 		return nil
@@ -19,14 +18,12 @@ func InitializeScaleDefinition(model *domain.AssessmentModel, now time.Time) err
 	return RefreshScaleDraftProjectionAt(model, now)
 }
 
-// RefreshScaleDraftProjection updates the draft wire projection from the
-// canonical DefinitionV2. The payload is not an authoring source of truth.
+// RefreshScaleDraftProjection 更新草稿线投影从规范DefinitionV2
 func RefreshScaleDraftProjection(model *domain.AssessmentModel) error {
 	return RefreshScaleDraftProjectionAt(model, time.Now().UTC())
 }
 
-// RefreshScaleDraftProjectionAt is the clock-injectable variant used by
-// lifecycle application services.
+// RefreshScaleDraftProjectionAt 刷新草稿线投影
 func RefreshScaleDraftProjectionAt(model *domain.AssessmentModel, now time.Time) error {
 	if model == nil || model.Kind != domain.KindScale || model.DefinitionV2 == nil {
 		return nil

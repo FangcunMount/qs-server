@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -17,14 +16,27 @@ func newTestReadyIndex(t *testing.T) (*Index, *miniredis.Miniredis, *redis.Clien
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
-	return NewIndex(client, StoreMongoDomainEvents), mr, client
+	return NewIndexWithRegistry(client, StoreMongoDomainEvents, testRegistry(t)), mr, client
+}
+
+func testRegistry(t *testing.T) *eventcatalog.EffectiveRegistry {
+	t.Helper()
+	cfg, err := eventcatalog.Load("../../../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := eventcatalog.NewEffectiveRegistry(eventcatalog.NewCatalog(cfg), eventcatalog.DefaultSpecs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
 }
 
 func TestClaimDueIDsAtomicallyPopsDueMembers(t *testing.T) {
 	index, mr, _ := newTestReadyIndex(t)
 	now := time.Date(2026, 6, 29, 12, 0, 0, 0, time.UTC)
 	ctx := context.Background()
-	key := "outbox:ready:" + StoreMongoDomainEvents + ":" + outboxpriority.BucketP0
+	key := "outbox:ready:" + StoreMongoDomainEvents + ":" + string(eventcatalog.PriorityP0)
 
 	if err := index.Enqueue(ctx, eventcatalog.AnswerSheetSubmitted, "evt-due-1", now.Add(-time.Minute), now.Add(-time.Minute)); err != nil {
 		t.Fatalf("Enqueue due: %v", err)
@@ -36,7 +48,7 @@ func TestClaimDueIDsAtomicallyPopsDueMembers(t *testing.T) {
 		t.Fatalf("Enqueue future: %v", err)
 	}
 
-	ids, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 10, now)
+	ids, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 10, now)
 	if err != nil {
 		t.Fatalf("ClaimDueIDs: %v", err)
 	}
@@ -51,7 +63,7 @@ func TestClaimDueIDsAtomicallyPopsDueMembers(t *testing.T) {
 		t.Fatalf("remaining zset = %#v, want only evt-future", remaining)
 	}
 
-	again, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 10, now)
+	again, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 10, now)
 	if err != nil {
 		t.Fatalf("ClaimDueIDs again: %v", err)
 	}
@@ -73,7 +85,7 @@ func TestClaimDueIDsRespectsLimit(t *testing.T) {
 		}
 	}
 
-	ids, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 2, now)
+	ids, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 2, now)
 	if err != nil {
 		t.Fatalf("ClaimDueIDs: %v", err)
 	}
@@ -94,11 +106,11 @@ func TestClaimDueIDsConcurrentClaimsDoNotOverlap(t *testing.T) {
 		}
 	}
 
-	first, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 3, now)
+	first, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 3, now)
 	if err != nil {
 		t.Fatalf("first ClaimDueIDs: %v", err)
 	}
-	second, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 3, now)
+	second, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 3, now)
 	if err != nil {
 		t.Fatalf("second ClaimDueIDs: %v", err)
 	}
@@ -117,7 +129,7 @@ func TestClaimDueIDsConcurrentClaimsDoNotOverlap(t *testing.T) {
 }
 
 func TestClaimDueIDsNilIndexIsNoop(t *testing.T) {
-	ids, err := (*Index)(nil).ClaimDueIDs(context.Background(), outboxpriority.BucketP0, 10, time.Now())
+	ids, err := (*Index)(nil).ClaimDueIDs(context.Background(), string(eventcatalog.PriorityP0), 10, time.Now())
 	if err != nil {
 		t.Fatalf("ClaimDueIDs: %v", err)
 	}
@@ -131,8 +143,9 @@ func TestClaimDueIDsIsolatedByStoreNamespace(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
 
-	mongoIndex := NewIndex(client, StoreMongoDomainEvents)
-	mysqlIndex := NewIndex(client, StoreAssessmentMySQLOutbox)
+	registry := testRegistry(t)
+	mongoIndex := NewIndexWithRegistry(client, StoreMongoDomainEvents, registry)
+	mysqlIndex := NewIndexWithRegistry(client, StoreAssessmentMySQLOutbox, registry)
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	ctx := context.Background()
 
@@ -143,7 +156,7 @@ func TestClaimDueIDsIsolatedByStoreNamespace(t *testing.T) {
 		t.Fatalf("mysql Enqueue: %v", err)
 	}
 
-	mongoIDs, err := mongoIndex.ClaimDueIDs(ctx, outboxpriority.BucketP0, 10, now)
+	mongoIDs, err := mongoIndex.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 10, now)
 	if err != nil {
 		t.Fatalf("mongo ClaimDueIDs: %v", err)
 	}
@@ -151,7 +164,7 @@ func TestClaimDueIDsIsolatedByStoreNamespace(t *testing.T) {
 		t.Fatalf("mongo claimed = %#v, want [mongo-evt]", mongoIDs)
 	}
 
-	mysqlIDs, err := mysqlIndex.ClaimDueIDs(ctx, outboxpriority.BucketP0, 10, now)
+	mysqlIDs, err := mysqlIndex.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 10, now)
 	if err != nil {
 		t.Fatalf("mysql ClaimDueIDs: %v", err)
 	}
@@ -176,7 +189,7 @@ func TestClaimDueIDsOrdersByCreatedAtWhenDueEqual(t *testing.T) {
 		t.Fatalf("enqueue mid: %v", err)
 	}
 
-	ids, err := index.ClaimDueIDs(ctx, outboxpriority.BucketP0, 10, due)
+	ids, err := index.ClaimDueIDs(ctx, string(eventcatalog.PriorityP0), 10, due)
 	if err != nil {
 		t.Fatalf("ClaimDueIDs: %v", err)
 	}

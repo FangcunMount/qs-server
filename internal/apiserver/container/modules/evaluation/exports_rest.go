@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )
 
@@ -24,12 +23,4 @@ func (m *Module) ExportTesteeScaleAnalysisService() evaluationoperator.ScaleAnal
 		return nil
 	}
 	return m.ScaleAnalysis
-}
-
-// ExportRESTEventStatusOutbox exposes the assessment outbox status reader for platform event status.
-func (m *Module) ExportRESTEventStatusOutbox() appEventing.NamedOutboxStatusReader {
-	if m == nil {
-		return appEventing.NamedOutboxStatusReader{}
-	}
-	return m.AssessmentOutboxStatusReader
 }

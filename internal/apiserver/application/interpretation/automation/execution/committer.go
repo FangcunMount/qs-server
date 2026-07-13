@@ -57,13 +57,13 @@ type CommitResult struct {
 }
 
 type interpretationCommitter struct {
-	txRunner     apptransaction.Runner
-	generations  domaingeneration.Repository
-	runs         interpretationrun.Repository
-	reports      domainreport.ReportRepository
-	stager       EventStager
-	readyIndexer *appEventing.PostCommitReadyIndexer
-	catalog      ReportCatalogProjector
+	txRunner    apptransaction.Runner
+	generations domaingeneration.Repository
+	runs        interpretationrun.Repository
+	reports     domainreport.ReportRepository
+	stager      EventStager
+	postCommit  appEventing.PostCommitDispatcher
+	catalog     ReportCatalogProjector
 }
 
 func NewInterpretationCommitter(
@@ -72,14 +72,14 @@ func NewInterpretationCommitter(
 	runs interpretationrun.Repository,
 	reports domainreport.ReportRepository,
 	stager EventStager,
-	readyIndexer *appEventing.PostCommitReadyIndexer,
+	postCommit appEventing.PostCommitDispatcher,
 	catalog ReportCatalogProjector,
 ) (InterpretationCommitter, error) {
 	if txRunner == nil || generations == nil || runs == nil || reports == nil || stager == nil || catalog == nil {
 		return nil, fmt.Errorf("interpretation committer dependencies are required")
 	}
 	return &interpretationCommitter{
-		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, readyIndexer: readyIndexer, catalog: catalog,
+		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, postCommit: postCommit, catalog: catalog,
 	}, nil
 }
 
@@ -223,8 +223,8 @@ func (c *interpretationCommitter) stage(ctx context.Context, events []event.Doma
 }
 
 func (c *interpretationCommitter) enqueueAfterCommit(ctx context.Context, events []event.DomainEvent, at time.Time) {
-	if c.readyIndexer != nil && len(events) > 0 {
-		c.readyIndexer.EnqueueAfterCommit(ctx, events, at)
+	if c.postCommit != nil && len(events) > 0 {
+		c.postCommit.AfterCommit(ctx, events, at)
 	}
 }
 

@@ -34,6 +34,7 @@ type Options struct {
 	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
 	BehaviorJourneyScan            *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
 	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
+	Eventing                       *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
 	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure                   *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
 	Cache                          *CacheOptions                           `json:"cache"     mapstructure:"cache"`
@@ -66,6 +67,7 @@ func NewOptions() *Options {
 		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
 		BehaviorJourneyScan:            NewBehaviorJourneyScanOptions(),
 		OutboxRelay:                    NewOutboxRelayOptions(),
+		Eventing:                       NewEventingOptions(),
 		RateLimit:                      NewRateLimitOptions(),
 		Backpressure:                   NewBackpressureOptions(),
 		Cache:                          NewCacheOptions(),
@@ -352,6 +354,34 @@ type OutboxRelayStoreOptions struct {
 	ImmediateMaxConcurrent int           `json:"immediate_max_concurrent" mapstructure:"immediate_max_concurrent"`
 }
 
+type EventingOptions struct {
+	Consumers *EventConsumerOptions `json:"consumers" mapstructure:"consumers"`
+}
+
+type EventConsumerOptions struct {
+	ModelCatalogHotRank *EventConsumerBindingOptions `json:"modelcatalog-hot-rank" mapstructure:"modelcatalog-hot-rank"`
+}
+
+type EventConsumerBindingOptions struct {
+	Enabled bool   `json:"enabled" mapstructure:"enabled"`
+	Channel string `json:"channel" mapstructure:"channel"`
+}
+
+func NewEventingOptions() *EventingOptions {
+	return &EventingOptions{Consumers: &EventConsumerOptions{ModelCatalogHotRank: &EventConsumerBindingOptions{
+		Enabled: true, Channel: "qs-apiserver-modelcatalog-hot-rank-v1",
+	}}}
+}
+
+func (o *EventingOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil || o.Consumers == nil || o.Consumers.ModelCatalogHotRank == nil {
+		return
+	}
+	hotRank := o.Consumers.ModelCatalogHotRank
+	fs.BoolVar(&hotRank.Enabled, "eventing.consumer.modelcatalog-hot-rank.enabled", hotRank.Enabled, "Enable the independent modelcatalog hot-rank event consumer.")
+	fs.StringVar(&hotRank.Channel, "eventing.consumer.modelcatalog-hot-rank.channel", hotRank.Channel, "Stable MQ channel for the modelcatalog hot-rank projection.")
+}
+
 func NewOutboxRelayOptions() *OutboxRelayOptions {
 	return &OutboxRelayOptions{
 		Mongo: &OutboxRelayStoreOptions{
@@ -452,6 +482,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
 	o.BehaviorJourneyScan.AddFlags(fss.FlagSet("behavior_journey_scan"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
+	o.Eventing.AddFlags(fss.FlagSet("eventing"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))

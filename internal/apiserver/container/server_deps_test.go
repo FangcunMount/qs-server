@@ -6,7 +6,6 @@ import (
 
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
@@ -54,8 +53,6 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	planCommand := &planCommandServiceStub{}
 	statsSync := &statisticsSyncServiceStub{}
 	behaviorProjector := &behaviorProjectorServiceStub{}
-	answerSheetRelay := &outboxRelayStub{}
-	assessmentRelay := &outboxRelayStub{}
 	consistencyReconcile := &evaluationConsistencyReconcileServiceStub{}
 
 	c.PlanModule = &PlanModule{CommandService: planCommand}
@@ -63,12 +60,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 		SyncService:              statsSync,
 		BehaviorProjectorService: behaviorProjector,
 	}
-	c.SurveyModule = &SurveyModule{
-		MongoDomainEventRelay: answerSheetRelay,
-	}
 	c.EvaluationModule = &EvaluationModule{
-		AssessmentOutboxRelay: assessmentRelay,
-		SchedulerService:      consistencyReconcile,
+		SchedulerService: consistencyReconcile,
 	}
 
 	deps := c.BuildServerRuntimeDeps()
@@ -89,12 +82,6 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	}
 	if deps.BehaviorProjectorService != behaviorProjector {
 		t.Fatalf("BehaviorProjectorService = %#v, want %#v", deps.BehaviorProjectorService, behaviorProjector)
-	}
-	if deps.MongoDomainEventRelay != answerSheetRelay {
-		t.Fatalf("MongoDomainEventRelay = %#v, want %#v", deps.MongoDomainEventRelay, answerSheetRelay)
-	}
-	if deps.AssessmentOutboxRelay != assessmentRelay {
-		t.Fatalf("AssessmentOutboxRelay = %#v, want %#v", deps.AssessmentOutboxRelay, assessmentRelay)
 	}
 	if deps.EvaluationConsistencyReconcileService != consistencyReconcile {
 		t.Fatalf("EvaluationConsistencyReconcileService = %#v, want %#v", deps.EvaluationConsistencyReconcileService, consistencyReconcile)
@@ -119,10 +106,6 @@ func (*fakeOperatorRepo) ListByRole(context.Context, int64, domainoperator.Role,
 }
 func (*fakeOperatorRepo) Delete(context.Context, domainoperator.ID) error { return nil }
 func (*fakeOperatorRepo) Count(context.Context, int64) (int64, error)     { return 0, nil }
-
-type outboxRelayStub struct{}
-
-func (*outboxRelayStub) DispatchDue(context.Context) error { return nil }
 
 type planCommandServiceStub struct{}
 
@@ -198,7 +181,6 @@ func (*serverBootstrapRoleUpdaterStub) PersistFromSnapshotByUser(context.Context
 }
 func (*serverBootstrapRoleUpdaterStub) SyncRoles(context.Context, int64, uint64) error { return nil }
 
-var _ appEventing.OutboxRelay = (*outboxRelayStub)(nil)
 var _ planApp.PlanCommandService = (*planCommandServiceStub)(nil)
 var _ statisticsApp.StatisticsSyncService = (*statisticsSyncServiceStub)(nil)
 var _ statisticsApp.BehaviorProjectorService = (*behaviorProjectorServiceStub)(nil)

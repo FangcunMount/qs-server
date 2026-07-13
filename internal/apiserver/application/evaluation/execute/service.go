@@ -29,9 +29,9 @@ type service struct {
 	assessmentRepo assessment.Repository
 	inputResolver  evaluationinput.Resolver
 
-	txRunner     apptransaction.Runner
-	eventStager  EventStager
-	readyIndexer *appEventing.PostCommitReadyIndexer
+	txRunner    apptransaction.Runner
+	eventStager EventStager
+	postCommit  appEventing.PostCommitDispatcher
 
 	descriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
 	descriptorExecutor  evalpipeline.DescriptorExecutor
@@ -49,9 +49,9 @@ type EventStager interface {
 // EngineOption configures the concrete Evaluation engine.
 type EngineOption func(*service)
 
-func WithPostCommitReadyIndexer(indexer *appEventing.PostCommitReadyIndexer) EngineOption {
+func WithPostCommitDispatcher(dispatcher appEventing.PostCommitDispatcher) EngineOption {
 	return func(s *service) {
-		s.readyIndexer = indexer
+		s.postCommit = dispatcher
 	}
 }
 
@@ -346,10 +346,10 @@ func (s *service) assessmentLoader() assessmentLoader {
 // failureFinalizer 评估失败标记器
 func (s *service) failureFinalizer() evaluationFailureFinalizer {
 	return evaluationFailureFinalizer{
-		repo:         s.assessmentRepo,
-		runRepo:      s.runRepo,
-		txRunner:     s.txRunner,
-		eventStager:  s.eventStager,
-		readyIndexer: s.readyIndexer,
+		repo:        s.assessmentRepo,
+		runRepo:     s.runRepo,
+		txRunner:    s.txRunner,
+		eventStager: s.eventStager,
+		postCommit:  s.postCommit,
 	}
 }

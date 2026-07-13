@@ -10,7 +10,6 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -77,7 +76,6 @@ func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver,
 		db:                 db,
 		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
-		priorityTiers:      defaultPriorityTiers(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -305,10 +303,6 @@ func outboxOldestStatusQuery(db *gorm.DB, status string) *gorm.DB {
 	return db.Where("status = ?", status).
 		Order("created_at ASC").
 		Limit(1)
-}
-
-func defaultPriorityTiers() [][]string {
-	return outboxpriority.ClaimOrder(nil, nil)
 }
 
 func normalizePriorityEventTypes(eventTypes []string) []string {

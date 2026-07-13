@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"fmt"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
@@ -17,8 +18,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -29,28 +28,24 @@ import (
 
 // WireInput carries composition-root inputs for evaluation module installation.
 type WireInput struct {
-	MySQLDB                                     *gorm.DB
-	MongoDB                                     *mongo.Database
-	EventPublisher                              event.EventPublisher
-	RedisClient                                 redis.UniversalClient
-	CacheBuilder                                *keyspace.Builder
-	QueryRedisClient                            redis.UniversalClient
-	QueryCacheBuilder                           *keyspace.Builder
-	MetaRedisClient                             redis.UniversalClient
-	AssessmentPolicy                            cachepolicy.CachePolicy
-	AssessmentListPolicy                        cachepolicy.CachePolicy
-	Observer                                    *observability.ComponentObserver
-	TopicResolver                               eventcatalog.TopicResolver
-	MySQLLimiter                                backpressure.Acquirer
-	MongoLimiter                                backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize              int
-	AssessmentOutboxRelayPublishWorkers         int
-	AssessmentOutboxRelayImmediateMaxConcurrent int
-	TesteeAccessChecker                         evaluationoperator.AccessChecker
-	OpsHandle                                   *redisruntime.Handle
-	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
-	PublishedModelCatalog                       rulesetport.Catalog
-	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
+	MySQLDB                   *gorm.DB
+	MongoDB                   *mongo.Database
+	EventPublisher            event.EventPublisher
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	QueryRedisClient          redis.UniversalClient
+	QueryCacheBuilder         *keyspace.Builder
+	MetaRedisClient           redis.UniversalClient
+	AssessmentPolicy          cachepolicy.CachePolicy
+	AssessmentListPolicy      cachepolicy.CachePolicy
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	MongoLimiter              backpressure.Acquirer
+	TesteeAccessChecker       evaluationoperator.AccessChecker
+	SurveyRuntimeInfra        *surveymod.SurveyRuntimeInfra
+	PublishedModelCatalog     rulesetport.Catalog
+	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
+	OutboxProfile             appEventing.ProfileBinding
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
@@ -99,28 +94,24 @@ func Wire(in WireInput) (WireResult, error) {
 	}
 
 	module, err := Bootstrap(BootstrapInput{
-		MySQLDB:                             in.MySQLDB,
-		InputResolver:                       inputResolver,
-		ScaleCatalog:                        scaleCatalog,
-		EventPublisher:                      in.EventPublisher,
-		RedisClient:                         in.RedisClient,
-		CacheBuilder:                        in.CacheBuilder,
-		AssessmentPolicy:                    in.AssessmentPolicy,
-		QueryRedisClient:                    in.QueryRedisClient,
-		QueryCacheBuilder:                   in.QueryCacheBuilder,
-		AssessmentListPolicy:                in.AssessmentListPolicy,
-		VersionStore:                        versionStore,
-		Observer:                            in.Observer,
-		TopicResolver:                       in.TopicResolver,
-		MySQLLimiter:                        in.MySQLLimiter,
-		AssessmentOutboxRelayBatchSize:      in.AssessmentOutboxRelayBatchSize,
-		AssessmentOutboxRelayPublishWorkers: in.AssessmentOutboxRelayPublishWorkers,
-		AssessmentOutboxRelayImmediateMaxConcurrent: in.AssessmentOutboxRelayImmediateMaxConcurrent,
-		TesteeAccessChecker:                         in.TesteeAccessChecker,
-		OpsHandle:                                   in.OpsHandle,
-		ExecutionPaths:                              executionPaths,
-		RuntimeDescriptorRegistry:                   in.RuntimeDescriptorRegistry,
-		PublishedModelReader:                        publishedModelReader,
+		MySQLDB:                   in.MySQLDB,
+		InputResolver:             inputResolver,
+		ScaleCatalog:              scaleCatalog,
+		EventPublisher:            in.EventPublisher,
+		RedisClient:               in.RedisClient,
+		CacheBuilder:              in.CacheBuilder,
+		AssessmentPolicy:          in.AssessmentPolicy,
+		QueryRedisClient:          in.QueryRedisClient,
+		QueryCacheBuilder:         in.QueryCacheBuilder,
+		AssessmentListPolicy:      in.AssessmentListPolicy,
+		VersionStore:              versionStore,
+		Observer:                  in.Observer,
+		MySQLLimiter:              in.MySQLLimiter,
+		TesteeAccessChecker:       in.TesteeAccessChecker,
+		ExecutionPaths:            executionPaths,
+		RuntimeDescriptorRegistry: in.RuntimeDescriptorRegistry,
+		PublishedModelReader:      publishedModelReader,
+		OutboxProfile:             in.OutboxProfile,
 	})
 	if err != nil {
 		return WireResult{}, err

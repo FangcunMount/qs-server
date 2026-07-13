@@ -2,8 +2,10 @@ package container
 
 import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -18,7 +20,10 @@ type ContainerOptions struct {
 	// PublisherMode 事件发布器模式（mq, logging, nop）
 	PublisherMode eventruntime.PublishMode
 	// EventCatalog 事件契约 catalog，发布器和 outbox topic resolver 共享。
-	EventCatalog *eventcatalog.Catalog
+	EventCatalog           *eventcatalog.Catalog
+	EventSubsystem         *eventsubsystem.Subsystem
+	EventSubscriberFactory eventsubsystem.SubscriberFactory
+	EventConsumers         map[string]eventsubsystem.ConsumerOptions
 	// Env 环境名称（prod, dev, test），用于自动选择发布器模式
 	Env string
 	// Cache 缓存控制选项
@@ -49,9 +54,11 @@ type BackpressureOptions struct {
 }
 
 type ContainerOutboxRelayOptions struct {
+	MongoInterval                    time.Duration
 	MongoBatchSize                   int
 	MongoPublishWorkers              int
 	MongoImmediateMaxConcurrent      int
+	AssessmentInterval               time.Duration
 	AssessmentBatchSize              int
 	AssessmentPublishWorkers         int
 	AssessmentImmediateMaxConcurrent int

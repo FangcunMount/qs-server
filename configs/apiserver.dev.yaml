@@ -349,6 +349,7 @@ behavior_journey_scan:
     - assessment
     - report
 
+# durable event 始终先写本地 Outbox；logging/nop 模式不会把 immediate 标记为 published。
 outbox_relay:
   mongo:
     interval: "500ms"
@@ -477,6 +478,14 @@ messaging:
   # NSQ 配置（开发环境默认）
   nsq-addr: "127.0.0.1:4150"           # NSQ Daemon 地址（用于发布）
   nsq-lookupd-addr: "127.0.0.1:4161"   # NSQ Lookupd 地址（apiserver 不需要，但保留配置）
+
+# hot-rank 与主 worker 共用 Topic、使用独立 channel；Redis 失败只重试本 channel。
+# messaging.enabled=false 时不订阅，status 显示 disabled。
+eventing:
+  consumers:
+    modelcatalog-hot-rank:
+      enabled: true
+      channel: "qs-apiserver-modelcatalog-hot-rank-v1"
 
 # ============================================================
 # 5. 集成配置

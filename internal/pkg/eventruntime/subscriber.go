@@ -14,6 +14,17 @@ type HandlerFunc func(ctx context.Context, eventType string, payload []byte) err
 // HandlerFactory creates handlers by configured handler name.
 type HandlerFactory func(handlerName string) (HandlerFunc, error)
 
+type DispatchOutcome string
+
+const (
+	DispatchHandled DispatchOutcome = "handled"
+	DispatchUnknown DispatchOutcome = "unknown"
+)
+
+type DispatchResult struct {
+	Outcome DispatchOutcome
+}
+
 // Subscriber registers configured handlers and dispatches events by event type.
 type Subscriber struct {
 	catalog        catalogReader
@@ -81,15 +92,18 @@ func (s *Subscriber) GetTopicsToSubscribe() []eventcatalog.TopicSubscription {
 }
 
 // Dispatch dispatches an event to its configured handler.
-func (s *Subscriber) Dispatch(ctx context.Context, eventType string, payload []byte) error {
+func (s *Subscriber) Dispatch(ctx context.Context, eventType string, payload []byte) (DispatchResult, error) {
 	handler, ok := s.handlers[eventType]
 	if !ok {
 		s.logger.Warn("no handler for event type",
 			slog.String("event_type", eventType),
 		)
-		return nil
+		return DispatchResult{Outcome: DispatchUnknown}, nil
 	}
-	return handler(ctx, eventType, payload)
+	if err := handler(ctx, eventType, payload); err != nil {
+		return DispatchResult{}, err
+	}
+	return DispatchResult{Outcome: DispatchHandled}, nil
 }
 
 // HasHandler reports whether an event type has a registered handler.

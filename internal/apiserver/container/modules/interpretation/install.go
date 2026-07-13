@@ -2,6 +2,7 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -15,10 +16,10 @@ type InstallHost interface {
 func InstallFrom(host InstallHost) error {
 	module, err := Wire(WireInput{
 		MongoDB:            host.MongoDB(),
-		TopicResolver:      host.TopicResolver(),
 		MongoLimiter:       host.MongoLimiter(),
 		OpsHandle:          host.CacheHandle(redisruntime.FamilyOps),
 		ReportStatusConfig: host.ReportStatusConfig(),
+		OutboxProfile:      host.EventProfile(eventcatalog.OutboxProfileMongoDomain),
 	})
 	if err != nil {
 		return err

@@ -5,6 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -33,28 +34,24 @@ func InstallFrom(host InstallHost) error {
 		queryRedis = nil
 	}
 	result, err := Wire(WireInput{
-		MySQLDB:                             host.MySQLDB(),
-		MongoDB:                             host.MongoDB(),
-		EventPublisher:                      host.EventPublisher(),
-		RedisClient:                         objectRedis,
-		CacheBuilder:                        host.CacheBuilder(redisruntime.FamilyObject),
-		QueryRedisClient:                    queryRedis,
-		QueryCacheBuilder:                   host.CacheBuilder(redisruntime.FamilyQuery),
-		MetaRedisClient:                     host.CacheClient(redisruntime.FamilyMeta),
-		AssessmentPolicy:                    detail.Policy,
-		AssessmentListPolicy:                list.Policy,
-		Observer:                            host.CacheObserver(),
-		TopicResolver:                       host.TopicResolver(),
-		MySQLLimiter:                        host.MySQLLimiter(),
-		MongoLimiter:                        host.MongoLimiter(),
-		AssessmentOutboxRelayBatchSize:      host.OutboxRelayAssessmentBatchSize(),
-		AssessmentOutboxRelayPublishWorkers: host.OutboxRelayAssessmentPublishWorkers(),
-		AssessmentOutboxRelayImmediateMaxConcurrent: host.OutboxRelayAssessmentImmediateMaxConcurrent(),
-		TesteeAccessChecker:                         NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
-		OpsHandle:                                   host.CacheHandle(redisruntime.FamilyOps),
-		SurveyRuntimeInfra:                          host.SurveyRuntimeInfra(),
-		PublishedModelCatalog:                       host.PublishedModelCatalog(),
-		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
+		MySQLDB:                   host.MySQLDB(),
+		MongoDB:                   host.MongoDB(),
+		EventPublisher:            host.EventPublisher(),
+		RedisClient:               objectRedis,
+		CacheBuilder:              host.CacheBuilder(redisruntime.FamilyObject),
+		QueryRedisClient:          queryRedis,
+		QueryCacheBuilder:         host.CacheBuilder(redisruntime.FamilyQuery),
+		MetaRedisClient:           host.CacheClient(redisruntime.FamilyMeta),
+		AssessmentPolicy:          detail.Policy,
+		AssessmentListPolicy:      list.Policy,
+		Observer:                  host.CacheObserver(),
+		MySQLLimiter:              host.MySQLLimiter(),
+		MongoLimiter:              host.MongoLimiter(),
+		TesteeAccessChecker:       NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
+		SurveyRuntimeInfra:        host.SurveyRuntimeInfra(),
+		PublishedModelCatalog:     host.PublishedModelCatalog(),
+		RuntimeDescriptorRegistry: catalog.RuntimeDescriptorRegistry,
+		OutboxProfile:             host.EventProfile(eventcatalog.OutboxProfileAssessmentMySQL),
 	})
 	if err != nil {
 		return err

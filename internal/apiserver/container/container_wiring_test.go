@@ -62,15 +62,11 @@ func TestContainerBuildSurveyModuleDepsUsesSharedApplicationWiring(t *testing.T)
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
 
 	wire := surveymod.WireInput{
-		EventPublisher:   c.eventPublisher,
-		RankCacheBuilder: c.CacheBuilder(redisruntime.FamilyRank),
-		IdentityService:  c.resolveIdentityService(),
+		EventPublisher:  c.eventPublisher,
+		IdentityService: c.resolveIdentityService(),
 	}
 	if wire.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", wire.EventPublisher, c.eventPublisher)
-	}
-	if wire.RankCacheBuilder != c.CacheBuilder(redisruntime.FamilyRank) {
-		t.Fatalf("rank cache builder = %#v, want %#v", wire.RankCacheBuilder, c.CacheBuilder(redisruntime.FamilyRank))
 	}
 	if wire.IdentityService != nil {
 		t.Fatalf("identity service = %#v, want nil without IAM", wire.IdentityService)

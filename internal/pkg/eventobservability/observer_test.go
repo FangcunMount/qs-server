@@ -52,6 +52,8 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		OutboxStatusScrapeOutcomeFailure.String(): "failure",
 		ConsumeOutcomePoisonAcked.String():        "poison_acked",
 		ConsumeOutcomePoisonAckFailed.String():    "poison_ack_failed",
+		ConsumeOutcomeUnknownAcked.String():       "unknown_acked",
+		ConsumeOutcomeUnknownAckFailed.String():   "unknown_ack_failed",
 		ConsumeOutcomeAcked.String():              "acked",
 		ConsumeOutcomeAckFailed.String():          "ack_failed",
 		ConsumeOutcomeNacked.String():             "nacked",

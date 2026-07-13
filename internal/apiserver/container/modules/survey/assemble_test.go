@@ -3,7 +3,6 @@ package survey
 import (
 	"testing"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -52,9 +51,6 @@ type fakeQuestionnaireReader struct {
 type fakeAnswerSheetStore struct {
 	domainAnswerSheet.Repository
 	asApp.SubmissionDurableWriter
-	asApp.EventStager
-	asApp.SubmittedEventOutboxStore
-	appEventing.OutboxStatusReader
 }
 
 type fakeAnswerSheetReader struct {

@@ -45,12 +45,14 @@ func (o OutboxStatusScrapeOutcome) String() string { return string(o) }
 type ConsumeOutcome string
 
 const (
-	ConsumeOutcomePoisonAcked     ConsumeOutcome = "poison_acked"
-	ConsumeOutcomePoisonAckFailed ConsumeOutcome = "poison_ack_failed"
-	ConsumeOutcomeAcked           ConsumeOutcome = "acked"
-	ConsumeOutcomeAckFailed       ConsumeOutcome = "ack_failed"
-	ConsumeOutcomeNacked          ConsumeOutcome = "nacked"
-	ConsumeOutcomeNackFailed      ConsumeOutcome = "nack_failed"
+	ConsumeOutcomePoisonAcked      ConsumeOutcome = "poison_acked"
+	ConsumeOutcomePoisonAckFailed  ConsumeOutcome = "poison_ack_failed"
+	ConsumeOutcomeUnknownAcked     ConsumeOutcome = "unknown_acked"
+	ConsumeOutcomeUnknownAckFailed ConsumeOutcome = "unknown_ack_failed"
+	ConsumeOutcomeAcked            ConsumeOutcome = "acked"
+	ConsumeOutcomeAckFailed        ConsumeOutcome = "ack_failed"
+	ConsumeOutcomeNacked           ConsumeOutcome = "nacked"
+	ConsumeOutcomeNackFailed       ConsumeOutcome = "nack_failed"
 )
 
 func (o ConsumeOutcome) String() string { return string(o) }

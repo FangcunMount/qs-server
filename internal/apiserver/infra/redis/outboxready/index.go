@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -38,15 +38,26 @@ return members
 
 // Index is a best-effort Redis ZSet scheduler for outbox pending events.
 type Index struct {
-	client redis.UniversalClient
-	store  string
+	client         redis.UniversalClient
+	store          string
+	priorityBucket func(string) string
+	buckets        []string
 }
 
-func NewIndex(client redis.UniversalClient, store string) *Index {
+// NewIndexWithRegistry binds ready-index routing to the same immutable policy
+// used by the owning outbox profile.
+func NewIndexWithRegistry(client redis.UniversalClient, store string, registry *eventcatalog.EffectiveRegistry) *Index {
+	if registry == nil {
+		return nil
+	}
+	return newIndex(client, store, registry.PriorityBucket, registry.ReadyIndexBuckets())
+}
+
+func newIndex(client redis.UniversalClient, store string, priorityBucket func(string) string, buckets []string) *Index {
 	if client == nil || store == "" {
 		return nil
 	}
-	return &Index{client: client, store: store}
+	return &Index{client: client, store: store, priorityBucket: priorityBucket, buckets: append([]string(nil), buckets...)}
 }
 
 func (i *Index) bucketKey(bucket string) string {
@@ -57,7 +68,7 @@ func (i *Index) Enqueue(ctx context.Context, eventType, eventID string, nextAtte
 	if i == nil || i.client == nil || eventID == "" {
 		return nil
 	}
-	bucket := outboxpriority.Bucket(eventType)
+	bucket := i.priorityBucket(eventType)
 	key := i.bucketKey(bucket)
 	score := ReadyScore(nextAttemptAt, createdAt)
 	return i.client.ZAdd(ctx, key, redis.Z{Score: score, Member: eventID}).Err()
@@ -67,7 +78,7 @@ func (i *Index) Remove(ctx context.Context, eventType, eventID string) error {
 	if i == nil || i.client == nil || eventID == "" {
 		return nil
 	}
-	key := i.bucketKey(outboxpriority.Bucket(eventType))
+	key := i.bucketKey(i.priorityBucket(eventType))
 	return i.client.ZRem(ctx, key, eventID).Err()
 }
 
@@ -76,7 +87,7 @@ func (i *Index) RemoveByEventID(ctx context.Context, eventID string) error {
 	if i == nil || i.client == nil || eventID == "" {
 		return nil
 	}
-	for _, bucket := range outboxpriority.ReadyIndexBuckets {
+	for _, bucket := range i.buckets {
 		key := i.bucketKey(bucket)
 		if err := i.client.ZRem(ctx, key, eventID).Err(); err != nil {
 			return err

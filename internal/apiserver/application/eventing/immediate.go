@@ -2,6 +2,7 @@ package eventing
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -25,23 +26,27 @@ type ImmediateDispatcher struct {
 	enabled             bool
 	timeout             time.Duration
 	sem                 chan struct{}
-	hooks               []OutboxBeforePublishHook
 	readyIndex          ReadyIndex
 	readyIndexer        *PostCommitReadyIndexer
 	immediateEventTypes map[string]struct{}
+	lifecycleMu         sync.Mutex
+	closed              bool
+	wg                  sync.WaitGroup
 }
 
 type ImmediateDispatcherOptions struct {
-	Name                string
-	Store               OutboxStore
-	Publisher           event.EventPublisher
-	Observer            eventobservability.Observer
-	Enabled             bool
-	Timeout             time.Duration
-	MaxConcurrent       int
-	Hooks               []OutboxBeforePublishHook
-	ReadyIndex          ReadyIndex
-	ImmediateEventTypes []string
+	Name      string
+	Store     OutboxStore
+	Publisher event.EventPublisher
+	Observer  eventobservability.Observer
+	Enabled   bool
+	// RequireDurablePublisher prevents a durable outbox event from being
+	// acknowledged as published by logging/nop publisher modes.
+	RequireDurablePublisher bool
+	Timeout                 time.Duration
+	MaxConcurrent           int
+	ReadyIndex              ReadyIndex
+	ImmediateEventTypes     []string
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
@@ -56,16 +61,19 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 	if maxConcurrent <= 0 {
 		maxConcurrent = defaultImmediateMaxConcurrent
 	}
+	enabled := opts.Enabled && reader != nil && opts.Publisher != nil
+	if opts.RequireDurablePublisher && !isDurablePublisher(opts.Publisher) {
+		enabled = false
+	}
 	return &ImmediateDispatcher{
 		name:                opts.Name,
 		store:               opts.Store,
 		reader:              reader,
 		publisher:           opts.Publisher,
 		observer:            opts.Observer,
-		enabled:             opts.Enabled && reader != nil && opts.Publisher != nil,
+		enabled:             enabled,
 		timeout:             opts.Timeout,
 		sem:                 make(chan struct{}, maxConcurrent),
-		hooks:               compactBeforePublishHooks(opts.Hooks),
 		readyIndex:          opts.ReadyIndex,
 		readyIndexer:        NewPostCommitReadyIndexer(opts.ReadyIndex),
 		immediateEventTypes: eventTypeSet(opts.ImmediateEventTypes),
@@ -73,11 +81,20 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 }
 
 func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events []event.DomainEvent) {
+	d.AfterCommit(ctx, events, time.Now())
+}
+
+// AfterCommit records ready-index hints and attempts immediate delivery for
+// explicitly eligible event types. It must only be called after commit.
+func (d *ImmediateDispatcher) AfterCommit(ctx context.Context, events []event.DomainEvent, readyAt time.Time) {
 	if d == nil || len(events) == 0 {
 		return
 	}
+	if readyAt.IsZero() {
+		readyAt = time.Now()
+	}
 	if d.readyIndexer != nil {
-		d.readyIndexer.EnqueueAfterCommit(ctx, events, time.Now())
+		d.readyIndexer.EnqueueAfterCommit(ctx, events, readyAt)
 	}
 	if !d.enabled {
 		return
@@ -91,7 +108,11 @@ func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events
 		}
 		eventID := evt.EventID()
 		eventType := evt.EventType()
+		if !d.reserveDispatch() {
+			return
+		}
 		go func() {
+			defer d.wg.Done()
 			select {
 			case d.sem <- struct{}{}:
 				defer func() { <-d.sem }()
@@ -104,6 +125,28 @@ func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events
 			d.dispatchOne(ctx, eventID, eventType)
 		}()
 	}
+}
+
+func (d *ImmediateDispatcher) reserveDispatch() bool {
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.closed {
+		return false
+	}
+	d.wg.Add(1)
+	return true
+}
+
+// Close prevents new immediate attempts and waits for attempts already owned
+// by this dispatcher. It does not close the injected store or publisher.
+func (d *ImmediateDispatcher) Close() {
+	if d == nil {
+		return
+	}
+	d.lifecycleMu.Lock()
+	d.closed = true
+	d.lifecycleMu.Unlock()
+	d.wg.Wait()
 }
 
 func detachedContext(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -121,20 +164,6 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 		return
 	}
 	l := logger.L(ctx)
-	for _, hook := range d.hooks {
-		if hook == nil {
-			continue
-		}
-		if err := hook.BeforePublish(ctx, pending); err != nil {
-			d.observeImmediate(ctx, eventType, "hook_failed")
-			l.Warnw("immediate outbox hook failed",
-				"dispatcher", d.name,
-				"event_id", eventID,
-				"error", err.Error(),
-			)
-			return
-		}
-	}
 	if err := d.publisher.Publish(ctx, pending.Event); err != nil {
 		d.observeImmediate(ctx, eventType, "publish_failed")
 		l.Warnw("immediate outbox publish failed",
@@ -169,7 +198,7 @@ func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, o
 		mapped = eventobservability.OutboxOutcomePublishFailed
 	case "mark_failed":
 		mapped = eventobservability.OutboxOutcomeMarkPublishedFailed
-	case "hook_failed", "not_found":
+	case "not_found":
 		mapped = eventobservability.OutboxOutcomeClaimFailed
 	case "immediate_skipped":
 		mapped = eventobservability.OutboxOutcomeImmediateSkipped

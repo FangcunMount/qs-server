@@ -6,7 +6,7 @@ Outbox 解决“业务写入成功，但 MQ 发布失败怎么办”的一致性
 
 ## 2. 所在位置
 
-Outbox 位于业务写入和 MQ 之间。Survey / Evaluation / Report 在保存业务状态时同时记录 Outbox 事件；relay 后续把事件发布到 MQ。
+Outbox 位于业务写入和 MQ 之间。Survey / Evaluation / Interpretation 在保存业务状态时通过 EventSubsystem 提供的 ProfileBinding 同事务记录 Outbox 事件；profile relay 后续把事件发布到 MQ。
 
 ## 3. 设计目标
 
@@ -54,6 +54,8 @@ relay claim 必须防止多实例重复发布；消费者仍需幂等，因为 M
 
 Outbox 不等于 MQ。Outbox 负责本地业务写入与事件发布之间的一致性，MQ 负责跨进程异步投递。它也不承担 `behavior_footprint` 投影：该数据只由 `behavior_journey_scan` 重建。
 
+Mongo 与 MySQL Outbox 分别属于 `mongo_domain_events` 和 `assessment_mysql_events` profile。每个 profile 只有一个 Store、ready index、immediate dispatcher、relay 和 reconciler；业务模块不能构造或启动这些运输组件。
+
 ## 11. 观测指标
 
 Outbox pending count、oldest pending age、claim duration、publish success / failed、retry count、dead letter count、relay loop error、publish latency。
@@ -64,5 +66,6 @@ Outbox pending count、oldest pending age、claim duration、publish success / f
 - [../../../internal/apiserver/application/eventing/outbox.go](../../../internal/apiserver/application/eventing/outbox.go)
 - [../../../internal/apiserver/infra/mongo/eventoutbox](../../../internal/apiserver/infra/mongo/eventoutbox)
 - [../../../internal/apiserver/infra/mysql/eventoutbox](../../../internal/apiserver/infra/mysql/eventoutbox)
-- [../../../internal/apiserver/container/internal/outboxruntime](../../../internal/apiserver/container/internal/outboxruntime)
+- [../../../internal/apiserver/eventing/subsystem](../../../internal/apiserver/eventing/subsystem)
+- [../../../internal/pkg/eventcatalog](../../../internal/pkg/eventcatalog)
 - [../../../configs/events.yaml](../../../configs/events.yaml)

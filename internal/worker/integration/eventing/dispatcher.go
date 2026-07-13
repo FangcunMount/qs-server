@@ -94,12 +94,31 @@ func (d *Dispatcher) Initialize(catalog *eventcatalog.Catalog) error {
 }
 
 func (d *Dispatcher) validateHandlerBindings(catalog *eventcatalog.Catalog) error {
+	if isRuntimeContractCatalog(catalog) {
+		registry, err := eventcatalog.NewEffectiveRegistry(catalog, eventcatalog.DefaultSpecs())
+		if err != nil {
+			return fmt.Errorf("build effective event registry: %w", err)
+		}
+		return registry.ValidatePrimaryHandlers(d.registry.Has)
+	}
 	for eventType, eventCfg := range catalog.Config().Events {
 		if !d.registry.Has(eventCfg.Handler) {
 			return fmt.Errorf("handler %q not registered for event %q", eventCfg.Handler, eventType)
 		}
 	}
 	return nil
+}
+
+func isRuntimeContractCatalog(catalog *eventcatalog.Catalog) bool {
+	if catalog == nil || catalog.Config() == nil || len(catalog.Config().Events) != len(eventcatalog.EventTypes()) {
+		return false
+	}
+	for _, eventType := range eventcatalog.EventTypes() {
+		if _, ok := catalog.Config().Events[eventType]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
@@ -142,9 +161,9 @@ func (d *Dispatcher) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
 }
 
 // DispatchEvent dispatches an event to its configured handler.
-func (d *Dispatcher) DispatchEvent(ctx context.Context, eventType string, payload []byte) error {
+func (d *Dispatcher) DispatchEvent(ctx context.Context, eventType string, payload []byte) (eventruntime.DispatchResult, error) {
 	if d.subscriber == nil {
-		return fmt.Errorf("event dispatcher not initialized")
+		return eventruntime.DispatchResult{}, fmt.Errorf("event dispatcher not initialized")
 	}
 	return d.subscriber.Dispatch(ctx, eventType, payload)
 }

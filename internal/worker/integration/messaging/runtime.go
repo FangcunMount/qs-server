@@ -9,8 +9,8 @@ import (
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/nsqio/go-nsq"
 )
@@ -20,7 +20,7 @@ type TopicSubscriptionSource interface {
 }
 
 type EventDispatcher interface {
-	DispatchEvent(ctx context.Context, eventType string, payload []byte) error
+	DispatchEvent(ctx context.Context, eventType string, payload []byte) (eventruntime.DispatchResult, error)
 }
 
 type SubscriptionRuntime interface {
@@ -28,111 +28,8 @@ type SubscriptionRuntime interface {
 	EventDispatcher
 }
 
-type MessageEventExtractor struct{}
-
-func (MessageEventExtractor) Extract(msg *basemessaging.Message) (string, error) {
-	if msg.Metadata == nil {
-		msg.Metadata = map[string]string{}
-	}
-	if eventType, ok := msg.Metadata["event_type"]; ok {
-		return eventType, nil
-	}
-	env, err := eventcodec.DecodeEnvelope(msg.Payload)
-	if err != nil {
-		return "", err
-	}
-	msg.Metadata["event_type"] = env.EventType
-	return env.EventType, nil
-}
-
-type MessageSettlementPolicy struct {
-	logger   *slog.Logger
-	service  string
-	topic    string
-	observer eventobservability.Observer
-}
-
-func (p MessageSettlementPolicy) AckInvalid(msg *basemessaging.Message, parseErr error) {
-	p.logger.Warn("message missing event_type and payload parse failed",
-		slog.String("channel", p.service),
-		slog.String("topic", p.topic),
-		slog.String("msg_id", msg.UUID),
-		slog.Int("payload_bytes", len(msg.Payload)),
-		slog.String("error", parseErr.Error()),
-	)
-	if ackErr := msg.Ack(); ackErr != nil {
-		p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAckFailed)
-		p.logger.Warn("failed to ack invalid message",
-			slog.String("channel", p.service),
-			slog.String("topic", p.topic),
-			slog.String("msg_id", msg.UUID),
-			slog.String("error", ackErr.Error()),
-		)
-		return
-	}
-	p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAcked)
-}
-
-func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {
-	p.logger.Error("failed to dispatch event",
-		slog.String("channel", p.service),
-		slog.String("topic", p.topic),
-		slog.String("event_type", eventType),
-		slog.String("msg_id", msg.UUID),
-		slog.String("error", dispatchErr.Error()),
-	)
-	if nackErr := msg.Nack(); nackErr != nil {
-		outcome := eventobservability.ConsumeOutcomeNackFailed
-		p.observe(msg, eventType, outcome)
-		p.logger.Warn("failed to nack message",
-			slog.String("channel", p.service),
-			slog.String("topic", p.topic),
-			slog.String("msg_id", msg.UUID),
-			slog.String("error", nackErr.Error()),
-		)
-		return outcome
-	}
-	outcome := eventobservability.ConsumeOutcomeNacked
-	p.observe(msg, eventType, outcome)
-	return outcome
-}
-
-func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) (eventobservability.ConsumeOutcome, error) {
-	if ackErr := msg.Ack(); ackErr != nil {
-		eventType := ""
-		if msg != nil && msg.Metadata != nil {
-			eventType = msg.Metadata["event_type"]
-		}
-		outcome := eventobservability.ConsumeOutcomeAckFailed
-		p.observe(msg, eventType, outcome)
-		p.logger.Warn("failed to ack message",
-			slog.String("channel", p.service),
-			slog.String("topic", p.topic),
-			slog.String("msg_id", msg.UUID),
-			slog.String("error", ackErr.Error()),
-		)
-		return outcome, ackErr
-	}
-	eventType := ""
-	if msg != nil && msg.Metadata != nil {
-		eventType = msg.Metadata["event_type"]
-	}
-	outcome := eventobservability.ConsumeOutcomeAcked
-	p.observe(msg, eventType, outcome)
-	return outcome, nil
-}
-
-func (p MessageSettlementPolicy) observe(msg *basemessaging.Message, eventType string, outcome eventobservability.ConsumeOutcome) {
-	if p.observer == nil {
-		return
-	}
-	p.observer.ObserveConsume(context.Background(), eventobservability.ConsumeEvent{
-		Service:   p.service,
-		Topic:     p.topic,
-		EventType: eventType,
-		Outcome:   outcome,
-	})
-}
+type MessageEventExtractor = eventruntime.MessageEventExtractor
+type MessageSettlementPolicy = eventruntime.MessageSettlementPolicy
 
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
 	switch cfg.Provider {
@@ -232,7 +129,7 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 	if observer == nil {
 		observer = eventobservability.DefaultObserver()
 	}
-	settlement := MessageSettlementPolicy{logger: logger, service: serviceName, topic: topicName, observer: observer}
+	settlement := eventruntime.NewMessageSettlementPolicy(logger, serviceName, topicName, observer)
 	return func(ctx context.Context, msg *basemessaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
@@ -244,7 +141,8 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 		logger.Log(ctx, logLevel, "dispatching event", dispatchLogFields(serviceName, topicName, eventType, msg)...)
 
 		startedAt := time.Now()
-		if err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
+		result, err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload)
+		if err != nil {
 			outcome := settlement.NackFailed(msg, eventType, err)
 			elapsed := time.Since(startedAt)
 			eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
@@ -263,7 +161,12 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 			return err
 		}
 
-		outcome, err := settlement.AckSuccess(msg)
+		var outcome eventobservability.ConsumeOutcome
+		if result.Outcome == eventruntime.DispatchUnknown {
+			outcome, err = settlement.AckUnknown(msg)
+		} else {
+			outcome, err = settlement.AckSuccess(msg)
+		}
 		elapsed := time.Since(startedAt)
 		eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
 			Service:   serviceName,

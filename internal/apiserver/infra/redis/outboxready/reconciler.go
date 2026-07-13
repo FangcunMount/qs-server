@@ -2,6 +2,7 @@ package outboxready
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -14,6 +15,10 @@ type Reconciler struct {
 	lister   outboxport.PendingEventRefLister
 	interval time.Duration
 	limit    int
+	mu       sync.Mutex
+	started  bool
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 func NewReconciler(index *Index, lister outboxport.PendingEventRefLister, interval time.Duration) *Reconciler {
@@ -27,7 +32,17 @@ func (r *Reconciler) Start(ctx context.Context) {
 	if r == nil || r.index == nil || r.lister == nil {
 		return
 	}
+	r.mu.Lock()
+	if r.started {
+		r.mu.Unlock()
+		return
+	}
+	ctx, r.cancel = context.WithCancel(ctx)
+	r.started = true
+	r.wg.Add(1)
+	r.mu.Unlock()
 	go func() {
+		defer r.wg.Done()
 		ticker := time.NewTicker(r.interval)
 		defer ticker.Stop()
 		for {
@@ -39,6 +54,19 @@ func (r *Reconciler) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (r *Reconciler) Close() {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	cancel := r.cancel
+	r.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	r.wg.Wait()
 }
 
 func (r *Reconciler) runOnce(ctx context.Context) {

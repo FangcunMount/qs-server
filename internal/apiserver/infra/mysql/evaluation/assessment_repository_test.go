@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestNewAssessmentRepositoryWithTopicResolverCreatesCommandRepository(t *testing.T) {
-	repo, ok := NewAssessmentRepositoryWithTopicResolver(nil, nil).(*assessmentRepository)
+func TestNewAssessmentRepositoryCreatesCommandRepository(t *testing.T) {
+	repo, ok := NewAssessmentRepository(nil).(*assessmentRepository)
 	if !ok {
 		t.Fatalf("repository type = %T, want *assessmentRepository", repo)
 	}

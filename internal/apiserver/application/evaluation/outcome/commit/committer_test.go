@@ -105,6 +105,18 @@ type commitEventStagerStub struct {
 	stageErr error
 }
 
+type commitPostCommitStub struct {
+	calls  int
+	events []event.DomainEvent
+	at     time.Time
+}
+
+func (s *commitPostCommitStub) AfterCommit(_ context.Context, events []event.DomainEvent, at time.Time) {
+	s.calls++
+	s.events = append(s.events, events...)
+	s.at = at
+}
+
 func (s *commitEventStagerStub) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	requireCommitTx(ctx)
 	*s.order = append(*s.order, "event")
@@ -120,6 +132,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	outcomeRepo := &commitOutcomeRepoStub{order: &order}
 	runRepo := &commitRunRepoStub{order: &order}
 	stager := &commitEventStagerStub{order: &order}
+	postCommit := &commitPostCommitStub{}
 	c := NewCommitter(
 		commitRunnerStub{},
 		commitAssessmentRepoStub{order: &order},
@@ -127,7 +140,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 		runRepo,
 		commitScoreProjectorStub{order: &order},
 		stager,
-		nil,
+		postCommit,
 	).(*committer)
 	c.newID = func() meta.ID { return meta.FromUint64(9001) }
 	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
@@ -166,6 +179,9 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	}
 	if len(stager.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(stager.events))
+	}
+	if postCommit.calls != 1 || len(postCommit.events) != 1 || postCommit.events[0].EventType() != "evaluation.outcome.committed" || !postCommit.at.Equal(evaluatedAt) {
+		t.Fatalf("post-commit = calls:%d events:%v at:%v", postCommit.calls, postCommit.events, postCommit.at)
 	}
 	evaluatedEvent, ok := stager.events[0].(assessment.EvaluationOutcomeCommittedEvent)
 	if !ok {

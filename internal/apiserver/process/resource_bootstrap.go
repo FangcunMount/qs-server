@@ -9,9 +9,11 @@ import (
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -168,15 +170,45 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		},
 	}
 	if deps.buildContainerOptions != nil {
-		output.containerInput = containerBootstrapInput{containerOptions: deps.buildContainerOptions(containerOptionsInput{
+		containerOptions := deps.buildContainerOptions(containerOptionsInput{
 			mqPublisher:    mqPublisher,
 			publishMode:    publishMode,
 			eventCatalog:   eventCatalog,
 			cacheSubsystem: cacheSubsystem,
 			backpressure:   backpressureOptions,
-		})}
+		})
+		events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, containerOptions)
+		if err != nil {
+			return resourceOutput{}, err
+		}
+		containerOptions.EventSubsystem = events
+		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}
 	return output, nil
+}
+
+func buildResourceEventSubsystem(mysqlDB *gorm.DB, mongoDB *mongo.Database, cacheSubsystem *cachebootstrap.Subsystem, opts container.ContainerOptions) (*eventsubsystem.Subsystem, error) {
+	if opts.EventCatalog == nil {
+		return nil, nil
+	}
+	var opsRedis redis.UniversalClient
+	if cacheSubsystem != nil {
+		opsRedis = cacheSubsystem.Client(redisruntime.FamilyOps)
+	}
+	return eventsubsystem.New(eventsubsystem.Options{
+		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
+		Catalog: opts.EventCatalog, MQPublisher: opts.MQPublisher, PublisherMode: opts.PublisherMode,
+		MySQLLimiter: opts.Backpressure.MySQL, MongoLimiter: opts.Backpressure.Mongo,
+		Mongo: eventsubsystem.ProfileOptions{
+			Interval: opts.OutboxRelay.MongoInterval, BatchSize: opts.OutboxRelay.MongoBatchSize,
+			PublishWorkers: opts.OutboxRelay.MongoPublishWorkers, ImmediateMaxConcurrent: opts.OutboxRelay.MongoImmediateMaxConcurrent,
+		},
+		Assessment: eventsubsystem.ProfileOptions{
+			Interval: opts.OutboxRelay.AssessmentInterval, BatchSize: opts.OutboxRelay.AssessmentBatchSize,
+			PublishWorkers: opts.OutboxRelay.AssessmentPublishWorkers, ImmediateMaxConcurrent: opts.OutboxRelay.AssessmentImmediateMaxConcurrent,
+		},
+		SubscriberFactory: opts.EventSubscriberFactory, Consumers: opts.EventConsumers,
+	})
 }
 
 func initializeDatabaseConnections(deps databaseResourceDeps) (*gorm.DB, *mongo.Database, error) {

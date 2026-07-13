@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -221,9 +222,9 @@ func (c *Container) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
 }
 
 // DispatchEvent 分发事件到对应的处理器
-func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload []byte) error {
+func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload []byte) (eventruntime.DispatchResult, error) {
 	if c.eventDispatcher == nil {
-		return nil
+		return eventruntime.DispatchResult{Outcome: eventruntime.DispatchUnknown}, nil
 	}
 	return c.eventDispatcher.DispatchEvent(ctx, eventType, payload)
 }

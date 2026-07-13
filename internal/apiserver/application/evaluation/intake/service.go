@@ -40,17 +40,17 @@ type EvaluationModelValidator interface {
 	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error
 }
 type service struct {
-	repo      domainassessment.Repository
-	validator EvaluationModelValidator
-	tx        apptransaction.Runner
-	events    EventStager
-	cache     assessmentListCache
-	immediate *appEventing.ImmediateDispatcher
+	repo       domainassessment.Repository
+	validator  EvaluationModelValidator
+	tx         apptransaction.Runner
+	events     EventStager
+	cache      assessmentListCache
+	postCommit appEventing.PostCommitDispatcher
 }
 type Option func(*service)
 
-func WithImmediateDispatcher(v *appEventing.ImmediateDispatcher) Option {
-	return func(s *service) { s.immediate = v }
+func WithPostCommitDispatcher(v appEventing.PostCommitDispatcher) Option {
+	return func(s *service) { s.postCommit = v }
 }
 func NewService(repo domainassessment.Repository, validator EvaluationModelValidator, tx apptransaction.Runner, events EventStager, cache assessmentListCache, opts ...Option) Service {
 	s := &service{repo: repo, validator: validator, tx: tx, events: events, cache: cache}
@@ -92,7 +92,7 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 	if err != nil {
 		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}
-	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, immediate: s.immediate}
+	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a, req, command); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}
@@ -107,7 +107,7 @@ func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessme
 	if err := a.Submit(); err != nil {
 		return nil, evalerrors.AssessmentSubmitFailed(err, "提交测评失败")
 	}
-	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, immediate: s.immediate}
+	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}

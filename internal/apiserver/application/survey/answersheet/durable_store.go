@@ -33,15 +33,12 @@ func NewTransactionalSubmissionDurableStore(
 	runner apptransaction.Runner,
 	writer SubmissionDurableWriter,
 	stager EventStager,
-	immediate *appEventing.ImmediateDispatcher,
+	postCommit appEventing.PostCommitDispatcher,
 ) SubmissionDurableStore {
 	return transactionalSubmissionDurableStore{
-		runner:    runner,
-		writer:    writer,
-		stager:    stager,
-		immediate: immediate,
+		runner:     runner,
+		writer:     writer,
+		stager:     stager,
+		postCommit: postCommit,
 	}
 }
-
-// SubmittedEventOutboxStore 保留兼容性 name 用于 共享 outbox 存储。
-type SubmittedEventOutboxStore = appEventing.OutboxStore

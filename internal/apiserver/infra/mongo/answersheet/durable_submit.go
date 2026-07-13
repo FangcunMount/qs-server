@@ -9,7 +9,6 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
-	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -21,7 +20,6 @@ import (
 const (
 	idempotencyLookupTimeout = 2 * time.Second
 	idempotencyLookupPoll    = 100 * time.Millisecond
-	outboxRetryDelay         = 10 * time.Second
 )
 
 func (r *Repository) ensureIndexes(ctx context.Context) error {
@@ -42,46 +40,6 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
-	if sheet == nil {
-		return nil, false, fmt.Errorf("answer sheet is required")
-	}
-
-	if metaInfo.IdempotencyKey != "" {
-		existing, err := r.FindCompletedSubmission(ctx, metaInfo.IdempotencyKey)
-		if err != nil {
-			return nil, false, err
-		}
-		if existing != nil {
-			return existing, true, nil
-		}
-	}
-
-	if err := r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
-		events, err := r.SaveSubmittedAnswerSheet(txCtx, sheet, metaInfo)
-		if err != nil {
-			return err
-		}
-		if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		if metaInfo.IdempotencyKey != "" {
-			existing, lookupErr := r.WaitForCompletedSubmission(ctx, metaInfo.IdempotencyKey)
-			if lookupErr == nil && existing != nil {
-				sheet.ClearEvents()
-				return existing, true, nil
-			}
-		}
-		return nil, false, err
-	}
-
-	sheet.ClearEvents()
-	return sheet, false, nil
 }
 
 func (r *Repository) FindCompletedSubmission(ctx context.Context, idempotencyKey string) (*domainAnswerSheet.AnswerSheet, error) {
@@ -153,84 +111,6 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 
 	events := append([]event.DomainEvent{}, sheet.Events()...)
 	return events, nil
-}
-
-func (r *Repository) Stage(ctx context.Context, events ...event.DomainEvent) error {
-	return r.outboxStore.Stage(ctx, events...)
-}
-
-func (r *Repository) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
-	return r.outboxStore.ClaimDueEvents(ctx, limit, now)
-}
-
-func (r *Repository) ClaimEventsByIDs(ctx context.Context, eventIDs []string, now time.Time) ([]outboxport.PendingEvent, error) {
-	if r == nil || r.outboxStore == nil {
-		return nil, nil
-	}
-	return r.outboxStore.ClaimEventsByIDs(ctx, eventIDs, now)
-}
-
-func (r *Repository) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
-	return r.outboxStore.MarkEventPublished(ctx, eventID, publishedAt)
-}
-
-func (r *Repository) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
-	return r.outboxStore.MarkEventFailed(ctx, eventID, lastError, nextAttemptAt)
-}
-
-func (r *Repository) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {
-	if r == nil || r.outboxStore == nil {
-		return outboxport.StatusSnapshot{}, nil
-	}
-	return r.outboxStore.OutboxStatusSnapshot(ctx, now)
-}
-
-func (r *Repository) GetPublishableEvent(ctx context.Context, eventID string, now time.Time) (outboxport.PendingEvent, bool, error) {
-	if r == nil || r.outboxStore == nil {
-		return outboxport.PendingEvent{}, false, nil
-	}
-	return r.outboxStore.GetPublishableEvent(ctx, eventID, now)
-}
-
-func (r *Repository) MarkEventsPublished(ctx context.Context, eventIDs []string, publishedAt time.Time) error {
-	if r == nil || r.outboxStore == nil {
-		return nil
-	}
-	return r.outboxStore.MarkEventsPublished(ctx, eventIDs, publishedAt)
-}
-
-func (r *Repository) MarkEventsFailed(ctx context.Context, failures []outboxport.FailedMark, nextAttemptAt time.Time) error {
-	if r == nil || r.outboxStore == nil {
-		return nil
-	}
-	return r.outboxStore.MarkEventsFailed(ctx, failures, nextAttemptAt)
-}
-
-func (r *Repository) OutboxStatusByEventType(ctx context.Context, now time.Time) ([]outboxport.EventTypeStatusBucket, error) {
-	if r == nil || r.outboxStore == nil {
-		return nil, nil
-	}
-	return r.outboxStore.OutboxStatusByEventType(ctx, now)
-}
-
-func (r *Repository) ListPendingEventRefs(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEventRef, error) {
-	if r == nil || r.outboxStore == nil {
-		return nil, nil
-	}
-	return r.outboxStore.ListPendingEventRefs(ctx, limit, now)
-}
-
-func (r *Repository) withTransaction(ctx context.Context, fn func(txCtx mongo.SessionContext) error) error {
-	session, err := r.DB().Client().StartSession()
-	if err != nil {
-		return err
-	}
-	defer session.EndSession(ctx)
-
-	_, err = session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (interface{}, error) {
-		return nil, fn(txCtx)
-	})
-	return err
 }
 
 func (r *Repository) findByIdempotencyKey(ctx context.Context, key string) (*domainAnswerSheet.AnswerSheet, error) {

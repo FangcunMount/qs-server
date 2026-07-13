@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -24,10 +25,16 @@ type containerOptionsInput struct {
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
+	var subscriberFactory eventsubsystem.SubscriberFactory
+	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
+		subscriberFactory = s.config.MessagingOptions.NewSubscriber
+	}
 	return container.ContainerOptions{
 		MQPublisher:                input.mqPublisher,
 		PublisherMode:              input.publishMode,
 		EventCatalog:               input.eventCatalog,
+		EventSubscriberFactory:     subscriberFactory,
+		EventConsumers:             buildEventConsumerOptions(s.config),
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		Backpressure:               input.backpressure,
@@ -40,17 +47,29 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 	}
 }
 
+func buildEventConsumerOptions(cfg *config.Config) map[string]eventsubsystem.ConsumerOptions {
+	result := map[string]eventsubsystem.ConsumerOptions{}
+	if cfg == nil || cfg.Eventing == nil || cfg.Eventing.Consumers == nil || cfg.Eventing.Consumers.ModelCatalogHotRank == nil {
+		return result
+	}
+	hotRank := cfg.Eventing.Consumers.ModelCatalogHotRank
+	result["modelcatalog.hot_rank_projection"] = eventsubsystem.ConsumerOptions{Enabled: hotRank.Enabled, Channel: hotRank.Channel}
+	return result
+}
+
 func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOutboxRelayOptions {
 	if cfg == nil || cfg.OutboxRelay == nil {
 		return container.ContainerOutboxRelayOptions{}
 	}
 	options := container.ContainerOutboxRelayOptions{}
 	if cfg.OutboxRelay.Mongo != nil {
+		options.MongoInterval = cfg.OutboxRelay.Mongo.Interval
 		options.MongoBatchSize = cfg.OutboxRelay.Mongo.BatchSize
 		options.MongoPublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
 		options.MongoImmediateMaxConcurrent = cfg.OutboxRelay.Mongo.ImmediateMaxConcurrent
 	}
 	if cfg.OutboxRelay.Assessment != nil {
+		options.AssessmentInterval = cfg.OutboxRelay.Assessment.Interval
 		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize
 		options.AssessmentPublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
 		options.AssessmentImmediateMaxConcurrent = cfg.OutboxRelay.Assessment.ImmediateMaxConcurrent

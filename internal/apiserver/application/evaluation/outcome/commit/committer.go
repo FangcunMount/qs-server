@@ -49,7 +49,7 @@ type committer struct {
 	runRepo        evaluationrun.Repository
 	scoreProjector outcomescoring.Projector
 	eventStager    EventStager
-	readyIndexer   *appEventing.PostCommitReadyIndexer
+	postCommit     appEventing.PostCommitDispatcher
 	newID          func() meta.ID
 }
 
@@ -60,7 +60,7 @@ func NewCommitter(
 	runRepo evaluationrun.Repository,
 	scoreProjector outcomescoring.Projector,
 	eventStager EventStager,
-	readyIndexer *appEventing.PostCommitReadyIndexer,
+	postCommit appEventing.PostCommitDispatcher,
 ) Committer {
 	return &committer{
 		txRunner:       txRunner,
@@ -69,7 +69,7 @@ func NewCommitter(
 		runRepo:        runRepo,
 		scoreProjector: scoreProjector,
 		eventStager:    eventStager,
-		readyIndexer:   readyIndexer,
+		postCommit:     postCommit,
 		newID:          meta.New,
 	}
 }
@@ -164,8 +164,8 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	assessmentToCommit.ClearEvents()
 	*request.Assessment = *assessmentToCommit
 	*request.Run = runToCommit
-	if c.readyIndexer != nil && len(eventsToStage) > 0 {
-		c.readyIndexer.EnqueueAfterCommit(ctx, eventsToStage, request.EvaluatedAt)
+	if c.postCommit != nil && len(eventsToStage) > 0 {
+		c.postCommit.AfterCommit(ctx, eventsToStage, request.EvaluatedAt)
 	}
 	return record, nil
 }

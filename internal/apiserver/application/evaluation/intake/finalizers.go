@@ -17,7 +17,7 @@ type assessmentCreateFinalizer struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 	cache       assessmentListCache
-	immediate   *appEventing.ImmediateDispatcher
+	postCommit  appEventing.PostCommitDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
@@ -27,7 +27,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.immediate); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
@@ -44,12 +44,12 @@ type assessmentSubmitFinalizer struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 	cache       assessmentListCache
-	immediate   *appEventing.ImmediateDispatcher
+	postCommit  appEventing.PostCommitDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
 func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAssessment.Assessment) error {
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.immediate); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil

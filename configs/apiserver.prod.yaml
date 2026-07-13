@@ -346,15 +346,15 @@ behavior_journey_scan:    # behavior_footprint 的唯一常规写入路径；不
 # 禁止用它驱动 behavior_footprint，行为轨迹由 behavior_journey_scan 重建。
 outbox_relay:
   mongo:
-    interval: "15s"                # Mongo outbox 主链路事件排水频率: 5s (生产环境建议调高)
-    batch_size: 1000              # 每轮最多 claim 的 Mongo outbox 事件数: 1000 (生产环境建议调高)
-    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测: 48 (生产环境建议调高)
+    interval: "15s"               # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
+    batch_size: 1000              # 每轮最多 claim 的 Mongo profile 事件数
+    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；保留 48
     immediate_max_concurrent: 24  # mixed_300 chain_probe：略提 immediate 旁路并发
   assessment:
-    interval: "15s"                # 对齐 Mongo 主链路 tick: 5s (生产环境建议调高)
-    batch_size: 200               # 每轮最多 claim 的 assessment outbox 事件数: 200 (生产环境建议调高)
-    publish_workers: 24           # MySQL outbox 并发 publish: 24 (生产环境建议调高)
-    immediate_max_concurrent: 24  # evaluation.requested immediate 旁路
+    interval: "15s"               # assessment_mysql_events DB fallback relay 周期
+    batch_size: 200               # 每轮最多 claim 的 MySQL profile 事件数
+    publish_workers: 24           # MySQL profile 并发 publish
+    immediate_max_concurrent: 24  # evaluation.requested / outcome.committed immediate 并发上限
 
 statistics_sync:                # 统计数据同步任务配置
   enable: true                  # 启用统计数据同步任务: true
@@ -467,6 +467,15 @@ messaging:
   # NSQ 配置（生产环境使用 Docker 服务名或实际地址）
   nsq-addr: "nsqd:4150"                 # NSQ 生产者地址: nsqd:4150 (Docker 网络内部)
   nsq-lookupd-addr: "nsqlookupd:4161"   # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
+
+# EventSubsystem 本地消费者。hot-rank 与主 worker 使用同一 Topic、不同 channel，
+# Redis 投影失败只会重试该 channel，不会阻断 answersheet Evaluation 主链。
+# 只有 MQ-backed publisher 可用时才实际订阅；logging/nop 模式 status 显示 disabled。
+eventing:
+  consumers:
+    modelcatalog-hot-rank:
+      enabled: true
+      channel: "qs-apiserver-modelcatalog-hot-rank-v1"
 
 # ============================================================================
 # 4. 外部服务集成配置

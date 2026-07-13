@@ -11,7 +11,6 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -84,7 +83,6 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),
 		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
-		priorityTiers:      defaultPriorityTiers(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -343,10 +341,6 @@ func cloneBSONMap(src bson.M) bson.M {
 		dst[key] = value
 	}
 	return dst
-}
-
-func defaultPriorityTiers() [][]string {
-	return outboxpriority.ClaimOrder(nil, nil)
 }
 
 func normalizePriorityEventTypes(eventTypes []string) []string {

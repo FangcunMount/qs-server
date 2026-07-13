@@ -107,12 +107,9 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 		return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{})
 	}
 	eventStatus := c.buildRESTEventStatusService()
-	outboxes := make([]appEventing.NamedOutboxStatusReader, 0, 2)
-	if c.SurveyModule != nil {
-		outboxes = append(outboxes, c.SurveyModule.ExportRESTEventStatusOutbox())
-	}
-	if c.EvaluationModule != nil {
-		outboxes = append(outboxes, c.EvaluationModule.ExportRESTEventStatusOutbox())
+	var outboxes []appEventing.NamedOutboxStatusReader
+	if c.eventSubsystem != nil {
+		outboxes = c.eventSubsystem.Outboxes()
 	}
 	cacheGovernance := statisticsApp.NewGovernanceFacade(
 		"apiserver",
@@ -137,14 +134,10 @@ func (c *Container) buildRESTEventStatusService() appEventing.StatusService {
 	if c == nil {
 		return platformmod.BuildRESTEventStatusService(platformmod.RESTEventStatusInput{})
 	}
-	input := platformmod.RESTEventStatusInput{Catalog: c.eventCatalog}
-	if c.SurveyModule != nil {
-		input.SurveyAnswerSheetOutbox = c.SurveyModule.ExportRESTEventStatusOutbox()
+	if c.eventSubsystem != nil {
+		return c.eventSubsystem.StatusService()
 	}
-	if c.EvaluationModule != nil {
-		input.EvaluationAssessmentOutbox = c.EvaluationModule.ExportRESTEventStatusOutbox()
-	}
-	return platformmod.BuildRESTEventStatusService(input)
+	return platformmod.BuildRESTEventStatusService(platformmod.RESTEventStatusInput{Catalog: c.eventCatalog})
 }
 
 func (c *Container) exportRESTIAMDeps() platformmod.RESTIAMDeps {
@@ -291,8 +284,6 @@ type ServerRuntimeDeps struct {
 	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
 	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
 	EvaluationConsistencyReconcileService evaluationScheduler.Service
-	MongoDomainEventRelay                 appEventing.OutboxRelay
-	AssessmentOutboxRelay                 appEventing.OutboxRelay
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -329,12 +320,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		deps.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
 		deps.BehaviorJourneyScanService = c.StatisticsModule.BehaviorJourneyScanService
 	}
-	deps.MongoDomainEventRelay = c.mongoDomainEventRelay
-	if deps.MongoDomainEventRelay == nil && c.SurveyModule != nil {
-		deps.MongoDomainEventRelay = c.SurveyModule.MongoDomainEventRelay
-	}
 	if c.EvaluationModule != nil {
-		deps.AssessmentOutboxRelay = c.EvaluationModule.AssessmentOutboxRelay
 		deps.EvaluationConsistencyReconcileService = c.EvaluationModule.SchedulerService
 	}
 

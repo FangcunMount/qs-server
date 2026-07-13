@@ -3,6 +3,7 @@ package answersheet
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -13,9 +14,9 @@ type transactionalSubmissionDurableStore struct {
 	runner interface {
 		WithinTransaction(context.Context, func(context.Context) error) error
 	}
-	writer    SubmissionDurableWriter
-	stager    EventStager
-	immediate *appEventing.ImmediateDispatcher
+	writer     SubmissionDurableWriter
+	stager     EventStager
+	postCommit appEventing.PostCommitDispatcher
 }
 
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
@@ -58,8 +59,8 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 		}
 		return nil, false, err
 	}
-	if s.immediate != nil && len(stagedEvents) > 0 {
-		s.immediate.TryDispatchAfterCommit(ctx, stagedEvents)
+	if s.postCommit != nil && len(stagedEvents) > 0 {
+		s.postCommit.AfterCommit(ctx, stagedEvents, time.Now())
 	}
 
 	sheet.ClearEvents()

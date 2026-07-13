@@ -14,7 +14,7 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// Service 是 DefinitionV2 先行的评估模型定义编辑用例
+// Service 评估模型定义编辑服务
 type Service struct {
 	ModelRepo  modelcatalogport.ModelRepository
 	Authorizer modelcatalog.Authorizer // 授权器

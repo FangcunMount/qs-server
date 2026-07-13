@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -17,20 +16,16 @@ import (
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -54,10 +49,10 @@ type Module struct {
 // Deps defines explicit constructor dependencies for the report module.
 type Deps struct {
 	MongoDB            *mongo.Database
-	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
 	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
+	OutboxProfile      appEventing.ProfileBinding
 }
 
 // New assembles the report module.
@@ -94,22 +89,9 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
 	}
 
-	priorityOpts := []mongoEventOutbox.StoreOption{
-		mongoEventOutbox.WithPriorityTiers(outboxruntime.DefaultPolicy().PriorityTiers),
+	if deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
-	if deps.MongoLimiter != nil {
-		priorityOpts = append(priorityOpts, mongoEventOutbox.WithLimiter(deps.MongoLimiter))
-	}
-	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(deps.MongoDB, deps.TopicResolver, priorityOpts...)
-	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
-	}
-	var opsClient redis.UniversalClient
-	if deps.OpsHandle != nil {
-		opsClient = deps.OpsHandle.Client
-	}
-	readyIndex := outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
-	readyIndexer := appEventing.NewPostCommitReadyIndexer(readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
 	{
 		registry, err := buildReportBuilderRegistry()
@@ -120,7 +102,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, reportOutboxStore, readyIndexer, catalogProjector)
+		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit, catalogProjector)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}

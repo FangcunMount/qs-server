@@ -11,6 +11,7 @@ import (
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	modelcatalogHotRank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
@@ -34,6 +35,11 @@ func (c *Container) initSurveyModule() error {
 func (c *Container) initModelCatalogModule() error {
 	if err := ammod.InstallFrom(c); err != nil {
 		return fmt.Errorf("failed to initialize model catalog module: %w", err)
+	}
+	if c.eventSubsystem != nil && c.AssessmentModelModule != nil && c.AssessmentModelModule.HotRank != nil {
+		if err := c.eventSubsystem.RegisterConsumer("modelcatalog.hot_rank_projection", modelcatalogHotRank.NewEventConsumer(c.AssessmentModelModule.HotRank.Projection)); err != nil {
+			return fmt.Errorf("register modelcatalog hot-rank event consumer: %w", err)
+		}
 	}
 	return nil
 }

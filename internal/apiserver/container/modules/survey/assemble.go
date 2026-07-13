@@ -3,29 +3,20 @@ package survey
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
-	redis "github.com/redis/go-redis/v9"
-
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
-	modelcatalogHotRank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	modelcatalogHotRankInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -36,39 +27,27 @@ type Module struct {
 	bindingSyncer *catalogBindingSyncer
 
 	eventPublisher event.EventPublisher
-	topicResolver  eventcatalog.TopicResolver
-	// MongoDomainEventRelay drains the shared Mongo domain_event_outbox. It is
-	// not limited to AnswerSheet events: Interpretation writes the same store.
-	MongoDomainEventRelay appEventing.OutboxRelay
 }
 
 // Deps defines explicit constructor dependencies for the survey module.
 type Deps struct {
-	MongoDB                           *mongo.Database
-	EventPublisher                    event.EventPublisher
-	RankRedisClient                   redis.UniversalClient
-	RankCacheBuilder                  *keyspace.Builder
-	IdentityService                   *iam.IdentityService
-	HotsetRecorder                    cachetarget.HotsetRecorder
-	TopicResolver                     eventcatalog.TopicResolver
-	QuestionnaireRepo                 questionnaire.Repository
-	QuestionnaireReader               surveyreadmodel.QuestionnaireReader
-	AnswerSheetRepo                   AnswerSheetStore
-	AnswerSheetReader                 surveyreadmodel.AnswerSheetReader
-	OutboxRelayBatchSize              int
-	OutboxRelayPublishWorkers         int
-	OutboxRelayImmediateMaxConcurrent int
-	CacheSignalNotifier               quesApp.CacheSignalNotifier
-	OpsHandle                         *redisruntime.Handle
+	MongoDB             *mongo.Database
+	EventPublisher      event.EventPublisher
+	IdentityService     *iam.IdentityService
+	HotsetRecorder      cachetarget.HotsetRecorder
+	QuestionnaireRepo   questionnaire.Repository
+	QuestionnaireReader surveyreadmodel.QuestionnaireReader
+	AnswerSheetRepo     AnswerSheetStore
+	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
+	CacheSignalNotifier quesApp.CacheSignalNotifier
+	OutboxProfile       appEventing.ProfileBinding
 }
 
-// AnswerSheetStore combines answer-sheet persistence and outbox ports.
+// AnswerSheetStore exposes answer-sheet persistence only; Outbox capability is
+// supplied separately by EventSubsystem's profile binding.
 type AnswerSheetStore interface {
 	answersheet.Repository
 	asApp.SubmissionDurableWriter
-	asApp.EventStager
-	asApp.SubmittedEventOutboxStore
-	appEventing.OutboxStatusReader
 }
 
 // QuestionnaireSubModule hosts questionnaire application services.
@@ -80,11 +59,9 @@ type QuestionnaireSubModule struct {
 
 // AnswerSheetSubModule hosts answer-sheet application services.
 type AnswerSheetSubModule struct {
-	SubmissionService          asApp.AnswerSheetSubmissionService
-	ManagementService          asApp.AnswerSheetManagementService
-	ScoringService             asApp.AnswerSheetScoringService
-	SubmittedEventStatusReader appEventing.NamedOutboxStatusReader
-	OutboxReadyIndex           *outboxready.Index
+	SubmissionService asApp.AnswerSheetSubmissionService
+	ManagementService asApp.AnswerSheetManagementService
+	ScoringService    asApp.AnswerSheetScoringService
 }
 
 // New assembles the survey module.
@@ -101,8 +78,6 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	module.eventPublisher = normalized.EventPublisher
-	module.topicResolver = normalized.TopicResolver
-
 	if err := module.initQuestionnaireSubModule(
 		normalized.IdentityService,
 		normalized.HotsetRecorder,
@@ -116,15 +91,10 @@ func New(deps Deps) (*Module, error) {
 
 	if err := module.initAnswerSheetSubModule(
 		normalized.MongoDB,
-		normalized.RankRedisClient,
-		normalized.RankCacheBuilder,
 		normalized.AnswerSheetRepo,
 		normalized.AnswerSheetReader,
 		normalized.QuestionnaireRepo,
-		normalized.OutboxRelayBatchSize,
-		normalized.OutboxRelayPublishWorkers,
-		normalized.OutboxRelayImmediateMaxConcurrent,
-		normalized.OpsHandle,
+		normalized.OutboxProfile,
 	); err != nil {
 		return nil, err
 	}
@@ -174,45 +144,20 @@ func (m *Module) SetCatalogManagementService(service modelcatalogApp.CatalogMana
 	m.bindingSyncer.SetCatalogManagementService(service)
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, outboxRelayImmediateMaxConcurrent int, opsHandle *redisruntime.Handle) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
 	sub := m.AnswerSheet
 
 	batchValidator := ruleengineInfra.NewAnswerValidator()
 	answerScorer := ruleengineInfra.NewAnswerScorer()
 
 	mongoTxRunner := modtx.NewMongoRunner(mongoDB)
-	var opsClient redis.UniversalClient
-	if opsHandle != nil {
-		opsClient = opsHandle.Client
+	if profile.Stager == nil || profile.PostCommit == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
-	readyIndex := outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
-	hotRankProjection := modelcatalogHotRankInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
-	outboxRuntime := outboxruntime.Build(outboxruntime.Spec{
-		Name:                    "mongo-domain-events",
-		Store:                   repo,
-		Publisher:               m.eventPublisher,
-		ReadyIndex:              readyIndex,
-		BatchSize:               outboxRelayBatchSize,
-		PublishWorkers:          outboxRelayPublishWorkers,
-		ImmediateMaxConcurrent:  outboxRelayImmediateMaxConcurrent,
-		ImmediateEnabled:        true,
-		RequireDurablePublisher: true,
-		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{
-			modelcatalogHotRank.NewProjectionHook(hotRankProjection),
-		},
-		Policy: outboxruntime.DefaultPolicy(),
-	})
-	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, outboxRuntime.Immediate)
+	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
 	sub.ManagementService = asApp.NewManagementService(repo, reader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
-	m.MongoDomainEventRelay = outboxRuntime.Relay
-	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
-		Name:   "mongo-domain-events",
-		Reader: repo,
-	}
-	sub.OutboxReadyIndex = readyIndex
-
 	return nil
 }
 

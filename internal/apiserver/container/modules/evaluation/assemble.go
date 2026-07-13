@@ -21,29 +21,23 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
-	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -51,9 +45,6 @@ import (
 
 // Module assembles evaluation application services.
 type Module struct {
-	AssessmentOutboxRelay        appEventing.OutboxRelay
-	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
-
 	IntakeService            evaluationintake.Service
 	TesteeService            evaluationtestee.Service
 	OperatorQuery            evaluationoperator.QueryService
@@ -63,36 +54,30 @@ type Module struct {
 	OperatorExecutionService evaluationoperator.BatchExecutionService
 	SchedulerService         evaluationscheduler.Service
 
-	OutboxReadyIndex              *outboxready.Index
-	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
-	outcomeRepository             domainoutcome.Repository
-	workbenchLatestRiskReader     workbenchreadmodel.LatestRiskReader
+	outcomeRepository         domainoutcome.Repository
+	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
 }
 
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
-	MySQLDB                                     *gorm.DB
-	InputResolver                               evaluationinput.Resolver
-	ScaleCatalog                                evaluationinput.ScaleCatalog
-	EventPublisher                              event.EventPublisher
-	RedisClient                                 redis.UniversalClient
-	CacheBuilder                                *keyspace.Builder
-	AssessmentPolicy                            cachepolicy.CachePolicy
-	QueryRedisClient                            redis.UniversalClient
-	QueryCacheBuilder                           *keyspace.Builder
-	AssessmentListPolicy                        cachepolicy.CachePolicy
-	VersionStore                                querycache.VersionTokenStore
-	Observer                                    *observability.ComponentObserver
-	TopicResolver                               eventcatalog.TopicResolver
-	MySQLLimiter                                backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize              int
-	AssessmentOutboxRelayPublishWorkers         int
-	AssessmentOutboxRelayImmediateMaxConcurrent int
-	TesteeAccessChecker                         evaluationoperator.AccessChecker
-	OpsHandle                                   *redisruntime.Handle
-	ExecutionPaths                              []modelcatalog.ExecutionPath
-	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
-	PublishedModelReader                        rulesetport.PublishedModelReader
+	MySQLDB                   *gorm.DB
+	InputResolver             evaluationinput.Resolver
+	ScaleCatalog              evaluationinput.ScaleCatalog
+	EventPublisher            event.EventPublisher
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	AssessmentPolicy          cachepolicy.CachePolicy
+	QueryRedisClient          redis.UniversalClient
+	QueryCacheBuilder         *keyspace.Builder
+	AssessmentListPolicy      cachepolicy.CachePolicy
+	VersionStore              querycache.VersionTokenStore
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	TesteeAccessChecker       evaluationoperator.AccessChecker
+	ExecutionPaths            []modelcatalog.ExecutionPath
+	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
+	PublishedModelReader      rulesetport.PublishedModelReader
+	OutboxProfile             appEventing.ProfileBinding
 }
 
 // New assembles the evaluation module.
@@ -106,13 +91,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 
-	module := &Module{
-		AssessmentOutboxRelay:         infra.assessmentOutboxRelay,
-		AssessmentOutboxStatusReader:  infra.assessmentOutboxStatusReader,
-		OutboxReadyIndex:              infra.assessmentReadyIndex,
-		AssessmentOutboxPendingLister: infra.assessmentOutboxStore,
-		outcomeRepository:             infra.outcomeRepo,
-	}
+	module := &Module{outcomeRepository: infra.outcomeRepo}
 	if err := module.wireEvaluationEngine(normalized, infra); err != nil {
 		return nil, err
 	}
@@ -123,27 +102,23 @@ func New(deps Deps) (*Module, error) {
 }
 
 type evaluationInfra struct {
-	assessmentRepo               assessment.Repository
-	runRepo                      evaluationrun.Repository
-	outcomeRepo                  domainoutcome.Repository
-	scoreRepo                    assessment.ScoreRepository
-	assessmentReader             evaluationreadmodel.AssessmentReader
-	submittedCandidateReader     evaluationscheduler.SubmittedCandidateReader
-	latestRiskReader             workbenchreadmodel.LatestRiskReader
-	scoreProjectionReader        evaluationreadmodel.ScoreProjectionReader
-	assessmentOutboxStore        *mysqlEventOutbox.Store
-	txRunner                     apptransaction.Runner
-	assessmentOutboxRelay        appEventing.OutboxRelay
-	assessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
-	assessmentImmediate          *appEventing.ImmediateDispatcher
-	assessmentReadyIndex         *outboxready.Index
-	postCommitReadyIndexer       *appEventing.PostCommitReadyIndexer
+	assessmentRepo           assessment.Repository
+	runRepo                  evaluationrun.Repository
+	outcomeRepo              domainoutcome.Repository
+	scoreRepo                assessment.ScoreRepository
+	assessmentReader         evaluationreadmodel.AssessmentReader
+	submittedCandidateReader evaluationscheduler.SubmittedCandidateReader
+	latestRiskReader         workbenchreadmodel.LatestRiskReader
+	scoreProjectionReader    evaluationreadmodel.ScoreProjectionReader
+	assessmentOutboxStore    appEventing.EventStager
+	txRunner                 apptransaction.Runner
+	postCommit               appEventing.PostCommitDispatcher
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra := &evaluationInfra{}
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
-	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
+	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(normalized.MySQLDB, mysqlOptions)
 	if normalized.RedisClient != nil {
 		infra.assessmentRepo = evaluationcache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
@@ -159,35 +134,11 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
 	infra.outcomeRepo = mysqlEval.NewOutcomeRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
-	var opsClient redis.UniversalClient
-	if normalized.OpsHandle != nil {
-		opsClient = normalized.OpsHandle.Client
+	if normalized.OutboxProfile.Stager == nil || normalized.OutboxProfile.PostCommit == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event profile is required")
 	}
-	assessmentReadyIndex := outboxready.NewIndex(opsClient, outboxready.StoreAssessmentMySQLOutbox)
-	infra.assessmentReadyIndex = assessmentReadyIndex
-	runtimePolicy := outboxruntime.DefaultPolicy()
-	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(runtimePolicy.PriorityTiers)}
-	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlPriorityOpts...)
-	infra.assessmentOutboxStore = assessmentOutboxStore
-	outboxRuntime := outboxruntime.Build(outboxruntime.Spec{
-		Name:                    "assessment-mysql-outbox",
-		Store:                   assessmentOutboxStore,
-		Publisher:               normalized.EventPublisher,
-		ReadyIndex:              assessmentReadyIndex,
-		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
-		PublishWorkers:          normalized.AssessmentOutboxRelayPublishWorkers,
-		ImmediateMaxConcurrent:  normalized.AssessmentOutboxRelayImmediateMaxConcurrent,
-		ImmediateEnabled:        true,
-		RequireDurablePublisher: true,
-		Policy:                  runtimePolicy,
-	})
-	infra.postCommitReadyIndexer = outboxRuntime.PostCommitReadyIndexer
-	infra.assessmentImmediate = outboxRuntime.Immediate
-	infra.assessmentOutboxRelay = outboxRuntime.Relay
-	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
-		Name:   "assessment-mysql-outbox",
-		Reader: assessmentOutboxStore,
-	}
+	infra.assessmentOutboxStore = normalized.OutboxProfile.Stager
+	infra.postCommit = normalized.OutboxProfile.PostCommit
 
 	return infra, nil
 }
@@ -213,13 +164,13 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.runRepo,
 			scoreProjector,
 			infra.assessmentOutboxStore,
-			infra.postCommitReadyIndexer,
+			infra.postCommit,
 		)
 		engine := execute.NewEngine(
 			infra.assessmentRepo,
 			normalized.InputResolver,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
-			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
+			execute.WithPostCommitDispatcher(infra.postCommit),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithEvaluationCommitter(evaluationCommitter),
@@ -251,7 +202,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			listCache,
-			evaluationintake.WithImmediateDispatcher(infra.assessmentImmediate),
+			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
 		)
 	} else {
 		m.IntakeService = evaluationintake.NewService(
@@ -260,7 +211,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			nil,
-			evaluationintake.WithImmediateDispatcher(infra.assessmentImmediate),
+			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
 		)
 	}
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader, infra.assessmentReader, normalized.ScaleCatalog)
