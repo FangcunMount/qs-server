@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -111,6 +112,15 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 		q.setStatus(requestID, SubmitStatusQueued, "")
 		q.observe(ctx, resilienceplane.OutcomeQueueAccepted)
 		q.observeQueueDepth()
+		logger.L(ctx).Infow("答卷提交请求已进入处理队列",
+			"action", "enqueue_answersheet_submit",
+			"request_id", requestID,
+			"writer_id", writerID,
+			"testee_id", req.TesteeID,
+			"questionnaire_code", req.QuestionnaireCode,
+			"queue_depth", len(q.jobs),
+			"queue_capacity", cap(q.jobs),
+		)
 	default:
 		q.observe(ctx, resilienceplane.OutcomeQueueFull)
 		q.observeQueueDepth()

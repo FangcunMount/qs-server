@@ -22,7 +22,7 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse evaluation requested event: %w", err)
 		}
 
-		deps.Logger.Debug("evaluation requested detail",
+		deps.Logger.Info("received evaluation requested event",
 			"event_id", env.ID,
 			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
@@ -60,6 +60,14 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			deps.Logger.Warn("evaluation returned retryable failure", slog.Int64("assessment_id", data.AssessmentID), slog.String("error", err.Error()), slog.String("evaluation_run_hint", evaluationRunRetryHint))
 			return err
 		}
+		deps.Logger.Info("evaluation request handled",
+			slog.String("event_id", env.ID),
+			slog.Int64("assessment_id", data.AssessmentID),
+			slog.String("answersheet_id", data.AnswerSheetID),
+			slog.String("status", resp.GetStatus()),
+			slog.String("evaluation_run_id", resp.GetRunId()),
+			slog.String("outcome_id", resp.GetOutcomeId()),
+		)
 		return nil
 	}
 }

@@ -19,7 +19,7 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse evaluation outcome committed event: %w", err)
 		}
 
-		deps.Logger.Debug("evaluation outcome committed detail",
+		deps.Logger.Info("received evaluation outcome committed event",
 			"event_id", env.ID,
 			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
@@ -73,6 +73,18 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 				)
 			}
 		}
-		return handleGenerateReportResponse(resp)
+		if err := handleGenerateReportResponse(resp); err != nil {
+			return err
+		}
+		deps.Logger.Info("report generation request handled",
+			slog.String("event_id", env.ID),
+			slog.Int64("assessment_id", data.AssessmentID),
+			slog.String("outcome_id", data.OutcomeID),
+			slog.String("generation_id", resp.GetGenerationId()),
+			slog.String("run_id", resp.GetRunId()),
+			slog.String("report_id", resp.GetReportId()),
+			slog.String("status", resp.GetStatus()),
+		)
+		return nil
 	}
 }

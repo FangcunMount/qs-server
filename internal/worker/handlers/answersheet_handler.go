@@ -100,7 +100,7 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, u
 		return nil, 0, nil, fmt.Errorf("invalid answersheet_id format or value: %w", err)
 	}
 
-	deps.Logger.Debug("answersheet submitted detail",
+	deps.Logger.Info("received answersheet submitted event",
 		"event_id", env.ID,
 		"answersheet_id", data.AnswerSheetID,
 		"questionnaire_code", data.QuestionnaireCode,
@@ -274,7 +274,7 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 	if assessmentResp == nil {
 		return fmt.Errorf("assessment creation failed: empty response")
 	}
-	deps.Logger.Debug("assessment creation detail",
+	deps.Logger.Info("assessment ensured from answersheet event",
 		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
 		"assessment_id", assessmentResp.AssessmentId,
 		"created", assessmentResp.Created,

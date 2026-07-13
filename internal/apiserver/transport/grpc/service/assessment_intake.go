@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,10 +38,23 @@ func (s *AssessmentIntakeService) EnsureAssessment(ctx context.Context, req *pb.
 			return nil, err
 		}
 	}
+	logger.L(ctx).Infow("gRPC: received ensure assessment request",
+		"answersheet_id", req.AnswerSheetId,
+		"org_id", orgID,
+		"testee_id", req.TesteeId,
+		"questionnaire_code", req.QuestionnaireCode,
+		"questionnaire_version", req.QuestionnaireVersion,
+	)
 	result, err := s.journey.Ensure(ctx, journey.Command{OrgID: orgID, AnswerSheetID: req.AnswerSheetId, QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion, TesteeID: req.TesteeId, FillerID: req.FillerId, TaskID: req.TaskId, OriginType: req.OriginType, OriginID: req.OriginId})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.L(ctx).Infow("gRPC: ensure assessment completed",
+		"answersheet_id", req.AnswerSheetId,
+		"assessment_id", result.AssessmentID,
+		"created", result.Created,
+		"auto_submitted", result.AutoSubmitted,
+	)
 	return &pb.EnsureAssessmentResponse{AssessmentId: result.AssessmentID, Created: result.Created, AutoSubmitted: result.AutoSubmitted}, nil
 }
 

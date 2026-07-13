@@ -120,6 +120,7 @@ func requestKey(requestID string, req *SubmitAnswerSheetRequest) string {
 
 func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	key := requestKey(requestID, req)
+	l := logger.L(ctx)
 	if key == "" || s.submitGuard == nil {
 		return s.submitSync(ctx, writerID, req)
 	}
@@ -142,6 +143,14 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 		if assessmentID == "" {
 			return nil, fmt.Errorf("completed answer sheet is missing assessment id")
 		}
+		l.Infow("答卷提交命中幂等结果",
+			"action", "submit_answersheet",
+			"request_id", requestID,
+			"idempotency_key", key,
+			"answersheet_id", doneID,
+			"assessment_id", assessmentID,
+			"result", "idempotent_hit",
+		)
 		return &SubmitAnswerSheetResponse{
 			ID:           doneID,
 			AssessmentID: assessmentID,
@@ -164,6 +173,14 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 		if err := s.submitGuard.Complete(context.Background(), key, lease, resp.ID); err != nil {
 			return nil, err
 		}
+		l.Infow("答卷提交链路已完成受理",
+			"action", "submit_answersheet",
+			"request_id", requestID,
+			"idempotency_key", key,
+			"answersheet_id", resp.ID,
+			"assessment_id", resp.AssessmentID,
+			"result", "success",
+		)
 	}
 	return resp, nil
 }
@@ -231,6 +248,13 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	if err != nil {
 		return nil, err
 	}
+	l.Infow("答卷已持久化，开始确保测评",
+		"action", "submit_answersheet",
+		"answersheet_id", result.ID,
+		"org_id", orgID,
+		"testee_id", resolvedTesteeID,
+		"questionnaire_code", req.QuestionnaireCode,
+	)
 
 	if s.assessmentIntake == nil {
 		return nil, fmt.Errorf("assessment intake not configured")
@@ -246,11 +270,19 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	if assessmentID == 0 {
 		return nil, fmt.Errorf("assessment intake returned empty assessment id")
 	}
+	l.Infow("测评已确保，等待评估事件处理",
+		"action", "submit_answersheet",
+		"answersheet_id", result.ID,
+		"assessment_id", assessmentID,
+		"org_id", orgID,
+		"testee_id", resolvedTesteeID,
+	)
 
 	// 5. 记录成功日志
 	duration := time.Since(startTime)
 	l.Infow("提交答卷成功", "action", "submit_answersheet", "result", "success",
 		"answersheet_id", result.ID,
+		"assessment_id", assessmentID,
 		"duration_ms", duration.Milliseconds(),
 	)
 

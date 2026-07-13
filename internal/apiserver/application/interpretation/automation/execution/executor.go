@@ -64,14 +64,37 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 	if input.OutcomeID.IsZero() || input.Report.ReportType.IsEmpty() || input.Report.TemplateVersion.IsEmpty() {
 		return nil, fmt.Errorf("interpretation input outcome, report type and template version are required")
 	}
+	logger.L(ctx).Infow("开始生成报告",
+		"action", "generate_interpretation_report",
+		"outcome_id", input.OutcomeID.String(),
+		"assessment_id", input.Association.AssessmentID.String(),
+		"testee_id", input.Association.TesteeID,
+		"report_type", input.Report.ReportType.String(),
+		"template_version", input.Report.TemplateVersion.String(),
+		"trace_id", traceID,
+	)
 	start, err := e.starter.Start(ctx, StartRequest{Key: domaingeneration.Key{OutcomeID: input.OutcomeID, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion}, TraceID: traceID})
 	if err != nil {
 		return nil, err
 	}
 	switch start.Status {
 	case StartStatusGenerated:
+		logger.L(ctx).Infow("报告已生成，复用已有结果",
+			"action", "generate_interpretation_report",
+			"outcome_id", input.OutcomeID.String(),
+			"generation_id", start.Generation.ID().String(),
+			"report_id", start.InterpretReport.ID().String(),
+			"result", "idempotent_hit",
+		)
 		return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: start.Generation, InterpretReport: start.InterpretReport}, nil
 	case StartStatusProcessing:
+		logger.L(ctx).Infow("报告生成正在进行，复用运行中任务",
+			"action", "generate_interpretation_report",
+			"outcome_id", input.OutcomeID.String(),
+			"generation_id", start.Generation.ID().String(),
+			"run_id", start.Run.ID().String(),
+			"result", "processing",
+		)
 		return &ExecuteResult{Status: ExecuteStatusProcessing, Generation: start.Generation, Run: start.Run}, nil
 	case StartStatusStarted:
 		return e.buildAndCommit(ctx, input, start.Generation, start.Run)
@@ -114,6 +137,16 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	if err != nil {
 		return nil, err
 	}
+	logger.L(ctx).Infow("报告已生成并持久化",
+		"action", "generate_interpretation_report",
+		"outcome_id", input.OutcomeID.String(),
+		"assessment_id", input.Association.AssessmentID.String(),
+		"generation_id", committed.Generation.ID().String(),
+		"run_id", committed.Run.ID().String(),
+		"report_id", committed.InterpretReport.ID().String(),
+		"builder_identity", builder.BuilderIdentity(),
+		"result", "success",
+	)
 	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, InterpretReport: committed.InterpretReport}, nil
 }
 

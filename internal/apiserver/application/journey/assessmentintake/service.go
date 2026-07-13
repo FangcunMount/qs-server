@@ -4,8 +4,10 @@ package assessmentintake
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -60,6 +62,17 @@ func NewService(scoring answersheetapp.AnswerSheetScoringService, binding rulese
 
 // Ensure 确保评估入库
 func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) {
+	l := logger.L(ctx)
+	startedAt := time.Now()
+	l.Infow("开始答卷测评入库",
+		"action", "ensure_assessment",
+		"answersheet_id", command.AnswerSheetID,
+		"org_id", command.OrgID,
+		"testee_id", command.TesteeID,
+		"questionnaire_code", command.QuestionnaireCode,
+		"questionnaire_version", command.QuestionnaireVersion,
+		"task_id", command.TaskID,
+	)
 	// 验证命令参数
 	if command.OrgID == 0 || command.AnswerSheetID == 0 || command.QuestionnaireCode == "" || command.QuestionnaireVersion == "" || command.TesteeID == 0 || command.FillerID == 0 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "assessment intake command is incomplete")
@@ -71,6 +84,11 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		if err := s.scoring.CalculateAndSave(ctx, command.AnswerSheetID); err != nil {
 			return nil, err
 		}
+		l.Infow("答卷评分已持久化",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"testee_id", command.TesteeID,
+		)
 	}
 
 	// 创建评估入库命令
@@ -87,6 +105,14 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
+	l.Infow("答卷测评绑定已解析",
+		"action", "ensure_assessment",
+		"answersheet_id", command.AnswerSheetID,
+		"bound", bound,
+		"model_kind", valueOrEmpty(dto.ModelKind),
+		"model_code", valueOrEmpty(dto.ModelCode),
+		"model_version", valueOrEmpty(dto.ModelVersion),
+	)
 
 	// 匹配计划
 	matched := s.matchPlan(ctx, command, dto.ModelCode)
@@ -98,6 +124,12 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	// 查找已存在的评估
 	if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
 		s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+		l.Infow("答卷已有关联测评，复用已有测评",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"assessment_id", existing.ID,
+			"result", "idempotent_hit",
+		)
 		return &Result{AssessmentID: existing.ID}, nil
 	}
 
@@ -129,7 +161,23 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	if s.reportStatus != nil {
 		s.reportStatus.SetQueued(ctx, reportstatus.AssessmentKey(created.ID), reportstatus.AssessmentKey(command.AnswerSheetID))
 	}
+	l.Infow("测评已创建并进入后续评估链路",
+		"action", "ensure_assessment",
+		"answersheet_id", command.AnswerSheetID,
+		"assessment_id", created.ID,
+		"bound", bound,
+		"auto_submitted", result.AutoSubmitted,
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"result", "success",
+	)
 	return result, nil
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // applyBinding 应用绑定

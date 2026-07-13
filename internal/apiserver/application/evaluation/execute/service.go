@@ -290,8 +290,21 @@ func (s *service) persistEvaluationOutcome(
 	if s.evaluationCommitter == nil {
 		return evalerrors.ModuleNotConfigured("evaluation committer is not configured")
 	}
-	_, err := s.evaluationCommitter.Commit(ctx, request)
-	return err
+	record, err := s.evaluationCommitter.Commit(ctx, request)
+	if err != nil {
+		return err
+	}
+	if record != nil {
+		logger.L(ctx).Infow("评估结果已持久化并投递报告生成事件",
+			"action", "evaluate",
+			"assessment_id", request.Assessment.ID().Uint64(),
+			"evaluation_run_id", request.Run.ID().String(),
+			"outcome_id", record.ID().String(),
+			"model_code", record.Model().Code,
+			"result", "success",
+		)
+	}
+	return nil
 }
 
 func (s *service) finalizeEvaluationFailure(
