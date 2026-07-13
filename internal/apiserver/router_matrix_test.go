@@ -26,6 +26,7 @@ import (
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -375,21 +376,23 @@ func newRouterTestContainer() *container.Container {
 		OperatorRecovery:         &routerEvaluationRecoveryStub{},
 		OperatorQuery:            &routerEvaluationQueryStub{},
 	}
-	return &container.Container{
-		SurveyModule: surveyModule,
-		ActorModule: &actormod.Module{
-			TesteeQueryService:     &routerTesteeQueryStub{},
-			ClinicianQueryService:  clinicianQuery,
-			AssessmentEntryService: &routerAssessmentEntryServiceStub{},
-		},
-		EvaluationModule: evaluationModule,
-		ReportModule:     &interpretationmod.Module{},
-		PlanModule: &planmod.Module{
-			CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
-			QueryService:   planApp.NewQueryService(nil, nil, nil),
-		},
-		StatisticsModule: &statmod.Module{},
+	c := container.NewContainerWithOptions(nil, nil, nil, container.ContainerOptions{
+		EventSubsystem: &eventsubsystem.Subsystem{},
+	})
+	c.SurveyModule = surveyModule
+	c.ActorModule = &actormod.Module{
+		TesteeQueryService:     &routerTesteeQueryStub{},
+		ClinicianQueryService:  clinicianQuery,
+		AssessmentEntryService: &routerAssessmentEntryServiceStub{},
 	}
+	c.EvaluationModule = evaluationModule
+	c.ReportModule = &interpretationmod.Module{}
+	c.PlanModule = &planmod.Module{
+		CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
+		QueryService:   planApp.NewQueryService(nil, nil, nil),
+	}
+	c.StatisticsModule = &statmod.Module{}
+	return c
 }
 
 func newRouterTestDeps() resttransport.Deps {
