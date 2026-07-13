@@ -3,6 +3,7 @@ package options
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // FieldSchema describes known nested fields. A nil child marks a leaf.
@@ -28,7 +29,7 @@ func validateFields(path string, values map[string]any, schema FieldSchema) erro
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		child, known := schema[key]
+		child, known := lookupSchemaField(schema, key)
 		if !known {
 			return fmt.Errorf("unknown configuration field %s.%s", path, key)
 		}
@@ -44,4 +45,19 @@ func validateFields(path string, values map[string]any, schema FieldSchema) erro
 		}
 	}
 	return nil
+}
+
+// lookupSchemaField matches YAML underscore keys and Viper/pflag hyphen keys.
+// pkg/flag.WordSepNormalizeFunc rewrites "_" to "-" before BindPFlags, so
+// AllSettings() may contain "max-entries" while schemas declare "max_entries".
+func lookupSchemaField(schema FieldSchema, key string) (FieldSchema, bool) {
+	if child, ok := schema[key]; ok {
+		return child, true
+	}
+	normalized := strings.ReplaceAll(key, "-", "_")
+	if normalized == key {
+		return nil, false
+	}
+	child, ok := schema[normalized]
+	return child, ok
 }
