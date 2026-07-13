@@ -1,4 +1,4 @@
-package statistics
+package statisticscache
 
 import (
 	"context"

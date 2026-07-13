@@ -1,4 +1,4 @@
-package cache
+package evaluationcache
 
 import (
 	"context"
@@ -8,15 +8,21 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	redis "github.com/redis/go-redis/v9"
 )
 
 const defaultAssessmentListCacheTTL = 10 * time.Minute
 
 const defaultAssessmentListLocalMaxEntries = 512
+
+func NewVersionTokenStore(client redis.UniversalClient, health cacheobserve.FamilyObserver) querycache.VersionTokenStore {
+	return adapterkit.NewVersionTokenStore(client, cachepolicy.CapabilityEvaluationAssessmentList, health)
+}
 
 // MyAssessmentListCache caches "my assessment list" queries.
 // It uses version tokens and versioned keys so the hot path does not need pattern deletion.
@@ -43,11 +49,11 @@ func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c sharedcache.Store, v
 		query: querycache.NewVersioned(querycache.VersionedOptions{
 			Store:      c,
 			Version:    versionStore,
-			Capability: sharedcache.Capability(cachepolicy.PolicyAssessmentList),
+			Capability: sharedcache.Capability(cachepolicy.CapabilityEvaluationAssessmentList),
 			Policy:     policy,
 			TTL:        policy.TTLOr(defaultAssessmentListCacheTTL),
 			Memory:     querycache.NewLocalHotCache[[]byte](30*time.Second, defaultAssessmentListLocalMaxEntries),
-			Observer:   newCapabilityObserver(cachepolicy.PolicyAssessmentList, observer),
+			Observer:   adapterkit.NewCapabilityObserver(cachepolicy.CapabilityEvaluationAssessmentList, observer),
 		}),
 		keyBuilder: keyBuilder,
 	}

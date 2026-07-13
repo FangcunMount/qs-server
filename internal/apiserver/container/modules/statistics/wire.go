@@ -2,10 +2,10 @@ package statistics
 
 import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cacheadapter "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -52,7 +52,7 @@ func Wire(in WireInput) (*Module, error) {
 		redisClient = nil
 	}
 	if !in.DisableStatisticsCache {
-		versionStore = cacheadapter.NewVersionTokenStore(in.MetaRedisClient, cachepolicy.PolicyStatsQuery, in.Observer)
+		versionStore = statisticsCache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
 		if versionStore == nil {
 			versionStore = querycache.NewStaticVersionTokenStore(0)
 		}

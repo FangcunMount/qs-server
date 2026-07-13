@@ -31,8 +31,8 @@ func InstallFrom(host InstallHost) error {
 		QueryRedisClient:                    host.CacheClient(redisruntime.FamilyQuery),
 		QueryCacheBuilder:                   host.CacheBuilder(redisruntime.FamilyQuery),
 		MetaRedisClient:                     host.CacheClient(redisruntime.FamilyMeta),
-		AssessmentPolicy:                    host.CachePolicy(cachepolicy.PolicyAssessmentDetail),
-		AssessmentListPolicy:                host.CachePolicy(cachepolicy.PolicyAssessmentList),
+		AssessmentPolicy:                    host.CachePolicy(cachepolicy.CapabilityEvaluationAssessmentDetail),
+		AssessmentListPolicy:                host.CachePolicy(cachepolicy.CapabilityEvaluationAssessmentList),
 		DisableEvaluationCache:              host.DisableEvaluationCache(),
 		Observer:                            host.CacheObserver(),
 		TopicResolver:                       host.TopicResolver(),
@@ -47,7 +47,7 @@ func InstallFrom(host InstallHost) error {
 		PublishedModelCatalog:                       host.PublishedModelCatalog(),
 		StaticRedisClient:                           host.CacheClient(redisruntime.FamilyStatic),
 		StaticCacheBuilder:                          host.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.PolicyPublishedModel),
+		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
 		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
 	})
 	if err != nil {

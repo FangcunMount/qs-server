@@ -17,6 +17,7 @@ import (
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
@@ -31,7 +32,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
@@ -95,7 +95,7 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	priorityOpts := []mongoEventOutbox.StoreOption{
-		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+		mongoEventOutbox.WithPriorityTiers(outboxruntime.DefaultPolicy().PriorityTiers),
 	}
 	if deps.MongoLimiter != nil {
 		priorityOpts = append(priorityOpts, mongoEventOutbox.WithLimiter(deps.MongoLimiter))

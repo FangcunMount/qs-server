@@ -43,8 +43,5 @@ func NewTransactionalSubmissionDurableStore(
 	}
 }
 
-// SubmittedEventRelay 保留兼容性 name 用于 共享 outbox relay。
-type SubmittedEventRelay = appEventing.OutboxRelay
-
 // SubmittedEventOutboxStore 保留兼容性 name 用于 共享 outbox 存储。
 type SubmittedEventOutboxStore = appEventing.OutboxStore

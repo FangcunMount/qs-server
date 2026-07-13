@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -64,7 +65,8 @@ type Container struct {
 	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
-	surveyRuntimeInfra *surveymod.SurveyRuntimeInfra
+	surveyRuntimeInfra    *surveymod.SurveyRuntimeInfra
+	mongoDomainEventRelay appEventing.OutboxRelay
 
 	// 基础设施服务
 	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）

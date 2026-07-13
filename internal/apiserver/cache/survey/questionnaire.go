@@ -1,4 +1,4 @@
-package cache
+package surveycache
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -27,7 +28,7 @@ type CachedQuestionnaireRepository struct {
 	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
 	observer *observability.ComponentObserver
-	store    *ObjectCacheStore[domainQuestionnaire.Questionnaire]
+	store    *adapterkit.ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
 func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
@@ -46,9 +47,9 @@ func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQue
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[domainQuestionnaire.Questionnaire]{
-			Cache:       newRedisStoreIfAvailable(client),
-			PolicyKey:   cachepolicy.PolicyQuestionnaire,
+		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[domainQuestionnaire.Questionnaire]{
+			Cache:       adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey:   cachepolicy.CapabilitySurveyQuestionnaire,
 			Policy:      policy,
 			TTL:         policy.TTLOr(defaultQuestionnaireCacheTTL),
 			NegativeTTL: policy.NegativeTTLOr(defaultNegativeQuestionnaireCacheTTL),
@@ -57,8 +58,8 @@ func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQue
 	}
 }
 
-func newQuestionnaireCacheEntryCodec(mapper *questionnaireInfra.QuestionnaireMapper) CacheEntryCodec[domainQuestionnaire.Questionnaire] {
-	return CacheEntryCodec[domainQuestionnaire.Questionnaire]{
+func newQuestionnaireCacheEntryCodec(mapper *questionnaireInfra.QuestionnaireMapper) adapterkit.CacheEntryCodec[domainQuestionnaire.Questionnaire] {
+	return adapterkit.CacheEntryCodec[domainQuestionnaire.Questionnaire]{
 		EncodeFunc: func(domain *domainQuestionnaire.Questionnaire) ([]byte, error) {
 			return json.Marshal(mapper.ToPO(domain))
 		},
@@ -234,8 +235,8 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 	key string,
 	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
 ) (*domainQuestionnaire.Questionnaire, error) {
-	return ReadThroughObject(ctx, ObjectReadThroughOptions[domainQuestionnaire.Questionnaire]{
-		PolicyKey:      cachepolicy.PolicyQuestionnaire,
+	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[domainQuestionnaire.Questionnaire]{
+		PolicyKey:      cachepolicy.CapabilitySurveyQuestionnaire,
 		CacheKey:       key,
 		Policy:         r.policy,
 		Observer:       r.observer,

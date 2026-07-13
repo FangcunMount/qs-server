@@ -59,13 +59,13 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		}
 	}
 	durableRelayEnabled := resources.messaging.mqPublisher != nil
-	if serverDeps.AnswerSheetSubmittedRelay != nil && durableRelayEnabled {
+	if serverDeps.MongoDomainEventRelay != nil && durableRelayEnabled {
 		deps.relays = append(deps.relays, relayRuntimeDeps{
 			stopHookName: "stop mongo outbox relay",
 			startLogName: "mongo outbox relay",
-			failureLog:   "answersheet submitted outbox relay",
+			failureLog:   "mongo domain event outbox relay",
 			interval:     mongoOutboxRelayInterval(s.config),
-			dispatch:     serverDeps.AnswerSheetSubmittedRelay.DispatchDue,
+			dispatch:     serverDeps.MongoDomainEventRelay.DispatchDue,
 		})
 	}
 	if serverDeps.AssessmentOutboxRelay != nil && durableRelayEnabled {

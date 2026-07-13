@@ -1,9 +1,8 @@
-package cache
+package adapterkit
 
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	objectcache "github.com/FangcunMount/qs-server/internal/pkg/cache/object"
 )
@@ -13,7 +12,7 @@ type ObjectCacheStore[T any] = objectcache.Store[T]
 
 type ObjectCacheStoreOptions[T any] struct {
 	Cache       sharedcache.Store
-	PolicyKey   cachepolicy.CachePolicyKey
+	PolicyKey   sharedcache.Capability
 	Policy      sharedcache.Policy
 	TTL         time.Duration
 	NegativeTTL time.Duration
@@ -27,7 +26,7 @@ func NewObjectCacheStore[T any](opts ObjectCacheStoreOptions[T]) *ObjectCacheSto
 		TTL:         opts.TTL,
 		NegativeTTL: opts.NegativeTTL,
 		Codec:       opts.Codec,
-		Observer:    newCapabilityObserver(opts.PolicyKey, nil),
+		Observer:    NewCapabilityObserver(opts.PolicyKey, nil),
 		Coalescer:   newCapabilityCoalescer(opts.Policy),
 	})
 }

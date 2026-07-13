@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -16,39 +15,33 @@ const (
 	defaultImmediateMaxConcurrent   = 16
 )
 
-// immediateDispatchEventTypes 走 post-commit immediate 旁路。
-// answersheet.submitted：Mongo 主链路；evaluation.requested：MySQL assessment outbox（Mongo immediate 查不到则 noop）。
-var immediateDispatchEventTypes = map[string]struct{}{
-	eventcatalog.AnswerSheetSubmitted:       {},
-	eventcatalog.EvaluationRequested:        {},
-	eventcatalog.EvaluationOutcomeCommitted: {},
-}
-
 // ImmediateDispatcher best-effort 发布 暂存的 outbox 事件 事务提交后立即。
 type ImmediateDispatcher struct {
-	name         string
-	store        OutboxStore
-	reader       outboxport.ImmediatePublishReader
-	publisher    event.EventPublisher
-	observer     eventobservability.Observer
-	enabled      bool
-	timeout      time.Duration
-	sem          chan struct{}
-	hooks        []OutboxBeforePublishHook
-	readyIndex   ReadyIndex
-	readyIndexer *PostCommitReadyIndexer
+	name                string
+	store               OutboxStore
+	reader              outboxport.ImmediatePublishReader
+	publisher           event.EventPublisher
+	observer            eventobservability.Observer
+	enabled             bool
+	timeout             time.Duration
+	sem                 chan struct{}
+	hooks               []OutboxBeforePublishHook
+	readyIndex          ReadyIndex
+	readyIndexer        *PostCommitReadyIndexer
+	immediateEventTypes map[string]struct{}
 }
 
 type ImmediateDispatcherOptions struct {
-	Name          string
-	Store         OutboxStore
-	Publisher     event.EventPublisher
-	Observer      eventobservability.Observer
-	Enabled       bool
-	Timeout       time.Duration
-	MaxConcurrent int
-	Hooks         []OutboxBeforePublishHook
-	ReadyIndex    ReadyIndex
+	Name                string
+	Store               OutboxStore
+	Publisher           event.EventPublisher
+	Observer            eventobservability.Observer
+	Enabled             bool
+	Timeout             time.Duration
+	MaxConcurrent       int
+	Hooks               []OutboxBeforePublishHook
+	ReadyIndex          ReadyIndex
+	ImmediateEventTypes []string
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
@@ -64,17 +57,18 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 		maxConcurrent = defaultImmediateMaxConcurrent
 	}
 	return &ImmediateDispatcher{
-		name:         opts.Name,
-		store:        opts.Store,
-		reader:       reader,
-		publisher:    opts.Publisher,
-		observer:     opts.Observer,
-		enabled:      opts.Enabled && reader != nil && opts.Publisher != nil,
-		timeout:      opts.Timeout,
-		sem:          make(chan struct{}, maxConcurrent),
-		hooks:        compactBeforePublishHooks(opts.Hooks),
-		readyIndex:   opts.ReadyIndex,
-		readyIndexer: NewPostCommitReadyIndexer(opts.ReadyIndex),
+		name:                opts.Name,
+		store:               opts.Store,
+		reader:              reader,
+		publisher:           opts.Publisher,
+		observer:            opts.Observer,
+		enabled:             opts.Enabled && reader != nil && opts.Publisher != nil,
+		timeout:             opts.Timeout,
+		sem:                 make(chan struct{}, maxConcurrent),
+		hooks:               compactBeforePublishHooks(opts.Hooks),
+		readyIndex:          opts.ReadyIndex,
+		readyIndexer:        NewPostCommitReadyIndexer(opts.ReadyIndex),
+		immediateEventTypes: eventTypeSet(opts.ImmediateEventTypes),
 	}
 }
 
@@ -92,7 +86,7 @@ func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events
 		if evt == nil {
 			continue
 		}
-		if _, ok := immediateDispatchEventTypes[evt.EventType()]; !ok {
+		if _, ok := d.immediateEventTypes[evt.EventType()]; !ok {
 			continue
 		}
 		eventID := evt.EventID()
@@ -187,7 +181,10 @@ func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, o
 	})
 }
 
-func IsImmediateDispatchEventType(eventType string) bool {
-	_, ok := immediateDispatchEventTypes[eventType]
-	return ok
+func eventTypeSet(eventTypes []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(eventTypes))
+	for _, eventType := range eventTypes {
+		set[eventType] = struct{}{}
+	}
+	return set
 }

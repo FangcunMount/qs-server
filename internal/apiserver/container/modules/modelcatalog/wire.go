@@ -1,9 +1,10 @@
 package modelcatalog
 
 import (
+	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -101,14 +102,20 @@ func buildCatalogDeps(
 	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
 	dualStore := modelcatalog.NewPublishedStore(v2Repo)
-	publishedLister := port.PublishedModelLister(dualStore)
+	var publishedStore interface {
+		port.PublishedModelReader
+		port.PublishedModelLister
+	} = dualStore
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
-		cached := cache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
-		publishedLister = cached
-		publishedRepo = cache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
+		cached := modelcatalogcache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
+		publishedStore = cached
+		publishedRepo = modelcatalogcache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
+	runtimeCatalog := rulesetInfra.NewRuntimePublishedCatalogWithStore(publishedStore)
+	trustedCatalog := modelcatalogRuntime.NewTrustedRuntimeCatalog(runtimeCatalog, runtimeCatalog)
 	return CatalogDeps{
-		PublishedLister:     publishedLister,
+		PublishedLister:     publishedStore,
+		PublishedCatalog:    trustedCatalog,
 		ModelRepo:           draftRepo,
 		PublishedRepo:       publishedRepo,
 		NormRepo:            normRepo,

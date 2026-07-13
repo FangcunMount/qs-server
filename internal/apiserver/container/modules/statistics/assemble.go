@@ -6,11 +6,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
-	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
+	statisticsQueryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -109,7 +110,7 @@ func New(deps Deps) (*Module, error) {
 		txRunner,
 		repo,
 		normalized.AnswerSheetScanSource,
-		statisticsCache.NewReportScanSource(normalized.MySQLDB, normalized.MongoDB),
+		statisticsQueryInfra.NewReportScanSource(normalized.MySQLDB, normalized.MongoDB),
 	)
 	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, repo, normalized.RepairWindowDays, normalized.LockManager)
 

@@ -28,7 +28,7 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 		t.Fatal("typology singleflight = false, want true")
 	}
 	entries := s.EffectiveRegistry().Snapshot()
-	if len(entries) != 2 || entries[0].Capability != "catalog.questionnaire" || entries[1].Capability != "catalog.typology" {
+	if len(entries) != 3 || entries[0].Capability != "catalog.questionnaire" || entries[1].Capability != "catalog.typology" || entries[2].Kind != "operational_state" {
 		t.Fatalf("effective registry = %#v", entries)
 	}
 }

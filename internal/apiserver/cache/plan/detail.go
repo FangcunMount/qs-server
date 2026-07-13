@@ -1,4 +1,4 @@
-package cache
+package plancache
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -22,7 +23,7 @@ type CachedPlanRepository struct {
 	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
 	observer *observability.ComponentObserver
-	store    *ObjectCacheStore[plan.AssessmentPlan]
+	store    *adapterkit.ObjectCacheStore[plan.AssessmentPlan]
 }
 
 // NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
@@ -40,9 +41,9 @@ func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPla
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[plan.AssessmentPlan]{
-			Cache:     newRedisStoreIfAvailable(client),
-			PolicyKey: cachepolicy.PolicyPlan,
+		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[plan.AssessmentPlan]{
+			Cache:     adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey: cachepolicy.CapabilityPlanDetail,
 			Policy:    policy,
 			TTL:       policy.TTLOr(defaultPlanCacheTTL),
 			Codec:     newPlanCacheEntryCodec(mapper),
@@ -50,8 +51,8 @@ func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPla
 	}
 }
 
-func newPlanCacheEntryCodec(mapper *planInfra.PlanMapper) CacheEntryCodec[plan.AssessmentPlan] {
-	return CacheEntryCodec[plan.AssessmentPlan]{
+func newPlanCacheEntryCodec(mapper *planInfra.PlanMapper) adapterkit.CacheEntryCodec[plan.AssessmentPlan] {
+	return adapterkit.CacheEntryCodec[plan.AssessmentPlan]{
 		EncodeFunc: func(domain *plan.AssessmentPlan) ([]byte, error) {
 			return json.Marshal(mapper.ToPO(domain))
 		},
@@ -72,8 +73,8 @@ func (r *CachedPlanRepository) buildCacheKey(id plan.AssessmentPlanID) string {
 
 // FindByID 根据ID查询计划（优先从缓存读取）
 func (r *CachedPlanRepository) FindByID(ctx context.Context, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[plan.AssessmentPlan]{
-		PolicyKey: cachepolicy.PolicyPlan,
+	domain, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[plan.AssessmentPlan]{
+		PolicyKey: cachepolicy.CapabilityPlanDetail,
 		CacheKey:  r.buildCacheKey(id),
 		Policy:    r.policy,
 		Observer:  r.observer,

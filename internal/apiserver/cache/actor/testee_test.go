@@ -1,4 +1,4 @@
-package cache
+package actorcache
 
 import (
 	"context"
@@ -80,4 +80,21 @@ type testeeNegativeRepo struct {
 func (r *testeeNegativeRepo) FindByID(context.Context, testee.ID) (*testee.Testee, error) {
 	r.findByIDCalls++
 	return nil, nil
+}
+
+func waitFor(t *testing.T, fn func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("condition not met before deadline")
+}
+
+func hasRedisKey(t *testing.T, client redis.UniversalClient, key string) bool {
+	t.Helper()
+	return client.Exists(context.Background(), key).Val() > 0
 }

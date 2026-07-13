@@ -33,11 +33,14 @@ func (s *immediateTestStore) GetPublishableEvent(ctx context.Context, eventID st
 	return pendingEvent(eventID, eventcatalog.AnswerSheetSubmitted), true, nil
 }
 
-func TestIsImmediateDispatchEventTypeIncludesAssessmentSubmitted(t *testing.T) {
-	if !IsImmediateDispatchEventType(eventcatalog.AnswerSheetSubmitted) {
+func TestImmediateDispatcherUsesExplicitEventTypes(t *testing.T) {
+	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
+		ImmediateEventTypes: []string{eventcatalog.AnswerSheetSubmitted, eventcatalog.AssessmentSubmitted},
+	})
+	if _, ok := dispatcher.immediateEventTypes[eventcatalog.AnswerSheetSubmitted]; !ok {
 		t.Fatal("answersheet.submitted should be immediate")
 	}
-	if !IsImmediateDispatchEventType(eventcatalog.AssessmentSubmitted) {
+	if _, ok := dispatcher.immediateEventTypes[eventcatalog.AssessmentSubmitted]; !ok {
 		t.Fatal("assessment.submitted should be immediate for MySQL assessment outbox")
 	}
 }
@@ -47,13 +50,14 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 	publisher := &fakePublisher{}
 	observer := &outboxObserver{}
 	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
-		Name:          "test-immediate",
-		Store:         store,
-		Publisher:     publisher,
-		Observer:      observer,
-		Enabled:       true,
-		MaxConcurrent: 1,
-		Timeout:       time.Second,
+		Name:                "test-immediate",
+		Store:               store,
+		Publisher:           publisher,
+		Observer:            observer,
+		Enabled:             true,
+		MaxConcurrent:       1,
+		Timeout:             time.Second,
+		ImmediateEventTypes: []string{eventcatalog.AnswerSheetSubmitted},
 	})
 
 	submitted := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-1", struct{}{})

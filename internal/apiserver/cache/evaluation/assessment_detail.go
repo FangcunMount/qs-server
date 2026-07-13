@@ -1,4 +1,4 @@
-package cache
+package evaluationcache
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	assessmentInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -22,7 +23,7 @@ type CachedAssessmentRepository struct {
 	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
 	observer *observability.ComponentObserver
-	store    *ObjectCacheStore[assessment.Assessment]
+	store    *adapterkit.ObjectCacheStore[assessment.Assessment]
 }
 
 // NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
@@ -40,9 +41,9 @@ func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.R
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[assessment.Assessment]{
-			Cache:     newRedisStoreIfAvailable(client),
-			PolicyKey: cachepolicy.PolicyAssessmentDetail,
+		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[assessment.Assessment]{
+			Cache:     adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey: cachepolicy.CapabilityEvaluationAssessmentDetail,
 			Policy:    policy,
 			TTL:       policy.TTLOr(defaultAssessmentDetailCacheTTL),
 			Codec:     newAssessmentCacheEntryCodec(mapper),
@@ -50,8 +51,8 @@ func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.R
 	}
 }
 
-func newAssessmentCacheEntryCodec(mapper *assessmentInfra.AssessmentMapper) CacheEntryCodec[assessment.Assessment] {
-	return CacheEntryCodec[assessment.Assessment]{
+func newAssessmentCacheEntryCodec(mapper *assessmentInfra.AssessmentMapper) adapterkit.CacheEntryCodec[assessment.Assessment] {
+	return adapterkit.CacheEntryCodec[assessment.Assessment]{
 		EncodeFunc: func(domain *assessment.Assessment) ([]byte, error) {
 			return json.Marshal(mapper.ToPO(domain))
 		},
@@ -72,8 +73,8 @@ func (r *CachedAssessmentRepository) buildCacheKey(id assessment.ID) string {
 
 // FindByID 根据ID查询测评（优先从缓存读取）
 func (r *CachedAssessmentRepository) FindByID(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[assessment.Assessment]{
-		PolicyKey: cachepolicy.PolicyAssessmentDetail,
+	domain, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[assessment.Assessment]{
+		PolicyKey: cachepolicy.CapabilityEvaluationAssessmentDetail,
 		CacheKey:  r.buildCacheKey(id),
 		Policy:    r.policy,
 		Observer:  r.observer,

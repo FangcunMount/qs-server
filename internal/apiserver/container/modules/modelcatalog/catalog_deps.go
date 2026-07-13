@@ -16,6 +16,7 @@ type TypologyCacheSignalNotifier interface {
 // CatalogDeps 包含模型目录的依赖
 type CatalogDeps struct {
 	PublishedLister     port.PublishedModelLister
+	PublishedCatalog    port.Catalog
 	ModelRepo           port.ModelRepository
 	PublishedRepo       port.PublishedModelRepository
 	NormRepo            port.NormRepository

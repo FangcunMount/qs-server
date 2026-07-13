@@ -33,7 +33,7 @@ func InstallFrom(host InstallHost) error {
 		AnswerSheetScanSource:  answerSheetScanSource,
 		MongoDB:                host.MongoDB(),
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
-		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
+		QueryPolicy:            host.CachePolicy(cachepolicy.CapabilityStatisticsQuery),
 		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
 		OverviewGuardOpts:      host.StatisticsOverviewGuardOptions(),
 		QuestionnaireGuardOpts: host.StatisticsQuestionnaireGuardOptions(),

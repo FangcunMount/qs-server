@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -54,7 +55,7 @@ type Host interface {
 	CacheClient(family redisruntime.Family) redis.UniversalClient
 	CacheBuilder(family redisruntime.Family) *keyspace.Builder
 	CacheHandle(family redisruntime.Family) *redisruntime.Handle
-	CachePolicy(key cachepolicy.CachePolicyKey) cachepolicy.CachePolicy
+	CachePolicy(key sharedcache.Capability) cachepolicy.CachePolicy
 	CacheObserver() *observability.ComponentObserver
 	HotsetRecorder() cachetarget.HotsetRecorder
 	CacheLockManager() locklease.Manager
@@ -67,7 +68,6 @@ type Host interface {
 
 	DefaultEvaluationCatalog() (EvaluationCatalog, error)
 	PublishedModelCatalog() rulesetport.Catalog
-	SetPublishedModelCatalog(catalog rulesetport.Catalog)
 
 	SurveyPorts() SurveyPorts
 	ActorPorts() ActorPorts

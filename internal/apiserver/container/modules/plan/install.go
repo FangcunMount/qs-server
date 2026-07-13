@@ -22,7 +22,7 @@ func InstallFrom(host InstallHost) error {
 		PublishedModels: host.PublishedModelLister(),
 		RedisClient:     host.CacheClient(redisruntime.FamilyObject),
 		CacheBuilder:    host.CacheBuilder(redisruntime.FamilyObject),
-		PlanPolicy:      host.CachePolicy(cachepolicy.PolicyPlan),
+		PlanPolicy:      host.CachePolicy(cachepolicy.CapabilityPlanDetail),
 		EntryBaseURL:    host.PlanEntryBaseURL(),
 		Observer:        host.CacheObserver(),
 		MySQLLimiter:    host.MySQLLimiter(),

@@ -1,16 +1,15 @@
-package cache
+package adapterkit
 
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	objectcache "github.com/FangcunMount/qs-server/internal/pkg/cache/object"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
 type ObjectReadThroughOptions[T any] struct {
-	PolicyKey        cachepolicy.CachePolicyKey
+	PolicyKey        sharedcache.Capability
 	CacheKey         string
 	Policy           sharedcache.Policy
 	Observer         *observability.ComponentObserver
@@ -26,7 +25,7 @@ func ReadThroughObject[T any](ctx context.Context, opts ObjectReadThroughOptions
 		Capability:       sharedcache.Capability(opts.PolicyKey),
 		CacheKey:         opts.CacheKey,
 		Policy:           opts.Policy,
-		Observer:         newCapabilityObserver(opts.PolicyKey, opts.Observer),
+		Observer:         NewCapabilityObserver(opts.PolicyKey, opts.Observer),
 		Store:            opts.Store,
 		Load:             opts.Load,
 		CacheNegative:    opts.CacheNegative,

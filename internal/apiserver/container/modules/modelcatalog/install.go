@@ -32,7 +32,7 @@ func InstallFrom(host InstallHost) error {
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
 		StaticRedisClient:      host.CacheClient(redisruntime.FamilyStatic),
 		StaticCacheBuilder:     host.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy:   host.CachePolicy(cachepolicy.PolicyPublishedModel),
+		PublishedModelPolicy:   host.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
 		CacheObserver:          host.CacheObserver(),
 	})
 	if err != nil {

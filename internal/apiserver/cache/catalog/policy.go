@@ -19,16 +19,13 @@ var (
 
 type CachePolicy = sharedcache.Policy
 
-// CachePolicyKey identifies an apiserver object-level cache policy.
-type CachePolicyKey string
-
 const (
-	PolicyScale            CachePolicyKey = "scale"
-	PolicyQuestionnaire    CachePolicyKey = "questionnaire"
-	PolicyPublishedModel   CachePolicyKey = "published_model"
-	PolicyAssessmentDetail CachePolicyKey = "assessment_detail"
-	PolicyAssessmentList   CachePolicyKey = "assessment_list"
-	PolicyTestee           CachePolicyKey = "testee"
-	PolicyPlan             CachePolicyKey = "plan"
-	PolicyStatsQuery       CachePolicyKey = "stats_query"
+	CapabilitySurveyQuestionnaire        sharedcache.Capability = "survey.questionnaire"
+	CapabilityModelCatalogPublished      sharedcache.Capability = "modelcatalog.published_model"
+	CapabilityEvaluationAssessmentDetail sharedcache.Capability = "evaluation.assessment_detail"
+	CapabilityEvaluationAssessmentList   sharedcache.Capability = "evaluation.assessment_list"
+	CapabilityActorTestee                sharedcache.Capability = "actor.testee"
+	CapabilityPlanDetail                 sharedcache.Capability = "plan.detail"
+	CapabilityStatisticsQuery            sharedcache.Capability = "statistics.query"
+	CapabilityReportStatus               sharedcache.Capability = "report_status"
 )

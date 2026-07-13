@@ -149,11 +149,10 @@ func (c *Container) DefaultEvaluationCatalog() (compose.EvaluationCatalog, error
 }
 
 func (c *Container) PublishedModelCatalog() rulesetport.Catalog {
-	return c.publishedModelCatalog
-}
-
-func (c *Container) SetPublishedModelCatalog(catalog rulesetport.Catalog) {
-	c.publishedModelCatalog = catalog
+	if c == nil || c.AssessmentModelModule == nil {
+		return nil
+	}
+	return c.AssessmentModelModule.PublishedCatalog
 }
 
 func (c *Container) SetWorkbenchLatestRiskReader(reader workbenchreadmodel.LatestRiskReader) {
@@ -179,6 +178,9 @@ func (c *Container) ActorPorts() compose.ActorPorts {
 
 func (c *Container) SetSurveyModule(module *surveymod.Module) {
 	c.SurveyModule = module
+	if module != nil {
+		c.mongoDomainEventRelay = module.MongoDomainEventRelay
+	}
 }
 
 func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
@@ -260,15 +262,10 @@ func (c *Container) PublishedModelTitleResolver() modelcatalogApp.PublishedModel
 }
 
 func (c *Container) PublishedModelLister() rulesetport.PublishedModelLister {
-	if c == nil {
+	if c == nil || c.AssessmentModelModule == nil {
 		return nil
 	}
-	catalog, err := c.ensurePublishedModelCatalog()
-	if err != nil {
-		return nil
-	}
-	lister, _ := catalog.(rulesetport.PublishedModelLister)
-	return lister
+	return c.AssessmentModelModule.PublishedLister
 }
 
 func (c *Container) TesteeQuery() testeeApp.TesteeQueryService {
@@ -295,7 +292,7 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 		MongoLimiter:        c.backpressure.Mongo,
 		StaticRedis:         c.CacheClient(redisruntime.FamilyStatic),
 		StaticBuilder:       c.CacheBuilder(redisruntime.FamilyStatic),
-		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
+		QuestionnairePolicy: c.CachePolicy(cachepolicy.CapabilitySurveyQuestionnaire),
 		Observer:            c.cacheObserver(),
 	})
 	if err != nil {
@@ -318,7 +315,7 @@ func (c *Container) ensurePublishedModelCatalog() (rulesetport.Catalog, error) {
 		Existing:             c.publishedModelCatalog,
 		StaticRedisClient:    c.CacheClient(redisruntime.FamilyStatic),
 		StaticCacheBuilder:   c.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy: c.CachePolicy(cachepolicy.PolicyPublishedModel),
+		PublishedModelPolicy: c.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
 		Observer:             c.cacheObserver(),
 	})
 	if err != nil {

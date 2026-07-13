@@ -4,63 +4,55 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 )
 
-func TestPolicyCatalogMergesFamilyDefaultIntoObjectPolicy(t *testing.T) {
-	t.Parallel()
-
-	catalog := NewPolicyCatalog(
-		map[cachemodel.Family]CachePolicy{
-			cachemodel.FamilyQuery: {
-				Compress:     PolicySwitchEnabled,
-				Singleflight: PolicySwitchDisabled,
-			},
-		},
-		map[CachePolicyKey]CachePolicy{
-			PolicyStatsQuery: {},
-		},
-	)
-
-	policy := catalog.Policy(PolicyStatsQuery)
-	if !policy.Compress.Enabled(false) {
-		t.Fatal("期望继承 family 级压缩配置")
+func TestPolicyCatalogMergesFamilyAndCapabilityDefaults(t *testing.T) {
+	catalog := NewPolicyCatalog(map[cachemodel.Family]sharedcache.Policy{
+		cachemodel.FamilyQuery: {Compress: PolicySwitchEnabled, Singleflight: PolicySwitchEnabled},
+	}, map[sharedcache.Capability]Binding{
+		CapabilityStatisticsQuery: {Enabled: true},
+	})
+	binding, ok := catalog.Resolve(CapabilityStatisticsQuery)
+	if !ok || !binding.Enabled {
+		t.Fatal("statistics binding missing or disabled")
 	}
-	if policy.Singleflight.Enabled(true) {
-		t.Fatal("期望继承 family 级 singleflight 禁用配置")
+	if !binding.Policy.Compress.Enabled(false) {
+		t.Fatal("expected family compression")
+	}
+	if binding.Policy.Singleflight.Enabled(true) {
+		t.Fatal("expected capability default to disable singleflight")
 	}
 }
 
-func TestFamilyForReturnsExpectedRedisFamily(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		key  CachePolicyKey
-		want cachemodel.Family
-	}{
-		{name: "static scale", key: PolicyScale, want: cachemodel.FamilyStatic},
-		{name: "static published model", key: PolicyPublishedModel, want: cachemodel.FamilyStatic},
-		{name: "object plan", key: PolicyPlan, want: cachemodel.FamilyObject},
-		{name: "query stats", key: PolicyStatsQuery, want: cachemodel.FamilyQuery},
-		{name: "unknown", key: CachePolicyKey("unknown"), want: cachemodel.FamilyDefault},
+func TestSpecsHaveUniqueModuleOwnedIdentity(t *testing.T) {
+	seen := map[sharedcache.Capability]bool{}
+	for _, spec := range Specs() {
+		if seen[spec.ID] {
+			t.Fatalf("duplicate capability %q", spec.ID)
+		}
+		seen[spec.ID] = true
+		if spec.Owner == "" || spec.ConfigPath == "" || spec.MetricLabel == "" {
+			t.Fatalf("incomplete spec: %#v", spec)
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := FamilyFor(tt.key); got != tt.want {
-				t.Fatalf("FamilyFor(%q) = %q, want %q", tt.key, got, tt.want)
-			}
-		})
+	if seen[sharedcache.Capability("catalog.scale")] {
+		t.Fatal("catalog.scale must not be registered")
 	}
 }
 
-func TestEffectiveRegistryUsesPathDerivedCapabilityIDs(t *testing.T) {
+func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 	registry := NewEffectiveRegistry(NewPolicyCatalog(nil, nil))
 	entries := registry.Snapshot()
 	if len(entries) != 8 {
 		t.Fatalf("registry entries = %d, want 8", len(entries))
 	}
-	if entries[0].Capability != "catalog.scale" || entries[0].Source != "cache.capabilities.catalog.scale" {
-		t.Fatalf("first entry = %#v", entries[0])
+	first := entries[0]
+	if first.Capability != CapabilitySurveyQuestionnaire || first.Owner != "survey" || first.Source != "cache.capabilities.survey.questionnaire" || first.MetricLabel != "questionnaire" || first.Version != "v2" {
+		t.Fatalf("first entry = %#v", first)
+	}
+	last := entries[len(entries)-1]
+	if last.Capability != CapabilityReportStatus || last.Kind != sharedcache.KindOperationalState || last.Layer != sharedcache.LayerRuntime {
+		t.Fatalf("report status entry = %#v", last)
 	}
 }

@@ -3,20 +3,29 @@ package cache
 import "sync"
 
 type Layer string
+type CapabilityKind string
 
 const (
-	LayerL1 Layer = "L1"
-	LayerL2 Layer = "L2"
+	LayerL1      Layer = "L1"
+	LayerL2      Layer = "L2"
+	LayerRuntime Layer = "runtime"
+
+	KindCache            CapabilityKind = "cache"
+	KindOperationalState CapabilityKind = "operational_state"
 )
 
 // EffectiveCapability is the process-resolved cache capability contract.
 type EffectiveCapability struct {
-	Capability Capability `json:"capability"`
-	Layer      Layer      `json:"layer"`
-	Family     string     `json:"family"`
-	Policy     Policy     `json:"policy"`
-	Source     string     `json:"source"`
-	Version    string     `json:"version"`
+	Capability  Capability     `json:"capability"`
+	Owner       string         `json:"owner"`
+	Kind        CapabilityKind `json:"kind"`
+	Layer       Layer          `json:"layer"`
+	Family      string         `json:"family"`
+	Enabled     bool           `json:"enabled"`
+	Policy      Policy         `json:"policy"`
+	Source      string         `json:"source"`
+	Version     string         `json:"version"`
+	MetricLabel string         `json:"metric_label"`
 }
 
 type Registry struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
+	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -42,7 +42,7 @@ func NewRuntimePublishedCatalog(
 	store := aminfra.NewPublishedStore(v2)
 	var publishedStore runtimePublishedStore = store
 	if cacheCfg.enabled() {
-		publishedStore = cache.NewCachedPublishedModelStore(store, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
+		publishedStore = modelcatalogcache.NewCachedPublishedModelStore(store, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
 	}
 	return &RuntimePublishedCatalog{store: publishedStore}, nil
 }

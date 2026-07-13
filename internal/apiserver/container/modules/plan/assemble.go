@@ -10,8 +10,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	planCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	plancache "github.com/FangcunMount/qs-server/internal/apiserver/cache/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
@@ -68,7 +68,7 @@ func New(deps Deps) (*Module, error) {
 
 	planRepo := basePlanRepo
 	if normalized.RedisClient != nil {
-		planRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
+		planRepo = plancache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
 	}
 
 	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)

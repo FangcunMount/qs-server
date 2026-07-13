@@ -5,15 +5,16 @@ import (
 	"strings"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -43,7 +44,7 @@ func (c *Container) CacheBuilder(family redisruntime.Family) *keyspace.Builder {
 	return c.cache.Builder(family)
 }
 
-func (c *Container) CachePolicy(key cachepolicy.CachePolicyKey) cachepolicy.CachePolicy {
+func (c *Container) CachePolicy(key sharedcache.Capability) cachepolicy.CachePolicy {
 	if c == nil || c.cache == nil {
 		return cachepolicy.CachePolicy{}
 	}
@@ -269,7 +270,7 @@ func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context
 	if infra == nil || infra.QuestionnaireRepo == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if cachedRepo, ok := infra.QuestionnaireRepo.(*cacheinfra.CachedQuestionnaireRepository); ok {
+	if cachedRepo, ok := infra.QuestionnaireRepo.(*surveycache.CachedQuestionnaireRepository); ok {
 		return cachedRepo.WarmupCache(ctx, []string{code})
 	}
 	_, err := infra.QuestionnaireRepo.FindBaseByCode(ctx, code)

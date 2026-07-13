@@ -1,10 +1,11 @@
-package statistics
+package statisticscache
 
 import (
 	"context"
 	"time"
 
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -16,6 +17,10 @@ import (
 )
 
 const statsQueryCacheKind = "stats:query"
+
+func NewVersionTokenStore(client redis.UniversalClient, health cacheobserve.FamilyObserver) querycache.VersionTokenStore {
+	return adapterkit.NewVersionTokenStore(client, cachepolicy.CapabilityStatisticsQuery, health)
+}
 
 // StatisticsCache 统计查询缓存（Redis 操作封装）。
 // 只保留查询结果缓存，不再承担事件去重和日计数写入。
@@ -97,12 +102,12 @@ func (c *StatisticsCache) queryCache(ttl time.Duration) *querycache.Versioned {
 	return querycache.NewVersioned(querycache.VersionedOptions{
 		Store:      c.cache,
 		Version:    c.versionStore,
-		Capability: sharedcache.Capability(cachepolicy.PolicyStatsQuery),
+		Capability: sharedcache.Capability(cachepolicy.CapabilityStatisticsQuery),
 		Policy:     c.policy,
 		TTL:        ttl,
 		Observer: cacheobserve.NewPrometheus(
-			string(cachepolicy.FamilyFor(cachepolicy.PolicyStatsQuery)),
-			string(cachepolicy.PolicyStatsQuery),
+			string(cachepolicy.Family(cachepolicy.CapabilityStatisticsQuery)),
+			cachepolicy.MetricLabel(cachepolicy.CapabilityStatisticsQuery),
 			c.observer,
 		),
 	})

@@ -10,7 +10,6 @@ import (
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
@@ -305,7 +304,7 @@ type ServerRuntimeDeps struct {
 	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
 	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
 	EvaluationConsistencyReconcileService evaluationScheduler.Service
-	AnswerSheetSubmittedRelay             answersheetApp.SubmittedEventRelay
+	MongoDomainEventRelay                 appEventing.OutboxRelay
 	AssessmentOutboxRelay                 appEventing.OutboxRelay
 }
 
@@ -343,8 +342,9 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		deps.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
 		deps.BehaviorJourneyScanService = c.StatisticsModule.BehaviorJourneyScanService
 	}
-	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
-		deps.AnswerSheetSubmittedRelay = c.SurveyModule.AnswerSheet.SubmittedEventRelay
+	deps.MongoDomainEventRelay = c.mongoDomainEventRelay
+	if deps.MongoDomainEventRelay == nil && c.SurveyModule != nil {
+		deps.MongoDomainEventRelay = c.SurveyModule.MongoDomainEventRelay
 	}
 	if c.EvaluationModule != nil {
 		deps.AssessmentOutboxRelay = c.EvaluationModule.AssessmentOutboxRelay

@@ -3,8 +3,8 @@ package modelcatalog
 import (
 	redis "github.com/redis/go-redis/v9"
 
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+	modelcatalogHotRankInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
@@ -21,7 +21,7 @@ type HotRankDeps struct {
 }
 
 func NewHotRank(deps HotRankDeps) *HotRank {
-	return &HotRank{ReadModel: cacheinfra.NewRedisScaleHotRankProjection(deps.RedisClient, deps.KeyBuilder)}
+	return &HotRank{ReadModel: modelcatalogHotRankInfra.NewRedisScaleHotRankProjection(deps.RedisClient, deps.KeyBuilder)}
 }
 
 func (*HotRank) Cleanup() error     { return nil }

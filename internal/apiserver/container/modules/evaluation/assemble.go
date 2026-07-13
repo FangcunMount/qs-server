@@ -19,8 +19,8 @@ import (
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -43,7 +43,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -146,7 +145,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
 	if normalized.RedisClient != nil {
-		infra.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
+		infra.assessmentRepo = evaluationcache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
 		infra.assessmentRepo = baseAssessmentRepo
 	}
@@ -166,7 +165,8 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	}
 	assessmentReadyIndex := outboxready.NewIndex(opsClient, outboxready.StoreAssessmentMySQLOutbox)
 	infra.assessmentReadyIndex = assessmentReadyIndex
-	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
+	runtimePolicy := outboxruntime.DefaultPolicy()
+	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(runtimePolicy.PriorityTiers)}
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlPriorityOpts...)
 	infra.assessmentOutboxStore = assessmentOutboxStore
 	outboxRuntime := outboxruntime.Build(outboxruntime.Spec{
@@ -179,6 +179,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 		ImmediateMaxConcurrent:  normalized.AssessmentOutboxRelayImmediateMaxConcurrent,
 		ImmediateEnabled:        true,
 		RequireDurablePublisher: true,
+		Policy:                  runtimePolicy,
 	})
 	infra.postCommitReadyIndexer = outboxRuntime.PostCommitReadyIndexer
 	infra.assessmentImmediate = outboxRuntime.Immediate
@@ -237,7 +238,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
+		listCache := evaluationcache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
 			redisstore.NewStore(normalized.QueryRedisClient),
 			normalized.VersionStore,
 			normalized.QueryCacheBuilder,

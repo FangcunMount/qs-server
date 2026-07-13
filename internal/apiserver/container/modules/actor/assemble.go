@@ -11,7 +11,7 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
+	actorcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -95,7 +95,7 @@ func New(deps Deps) (*Module, error) {
 
 	var testeeRepo testee.Repository
 	if deps.RedisClient != nil {
-		testeeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
+		testeeRepo = actorcache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
 	} else {
 		testeeRepo = baseTesteeRepo
 	}

@@ -82,9 +82,7 @@ func TestBuildRuntimeStageDepsDisablesDurableRelaysWithoutMQPublisher(t *testing
 
 	s := &server{}
 	c := &container.Container{
-		SurveyModule: &surveymod.Module{
-			AnswerSheet: &surveymod.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
-		},
+		SurveyModule:     &surveymod.Module{MongoDomainEventRelay: fakeRuntimeRelay{}},
 		EvaluationModule: &evalmod.Module{AssessmentOutboxRelay: fakeRuntimeRelay{}},
 	}
 
@@ -114,9 +112,7 @@ func TestBuildRuntimeStageDepsUsesConfiguredOutboxRelayIntervals(t *testing.T) {
 	}
 	s := &server{config: cfg}
 	c := &container.Container{
-		SurveyModule: &surveymod.Module{
-			AnswerSheet: &surveymod.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
-		},
+		SurveyModule:     &surveymod.Module{MongoDomainEventRelay: fakeRuntimeRelay{}},
 		EvaluationModule: &evalmod.Module{AssessmentOutboxRelay: fakeRuntimeRelay{}},
 	}
 

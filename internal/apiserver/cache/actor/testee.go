@@ -1,4 +1,4 @@
-package cache
+package actorcache
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -25,7 +26,7 @@ type CachedTesteeRepository struct {
 	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
 	observer *observability.ComponentObserver
-	store    *ObjectCacheStore[testee.Testee]
+	store    *adapterkit.ObjectCacheStore[testee.Testee]
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
@@ -43,9 +44,9 @@ func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repositor
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[testee.Testee]{
-			Cache:       newRedisStoreIfAvailable(client),
-			PolicyKey:   cachepolicy.PolicyTestee,
+		store: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[testee.Testee]{
+			Cache:       adapterkit.NewRedisStoreIfAvailable(client),
+			PolicyKey:   cachepolicy.CapabilityActorTestee,
 			Policy:      policy,
 			TTL:         policy.TTLOr(defaultTesteeCacheTTL),
 			NegativeTTL: policy.NegativeTTLOr(defaultNegativeTesteeCacheTTL),
@@ -54,8 +55,8 @@ func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repositor
 	}
 }
 
-func newTesteeCacheEntryCodec(mapper *testeeInfra.TesteeMapper) CacheEntryCodec[testee.Testee] {
-	return CacheEntryCodec[testee.Testee]{
+func newTesteeCacheEntryCodec(mapper *testeeInfra.TesteeMapper) adapterkit.CacheEntryCodec[testee.Testee] {
+	return adapterkit.CacheEntryCodec[testee.Testee]{
 		EncodeFunc: func(domain *testee.Testee) ([]byte, error) {
 			return json.Marshal(mapper.ToPO(domain))
 		},
@@ -76,8 +77,8 @@ func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
 
 // FindByID 根据ID查询受试者（优先从缓存读取）
 func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[testee.Testee]{
-		PolicyKey:        cachepolicy.PolicyTestee,
+	domain, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[testee.Testee]{
+		PolicyKey:        cachepolicy.CapabilityActorTestee,
 		CacheKey:         r.buildCacheKey(id),
 		Policy:           r.policy,
 		Observer:         r.observer,

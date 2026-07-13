@@ -64,7 +64,7 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 		BehaviorProjectorService: behaviorProjector,
 	}
 	c.SurveyModule = &SurveyModule{
-		AnswerSheet: &AnswerSheetSubModule{SubmittedEventRelay: answerSheetRelay},
+		MongoDomainEventRelay: answerSheetRelay,
 	}
 	c.EvaluationModule = &EvaluationModule{
 		AssessmentOutboxRelay: assessmentRelay,
@@ -90,8 +90,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	if deps.BehaviorProjectorService != behaviorProjector {
 		t.Fatalf("BehaviorProjectorService = %#v, want %#v", deps.BehaviorProjectorService, behaviorProjector)
 	}
-	if deps.AnswerSheetSubmittedRelay != answerSheetRelay {
-		t.Fatalf("AnswerSheetSubmittedRelay = %#v, want %#v", deps.AnswerSheetSubmittedRelay, answerSheetRelay)
+	if deps.MongoDomainEventRelay != answerSheetRelay {
+		t.Fatalf("MongoDomainEventRelay = %#v, want %#v", deps.MongoDomainEventRelay, answerSheetRelay)
 	}
 	if deps.AssessmentOutboxRelay != assessmentRelay {
 		t.Fatalf("AssessmentOutboxRelay = %#v, want %#v", deps.AssessmentOutboxRelay, assessmentRelay)

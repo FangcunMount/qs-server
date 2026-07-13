@@ -286,11 +286,19 @@ func (s *Subsystem) Builder(family redisruntime.Family) *keyspace.Builder {
 	return handle.Builder
 }
 
-func (s *Subsystem) Policy(key cachepolicy.CachePolicyKey) cachepolicy.CachePolicy {
+func (s *Subsystem) Policy(key sharedcache.Capability) cachepolicy.CachePolicy {
 	if s == nil || s.policyCatalog == nil {
 		return cachepolicy.CachePolicy{}
 	}
 	return s.policyCatalog.Policy(key)
+}
+
+func (s *Subsystem) Capability(key sharedcache.Capability) cachepolicy.Binding {
+	if s == nil || s.policyCatalog == nil {
+		return cachepolicy.Binding{}
+	}
+	binding, _ := s.policyCatalog.Resolve(key)
+	return binding
 }
 
 func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
@@ -403,40 +411,38 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 			Negative:     resolvePolicySwitch(cacheConfig.Query.Negative, false),
 			JitterRatio:  firstPositiveFloat(cacheConfig.Query.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-	}, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
-		cachepolicy.PolicyScale: {
-			TTL: cacheConfig.TTL.Scale,
-		},
-		cachepolicy.PolicyQuestionnaire: {
+	}, map[sharedcache.Capability]cachepolicy.Binding{
+		cachepolicy.CapabilitySurveyQuestionnaire: {Enabled: true, Policy: cachepolicy.CachePolicy{
 			TTL:         cacheConfig.TTL.Questionnaire,
 			NegativeTTL: cacheConfig.TTL.Negative,
 			Negative:    cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyPublishedModel: {
+		}},
+		cachepolicy.CapabilityModelCatalogPublished: {Enabled: true, Policy: cachepolicy.CachePolicy{
 			TTL:         cacheConfig.TTL.Scale,
 			NegativeTTL: cacheConfig.TTL.Negative,
 			Negative:    cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyAssessmentDetail: {
+		}},
+		cachepolicy.CapabilityEvaluationAssessmentDetail: {Enabled: !cacheConfig.DisableEvaluationCache, Policy: cachepolicy.CachePolicy{
 			TTL:          cacheConfig.TTL.AssessmentDetail,
 			Singleflight: cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyAssessmentList: {
+		}},
+		cachepolicy.CapabilityEvaluationAssessmentList: {Enabled: !cacheConfig.DisableEvaluationCache, Policy: cachepolicy.CachePolicy{
 			TTL:          cacheConfig.TTL.AssessmentList,
 			Singleflight: cachepolicy.PolicySwitchDisabled,
-		},
-		cachepolicy.PolicyTestee: {
+		}},
+		cachepolicy.CapabilityActorTestee: {Enabled: true, Policy: cachepolicy.CachePolicy{
 			TTL:         cacheConfig.TTL.Testee,
 			NegativeTTL: cacheConfig.TTL.Negative,
 			Negative:    cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyPlan: {
+		}},
+		cachepolicy.CapabilityPlanDetail: {Enabled: true, Policy: cachepolicy.CachePolicy{
 			TTL:          cacheConfig.TTL.Plan,
 			Singleflight: cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyStatsQuery: {
+		}},
+		cachepolicy.CapabilityStatisticsQuery: {Enabled: !cacheConfig.DisableStatisticsCache, Policy: cachepolicy.CachePolicy{
 			Singleflight: cachepolicy.PolicySwitchDisabled,
-		},
+		}},
+		cachepolicy.CapabilityReportStatus: {Enabled: true},
 	})
 }
 

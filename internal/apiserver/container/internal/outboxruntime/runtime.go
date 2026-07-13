@@ -18,6 +18,7 @@ type Spec struct {
 	RequireDurablePublisher bool
 	BeforePublishHooks      []appEventing.OutboxBeforePublishHook
 	Observer                eventobservability.Observer
+	Policy                  Policy
 }
 
 type Runtime struct {
@@ -31,14 +32,15 @@ func Build(spec Spec) Runtime {
 		spec.Observer = eventobservability.DefaultObserver()
 	}
 	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name:          spec.Name,
-		Store:         spec.Store,
-		Publisher:     spec.Publisher,
-		Observer:      spec.Observer,
-		Enabled:       spec.ImmediateEnabled,
-		MaxConcurrent: spec.ImmediateMaxConcurrent,
-		Hooks:         spec.BeforePublishHooks,
-		ReadyIndex:    spec.ReadyIndex,
+		Name:                spec.Name,
+		Store:               spec.Store,
+		Publisher:           spec.Publisher,
+		Observer:            spec.Observer,
+		Enabled:             spec.ImmediateEnabled,
+		MaxConcurrent:       spec.ImmediateMaxConcurrent,
+		Hooks:               spec.BeforePublishHooks,
+		ReadyIndex:          spec.ReadyIndex,
+		ImmediateEventTypes: spec.Policy.ImmediateEventTypes,
 	})
 	relay := appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
 		Name:                    spec.Name,

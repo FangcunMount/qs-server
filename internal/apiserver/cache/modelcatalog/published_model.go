@@ -1,4 +1,4 @@
-package cache
+package modelcatalogcache
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -35,8 +36,8 @@ type CachedPublishedModelStore struct {
 	keys              *keyspace.Builder
 	policy            cachepolicy.CachePolicy
 	observer          *observability.ComponentObserver
-	catalogList       *ObjectCacheStore[publishedModelCatalogListPage]
-	catalogAlgorithms *ObjectCacheStore[publishedModelCatalogAlgorithms]
+	catalogList       *adapterkit.ObjectCacheStore[publishedModelCatalogListPage]
+	catalogAlgorithms *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
 }
 
 type publishedModelCatalogListPage struct {
@@ -59,7 +60,7 @@ func NewCachedPublishedModelStore(
 	if builder == nil {
 		panic("redis builder is required")
 	}
-	redisCache := newRedisStoreIfAvailable(client)
+	redisCache := adapterkit.NewRedisStoreIfAvailable(client)
 	ttl := policy.TTLOr(defaultPublishedModelCacheTTL)
 	negativeTTL := policy.NegativeTTLOr(defaultNegativePublishedModelCacheTTL)
 	return &CachedPublishedModelStore{
@@ -67,17 +68,17 @@ func NewCachedPublishedModelStore(
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		catalogList: NewObjectCacheStore(ObjectCacheStoreOptions[publishedModelCatalogListPage]{
+		catalogList: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[publishedModelCatalogListPage]{
 			Cache:       redisCache,
-			PolicyKey:   cachepolicy.PolicyPublishedModel,
+			PolicyKey:   cachepolicy.CapabilityModelCatalogPublished,
 			Policy:      policy,
 			TTL:         ttl,
 			NegativeTTL: negativeTTL,
 			Codec:       newPublishedModelCatalogListCodec(),
 		}),
-		catalogAlgorithms: NewObjectCacheStore(ObjectCacheStoreOptions[publishedModelCatalogAlgorithms]{
+		catalogAlgorithms: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[publishedModelCatalogAlgorithms]{
 			Cache:       redisCache,
-			PolicyKey:   cachepolicy.PolicyPublishedModel,
+			PolicyKey:   cachepolicy.CapabilityModelCatalogPublished,
 			Policy:      policy,
 			TTL:         ttl,
 			NegativeTTL: negativeTTL,
@@ -86,8 +87,8 @@ func NewCachedPublishedModelStore(
 	}
 }
 
-func newPublishedModelCatalogListCodec() CacheEntryCodec[publishedModelCatalogListPage] {
-	return CacheEntryCodec[publishedModelCatalogListPage]{
+func newPublishedModelCatalogListCodec() adapterkit.CacheEntryCodec[publishedModelCatalogListPage] {
+	return adapterkit.CacheEntryCodec[publishedModelCatalogListPage]{
 		EncodeFunc: func(page *publishedModelCatalogListPage) ([]byte, error) {
 			return json.Marshal(page)
 		},
@@ -101,8 +102,8 @@ func newPublishedModelCatalogListCodec() CacheEntryCodec[publishedModelCatalogLi
 	}
 }
 
-func newPublishedModelCatalogAlgorithmsCodec() CacheEntryCodec[publishedModelCatalogAlgorithms] {
-	return CacheEntryCodec[publishedModelCatalogAlgorithms]{
+func newPublishedModelCatalogAlgorithmsCodec() adapterkit.CacheEntryCodec[publishedModelCatalogAlgorithms] {
+	return adapterkit.CacheEntryCodec[publishedModelCatalogAlgorithms]{
 		EncodeFunc: func(payload *publishedModelCatalogAlgorithms) ([]byte, error) {
 			return json.Marshal(payload)
 		},
@@ -156,8 +157,8 @@ func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, fil
 		return c.inner.ListPublishedModels(ctx, filter)
 	}
 	cacheKey := c.listCatalogCacheKey(filter)
-	page, err := ReadThroughObject(ctx, ObjectReadThroughOptions[publishedModelCatalogListPage]{
-		PolicyKey:      cachepolicy.PolicyPublishedModel,
+	page, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[publishedModelCatalogListPage]{
+		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
 		CacheKey:       cacheKey,
 		Policy:         c.policy,
 		Observer:       c.observer,
@@ -189,8 +190,8 @@ func (c *CachedPublishedModelStore) ListPublishedAlgorithms(ctx context.Context)
 		return c.inner.ListPublishedAlgorithms(ctx)
 	}
 	cacheKey := c.algorithmsCatalogCacheKey()
-	payload, err := ReadThroughObject(ctx, ObjectReadThroughOptions[publishedModelCatalogAlgorithms]{
-		PolicyKey:      cachepolicy.PolicyPublishedModel,
+	payload, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[publishedModelCatalogAlgorithms]{
+		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
 		CacheKey:       cacheKey,
 		Policy:         c.policy,
 		Observer:       c.observer,

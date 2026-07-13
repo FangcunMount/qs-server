@@ -255,8 +255,17 @@ func buildEffectiveRegistry(opts *options.Options) *sharedcache.Registry {
 			policy.Singleflight = sharedcache.PolicySwitchFromBool(item.cfg.Singleflight)
 		}
 		entries = append(entries, sharedcache.EffectiveCapability{
-			Capability: sharedcache.Capability(item.id), Layer: sharedcache.LayerL1,
-			Family: "local", Policy: policy, Source: item.source, Version: "v1",
+			Capability: sharedcache.Capability(item.id), Owner: "collection", Kind: sharedcache.KindCache,
+			Layer: sharedcache.LayerL1, Family: "local", Enabled: enabled(item.cfg), Policy: policy,
+			Source: item.source, Version: "v2", MetricLabel: item.id,
+		})
+	}
+	if opts != nil && opts.Cache != nil && opts.Cache.Capabilities != nil && opts.Cache.Capabilities.ReportStatus != nil {
+		entries = append(entries, sharedcache.EffectiveCapability{
+			Capability: "report_status", Owner: "interpretation", Kind: sharedcache.KindOperationalState,
+			Layer: sharedcache.LayerRuntime, Family: "ops_runtime", Enabled: true,
+			Policy: sharedcache.Policy{TTL: time.Duration(opts.Cache.Capabilities.ReportStatus.TTLSeconds) * time.Second},
+			Source: "cache.capabilities.report_status", Version: "v2", MetricLabel: "report_status",
 		})
 	}
 	return sharedcache.NewRegistry(entries...)

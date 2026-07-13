@@ -7,8 +7,8 @@ import (
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
-	cacheadapter "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -159,11 +159,7 @@ func Wire(in WireInput) (WireResult, error) {
 
 	var versionStore querycache.VersionTokenStore
 	if queryRedisClient != nil {
-		versionStore = cacheadapter.NewVersionTokenStore(
-			in.MetaRedisClient,
-			cachepolicy.PolicyAssessmentList,
-			in.Observer,
-		)
+		versionStore = evaluationcache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
 	}
 
 	var publishedModelReader rulesetport.PublishedModelReader

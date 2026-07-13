@@ -19,7 +19,7 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:             host.MySQLDB(),
 		RedisClient:         host.CacheClient(redisruntime.FamilyObject),
 		CacheBuilder:        host.CacheBuilder(redisruntime.FamilyObject),
-		TesteePolicy:        host.CachePolicy(cachepolicy.PolicyTestee),
+		TesteePolicy:        host.CachePolicy(cachepolicy.CapabilityActorTestee),
 		Observer:            host.CacheObserver(),
 		MySQLLimiter:        host.MySQLLimiter(),
 		IAMEnabled:          iamPorts.Enabled,

@@ -2,8 +2,8 @@ package survey
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	answerSheetMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
@@ -57,7 +57,7 @@ func EnsureSurveyRuntimeInfra(deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra,
 	questionnaireReader := questionnaireMongo.NewQuestionnaireReadModel(questionnaireBaseRepo)
 	var questionnaireRepo questionnaire.Repository = questionnaireBaseRepo
 	if deps.StaticRedis != nil {
-		questionnaireRepo = scaleCache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(
+		questionnaireRepo = surveycache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(
 			questionnaireBaseRepo,
 			deps.StaticRedis,
 			deps.StaticBuilder,
