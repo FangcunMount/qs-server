@@ -76,6 +76,33 @@ func TestGetCacheIncludesRemoteComponentDegradationAndHotsets(t *testing.T) {
 	}
 }
 
+func TestGetCacheIncludesCanonicalCapabilityWorkloadRows(t *testing.T) {
+	status := healthyCacheStatus("apiserver")
+	status.EffectiveRegistry = &cachemodel.EffectiveRegistrySnapshot{
+		Capabilities: []cachemodel.CapabilityPolicyView{
+			{Capability: "statistics.query", Kind: "cache", Family: "query_result", MetricLabel: "stats_query"},
+			{Capability: "report_status", Kind: "operational_state", Family: "ops_runtime", MetricLabel: "report_status"},
+		},
+	}
+	view, err := NewFacade(FacadeDeps{
+		CacheGovernance: &cacheGovernanceForFacade{status: status},
+		Metrics:         &countingMetricsClient{},
+	}).GetCache(context.Background(), "5m")
+	if err != nil {
+		t.Fatalf("GetCache() error = %v", err)
+	}
+	if len(view.CapabilityRows) != 1 {
+		t.Fatalf("capability rows = %#v, want one workload cache row", view.CapabilityRows)
+	}
+	row := view.CapabilityRows[0]
+	if row.Capability != "statistics.query" || row.MetricLabel != "stats_query" {
+		t.Fatalf("capability row = %#v", row)
+	}
+	if row.Workload.HitRate == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
+		t.Fatalf("workload = %#v, want all metric evidences", row.Workload)
+	}
+}
+
 func TestGetResilienceIncludesSummaryRowsAndRemoteDegradation(t *testing.T) {
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

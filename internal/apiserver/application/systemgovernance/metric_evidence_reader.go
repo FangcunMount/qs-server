@@ -110,6 +110,49 @@ func (r MetricEvidenceReader) CacheHotsetSize(ctx context.Context, family, kind,
 	}, evalAt)
 }
 
+func (r MetricEvidenceReader) CacheCapabilityHitRate(ctx context.Context, capability, family, metricLabel, window string, evalAt time.Time) (MetricEvidence, bool) {
+	base := map[string]string{"family": family, "policy": metricLabel}
+	hit := cloneMetricLabels(base, "result", "hit")
+	miss := cloneMetricLabels(base, "result", "miss")
+	return r.query(ctx, govprom.CounterIncreaseRatioQuery(
+		"cache_hit_rate_"+metricNamePart(capability), window,
+		[]govprom.CounterIncreaseTerm{{Metric: "qs_cache_get_total", Labels: hit}},
+		[]govprom.CounterIncreaseTerm{{Metric: "qs_cache_get_total", Labels: hit}, {Metric: "qs_cache_get_total", Labels: miss}},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CacheCapabilityErrorCount(ctx context.Context, capability, family, metricLabel, window string, evalAt time.Time) (MetricEvidence, bool) {
+	labels := cloneMetricLabels(map[string]string{"family": family, "policy": metricLabel}, "result", "error")
+	return r.query(ctx, govprom.CounterIncreaseSumQuery(
+		"cache_error_count_"+metricNamePart(capability), window, "count",
+		govprom.CounterIncreaseTerm{Metric: "qs_cache_get_total", Labels: labels},
+		govprom.CounterIncreaseTerm{Metric: "qs_cache_write_total", Labels: labels},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CacheCapabilityGetP95(ctx context.Context, capability, family, metricLabel, window string, evalAt time.Time) (MetricEvidence, bool) {
+	return r.query(ctx, govprom.HistogramQuantileQuery(
+		"cache_get_p95_"+metricNamePart(capability), "qs_cache_operation_duration_seconds", window, "seconds", 0.95,
+		map[string]string{"family": family, "policy": metricLabel, "op": "get"},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) query(ctx context.Context, spec govprom.QuerySpec, evalAt time.Time) (MetricEvidence, bool) {
+	if r.metrics == nil {
+		return MetricEvidence{}, false
+	}
+	return toMetricEvidence(r.metrics.Query(ctx, spec, evalAt)), true
+}
+
+func cloneMetricLabels(base map[string]string, key, value string) map[string]string {
+	result := make(map[string]string, len(base)+1)
+	for itemKey, itemValue := range base {
+		result[itemKey] = itemValue
+	}
+	result[key] = value
+	return result
+}
+
 func (r MetricEvidenceReader) ResilienceQueueFull(
 	ctx context.Context,
 	component string,

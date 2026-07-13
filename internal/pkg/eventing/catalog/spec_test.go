@@ -3,6 +3,7 @@ package eventcatalog
 import (
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -22,63 +23,141 @@ func loadDefaultRegistry(t *testing.T) *EffectiveRegistry {
 
 func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 	registry := loadDefaultRegistry(t)
-	matrix, err := os.ReadFile("../../../../docs/03-基础设施/event/09-事件契约矩阵.md")
+	matrixBytes, err := os.ReadFile("../../../../docs/03-基础设施/event/09-事件契约矩阵.md")
 	if err != nil {
 		t.Fatalf("read event matrix: %v", err)
 	}
-	rows := make(map[string][]string)
-	for _, line := range strings.Split(string(matrix), "\n") {
-		if !strings.HasPrefix(line, "| `") {
-			continue
-		}
-		cells := strings.Split(line, "|")
-		if len(cells) < 9 {
-			continue
-		}
-		eventType := strings.Trim(strings.TrimSpace(cells[1]), "`")
-		if _, ok := registry.Lookup(eventType); ok {
-			rows[eventType] = cells
-		}
-	}
+	matrix := string(matrixBytes)
+	eventRows := parseMarkdownTable(t, matrix, []string{
+		"Event type", "Owner", "Producer", "Delivery", "Profile", "Store", "Immediate", "Priority",
+		"Handler", "Idempotency policy", "Settlement policy", "Handler failure behavior",
+	})
+	rows := indexMarkdownRows(t, eventRows, "Event type")
 	if len(rows) != len(registry.Snapshot()) {
 		t.Fatalf("matrix event rows = %d, effective events = %d", len(rows), len(registry.Snapshot()))
 	}
 	for _, evt := range registry.Snapshot() {
 		row := rows[evt.Type]
-		joined := strings.Join(row, "|")
-		for _, want := range []string{string(evt.Delivery), evt.PrimaryHandler, yesNo(evt.Immediate)} {
-			if !strings.Contains(joined, want) {
-				t.Fatalf("matrix row for %q does not contain %q: %s", evt.Type, want, joined)
+		if row == nil {
+			t.Fatalf("matrix is missing event %q", evt.Type)
+		}
+		want := map[string]string{
+			"Owner":              evt.Owner,
+			"Delivery":           string(evt.Delivery),
+			"Profile":            string(evt.OutboxProfile),
+			"Store":              matrixStoreToken(evt.OutboxProfile),
+			"Immediate":          strconv.FormatBool(evt.Immediate),
+			"Priority":           string(evt.Priority),
+			"Handler":            evt.PrimaryHandler,
+			"Idempotency policy": evt.IdempotencyPolicy,
+			"Settlement policy":  string(evt.SettlementPolicy),
+		}
+		for field, expected := range want {
+			if got := row[field]; got != expected {
+				t.Fatalf("matrix %s for %q = %q, want %q", field, evt.Type, got, expected)
 			}
 		}
-		wantPriority := "无"
-		if evt.Priority != PriorityNone {
-			wantPriority = strings.ToUpper(string(evt.Priority))
+		if row["Producer"] == "" || row["Handler failure behavior"] == "" {
+			t.Fatalf("matrix row for %q must include readable producer and failure behavior", evt.Type)
 		}
-		if got := strings.TrimSpace(row[6]); got != wantPriority {
-			t.Fatalf("matrix priority for %q = %q, want %q", evt.Type, got, wantPriority)
-		}
-		if strings.TrimSpace(row[8]) == "" || strings.TrimSpace(row[9]) == "" {
-			t.Fatalf("matrix row for %q must declare idempotency and settlement: %s", evt.Type, joined)
-		}
-		switch evt.OutboxProfile {
-		case OutboxProfileMongoDomain:
-			if !strings.Contains(joined, "Mongo `domain_event_outbox`") {
-				t.Fatalf("matrix row for %q has wrong Mongo store: %s", evt.Type, joined)
+	}
+
+	consumerRows := parseMarkdownTable(t, matrix, []string{
+		"Consumer ID", "Event", "Runtime", "Topic", "Channel", "Idempotency policy", "Settlement policy",
+	})
+	actualConsumers := indexMarkdownRows(t, consumerRows, "Consumer ID")
+	wantConsumerCount := 0
+	for _, evt := range registry.Snapshot() {
+		for _, consumer := range evt.AdditionalConsumers {
+			wantConsumerCount++
+			row := actualConsumers[consumer.ID]
+			if row == nil {
+				t.Fatalf("additional consumer table is missing %q", consumer.ID)
 			}
-		case OutboxProfileAssessmentMySQL:
-			if !strings.Contains(joined, "MySQL `domain_event_outbox`") {
-				t.Fatalf("matrix row for %q has wrong MySQL store: %s", evt.Type, joined)
+			want := map[string]string{
+				"Event": evt.Type, "Runtime": consumer.Runtime, "Topic": evt.Topic,
+				"Channel": consumer.Channel, "Idempotency policy": consumer.IdempotencyPolicy,
+				"Settlement policy": string(consumer.SettlementPolicy),
+			}
+			for field, expected := range want {
+				if got := row[field]; got != expected {
+					t.Fatalf("additional consumer %s for %q = %q, want %q", field, consumer.ID, got, expected)
+				}
 			}
 		}
+	}
+	if len(actualConsumers) != wantConsumerCount {
+		t.Fatalf("additional consumer rows = %d, registry consumers = %d", len(actualConsumers), wantConsumerCount)
 	}
 }
 
-func yesNo(value bool) string {
-	if value {
-		return "是"
+func matrixStoreToken(profile OutboxProfile) string {
+	switch profile {
+	case OutboxProfileMongoDomain:
+		return "Mongo domain_event_outbox"
+	case OutboxProfileAssessmentMySQL:
+		return "MySQL domain_event_outbox"
+	default:
+		return "none"
 	}
-	return "否"
+}
+
+func parseMarkdownTable(t *testing.T, document string, headers []string) []map[string]string {
+	t.Helper()
+	lines := strings.Split(document, "\n")
+	for index, line := range lines {
+		cells := markdownCells(line)
+		if !slices.Equal(cells, headers) {
+			continue
+		}
+		var rows []map[string]string
+		for _, rowLine := range lines[index+2:] {
+			rowCells := markdownCells(rowLine)
+			if len(rowCells) == 0 {
+				break
+			}
+			if len(rowCells) != len(headers) {
+				t.Fatalf("matrix row has %d cells, want %d: %s", len(rowCells), len(headers), rowLine)
+			}
+			row := make(map[string]string, len(headers))
+			for i, header := range headers {
+				row[header] = rowCells[i]
+			}
+			rows = append(rows, row)
+		}
+		return rows
+	}
+	t.Fatalf("matrix table with headers %v not found", headers)
+	return nil
+}
+
+func markdownCells(line string) []string {
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
+		return nil
+	}
+	parts := strings.Split(strings.Trim(line, "|"), "|")
+	cells := make([]string, len(parts))
+	for i, part := range parts {
+		cells[i] = strings.Trim(strings.TrimSpace(part), "`")
+	}
+	return cells
+}
+
+func indexMarkdownRows(t *testing.T, rows []map[string]string, key string) map[string]map[string]string {
+	t.Helper()
+	indexed := make(map[string]map[string]string, len(rows))
+	for _, row := range rows {
+		value := row[key]
+		if value == "" {
+			t.Fatalf("matrix row has empty %s: %#v", key, row)
+		}
+		if _, exists := indexed[value]; exists {
+			t.Fatalf("matrix has duplicate %s %q", key, value)
+		}
+		indexed[value] = row
+	}
+	return indexed
 }
 
 func TestEffectiveRegistryCoversWireCatalog(t *testing.T) {

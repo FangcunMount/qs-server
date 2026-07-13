@@ -106,6 +106,39 @@ func CounterIncreaseQuery(name, metric, window string, labels map[string]string)
 	}
 }
 
+// CounterIncreaseTerm describes one counter contribution to a bounded window
+// aggregation. It keeps label construction centralized and escaped.
+type CounterIncreaseTerm struct {
+	Metric string
+	Labels map[string]string
+}
+
+// CounterIncreaseSumQuery sums the increases of a small, explicit term set.
+func CounterIncreaseSumQuery(name, window, unit string, terms ...CounterIncreaseTerm) QuerySpec {
+	parts := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if term.Metric == "" {
+			continue
+		}
+		parts = append(parts, counterIncreaseExpression(term.Metric, window, term.Labels))
+	}
+	return GaugeQuery(name, strings.Join(parts, " + "), window, unit)
+}
+
+// CounterIncreaseRatioQuery computes a numerator/denominator ratio from
+// counter increases. clamp_min makes a zero-traffic window a stable zero
+// rather than a division error when Prometheus has samples for both sides.
+func CounterIncreaseRatioQuery(name, window string, numerator, denominator []CounterIncreaseTerm) QuerySpec {
+	numeratorQuery := counterIncreaseSumExpression(numerator, window)
+	denominatorQuery := counterIncreaseSumExpression(denominator, window)
+	return GaugeQuery(name, fmt.Sprintf(`(%s) / clamp_min((%s), 1)`, numeratorQuery, denominatorQuery), window, "ratio")
+}
+
+// HistogramQuantileQuery evaluates one bounded histogram quantile.
+func HistogramQuantileQuery(name, metric, window, unit string, quantile float64, labels map[string]string) QuerySpec {
+	return GaugeQuery(name, fmt.Sprintf(`histogram_quantile(%g, sum by (le) (rate(%s_bucket%s[%s])))`, quantile, metric, formatLabelSelector(labels), window), window, unit)
+}
+
 // GaugeQuery 包装即时仪表查询。
 func GaugeQuery(name, promQL, window, unit string) QuerySpec {
 	return QuerySpec{
@@ -124,6 +157,24 @@ func InstantGaugeQuery(name, metric, window, unit string, labels map[string]stri
 		Window: window,
 		Unit:   unit,
 	}
+}
+
+func counterIncreaseSumExpression(terms []CounterIncreaseTerm, window string) string {
+	parts := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if term.Metric == "" {
+			continue
+		}
+		parts = append(parts, counterIncreaseExpression(term.Metric, window, term.Labels))
+	}
+	if len(parts) == 0 {
+		return "0"
+	}
+	return strings.Join(parts, " + ")
+}
+
+func counterIncreaseExpression(metric, window string, labels map[string]string) string {
+	return fmt.Sprintf(`sum(increase(%s%s[%s]))`, metric, formatLabelSelector(labels), window)
 }
 
 func formatLabelSelector(labels map[string]string) string {

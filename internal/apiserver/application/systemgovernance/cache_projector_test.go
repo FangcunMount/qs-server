@@ -7,6 +7,7 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
@@ -80,5 +81,38 @@ func TestCacheWarmupProjectionMarksHotsetDegraded(t *testing.T) {
 	}, "5m", time.Now())
 	if len(projection.Signals) != 1 || projection.Signals[0].Status != "hotset_degraded" {
 		t.Fatalf("signals = %#v, want hotset degraded signal", projection.Signals)
+	}
+}
+
+func TestCacheCapabilityRowsProjectCanonicalCapabilitiesAndLegacyMetricLabels(t *testing.T) {
+	metrics := &recordingMetricsReader{}
+	rows := NewCacheWarmupEvaluator(metrics).CapabilityRows(context.Background(), &cachemodel.EffectiveRegistrySnapshot{
+		Capabilities: []cachemodel.CapabilityPolicyView{
+			{
+				Capability: "statistics.query", Kind: "cache", Family: "query_result", MetricLabel: "stats_query",
+			},
+			{
+				Capability: "report_status", Kind: "operational_state", Family: "ops_runtime", MetricLabel: "report_status",
+			},
+		},
+	}, "5m", time.Now())
+
+	if len(rows) != 1 {
+		t.Fatalf("capability rows = %#v, want one workload cache row", rows)
+	}
+	row := rows[0]
+	if row.Capability != "statistics.query" || row.MetricLabel != "stats_query" || row.Family != "query_result" {
+		t.Fatalf("capability row = %#v, want canonical capability and legacy metric labels", row)
+	}
+	if row.Workload.HitRate == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
+		t.Fatalf("workload = %#v, want three metric evidences", row.Workload)
+	}
+	if len(metrics.specs) != 3 {
+		t.Fatalf("metric specs = %#v, want three workload queries", metrics.specs)
+	}
+	for _, spec := range metrics.specs {
+		if !strings.Contains(spec.Query, `family="query_result"`) || !strings.Contains(spec.Query, `policy="stats_query"`) {
+			t.Fatalf("query = %q, want legacy family/policy labels", spec.Query)
+		}
 	}
 }

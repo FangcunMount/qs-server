@@ -63,16 +63,21 @@ func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 	}
 	evaluator := NewCacheWarmupEvaluator(c.metrics)
 	projection := evaluator.EvaluateWithLatestRun(ctx, components, hotsets, latestWarmupRun(snapshot), evalCtx.windowLabel, evalCtx.evalAt)
+	var capabilityRows []CacheCapabilityRow
+	if snapshot != nil {
+		capabilityRows = evaluator.CapabilityRows(ctx, snapshot.EffectiveRegistry, evalCtx.windowLabel, evalCtx.evalAt)
+	}
 	return &CacheView{
-		GeneratedAt: evalCtx.evalAt,
-		Window:      evalCtx.windowLabel,
-		Metrics:     evalCtx.metrics,
-		Signals:     projection.Signals,
-		Snapshot:    snapshot,
-		Components:  components,
-		FamilyRows:  projection.FamilyRows,
-		WarmupKinds: projection.WarmupKinds,
-		Hotsets:     projection.Hotsets,
+		GeneratedAt:    evalCtx.evalAt,
+		Window:         evalCtx.windowLabel,
+		Metrics:        evalCtx.metrics,
+		Signals:        projection.Signals,
+		Snapshot:       snapshot,
+		Components:     components,
+		FamilyRows:     projection.FamilyRows,
+		CapabilityRows: capabilityRows,
+		WarmupKinds:    projection.WarmupKinds,
+		Hotsets:        projection.Hotsets,
 	}, nil
 }
 

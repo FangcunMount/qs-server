@@ -10,15 +10,32 @@ import (
 
 // CacheView 暴露缓存 governance detail。
 type CacheView struct {
-	GeneratedAt time.Time                  `json:"generated_at"`
-	Window      string                     `json:"window"`
-	Metrics     MetricsSummary             `json:"metrics"`
-	Signals     []Signal                   `json:"signals"`
-	Snapshot    *cachemodel.StatusSnapshot `json:"snapshot,omitempty"`
-	Components  map[string]ComponentCache  `json:"components,omitempty"`
-	FamilyRows  []CacheFamilyRow           `json:"family_rows,omitempty"`
-	WarmupKinds []CacheWarmupKind          `json:"warmup_kinds,omitempty"`
-	Hotsets     []CacheHotsetView          `json:"hotsets,omitempty"`
+	GeneratedAt    time.Time                  `json:"generated_at"`
+	Window         string                     `json:"window"`
+	Metrics        MetricsSummary             `json:"metrics"`
+	Signals        []Signal                   `json:"signals"`
+	Snapshot       *cachemodel.StatusSnapshot `json:"snapshot,omitempty"`
+	Components     map[string]ComponentCache  `json:"components,omitempty"`
+	FamilyRows     []CacheFamilyRow           `json:"family_rows,omitempty"`
+	CapabilityRows []CacheCapabilityRow       `json:"capability_rows,omitempty"`
+	WarmupKinds    []CacheWarmupKind          `json:"warmup_kinds,omitempty"`
+	Hotsets        []CacheHotsetView          `json:"hotsets,omitempty"`
+}
+
+// CacheCapabilityRow is the operator-facing workload projection for one
+// canonical cache capability. Its metric labels remain the legacy labels
+// emitted by the cache kernel, while Capability remains the Registry ID.
+type CacheCapabilityRow struct {
+	Capability  string                  `json:"capability"`
+	Family      string                  `json:"family"`
+	MetricLabel string                  `json:"metric_label"`
+	Workload    CacheCapabilityWorkload `json:"workload"`
+}
+
+type CacheCapabilityWorkload struct {
+	HitRate       *MetricEvidence `json:"hit_rate,omitempty"`
+	ErrorCount    *MetricEvidence `json:"error_count,omitempty"`
+	GetLatencyP95 *MetricEvidence `json:"get_latency_p95,omitempty"`
 }
 
 // ComponentCache 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。

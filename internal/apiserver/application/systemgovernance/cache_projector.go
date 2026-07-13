@@ -3,10 +3,13 @@ package systemgovernance
 import (
 	"context"
 	"sort"
+	"sync"
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
@@ -22,6 +25,8 @@ type CacheWarmupProjection struct {
 type CacheWarmupEvaluator struct {
 	evidence MetricEvidenceReader
 }
+
+const cacheCapabilityMetricsConcurrency = 4
 
 func NewCacheWarmupEvaluator(metrics MetricsReader) *CacheWarmupEvaluator {
 	return &CacheWarmupEvaluator{evidence: NewMetricEvidenceReader(metrics)}
@@ -128,6 +133,59 @@ func (e *CacheWarmupEvaluator) evaluate(
 	sortCacheHotsets(projection.Hotsets)
 	projection.Signals = SortSignals(projection.Signals)
 	return projection
+}
+
+// CapabilityRows projects bounded near-window workload evidence for canonical
+// cache capabilities. Queries are concurrency-limited because every row has
+// three independent Prometheus expressions.
+func (e *CacheWarmupEvaluator) CapabilityRows(
+	ctx context.Context,
+	registry *cachemodel.EffectiveRegistrySnapshot,
+	window string,
+	evalAt time.Time,
+) []CacheCapabilityRow {
+	if e == nil || registry == nil {
+		return nil
+	}
+	capabilities := make([]cachemodel.CapabilityPolicyView, 0, len(registry.Capabilities))
+	for _, item := range registry.Capabilities {
+		if item.Kind == string(sharedcache.KindCache) {
+			capabilities = append(capabilities, item)
+		}
+	}
+	rows := make([]CacheCapabilityRow, len(capabilities))
+	semaphore := make(chan struct{}, cacheCapabilityMetricsConcurrency)
+	var group sync.WaitGroup
+	for index, capability := range capabilities {
+		group.Add(1)
+		go func(index int, capability cachemodel.CapabilityPolicyView) {
+			defer group.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+			rows[index] = e.capabilityRow(ctx, capability, window, evalAt)
+		}(index, capability)
+	}
+	group.Wait()
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Capability < rows[j].Capability })
+	return rows
+}
+
+func (e *CacheWarmupEvaluator) capabilityRow(ctx context.Context, capability cachemodel.CapabilityPolicyView, window string, evalAt time.Time) CacheCapabilityRow {
+	row := CacheCapabilityRow{
+		Capability:  capability.Capability,
+		Family:      capability.Family,
+		MetricLabel: capability.MetricLabel,
+	}
+	if item, ok := e.evidence.CacheCapabilityHitRate(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
+		row.Workload.HitRate = &item
+	}
+	if item, ok := e.evidence.CacheCapabilityErrorCount(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
+		row.Workload.ErrorCount = &item
+	}
+	if item, ok := e.evidence.CacheCapabilityGetP95(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
+		row.Workload.GetLatencyP95 = &item
+	}
+	return row
 }
 
 func (e *CacheWarmupEvaluator) projectFamilyRow(
