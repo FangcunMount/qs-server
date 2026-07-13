@@ -118,7 +118,7 @@ func TestProjectionHandlerFailureNacksOnlyItsMessage(t *testing.T) {
 	if err := s.Start(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	var nacked bool
 	msg := messaging.NewMessage("event-2", nil)
@@ -140,7 +140,7 @@ func TestLoggingModeReportsProjectionConsumerDisabled(t *testing.T) {
 	if err := s.Start(t.Context()); err != nil {
 		t.Fatalf("logging Start(): %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	status, err := s.StatusService().GetStatus(t.Context())
 	if err != nil {
