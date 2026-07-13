@@ -82,6 +82,14 @@ func (k CacheKeyspace) PublishedAssessmentModelByRef(kind, subKind, algorithm, c
 	))
 }
 
+func (k CacheKeyspace) PublishedAssessmentModelLatestByCode(kind, code string) string {
+	return k.keyspace.Prefix(fmt.Sprintf(
+		"assessment_model:published:latest:%s:%s",
+		strings.ToLower(strings.TrimSpace(kind)),
+		strings.ToLower(strings.TrimSpace(code)),
+	))
+}
+
 func (k CacheKeyspace) AssessmentDetail(id uint64) string {
 	return k.keyspace.Prefix(fmt.Sprintf("assessment:detail:%d", id))
 }

@@ -5,7 +5,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
@@ -77,7 +78,13 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 }
 
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
-	cacheCfg := s.config.Cache
+	if s == nil || s.config == nil {
+		return container.ContainerCacheOptions{}
+	}
+	return buildContainerCacheOptions(s.config.Cache)
+}
+
+func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerCacheOptions {
 	if cacheCfg == nil {
 		return container.ContainerCacheOptions{}
 	}

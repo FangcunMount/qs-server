@@ -44,6 +44,12 @@ func (o *Options) Validate() []error {
 	return errs
 }
 
+// ValidateCacheOptions validates only the cache section for policy reload.
+// Unrelated process settings are deliberately outside the reload transaction.
+func ValidateCacheOptions(options *CacheOptions) []error {
+	return validateCacheOptions(options)
+}
+
 func validateRateLimit(opts *RateLimitOptions) []error {
 	if opts == nil || !opts.Enabled {
 		return nil

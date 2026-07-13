@@ -2,9 +2,12 @@ package modelcatalogcache
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -14,7 +17,7 @@ import (
 )
 
 func publishedModelPolicies(policy sharedcache.Policy) sharedcache.PolicyProvider {
-	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityModelCatalogPublished, Policy: policy})
+	return sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityModelCatalogPublished, Enabled: true, Policy: policy})
 }
 
 type publishedModelStoreStub struct {
@@ -174,8 +177,12 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	if got == nil || got.Code != "mbti" {
 		t.Fatalf("second FindPublishedModelByCode() = %#v", got)
 	}
-	if inner.findByCodeCalls != 2 {
-		t.Fatalf("source calls after second read = %d, want 2", inner.findByCodeCalls)
+	if inner.findByCodeCalls != 1 {
+		t.Fatalf("source calls after second read = %d, want 1", inner.findByCodeCalls)
+	}
+	key := keyspace.NewBuilderWithNamespace("test-ns").BuildPublishedAssessmentModelLatestByCodeKey("typology", "mbti")
+	if !mr.Exists(key) {
+		t.Fatalf("latest-by-code cache key %q does not exist", key)
 	}
 }
 
@@ -203,4 +210,38 @@ func TestCachedPublishedModelStoreInvalidatePublishedModelClearsModelByCodeCache
 		t.Fatalf("FindPublishedModelByCode error = %v", err)
 	}
 	cached.invalidatePublishedModel(context.Background(), snapshot)
+	if _, err := cached.FindPublishedModelByCode(context.Background(), domain.KindTypology, "mbti"); err != nil {
+		t.Fatalf("FindPublishedModelByCode after invalidation error = %v", err)
+	}
+	if inner.findByCodeCalls != 2 {
+		t.Fatalf("source calls after invalidation = %d, want 2", inner.findByCodeCalls)
+	}
+}
+
+func TestCachedPublishedModelStoreWarmByCodeSynchronouslyPublishesVisibleEntry(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	inner := &publishedModelStoreStub{findByCode: &port.PublishedModel{Kind: domain.KindScale, Code: "SDS", Version: "1"}}
+	cached := NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("static"),
+		publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+
+	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "SDS"); err != nil {
+		t.Fatalf("WarmByCode() error = %v", err)
+	}
+	key := "static:assessment_model:published:latest:scale:sds"
+	if !mr.Exists(key) {
+		t.Fatalf("warmup returned ok before %q existed", key)
+	}
+	if inner.findByCodeCalls != 1 {
+		t.Fatalf("source calls = %d, want 1", inner.findByCodeCalls)
+	}
+}
+
+func TestCachedPublishedModelStoreWarmByCodeSkipsWhenUnavailable(t *testing.T) {
+	cached := NewCachedPublishedModelStore(&publishedModelStoreStub{}, nil, keyspace.NewBuilderWithNamespace("static"),
+		publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "SDS"); !errors.Is(err, cachetarget.ErrWarmupSkipped) {
+		t.Fatalf("WarmByCode() error = %v, want ErrWarmupSkipped", err)
+	}
 }

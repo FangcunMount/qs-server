@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
@@ -105,9 +106,11 @@ func buildCatalogDeps(
 		port.PublishedModelReader
 		port.PublishedModelLister
 	} = dualStore
+	var publishedWarmer cachetarget.PublishedModelWarmer
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
 		cached := modelcatalogcache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policies, cacheCfg.Observer)
 		publishedStore = cached
+		publishedWarmer = cached
 		publishedRepo = modelcatalogcache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
 	runtimeCatalog := rulesetInfra.NewRuntimePublishedCatalogWithStore(publishedStore)
@@ -115,6 +118,7 @@ func buildCatalogDeps(
 	return CatalogDeps{
 		PublishedLister:     publishedStore,
 		PublishedCatalog:    trustedCatalog,
+		PublishedWarmer:     publishedWarmer,
 		ModelRepo:           draftRepo,
 		PublishedRepo:       publishedRepo,
 		NormRepo:            normRepo,

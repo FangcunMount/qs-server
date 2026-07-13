@@ -92,6 +92,10 @@ func (b *Builder) BuildPublishedAssessmentModelByRefKey(kind, subKind, algorithm
 	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelByRef(kind, subKind, algorithm, code, version)
 }
 
+func (b *Builder) BuildPublishedAssessmentModelLatestByCodeKey(kind, code string) string {
+	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelLatestByCode(kind, code)
+}
+
 func (b *Builder) BuildAssessmentDetailKey(id uint64) string {
 	return NewCacheKeyspace(b.namespace()).AssessmentDetail(id)
 }

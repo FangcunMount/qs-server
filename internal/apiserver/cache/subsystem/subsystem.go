@@ -54,6 +54,7 @@ type Subsystem struct {
 
 	warmupCoordinator cachegov.Coordinator
 	statusService     cachegov.StatusService
+	policyReloader    *cachegov.PolicyReloader
 	notifier          *cachesignal.Notifier
 
 	lifecycleMu sync.Mutex
@@ -151,7 +152,27 @@ func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
 		WarmStatsQuestionnaire:          bindings.WarmStatsQuestionnaire,
 		WarmStatsPlan:                   bindings.WarmStatsPlan,
 	})
-	s.statusService = cachegov.NewStatusService(s.component, s.statusRegistry, s.hotsetInspector, s.warmupCoordinator)
+	s.statusService = cachegov.NewStatusService(s.component, s.statusRegistry, s.hotsetInspector, s.warmupCoordinator, s.effective, s.policyReloader)
+}
+
+// BindPolicyReloader installs the process-owned configuration candidate loader.
+// Constructors remain side-effect free; the loader is invoked only by an
+// authenticated governance action.
+func (s *Subsystem) BindPolicyReloader(loader cachegov.PolicyCandidateLoader) {
+	if s == nil {
+		return
+	}
+	s.policyReloader = cachegov.NewPolicyReloader(s.component, s.effective, loader)
+	if s.statusService != nil {
+		s.statusService = cachegov.NewStatusService(s.component, s.statusRegistry, s.hotsetInspector, s.warmupCoordinator, s.effective, s.policyReloader)
+	}
+}
+
+func (s *Subsystem) PolicyReloader() *cachegov.PolicyReloader {
+	if s == nil {
+		return nil
+	}
+	return s.policyReloader
 }
 
 // BindSignalNotifier transfers signal-watcher ownership to the cache subsystem.
@@ -397,6 +418,13 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 			JitterRatio:  cacheConfig.Query.TTLJitterRatio,
 		},
 	}, cacheConfig.Capabilities)
+}
+
+// BuildEffectiveCapabilities resolves a complete immutable candidate using the
+// same catalog path as production bootstrap.
+func BuildEffectiveCapabilities(cacheConfig CacheOptions) []sharedcache.EffectiveCapability {
+	registry := cachepolicy.NewEffectiveRegistry(newPolicyCatalog(cacheConfig))
+	return registry.All()
 }
 
 func resolvePolicySwitch(explicit *bool, defaultValue bool) cachepolicy.PolicySwitch {

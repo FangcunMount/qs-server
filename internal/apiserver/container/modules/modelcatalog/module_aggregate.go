@@ -7,6 +7,7 @@ import (
 	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -18,6 +19,7 @@ type Module struct {
 	ModelRepo        modelcatalogport.ModelRepository
 	PublishedLister  modelcatalogport.PublishedModelLister
 	PublishedCatalog modelcatalogport.Catalog
+	PublishedWarmer  cachetarget.PublishedModelWarmer
 	Management       assessmentModelApp.CatalogManagementService
 	Authoring        *appauthoring.Service
 	Publication      assessmentModelApp.PublicationService
@@ -78,6 +80,7 @@ func New(deps Deps) (*Module, error) {
 		ModelRepo:        deps.Catalog.ModelRepo,
 		PublishedLister:  deps.Catalog.PublishedLister,
 		PublishedCatalog: deps.Catalog.PublishedCatalog,
+		PublishedWarmer:  deps.Catalog.PublishedWarmer,
 		Management:       management,
 		Authoring:        authoring,
 		Publication:      publication,

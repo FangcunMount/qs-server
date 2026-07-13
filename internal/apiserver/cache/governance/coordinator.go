@@ -2,6 +2,7 @@ package cachegovernance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -246,6 +247,15 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 			continue
 		}
 		if err := c.registry.Execute(runCtx, target); err != nil {
+			if errors.Is(err, cachetarget.ErrWarmupSkipped) {
+				warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "skipped").Inc()
+				skippedCount++
+				items = append(items, cachemodel.ManualWarmupItemResult{
+					Family: string(target.Family), Kind: string(target.Kind), Scope: target.Scope,
+					Status: cachemodel.ManualWarmupItemStatusSkipped, Message: err.Error(),
+				})
+				continue
+			}
 			warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "error").Inc()
 			errorCount++
 			items = append(items, cachemodel.ManualWarmupItemResult{

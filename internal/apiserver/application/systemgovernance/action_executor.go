@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -15,11 +16,16 @@ import (
 type ActionExecutor struct {
 	registry   *ActionRegistry
 	governance statisticsApp.GovernanceFacade
+	reloader   CachePolicyReloader
 }
 
 // NewActionExecutor 创建action executor。
-func NewActionExecutor(registry *ActionRegistry, governance statisticsApp.GovernanceFacade) *ActionExecutor {
-	return &ActionExecutor{registry: registry, governance: governance}
+func NewActionExecutor(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloaders ...CachePolicyReloader) *ActionExecutor {
+	executor := &ActionExecutor{registry: registry, governance: governance}
+	if len(reloaders) > 0 {
+		executor.reloader = reloaders[0]
+	}
+	return executor
 }
 
 // Run 执行一个enabled action。
@@ -47,9 +53,34 @@ func (e *ActionExecutor) Run(
 	case "cache.repair_complete":
 		result, err := e.runRepairComplete(ctx, orgID, req.Input)
 		return finalizeActionRun(actionID, startedAt, result, err)
+	case "cache.reload_policy":
+		result, err := e.runReloadPolicy(ctx, orgID, req.Input)
+		return finalizeActionRun(actionID, startedAt, result, err)
 	default:
 		return nil, errors.WithCode(code.ErrInvalidArgument, "action %s is not executable in v1", actionID)
 	}
+}
+
+func (e *ActionExecutor) runReloadPolicy(ctx context.Context, orgID int64, input map[string]interface{}) (map[string]interface{}, error) {
+	if e == nil || e.reloader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "cache policy reloader unavailable")
+	}
+	payload, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid input: %s", err.Error())
+	}
+	var req cachemodel.CachePolicyReloadRequest
+	if err := json.Unmarshal(payload, &req); err != nil || req.ExpectedVersion == 0 {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "expected_version must be a positive integer")
+	}
+	result, err := e.reloader.ReloadPolicy(ctx, orgID, req)
+	if err != nil {
+		return nil, err
+	}
+	payload, _ = json.Marshal(result)
+	view := map[string]interface{}{}
+	_ = json.Unmarshal(payload, &view)
+	return view, nil
 }
 
 func (e *ActionExecutor) runManualWarmup(ctx context.Context, orgID int64, input map[string]interface{}) (map[string]interface{}, error) {

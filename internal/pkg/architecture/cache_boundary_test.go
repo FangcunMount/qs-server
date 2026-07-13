@@ -23,6 +23,22 @@ func TestSharedCacheKernelDoesNotImportBusinessProcesses(t *testing.T) {
 	})
 }
 
+func TestCachePackagesUseLoadguardInsteadOfSingleflightDirectly(t *testing.T) {
+	root := repoRoot(t)
+	matched := 0
+	for _, rel := range []string{"internal/pkg/cache", "internal/apiserver/cache"} {
+		walkGoFiles(t, filepath.Join(root, filepath.FromSlash(rel)), func(path, text string) {
+			matched++
+			if strings.Contains(text, "golang.org/x/sync/singleflight") {
+				t.Fatalf("%s imports singleflight directly; use internal/pkg/loadguard", mustRel(t, root, path))
+			}
+		})
+	}
+	if matched == 0 {
+		t.Fatal("cache singleflight boundary scan matched zero production files")
+	}
+}
+
 func TestDomainPackagesDoNotImportCache(t *testing.T) {
 	root := repoRoot(t)
 	matched := 0

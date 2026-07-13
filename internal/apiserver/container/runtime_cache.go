@@ -2,11 +2,13 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -90,6 +92,13 @@ func (c *Container) CacheGovernanceStatusService() statisticsApp.GovernanceStatu
 		return nil
 	}
 	return c.cache.StatusService()
+}
+
+func (c *Container) CachePolicyReloader() systemgovApp.CachePolicyReloader {
+	if c == nil || c.cache == nil {
+		return nil
+	}
+	return c.cache.PolicyReloader()
 }
 
 func (c *Container) initCacheSignalNotifier() error {
@@ -252,12 +261,11 @@ func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code s
 	if a.container == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	lister := a.container.PublishedModelLister()
-	if lister == nil {
-		return nil
+	warmer := a.container.PublishedModelWarmer()
+	if warmer == nil {
+		return fmt.Errorf("%w: published model warmer unavailable", cachetarget.ErrWarmupSkipped)
 	}
-	_, err := lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
-	return err
+	return warmer.WarmByCode(ctx, cachetarget.WarmupKindStaticScale, code)
 }
 
 func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context, code string) error {
@@ -277,12 +285,11 @@ func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, 
 	if c == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	lister := c.PublishedModelLister()
-	if lister == nil {
-		return nil
+	warmer := c.PublishedModelWarmer()
+	if warmer == nil {
+		return fmt.Errorf("%w: published model warmer unavailable", cachetarget.ErrWarmupSkipped)
 	}
-	_, err := lister.FindPublishedModelByCode(ctx, domain.KindTypology, code)
-	return err
+	return warmer.WarmByCode(ctx, cachetarget.WarmupKindStaticTypologyModel, code)
 }
 
 func (a cacheGovernanceAdapter) containerSurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra {

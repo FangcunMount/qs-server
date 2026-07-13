@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -33,6 +34,7 @@ type CachedPublishedModelStore struct {
 	observer          *observability.ComponentObserver
 	catalogList       *adapterkit.ObjectCacheStore[publishedModelCatalogListPage]
 	catalogAlgorithms *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
+	latestByCode      *adapterkit.ObjectCacheStore[port.PublishedModel]
 }
 
 type publishedModelCatalogListPage struct {
@@ -70,6 +72,19 @@ func NewCachedPublishedModelStore(
 			Cache:     redisCache,
 			PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec:     newPublishedModelCatalogAlgorithmsCodec(),
+		}),
+		latestByCode: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
+			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
+			Codec: adapterkit.CacheEntryCodec[port.PublishedModel]{
+				EncodeFunc: func(model *port.PublishedModel) ([]byte, error) { return json.Marshal(model) },
+				DecodeFunc: func(data []byte) (*port.PublishedModel, error) {
+					var model port.PublishedModel
+					if err := json.Unmarshal(data, &model); err != nil {
+						return nil, err
+					}
+					return &model, nil
+				},
+			},
 		}),
 	}
 }
@@ -133,7 +148,72 @@ func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	return c.inner.FindPublishedModelByCode(ctx, kind, code)
+	if c.latestByCode == nil || !c.latestByCode.Available() {
+		return c.inner.FindPublishedModelByCode(ctx, kind, code)
+	}
+	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
+		PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
+		CacheKey:  c.latestByCodeCacheKey(kind, code), PolicyProvider: c.policies,
+		Observer: c.observer, Store: c.latestByCode, AsyncSetCached: false,
+		Load: func(loadCtx context.Context) (*port.PublishedModel, error) {
+			return c.inner.FindPublishedModelByCode(loadCtx, kind, code)
+		},
+	})
+}
+
+func (c *CachedPublishedModelStore) WarmByCode(ctx context.Context, kind cachetarget.WarmupKind, code string) error {
+	if c == nil || c.inner == nil || c.latestByCode == nil || !c.latestByCode.Available() {
+		return fmt.Errorf("%w: published model cache unavailable", cachetarget.ErrWarmupSkipped)
+	}
+	effective, ok := c.policies.Resolve(cachepolicy.CapabilityModelCatalogPublished)
+	if !ok || !effective.Enabled {
+		return fmt.Errorf("%w: modelcatalog.published_model disabled", cachetarget.ErrWarmupSkipped)
+	}
+	modelKind, ok := publishedModelKindForWarmup(kind)
+	if !ok {
+		return fmt.Errorf("unsupported published model warmup kind: %s", kind)
+	}
+	model, err := c.inner.FindPublishedModelByCode(ctx, modelKind, code)
+	if err != nil {
+		return err
+	}
+	if model == nil {
+		return domain.ErrNotFound
+	}
+	key := c.latestByCodeCacheKey(modelKind, code)
+	if err := c.latestByCode.Set(ctx, key, model, effective.Policy); err != nil {
+		return err
+	}
+	exists, err := c.latestByCode.Exists(ctx, key)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("published model warmup entry is not visible")
+	}
+	readBack, err := c.latestByCode.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	if readBack == nil {
+		return fmt.Errorf("published model warmup read-back is empty")
+	}
+	return nil
+}
+
+func publishedModelKindForWarmup(kind cachetarget.WarmupKind) (domain.Kind, bool) {
+	switch kind {
+	case cachetarget.WarmupKindStaticScale:
+		return domain.KindScale, true
+	case cachetarget.WarmupKindStaticTypologyModel:
+		return domain.KindTypology, true
+	default:
+		return "", false
+	}
+}
+
+func (c *CachedPublishedModelStore) latestByCodeCacheKey(kind domain.Kind, code string) string {
+	return c.keys.BuildPublishedAssessmentModelLatestByCodeKey(string(kind), strings.ToLower(strings.TrimSpace(code)))
 }
 
 func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
@@ -244,6 +324,11 @@ func (c *CachedPublishedModelStore) invalidatePublishedModel(ctx context.Context
 			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)
 		}
 	}
+	if c.latestByCode != nil {
+		if err := c.latestByCode.Delete(ctx, c.latestByCodeCacheKey(model.Kind, model.Code)); err != nil {
+			logger.L(ctx).Warnw("failed to invalidate latest published model cache", "error", err)
+		}
+	}
 	c.invalidateCatalogListCaches(ctx)
 }
 
@@ -267,8 +352,9 @@ func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Cont
 }
 
 var (
-	_ port.PublishedModelReader     = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedModelLister     = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedWriter          = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedAlgorithmLister = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedModelReader        = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedModelLister        = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedWriter             = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedAlgorithmLister    = (*CachedPublishedModelStore)(nil)
+	_ cachetarget.PublishedModelWarmer = (*CachedPublishedModelStore)(nil)
 )

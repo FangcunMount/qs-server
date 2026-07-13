@@ -21,6 +21,7 @@ type RESTSystemGovernanceInput struct {
 	EventStatusService      appEventing.StatusService
 	EventOutboxes           []appEventing.NamedOutboxStatusReader
 	CacheGovernance         statisticsApp.GovernanceFacade
+	CachePolicyReloader     systemgov.CachePolicyReloader
 	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
 	MySQLDB                 *gorm.DB
 }
@@ -38,11 +39,12 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		EventStatusService:      in.EventStatusService,
 		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
 		CacheGovernance:         in.CacheGovernance,
+		CachePolicyReloader:     in.CachePolicyReloader,
 		LocalResilienceSnapshot: in.LocalResilienceSnapshot,
 		CheckpointReader:        NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
 		Metrics:                 metrics,
 		Components:              components,
-		Actions:                 systemgov.NewActionExecutor(registry, in.CacheGovernance),
+		Actions:                 systemgov.NewActionExecutor(registry, in.CacheGovernance, in.CachePolicyReloader),
 	})
 }
 

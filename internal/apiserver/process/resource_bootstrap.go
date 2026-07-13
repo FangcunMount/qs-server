@@ -102,7 +102,9 @@ func (s *server) buildRedisRuntimeDeps(dbManager *bootstrap.DatabaseManager) red
 			})
 		},
 		buildSubsystem: func(runtimeBundle *cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
-			return cachebootstrap.NewSubsystemFromRuntime(runtimeBundle, s.buildContainerCacheOptions())
+			subsystem := cachebootstrap.NewSubsystemFromRuntime(runtimeBundle, s.buildContainerCacheOptions())
+			subsystem.BindPolicyReloader(s.cachePolicyCandidateLoader(subsystem.EffectiveRegistry()))
+			return subsystem
 		},
 	}
 }

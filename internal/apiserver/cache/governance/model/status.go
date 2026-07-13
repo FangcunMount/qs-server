@@ -68,7 +68,60 @@ type WarmupHotsetStatus struct {
 
 type StatusSnapshot struct {
 	RuntimeSnapshot
-	Warmup WarmupStatusSnapshot `json:"warmup"`
+	Warmup            WarmupStatusSnapshot       `json:"warmup"`
+	EffectiveRegistry *EffectiveRegistrySnapshot `json:"effective_registry,omitempty"`
+}
+
+type PolicyView struct {
+	TTL            string  `json:"ttl"`
+	NegativeTTL    string  `json:"negative_ttl"`
+	TTLJitterRatio float64 `json:"ttl_jitter_ratio"`
+	Compress       string  `json:"compress"`
+	Singleflight   string  `json:"singleflight"`
+	Negative       string  `json:"negative"`
+}
+
+type CapabilityPolicyView struct {
+	Capability    string     `json:"capability"`
+	Owner         string     `json:"owner"`
+	Kind          string     `json:"kind"`
+	Layer         string     `json:"layer"`
+	Family        string     `json:"family"`
+	Enabled       bool       `json:"enabled"`
+	SpecDefault   PolicyView `json:"spec_default"`
+	GlobalDefault PolicyView `json:"global_default"`
+	FamilyDefault PolicyView `json:"family_default"`
+	Override      PolicyView `json:"override"`
+	Effective     PolicyView `json:"effective"`
+	Source        string     `json:"source"`
+	MetricLabel   string     `json:"metric_label"`
+}
+
+type PolicyReloadStatus struct {
+	LastAttemptAt time.Time `json:"last_attempt_at,omitempty"`
+	LastSuccessAt time.Time `json:"last_success_at,omitempty"`
+	LastFailureAt time.Time `json:"last_failure_at,omitempty"`
+	LastError     string    `json:"last_error,omitempty"`
+}
+
+type EffectiveRegistrySnapshot struct {
+	SnapshotVersion uint64                 `json:"snapshot_version"`
+	CatalogVersion  string                 `json:"catalog_version"`
+	GeneratedAt     time.Time              `json:"generated_at"`
+	Capabilities    []CapabilityPolicyView `json:"capabilities"`
+	Reload          PolicyReloadStatus     `json:"reload"`
+}
+
+type CachePolicyReloadRequest struct {
+	ExpectedVersion uint64 `json:"expected_version"`
+}
+
+type CachePolicyReloadResult struct {
+	PreviousVersion     uint64   `json:"previous_version"`
+	CurrentVersion      uint64   `json:"current_version"`
+	Changed             bool     `json:"changed"`
+	Source              string   `json:"source"`
+	ChangedCapabilities []string `json:"changed_capabilities"`
 }
 
 type ManualWarmupItemStatus string

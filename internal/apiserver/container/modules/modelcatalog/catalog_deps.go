@@ -4,6 +4,7 @@ import (
 	"context"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -17,6 +18,7 @@ type TypologyCacheSignalNotifier interface {
 type CatalogDeps struct {
 	PublishedLister     port.PublishedModelLister
 	PublishedCatalog    port.Catalog
+	PublishedWarmer     cachetarget.PublishedModelWarmer
 	ModelRepo           port.ModelRepository
 	PublishedRepo       port.PublishedModelRepository
 	NormRepo            port.NormRepository

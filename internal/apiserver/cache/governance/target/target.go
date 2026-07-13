@@ -2,12 +2,22 @@ package cachetarget
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 )
+
+var ErrWarmupSkipped = errors.New("cache warmup skipped")
+
+// PublishedModelWarmer is the narrow governance port exported by the
+// modelcatalog composition root. WarmupKind keeps this contract business-model
+// independent while preserving the public scale/typology target names.
+type PublishedModelWarmer interface {
+	WarmByCode(context.Context, WarmupKind, string) error
+}
 
 type contextKey string
 

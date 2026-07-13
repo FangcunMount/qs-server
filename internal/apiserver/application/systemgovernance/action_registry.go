@@ -35,6 +35,20 @@ func (r *ActionRegistry) Get(actionID string) (ActionDescriptor, bool) {
 func defaultActions() []ActionDescriptor {
 	return []ActionDescriptor{
 		{
+			ID:                   "cache.reload_policy",
+			Domain:               DomainCache,
+			Label:                "Reload cache policy",
+			RiskLevel:            "medium",
+			Enabled:              true,
+			RequiresConfirmation: true,
+			InputSchema: map[string]interface{}{
+				"type": "object", "required": []string{"expected_version"},
+				"properties": map[string]interface{}{
+					"expected_version": map[string]interface{}{"type": "integer", "minimum": 1},
+				},
+			},
+		},
+		{
 			ID:                   "cache.manual_warmup",
 			Domain:               DomainCache,
 			Label:                "Manual cache warmup",

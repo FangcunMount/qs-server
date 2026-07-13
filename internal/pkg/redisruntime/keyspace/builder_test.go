@@ -71,6 +71,9 @@ func TestBuilderWithExplicitNamespace(t *testing.T) {
 	if got := builder.BuildPublishedScaleByQuestionnaireKey("q-001"); got != "prod:cache:query:scale:published:questionnaire:q-001" {
 		t.Fatalf("unexpected published scale questionnaire key: %s", got)
 	}
+	if got := builder.BuildPublishedAssessmentModelLatestByCodeKey("Typology", "MBTI"); got != "prod:cache:query:assessment_model:published:latest:typology:mbti" {
+		t.Fatalf("unexpected published model latest-by-code key: %s", got)
+	}
 	if got := builder.BuildScaleHotListKey(5, 30); got != "prod:cache:query:scale:hot:list:v1:5:30" {
 		t.Fatalf("unexpected hot list key: %s", got)
 	}

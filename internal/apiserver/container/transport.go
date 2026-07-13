@@ -116,11 +116,12 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 		statisticsDeps.CacheGovernanceStatusService,
 	)
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
-		Options:            c.systemGovernanceOptions,
-		EventStatusService: eventStatus,
-		EventOutboxes:      outboxes,
-		CacheGovernance:    cacheGovernance,
-		MySQLDB:            c.mysqlDB,
+		Options:             c.systemGovernanceOptions,
+		EventStatusService:  eventStatus,
+		EventOutboxes:       outboxes,
+		CacheGovernance:     cacheGovernance,
+		CachePolicyReloader: c.CachePolicyReloader(),
+		MySQLDB:             c.mysqlDB,
 		LocalResilienceSnapshot: platformmod.BuildLocalResilienceSnapshot(
 			"apiserver",
 			rateCfg != nil && rateCfg.Enabled,

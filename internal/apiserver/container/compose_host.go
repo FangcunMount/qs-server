@@ -10,7 +10,7 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -247,6 +247,13 @@ func (c *Container) PublishedModelLister() rulesetport.PublishedModelLister {
 		return nil
 	}
 	return c.AssessmentModelModule.PublishedLister
+}
+
+func (c *Container) PublishedModelWarmer() cachetarget.PublishedModelWarmer {
+	if c == nil || c.AssessmentModelModule == nil {
+		return nil
+	}
+	return c.AssessmentModelModule.PublishedWarmer
 }
 
 func (c *Container) TesteeQuery() testeeApp.TesteeQueryService {
