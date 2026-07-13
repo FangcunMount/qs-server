@@ -8,6 +8,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	plancache "github.com/FangcunMount/qs-server/internal/apiserver/cache/plan"
@@ -23,7 +24,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // Module assembles plan application services.

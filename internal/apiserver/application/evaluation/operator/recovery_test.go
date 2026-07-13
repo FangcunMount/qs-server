@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type recoveryTx struct{}

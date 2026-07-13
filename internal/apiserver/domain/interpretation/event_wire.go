@@ -2,7 +2,7 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 // EventModelIdentity 是线缆投影 of ModelIdentity on 领域事件。

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestHandleInterpretationReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) {

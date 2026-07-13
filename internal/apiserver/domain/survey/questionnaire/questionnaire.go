@@ -4,8 +4,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // Questionnaire 问卷聚合根

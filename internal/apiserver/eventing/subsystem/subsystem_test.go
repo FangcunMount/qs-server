@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 )
 
 const hotRankConsumerID = "modelcatalog.hot_rank_projection"

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
@@ -15,7 +16,6 @@ import (
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type executorBuilder struct {

@@ -8,7 +8,7 @@ import (
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestHandleEvaluationRequestedFailsWhenInternalClientMissing(t *testing.T) {

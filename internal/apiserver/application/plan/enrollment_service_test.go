@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type enrollmentPlanRepoStub struct {

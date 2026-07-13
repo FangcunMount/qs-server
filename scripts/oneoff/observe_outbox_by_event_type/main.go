@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"

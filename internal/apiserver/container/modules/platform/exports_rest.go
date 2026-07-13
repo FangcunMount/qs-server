@@ -8,7 +8,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 

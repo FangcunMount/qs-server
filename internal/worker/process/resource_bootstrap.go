@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"

@@ -9,7 +9,7 @@ import (
 
 func loadDefaultRegistry(t *testing.T) *EffectiveRegistry {
 	t.Helper()
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
@@ -22,7 +22,7 @@ func loadDefaultRegistry(t *testing.T) *EffectiveRegistry {
 
 func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 	registry := loadDefaultRegistry(t)
-	matrix, err := os.ReadFile("../../../docs/03-基础设施/event/09-事件契约矩阵.md")
+	matrix, err := os.ReadFile("../../../../docs/03-基础设施/event/09-事件契约矩阵.md")
 	if err != nil {
 		t.Fatalf("read event matrix: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestEffectiveRegistryDeclaresHotRankSecondaryConsumer(t *testing.T) {
 }
 
 func TestEffectiveRegistryRejectsDeliveryPolicyMismatch(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

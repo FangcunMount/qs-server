@@ -6,7 +6,7 @@ import (
 )
 
 func TestLoadEventsYAMLAndCodeConstantsStayInSync(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
@@ -22,7 +22,7 @@ func TestLoadEventsYAMLAndCodeConstantsStayInSync(t *testing.T) {
 }
 
 func TestRemovedEventTypesAbsent(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestRemovedEventTypesAbsent(t *testing.T) {
 }
 
 func TestCatalogQueriesTopicHandlerAndSubscription(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestCatalogQueriesTopicHandlerAndSubscription(t *testing.T) {
 }
 
 func TestCatalogDeliveryClass(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestCatalogDeliveryClass(t *testing.T) {
 }
 
 func TestEventsYAMLDeclaresDeliveryClassForEveryEvent(t *testing.T) {
-	cfg, err := Load("../../../configs/events.yaml")
+	cfg, err := Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}

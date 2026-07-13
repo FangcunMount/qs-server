@@ -3,8 +3,8 @@ package interpretation
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 const (

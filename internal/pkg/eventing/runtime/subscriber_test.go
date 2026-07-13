@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestSubscriberGetTopicsToSubscribe(t *testing.T) {
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestSubscriberGetTopicsToSubscribe(t *testing.T) {
 }
 
 func TestSubscriberRegisterHandlersFailsOnMissingHandler(t *testing.T) {
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSubscriberRegisterHandlersFailsOnMissingHandler(t *testing.T) {
 }
 
 func TestSubscriberDispatchUnknownEventSkipsWithoutError(t *testing.T) {
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}

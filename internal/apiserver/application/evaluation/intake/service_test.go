@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type intakeRepoStub struct {

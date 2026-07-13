@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -15,7 +16,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type commitTxMarker struct{}

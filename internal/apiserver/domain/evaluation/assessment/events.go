@@ -4,12 +4,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 type fakeStatusReader struct {

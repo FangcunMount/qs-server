@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestRegistryResolvesConfiguredEventHandlers(t *testing.T) {

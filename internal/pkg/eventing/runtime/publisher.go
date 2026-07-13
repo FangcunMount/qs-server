@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 )
 
 // RoutingPublisher routes domain events to topics described by an event catalog.
@@ -28,6 +28,7 @@ const (
 	PublishModeMQ      PublishMode = "mq"
 	PublishModeLogging PublishMode = "logging"
 	PublishModeNop     PublishMode = "nop"
+	SourceAPIServer                = "api-server"
 )
 
 // PublishModeFromEnv maps process mode to a safe default publish mode.
@@ -64,7 +65,7 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 		resolver = eventcatalog.NewCatalog(nil)
 	}
 	if opts.Source == "" {
-		opts.Source = event.SourceAPIServer
+		opts.Source = SourceAPIServer
 	}
 	if opts.Mode == "" {
 		opts.Mode = PublishModeLogging
@@ -146,7 +147,7 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 		return nil
 	}
 
-	msg, err := eventcodec.BuildMessage(evt, p.source)
+	msg, err := eventmessaging.BuildMessage(evt, p.source)
 	if err != nil {
 		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeEncodeFailed)
 		return err

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/eventcodec"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type fakeHandlerRegistry struct {

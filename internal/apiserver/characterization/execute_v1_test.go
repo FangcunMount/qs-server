@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
@@ -12,7 +13,6 @@ import (
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 func wireV1RuntimeDescriptorRegistry(t *testing.T) *evalpipeline.RuntimeDescriptorRegistry {

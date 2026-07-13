@@ -6,7 +6,7 @@ import (
 	"time"
 
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 )
 
 const defaultOutboxStatusReportInterval = 30 * time.Second

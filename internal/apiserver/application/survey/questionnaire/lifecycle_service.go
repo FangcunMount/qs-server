@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // CacheSignalNotifier 缓存失效信令发布端口（best-effort，非领域事件）。

@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
@@ -10,13 +11,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"

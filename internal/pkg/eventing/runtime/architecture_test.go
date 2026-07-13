@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
@@ -212,7 +212,7 @@ func repoRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	return filepath.Clean(filepath.Join(wd, "../../.."))
+	return filepath.Clean(filepath.Join(wd, "../../../.."))
 }
 
 func mustRel(t *testing.T, root, path string) string {

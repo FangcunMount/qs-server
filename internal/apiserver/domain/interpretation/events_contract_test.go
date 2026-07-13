@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 // Batch I0 freezes the two terminal facts. pending/generating remain query

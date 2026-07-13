@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 

@@ -12,8 +12,8 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 )
 
 type containerOptionsInput struct {

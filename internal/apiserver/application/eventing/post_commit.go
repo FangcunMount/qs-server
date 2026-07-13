@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/event"
 )
 
 // PostCommitDispatcher is the narrow application seam for outbox acceleration.

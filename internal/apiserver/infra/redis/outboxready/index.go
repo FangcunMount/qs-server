@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/redis/go-redis/v9"
 )
 

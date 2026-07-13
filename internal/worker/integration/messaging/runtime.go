@@ -8,9 +8,9 @@ import (
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/nsqio/go-nsq"
 )

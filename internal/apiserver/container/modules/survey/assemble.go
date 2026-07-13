@@ -4,6 +4,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -17,7 +18,6 @@ import (
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // Module assembles survey application services.

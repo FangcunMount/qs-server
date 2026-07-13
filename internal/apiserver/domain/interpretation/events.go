@@ -1,6 +1,6 @@
 package interpretation
 
-import "github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+import "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 
 const (
 	EventTypeReportGenerated = eventcatalog.InterpretationReportGenerated

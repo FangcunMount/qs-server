@@ -1,6 +1,6 @@
 package report
 
-import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+import "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 
 // DimensionInterpret 维度解读值对象
 // 记录单个因子/维度的解读信息（含解读与建议）

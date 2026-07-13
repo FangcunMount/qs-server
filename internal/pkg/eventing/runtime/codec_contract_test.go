@@ -1,11 +1,13 @@
-package eventcodec
+package eventruntime
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/eventcodec"
+	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 )
 
 type samplePayload struct {
@@ -15,12 +17,12 @@ type samplePayload struct {
 func TestDomainEventJSONRoundTrip(t *testing.T) {
 	evt := event.New("sample.created", "Sample", "sample-1", samplePayload{Value: "ok"})
 
-	payload, err := EncodeDomainEvent(evt)
+	payload, err := eventcodec.EncodeDomainEvent(evt)
 	if err != nil {
 		t.Fatalf("EncodeDomainEvent: %v", err)
 	}
 
-	env, err := DecodeEnvelope(payload)
+	env, err := eventcodec.DecodeEnvelope(payload)
 	if err != nil {
 		t.Fatalf("DecodeEnvelope: %v", err)
 	}
@@ -35,7 +37,7 @@ func TestDomainEventJSONRoundTrip(t *testing.T) {
 		t.Fatalf("decoded data = %q, want ok", data.Value)
 	}
 
-	decoded, err := DecodeDomainEvent(payload)
+	decoded, err := eventcodec.DecodeDomainEvent(payload)
 	if err != nil {
 		t.Fatalf("DecodeDomainEvent: %v", err)
 	}
@@ -56,7 +58,7 @@ func TestBuildMessageMetadata(t *testing.T) {
 		Data: samplePayload{Value: "ok"},
 	}
 
-	msg, err := BuildMessage(evt, "unit-test")
+	msg, err := eventmessaging.BuildMessage(evt, "unit-test")
 	if err != nil {
 		t.Fatalf("BuildMessage: %v", err)
 	}

@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 )
 
 // MessageEventExtractor resolves event type from metadata first and falls back

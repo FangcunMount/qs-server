@@ -1,6 +1,6 @@
 package eventpayload
 
-import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+import "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 
 // IsHighRiskCode reports whether code maps to high or severe risk.
 func IsHighRiskCode(code string) bool {

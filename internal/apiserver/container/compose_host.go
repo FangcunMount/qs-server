@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -26,11 +27,10 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"

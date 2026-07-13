@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
 
 // ScaleCacheSignalNotifier 发布最佳努力无效通知

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
@@ -19,10 +21,8 @@ import (
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	workerhandlers "github.com/FangcunMount/qs-server/internal/worker/handlers"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type charCrossModuleConfig struct {

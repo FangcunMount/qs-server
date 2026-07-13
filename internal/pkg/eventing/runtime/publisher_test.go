@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 )
 
 type capturedPublisher struct {
@@ -39,7 +39,7 @@ func (o *publishObserver) ObserveOutbox(context.Context, eventobservability.Outb
 func (o *publishObserver) ObserveConsume(context.Context, eventobservability.ConsumeEvent) {}
 
 func TestRoutingPublisherUsesExplicitCatalogAndMetadata(t *testing.T) {
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestRoutingPublisherRejectsUnknownEvent(t *testing.T) {
 
 func loadEventCatalog(t *testing.T) *eventcatalog.Catalog {
 	t.Helper()
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}

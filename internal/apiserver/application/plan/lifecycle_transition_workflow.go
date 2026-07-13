@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type planTransitionSpec struct {

@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
@@ -17,7 +18,6 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	"github.com/google/uuid"
 )
 

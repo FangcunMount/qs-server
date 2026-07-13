@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 // V1 contract: production split-phase wiring scores first, then persists report,

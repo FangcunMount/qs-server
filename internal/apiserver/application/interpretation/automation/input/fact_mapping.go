@@ -12,7 +12,7 @@ import (
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 func primary(execution *domainoutcome.Execution) *report.ScoreValue {

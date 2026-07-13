@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 )
 
 type fakeDispatcher struct {

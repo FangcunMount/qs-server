@@ -10,10 +10,10 @@ import (
 	"sort"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"

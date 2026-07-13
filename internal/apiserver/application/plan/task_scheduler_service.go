@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -14,7 +15,6 @@ import (
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // taskSchedulerService 任务调度服务实现

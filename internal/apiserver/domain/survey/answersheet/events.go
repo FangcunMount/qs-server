@@ -3,10 +3,10 @@ package answersheet
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // ==================== 事件类型常量 ====================

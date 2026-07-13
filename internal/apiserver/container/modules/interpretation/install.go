@@ -2,7 +2,7 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 

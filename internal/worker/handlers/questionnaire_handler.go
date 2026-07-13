@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
 
 func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {

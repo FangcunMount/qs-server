@@ -2,7 +2,7 @@ package survey
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 // InstallHost extends the shared compose seam with survey-specific bindings.

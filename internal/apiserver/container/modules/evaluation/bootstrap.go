@@ -6,6 +6,7 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -16,7 +17,6 @@ import (
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // BootstrapInput carries container integration inputs for evaluation module bootstrap.

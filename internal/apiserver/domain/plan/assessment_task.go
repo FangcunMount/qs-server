@@ -3,9 +3,9 @@ package plan
 import (
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // AssessmentTask 测评任务实体

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )

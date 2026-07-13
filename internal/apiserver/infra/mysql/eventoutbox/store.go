@@ -9,11 +9,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/event"
 )
 
 type OutboxPO struct {

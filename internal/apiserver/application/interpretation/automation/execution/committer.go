@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EventStager stores terminal Interpretation events in the transaction that

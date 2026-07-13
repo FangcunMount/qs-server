@@ -10,7 +10,7 @@ import (
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 type FactorScoringBuilder struct {

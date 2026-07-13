@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 func handleInterpretationReportGenerated(deps *Dependencies) HandlerFunc {

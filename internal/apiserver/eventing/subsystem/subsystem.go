@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -15,10 +16,9 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -102,7 +102,7 @@ func New(opts Options) (*Subsystem, error) {
 	}
 	publisher := eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
 		Catalog: opts.Catalog, MQPublisher: opts.MQPublisher, Mode: opts.PublisherMode,
-		Source: event.SourceAPIServer, Observer: opts.Observer,
+		Source: eventruntime.SourceAPIServer, Observer: opts.Observer,
 	})
 	s := &Subsystem{
 		catalog: opts.Catalog, registry: registry, publisher: publisher,

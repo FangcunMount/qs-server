@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	cachegovobs "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"

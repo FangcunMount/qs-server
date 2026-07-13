@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EventStager 事件阶段器

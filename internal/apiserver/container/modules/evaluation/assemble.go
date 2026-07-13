@@ -6,6 +6,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
@@ -40,7 +41,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // Module assembles evaluation application services.

@@ -10,6 +10,7 @@ import (
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	interpretationinput "github.com/FangcunMount/qs-server/internal/apiserver/testutil/interpretationinput"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
@@ -20,7 +21,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // v1SplitPhaseConfig preserves the legacy characterization fixtures while keeping

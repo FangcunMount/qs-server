@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/component-base/pkg/event"
 )
 
 type fakeCollector struct {

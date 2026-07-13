@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 func isHighRiskRiskLevel(riskLevel string) bool {

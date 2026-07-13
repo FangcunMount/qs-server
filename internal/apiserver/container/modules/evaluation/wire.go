@@ -4,6 +4,7 @@ import (
 	"fmt"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
@@ -20,7 +21,6 @@ import (
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"

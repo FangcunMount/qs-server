@@ -4,12 +4,12 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // BootstrapInput carries container integration inputs for survey module bootstrap.
