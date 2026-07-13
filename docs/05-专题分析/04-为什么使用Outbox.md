@@ -869,6 +869,6 @@ git diff --check
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
 | Event Publish / Outbox 深讲 | `../03-基础设施/event/03-Outbox可靠出站链路.md` |
 | Worker Ack/Nack | `../03-基础设施/event/04-MQ发布与消费链路.md` |
-| AnswerSheet 提交 | `../02-业务模块/10-survey/02-AnswerSheet提交事实模型.md` |
+| AnswerSheet 提交 | `../02-业务模块/10-survey/31-关键链路-答卷提交校验与测评驱动.md` |
 | Evaluation 执行链路 | `../02-业务模块/30-evaluation/02-Evaluation执行链路--从AnswerSheet提交到Assessment完成.md` |
 | Evaluation 引擎链路 | `../02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |
