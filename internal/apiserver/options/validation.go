@@ -264,29 +264,65 @@ func validateCacheOptions(opts *CacheOptions) []error {
 	if opts == nil {
 		return nil
 	}
-	opts = opts.Effective()
-
 	var errs []error
-	if opts.TTLJitterRatio < 0 || opts.TTLJitterRatio > 1 {
+	if opts.Defaults == nil {
+		return nil
+	}
+	if opts.Defaults.TTLJitterRatio < 0 || opts.Defaults.TTLJitterRatio > 1 {
 		errs = append(errs, fmt.Errorf("cache.ttl_jitter_ratio must be between 0 and 1"))
 	}
 	for _, family := range []struct {
 		name string
 		opt  *CacheFamilyOptions
 	}{
-		{name: "static", opt: opts.Static},
-		{name: "object", opt: opts.Object},
-		{name: "query", opt: opts.Query},
+		{name: "static", opt: opts.Defaults.Static},
+		{name: "object", opt: opts.Defaults.Object},
+		{name: "query", opt: opts.Defaults.Query},
 	} {
 		errs = append(errs, validateCacheFamilyPolicy(family.name, family.opt)...)
 	}
-	if opts.Warmup != nil && opts.Warmup.Hotset != nil && opts.Warmup.Hotset.Enable {
-		if opts.Warmup.Hotset.TopN <= 0 {
+	if opts.Capabilities != nil {
+		ensureCacheCapabilities(opts.Capabilities)
+		for name, capability := range map[string]*CapabilityPolicyOptions{
+			"survey.questionnaire":         opts.Capabilities.Survey.Questionnaire,
+			"modelcatalog.published_model": opts.Capabilities.ModelCatalog.PublishedModel,
+			"evaluation.assessment_detail": opts.Capabilities.Evaluation.AssessmentDetail,
+			"evaluation.assessment_list":   opts.Capabilities.Evaluation.AssessmentList,
+			"actor.testee":                 opts.Capabilities.Actor.Testee,
+			"plan.detail":                  opts.Capabilities.Plan.Detail,
+			"statistics.query":             opts.Capabilities.Statistics.Query,
+		} {
+			errs = append(errs, validateCapabilityPolicy(name, capability)...)
+		}
+	}
+	var warmup *WarmupOptions
+	if opts.Governance != nil {
+		warmup = opts.Governance.Warmup
+	}
+	if warmup != nil && warmup.Hotset != nil && warmup.Hotset.Enable {
+		if warmup.Hotset.TopN <= 0 {
 			errs = append(errs, fmt.Errorf("cache.warmup.hotset.top_n must be greater than 0 when enabled"))
 		}
-		if opts.Warmup.Hotset.MaxItemsPerKind <= 0 {
+		if warmup.Hotset.MaxItemsPerKind <= 0 {
 			errs = append(errs, fmt.Errorf("cache.warmup.hotset.max_items_per_kind must be greater than 0 when enabled"))
 		}
+	}
+	return errs
+}
+
+func validateCapabilityPolicy(name string, capability *CapabilityPolicyOptions) []error {
+	if capability == nil {
+		return nil
+	}
+	var errs []error
+	if capability.TTL < 0 {
+		errs = append(errs, fmt.Errorf("cache.capabilities.%s.ttl cannot be negative", name))
+	}
+	if capability.NegativeTTL < 0 {
+		errs = append(errs, fmt.Errorf("cache.capabilities.%s.negative_ttl cannot be negative", name))
+	}
+	if capability.TTLJitterRatio < 0 || capability.TTLJitterRatio > 1 {
+		errs = append(errs, fmt.Errorf("cache.capabilities.%s.ttl_jitter_ratio must be between 0 and 1", name))
 	}
 	return errs
 }
@@ -297,9 +333,6 @@ func validateCacheFamilyPolicy(name string, route *CacheFamilyOptions) []error {
 	}
 
 	var errs []error
-	if route.TTL < 0 {
-		errs = append(errs, fmt.Errorf("cache.%s.ttl cannot be negative", name))
-	}
 	if route.NegativeTTL < 0 {
 		errs = append(errs, fmt.Errorf("cache.%s.negative_ttl cannot be negative", name))
 	}

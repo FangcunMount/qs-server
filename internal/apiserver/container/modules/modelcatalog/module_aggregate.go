@@ -14,15 +14,15 @@ import (
 // Module 模型目录的组合根
 // 包含模型目录的管理、定义、发布和查询用例
 type Module struct {
-	HotRank         *HotRank
-	ModelRepo       modelcatalogport.ModelRepository
-	PublishedLister modelcatalogport.PublishedModelLister
+	HotRank          *HotRank
+	ModelRepo        modelcatalogport.ModelRepository
+	PublishedLister  modelcatalogport.PublishedModelLister
 	PublishedCatalog modelcatalogport.Catalog
-	Management      assessmentModelApp.CatalogManagementService
-	Authoring       *appauthoring.Service
-	Publication     assessmentModelApp.PublicationService
-	Query           assessmentModelApp.CatalogQueryService
-	TitleResolver   assessmentModelApp.PublishedModelTitleResolver
+	Management       assessmentModelApp.CatalogManagementService
+	Authoring        *appauthoring.Service
+	Publication      assessmentModelApp.PublicationService
+	Query            assessmentModelApp.CatalogQueryService
+	TitleResolver    assessmentModelApp.PublishedModelTitleResolver
 }
 
 // Deps 包含模型目录的基础设施依赖
@@ -74,15 +74,15 @@ func New(deps Deps) (*Module, error) {
 	})
 	// 组合模块
 	return &Module{
-		HotRank:         hotRank,
-		ModelRepo:       deps.Catalog.ModelRepo,
-		PublishedLister: deps.Catalog.PublishedLister,
+		HotRank:          hotRank,
+		ModelRepo:        deps.Catalog.ModelRepo,
+		PublishedLister:  deps.Catalog.PublishedLister,
 		PublishedCatalog: deps.Catalog.PublishedCatalog,
-		Management:      management,
-		Authoring:       authoring,
-		Publication:     publication,
-		Query:           query,
-		TitleResolver:   modelcatalogRuntime.NewTitleResolver(deps.Catalog.PublishedLister),
+		Management:       management,
+		Authoring:        authoring,
+		Publication:      publication,
+		Query:            query,
+		TitleResolver:    modelcatalogRuntime.NewTitleResolver(deps.Catalog.PublishedLister),
 	}, nil
 }
 

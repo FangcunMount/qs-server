@@ -65,7 +65,10 @@ func buildLifecycleDeps(in WireInput) LifecycleDeps {
 
 // catalogCacheWireConfig 模型目录缓存配置
 type catalogCacheWireConfig struct {
-	rulesetInfra.PublishedModelCacheConfig
+	Redis    redis.UniversalClient
+	Builder  *keyspace.Builder
+	Policy   cachepolicy.CachePolicy
+	Observer *observability.ComponentObserver
 	Notifier TypologyCacheSignalNotifier
 }
 
@@ -76,12 +79,8 @@ func catalogCacheConfig(in WireInput) catalogCacheWireConfig {
 		notifier = n
 	}
 	return catalogCacheWireConfig{
-		PublishedModelCacheConfig: rulesetInfra.PublishedModelCacheConfig{
-			Redis:    in.StaticRedisClient,
-			Builder:  in.StaticCacheBuilder,
-			Policy:   in.PublishedModelPolicy,
-			Observer: in.CacheObserver,
-		},
+		Redis: in.StaticRedisClient, Builder: in.StaticCacheBuilder,
+		Policy: in.PublishedModelPolicy, Observer: in.CacheObserver,
 		Notifier: notifier,
 	}
 }

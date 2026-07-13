@@ -44,11 +44,11 @@ func (c *Container) CacheBuilder(family redisruntime.Family) *keyspace.Builder {
 	return c.cache.Builder(family)
 }
 
-func (c *Container) CachePolicy(key sharedcache.Capability) cachepolicy.CachePolicy {
+func (c *Container) CacheCapability(key sharedcache.Capability) cachepolicy.Binding {
 	if c == nil || c.cache == nil {
-		return cachepolicy.CachePolicy{}
+		return cachepolicy.Binding{}
 	}
-	return c.cache.Policy(key)
+	return c.cache.Capability(key)
 }
 
 func (c *Container) cacheObserver() *observability.ComponentObserver {
@@ -148,7 +148,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	var warmStatsOverview func(context.Context, int64, string) error
 	var warmStatsQuestionnaire func(context.Context, int64, string) error
 	var warmStatsPlan func(context.Context, int64, uint64) error
-	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
+	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Enabled {
 		warmStatsOverview = a.warmOverviewStatsTarget
 		warmStatsSystem = a.warmSystemStatsTarget
 		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget
@@ -173,12 +173,8 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 	if a.container == nil {
 		return nil, nil
 	}
-	catalog, err := a.container.ensurePublishedModelCatalog()
-	if err != nil {
-		return nil, err
-	}
-	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
-	if !ok || lister == nil {
+	lister := a.container.PublishedModelLister()
+	if lister == nil {
 		return nil, nil
 	}
 	const pageSize = 200
@@ -234,12 +230,8 @@ func (a cacheGovernanceAdapter) lookupScaleQuestionnaireCode(ctx context.Context
 	if a.container == nil {
 		return "", nil
 	}
-	catalog, err := a.container.ensurePublishedModelCatalog()
-	if err != nil {
-		return "", err
-	}
-	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
-	if !ok || lister == nil {
+	lister := a.container.PublishedModelLister()
+	if lister == nil {
 		return "", nil
 	}
 	model, err := lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
@@ -253,15 +245,11 @@ func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code s
 	if a.container == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	catalog, err := a.container.ensurePublishedModelCatalog()
-	if err != nil {
-		return err
-	}
-	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
-	if !ok || lister == nil {
+	lister := a.container.PublishedModelLister()
+	if lister == nil {
 		return nil
 	}
-	_, err = lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
+	_, err := lister.FindPublishedModelByCode(ctx, domain.KindScale, code)
 	return err
 }
 
@@ -282,15 +270,11 @@ func (a cacheGovernanceAdapter) warmPublishedTypologyModel(ctx context.Context, 
 	if c == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	catalog, err := c.ensurePublishedModelCatalog()
-	if err != nil {
-		return err
-	}
-	lister, ok := catalog.(modelcatalogport.PublishedModelLister)
-	if !ok || lister == nil {
+	lister := c.PublishedModelLister()
+	if lister == nil {
 		return nil
 	}
-	_, err = lister.FindPublishedModelByCode(ctx, domain.KindTypology, code)
+	_, err := lister.FindPublishedModelByCode(ctx, domain.KindTypology, code)
 	return err
 }
 

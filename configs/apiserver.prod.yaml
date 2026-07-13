@@ -233,37 +233,41 @@ plan:
 # ----------------------------------------------------------------------------
 cache:
   capabilities:
+    survey:
+      questionnaire: {enabled: true, ttl: "2h", negative: true}
+    modelcatalog:
+      published_model: {enabled: true, ttl: "2h", negative: true}
+    evaluation:
+      assessment_detail: {enabled: true, ttl: "1h", singleflight: true}
+      assessment_list: {enabled: true, ttl: "10m", singleflight: false}
+    actor:
+      testee: {enabled: true, ttl: "30m", negative: true}
+    plan:
+      detail: {enabled: true, ttl: "12h", singleflight: true}
+    statistics:
+      query: {enabled: true, ttl: "15m", singleflight: false}
     report_status:
       ttl_seconds: 172800
-    disable_evaluation_cache: false # 开启测评结果缓存
-    disable_statistics_cache: false # 开启统计缓存
   defaults:
     compress_payload: false         # 是否压缩缓存 payload
 
     static:               # 静态数据缓存（如量表、问卷定义等），适合长期缓存，穿透保护优先
+      negative_ttl: "5m"
       compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
       singleflight: true  # 启用单飞，避免缓存穿透时的雪崩效应
       negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
 
     object:               # 对象数据缓存（如测评结果等），适合短期缓存，性能优先
+      negative_ttl: "5m"
       compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
       singleflight: true  # 启用单飞，避免缓存穿透时的雪崩效应
       negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
 
     query:                # 查询结果缓存（如统计数据等），适合短期缓存，性能优先
-      ttl: "15m"           # 查询结果缓存时间，生产环境建议设置为 15 分钟，平衡数据新鲜度和性能
+      negative_ttl: "5m"
       compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
       singleflight: true  # 线 B1：统计 query cache miss 合并回源，避免缓存击穿雪崩
       negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
-
-    ttl:                       # 缓存时间，可配置
-      scale: "2h"              # 量表缓存时间，生产环境建议设置为 2 小时，平衡数据新鲜度和性能
-      questionnaire: "2h"      # 问卷缓存时间，生产环境建议设置为 2 小时，平衡数据新鲜度和性能
-      assessment_detail: "1h"    # 测评详情缓存时间，生产环境建议设置为 1 小时，平衡数据新鲜度和性能；如果测评结果更新频率较高，可以适当缩短缓存时间
-      assessment_list: "10m"     # 我的测评列表缓存时间，生产环境建议设置为 10 分钟，平衡数据新鲜度和性能；如果用户测评列表更新频率较高，可以适当缩短缓存时间
-      testee: "30m"              # 受试者缓存时间，生产环境建议设置为 30 分钟，平衡数据新鲜度和性能；如果受试者信息更新频率较高，可以适当缩短缓存时间
-      plan: "12h"                # 计划缓存时间，生产环境建议设置为 12 小时，平衡数据新鲜度和性能；如果计划信息更新频率较高，可以适当缩短缓存时间
-      negative: "5m"             # 负缓存时间（穿透保护），生产环境建议设置为 5 分钟，避免长时间读取旧数据；依赖单飞机制保护数据库安全
 
     ttl_jitter_ratio: 0.2       # 缓存时间抖动比例，生产环境建议设置为 0.1（10%），避免大量缓存同时过期导致的性能问题
 

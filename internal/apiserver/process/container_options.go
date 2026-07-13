@@ -1,12 +1,16 @@
 package process
 
 import (
+	"time"
+
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 )
@@ -55,59 +59,67 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 }
 
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
-	cacheCfg := s.config.Cache.Effective()
+	cacheCfg := s.config.Cache
 	if cacheCfg == nil {
 		return container.ContainerCacheOptions{}
 	}
-
-	var ttl container.ContainerCacheTTLOptions
-	if cacheCfg.TTL != nil {
-		ttl = container.ContainerCacheTTLOptions{
-			Scale:            cacheCfg.TTL.Scale,
-			Questionnaire:    cacheCfg.TTL.Questionnaire,
-			AssessmentDetail: cacheCfg.TTL.AssessmentDetail,
-			AssessmentList:   cacheCfg.TTL.AssessmentList,
-			Testee:           cacheCfg.TTL.Testee,
-			Plan:             cacheCfg.TTL.Plan,
-			Negative:         cacheCfg.TTL.Negative,
+	capabilities := map[sharedcache.Capability]cachepolicy.Binding{}
+	if c := cacheCfg.Capabilities; c != nil {
+		capabilities[cachepolicy.CapabilitySurveyQuestionnaire] = buildCapabilityBinding(c.Survey.Questionnaire)
+		capabilities[cachepolicy.CapabilityModelCatalogPublished] = buildCapabilityBinding(c.ModelCatalog.PublishedModel)
+		capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail] = buildCapabilityBinding(c.Evaluation.AssessmentDetail)
+		capabilities[cachepolicy.CapabilityEvaluationAssessmentList] = buildCapabilityBinding(c.Evaluation.AssessmentList)
+		capabilities[cachepolicy.CapabilityActorTestee] = buildCapabilityBinding(c.Actor.Testee)
+		capabilities[cachepolicy.CapabilityPlanDetail] = buildCapabilityBinding(c.Plan.Detail)
+		capabilities[cachepolicy.CapabilityStatisticsQuery] = buildCapabilityBinding(c.Statistics.Query)
+		reportStatus := cachepolicy.Binding{Enabled: true}
+		if c.ReportStatus != nil {
+			reportStatus.Policy.TTL = time.Duration(c.ReportStatus.TTLSeconds) * time.Second
 		}
+		capabilities[cachepolicy.CapabilityReportStatus] = reportStatus
 	}
-
+	defaults := cacheCfg.Defaults
 	return container.ContainerCacheOptions{
-		DisableEvaluationCache:  cacheCfg.DisableEvaluationCache,
-		DisableStatisticsCache:  cacheCfg.DisableStatisticsCache,
-		TTL:                     ttl,
-		TTLJitterRatio:          cacheCfg.TTLJitterRatio,
+		Capabilities:            capabilities,
+		TTLJitterRatio:          defaults.TTLJitterRatio,
 		StatisticsWarmup:        buildStatisticsWarmupConfig(cacheCfg),
 		StatisticsSystem:        buildStatisticsSystemOptions(cacheCfg),
 		StatisticsOverview:      buildStatisticsOverviewOptions(cacheCfg),
 		StatisticsQuestionnaire: buildStatisticsQuestionnaireOptions(cacheCfg),
 		Warmup:                  buildWarmupOptions(cacheCfg),
-		CompressPayload:         cacheCfg.CompressPayload,
-		Static:                  buildCacheFamilyOptions(cacheCfg.Static),
-		Object:                  buildCacheFamilyOptions(cacheCfg.Object),
-		Query:                   buildQueryFamilyOptions(cacheCfg.Query),
+		CompressPayload:         defaults.CompressPayload,
+		Static:                  buildCacheFamilyOptions(defaults.Static),
+		Object:                  buildCacheFamilyOptions(defaults.Object),
+		Query:                   buildCacheFamilyOptions(defaults.Query),
 	}
 }
 
+func buildCapabilityBinding(capability *apiserveroptions.CapabilityPolicyOptions) cachepolicy.Binding {
+	if capability == nil {
+		return cachepolicy.Binding{}
+	}
+	return cachepolicy.Binding{Enabled: capability.Enabled, Policy: sharedcache.Policy{
+		TTL: capability.TTL, NegativeTTL: capability.NegativeTTL, JitterRatio: capability.TTLJitterRatio,
+		Compress:     sharedcache.PolicySwitchFromBoolPtr(capability.Compress),
+		Singleflight: sharedcache.PolicySwitchFromBoolPtr(capability.Singleflight),
+		Negative:     sharedcache.PolicySwitchFromBoolPtr(capability.Negative),
+	}}
+}
+
 func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cachegov.StatisticsWarmupConfig {
-	cacheCfg = cacheCfg.Effective()
-	if cacheCfg == nil || cacheCfg.StatisticsWarmup == nil || !cacheCfg.StatisticsWarmup.Enable {
+	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.StatisticsWarmup == nil || !cacheCfg.Governance.StatisticsWarmup.Enable {
 		return nil
 	}
+	config := cacheCfg.Governance.StatisticsWarmup
 	return &cachegov.StatisticsWarmupConfig{
-		OrgIDs:             cacheCfg.StatisticsWarmup.OrgIDs,
-		OverviewPresets:    cacheCfg.StatisticsWarmup.OverviewPresets,
-		QuestionnaireCodes: cacheCfg.StatisticsWarmup.QuestionnaireCodes,
-		PlanIDs:            cacheCfg.StatisticsWarmup.PlanIDs,
-		WarmOnStartup:      cacheCfg.StatisticsWarmup.WarmOnStartup,
+		OrgIDs: config.OrgIDs, OverviewPresets: config.OverviewPresets,
+		QuestionnaireCodes: config.QuestionnaireCodes, PlanIDs: config.PlanIDs, WarmOnStartup: config.WarmOnStartup,
 	}
 }
 
 func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsSystemOptions {
-	cacheCfg = cacheCfg.Effective()
-	defaults := apiserveroptions.NewCacheOptions().StatisticsSystem
-	if cacheCfg == nil || cacheCfg.StatisticsSystem == nil {
+	defaults := apiserveroptions.NewCacheOptions().Governance.StatisticsSystem
+	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.StatisticsSystem == nil {
 		if defaults == nil {
 			return cachebootstrap.StatisticsSystemOptions{}
 		}
@@ -118,18 +130,16 @@ func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cache
 			LoadTimeout:             defaults.LoadTimeout,
 		}
 	}
+	config := cacheCfg.Governance.StatisticsSystem
 	return cachebootstrap.StatisticsSystemOptions{
-		ServiceSingleflight:     cacheCfg.StatisticsSystem.ServiceSingleflight,
-		DisableRealtimeFallback: cacheCfg.StatisticsSystem.DisableRealtimeFallback,
-		StaleOnTimeout:          cacheCfg.StatisticsSystem.StaleOnTimeout,
-		LoadTimeout:             cacheCfg.StatisticsSystem.LoadTimeout,
+		ServiceSingleflight: config.ServiceSingleflight, DisableRealtimeFallback: config.DisableRealtimeFallback,
+		StaleOnTimeout: config.StaleOnTimeout, LoadTimeout: config.LoadTimeout,
 	}
 }
 
 func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
-	cacheCfg = cacheCfg.Effective()
-	defaults := apiserveroptions.NewCacheOptions().StatisticsOverview
-	if cacheCfg == nil || cacheCfg.StatisticsOverview == nil {
+	defaults := apiserveroptions.NewCacheOptions().Governance.StatisticsOverview
+	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.StatisticsOverview == nil {
 		if defaults == nil {
 			return cachebootstrap.StatisticsReadGuardOptions{}
 		}
@@ -139,17 +149,15 @@ func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cac
 			LoadTimeout:         defaults.LoadTimeout,
 		}
 	}
+	config := cacheCfg.Governance.StatisticsOverview
 	return cachebootstrap.StatisticsReadGuardOptions{
-		ServiceSingleflight: cacheCfg.StatisticsOverview.ServiceSingleflight,
-		StaleOnTimeout:      cacheCfg.StatisticsOverview.StaleOnTimeout,
-		LoadTimeout:         cacheCfg.StatisticsOverview.LoadTimeout,
+		ServiceSingleflight: config.ServiceSingleflight, StaleOnTimeout: config.StaleOnTimeout, LoadTimeout: config.LoadTimeout,
 	}
 }
 
 func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
-	cacheCfg = cacheCfg.Effective()
-	defaults := apiserveroptions.NewCacheOptions().StatisticsQuestionnaire
-	if cacheCfg == nil || cacheCfg.StatisticsQuestionnaire == nil {
+	defaults := apiserveroptions.NewCacheOptions().Governance.StatisticsQuestionnaire
+	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.StatisticsQuestionnaire == nil {
 		if defaults == nil {
 			return cachebootstrap.StatisticsReadGuardOptions{}
 		}
@@ -159,29 +167,28 @@ func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions
 			LoadTimeout:         defaults.LoadTimeout,
 		}
 	}
+	config := cacheCfg.Governance.StatisticsQuestionnaire
 	return cachebootstrap.StatisticsReadGuardOptions{
-		ServiceSingleflight: cacheCfg.StatisticsQuestionnaire.ServiceSingleflight,
-		StaleOnTimeout:      cacheCfg.StatisticsQuestionnaire.StaleOnTimeout,
-		LoadTimeout:         cacheCfg.StatisticsQuestionnaire.LoadTimeout,
+		ServiceSingleflight: config.ServiceSingleflight, StaleOnTimeout: config.StaleOnTimeout, LoadTimeout: config.LoadTimeout,
 	}
 }
 
 func buildWarmupOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerWarmupOptions {
-	cacheCfg = cacheCfg.Effective()
-	if cacheCfg == nil || cacheCfg.Warmup == nil {
+	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.Warmup == nil {
 		return container.ContainerWarmupOptions{}
 	}
+	warmup := cacheCfg.Governance.Warmup
 	options := container.ContainerWarmupOptions{
-		Enable: cacheCfg.Warmup.Enable,
+		Enable: warmup.Enable,
 	}
-	if cacheCfg.Warmup.Startup != nil {
-		options.StartupStatic = cacheCfg.Warmup.Startup.Static
-		options.StartupQuery = cacheCfg.Warmup.Startup.Query
+	if warmup.Startup != nil {
+		options.StartupStatic = warmup.Startup.Static
+		options.StartupQuery = warmup.Startup.Query
 	}
-	if cacheCfg.Warmup.Hotset != nil {
-		options.HotsetEnable = cacheCfg.Warmup.Hotset.Enable
-		options.HotsetTopN = cacheCfg.Warmup.Hotset.TopN
-		options.MaxItemsPerKind = cacheCfg.Warmup.Hotset.MaxItemsPerKind
+	if warmup.Hotset != nil {
+		options.HotsetEnable = warmup.Hotset.Enable
+		options.HotsetTopN = warmup.Hotset.TopN
+		options.MaxItemsPerKind = warmup.Hotset.MaxItemsPerKind
 	}
 	return options
 }
@@ -197,14 +204,6 @@ func buildCacheFamilyOptions(family *apiserveroptions.CacheFamilyOptions) contai
 		Singleflight:   family.Singleflight,
 		Negative:       family.Negative,
 	}
-}
-
-func buildQueryFamilyOptions(family *apiserveroptions.CacheFamilyOptions) container.ContainerCacheFamilyOptions {
-	options := buildCacheFamilyOptions(family)
-	if family != nil {
-		options.TTL = family.TTL
-	}
-	return options
 }
 
 func statisticsRepairWindowDays(cfg *config.Config) int {

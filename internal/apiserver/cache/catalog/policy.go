@@ -2,8 +2,8 @@ package cachepolicy
 
 import sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 
-// Transitional aliases keep the object policy catalog stable while adapters
-// move to the shared cache kernel. They are removed with the legacy package.
+// Policy aliases expose the shared kernel types through the apiserver catalog
+// vocabulary; the implementation and semantics remain owned by pkg/cache.
 type PolicySwitch = sharedcache.PolicySwitch
 
 const (

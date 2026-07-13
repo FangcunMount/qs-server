@@ -8,6 +8,7 @@ type CapabilityKind string
 const (
 	LayerL1      Layer = "L1"
 	LayerL2      Layer = "L2"
+	LayerL1L2    Layer = "L1+L2"
 	LayerRuntime Layer = "runtime"
 
 	KindCache            CapabilityKind = "cache"

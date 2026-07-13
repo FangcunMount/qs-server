@@ -20,7 +20,6 @@ import (
 // WireInput carries composition-root inputs for statistics module installation.
 type WireInput struct {
 	MySQLDB                *gorm.DB
-	RedisClient            redis.UniversalClient
 	FallbackRedisClient    redis.UniversalClient
 	CacheBuilder           *keyspace.Builder
 	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
@@ -37,21 +36,13 @@ type WireInput struct {
 	MySQLLimiter           backpressure.Acquirer
 	WarmupCoordinator      cachegov.Coordinator
 	StatusService          cachegov.StatusService
-	DisableStatisticsCache bool
 	MetaRedisClient        redis.UniversalClient
 }
 
 // Wire builds and bootstraps the statistics module from composition inputs.
 func Wire(in WireInput) (*Module, error) {
 	versionStore := querycache.NewStaticVersionTokenStore(0)
-	redisClient := in.RedisClient
-	if !in.DisableStatisticsCache {
-		redisClient = in.FallbackRedisClient
-	}
-	if in.DisableStatisticsCache {
-		redisClient = nil
-	}
-	if !in.DisableStatisticsCache {
+	if in.FallbackRedisClient != nil {
 		versionStore = statisticsCache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
 		if versionStore == nil {
 			versionStore = querycache.NewStaticVersionTokenStore(0)
@@ -59,7 +50,7 @@ func Wire(in WireInput) (*Module, error) {
 	}
 	return Bootstrap(BootstrapInput{
 		MySQLDB:                in.MySQLDB,
-		RedisClient:            redisClient,
+		RedisClient:            in.FallbackRedisClient,
 		CacheBuilder:           in.CacheBuilder,
 		AnswerSheetReader:      in.AnswerSheetReader,
 		AnswerSheetScanSource:  in.AnswerSheetScanSource,

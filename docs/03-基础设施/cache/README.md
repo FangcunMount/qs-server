@@ -58,6 +58,6 @@ flowchart LR
 | 能力 | 事实源 |
 | --- | --- |
 | L1 / 本地 TTL | [../../../internal/pkg/cache/local](../../../internal/pkg/cache/local)、[../../../internal/collection-server/cache](../../../internal/collection-server/cache) |
-| L2 / read-through | [../../../internal/apiserver/cache/adapter](../../../internal/apiserver/cache/adapter)、[../../../internal/pkg/cache/query](../../../internal/pkg/cache/query) |
+| L2 / read-through | [../../../internal/apiserver/cache](../../../internal/apiserver/cache)、[../../../internal/pkg/cache/query](../../../internal/pkg/cache/query) |
 | 缓存治理与观测 | [../../../internal/apiserver/cache/governance](../../../internal/apiserver/cache/governance)、[../../../internal/pkg/cache/observe](../../../internal/pkg/cache/observe)、[../../../internal/pkg/redisruntime/observability](../../../internal/pkg/redisruntime/observability) |
 | 信令 | [../../../configs/signals.yaml](../../../configs/signals.yaml)、[../../../internal/pkg/cachesignal](../../../internal/pkg/cachesignal) |

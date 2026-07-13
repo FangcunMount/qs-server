@@ -6,14 +6,12 @@ import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
-	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
@@ -41,7 +39,6 @@ type WireInput struct {
 	MetaRedisClient                             redis.UniversalClient
 	AssessmentPolicy                            cachepolicy.CachePolicy
 	AssessmentListPolicy                        cachepolicy.CachePolicy
-	DisableEvaluationCache                      bool
 	Observer                                    *observability.ComponentObserver
 	TopicResolver                               eventcatalog.TopicResolver
 	MySQLLimiter                                backpressure.Acquirer
@@ -53,65 +50,20 @@ type WireInput struct {
 	OpsHandle                                   *redisruntime.Handle
 	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog                       rulesetport.Catalog
-	StaticRedisClient                           redis.UniversalClient
-	StaticCacheBuilder                          *keyspace.Builder
-	PublishedModelPolicy                        cachepolicy.CachePolicy
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
 type WireResult struct {
 	Module                    *Module
-	PublishedModelCatalog     rulesetport.Catalog
 	WorkbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
-}
-
-// EnsurePublishedModelCatalog builds the shared published-model catalog used by evaluation and gRPC export.
-func EnsurePublishedModelCatalog(in PublishedModelCatalogInput) (rulesetport.Catalog, error) {
-	catalog := in.Existing
-	if catalog == nil {
-		if in.MongoDB == nil {
-			return nil, fmt.Errorf("mongo database is nil")
-		}
-		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
-		created, err := rulesetInfra.NewRuntimePublishedCatalog(in.MongoDB, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
-			Redis:    in.StaticRedisClient,
-			Builder:  in.StaticCacheBuilder,
-			Policy:   in.PublishedModelPolicy,
-			Observer: in.Observer,
-		})
-		if err != nil {
-			return nil, err
-		}
-		catalog = created
-	}
-	if trusted, ok := catalog.(*modelcatalogRuntime.TrustedRuntimeCatalog); ok {
-		return trusted, nil
-	}
-	reader, ok := catalog.(rulesetport.PublishedModelReader)
-	if !ok {
-		return nil, fmt.Errorf("runtime published model catalog must implement PublishedModelReader")
-	}
-	lister, ok := catalog.(rulesetport.PublishedModelLister)
-	if !ok {
-		return nil, fmt.Errorf("runtime published model catalog must implement PublishedModelLister")
-	}
-	return modelcatalogRuntime.NewTrustedRuntimeCatalog(reader, lister), nil
-}
-
-// PublishedModelCatalogInput collects dependencies for published-model catalog construction.
-type PublishedModelCatalogInput struct {
-	MongoDB              *mongo.Database
-	MongoLimiter         backpressure.Acquirer
-	Existing             rulesetport.Catalog
-	StaticRedisClient    redis.UniversalClient
-	StaticCacheBuilder   *keyspace.Builder
-	PublishedModelPolicy cachepolicy.CachePolicy
-	Observer             *observability.ComponentObserver
 }
 
 // Wire builds and bootstraps the evaluation module from composition inputs.
 func Wire(in WireInput) (WireResult, error) {
+	if in.PublishedModelCatalog == nil {
+		return WireResult{}, fmt.Errorf("modelcatalog published model catalog is required")
+	}
 	executionPaths, err := evalruntime.ExecutionPathsFromRegistry(in.RuntimeDescriptorRegistry)
 	if err != nil {
 		return WireResult{}, fmt.Errorf("evaluation runtime registry: %w", err)
@@ -122,20 +74,6 @@ func Wire(in WireInput) (WireResult, error) {
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra := in.SurveyRuntimeInfra; infra != nil {
-		var err error
-		if catalog == nil {
-			catalog, err = EnsurePublishedModelCatalog(PublishedModelCatalogInput{
-				MongoDB:              in.MongoDB,
-				MongoLimiter:         in.MongoLimiter,
-				StaticRedisClient:    in.StaticRedisClient,
-				StaticCacheBuilder:   in.StaticCacheBuilder,
-				PublishedModelPolicy: in.PublishedModelPolicy,
-				Observer:             in.Observer,
-			})
-			if err != nil {
-				return WireResult{}, err
-			}
-		}
 		resolver, err := evaluationinputInfra.NewRepositoryResolver(
 			infra.AnswerSheetRepo,
 			infra.QuestionnaireRepo,
@@ -150,15 +88,8 @@ func Wire(in WireInput) (WireResult, error) {
 		scaleCatalog = resolver
 	}
 
-	redisClient := in.RedisClient
-	queryRedisClient := in.QueryRedisClient
-	if in.DisableEvaluationCache {
-		redisClient = nil
-		queryRedisClient = nil
-	}
-
 	var versionStore querycache.VersionTokenStore
-	if queryRedisClient != nil {
+	if in.QueryRedisClient != nil {
 		versionStore = evaluationcache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
 	}
 
@@ -172,10 +103,10 @@ func Wire(in WireInput) (WireResult, error) {
 		InputResolver:                       inputResolver,
 		ScaleCatalog:                        scaleCatalog,
 		EventPublisher:                      in.EventPublisher,
-		RedisClient:                         redisClient,
+		RedisClient:                         in.RedisClient,
 		CacheBuilder:                        in.CacheBuilder,
 		AssessmentPolicy:                    in.AssessmentPolicy,
-		QueryRedisClient:                    queryRedisClient,
+		QueryRedisClient:                    in.QueryRedisClient,
 		QueryCacheBuilder:                   in.QueryCacheBuilder,
 		AssessmentListPolicy:                in.AssessmentListPolicy,
 		VersionStore:                        versionStore,
@@ -194,5 +125,5 @@ func Wire(in WireInput) (WireResult, error) {
 	if err != nil {
 		return WireResult{}, err
 	}
-	return WireResult{Module: module, PublishedModelCatalog: catalog, WorkbenchLatestRiskReader: module.workbenchLatestRiskReader}, nil
+	return WireResult{Module: module, WorkbenchLatestRiskReader: module.workbenchLatestRiskReader}, nil
 }

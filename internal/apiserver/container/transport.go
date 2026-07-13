@@ -243,20 +243,7 @@ func (c *Container) exportGRPCAuthzSnapshotLoader() *iaminfra.AuthzSnapshotLoade
 }
 
 func (c *Container) exportGRPCPublishedModelCatalog() rulesetport.Catalog {
-	if c == nil {
-		return nil
-	}
-	if c.publishedModelCatalog != nil {
-		return c.publishedModelCatalog
-	}
-	catalog, err := c.ensurePublishedModelCatalog()
-	if err != nil {
-		return nil
-	}
-	if catalog != nil {
-		c.publishedModelCatalog = catalog
-	}
-	return catalog
+	return c.PublishedModelCatalog()
 }
 
 func composeRESTWorkbenchDeps(c *Container) resttransport.WorkbenchDeps {

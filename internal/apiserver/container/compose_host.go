@@ -81,10 +81,6 @@ func (c *Container) StatisticsRepairWindowDays() int { return c.statisticsRepair
 
 func (c *Container) ReportStatusConfig() reportstatus.Config { return c.reportStatusConfig }
 
-func (c *Container) DisableEvaluationCache() bool { return c.cacheOptions.DisableEvaluationCache }
-
-func (c *Container) DisableStatisticsCache() bool { return c.cacheOptions.DisableStatisticsCache }
-
 func (c *Container) StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions {
 	opts := c.cacheOptions.StatisticsSystem
 	return statisticsApp.SystemStatisticsOptions{
@@ -286,13 +282,18 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
+	binding := c.CacheCapability(cachepolicy.CapabilitySurveyQuestionnaire)
+	staticRedis := c.CacheClient(redisruntime.FamilyStatic)
+	if !binding.Enabled {
+		staticRedis = nil
+	}
 	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
 		MongoDB:             c.mongoDB,
 		EventCatalog:        c.eventCatalog,
 		MongoLimiter:        c.backpressure.Mongo,
-		StaticRedis:         c.CacheClient(redisruntime.FamilyStatic),
+		StaticRedis:         staticRedis,
 		StaticBuilder:       c.CacheBuilder(redisruntime.FamilyStatic),
-		QuestionnairePolicy: c.CachePolicy(cachepolicy.CapabilitySurveyQuestionnaire),
+		QuestionnairePolicy: binding.Policy,
 		Observer:            c.cacheObserver(),
 	})
 	if err != nil {
@@ -300,29 +301,6 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	}
 	c.surveyRuntimeInfra = infra
 	return infra, nil
-}
-
-func (c *Container) ensurePublishedModelCatalog() (rulesetport.Catalog, error) {
-	if c == nil {
-		return nil, fmt.Errorf("container is nil")
-	}
-	if c.publishedModelCatalog != nil {
-		return c.publishedModelCatalog, nil
-	}
-	catalog, err := evalmod.EnsurePublishedModelCatalog(evalmod.PublishedModelCatalogInput{
-		MongoDB:              c.mongoDB,
-		MongoLimiter:         c.backpressure.Mongo,
-		Existing:             c.publishedModelCatalog,
-		StaticRedisClient:    c.CacheClient(redisruntime.FamilyStatic),
-		StaticCacheBuilder:   c.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy: c.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
-		Observer:             c.cacheObserver(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize published model catalog: %w", err)
-	}
-	c.publishedModelCatalog = catalog
-	return c.publishedModelCatalog, nil
 }
 
 func (c *Container) resolveIdentityService() *iam.IdentityService {

@@ -63,6 +63,3 @@ type ContainerWarmupOptions = cachebootstrap.WarmupOptions
 
 // ContainerCacheFamilyOptions 定义单个缓存 family 的对象级策略。
 type ContainerCacheFamilyOptions = cachebootstrap.CacheFamilyOptions
-
-// ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
-type ContainerCacheTTLOptions = cachebootstrap.CacheTTLOptions

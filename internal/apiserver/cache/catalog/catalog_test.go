@@ -2,6 +2,7 @@ package cachepolicy
 
 import (
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -54,5 +55,8 @@ func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 	last := entries[len(entries)-1]
 	if last.Capability != CapabilityReportStatus || last.Kind != sharedcache.KindOperationalState || last.Layer != sharedcache.LayerRuntime {
 		t.Fatalf("report status entry = %#v", last)
+	}
+	if last.Policy.TTL != 48*time.Hour {
+		t.Fatalf("report status TTL = %v, want 48h", last.Policy.TTL)
 	}
 }

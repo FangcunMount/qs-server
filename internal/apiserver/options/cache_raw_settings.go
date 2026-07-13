@@ -4,18 +4,14 @@ import genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 
 func (o *Options) ValidateRawSettings(settings map[string]any) error {
 	leaf := genericoptions.FieldSchema(nil)
-	family := genericoptions.FieldSchema{
-		"ttl": leaf, "negative_ttl": leaf, "ttl_jitter_ratio": leaf,
-		"compress": leaf, "singleflight": leaf, "negative": leaf,
-	}
+	policy := genericoptions.FieldSchema{"enabled": leaf, "ttl": leaf, "negative_ttl": leaf, "ttl_jitter_ratio": leaf, "compress": leaf, "singleflight": leaf, "negative": leaf}
+	family := genericoptions.FieldSchema{"negative_ttl": leaf, "ttl_jitter_ratio": leaf, "compress": leaf, "singleflight": leaf, "negative": leaf}
 	return genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{
-		"defaults": {
-			"compress_payload": leaf, "ttl_jitter_ratio": leaf,
-			"ttl":    {"scale": leaf, "questionnaire": leaf, "assessment_detail": leaf, "assessment_list": leaf, "testee": leaf, "plan": leaf, "negative": leaf},
-			"static": family, "object": family, "query": family,
-		},
+		"defaults": {"compress_payload": leaf, "ttl_jitter_ratio": leaf, "static": family, "object": family, "query": family},
 		"capabilities": {
-			"disable_evaluation_cache": leaf, "disable_statistics_cache": leaf,
+			"survey": {"questionnaire": policy}, "modelcatalog": {"published_model": policy},
+			"evaluation": {"assessment_detail": policy, "assessment_list": policy},
+			"actor":      {"testee": policy}, "plan": {"detail": policy}, "statistics": {"query": policy},
 			"report_status": {"ttl_seconds": leaf},
 		},
 		"governance": {

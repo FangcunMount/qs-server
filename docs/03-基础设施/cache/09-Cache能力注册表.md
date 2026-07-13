@@ -4,7 +4,7 @@
 
 Cache 已形成三个稳定入口：共享机制在 `internal/pkg/cache`，apiserver 的 capability/adapter/governance 在 `internal/apiserver/cache`，collection-server 的 L1 与生命周期在 `internal/collection-server/cache`。Redis family/profile/namespace 属于 `internal/pkg/redisruntime`，不再以 cache package 承载 lock、rank、signal 等 workload。
 
-进程内 Effective Registry 使用路径派生的稳定 ID，例如 `cache.capabilities.catalog.questionnaire` 对应 `catalog.questionnaire`。Registry 返回 layer、family、最终 Policy、配置来源与 schema version。
+apiserver 的 capability ID 使用业务模块前缀，例如 `cache.capabilities.survey.questionnaire` 对应 `survey.questionnaire`。collection-server 的既有 L1 ID 保持 `catalog.questionnaire/catalog.typology`。Registry v2 返回 owner、kind、layer、family、最终 Policy、配置来源、版本和兼容 metric label。
 
 ## 代码入口
 
@@ -21,19 +21,18 @@ Cache 已形成三个稳定入口：共享机制在 `internal/pkg/cache`，apise
 
 ## Active capability
 
-| Capability ID | Owner | Layer | Family | Policy 来源 | Loader / 事实源 | 失效与预热 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `catalog.questionnaire` | collection-server | L1 | `local` | `cache.capabilities.catalog.questionnaire` | apiserver questionnaire gRPC | signal 精确/前缀删除，TTL 兜底 |
-| `catalog.typology` | collection-server | L1 | `local` | `cache.capabilities.catalog.typology` | assessment-model catalog gRPC | signal 驱逐；启动预热 list/categories |
-| `catalog.scale` | apiserver | L2 | `static_meta` | apiserver effective catalog | Mongo published model | publish/manual warmup；现有成功判定保持 |
-| `catalog.questionnaire` | apiserver | L2 | `static_meta` | apiserver effective catalog | Mongo questionnaire | 写后删除；startup/publish/manual warmup |
-| `catalog.published_model` | apiserver | L2 | `static_meta` | apiserver effective catalog | Mongo published model | upsert 后失效 list/algorithm keys |
-| `assessment.detail` | apiserver | L2 | `object_view` | apiserver effective catalog | MySQL assessment | Save/Delete 后按 ID 删除 |
-| `assessment.list` | apiserver | L1+L2 | `query_result` + `meta_hotset` | apiserver effective catalog | assessment read model | version token bump |
-| `actor.testee` | apiserver | L2 | `object_view` | apiserver effective catalog | MySQL testee | 写后删除；negative sentinel |
-| `plan.detail` | apiserver | L2 | `object_view` | apiserver effective catalog | MySQL plan | Save 后删除 |
-| `statistics.query` | apiserver | L2 | `query_result` + `meta_hotset` | apiserver effective catalog | statistics read model | version token / service invalidation；startup/repair/manual warmup |
-| `report_status` | 三进程 | operational Redis state | `ops_runtime` | `cache.capabilities.report_status` | report workflow | 单调状态覆盖、TTL、signal 唤醒 |
+| Capability ID | Owner | Kind | Layer | Family | Policy 来源 | Legacy metric label | Loader / 事实源 | 失效与预热 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `catalog.questionnaire` | collection-server | cache | L1 | `local` | `cache.capabilities.catalog.questionnaire` | `catalog.questionnaire` | apiserver questionnaire gRPC | signal 精确/前缀删除，TTL 兜底 |
+| `catalog.typology` | collection-server | cache | L1 | `local` | `cache.capabilities.catalog.typology` | `catalog.typology` | assessment-model catalog gRPC | signal 驱逐；启动预热 list/categories |
+| `survey.questionnaire` | survey | cache | L2 | `static_meta` | `cache.capabilities.survey.questionnaire` | `questionnaire` | Mongo questionnaire | 写后删除；startup/publish/manual warmup |
+| `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | `cache.capabilities.modelcatalog.published_model` | `published_model` | Mongo published model | scale/typology warmup target；upsert 后失效 list/algorithm keys |
+| `evaluation.assessment_detail` | evaluation | cache | L2 | `object_view` | `cache.capabilities.evaluation.assessment_detail` | `assessment_detail` | MySQL assessment | Save/Delete 后按 ID 删除 |
+| `evaluation.assessment_list` | evaluation | cache | L1+L2 | `query_result` + `meta_hotset` | `cache.capabilities.evaluation.assessment_list` | `assessment_list` | assessment read model | version token bump |
+| `actor.testee` | actor | cache | L2 | `object_view` | `cache.capabilities.actor.testee` | `testee` | MySQL testee | 写后删除；negative sentinel |
+| `plan.detail` | plan | cache | L2 | `object_view` | `cache.capabilities.plan.detail` | `plan` | MySQL plan | Save 后删除 |
+| `statistics.query` | statistics | cache | L2 | `query_result` + `meta_hotset` | `cache.capabilities.statistics.query` | `stats_query` | statistics read model | version token / service invalidation；startup/repair/manual warmup |
+| `report_status` | interpretation workflow | operational_state | runtime | `ops_runtime` | `cache.capabilities.report_status` | 保持现状 | report workflow | 单调状态覆盖、TTL、signal 唤醒 |
 
 IAM user/profile-link/JWKS 与 WeChat SDK cache 保持 integration owner，不进入共享 business capability catalog。
 
@@ -61,12 +60,14 @@ cache:
   governance:     # warmup/hotset/read guard
 ```
 
-- apiserver 使用 `defaults/capabilities/governance`；
+- apiserver 使用 `defaults/capabilities/governance`，普通 capability 按 `survey/modelcatalog/evaluation/actor/plan/statistics` 分组；
 - collection-server 使用 `capabilities.catalog` 与 `capabilities.report_status`；
 - worker 只保留真实消费者 `capabilities.report_status`；
 - `scale_cache`、`wait_report.status_ttl_seconds`、`wait_report.pubsub_*` 和 worker 无消费者开关已删除；
 - 未知 cache capability 或字段由 `pkg/app` raw-settings validator 在启动时拒绝；
 - Redis route 仍只由 `redis_runtime` 管理。
+
+普通 apiserver capability 可覆盖 `enabled/ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`。继承顺序固定为 capability 显式值 → family defaults → global compress/jitter → `Spec.Defaults`；`report_status` 只使用 operational-state 合同字段。
 
 ## 行为合同
 

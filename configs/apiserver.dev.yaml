@@ -256,33 +256,38 @@ plan:
 # -------------------------------------------------------
 cache:
   capabilities:
+    survey:
+      questionnaire: {enabled: true, ttl: "8h", negative: true}
+    modelcatalog:
+      published_model: {enabled: true, ttl: "6h", negative: true}
+    evaluation:
+      assessment_detail: {enabled: true, ttl: "1h30m", singleflight: true}
+      assessment_list: {enabled: true, ttl: "10m", singleflight: false}
+    actor:
+      testee: {enabled: true, ttl: "30m", negative: true}
+    plan:
+      detail: {enabled: true, ttl: "1h", singleflight: true}
+    statistics:
+      query: {enabled: true, ttl: "5m", singleflight: false}
     report_status:
       ttl_seconds: 172800
-    disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
-    disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
   defaults:
     compress_payload: false          # 是否压缩缓存 payload
     static:
+      negative_ttl: "5m"
       compress: false
       singleflight: true
       negative: false
     object:
+      negative_ttl: "5m"
       compress: false
       singleflight: true
       negative: false
     query:
-      ttl: "5m"
+      negative_ttl: "5m"
       compress: false
       singleflight: true
       negative: false
-    ttl:
-      scale: "6h"
-      questionnaire: "8h"
-      assessment_detail: "1h30m"
-      assessment_list: "10m"
-      testee: "30m"
-      plan: "1h"
-      negative: "5m"
     ttl_jitter_ratio: 0.1
   governance:
     statistics_warmup:

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -15,15 +16,16 @@ func boolPtr(v bool) *bool {
 
 func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
-	opts.Cache.Capabilities.DisableEvaluationCache = true
-	opts.Cache.Capabilities.DisableStatisticsCache = true
-	opts.Cache.Defaults.TTL.Scale = time.Minute
-	opts.Cache.Defaults.TTL.Questionnaire = 3 * time.Minute
-	opts.Cache.Defaults.TTL.AssessmentDetail = 4 * time.Minute
-	opts.Cache.Defaults.TTL.AssessmentList = 5 * time.Minute
-	opts.Cache.Defaults.TTL.Testee = 6 * time.Minute
-	opts.Cache.Defaults.TTL.Plan = 7 * time.Minute
-	opts.Cache.Defaults.TTL.Negative = 8 * time.Second
+	opts.Cache.Capabilities.Survey.Questionnaire.TTL = 3 * time.Minute
+	opts.Cache.Capabilities.ModelCatalog.PublishedModel.TTL = time.Minute
+	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Enabled = false
+	opts.Cache.Capabilities.Evaluation.AssessmentDetail.TTL = 4 * time.Minute
+	opts.Cache.Capabilities.Evaluation.AssessmentList.Enabled = false
+	opts.Cache.Capabilities.Evaluation.AssessmentList.TTL = 5 * time.Minute
+	opts.Cache.Capabilities.Actor.Testee.TTL = 6 * time.Minute
+	opts.Cache.Capabilities.Plan.Detail.TTL = 7 * time.Minute
+	opts.Cache.Capabilities.Statistics.Query.Enabled = false
+	opts.Cache.Capabilities.Statistics.Query.TTL = 30 * time.Second
 	opts.Cache.Defaults.TTLJitterRatio = 0.25
 	opts.Cache.Defaults.CompressPayload = true
 	opts.Cache.Governance.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
@@ -60,7 +62,6 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 		Negative:       boolPtr(false),
 	}
 	opts.Cache.Defaults.Query = &apiserveroptions.CacheFamilyOptions{
-		TTL:            30 * time.Second,
 		NegativeTTL:    6 * time.Second,
 		TTLJitterRatio: 0.15,
 		Compress:       boolPtr(true),
@@ -76,14 +77,19 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	server := &server{config: cfg}
 	got := server.buildContainerCacheOptions()
 
-	if !got.DisableEvaluationCache {
-		t.Fatalf("DisableEvaluationCache = false, want true")
+	detail := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail]
+	list := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentList]
+	statistics := got.Capabilities[cachepolicy.CapabilityStatisticsQuery]
+	if detail.Enabled || list.Enabled || statistics.Enabled {
+		t.Fatalf("disabled capability mapping mismatch: detail=%+v list=%+v statistics=%+v", detail, list, statistics)
 	}
-	if !got.DisableStatisticsCache {
-		t.Fatalf("DisableStatisticsCache = false, want true")
+	if got.Capabilities[cachepolicy.CapabilityModelCatalogPublished].Policy.TTL != time.Minute ||
+		got.Capabilities[cachepolicy.CapabilityPlanDetail].Policy.TTL != 7*time.Minute ||
+		got.Capabilities[cachepolicy.CapabilityActorTestee].Policy.TTL != 6*time.Minute {
+		t.Fatalf("capability TTL mapping mismatch: %+v", got.Capabilities)
 	}
-	if got.TTL.Scale != time.Minute || got.TTL.Plan != 7*time.Minute || got.TTL.Negative != 8*time.Second {
-		t.Fatalf("TTL mapping mismatch: %+v", got.TTL)
+	if got.Capabilities[cachepolicy.CapabilityReportStatus].Policy.TTL != 48*time.Hour {
+		t.Fatalf("report_status TTL = %v, want 48h", got.Capabilities[cachepolicy.CapabilityReportStatus].Policy.TTL)
 	}
 	if got.TTLJitterRatio != 0.25 {
 		t.Fatalf("TTLJitterRatio = %v, want 0.25", got.TTLJitterRatio)
@@ -109,7 +115,7 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	if got.Static.NegativeTTL != 9*time.Second || got.Static.Compress == nil || !*got.Static.Compress || got.Static.Singleflight == nil || !*got.Static.Singleflight || got.Static.Negative == nil || !*got.Static.Negative {
 		t.Fatalf("Static family mapping mismatch: %+v", got.Static)
 	}
-	if got.Query.TTL != 30*time.Second || got.Query.NegativeTTL != 6*time.Second || got.Query.Compress == nil || !*got.Query.Compress {
+	if got.Query.NegativeTTL != 6*time.Second || got.Query.Compress == nil || !*got.Query.Compress {
 		t.Fatalf("Query family mapping mismatch: %+v", got.Query)
 	}
 }

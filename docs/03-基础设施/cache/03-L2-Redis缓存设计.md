@@ -46,7 +46,7 @@ Redis hit/miss、Redis latency、error count、serialization error、fallback DB
 
 ## 12. 代码事实源
 
-- [../../../internal/apiserver/cache/adapter](../../../internal/apiserver/cache/adapter)
+- [../../../internal/apiserver/cache](../../../internal/apiserver/cache)
 - [../../../internal/pkg/cache/query](../../../internal/pkg/cache/query)
 - [../../../internal/pkg/cache/redis](../../../internal/pkg/cache/redis)
 - [../../../internal/apiserver/cache/catalog](../../../internal/apiserver/cache/catalog)

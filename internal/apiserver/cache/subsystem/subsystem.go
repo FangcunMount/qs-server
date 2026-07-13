@@ -3,7 +3,6 @@ package cachebootstrap
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -286,13 +285,6 @@ func (s *Subsystem) Builder(family redisruntime.Family) *keyspace.Builder {
 	return handle.Builder
 }
 
-func (s *Subsystem) Policy(key sharedcache.Capability) cachepolicy.CachePolicy {
-	if s == nil || s.policyCatalog == nil {
-		return cachepolicy.CachePolicy{}
-	}
-	return s.policyCatalog.Policy(key)
-}
-
 func (s *Subsystem) Capability(key sharedcache.Capability) cachepolicy.Binding {
 	if s == nil || s.policyCatalog == nil {
 		return cachepolicy.Binding{}
@@ -393,66 +385,24 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 			Compress:     resolvePolicySwitch(cacheConfig.Static.Compress, cacheConfig.CompressPayload),
 			Singleflight: resolvePolicySwitch(cacheConfig.Static.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Static.Negative, false),
-			NegativeTTL:  firstPositiveDuration(cacheConfig.Static.NegativeTTL, cacheConfig.TTL.Negative),
+			NegativeTTL:  cacheConfig.Static.NegativeTTL,
 			JitterRatio:  firstPositiveFloat(cacheConfig.Static.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
 		cachemodel.FamilyObject: {
 			Compress:     resolvePolicySwitch(cacheConfig.Object.Compress, cacheConfig.CompressPayload),
 			Singleflight: resolvePolicySwitch(cacheConfig.Object.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Object.Negative, false),
-			NegativeTTL:  firstPositiveDuration(cacheConfig.Object.NegativeTTL, cacheConfig.TTL.Negative),
+			NegativeTTL:  cacheConfig.Object.NegativeTTL,
 			JitterRatio:  firstPositiveFloat(cacheConfig.Object.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
 		cachemodel.FamilyQuery: {
-			TTL:          cacheConfig.Query.TTL,
-			NegativeTTL:  firstPositiveDuration(cacheConfig.Query.NegativeTTL, cacheConfig.TTL.Negative),
+			NegativeTTL:  cacheConfig.Query.NegativeTTL,
 			Compress:     resolvePolicySwitch(cacheConfig.Query.Compress, cacheConfig.CompressPayload),
 			Singleflight: resolvePolicySwitch(cacheConfig.Query.Singleflight, false),
 			Negative:     resolvePolicySwitch(cacheConfig.Query.Negative, false),
 			JitterRatio:  firstPositiveFloat(cacheConfig.Query.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-	}, map[sharedcache.Capability]cachepolicy.Binding{
-		cachepolicy.CapabilitySurveyQuestionnaire: {Enabled: true, Policy: cachepolicy.CachePolicy{
-			TTL:         cacheConfig.TTL.Questionnaire,
-			NegativeTTL: cacheConfig.TTL.Negative,
-			Negative:    cachepolicy.PolicySwitchEnabled,
-		}},
-		cachepolicy.CapabilityModelCatalogPublished: {Enabled: true, Policy: cachepolicy.CachePolicy{
-			TTL:         cacheConfig.TTL.Scale,
-			NegativeTTL: cacheConfig.TTL.Negative,
-			Negative:    cachepolicy.PolicySwitchEnabled,
-		}},
-		cachepolicy.CapabilityEvaluationAssessmentDetail: {Enabled: !cacheConfig.DisableEvaluationCache, Policy: cachepolicy.CachePolicy{
-			TTL:          cacheConfig.TTL.AssessmentDetail,
-			Singleflight: cachepolicy.PolicySwitchEnabled,
-		}},
-		cachepolicy.CapabilityEvaluationAssessmentList: {Enabled: !cacheConfig.DisableEvaluationCache, Policy: cachepolicy.CachePolicy{
-			TTL:          cacheConfig.TTL.AssessmentList,
-			Singleflight: cachepolicy.PolicySwitchDisabled,
-		}},
-		cachepolicy.CapabilityActorTestee: {Enabled: true, Policy: cachepolicy.CachePolicy{
-			TTL:         cacheConfig.TTL.Testee,
-			NegativeTTL: cacheConfig.TTL.Negative,
-			Negative:    cachepolicy.PolicySwitchEnabled,
-		}},
-		cachepolicy.CapabilityPlanDetail: {Enabled: true, Policy: cachepolicy.CachePolicy{
-			TTL:          cacheConfig.TTL.Plan,
-			Singleflight: cachepolicy.PolicySwitchEnabled,
-		}},
-		cachepolicy.CapabilityStatisticsQuery: {Enabled: !cacheConfig.DisableStatisticsCache, Policy: cachepolicy.CachePolicy{
-			Singleflight: cachepolicy.PolicySwitchDisabled,
-		}},
-		cachepolicy.CapabilityReportStatus: {Enabled: true},
-	})
-}
-
-func firstPositiveDuration(values ...time.Duration) time.Duration {
-	for _, value := range values {
-		if value > 0 {
-			return value
-		}
-	}
-	return 0
+	}, cacheConfig.Capabilities)
 }
 
 func firstPositiveFloat(values ...float64) float64 {

@@ -15,6 +15,7 @@ import (
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -26,21 +27,24 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 
 	c := NewContainer(nil, nil, nil)
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
-		TTL: ContainerCacheTTLOptions{Testee: 5},
+		Capabilities: map[sharedcache.Capability]cachepolicy.Binding{
+			cachepolicy.CapabilityActorTestee: {Enabled: true, Policy: sharedcache.Policy{TTL: 5}},
+		},
 	}, nil)
+	binding := c.CacheCapability(cachepolicy.CapabilityActorTestee)
 
 	wire := actormod.WireInput{
 		RedisClient:  c.CacheClient(redisruntime.FamilyObject),
 		CacheBuilder: c.CacheBuilder(redisruntime.FamilyObject),
-		TesteePolicy: c.CachePolicy(cachepolicy.CapabilityActorTestee),
+		TesteePolicy: binding.Policy,
 		Observer:     c.cacheObserver(),
 		MySQLLimiter: c.backpressure.MySQL,
 	}
 	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyObject) {
 		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyObject))
 	}
-	if wire.TesteePolicy != c.CachePolicy(cachepolicy.CapabilityActorTestee) {
-		t.Fatalf("policy = %#v, want %#v", wire.TesteePolicy, c.CachePolicy(cachepolicy.CapabilityActorTestee))
+	if wire.TesteePolicy != binding.Policy {
+		t.Fatalf("policy = %#v, want %#v", wire.TesteePolicy, binding.Policy)
 	}
 	if wire.ProfileLinkService != nil || wire.IdentityService != nil || wire.IAMClient != nil || wire.OperationAccountSvc != nil {
 		t.Fatalf("unexpected IAM deps in actor wire input: %#v", wire)
@@ -55,9 +59,7 @@ func TestContainerBuildSurveyModuleDepsUsesSharedApplicationWiring(t *testing.T)
 
 	c := NewContainer(nil, nil, nil)
 	c.eventPublisher = event.NewNopEventPublisher()
-	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
-		TTL: ContainerCacheTTLOptions{Questionnaire: 7},
-	}, nil)
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
 
 	wire := surveymod.WireInput{
 		EventPublisher:   c.eventPublisher,
@@ -80,9 +82,7 @@ func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) 
 
 	c := NewContainer(nil, nil, nil)
 	c.eventPublisher = event.NewNopEventPublisher()
-	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
-		TTL: ContainerCacheTTLOptions{Scale: 7},
-	}, nil)
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
 
 	wire := ammod.WireInput{
 		EventPublisher:   c.eventPublisher,
@@ -129,10 +129,9 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	})
 
 	wire := statmod.WireInput{
-		RedisClient:         c.redisCache,
 		FallbackRedisClient: c.CacheClient(redisruntime.FamilyQuery),
 		CacheBuilder:        c.CacheBuilder(redisruntime.FamilyQuery),
-		QueryPolicy:         c.CachePolicy(cachepolicy.CapabilityStatisticsQuery),
+		QueryPolicy:         c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy,
 		LockManager:         c.CacheLockManager(),
 		Observer:            c.cacheObserver(),
 		MetaRedisClient:     c.CacheClient(redisruntime.FamilyMeta),
@@ -143,8 +142,8 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyQuery) {
 		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyQuery))
 	}
-	if wire.QueryPolicy != c.CachePolicy(cachepolicy.CapabilityStatisticsQuery) {
-		t.Fatalf("policy = %#v, want %#v", wire.QueryPolicy, c.CachePolicy(cachepolicy.CapabilityStatisticsQuery))
+	if wire.QueryPolicy != c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy {
+		t.Fatalf("policy = %#v, want %#v", wire.QueryPolicy, c.CacheCapability(cachepolicy.CapabilityStatisticsQuery).Policy)
 	}
 	if wire.LockManager == nil {
 		t.Fatalf("lock manager = %#v, want *redisadapter.Manager", wire.LockManager)
@@ -153,21 +152,13 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 		t.Fatalf("observer = %#v, want %#v", wire.Observer, c.cacheObserver())
 	}
 
-	c.cacheOptions.DisableStatisticsCache = true
-	wire = statmod.WireInput{
-		DisableStatisticsCache: true,
-		FallbackRedisClient:    queryClient,
-	}
-	if !wire.DisableStatisticsCache {
-		t.Fatal("DisableStatisticsCache = false, want true")
-	}
 }
 
 func TestContainerBuildStatisticsModuleDepsHandlesNilContainer(t *testing.T) {
 	t.Parallel()
 
 	wire := statmod.WireInput{}
-	if wire.RedisClient != nil || wire.FallbackRedisClient != nil {
+	if wire.FallbackRedisClient != nil {
 		t.Fatalf("empty wire input should not preset redis clients: %#v", wire)
 	}
 }
@@ -203,7 +194,11 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 		t.Fatalf("statistics warm callbacks should be wired when query family is available: %#v", bindings)
 	}
 
-	c.cacheOptions.DisableStatisticsCache = true
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
+		Capabilities: map[sharedcache.Capability]cachepolicy.Binding{
+			cachepolicy.CapabilityStatisticsQuery: {Enabled: false},
+		},
+	}, map[string]redis.UniversalClient{"static": staticClient, "query": queryClient})
 	bindings = newCacheGovernanceAdapter(c).bindings()
 	if bindings.WarmStatsSystem != nil || bindings.WarmStatsQuestionnaire != nil || bindings.WarmStatsPlan != nil {
 		t.Fatalf("statistics warm callbacks = %#v, want nil when statistics cache is disabled", bindings)

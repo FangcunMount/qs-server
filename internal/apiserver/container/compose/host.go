@@ -46,8 +46,6 @@ type Host interface {
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config
-	DisableEvaluationCache() bool
-	DisableStatisticsCache() bool
 	StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions
 	StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions
 	StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions
@@ -55,7 +53,7 @@ type Host interface {
 	CacheClient(family redisruntime.Family) redis.UniversalClient
 	CacheBuilder(family redisruntime.Family) *keyspace.Builder
 	CacheHandle(family redisruntime.Family) *redisruntime.Handle
-	CachePolicy(key sharedcache.Capability) cachepolicy.CachePolicy
+	CacheCapability(key sharedcache.Capability) cachepolicy.Binding
 	CacheObserver() *observability.ComponentObserver
 	HotsetRecorder() cachetarget.HotsetRecorder
 	CacheLockManager() locklease.Manager

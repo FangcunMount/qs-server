@@ -22,18 +22,27 @@ func InstallFrom(host InstallHost) error {
 	if err != nil {
 		return err
 	}
+	detail := host.CacheCapability(cachepolicy.CapabilityEvaluationAssessmentDetail)
+	list := host.CacheCapability(cachepolicy.CapabilityEvaluationAssessmentList)
+	objectRedis := host.CacheClient(redisruntime.FamilyObject)
+	queryRedis := host.CacheClient(redisruntime.FamilyQuery)
+	if !detail.Enabled {
+		objectRedis = nil
+	}
+	if !list.Enabled {
+		queryRedis = nil
+	}
 	result, err := Wire(WireInput{
 		MySQLDB:                             host.MySQLDB(),
 		MongoDB:                             host.MongoDB(),
 		EventPublisher:                      host.EventPublisher(),
-		RedisClient:                         host.CacheClient(redisruntime.FamilyObject),
+		RedisClient:                         objectRedis,
 		CacheBuilder:                        host.CacheBuilder(redisruntime.FamilyObject),
-		QueryRedisClient:                    host.CacheClient(redisruntime.FamilyQuery),
+		QueryRedisClient:                    queryRedis,
 		QueryCacheBuilder:                   host.CacheBuilder(redisruntime.FamilyQuery),
 		MetaRedisClient:                     host.CacheClient(redisruntime.FamilyMeta),
-		AssessmentPolicy:                    host.CachePolicy(cachepolicy.CapabilityEvaluationAssessmentDetail),
-		AssessmentListPolicy:                host.CachePolicy(cachepolicy.CapabilityEvaluationAssessmentList),
-		DisableEvaluationCache:              host.DisableEvaluationCache(),
+		AssessmentPolicy:                    detail.Policy,
+		AssessmentListPolicy:                list.Policy,
 		Observer:                            host.CacheObserver(),
 		TopicResolver:                       host.TopicResolver(),
 		MySQLLimiter:                        host.MySQLLimiter(),
@@ -45,16 +54,10 @@ func InstallFrom(host InstallHost) error {
 		OpsHandle:                                   host.CacheHandle(redisruntime.FamilyOps),
 		SurveyRuntimeInfra:                          host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:                       host.PublishedModelCatalog(),
-		StaticRedisClient:                           host.CacheClient(redisruntime.FamilyStatic),
-		StaticCacheBuilder:                          host.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
 		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
 	})
 	if err != nil {
 		return err
-	}
-	if result.PublishedModelCatalog != nil {
-		host.SetPublishedModelCatalog(result.PublishedModelCatalog)
 	}
 	host.SetEvaluationModule(result.Module)
 	host.SetWorkbenchLatestRiskReader(result.WorkbenchLatestRiskReader)

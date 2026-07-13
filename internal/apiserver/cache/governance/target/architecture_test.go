@@ -90,7 +90,7 @@ func checkNoInfraCacheImport(t *testing.T, file string) {
 		t.Fatalf("parse imports for %s: %v", file, err)
 	}
 	for _, imported := range parsed.Imports {
-		if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter" {
+		if strings.HasPrefix(strings.Trim(imported.Path.Value, `"`), "github.com/FangcunMount/qs-server/internal/apiserver/cache/") {
 			t.Fatalf("%s imports infra/cache; hotset-facing application code should depend on cachetarget interfaces", file)
 		}
 	}

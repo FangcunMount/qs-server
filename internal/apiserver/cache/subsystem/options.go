@@ -3,14 +3,14 @@ package cachebootstrap
 import (
 	"time"
 
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 )
 
 // CacheOptions 描述 apiserver cache 子系统的运行时配置。
 type CacheOptions struct {
-	DisableEvaluationCache  bool
-	DisableStatisticsCache  bool
-	TTL                     CacheTTLOptions
+	Capabilities            map[sharedcache.Capability]cachepolicy.Binding
 	TTLJitterRatio          float64
 	StatisticsWarmup        *cachegov.StatisticsWarmupConfig
 	StatisticsSystem        StatisticsSystemOptions
@@ -49,21 +49,9 @@ type WarmupOptions struct {
 
 // CacheFamilyOptions 定义单个缓存 family 的对象级策略。
 type CacheFamilyOptions struct {
-	TTL            time.Duration
 	NegativeTTL    time.Duration
 	TTLJitterRatio float64
 	Compress       *bool
 	Singleflight   *bool
 	Negative       *bool
-}
-
-// CacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）。
-type CacheTTLOptions struct {
-	Scale            time.Duration
-	Questionnaire    time.Duration
-	AssessmentDetail time.Duration
-	AssessmentList   time.Duration
-	Testee           time.Duration
-	Plan             time.Duration
-	Negative         time.Duration
 }

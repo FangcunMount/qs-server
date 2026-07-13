@@ -2,15 +2,9 @@ package ruleset
 
 import (
 	"context"
-	"fmt"
 
-	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
-	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type runtimePublishedStore interface {
@@ -28,24 +22,6 @@ var (
 	_ port.PublishedModelReader = (*RuntimePublishedCatalog)(nil)
 	_ port.PublishedModelLister = (*RuntimePublishedCatalog)(nil)
 )
-
-// NewRuntimePublishedCatalog builds the production runtime catalog backed by v2 published snapshots.
-func NewRuntimePublishedCatalog(
-	db *mongo.Database,
-	mongoOpts mongoBase.BaseRepositoryOptions,
-	cacheCfg PublishedModelCacheConfig,
-) (port.Catalog, error) {
-	if db == nil {
-		return nil, fmt.Errorf("mongo database is nil")
-	}
-	v2 := mongomodelcatalog.NewRepository(db, mongoOpts)
-	store := aminfra.NewPublishedStore(v2)
-	var publishedStore runtimePublishedStore = store
-	if cacheCfg.enabled() {
-		publishedStore = modelcatalogcache.NewCachedPublishedModelStore(store, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
-	}
-	return &RuntimePublishedCatalog{store: publishedStore}, nil
-}
 
 // NewRuntimePublishedCatalogWithStore wires a runtime catalog for tests.
 func NewRuntimePublishedCatalogWithStore(store runtimePublishedStore) *RuntimePublishedCatalog {

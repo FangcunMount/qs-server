@@ -24,16 +24,20 @@ func InstallFrom(host InstallHost) error {
 		answerSheetReader = infra.AnswerSheetReader
 		answerSheetScanSource = infra.AnswerSheetRepo
 	}
+	binding := host.CacheCapability(cachepolicy.CapabilityStatisticsQuery)
+	queryRedis := host.CacheClient(redisruntime.FamilyQuery)
+	if !binding.Enabled {
+		queryRedis = nil
+	}
 	module, err := Wire(WireInput{
 		MySQLDB:                host.MySQLDB(),
-		RedisClient:            host.RedisCache(),
-		FallbackRedisClient:    host.CacheClient(redisruntime.FamilyQuery),
+		FallbackRedisClient:    queryRedis,
 		CacheBuilder:           host.CacheBuilder(redisruntime.FamilyQuery),
 		AnswerSheetReader:      answerSheetReader,
 		AnswerSheetScanSource:  answerSheetScanSource,
 		MongoDB:                host.MongoDB(),
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
-		QueryPolicy:            host.CachePolicy(cachepolicy.CapabilityStatisticsQuery),
+		QueryPolicy:            binding.Policy,
 		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
 		OverviewGuardOpts:      host.StatisticsOverviewGuardOptions(),
 		QuestionnaireGuardOpts: host.StatisticsQuestionnaireGuardOptions(),
@@ -43,7 +47,6 @@ func InstallFrom(host InstallHost) error {
 		MySQLLimiter:           host.MySQLLimiter(),
 		WarmupCoordinator:      host.WarmupCoordinator(),
 		StatusService:          host.CacheGovernanceStatusService(),
-		DisableStatisticsCache: host.DisableStatisticsCache(),
 		MetaRedisClient:        host.CacheClient(redisruntime.FamilyMeta),
 	})
 	if err != nil {

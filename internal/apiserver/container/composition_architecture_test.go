@@ -78,11 +78,11 @@ func TestRuntimeCacheUsesSharedPublishedModelResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "ensurePublishedModelCatalog()") {
-		t.Fatal("runtime cache warmup must use the shared published model catalog")
+	if !strings.Contains(text, "PublishedModelLister()") {
+		t.Fatal("runtime cache warmup must use the modelcatalog-owned published model port")
 	}
-	if strings.Contains(text, "AssessmentModelModule.PublishedLister") {
-		t.Fatal("runtime cache warmup must not bypass PublishedModelResolver through the modelcatalog module")
+	if strings.Contains(text, "ensurePublishedModelCatalog") {
+		t.Fatal("runtime cache warmup must not construct a fallback published model catalog")
 	}
 }
 
@@ -609,7 +609,7 @@ func TestActorTransportsDoNotDependOnActorRepositoryImplementations(t *testing.T
 				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"):
 					rel := filepath.ToSlash(mustRel(t, root, path))
 					t.Fatalf("%s imports %s; actor transport must consume application ports/read models, not actor infra repositories", rel, importPath)
-				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"):
+				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/cache/actor"):
 					rel := filepath.ToSlash(mustRel(t, root, path))
 					t.Fatalf("%s imports %s; actor transport must not depend on cached actor repositories", rel, importPath)
 				}

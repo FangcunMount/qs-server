@@ -20,6 +20,11 @@ func InstallFrom(host InstallHost) error {
 	if err != nil {
 		return err
 	}
+	binding := host.CacheCapability(cachepolicy.CapabilityModelCatalogPublished)
+	staticRedis := host.CacheClient(redisruntime.FamilyStatic)
+	if !binding.Enabled {
+		staticRedis = nil
+	}
 	module, err := Wire(WireInput{
 		MongoDB:                host.MongoDB(),
 		MongoLimiter:           host.MongoLimiter(),
@@ -30,9 +35,9 @@ func InstallFrom(host InstallHost) error {
 		SurveyRuntimeInfra:     infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
-		StaticRedisClient:      host.CacheClient(redisruntime.FamilyStatic),
+		StaticRedisClient:      staticRedis,
 		StaticCacheBuilder:     host.CacheBuilder(redisruntime.FamilyStatic),
-		PublishedModelPolicy:   host.CachePolicy(cachepolicy.CapabilityModelCatalogPublished),
+		PublishedModelPolicy:   binding.Policy,
 		CacheObserver:          host.CacheObserver(),
 	})
 	if err != nil {

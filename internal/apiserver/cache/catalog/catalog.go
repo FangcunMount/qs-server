@@ -1,6 +1,8 @@
 package cachepolicy
 
 import (
+	"time"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 )
@@ -27,11 +29,11 @@ var specs = []Spec{
 	{ID: CapabilitySurveyQuestionnaire, Owner: "survey", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.survey.questionnaire", MetricLabel: "questionnaire", Defaults: sharedcache.Policy{Negative: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityModelCatalogPublished, Owner: "modelcatalog", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.modelcatalog.published_model", MetricLabel: "published_model", Defaults: sharedcache.Policy{Negative: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityEvaluationAssessmentDetail, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.evaluation.assessment_detail", MetricLabel: "assessment_detail", Defaults: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchEnabled}},
-	{ID: CapabilityEvaluationAssessmentList, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyQuery, ConfigPath: "cache.capabilities.evaluation.assessment_list", MetricLabel: "assessment_list", Defaults: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchDisabled}},
+	{ID: CapabilityEvaluationAssessmentList, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL1L2, Family: cachemodel.FamilyQuery, ConfigPath: "cache.capabilities.evaluation.assessment_list", MetricLabel: "assessment_list", Defaults: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchDisabled}},
 	{ID: CapabilityActorTestee, Owner: "actor", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.actor.testee", MetricLabel: "testee", Defaults: sharedcache.Policy{Negative: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityPlanDetail, Owner: "plan", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.plan.detail", MetricLabel: "plan", Defaults: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityStatisticsQuery, Owner: "statistics", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyQuery, ConfigPath: "cache.capabilities.statistics.query", MetricLabel: "stats_query", Defaults: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchDisabled}},
-	{ID: CapabilityReportStatus, Owner: "interpretation", Kind: sharedcache.KindOperationalState, Layer: sharedcache.LayerRuntime, Family: cachemodel.FamilyOps, ConfigPath: "cache.capabilities.report_status", MetricLabel: "report_status"},
+	{ID: CapabilityReportStatus, Owner: "interpretation", Kind: sharedcache.KindOperationalState, Layer: sharedcache.LayerRuntime, Family: cachemodel.FamilyOps, ConfigPath: "cache.capabilities.report_status", MetricLabel: "report_status", Defaults: sharedcache.Policy{TTL: 48 * time.Hour}},
 }
 
 func Specs() []Spec { return append([]Spec(nil), specs...) }
@@ -88,9 +90,4 @@ func (c *PolicyCatalog) Resolve(id sharedcache.Capability) (Binding, bool) {
 	}
 	binding.Policy = binding.Policy.MergeWith(spec.Defaults.MergeWith(c.familyDefaults[spec.Family]))
 	return binding, true
-}
-
-func (c *PolicyCatalog) Policy(id sharedcache.Capability) sharedcache.Policy {
-	binding, _ := c.Resolve(id)
-	return binding.Policy
 }
