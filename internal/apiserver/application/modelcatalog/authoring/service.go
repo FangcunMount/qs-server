@@ -44,6 +44,9 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 	if issues := appdefinition.ValidateDefinitionV2(value); len(issues) > 0 {
 		return nil, appdefinition.NewValidationError(issues)
 	}
+	if err := model.ForkDraftFromPublished(s.now()); err != nil {
+		return nil, err
+	}
 	handler, err := s.Registry.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
 	if err != nil {
 		return nil, err

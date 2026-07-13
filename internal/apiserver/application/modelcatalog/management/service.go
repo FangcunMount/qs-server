@@ -89,6 +89,9 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 	if err != nil {
 		return nil, err
 	}
+	if err := model.ForkDraftFromPublished(s.now()); err != nil {
+		return nil, err
+	}
 	if model.Kind == domain.KindScale {
 		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
 			return nil, err
@@ -112,6 +115,9 @@ func (s Service) BindQuestionnaire(ctx context.Context, actor modelcatalog.Actor
 	}
 	binding, err := s.BindingPolicies.Validate(ctx, model, domain.QuestionnaireBinding{QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion})
 	if err != nil {
+		return nil, err
+	}
+	if err := model.ForkDraftFromPublished(s.now()); err != nil {
 		return nil, err
 	}
 	if err := model.BindQuestionnaire(binding, s.now()); err != nil {

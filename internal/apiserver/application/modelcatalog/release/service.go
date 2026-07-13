@@ -39,13 +39,16 @@ var _ modelcatalog.AssessmentReleaseService = Service{}
 func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
 	var result *modelcatalog.AssessmentRelease
+	alreadyPublished := false
 	err := s.withTransaction(ctx, func(txCtx context.Context) error {
 		model, err := s.loadAndAuthorize(txCtx, actor, modelCode, modelcatalog.ActionPublishCatalog)
 		if err != nil {
 			return err
 		}
 		if model.IsPublished() {
-			return errors.WithCode(code.ErrInvalidArgument, "assessment release is already published")
+			alreadyPublished = true
+			result = releaseFrom(model, "published", "")
+			return nil
 		}
 		if model.Binding.QuestionnaireCode == "" {
 			return errors.WithCode(code.ErrInvalidArgument, "assessment release requires a questionnaire binding")
@@ -84,6 +87,10 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 	if err != nil {
 		logger.L(ctx).Errorw("测评发布事务失败", "release_action", "publish", "model_code", modelCode, "transaction_result", "rolled_back", "duration_ms", time.Since(start).Milliseconds(), "error", err.Error())
 		return nil, err
+	}
+	if alreadyPublished {
+		logger.L(ctx).Infow("测评发布幂等命中", "release_action", "publish", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "previous_status", "published", "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
+		return result, nil
 	}
 	// Effects run after the transaction has committed, avoiding a QR/cache
 	// consumer observing a release that later rolls back.

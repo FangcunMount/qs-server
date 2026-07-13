@@ -65,7 +65,7 @@ Survey
 | 10 | Survey | 作答事实层 | [10-survey/README.md](./10-survey/README.md) |
 | 20 | Assessment Model | 测评模型资产层 | [20-model-catalog/README.md](./20-model-catalog/README.md) |
 | 30 | Evaluation | 测评执行层 | [30-evaluation/README.md](./30-evaluation/README.md) |
-| 40 | Interpretation Model / Report | 解释模型与报告产出层 | [40-interpretation/README.md](./40-interpretation/README.md) |
+| 40 | Interpretation Model / Report | Outcome 解释、报告幂等生成与多角色查询层 | [40-interpretation/README.md](./40-interpretation/README.md) |
 | 50 | Actor | 业务参与者上下文 | [50-actor/README.md](./50-actor/README.md) |
 | 60 | Plan | 测评计划与任务编排 | [60-plan/README.md](./60-plan/README.md) |
 | 70 | Statistics | 读侧统计与行为投影 | [70-statistics/README.md](./70-statistics/README.md) |
@@ -79,7 +79,7 @@ Survey
 | `survey` | `survey` | 问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实 |
 | `model-catalog` | `modelcatalog` | 统一测评模型资产层，四类 canonical identity 共享 `DefinitionV2` 主路径 |
 | `evaluation` | `evaluation` | 一次测评执行、执行状态、计分和结果生成 |
-| `interpretation` | `interpretation` | 解释模型、报告模型、builder、adapter、`InterpretReport` 输出 |
+| `interpretation` | `interpretation` | `ReportGeneration` / `InterpretationRun`、builder registry、不可变 `InterpretReport`、catalog 与授权查询 |
 | `actor` | `actor` | 受试者、从业者、操作者、访问上下文 |
 | `plan` | `plan` | 测评计划、周期任务、任务生命周期 |
 | `statistics` | `statistics` | 读侧统计、行为投影、指标聚合 |

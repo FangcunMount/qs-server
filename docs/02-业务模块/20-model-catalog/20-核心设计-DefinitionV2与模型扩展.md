@@ -55,9 +55,11 @@ flowchart LR
 | `Factor` | 只保存 code、title、role |
 | `FactorGraph` | roots、父子边和展示顺序 |
 | `Scoring` | 指定目标 Factor、输入来源、聚合策略和参数 |
-| `ScoringSource` | 引用 question 或子 factor，可带 sign 和 option scores |
+| `ScoringSource` | 引用 question 或子 factor；question source 可声明 scoring mode、sign、weight 和高级 option override |
 
 Scoring 支持 sum、avg、weighted sum/avg、max、min、count。FactorGraph 表达结构，Scoring 表达计算，不能根据父子边暗推计分公式。
+
+人格类型的 question source 默认不复制问卷选项分值，而是通过 `question_score` 消费答卷中的 `Answer.Score`，再应用 sign 和 weight。精确公式、override、因子聚合和旧快照兼容规则见 [23-核心设计-人格题目贡献与因子计分.md](./23-核心设计-人格题目贡献与因子计分.md)。
 
 ### 3.2 Calibration：引用版本化常模
 

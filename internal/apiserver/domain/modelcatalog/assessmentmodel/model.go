@@ -257,13 +257,15 @@ func (m *AssessmentModel) UpdateDefinitionWithV2(payload DefinitionPayload, defi
 }
 
 // ForkDraftFromPublished derives a working draft from a published head without
-// changing the active published runtime snapshot.
-func (m *AssessmentModel) ForkDraftFromPublished(now time.Time) error {
+// changing the active published runtime snapshot. It deliberately does not
+// advance the revision: the edit that follows owns the single optimistic-lock
+// revision increment persisted for this command.
+func (m *AssessmentModel) ForkDraftFromPublished(_ time.Time) error {
 	if m == nil || !m.IsPublished() {
 		return nil
 	}
 	m.Status = StatusDraft
-	m.touch(now)
+	m.PublishedAt = nil
 	return nil
 }
 

@@ -1,73 +1,70 @@
-# Interpretation Model / Report
+# Interpretation 模块
 
-**本文回答**：Interpretation Model 如何把 Evaluation 的结构化结果转换成用户可理解的 `InterpretReport`。当前代码实现仍位于 `interpretation` module。
+> 状态：已实现。本文只做模块边界和阅读地图，详细规则以下方 6 篇 canonical 文档为准。
 
----
+## 1. 30 秒结论
 
-## 1. 这个模块负责什么
+Interpretation 把已可靠提交的 EvaluationOutcome 转换为可追溯、可授权查询的报告成品：
 
-Interpretation Model / Report 负责“测评结果如何被解释成报告”：
+```text
+EvaluationOutcome Record + frozen ReportInput
+  -> InterpretationInput                 只读解释事实
+  -> ReportGeneration                    幂等生成意图
+  -> InterpretationRun                  一次可重试构建尝试
+  -> Report Draft                        进程内内容
+  -> InterpretReport                     不可变成品
+  -> report_query_catalog                当前报告查询索引
+```
 
-- 解释模型和报告模型。
-- `ReportGeneration`、`InterpretationRun` 与 `InterpretReport` 三对象模型。
-- Report Builder Registry。
-- Score-based adapter。
-- Personality adapter。
-- 解释文案、建议、风险提示。
-- 报告聚合与持久化。
-- 独立的报告生成状态、失败与重试。
+Interpretation 不重新计分，不修改 Assessment、EvaluationRun 或 Outcome。报告生成失败只会改变 ReportGeneration / InterpretationRun，不能把已 `evaluated` 的 Assessment 改为 `failed`。
 
----
+## 2. 模块边界
 
-## 2. 这个模块不负责什么
+| Interpretation 负责 | Interpretation 不负责 |
+| --- | --- |
+| 把持久化 Outcome 和冻结 ReportInput 映射为解释输入 | 答卷校验、分数计算、等级判定 |
+| ReportGeneration 幂等、Run lease、失败分类与重试 | Assessment / EvaluationRun 状态机 |
+| 按完整机制键选择 Builder 和冻结模板版本 | ModelCatalog draft 编辑和 Published Model 发布 |
+| 不可变 InterpretReport 及报告终态事件 | Statistics 聚合、Plan 调度、Actor 关系管理 |
+| 受试者、临床人员、管理员和运维的报告查询用例 | IAM 身份、Assessment 归属和照护关系本身 |
 
-- 不提交答卷。
-- 不执行测评状态机。
-- 不修改或保存 Evaluation 的 Assessment 聚合。
-- 不发布模型资产。
-- 不调度周期任务。
-- 不维护统计读模型。
+必须区分：
 
-一句话：**Interpretation 消费已经成立的 EvaluationOutcome 并生成 Report；报告成败不能改写评估事实。**
+- `EvaluationOutcome` 是评分事实；`InterpretReport` 是人可读解释成品。
+- `ReportGeneration` 是聚合根；`InterpretReport` 是成功后才存在的不可变子成品。
+- `Report Draft` 可用于预览或事务提交前；下游只能依赖已持久化成品。
+- `report_query_catalog` 是读模型索引，不是第四个领域对象，也不保存报告正文。
+- 客户端 `interpreted / completed` 是 Assessment 与报告存在性的组合投影，不是 Assessment 新状态。
 
-已落地的边界：Assessment 保持 `evaluated`，Report 独立进入 `generated / failed`；客户端 `completed` 或兼容 `interpreted` 由跨模块读模型派生。Interpretation 不再持有 Assessment Repository，`Assessment.ApplyOutcome` 与旧 reporting Writer 已删除。
+## 3. 文档地图
 
----
+| 顺序 | 文档 | 核心问题 |
+| --- | --- | --- |
+| 10 | [领域模型](./10-领域模型.md) | Generation、Run、Draft、Report 和查询投影为什么必须拆分 |
+| 20 | [核心设计：冻结输入与报告渲染扩展](./20-核心设计-冻结输入与报告渲染扩展.md) | Outcome schema、ReportInput、机制键、Builder 和模板版本如何联合扩展 |
+| 21 | [核心设计：生成幂等与可靠提交](./21-核心设计-生成幂等与可靠提交.md) | Generation key、Run lease、失败重试和 Mongo 事务保护什么 |
+| 22 | [核心设计：报告数据存储与查询索引](./22-核心设计-报告数据存储与查询索引.md) | 5 个 Mongo collection、唯一约束、catalog 与历史兼容如何分工 |
+| 30 | [关键链路：Outcome 驱动报告生成](./30-关键链路-Outcome驱动报告生成.md) | Worker 如何从 `evaluation.outcome.committed` 进入构建、提交与 ACK/NACK |
+| 31 | [关键链路：多角色报告查询与状态投影](./31-关键链路-多角色报告查询与状态投影.md) | participant、clinician、admin、operations 如何授权并读取同一成品 |
 
-## 3. 核心领域模型
+扩展新报告机制先看 `20`；排查重复生成、长时运行或失败重试先看 `21`；排查 Mongo 数据、catalog 或历史报告先看 `22`；跟踪生产主链直接进入 `30` 或 `31`。
 
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `InterpretationModel` | 解释规则资产 | [03-解释模型设计.md](./03-解释模型设计.md) |
-| `ReportTemplate` | 报告结构和 section 模板 | [05-解释适配器与模板机制.md](./05-解释适配器与模板机制.md) |
-| `ReportGeneration` / `InterpretationRun` / `InterpretReport` | 生成意图、执行尝试、最终成品 | [02-领域模型.md](./02-领域模型.md) |
-| `ReportBuilder` | 报告构建适配能力 | [05-解释适配器与模板机制.md](./05-解释适配器与模板机制.md) |
+## 4. 事实源与验证
 
----
+| 主题 | 事实源 |
+| --- | --- |
+| Domain | [`internal/apiserver/domain/interpretation`](../../../internal/apiserver/domain/interpretation/) |
+| Application | [`internal/apiserver/application/interpretation`](../../../internal/apiserver/application/interpretation/) |
+| Mongo | [`internal/apiserver/infra/mongo/interpretation`](../../../internal/apiserver/infra/mongo/interpretation/) |
+| Query port | [`port/interpretationreadmodel`](../../../internal/apiserver/port/interpretationreadmodel/) |
+| Composition root | [`container/modules/interpretation`](../../../internal/apiserver/container/modules/interpretation/) |
+| Worker / gRPC | [`worker/handlers/assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go)、[`interpretation.proto`](../../../api/grpc/proto/interpretation/interpretation.proto) |
+| Event catalog | [`configs/events.yaml`](../../../configs/events.yaml)、[`internal/pkg/eventing/catalog`](../../../internal/pkg/eventing/catalog/) |
 
-## 4. 关键业务链路
-
-| 链路 | 文档 |
-| ---- | ---- |
-| 设计解释规则、建议和模板 | [03-解释模型设计.md](./03-解释模型设计.md) |
-| 消费执行结果并生成报告 | [04-报告生成链路.md](./04-报告生成链路.md) |
-| Builder、adapter、template 扩展 | [05-解释适配器与模板机制.md](./05-解释适配器与模板机制.md) |
-| 报告版本和可追溯性 | [06-报告版本与可追溯性.md](./06-报告版本与可追溯性.md) |
-| 新增报告模型 | [07-扩展新报告模型SOP.md](./07-扩展新报告模型SOP.md) |
-| 设计终局与重构判据 | [08-设计终局.md](./08-设计终局.md) |
-
----
-
-## 5. 上下游依赖
-
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | `evaluation` | 提供结构化执行结果 |
-| 上游 | `model-catalog` | 提供模型身份、快照和解释绑定 |
-| 下游 | `statistics` | 消费 `interpretation.report.generated` 和报告行为投影 |
-| 下游 | 查询端 | 读取报告状态和内容 |
-
-代码事实入口：
-
-- [`internal/apiserver/domain/interpretation`](../../../internal/apiserver/domain/interpretation/)
-- [`internal/apiserver/container/modules/interpretation`](../../../internal/apiserver/container/modules/interpretation/)
+```bash
+go test ./internal/apiserver/domain/interpretation/...
+go test ./internal/apiserver/application/interpretation/...
+go test ./internal/apiserver/infra/mongo/interpretation ./internal/apiserver/port/interpretationreadmodel
+go test ./internal/apiserver/container/modules/interpretation ./internal/apiserver/transport/grpc/service ./internal/worker/handlers
+make docs-hygiene
+```

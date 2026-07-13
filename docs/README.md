@@ -48,11 +48,10 @@ Assessment Model
     Scale / MBTI / BigFive 等都是模型 identity 或 Definition strategy
 
 Evaluation
-    管一次测评执行：Assessment / Outcome / Retry / Events
-    （EvaluationRun 为演进方向，当前未实现）
+    管一次测评执行：Assessment / EvaluationRun / Outcome / Retry / Events
 
 Interpretation Model / Report
-    管解释模型、报告 builder、adapter、InterpretReport 聚合与持久化
+    管 Outcome 解释、ReportGeneration / InterpretationRun、builder、不可变 InterpretReport 与查询索引
 
 Actor / Plan / Statistics
     管参与者上下文、计划任务编排和读侧统计投影
@@ -144,7 +143,7 @@ Actor / Plan / Statistics
     再理解 Assessment / EvaluationRun / Result / Retry / Events
 
 40-interpretation
-    最后理解 interpretation 模块如何产出 InterpretReport
+    最后理解 Outcome 如何经幂等生成意图与可重试 Run 产出 InterpretReport
 
 50-actor / 60-plan / 70-statistics
     按参与者、计划编排、读侧统计问题进入
@@ -189,7 +188,7 @@ configs/events.yaml
 | Survey | 作答事实层，负责问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实沉淀 | [02-业务模块/10-survey/README.md](./02-业务模块/10-survey/README.md) |
 | Assessment Model | 测评模型资产层，负责统一管理医学量表、人格模型等模型资产 | [02-业务模块/20-model-catalog/README.md](./02-业务模块/20-model-catalog/README.md) |
 | Evaluation | 测评执行层，负责将 `AnswerSheet` 与 Assessment Model 结合，完成一次 `Assessment` 执行并生成结果 | [02-业务模块/30-evaluation/README.md](./02-业务模块/30-evaluation/README.md) |
-| Interpretation Model / Report | 解释模型层，负责报告构建、解释适配、`InterpretReport` 聚合与持久化；当前代码实现仍位于 `interpretation` module | [02-业务模块/40-interpretation/README.md](./02-业务模块/40-interpretation/README.md) |
+| Interpretation Model / Report | 报告解释层，负责 Outcome 映射、生成幂等、渲染扩展、不可变 `InterpretReport` 与多角色查询 | [02-业务模块/40-interpretation/README.md](./02-业务模块/40-interpretation/README.md) |
 
 支撑模块入口：
 
@@ -287,5 +286,5 @@ Survey 保持作答事实层；
 Assessment Model 收敛模型资产和发布快照；
 Scale / MBTI / SBTI 作为模型资产与执行插件存在；
 Evaluation 保持通用测评执行层；
-Interpretation Model / Report 保持最终解释报告聚合。
+Interpretation Model / Report 保持从冻结 Outcome 到可追溯报告成品的独立边界。
 ```
