@@ -20,7 +20,7 @@ func TestV1CrossModuleAnswerSheetSubmittedWorkerToInterpretedReport(t *testing.T
 	})
 
 	h.runAnswerSheetSubmittedWorker(t, ctx, answerSheetID)
-	if !hasStagedEvent(*h.submitStaged, eventcatalog.AssessmentSubmitted) {
+	if !hasStagedEvent(*h.submitStaged, eventcatalog.EvaluationRequested) {
 		t.Fatalf("submit staged = %#v, want assessment.submitted after auto-submit", *h.submitStaged)
 	}
 
@@ -61,7 +61,7 @@ func TestV1CrossModuleAsyncAnswerSheetSubmittedWorkerEvaluatedToReport(t *testin
 	if h.reportSaver.saved {
 		t.Fatal("report should not be saved before evaluated worker")
 	}
-	if len(h.evaluateStaged) != 1 || h.evaluateStaged[0].EventType() != eventcatalog.AssessmentEvaluated {
+	if len(h.evaluateStaged) != 1 || h.evaluateStaged[0].EventType() != eventcatalog.EvaluationOutcomeCommitted {
 		t.Fatalf("evaluate staged = %#v, want [assessment.evaluated]", h.evaluateStaged)
 	}
 

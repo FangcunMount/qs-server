@@ -152,7 +152,7 @@ func TestClaimDueIDsIsolatedByStoreNamespace(t *testing.T) {
 	if err := mongoIndex.Enqueue(ctx, eventcatalog.AnswerSheetSubmitted, "mongo-evt", now, now); err != nil {
 		t.Fatalf("mongo Enqueue: %v", err)
 	}
-	if err := mysqlIndex.Enqueue(ctx, eventcatalog.AssessmentSubmitted, "mysql-evt", now, now); err != nil {
+	if err := mysqlIndex.Enqueue(ctx, eventcatalog.EvaluationRequested, "mysql-evt", now, now); err != nil {
 		t.Fatalf("mysql Enqueue: %v", err)
 	}
 

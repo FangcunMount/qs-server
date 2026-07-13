@@ -13,18 +13,3 @@ import (
 type PostCommitDispatcher interface {
 	AfterCommit(ctx context.Context, events []event.DomainEvent, readyAt time.Time)
 }
-
-type readyIndexPostCommitDispatcher struct {
-	indexer *PostCommitReadyIndexer
-}
-
-func NewReadyIndexPostCommitDispatcher(index ReadyIndex) PostCommitDispatcher {
-	return &readyIndexPostCommitDispatcher{indexer: NewPostCommitReadyIndexer(index)}
-}
-
-func (d *readyIndexPostCommitDispatcher) AfterCommit(ctx context.Context, events []event.DomainEvent, readyAt time.Time) {
-	if d == nil || d.indexer == nil {
-		return
-	}
-	d.indexer.EnqueueAfterCommit(ctx, events, readyAt)
-}

@@ -13,17 +13,6 @@ const (
 	InterpretationReportGenerated = "interpretation.report.generated"
 	InterpretationReportFailed    = "interpretation.report.failed"
 
-	// Deprecated identifiers retained only while repository-wide tests and
-	// operational fixtures migrate. They resolve to the new event contract and
-	// do not preserve any old wire event names.
-	AssessmentSubmitted          = EvaluationRequested
-	AssessmentEvaluated          = EvaluationOutcomeCommitted
-	AssessmentInterpreted        = InterpretationReportGenerated
-	AssessmentInterpretedOutcome = InterpretationReportGenerated
-	AssessmentFailed             = EvaluationFailed
-	ReportGenerated              = InterpretationReportGenerated
-	ReportGeneratedOutcome       = InterpretationReportGenerated
-
 	AssessmentModelChanged = "assessment_model.changed"
 
 	TaskOpened    = "task.opened"

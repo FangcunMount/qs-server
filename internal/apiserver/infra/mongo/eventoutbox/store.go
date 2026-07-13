@@ -51,20 +51,7 @@ type Store struct {
 	priorityTiers      [][]string
 }
 
-func NewStore(db *mongo.Database) (*Store, error) {
-	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
-}
-
 type StoreOption func(*Store)
-
-func WithPriorityEventTypes(eventTypes []string) StoreOption {
-	return func(s *Store) {
-		if len(eventTypes) == 0 {
-			return
-		}
-		s.priorityTiers = [][]string{normalizePriorityEventTypes(eventTypes), nil}
-	}
-}
 
 func WithPriorityTiers(tiers [][]string) StoreOption {
 	return func(s *Store) {
@@ -190,12 +177,6 @@ func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
 		return ErrActiveSessionTransactionRequired
 	}
 	return s.stageWithSession(txCtx, events)
-}
-
-// StageEventsTx stages events through an explicit Mongo session transaction.
-// Deprecated: keep this only for existing repository-owned Mongo transactions.
-func (s *Store) StageEventsTx(ctx mongo.SessionContext, events []event.DomainEvent) error {
-	return s.stageWithSession(ctx, events)
 }
 
 func (s *Store) stageWithSession(ctx mongo.SessionContext, events []event.DomainEvent) error {

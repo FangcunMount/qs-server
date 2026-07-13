@@ -35,12 +35,12 @@ func (s *immediateTestStore) GetPublishableEvent(ctx context.Context, eventID st
 
 func TestImmediateDispatcherUsesExplicitEventTypes(t *testing.T) {
 	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
-		ImmediateEventTypes: []string{eventcatalog.AnswerSheetSubmitted, eventcatalog.AssessmentSubmitted},
+		ImmediateEventTypes: []string{eventcatalog.AnswerSheetSubmitted, eventcatalog.EvaluationRequested},
 	})
 	if _, ok := dispatcher.immediateEventTypes[eventcatalog.AnswerSheetSubmitted]; !ok {
 		t.Fatal("answersheet.submitted should be immediate")
 	}
-	if _, ok := dispatcher.immediateEventTypes[eventcatalog.AssessmentSubmitted]; !ok {
+	if _, ok := dispatcher.immediateEventTypes[eventcatalog.EvaluationRequested]; !ok {
 		t.Fatal("assessment.submitted should be immediate for MySQL assessment outbox")
 	}
 }

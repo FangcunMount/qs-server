@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func TestClaimDueEventsQueryDocumentsDueStaleAndOrderContract(t *testing.T) {
 	db := newDryRunOutboxDB(t)
-	store := NewStore(db)
+	store := NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 	now := time.Date(2026, 6, 5, 16, 8, 0, 0, time.UTC)
 	var rows []OutboxPO
 

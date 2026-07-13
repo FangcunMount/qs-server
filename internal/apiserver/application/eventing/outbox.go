@@ -58,15 +58,6 @@ type relayPublishResult struct {
 	err       error
 }
 
-// NewOutboxRelay 创建通用中继器 用于 outbox 支撑的事件。
-func NewOutboxRelay(name string, store OutboxStore, publisher event.EventPublisher) OutboxRelay {
-	return NewOutboxRelayWithOptions(OutboxRelayOptions{
-		Name:      name,
-		Store:     store,
-		Publisher: publisher,
-	})
-}
-
 type OutboxRelayOptions struct {
 	Name                    string
 	Store                   OutboxStore
@@ -123,15 +114,6 @@ func batchPublisherOf(store OutboxStore) outboxport.BatchPublisher {
 	}
 	typed, _ := store.(outboxport.BatchPublisher)
 	return typed
-}
-
-func NewDurableOutboxRelay(name string, store OutboxStore, publisher event.EventPublisher) OutboxRelay {
-	return NewOutboxRelayWithOptions(OutboxRelayOptions{
-		Name:                    name,
-		Store:                   store,
-		Publisher:               publisher,
-		RequireDurablePublisher: true,
-	})
 }
 
 type durablePublisher interface {

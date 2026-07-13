@@ -3,7 +3,6 @@ package eventoutbox
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
@@ -46,15 +45,6 @@ type Store struct {
 
 type StoreOption func(*Store)
 
-func WithPriorityEventTypes(eventTypes []string) StoreOption {
-	return func(s *Store) {
-		if len(eventTypes) == 0 {
-			return
-		}
-		s.priorityTiers = [][]string{normalizePriorityEventTypes(eventTypes), nil}
-	}
-}
-
 func WithPriorityTiers(tiers [][]string) StoreOption {
 	return func(s *Store) {
 		if len(tiers) == 0 {
@@ -62,10 +52,6 @@ func WithPriorityTiers(tiers [][]string) StoreOption {
 		}
 		s.priorityTiers = tiers
 	}
-}
-
-func NewStore(db *gorm.DB) *Store {
-	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 }
 
 func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver, opts ...StoreOption) *Store {
@@ -90,12 +76,6 @@ func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	if err != nil {
 		return err
 	}
-	return s.stageWithDB(tx, events)
-}
-
-// StageEventsTx stages events through an explicit transaction handle.
-// Deprecated: use Stage(ctx, events...) with a transaction context.
-func (s *Store) StageEventsTx(tx *gorm.DB, events []event.DomainEvent) error {
 	return s.stageWithDB(tx, events)
 }
 
@@ -303,24 +283,4 @@ func outboxOldestStatusQuery(db *gorm.DB, status string) *gorm.DB {
 	return db.Where("status = ?", status).
 		Order("created_at ASC").
 		Limit(1)
-}
-
-func normalizePriorityEventTypes(eventTypes []string) []string {
-	if len(eventTypes) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{}, len(eventTypes))
-	normalized := make([]string, 0, len(eventTypes))
-	for _, eventType := range eventTypes {
-		eventType = strings.TrimSpace(eventType)
-		if eventType == "" {
-			continue
-		}
-		if _, ok := seen[eventType]; ok {
-			continue
-		}
-		seen[eventType] = struct{}{}
-		normalized = append(normalized, eventType)
-	}
-	return normalized
 }

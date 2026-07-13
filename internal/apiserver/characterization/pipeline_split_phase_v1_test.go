@@ -90,8 +90,8 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	if reportSaver.saved {
 		t.Fatal("report should not be saved before async GenerateReport")
 	}
-	if len(staged) != 1 || staged[0] != eventcatalog.AssessmentEvaluated {
-		t.Fatalf("staged events = %#v, want [%q]", staged, eventcatalog.AssessmentEvaluated)
+	if len(staged) != 1 || staged[0] != eventcatalog.EvaluationOutcomeCommitted {
+		t.Fatalf("staged events = %#v, want [%q]", staged, eventcatalog.EvaluationOutcomeCommitted)
 	}
 
 	if err := svc.GenerateReport(context.Background(), a.ID().Uint64()); err != nil {

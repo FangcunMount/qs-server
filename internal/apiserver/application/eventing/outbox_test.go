@@ -191,7 +191,7 @@ func TestOutboxRelayObservesClaimFailed(t *testing.T) {
 func TestOutboxRelayObservesPublished(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		statusSnapshot: outboxport.StatusSnapshot{
 			Store: "test-relay",
 			Buckets: []outboxport.StatusBucket{
@@ -236,12 +236,12 @@ func TestOutboxRelayUsesConfiguredBatchSize(t *testing.T) {
 func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 	store := &fakeOutboxStore{
 		pending: []PendingOutboxEvent{
-			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
-			pendingEvent("evt-2", eventcatalog.ReportGenerated),
+			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
+			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
-			pendingEvent("evt-4", eventcatalog.ReportGeneratedOutcome),
-			pendingEvent("evt-5", eventcatalog.AssessmentSubmitted),
-			pendingEvent("evt-6", eventcatalog.ReportGenerated),
+			pendingEvent("evt-4", eventcatalog.InterpretationReportGenerated),
+			pendingEvent("evt-5", eventcatalog.EvaluationRequested),
+			pendingEvent("evt-6", eventcatalog.InterpretationReportGenerated),
 		},
 	}
 	publisher := &trackingPublisher{}
@@ -268,10 +268,10 @@ func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 	store := &fakeOutboxStore{
 		pending: []PendingOutboxEvent{
-			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
-			pendingEvent("evt-2", eventcatalog.ReportGenerated),
+			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
+			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
-			pendingEvent("evt-4", eventcatalog.ReportGeneratedOutcome),
+			pendingEvent("evt-4", eventcatalog.InterpretationReportGenerated),
 		},
 	}
 	publisher := &trackingPublisher{}
@@ -295,8 +295,8 @@ func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 
 func TestOutboxRelayMarksPublishedBeforeWholeClaimedBatchCompletes(t *testing.T) {
 	store := newBlockingMarkStore([]PendingOutboxEvent{
-		pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
-		pendingEvent("evt-2", eventcatalog.ReportGenerated),
+		pendingEvent("evt-1", eventcatalog.EvaluationRequested),
+		pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 		pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
 	})
 	publisher := &blockingThirdPublisher{
@@ -348,7 +348,7 @@ func TestOutboxRelayMarksPublishedBeforeWholeClaimedBatchCompletes(t *testing.T)
 func TestOutboxRelayObservesBatchMarkPublishedFailed(t *testing.T) {
 	observer := &outboxObserver{}
 	store := newBlockingMarkStore([]PendingOutboxEvent{
-		pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
+		pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 	})
 	store.markPublishedErr = errors.New("batch mark failed")
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
@@ -371,11 +371,11 @@ func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
 		pending: []PendingOutboxEvent{
-			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
-			pendingEvent("evt-2", eventcatalog.ReportGenerated),
+			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
+			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 		},
 	}
-	publisher := &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}}
+	publisher := &fakePublisher{failAt: map[string]error{eventcatalog.EvaluationRequested: errors.New("publish failed")}}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:      "test-relay",
 		Store:     store,
@@ -402,13 +402,13 @@ func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
 func TestOutboxRelayObservesMarkFailedFailed(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending:       []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending:       []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		markFailedErr: errors.New("mark failed"),
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:      "test-relay",
 		Store:     store,
-		Publisher: &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}},
+		Publisher: &fakePublisher{failAt: map[string]error{eventcatalog.EvaluationRequested: errors.New("publish failed")}},
 		Observer:  observer,
 	})
 
@@ -424,7 +424,7 @@ func TestOutboxRelayObservesMarkPublishedFailed(t *testing.T) {
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name: "test-relay",
 		Store: &fakeOutboxStore{
-			pending:          []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+			pending:          []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 			markPublishedErr: errors.New("mark published failed"),
 		},
 		Publisher: &fakePublisher{},
@@ -440,7 +440,7 @@ func TestOutboxRelayObservesMarkPublishedFailed(t *testing.T) {
 func TestOutboxRelayStatusReporterFailureDoesNotChangeDispatchResult(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending:   []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending:   []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		statusErr: errors.New("status failed"),
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
@@ -501,7 +501,7 @@ func TestOutboxStatusReporterThrottlesStatusScrapes(t *testing.T) {
 
 func TestDurableOutboxRelayRejectsNonMQBackedPublisher(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:                    "durable-relay",
@@ -519,7 +519,7 @@ func TestDurableOutboxRelayRejectsNonMQBackedPublisher(t *testing.T) {
 
 func TestDurableOutboxRelayAcceptsMQBackedPublisher(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:                    "durable-relay",
@@ -574,12 +574,12 @@ func TestOutboxRelayClaimsFromReadyIndexFirst(t *testing.T) {
 func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
 	ready := &fakeReadyIndex{buckets: map[string][]string{}}
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:       "test-relay",
 		Store:      store,
-		Publisher:  &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}},
+		Publisher:  &fakePublisher{failAt: map[string]error{eventcatalog.EvaluationRequested: errors.New("publish failed")}},
 		ReadyIndex: ready,
 	})
 
@@ -589,7 +589,7 @@ func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
 	if len(ready.enqueues) != 1 {
 		t.Fatalf("ready index enqueues = %#v, want one", ready.enqueues)
 	}
-	if ready.enqueues[0].eventType != eventcatalog.AssessmentSubmitted || ready.enqueues[0].eventID != "evt-1" {
+	if ready.enqueues[0].eventType != eventcatalog.EvaluationRequested || ready.enqueues[0].eventID != "evt-1" {
 		t.Fatalf("ready index enqueue = %#v, want assessment.submitted evt-1", ready.enqueues[0])
 	}
 }
