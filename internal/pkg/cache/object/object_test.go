@@ -119,6 +119,62 @@ func TestReadThroughFailsOpenOnStoreError(t *testing.T) {
 	}
 }
 
+func TestReadThroughRequiresInjectedCoalescerWhenPolicyEnablesSingleflight(t *testing.T) {
+	store := NewStore(StoreOptions[contractValue]{Codec: contractCodec})
+	policies := sharedcache.NewRegistry(sharedcache.EffectiveCapability{
+		Capability: "assessment_detail", Policy: sharedcache.Policy{Singleflight: sharedcache.PolicySwitchEnabled},
+	})
+	_, err := ReadThrough(context.Background(), ReadThroughOptions[contractValue]{
+		Capability: "assessment_detail", CacheKey: "object:missing-coalescer", PolicyProvider: policies,
+		Store: store, Load: func(context.Context) (*contractValue, error) { return &contractValue{ID: 1}, nil },
+	})
+	if !errors.Is(err, ErrCoalescerRequired) {
+		t.Fatalf("ReadThrough() error = %v, want ErrCoalescerRequired", err)
+	}
+}
+
+func TestReadThroughSingleflightFollowsReloadedSnapshot(t *testing.T) {
+	policy := sharedcache.Policy{Singleflight: sharedcache.PolicySwitchDisabled, TTL: time.Minute}
+	store, _, cleanup := newContractStore(t, policy)
+	defer cleanup()
+	capability := sharedcache.EffectiveCapability{Capability: "assessment_detail", Policy: policy}
+	policies := sharedcache.NewRegistry(capability)
+
+	run := func(key string) int32 {
+		var loads atomic.Int32
+		errCh := make(chan error, 8)
+		for i := 0; i < 8; i++ {
+			go func() {
+				_, err := ReadThrough(context.Background(), ReadThroughOptions[contractValue]{
+					Capability: "assessment_detail", CacheKey: key, PolicyProvider: policies, Store: store,
+					Load: func(context.Context) (*contractValue, error) {
+						loads.Add(1)
+						time.Sleep(15 * time.Millisecond)
+						return &contractValue{ID: 9}, nil
+					},
+				})
+				errCh <- err
+			}()
+		}
+		for i := 0; i < 8; i++ {
+			if err := <-errCh; err != nil {
+				t.Fatal(err)
+			}
+		}
+		return loads.Load()
+	}
+	if loads := run("object:disabled"); loads != 8 {
+		t.Fatalf("loads with singleflight disabled = %d, want 8", loads)
+	}
+	capability.Policy.Singleflight = sharedcache.PolicySwitchEnabled
+	if _, err := policies.Publish(1, []sharedcache.EffectiveCapability{capability}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if loads := run("object:enabled"); loads != 1 {
+		t.Fatalf("loads with singleflight enabled = %d, want 1", loads)
+	}
+}
+
 func newContractStore(t *testing.T, policy sharedcache.Policy) (*Store[contractValue], redis.UniversalClient, func()) {
 	t.Helper()
 	mr := miniredis.RunT(t)

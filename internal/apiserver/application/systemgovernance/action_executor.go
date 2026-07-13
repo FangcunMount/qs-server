@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -73,6 +74,7 @@ func (e *ActionExecutor) runReloadPolicy(ctx context.Context, orgID int64, input
 	if err := json.Unmarshal(payload, &req); err != nil || req.ExpectedVersion == 0 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "expected_version must be a positive integer")
 	}
+	req.ActorUserID = actorctx.GrantingUserID(ctx)
 	result, err := e.reloader.ReloadPolicy(ctx, orgID, req)
 	if err != nil {
 		return nil, err

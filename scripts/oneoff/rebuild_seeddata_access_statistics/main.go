@@ -16,6 +16,7 @@ import (
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	driverMysql "github.com/go-sql-driver/mysql"
 	redis "github.com/redis/go-redis/v9"
@@ -1160,10 +1161,13 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 	}
 	log.Printf("cleared statistics query cache: query_keys=%d version_keys=%d", queryDeleted, versionDeleted)
 
-	cache := statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+	cache := statisticsCache.NewStatisticsCacheWithBuilderProviderVersionStoreAndObserver(
 		queryClient,
 		keyspace.NewBuilderWithNamespace(cfg.redisQueryNS),
-		cachepolicy.CachePolicy{},
+		sharedcache.NewRegistry(sharedcache.EffectiveCapability{
+			Capability: cachepolicy.CapabilityStatisticsQuery,
+			Policy:     cachepolicy.CachePolicy{},
+		}),
 		statisticsCache.NewVersionTokenStore(metaClient, nil),
 		nil,
 	)

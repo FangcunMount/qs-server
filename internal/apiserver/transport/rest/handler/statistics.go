@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
@@ -799,8 +801,8 @@ func (h *StatisticsHandler) RepairComplete(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Param request body cachegovernance.ManualWarmupRequest true "预热目标列表"
-// @Success 200 {object} core.Response{data=cachegovernance.ManualWarmupResult}
+// @Param request body cachetarget.ManualWarmupRequest true "预热目标列表"
+// @Success 200 {object} core.Response{data=cachemodel.ManualWarmupResult}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
 // @Router /internal/v1/cache/governance/warmup-targets [post]
@@ -811,12 +813,13 @@ func (h *StatisticsHandler) WarmupTargets(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	var req statisticsApp.ManualWarmupRequest
+	var req cachetarget.ManualWarmupRequest
 	if !h.bindJSON(c, &req) {
 		return
 	}
 
-	result, err := h.governance().HandleManualWarmup(ctx, orgID, req)
+	var result *cachemodel.ManualWarmupResult
+	result, err = h.governance().HandleManualWarmup(ctx, orgID, req)
 	if err != nil {
 		h.Error(c, err)
 		return

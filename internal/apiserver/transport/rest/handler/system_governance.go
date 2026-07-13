@@ -141,7 +141,7 @@ func (h *SystemGovernanceHandler) Actions(c *gin.Context) {
 
 // RunAction executes one enabled governance command.
 // @Summary 执行治理动作
-// @Description 执行低风险治理动作（如 cache.manual_warmup、cache.repair_complete）；仅 qs:admin 可访问
+// @Description 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅 qs:admin 可访问
 // @Tags System-Governance
 // @Accept json
 // @Produce json

@@ -7901,7 +7901,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/observability.RuntimeSnapshot"
+                            "$ref": "#/definitions/cachemodel.RuntimeSnapshot"
                         }
                     }
                 }
@@ -8049,7 +8049,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/cachegovernance.ManualWarmupRequest"
+                            "$ref": "#/definitions/cachetarget.ManualWarmupRequest"
                         }
                     }
                 ],
@@ -8065,7 +8065,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/cachegovernance.ManualWarmupResult"
+                                            "$ref": "#/definitions/cachemodel.ManualWarmupResult"
                                         }
                                     }
                                 }
@@ -8753,7 +8753,7 @@ const docTemplate = `{
         },
         "/internal/v1/system-governance/actions/{action_id}/runs": {
             "post": {
-                "description": "执行低风险治理动作（如 cache.manual_warmup、cache.repair_complete）；仅 qs:admin 可访问",
+                "description": "执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -9077,14 +9077,61 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "cachegovernance.ManualWarmupItemResult": {
+        "cachemodel.FamilyStatus": {
+            "type": "object",
+            "properties": {
+                "allow_warmup": {
+                    "type": "boolean"
+                },
+                "available": {
+                    "type": "boolean"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "cachemodel.ManualWarmupItemResult": {
             "type": "object",
             "properties": {
                 "family": {
                     "type": "string"
                 },
                 "kind": {
-                    "$ref": "#/definitions/cachetarget.WarmupKind"
+                    "type": "string"
                 },
                 "message": {
                     "type": "string"
@@ -9093,11 +9140,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/cachegovernance.ManualWarmupItemStatus"
+                    "$ref": "#/definitions/cachemodel.ManualWarmupItemStatus"
                 }
             }
         },
-        "cachegovernance.ManualWarmupItemStatus": {
+        "cachemodel.ManualWarmupItemStatus": {
             "type": "string",
             "enum": [
                 "ok",
@@ -9110,18 +9157,7 @@ const docTemplate = `{
                 "ManualWarmupItemStatusError"
             ]
         },
-        "cachegovernance.ManualWarmupRequest": {
-            "type": "object",
-            "properties": {
-                "targets": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/cachegovernance.ManualWarmupTarget"
-                    }
-                }
-            }
-        },
-        "cachegovernance.ManualWarmupResult": {
+        "cachemodel.ManualWarmupResult": {
             "type": "object",
             "properties": {
                 "finished_at": {
@@ -9130,21 +9166,21 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/cachegovernance.ManualWarmupItemResult"
+                        "$ref": "#/definitions/cachemodel.ManualWarmupItemResult"
                     }
                 },
                 "started_at": {
                     "type": "string"
                 },
                 "summary": {
-                    "$ref": "#/definitions/cachegovernance.ManualWarmupSummary"
+                    "$ref": "#/definitions/cachemodel.ManualWarmupSummary"
                 },
                 "trigger": {
                     "type": "string"
                 }
             }
         },
-        "cachegovernance.ManualWarmupSummary": {
+        "cachemodel.ManualWarmupSummary": {
             "type": "object",
             "properties": {
                 "error_count": {
@@ -9164,7 +9200,58 @@ const docTemplate = `{
                 }
             }
         },
-        "cachegovernance.ManualWarmupTarget": {
+        "cachemodel.RuntimeSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.FamilyStatus"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/cachemodel.RuntimeSummary"
+                }
+            }
+        },
+        "cachemodel.RuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "available_count": {
+                    "type": "integer"
+                },
+                "degraded_count": {
+                    "type": "integer"
+                },
+                "family_total": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
+                },
+                "unavailable_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachetarget.ManualWarmupRequest": {
+            "type": "object",
+            "properties": {
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachetarget.ManualWarmupTarget"
+                    }
+                }
+            }
+        },
+        "cachetarget.ManualWarmupTarget": {
             "type": "object",
             "properties": {
                 "kind": {
@@ -9906,93 +9993,6 @@ const docTemplate = `{
                 },
                 "normTableVersion": {
                     "type": "string"
-                }
-            }
-        },
-        "observability.FamilyStatus": {
-            "type": "object",
-            "properties": {
-                "allow_warmup": {
-                    "type": "boolean"
-                },
-                "available": {
-                    "type": "boolean"
-                },
-                "component": {
-                    "type": "string"
-                },
-                "configured": {
-                    "type": "boolean"
-                },
-                "consecutive_failures": {
-                    "type": "integer"
-                },
-                "degraded": {
-                    "type": "boolean"
-                },
-                "family": {
-                    "type": "string"
-                },
-                "last_error": {
-                    "type": "string"
-                },
-                "last_failure_at": {
-                    "type": "string"
-                },
-                "last_success_at": {
-                    "type": "string"
-                },
-                "mode": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "profile": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "observability.RuntimeSnapshot": {
-            "type": "object",
-            "properties": {
-                "component": {
-                    "type": "string"
-                },
-                "families": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/observability.FamilyStatus"
-                    }
-                },
-                "generated_at": {
-                    "type": "string"
-                },
-                "summary": {
-                    "$ref": "#/definitions/observability.RuntimeSummary"
-                }
-            }
-        },
-        "observability.RuntimeSummary": {
-            "type": "object",
-            "properties": {
-                "available_count": {
-                    "type": "integer"
-                },
-                "degraded_count": {
-                    "type": "integer"
-                },
-                "family_total": {
-                    "type": "integer"
-                },
-                "ready": {
-                    "type": "boolean"
-                },
-                "unavailable_count": {
-                    "type": "integer"
                 }
             }
         },

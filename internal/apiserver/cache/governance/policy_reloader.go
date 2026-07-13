@@ -62,9 +62,17 @@ func (r *PolicyReloader) ReloadPolicy(ctx context.Context, orgID int64, request 
 	startedAt := time.Now()
 	r.status.LastAttemptAt = startedAt
 	resultLabel := "failure"
+	source := ""
 	defer func() {
 		policyReloadTotal.WithLabelValues(r.component, resultLabel).Inc()
 		policyReloadDuration.WithLabelValues(r.component, resultLabel).Observe(time.Since(startedAt).Seconds())
+		if resultLabel == "failure" {
+			logger.L(ctx).Warnw("Cache policy reload failed",
+				"component", r.component, "actor_user_id", request.ActorUserID, "org_id", orgID,
+				"source", source, "expected_version", request.ExpectedVersion,
+				"current_version", r.registry.Version(), "result", resultLabel, "error", r.status.LastError,
+			)
+		}
 	}()
 
 	if current := r.registry.Version(); current != request.ExpectedVersion {
@@ -72,7 +80,8 @@ func (r *PolicyReloader) ReloadPolicy(ctx context.Context, orgID int64, request 
 		r.recordFailure(err)
 		return nil, err
 	}
-	candidate, source, err := r.loader(ctx)
+	candidate, loadedSource, err := r.loader(ctx)
+	source = loadedSource
 	if err != nil {
 		r.recordFailure(err)
 		return nil, err
@@ -92,7 +101,7 @@ func (r *PolicyReloader) ReloadPolicy(ctx context.Context, orgID int64, request 
 	resultLabel = "success"
 	policySnapshotVersion.WithLabelValues(r.component).Set(float64(published.CurrentVersion))
 	logger.L(ctx).Infow("Cache policy reload completed",
-		"component", r.component, "org_id", orgID, "source", source,
+		"component", r.component, "actor_user_id", request.ActorUserID, "org_id", orgID, "source", source,
 		"previous_version", published.PreviousVersion, "current_version", published.CurrentVersion,
 		"changed", published.Changed, "changed_capabilities", changedCapabilities,
 	)

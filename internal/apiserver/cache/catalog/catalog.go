@@ -33,7 +33,7 @@ var specs = []Spec{
 	{ID: CapabilityActorTestee, Owner: "actor", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.actor.testee", MetricLabel: "testee", Defaults: sharedcache.Policy{TTL: 30 * time.Minute, Negative: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityPlanDetail, Owner: "plan", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.plan.detail", MetricLabel: "plan", Defaults: sharedcache.Policy{TTL: 2 * time.Hour, Singleflight: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityStatisticsQuery, Owner: "statistics", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyQuery, ConfigPath: "cache.capabilities.statistics.query", MetricLabel: "stats_query", Defaults: sharedcache.Policy{TTL: 5 * time.Minute, Singleflight: sharedcache.PolicySwitchDisabled}},
-	{ID: CapabilityReportStatus, Owner: "interpretation", Kind: sharedcache.KindOperationalState, Layer: sharedcache.LayerRuntime, Family: cachemodel.FamilyOps, ConfigPath: "cache.capabilities.report_status", MetricLabel: "report_status", Defaults: sharedcache.Policy{TTL: 48 * time.Hour}},
+	{ID: CapabilityReportStatus, Owner: "interpretation", Kind: sharedcache.KindOperationalState, Layer: sharedcache.LayerRuntime, Family: cachemodel.FamilyOps, ConfigPath: "cache.capabilities.report_status", MetricLabel: "report_status", Defaults: sharedcache.Policy{TTL: 48 * time.Hour, Singleflight: sharedcache.PolicySwitchDisabled, Negative: sharedcache.PolicySwitchDisabled}},
 }
 
 func Specs() []Spec { return append([]Spec(nil), specs...) }

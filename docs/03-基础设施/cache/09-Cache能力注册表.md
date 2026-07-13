@@ -4,7 +4,7 @@
 
 Cache 已形成三个稳定入口：共享机制在 `internal/pkg/cache`，apiserver 的 capability/adapter/governance 在 `internal/apiserver/cache`，collection-server 的 L1 与生命周期在 `internal/collection-server/cache`。Redis family/profile/namespace 属于 `internal/pkg/redisruntime`，不再以 cache package 承载 lock、rank、signal 等 workload。
 
-apiserver 的 capability ID 使用业务模块前缀，例如 `cache.capabilities.survey.questionnaire` 对应 `survey.questionnaire`。collection-server 的既有 L1 ID 保持 `catalog.questionnaire/catalog.typology`。Registry v2 返回 owner、kind、layer、family、最终 Policy、配置来源、版本和兼容 metric label。
+apiserver 的 capability ID 使用业务模块前缀，例如 `cache.capabilities.survey.questionnaire` 对应 `survey.questionnaire`。collection-server 的既有 L1 ID 保持 `catalog.questionnaire/catalog.typology`。Registry v2 是进程内唯一 Policy 事实源，返回 owner、kind、layer、family、四层 Policy、最终 Policy、配置来源、snapshot/catalog 版本和兼容 metric label。apiserver 可通过受保护的 system-governance 动作原子 reload 七个普通 capability；collection-server 保持静态 snapshot。
 
 ## 代码入口
 
@@ -26,7 +26,7 @@ apiserver 的 capability ID 使用业务模块前缀，例如 `cache.capabilitie
 | `catalog.questionnaire` | collection-server | cache | L1 | `local` | `cache.capabilities.catalog.questionnaire` | `catalog.questionnaire` | apiserver questionnaire gRPC | signal 精确/前缀删除，TTL 兜底 |
 | `catalog.typology` | collection-server | cache | L1 | `local` | `cache.capabilities.catalog.typology` | `catalog.typology` | assessment-model catalog gRPC | signal 驱逐；启动预热 list/categories |
 | `survey.questionnaire` | survey | cache | L2 | `static_meta` | `cache.capabilities.survey.questionnaire` | `questionnaire` | Mongo questionnaire | 写后删除；startup/publish/manual warmup |
-| `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | `cache.capabilities.modelcatalog.published_model` | `published_model` | Mongo published model | scale/typology warmup target；upsert 后失效 list/algorithm keys |
+| `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | `cache.capabilities.modelcatalog.published_model` | `published_model` | Mongo published model | latest-by-code 真填充；upsert 后精确失效 latest/list/algorithm keys |
 | `evaluation.assessment_detail` | evaluation | cache | L2 | `object_view` | `cache.capabilities.evaluation.assessment_detail` | `assessment_detail` | MySQL assessment | Save/Delete 后按 ID 删除 |
 | `evaluation.assessment_list` | evaluation | cache | L1+L2 | `query_result` + `meta_hotset` | `cache.capabilities.evaluation.assessment_list` | `assessment_list` | assessment read model | version token bump |
 | `actor.testee` | actor | cache | L2 | `object_view` | `cache.capabilities.actor.testee` | `testee` | MySQL testee | 写后删除；negative sentinel |
@@ -67,7 +67,15 @@ cache:
 - 未知 cache capability 或字段由 `pkg/app` raw-settings validator 在启动时拒绝；
 - Redis route 仍只由 `redis_runtime` 管理。
 
-普通 apiserver capability 可覆盖 `enabled/ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`。继承顺序固定为 capability 显式值 → family defaults → global compress/jitter → `Spec.Defaults`；`report_status` 只使用 operational-state 合同字段。
+普通 apiserver capability 可配置 `enabled/ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`。继承顺序固定为 capability override → family defaults → global defaults → `Spec.Defaults`；最终 effective Policy 不保留 `inherit`。`report_status` 只使用 operational-state 合同字段。
+
+运行期 reload 使用：
+
+```http
+POST /internal/v1/system-governance/actions/cache.reload_policy/runs
+```
+
+该动作仅允许修改七个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative` 以及 global/family policy defaults，要求 `qs:admin`、`confirm=true` 和 `expected_version`。`enabled/family/layer/governance/report_status` 均为启动期静态合同；非法 candidate、读取失败或 version conflict 不改变当前 snapshot。成功 reload 只影响后续操作和新写入 entry，既有 Redis expiry 不追溯修改。
 
 ## 行为合同
 
@@ -78,6 +86,14 @@ cache:
 - TTL、jitter、FIFO、clone、prefix delete 与 singleflight；
 - Prometheus metric name 与 label schema；
 - Cache-Aside 留在 application query service 或 infrastructure decorator；domain 不依赖 cache。
+
+`modelcatalog.published_model` 新增的 entry 是此前不存在的新合同：
+
+```text
+<static namespace>:assessment_model:published:latest:<kind>:<lowercase-code>
+```
+
+scale/typology warmup 同步执行 source load、Redis Set、Exists 与 read-back；只有 entry 已可见才记录 `ok`。capability disabled 或 Redis unavailable 记录 `skipped`。
 
 ## 新增 capability 的登记要求
 

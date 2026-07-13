@@ -54,6 +54,10 @@ func (c *Versioned) Get(ctx context.Context, versionKey string, buildDataKey fun
 	if c == nil || c.payload == nil || buildDataKey == nil {
 		return sharedcache.ErrMiss
 	}
+	// Resolve once at the operation boundary so a concurrent reload cannot mix
+	// policy snapshots inside this operation. Get currently needs no policy
+	// field, but retains the same boundary contract as Set.
+	_ = c.resolvePolicy()
 	version, err := c.CurrentVersion(ctx, versionKey)
 	if err != nil {
 		sharedcache.Observe(c.observer, sharedcache.Event{Operation: sharedcache.OperationGet, Result: sharedcache.ResultMiss})
@@ -102,6 +106,7 @@ func (c *Versioned) Set(ctx context.Context, versionKey string, buildDataKey fun
 	if c == nil || c.payload == nil || buildDataKey == nil || value == nil {
 		return
 	}
+	policy := c.resolvePolicy()
 	version, err := c.CurrentVersion(ctx, versionKey)
 	if err != nil {
 		return
@@ -115,18 +120,21 @@ func (c *Versioned) Set(ctx context.Context, versionKey string, buildDataKey fun
 		c.memory.Set(key, raw)
 	}
 	start := time.Now()
-	policy := sharedcache.Policy{}
-	if c.policies != nil {
-		if effective, ok := c.policies.Resolve(c.capability); ok {
-			policy = effective.Policy
-		}
-	}
 	err = c.payload.Set(ctx, key, raw, policy.TTL, policy)
 	result := sharedcache.ResultOK
 	if err != nil {
 		result = sharedcache.ResultError
 	}
 	sharedcache.Observe(c.observer, sharedcache.Event{Operation: sharedcache.OperationSet, Result: result, Duration: time.Since(start), Err: err})
+}
+
+func (c *Versioned) resolvePolicy() sharedcache.Policy {
+	if c != nil && c.policies != nil {
+		if effective, ok := c.policies.Resolve(c.capability); ok {
+			return effective.Policy
+		}
+	}
+	return sharedcache.Policy{}
 }
 
 func (c *Versioned) Invalidate(ctx context.Context, versionKey string) error {

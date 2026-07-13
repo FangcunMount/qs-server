@@ -2,6 +2,7 @@ package statisticscache
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -97,6 +98,43 @@ func TestStatisticsCacheAppliesPolicyTTLAndCompression(t *testing.T) {
 	}
 	if value != "{\"ok\":true}" {
 		t.Fatalf("unexpected cache value after compression roundtrip: %s", value)
+	}
+}
+
+func TestStatisticsCacheReloadAffectsOnlyNewWritesAndKeepsGzipReadable(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	capability := sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityStatisticsQuery, Enabled: true,
+		Policy: sharedcache.Policy{TTL: time.Minute, Compress: sharedcache.PolicySwitchEnabled}}
+	registry := sharedcache.NewRegistry(capability)
+	cache := NewStatisticsCacheWithBuilderAndProvider(client, keyspace.NewBuilderWithNamespace("reload"), registry)
+	ctx := context.Background()
+	if err := cache.SetQueryCache(ctx, "old", `{"value":"old"}`); err != nil {
+		t.Fatal(err)
+	}
+	oldKey := "reload:query:stats:query:old:v0"
+	oldTTL := mr.TTL(oldKey)
+
+	capability.Policy = sharedcache.Policy{TTL: 5 * time.Minute, Compress: sharedcache.PolicySwitchDisabled}
+	if _, err := registry.Publish(1, []sharedcache.EffectiveCapability{capability}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.SetQueryCache(ctx, "new", `{"value":"new"}`); err != nil {
+		t.Fatal(err)
+	}
+	newKey := "reload:query:stats:query:new:v0"
+	if ttl := mr.TTL(newKey); ttl <= 4*time.Minute || ttl > 5*time.Minute {
+		t.Fatalf("new TTL = %s, want approximately 5m", ttl)
+	}
+	if ttl := mr.TTL(oldKey); ttl != oldTTL {
+		t.Fatalf("old TTL changed from %s to %s", oldTTL, ttl)
+	}
+	if got, err := mr.Get(newKey); err != nil || strings.HasPrefix(got, "\x1f\x8b") {
+		t.Fatalf("new payload = %q, want uncompressed JSON", got)
+	}
+	if got, err := cache.GetQueryCache(ctx, "old"); err != nil || got != `{"value":"old"}` {
+		t.Fatalf("old gzip payload after reload = %q, %v", got, err)
 	}
 }
 

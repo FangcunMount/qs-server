@@ -114,6 +114,7 @@ type EffectiveRegistrySnapshot struct {
 
 type CachePolicyReloadRequest struct {
 	ExpectedVersion uint64 `json:"expected_version"`
+	ActorUserID     uint64 `json:"-"`
 }
 
 type CachePolicyReloadResult struct {

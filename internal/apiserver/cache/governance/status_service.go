@@ -116,7 +116,18 @@ func projectEffectiveRegistry(registry *sharedcache.Registry, reloader interface
 func policyView(policy sharedcache.Policy) cachemodel.PolicyView {
 	return cachemodel.PolicyView{
 		TTL: policy.TTL.String(), NegativeTTL: policy.NegativeTTL.String(), TTLJitterRatio: policy.JitterRatio,
-		Compress: string(policy.Compress), Singleflight: string(policy.Singleflight), Negative: string(policy.Negative),
+		Compress: policySwitchView(policy.Compress), Singleflight: policySwitchView(policy.Singleflight), Negative: policySwitchView(policy.Negative),
+	}
+}
+
+func policySwitchView(value sharedcache.PolicySwitch) string {
+	switch value {
+	case sharedcache.PolicySwitchEnabled:
+		return "enabled"
+	case sharedcache.PolicySwitchDisabled:
+		return "disabled"
+	default:
+		return "inherit"
 	}
 }
 

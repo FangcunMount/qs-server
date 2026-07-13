@@ -9123,7 +9123,7 @@ paths:
       tags:
       - System-Governance
       summary: 执行治理动作
-      description: 执行低风险治理动作（如 cache.manual_warmup、cache.repair_complete）；仅 qs:admin
+      description: 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅 qs:admin
         可访问
       operationId: 执行治理动作
       parameters:

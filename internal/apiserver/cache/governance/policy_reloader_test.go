@@ -68,3 +68,25 @@ func TestPolicyReloaderNoopAndLoaderFailureDoNotBumpVersion(t *testing.T) {
 		t.Fatalf("reload status = %#v", status)
 	}
 }
+
+func TestStatusServiceProjectsEffectiveRegistryLayers(t *testing.T) {
+	entry := sharedcache.EffectiveCapability{
+		Capability: "plan.detail", Owner: "plan", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2,
+		Family: "object_view", Enabled: true, CatalogVersion: "v2", Source: "cache.capabilities.plan.detail",
+		Layers: sharedcache.PolicyLayers{SpecDefault: sharedcache.Policy{TTL: time.Hour}, Override: sharedcache.Policy{TTL: 2 * time.Hour}},
+		Policy: sharedcache.Policy{TTL: 2 * time.Hour, Compress: sharedcache.PolicySwitchDisabled, Singleflight: sharedcache.PolicySwitchEnabled, Negative: sharedcache.PolicySwitchDisabled},
+	}
+	registry := sharedcache.NewRegistry(entry)
+	service := NewStatusService("apiserver", nil, nil, nil, registry)
+	status, err := service.GetStatus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.EffectiveRegistry == nil || status.EffectiveRegistry.SnapshotVersion != 1 || status.EffectiveRegistry.CatalogVersion != "v2" {
+		t.Fatalf("effective registry = %#v", status.EffectiveRegistry)
+	}
+	capability := status.EffectiveRegistry.Capabilities[0]
+	if capability.Override.TTL != "2h0m0s" || capability.Effective.Singleflight != "enabled" {
+		t.Fatalf("capability policy view = %#v", capability)
+	}
+}
