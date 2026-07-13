@@ -2,8 +2,8 @@ package signalcatalog
 
 import (
 	"os"
-	"sort"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -15,9 +15,9 @@ type manifest struct {
 }
 
 type manifestSignal struct {
-	Delivery  string `yaml:"delivery"`
-	Transport string `yaml:"transport"`
-	Publisher string `yaml:"publisher"`
+	Delivery    string   `yaml:"delivery"`
+	Transport   string   `yaml:"transport"`
+	Publisher   string   `yaml:"publisher"`
 	Subscribers []string `yaml:"subscribers"`
 }
 

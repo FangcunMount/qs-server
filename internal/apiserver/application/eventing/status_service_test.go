@@ -88,7 +88,7 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewStatusService(StatusServiceOptions{
-		Catalog: eventcatalog.NewCatalog(cfg),
+		Catalog:  eventcatalog.NewCatalog(cfg),
 		Registry: registry,
 		RuntimeSnapshot: func() RuntimeStatusSnapshot {
 			return RuntimeStatusSnapshot{

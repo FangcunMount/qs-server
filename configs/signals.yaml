@@ -39,7 +39,6 @@ signals:
     publisher: apiserver
     subscribers:
       - apiserver
-      - collection-server
 
   typology_model_cache_changed:
     delivery: ephemeral_signal
