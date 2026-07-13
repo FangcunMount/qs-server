@@ -131,7 +131,8 @@ func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 			})
 		}
 		seenKind = source.Kind
-		if source.Kind == ScoringSourceFactor {
+		switch source.Kind {
+		case ScoringSourceFactor:
 			if _, ok := byCode[source.Code]; !ok {
 				issues = append(issues, HierarchyIssue{
 					Field:   fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
@@ -146,7 +147,7 @@ func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 					Message: "factor scoring source cannot define question contribution fields",
 				})
 			}
-		} else if source.Kind == ScoringSourceQuestion {
+		case ScoringSourceQuestion:
 			if _, duplicate := seenQuestions[source.Code]; duplicate {
 				issues = append(issues, HierarchyIssue{Field: fmt.Sprintf("scoring[%s].sources", rule.FactorCode), Code: "question_contribution.duplicate", Message: fmt.Sprintf("question %s 对 factor %s 的贡献重复", source.Code, rule.FactorCode)})
 			}
