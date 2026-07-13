@@ -15,6 +15,7 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -70,6 +71,31 @@ func TestContainerBuildSurveyModuleDepsUsesSharedApplicationWiring(t *testing.T)
 	}
 	if wire.IdentityService != nil {
 		t.Fatalf("identity service = %#v, want nil without IAM", wire.IdentityService)
+	}
+}
+
+func TestContainerInitEventSubsystemRequiresInjectedSubsystem(t *testing.T) {
+	t.Parallel()
+
+	c := NewContainer(nil, nil, nil)
+	if err := c.initEventSubsystem(); err == nil {
+		t.Fatal("initEventSubsystem() error = nil, want missing subsystem failure")
+	}
+}
+
+func TestContainerInitEventSubsystemUsesInjectedPublisher(t *testing.T) {
+	t.Parallel()
+
+	subsystem := &eventsubsystem.Subsystem{}
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{EventSubsystem: subsystem})
+	if err := c.initEventSubsystem(); err != nil {
+		t.Fatalf("initEventSubsystem() error = %v", err)
+	}
+	if c.eventSubsystem != subsystem {
+		t.Fatalf("eventSubsystem = %p, want %p", c.eventSubsystem, subsystem)
+	}
+	if c.eventPublisher != subsystem.Publisher() {
+		t.Fatalf("eventPublisher = %#v, want injected subsystem publisher %#v", c.eventPublisher, subsystem.Publisher())
 	}
 }
 
@@ -301,6 +327,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
+	c.eventSubsystem = &eventsubsystem.Subsystem{}
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
 	c.cache.BindGovernance(cachebootstrap.GovernanceBindings{})
 	c.CodesService = &codesServiceStub{}

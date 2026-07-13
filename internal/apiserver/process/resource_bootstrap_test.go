@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -37,10 +38,12 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	subsystem := &cachebootstrap.Subsystem{}
 	publisher := &fakePublisher{}
 	catalog := eventcatalog.NewCatalog(nil)
+	events := &eventsubsystem.Subsystem{}
 
 	var backpressureConfigured bool
 	var buildOptionsInput containerOptionsInput
-	wantOptions := container.ContainerOptions{PlanEntryBaseURL: "https://entry.example"}
+	var eventOptions eventsubsystem.Options
+	wantOptions := container.ContainerOptions{PlanEntryBaseURL: "https://entry.example", EventSubsystem: events}
 	backpressureOptions := container.BackpressureOptions{}
 
 	got, err := prepareResources(resourceStageDeps{
@@ -64,6 +67,12 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			enabled:      true,
 			provider:     "stub",
 			newPublisher: func() (messaging.Publisher, error) { return publisher, nil },
+		},
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				eventOptions = opts
+				return events, nil
+			},
 		},
 		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return catalog, nil },
 		buildBackpressure: func() container.BackpressureOptions {
@@ -103,8 +112,11 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if !reflect.DeepEqual(got.containerInput.containerOptions, wantOptions) {
 		t.Fatalf("containerOptions = %#v, want %#v", got.containerInput.containerOptions, wantOptions)
 	}
-	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher || buildOptionsInput.eventCatalog != catalog || buildOptionsInput.backpressure != backpressureOptions {
+	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.eventSubsystem != events || buildOptionsInput.backpressure != backpressureOptions {
 		t.Fatalf("buildContainerOptions input mismatch: %#v", buildOptionsInput)
+	}
+	if eventOptions.MySQLDB != &mysqlDB || eventOptions.MongoDB != &mongoDB || eventOptions.Catalog != catalog || eventOptions.MQPublisher != publisher {
+		t.Fatalf("event subsystem options mismatch: %#v", eventOptions)
 	}
 }
 

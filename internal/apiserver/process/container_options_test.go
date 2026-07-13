@@ -226,7 +226,7 @@ func TestBuildStatisticsQuestionnaireOptionsDefaultsServiceSingleflightTrue(t *t
 	}
 }
 
-func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
+func TestBuildEventProfileOptionsMapsOutboxRelayOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
 	opts.OutboxRelay.Mongo.BatchSize = 360
 	opts.OutboxRelay.Mongo.PublishWorkers = 64
@@ -238,22 +238,21 @@ func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
 		t.Fatalf("CreateConfigFromOptions() error = %v", err)
 	}
 
-	server := &server{config: cfg}
-	got := server.buildContainerOptions(containerOptionsInput{})
+	mongoProfile, assessmentProfile := buildEventProfileOptions(cfg)
 
-	if got.OutboxRelay.MongoBatchSize != 360 {
-		t.Fatalf("MongoBatchSize = %d, want 360", got.OutboxRelay.MongoBatchSize)
+	if mongoProfile.BatchSize != 360 {
+		t.Fatalf("Mongo BatchSize = %d, want 360", mongoProfile.BatchSize)
 	}
-	if got.OutboxRelay.MongoPublishWorkers != 64 {
-		t.Fatalf("MongoPublishWorkers = %d, want 64", got.OutboxRelay.MongoPublishWorkers)
+	if mongoProfile.PublishWorkers != 64 {
+		t.Fatalf("Mongo PublishWorkers = %d, want 64", mongoProfile.PublishWorkers)
 	}
-	if got.OutboxRelay.MongoImmediateMaxConcurrent != 24 {
-		t.Fatalf("MongoImmediateMaxConcurrent = %d, want 24", got.OutboxRelay.MongoImmediateMaxConcurrent)
+	if mongoProfile.ImmediateMaxConcurrent != 24 {
+		t.Fatalf("Mongo ImmediateMaxConcurrent = %d, want 24", mongoProfile.ImmediateMaxConcurrent)
 	}
-	if got.OutboxRelay.AssessmentBatchSize != 80 {
-		t.Fatalf("AssessmentBatchSize = %d, want 80", got.OutboxRelay.AssessmentBatchSize)
+	if assessmentProfile.BatchSize != 80 {
+		t.Fatalf("Assessment BatchSize = %d, want 80", assessmentProfile.BatchSize)
 	}
-	if got.OutboxRelay.AssessmentPublishWorkers != 12 {
-		t.Fatalf("AssessmentPublishWorkers = %d, want 12", got.OutboxRelay.AssessmentPublishWorkers)
+	if assessmentProfile.PublishWorkers != 12 {
+		t.Fatalf("Assessment PublishWorkers = %d, want 12", assessmentProfile.PublishWorkers)
 	}
 }

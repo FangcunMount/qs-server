@@ -131,13 +131,10 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 }
 
 func (c *Container) buildRESTEventStatusService() appEventing.StatusService {
-	if c == nil {
-		return platformmod.BuildRESTEventStatusService(platformmod.RESTEventStatusInput{})
+	if c == nil || c.eventSubsystem == nil {
+		return nil
 	}
-	if c.eventSubsystem != nil {
-		return c.eventSubsystem.StatusService()
-	}
-	return platformmod.BuildRESTEventStatusService(platformmod.RESTEventStatusInput{Catalog: c.eventCatalog})
+	return c.eventSubsystem.StatusService()
 }
 
 func (c *Container) exportRESTIAMDeps() platformmod.RESTIAMDeps {

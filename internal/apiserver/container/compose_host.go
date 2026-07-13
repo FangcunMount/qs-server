@@ -282,7 +282,6 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	}
 	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
 		MongoDB:       c.mongoDB,
-		EventCatalog:  c.eventCatalog,
 		MongoLimiter:  c.backpressure.Mongo,
 		StaticRedis:   staticRedis,
 		StaticBuilder: c.CacheBuilder(redisruntime.FamilyStatic),

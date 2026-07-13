@@ -3,7 +3,6 @@ package container
 import (
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -15,9 +14,6 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -36,22 +32,14 @@ type Container struct {
 	cacheOptions               ContainerCacheOptions
 	cache                      *cachebootstrap.Subsystem
 	backpressure               BackpressureOptions
-	outboxRelay                ContainerOutboxRelayOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
 
-	// 消息队列（可选）
-	mqPublisher messaging.Publisher
-
 	// 事件发布器（统一管理）
-	eventPublisher         event.EventPublisher
-	eventCatalog           *eventcatalog.Catalog
-	publisherMode          eventruntime.PublishMode
-	eventSubsystem         *eventsubsystem.Subsystem
-	eventSubscriberFactory eventsubsystem.SubscriberFactory
-	eventConsumers         map[string]eventsubsystem.ConsumerOptions
+	eventPublisher event.EventPublisher
+	eventSubsystem *eventsubsystem.Subsystem
 
 	// 业务模块
 	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
@@ -89,13 +77,12 @@ type Container struct {
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
-		mysqlDB:       mysqlDB,
-		mongoDB:       mongoDB,
-		redisCache:    redisCache,
-		publisherMode: eventruntime.PublishModeLogging, // 默认使用日志模式
-		cacheOptions:  ContainerCacheOptions{},
-		initialized:   false,
-		modules:       make(map[string]Module),
+		mysqlDB:      mysqlDB,
+		mongoDB:      mongoDB,
+		redisCache:   redisCache,
+		cacheOptions: ContainerCacheOptions{},
+		initialized:  false,
+		modules:      make(map[string]Module),
 	}
 }
 
@@ -128,23 +115,10 @@ func (c *Container) loadedModules() []Module {
 // NewContainerWithOptions 创建带配置的容器
 func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, opts ContainerOptions) *Container {
 	c := NewContainer(mysqlDB, mongoDB, redisCache)
-	c.mqPublisher = opts.MQPublisher
-
-	// 根据环境或显式配置确定发布器模式
-	if opts.PublisherMode != "" {
-		c.publisherMode = opts.PublisherMode
-	} else if opts.Env != "" {
-		c.publisherMode = eventruntime.PublishModeFromEnv(opts.Env)
-	}
-
-	c.eventCatalog = opts.EventCatalog
 	c.eventSubsystem = opts.EventSubsystem
-	c.eventSubscriberFactory = opts.EventSubscriberFactory
-	c.eventConsumers = opts.EventConsumers
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.backpressure = opts.Backpressure
-	c.outboxRelay = opts.OutboxRelay
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
@@ -166,7 +140,7 @@ func (c *Container) Initialize() error {
 	if err := c.initEventSubsystem(); err != nil {
 		return fmt.Errorf("failed to initialize event subsystem: %w", err)
 	}
-	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
+	c.printf("📡 Event subsystem initialized\n")
 
 	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
 	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入
@@ -226,28 +200,12 @@ func (c *Container) printf(format string, args ...interface{}) {
 	fmt.Printf(format, args...)
 }
 
-// initEventPublisher 初始化事件发布器
+// initEventSubsystem 绑定 resource stage 构造完成的唯一事件运行时。
 func (c *Container) initEventSubsystem() error {
-	if c.eventSubsystem != nil {
-		c.eventPublisher = c.eventSubsystem.Publisher()
-		c.eventCatalog = c.eventSubsystem.Catalog()
-		return nil
+	if c.eventSubsystem == nil {
+		return fmt.Errorf("event subsystem is required")
 	}
-	s, err := eventsubsystem.New(eventsubsystem.Options{
-		MySQLDB: c.mysqlDB, MongoDB: c.mongoDB,
-		OpsRedis: c.CacheClient(redisruntime.FamilyOps), Catalog: c.eventCatalog,
-		MQPublisher: c.mqPublisher, PublisherMode: c.publisherMode,
-		MySQLLimiter: c.backpressure.MySQL, MongoLimiter: c.backpressure.Mongo,
-		Mongo:             eventsubsystem.ProfileOptions{Interval: c.outboxRelay.MongoInterval, BatchSize: c.outboxRelay.MongoBatchSize, PublishWorkers: c.outboxRelay.MongoPublishWorkers, ImmediateMaxConcurrent: c.outboxRelay.MongoImmediateMaxConcurrent},
-		Assessment:        eventsubsystem.ProfileOptions{Interval: c.outboxRelay.AssessmentInterval, BatchSize: c.outboxRelay.AssessmentBatchSize, PublishWorkers: c.outboxRelay.AssessmentPublishWorkers, ImmediateMaxConcurrent: c.outboxRelay.AssessmentImmediateMaxConcurrent},
-		SubscriberFactory: c.eventSubscriberFactory, Consumers: c.eventConsumers,
-	})
-	if err != nil {
-		return err
-	}
-	c.eventSubsystem = s
-	c.eventPublisher = s.Publisher()
-	c.eventCatalog = s.Catalog()
+	c.eventPublisher = c.eventSubsystem.Publisher()
 	return nil
 }
 

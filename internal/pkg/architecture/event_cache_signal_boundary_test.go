@@ -59,6 +59,21 @@ func TestRemovedEventAndCacheSignalPathsDoNotReturn(t *testing.T) {
 	}
 }
 
+func TestEventSubsystemHasSingleProductionCompositionRoot(t *testing.T) {
+	root := repoRoot(t)
+	want := "internal/apiserver/process/resource_bootstrap.go"
+	var found []string
+	walkGoFiles(t, filepath.Join(root, "internal", "apiserver"), func(file, text string) {
+		if strings.HasSuffix(file, "_test.go") || !strings.Contains(text, "eventsubsystem.New") {
+			return
+		}
+		found = append(found, filepath.ToSlash(mustRel(t, root, file)))
+	})
+	if len(found) != 1 || found[0] != want {
+		t.Fatalf("eventsubsystem.New production call sites = %v, want [%s]", found, want)
+	}
+}
+
 func TestEventingSharedPackagesKeepDependencyDirection(t *testing.T) {
 	root := repoRoot(t)
 	processImports := []string{

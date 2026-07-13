@@ -11,7 +11,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
@@ -29,7 +28,6 @@ type SurveyRuntimeInfra struct {
 // SurveyRuntimeInfraDeps collects infrastructure inputs for EnsureSurveyRuntimeInfra.
 type SurveyRuntimeInfraDeps struct {
 	MongoDB       *mongo.Database
-	EventCatalog  *eventcatalog.Catalog
 	MongoLimiter  backpressure.Acquirer
 	StaticRedis   redis.UniversalClient
 	StaticBuilder *keyspace.Builder

@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -25,9 +26,18 @@ type resourceStageDeps struct {
 	database              databaseResourceDeps
 	redisRuntime          redisRuntimeStageDeps
 	mqPublisher           mqPublisherStageDeps
+	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
 	buildBackpressure     func() container.BackpressureOptions
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
+}
+
+type eventSubsystemResourceDeps struct {
+	newSubsystem      func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
+	subscriberFactory eventsubsystem.SubscriberFactory
+	consumers         map[string]eventsubsystem.ConsumerOptions
+	mongo             eventsubsystem.ProfileOptions
+	assessment        eventsubsystem.ProfileOptions
 }
 
 type databaseResourceDeps struct {
@@ -60,11 +70,30 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		database:              buildDatabaseDeps(dbManager),
 		redisRuntime:          s.buildRedisRuntimeDeps(dbManager),
 		mqPublisher:           s.buildMQPublisherDeps(),
+		eventSubsystem:        s.buildEventSubsystemResourceDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
 		buildBackpressure:     s.buildBackpressureDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
 	return deps
+}
+
+func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
+	if s == nil || s.config == nil {
+		return eventSubsystemResourceDeps{}
+	}
+	var subscriberFactory eventsubsystem.SubscriberFactory
+	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
+		subscriberFactory = s.config.MessagingOptions.NewSubscriber
+	}
+	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
+	return eventSubsystemResourceDeps{
+		newSubsystem:      eventsubsystem.New,
+		subscriberFactory: subscriberFactory,
+		consumers:         buildEventConsumerOptions(s.config),
+		mongo:             mongoProfile,
+		assessment:        assessmentProfile,
+	}
 }
 
 func (s *server) buildDatabaseManager() *bootstrap.DatabaseManager {
@@ -154,6 +183,10 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if err != nil {
 		return resourceOutput{}, err
 	}
+	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, backpressureOptions, deps.eventSubsystem)
+	if err != nil {
+		return resourceOutput{}, err
+	}
 
 	output := resourceOutput{
 		handles: resourceHandles{
@@ -173,43 +206,38 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	if deps.buildContainerOptions != nil {
 		containerOptions := deps.buildContainerOptions(containerOptionsInput{
-			mqPublisher:    mqPublisher,
-			publishMode:    publishMode,
-			eventCatalog:   eventCatalog,
 			cacheSubsystem: cacheSubsystem,
 			backpressure:   backpressureOptions,
+			eventSubsystem: events,
 		})
-		events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, containerOptions)
-		if err != nil {
-			return resourceOutput{}, err
-		}
-		containerOptions.EventSubsystem = events
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}
 	return output, nil
 }
 
-func buildResourceEventSubsystem(mysqlDB *gorm.DB, mongoDB *mongo.Database, cacheSubsystem *cachebootstrap.Subsystem, opts container.ContainerOptions) (*eventsubsystem.Subsystem, error) {
-	if opts.EventCatalog == nil {
-		return nil, nil
+func buildResourceEventSubsystem(
+	mysqlDB *gorm.DB,
+	mongoDB *mongo.Database,
+	cacheSubsystem *cachebootstrap.Subsystem,
+	catalog *eventcatalog.Catalog,
+	mqPublisher messaging.Publisher,
+	publishMode eventruntime.PublishMode,
+	backpressureOptions container.BackpressureOptions,
+	deps eventSubsystemResourceDeps,
+) (*eventsubsystem.Subsystem, error) {
+	if deps.newSubsystem == nil {
+		return nil, fmt.Errorf("event subsystem constructor is not configured")
 	}
 	var opsRedis redis.UniversalClient
 	if cacheSubsystem != nil {
 		opsRedis = cacheSubsystem.Client(redisruntime.FamilyOps)
 	}
-	return eventsubsystem.New(eventsubsystem.Options{
+	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
-		Catalog: opts.EventCatalog, MQPublisher: opts.MQPublisher, PublisherMode: opts.PublisherMode,
-		MySQLLimiter: opts.Backpressure.MySQL, MongoLimiter: opts.Backpressure.Mongo,
-		Mongo: eventsubsystem.ProfileOptions{
-			Interval: opts.OutboxRelay.MongoInterval, BatchSize: opts.OutboxRelay.MongoBatchSize,
-			PublishWorkers: opts.OutboxRelay.MongoPublishWorkers, ImmediateMaxConcurrent: opts.OutboxRelay.MongoImmediateMaxConcurrent,
-		},
-		Assessment: eventsubsystem.ProfileOptions{
-			Interval: opts.OutboxRelay.AssessmentInterval, BatchSize: opts.OutboxRelay.AssessmentBatchSize,
-			PublishWorkers: opts.OutboxRelay.AssessmentPublishWorkers, ImmediateMaxConcurrent: opts.OutboxRelay.AssessmentImmediateMaxConcurrent,
-		},
-		SubscriberFactory: opts.EventSubscriberFactory, Consumers: opts.EventConsumers,
+		Catalog: catalog, MQPublisher: mqPublisher, PublisherMode: publishMode,
+		MySQLLimiter: backpressureOptions.MySQL, MongoLimiter: backpressureOptions.Mongo,
+		Mongo: deps.mongo, Assessment: deps.assessment,
+		SubscriberFactory: deps.subscriberFactory, Consumers: deps.consumers,
 	})
 }
 

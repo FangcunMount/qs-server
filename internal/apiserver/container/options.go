@@ -1,39 +1,23 @@
 package container
 
 import (
-	"github.com/FangcunMount/component-base/pkg/messaging"
-	"time"
-
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // ContainerOptions 容器配置选项。
 type ContainerOptions struct {
-	// MQPublisher 消息队列发布器（可选，传入则启用 MQ 模式）
-	MQPublisher messaging.Publisher
-	// PublisherMode 事件发布器模式（mq, logging, nop）
-	PublisherMode eventruntime.PublishMode
-	// EventCatalog 事件契约 catalog，发布器和 outbox topic resolver 共享。
-	EventCatalog           *eventcatalog.Catalog
-	EventSubsystem         *eventsubsystem.Subsystem
-	EventSubscriberFactory eventsubsystem.SubscriberFactory
-	EventConsumers         map[string]eventsubsystem.ConsumerOptions
-	// Env 环境名称（prod, dev, test），用于自动选择发布器模式
-	Env string
+	// EventSubsystem 是 resource stage 构造完成的唯一事件运行时。
+	EventSubsystem *eventsubsystem.Subsystem
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
 	// CacheSubsystem cache 子系统组合根。
 	CacheSubsystem *cachebootstrap.Subsystem
 	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
 	Backpressure BackpressureOptions
-	// OutboxRelay durable outbox relay options used while assembling modules.
-	OutboxRelay ContainerOutboxRelayOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
@@ -51,17 +35,6 @@ type BackpressureOptions struct {
 	MySQL backpressure.Acquirer
 	Mongo backpressure.Acquirer
 	IAM   backpressure.Acquirer
-}
-
-type ContainerOutboxRelayOptions struct {
-	MongoInterval                    time.Duration
-	MongoBatchSize                   int
-	MongoPublishWorkers              int
-	MongoImmediateMaxConcurrent      int
-	AssessmentInterval               time.Duration
-	AssessmentBatchSize              int
-	AssessmentPublishWorkers         int
-	AssessmentImmediateMaxConcurrent int
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

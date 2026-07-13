@@ -3,7 +3,6 @@ package process
 import (
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
@@ -12,34 +11,21 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 type containerOptionsInput struct {
-	mqPublisher    messaging.Publisher
-	publishMode    eventruntime.PublishMode
-	eventCatalog   *eventcatalog.Catalog
 	cacheSubsystem *cachebootstrap.Subsystem
 	backpressure   container.BackpressureOptions
+	eventSubsystem *eventsubsystem.Subsystem
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
-	var subscriberFactory eventsubsystem.SubscriberFactory
-	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
-		subscriberFactory = s.config.MessagingOptions.NewSubscriber
-	}
 	return container.ContainerOptions{
-		MQPublisher:                input.mqPublisher,
-		PublisherMode:              input.publishMode,
-		EventCatalog:               input.eventCatalog,
-		EventSubscriberFactory:     subscriberFactory,
-		EventConsumers:             buildEventConsumerOptions(s.config),
+		EventSubsystem:             input.eventSubsystem,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		Backpressure:               input.backpressure,
-		OutboxRelay:                buildContainerOutboxRelayOptions(s.config),
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
@@ -58,24 +44,25 @@ func buildEventConsumerOptions(cfg *config.Config) map[string]eventsubsystem.Con
 	return result
 }
 
-func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOutboxRelayOptions {
+func buildEventProfileOptions(cfg *config.Config) (eventsubsystem.ProfileOptions, eventsubsystem.ProfileOptions) {
 	if cfg == nil || cfg.OutboxRelay == nil {
-		return container.ContainerOutboxRelayOptions{}
+		return eventsubsystem.ProfileOptions{}, eventsubsystem.ProfileOptions{}
 	}
-	options := container.ContainerOutboxRelayOptions{}
+	mongoProfile := eventsubsystem.ProfileOptions{}
+	assessmentProfile := eventsubsystem.ProfileOptions{}
 	if cfg.OutboxRelay.Mongo != nil {
-		options.MongoInterval = cfg.OutboxRelay.Mongo.Interval
-		options.MongoBatchSize = cfg.OutboxRelay.Mongo.BatchSize
-		options.MongoPublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
-		options.MongoImmediateMaxConcurrent = cfg.OutboxRelay.Mongo.ImmediateMaxConcurrent
+		mongoProfile.Interval = cfg.OutboxRelay.Mongo.Interval
+		mongoProfile.BatchSize = cfg.OutboxRelay.Mongo.BatchSize
+		mongoProfile.PublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
+		mongoProfile.ImmediateMaxConcurrent = cfg.OutboxRelay.Mongo.ImmediateMaxConcurrent
 	}
 	if cfg.OutboxRelay.Assessment != nil {
-		options.AssessmentInterval = cfg.OutboxRelay.Assessment.Interval
-		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize
-		options.AssessmentPublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
-		options.AssessmentImmediateMaxConcurrent = cfg.OutboxRelay.Assessment.ImmediateMaxConcurrent
+		assessmentProfile.Interval = cfg.OutboxRelay.Assessment.Interval
+		assessmentProfile.BatchSize = cfg.OutboxRelay.Assessment.BatchSize
+		assessmentProfile.PublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
+		assessmentProfile.ImmediateMaxConcurrent = cfg.OutboxRelay.Assessment.ImmediateMaxConcurrent
 	}
-	return options
+	return mongoProfile, assessmentProfile
 }
 
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
