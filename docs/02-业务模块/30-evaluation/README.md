@@ -1,74 +1,67 @@
-# Evaluation
+# Evaluation 模块
 
-**本文回答**：Evaluation 如何作为测评执行层，把 `AnswerSheet` 和模型快照结合，完成一次测评执行并生成结构化结果。
+> 状态：已实现。本文只做模块边界和阅读地图，详细规则以下方 6 篇 canonical 文档为准。
 
----
+## 1. 30 秒结论
 
-## 1. 这个模块负责什么
+Evaluation 把已提交答卷和已发布模型执行为可追溯的评分事实：
 
-Evaluation 负责“一次测评如何执行”：
+```text
+AnswerSheet + Published Model
+  -> Assessment            一次测评业务实例
+  -> EvaluationRun         一次可 claim 的执行尝试
+  -> Execution             进程内计算结果
+  -> EvaluationOutcome     不可变持久化事实
+  -> score projection + evaluation.outcome.committed
+```
 
-- `Assessment`：一次具体测评行为。
-- `EvaluationRun`：一次执行尝试和运行状态。
-- `EvaluationResult`：结构化执行结果。
-- 计分、因子计算、等级判定。
-- canonical `EvaluationOutcome` 与 `assessment_score` 等评估事实。
-- 执行状态机、失败、重试、幂等。
-- `evaluation.requested`、`evaluation.outcome.committed`、`evaluation.failed` 等执行事件。
+`Assessment=evaluated` 表示评分事实已可靠提交，不表示报告已生成。Interpretation 只通过 Outcome ID 和只读事实契约生成报告，不回写 Evaluation 状态。
 
----
+## 2. 模块边界
 
-## 2. 这个模块不负责什么
+| Evaluation 负责 | Evaluation 不负责 |
+| --- | --- |
+| Assessment 生命周期与业务引用 | Questionnaire、Question 和 AnswerSheet 内容 |
+| EvaluationRun 尝试、claim、lease、失败与重试 | AssessmentModel 草稿、Definition 编辑和发布 |
+| 执行输入解析、运行时路由和计算机制 | 报告模板、文案、Report 和 InterpretationRun |
+| canonical Outcome、Assessment 摘要与 score 查询投影 | Plan 调度、Statistics 聚合和工作台组合读模型 |
+| `evaluation.requested / outcome.committed / failed` 可靠事件 | 客户端 `completed / interpreted` 组合进度 |
 
-- 不定义问卷和题目结构。
-- 不维护模型资产草稿和发布。
-- 不维护最终报告模板和解释文案。
-- 不调度周期任务。
-- 不维护统计读模型。
+必须区分：
 
-一句话：**Evaluation 只生成可信、可持久化的结构化测评结果，不生成最终解释报告，也不以报告是否成功来改写评估事实。**
+- AnswerSheet 是 Survey 的作答事实，Assessment 是 Evaluation 的测评实例。
+- Execution 是尚未提交的进程内结果，EvaluationOutcome Record 才是下游可依赖的事实。
+- `assessment_score` 是 Outcome 的查询投影，不是所有算法的统一事实模型。
+- 报告失败不得把已 `evaluated` 的 Assessment 改为 `failed`。
 
-已确认的边界：`Assessment` 归属 Evaluation，成功终态是 `evaluated`。面向客户端的 `interpreted / completed` 是 Assessment 与 Report 的组合投影，不是 Assessment 聚合状态。
+## 3. 文档地图
 
-`EvaluationRun.succeeded` 表示 EvaluationOutcome 已可靠提交，不包含 Report 生成；生产目标态不保留 Evaluation 内联生成 Report 的同步模式。
+| 顺序 | 文档 | 核心问题 |
+| --- | --- | --- |
+| 10 | [领域模型](./10-领域模型.md) | Assessment、EvaluationRun、Execution 和 Outcome 为什么必须拆分 |
+| 20 | [核心设计：执行身份与运行时扩展](./20-核心设计-执行身份与运行时扩展.md) | InputProvider、ModelRoute、Descriptor 和四类计算机制如何联合扩展 |
+| 21 | [核心设计：状态、幂等与可靠提交](./21-核心设计-状态幂等与可靠提交.md) | 双状态机、Run claim/lease、失败重试和 MySQL 事务保护什么 |
+| 22 | [核心设计：评估事实与数据存储](./22-核心设计-评估事实与数据存储.md) | schema v2 Outcome、冻结 ReportInput、投影和四类主表如何分工 |
+| 30 | [关键链路：答卷入站与测评请求](./30-关键链路-答卷入站与测评请求.md) | answersheet.submitted 如何幂等创建 Assessment 并发出 evaluation.requested |
+| 31 | [关键链路：Worker 执行与报告驱动](./31-关键链路-Worker执行与报告驱动.md) | Worker 如何解析输入、执行算法、提交 Outcome 并驱动 Interpretation |
 
----
+扩展新模型或算法时先看 `20`；排查重复执行、长时运行或失败重试时看 `21`；排查数据或报告输入时看 `22`；跟踪生产主链时直接进入 `30` 或 `31`。
 
-## 3. 核心领域模型
+## 4. 事实源与验证
 
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `Assessment` | 一次测评执行实例 | [02-领域模型.md](./02-领域模型.md) |
-| `EvaluationRun` | 执行尝试和状态 | [05-状态机与失败重试.md](./05-状态机与失败重试.md) |
-| `EvaluationResult` | 总分、等级、因子分和原始结果 | [04-计分与因子计算链路.md](./04-计分与因子计算链路.md) |
-| `EvaluationError` | 失败原因和重试语义 | [05-状态机与失败重试.md](./05-状态机与失败重试.md) |
+| 主题 | 事实源 |
+| --- | --- |
+| Domain | [`internal/apiserver/domain/evaluation`](../../../internal/apiserver/domain/evaluation/) |
+| Application / runtime | [`internal/apiserver/application/evaluation`](../../../internal/apiserver/application/evaluation/) |
+| Input / fact ports | [`port/evaluationinput`](../../../internal/apiserver/port/evaluationinput/)、[`port/evaluationfact`](../../../internal/apiserver/port/evaluationfact/) |
+| MySQL | [`infra/mysql/evaluation`](../../../internal/apiserver/infra/mysql/evaluation/)、[`infra/mysql/checkpoint`](../../../internal/apiserver/infra/mysql/checkpoint/) |
+| Composition root | [`container/modules/evaluation`](../../../internal/apiserver/container/modules/evaluation/) |
+| Event / transport | [`configs/events.yaml`](../../../configs/events.yaml)、[`evaluation.proto`](../../../api/grpc/proto/evaluation/evaluation.proto) |
 
----
-
-## 4. 关键业务链路
-
-| 链路 | 文档 |
-| ---- | ---- |
-| 消费答卷事件并创建测评 | [03-测评执行链路.md](./03-测评执行链路.md) |
-| 计分、因子、等级判定 | [04-计分与因子计算链路.md](./04-计分与因子计算链路.md) |
-| Assessment 与 EvaluationRun 双状态机 | [05-状态机与失败重试.md](./05-状态机与失败重试.md) |
-| 幂等和一致性 | [06-幂等与一致性设计.md](./06-幂等与一致性设计.md) |
-| 接口、事件和存储 | [07-接口事件与存储.md](./07-接口事件与存储.md) |
-| 设计终局与重构判据 | [08-设计终局.md](./08-设计终局.md) |
-| 应用层行为人、入口与权限契约 | [09-应用层行为人契约.md](./09-应用层行为人契约.md) |
-
----
-
-## 5. 上下游依赖
-
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | `survey` | 提供 `AnswerSheet` |
-| 上游 | `model-catalog` | 提供模型快照和执行 payload |
-| 下游 | `interpretation` | 消费结构化结果生成报告 |
-| 下游 | `statistics` | 消费执行事件和服务过程投影 |
-
-代码事实入口：
-
-- [`internal/apiserver/domain/evaluation`](../../../internal/apiserver/domain/evaluation/)
-- [`internal/apiserver/container/modules/evaluation`](../../../internal/apiserver/container/modules/evaluation/)
+```bash
+go test ./internal/apiserver/domain/evaluation/...
+go test ./internal/apiserver/application/evaluation/...
+go test ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/infra/mysql/checkpoint
+go test ./internal/apiserver/container/modules/evaluation/...
+make docs-hygiene
+```
