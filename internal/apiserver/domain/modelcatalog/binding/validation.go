@@ -21,14 +21,16 @@ type DomainValidationResult struct {
 	Issues []DomainValidationIssue
 }
 
-func (r DomainValidationResult) Passed() bool {
-	if len(r.Issues) == 0 {
-		return true
-	}
-	for _, issue := range r.Issues {
+// HasValidationErrors reports whether issues contain a blocking validation error.
+func HasValidationErrors(issues []DomainValidationIssue) bool {
+	for _, issue := range issues {
 		if issue.Level == "" || issue.Level == ValidationLevelError {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
+}
+
+func (r DomainValidationResult) Passed() bool {
+	return !HasValidationErrors(r.Issues)
 }

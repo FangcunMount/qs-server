@@ -338,6 +338,14 @@ definitions:
     x-enum-varnames:
     - OptionScoringStrict
     - OptionScoringCompat
+  factor.QuestionScoringMode:
+    enum:
+    - question_score
+    - option_override
+    type: string
+    x-enum-varnames:
+    - QuestionScoringModeQuestionScore
+    - QuestionScoringModeOptionOverride
   factor.Scoring:
     properties:
       constant:
@@ -370,15 +378,19 @@ definitions:
     type: object
   factor.ScoringSource:
     properties:
-      code:
+      Code:
         type: string
-      kind:
+      Kind:
         $ref: '#/definitions/factor.ScoringSourceKind'
-      optionScores:
+      OptionScores:
         additionalProperties:
           type: number
         type: object
-      sign:
+      ScoringMode:
+        $ref: '#/definitions/factor.QuestionScoringMode'
+      Sign:
+        type: number
+      Weight:
         type: number
     type: object
   factor.ScoringSourceKind:
@@ -420,6 +432,23 @@ definitions:
     type: integer
     x-enum-varnames:
     - ZeroID
+  modelcatalog.AssessmentRelease:
+    properties:
+      archived_at:
+        type: string
+      model_code:
+        type: string
+      model_status:
+        type: string
+      published_at:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_status:
+        type: string
+      questionnaire_version:
+        type: string
+    type: object
   modelcatalog.Definition:
     properties:
       calibration:
@@ -1856,7 +1885,14 @@ definitions:
         additionalProperties:
           type: number
         type: object
+      ScoringMode:
+        enum:
+        - question_score
+        - option_override
+        type: string
       Sign:
+        type: number
+      Weight:
         type: number
     type: object
   response.DefinitionScoringWire:
@@ -1901,6 +1937,21 @@ definitions:
         type: number
       Kind:
         type: string
+      LevelRule:
+        $ref: '#/definitions/response.DefinitionTypeLevelRuleWire'
+      Poles:
+        items:
+          $ref: '#/definitions/response.DefinitionTypePoleWire'
+        type: array
+      TopK:
+        type: integer
+    type: object
+  response.DefinitionTypeLevelRuleWire:
+    properties:
+      HighMin:
+        type: number
+      LowMax:
+        type: number
     type: object
   response.DefinitionTypeOutcomeMappingWire:
     properties:
@@ -1910,6 +1961,19 @@ definitions:
         type: string
       DetailKind:
         type: string
+    type: object
+  response.DefinitionTypePoleWire:
+    properties:
+      FactorCode:
+        type: string
+      LeftPole:
+        type: string
+      Model:
+        type: string
+      RightPole:
+        type: string
+      Threshold:
+        type: number
     type: object
   response.DefinitionTypeProfileWire:
     properties:
@@ -4722,6 +4786,62 @@ paths:
       summary: 获取已发布测评模型
       tags:
       - AssessmentModel
+  /api/v1/assessment-releases/{code}/archive:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.AssessmentRelease'
+              type: object
+      summary: 归档测评版本
+      tags:
+      - AssessmentRelease
+  /api/v1/assessment-releases/{code}/publish:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.AssessmentRelease'
+              type: object
+      summary: 发布测评版本
+      tags:
+      - AssessmentRelease
   /api/v1/assessments/{id}/wait-report:
     get:
       description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒

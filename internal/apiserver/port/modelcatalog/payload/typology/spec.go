@@ -1,6 +1,10 @@
 package typology
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+import (
+	"encoding/json"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+)
 
 // RuntimeSpec 是配置-driven execution 视图 of 类型学载荷。
 type RuntimeSpec struct {
@@ -63,9 +67,42 @@ const (
 
 // FactorContributionSpec 映射问卷题目 到 叶子 因子 score。
 type FactorContributionSpec struct {
-	QuestionCode string             `json:"question_code"`
-	Sign         float64            `json:"sign,omitempty"`
-	OptionScores map[string]float64 `json:"option_scores,omitempty"`
+	QuestionCode string              `json:"question_code"`
+	ScoringMode  QuestionScoringMode `json:"scoring_mode,omitempty"`
+	Sign         float64             `json:"sign,omitempty"`
+	Weight       float64             `json:"weight,omitempty"`
+	OptionScores map[string]float64  `json:"option_scores,omitempty"`
+}
+
+// QuestionScoringMode selects the source of a question contribution's base score.
+type QuestionScoringMode string
+
+const (
+	QuestionScoringModeQuestionScore  QuestionScoringMode = "question_score"
+	QuestionScoringModeOptionOverride QuestionScoringMode = "option_override"
+)
+
+// UnmarshalJSON applies defaults only when explicit-mode fields are omitted.
+func (c *FactorContributionSpec) UnmarshalJSON(data []byte) error {
+	type alias FactorContributionSpec
+	var decoded alias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if decoded.ScoringMode != "" {
+		if _, ok := fields["sign"]; !ok {
+			decoded.Sign = 1
+		}
+		if _, ok := fields["weight"]; !ok {
+			decoded.Weight = 1
+		}
+	}
+	*c = FactorContributionSpec(decoded)
+	return nil
 }
 
 // HasExplicitFactorGraph 报告是否 spec 携带 显式 因子 层级。

@@ -1465,6 +1465,100 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessment-releases/{code}/archive": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentRelease"
+                ],
+                "summary": "归档测评版本",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/modelcatalog.AssessmentRelease"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-releases/{code}/publish": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentRelease"
+                ],
+                "summary": "发布测评版本",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/modelcatalog.AssessmentRelease"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessments/{id}/wait-report": {
             "get": {
                 "description": "等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒",
@@ -9572,6 +9666,17 @@ const docTemplate = `{
                 "OptionScoringCompat"
             ]
         },
+        "factor.QuestionScoringMode": {
+            "type": "string",
+            "enum": [
+                "question_score",
+                "option_override"
+            ],
+            "x-enum-varnames": [
+                "QuestionScoringModeQuestionScore",
+                "QuestionScoringModeOptionOverride"
+            ]
+        },
         "factor.Scoring": {
             "type": "object",
             "properties": {
@@ -9621,19 +9726,25 @@ const docTemplate = `{
         "factor.ScoringSource": {
             "type": "object",
             "properties": {
-                "code": {
+                "Code": {
                     "type": "string"
                 },
-                "kind": {
+                "Kind": {
                     "$ref": "#/definitions/factor.ScoringSourceKind"
                 },
-                "optionScores": {
+                "OptionScores": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "number"
                     }
                 },
-                "sign": {
+                "ScoringMode": {
+                    "$ref": "#/definitions/factor.QuestionScoringMode"
+                },
+                "Sign": {
+                    "type": "number"
+                },
+                "Weight": {
                     "type": "number"
                 }
             }
@@ -9689,6 +9800,32 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "ZeroID"
             ]
+        },
+        "modelcatalog.AssessmentRelease": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "model_code": {
+                    "type": "string"
+                },
+                "model_status": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_status": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                }
+            }
         },
         "modelcatalog.Definition": {
             "type": "object",
@@ -11830,7 +11967,17 @@ const docTemplate = `{
                         "type": "number"
                     }
                 },
+                "ScoringMode": {
+                    "type": "string",
+                    "enum": [
+                        "question_score",
+                        "option_override"
+                    ]
+                },
                 "Sign": {
+                    "type": "number"
+                },
+                "Weight": {
                     "type": "number"
                 }
             }
@@ -11894,6 +12041,29 @@ const docTemplate = `{
                 },
                 "Kind": {
                     "type": "string"
+                },
+                "LevelRule": {
+                    "$ref": "#/definitions/response.DefinitionTypeLevelRuleWire"
+                },
+                "Poles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionTypePoleWire"
+                    }
+                },
+                "TopK": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.DefinitionTypeLevelRuleWire": {
+            "type": "object",
+            "properties": {
+                "HighMin": {
+                    "type": "number"
+                },
+                "LowMax": {
+                    "type": "number"
                 }
             }
         },
@@ -11908,6 +12078,26 @@ const docTemplate = `{
                 },
                 "DetailKind": {
                     "type": "string"
+                }
+            }
+        },
+        "response.DefinitionTypePoleWire": {
+            "type": "object",
+            "properties": {
+                "FactorCode": {
+                    "type": "string"
+                },
+                "LeftPole": {
+                    "type": "string"
+                },
+                "Model": {
+                    "type": "string"
+                },
+                "RightPole": {
+                    "type": "string"
+                },
+                "Threshold": {
+                    "type": "number"
                 }
             }
         },

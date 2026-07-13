@@ -138,7 +138,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 		modeltypology.QuestionnaireSnapshot{Code: tc.questionnaire, Version: "1.0.0", Questions: tc.questions},
 		modeltypology.RuntimeSpecValidationContext{Algorithm: publishedPayload.Algorithm, Outcomes: publishedPayload.Outcomes},
 	)
-	if len(issues) > 0 {
+	if domainmodel.HasValidationErrors(issues) {
 		t.Fatalf("ValidateRuntimeSpecForPublishWithContext issues = %#v", issues)
 	}
 

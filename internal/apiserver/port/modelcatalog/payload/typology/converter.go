@@ -226,6 +226,8 @@ func cloneFactorSpec(source FactorSpec) FactorSpec {
 		}
 	}
 	for i := range cloned.Contributions {
+		cloned.Contributions[i].ScoringMode = source.Contributions[i].ScoringMode
+		cloned.Contributions[i].Weight = source.Contributions[i].Weight
 		if source.Contributions[i].OptionScores != nil {
 			cloned.Contributions[i].OptionScores = make(map[string]float64, len(source.Contributions[i].OptionScores))
 			for key, value := range source.Contributions[i].OptionScores {

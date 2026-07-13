@@ -81,7 +81,9 @@ type ScoringPO struct {
 type ScoringSourcePO struct {
 	Kind         string             `bson:"kind"`
 	Code         string             `bson:"code"`
+	ScoringMode  string             `bson:"scoring_mode,omitempty"`
 	Sign         float64            `bson:"sign,omitempty"`
+	Weight       float64            `bson:"weight,omitempty"`
 	OptionScores map[string]float64 `bson:"option_scores,omitempty"`
 }
 
@@ -382,7 +384,7 @@ func scoringSourcesToPO(sources []factor.ScoringSource) []ScoringSourcePO {
 	}
 	out := make([]ScoringSourcePO, 0, len(sources))
 	for _, source := range sources {
-		out = append(out, ScoringSourcePO{Kind: string(source.Kind), Code: source.Code, Sign: source.Sign, OptionScores: cloneFloat64Map(source.OptionScores)})
+		out = append(out, ScoringSourcePO{Kind: string(source.Kind), Code: source.Code, ScoringMode: string(source.ScoringMode), Sign: source.Sign, Weight: source.Weight, OptionScores: cloneFloat64Map(source.OptionScores)})
 	}
 	return out
 }
@@ -393,7 +395,7 @@ func scoringSourcesFromPO(items []ScoringSourcePO) []factor.ScoringSource {
 	}
 	out := make([]factor.ScoringSource, 0, len(items))
 	for _, item := range items {
-		out = append(out, factor.ScoringSource{Kind: factor.ScoringSourceKind(item.Kind), Code: item.Code, Sign: item.Sign, OptionScores: cloneFloat64Map(item.OptionScores)})
+		out = append(out, factor.ScoringSource{Kind: factor.ScoringSourceKind(item.Kind), Code: item.Code, ScoringMode: factor.QuestionScoringMode(item.ScoringMode), Sign: item.Sign, Weight: item.Weight, OptionScores: cloneFloat64Map(item.OptionScores)})
 	}
 	return out
 }

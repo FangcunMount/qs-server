@@ -173,7 +173,8 @@ func scoringFromExplicitFactor(spec FactorSpec, code string, codes map[string]st
 	sources := make([]factor.ScoringSource, 0, len(spec.Contributions))
 	for _, contribution := range spec.Contributions {
 		sources = append(sources, factor.ScoringSource{
-			Kind: factor.ScoringSourceQuestion, Code: contribution.QuestionCode, Sign: contribution.Sign,
+			Kind: factor.ScoringSourceQuestion, Code: contribution.QuestionCode,
+			ScoringMode: factor.QuestionScoringMode(contribution.ScoringMode), Sign: contribution.Sign, Weight: contribution.Weight,
 			OptionScores: cloneFloatMap(contribution.OptionScores),
 		})
 	}
@@ -336,7 +337,10 @@ func runtimeGraphFromMeasure(measure definition.MeasureSpec, decision conclusion
 			spec.OptionScoring = FactorOptionScoring(rule.OptionScoring)
 			for _, source := range rule.Sources {
 				if source.Kind == factor.ScoringSourceQuestion {
-					spec.Contributions = append(spec.Contributions, FactorContributionSpec{QuestionCode: source.Code, Sign: source.Sign, OptionScores: cloneFloatMap(source.OptionScores)})
+					spec.Contributions = append(spec.Contributions, FactorContributionSpec{
+						QuestionCode: source.Code, ScoringMode: QuestionScoringMode(source.ScoringMode), Sign: source.Sign, Weight: source.Weight,
+						OptionScores: cloneFloatMap(source.OptionScores),
+					})
 				}
 			}
 		}

@@ -159,7 +159,9 @@ func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec, kind modelcata
 	for _, contribution := range spec.Contributions {
 		item := calcclassification.AnswerContribution{
 			QuestionCode: contribution.QuestionCode,
+			ScoringMode:  calcclassification.QuestionScoringMode(contribution.ScoringMode),
 			Sign:         contribution.Sign,
+			Weight:       contribution.Weight,
 		}
 		if len(contribution.OptionScores) > 0 {
 			item.OptionScores = cloneOptionScores(contribution.OptionScores)

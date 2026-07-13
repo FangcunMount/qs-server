@@ -47,7 +47,9 @@ type DefinitionScoringWire struct {
 type DefinitionScoringSourceWire struct {
 	Kind         string             `json:"Kind" enums:"question,factor"`
 	Code         string             `json:"Code"`
+	ScoringMode  string             `json:"ScoringMode,omitempty" enums:"question_score,option_override"`
 	Sign         float64            `json:"Sign,omitempty"`
+	Weight       float64            `json:"Weight,omitempty"`
 	OptionScores map[string]float64 `json:"OptionScores,omitempty"`
 }
 

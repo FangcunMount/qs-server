@@ -2,6 +2,7 @@ package classification
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -82,7 +83,7 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]Answer) (float64, error)
 		if !ok {
 			return 0, fmt.Errorf("missing answer for question %s", contribution.QuestionCode)
 		}
-		value, err := contributionScore(spec.OptionScoring, contribution, answer)
+		value, err := CalculateQuestionContribution(spec.OptionScoring, contribution, answer)
 		if err != nil {
 			return 0, err
 		}
@@ -91,7 +92,29 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]Answer) (float64, error)
 	return total, nil
 }
 
-func contributionScore(policy OptionScoringPolicy, contribution AnswerContribution, answer Answer) (float64, error) {
+// CalculateQuestionContribution calculates one question's contribution to a leaf factor.
+// An empty scoring mode deliberately preserves the historical snapshot behavior.
+func CalculateQuestionContribution(policy OptionScoringPolicy, contribution AnswerContribution, answer Answer) (float64, error) {
+	switch contribution.ScoringMode {
+	case "":
+		return legacyContributionScore(policy, contribution, answer)
+	case QuestionScoringModeQuestionScore:
+		return explicitContributionScore(contribution, answer.Score)
+	case QuestionScoringModeOptionOverride:
+		if len(contribution.OptionScores) == 0 {
+			return 0, fmt.Errorf("option scores are required for question %s", contribution.QuestionCode)
+		}
+		base, err := scoreOptionAnswer(OptionScoringStrict, contribution.OptionScores, answer)
+		if err != nil {
+			return 0, err
+		}
+		return explicitContributionScore(contribution, base)
+	default:
+		return 0, fmt.Errorf("unsupported scoring mode %s for question %s", contribution.ScoringMode, contribution.QuestionCode)
+	}
+}
+
+func legacyContributionScore(policy OptionScoringPolicy, contribution AnswerContribution, answer Answer) (float64, error) {
 	if len(contribution.OptionScores) > 0 {
 		return scoreOptionAnswer(policy, contribution.OptionScores, answer)
 	}
@@ -100,6 +123,27 @@ func contributionScore(policy OptionScoringPolicy, contribution AnswerContributi
 		return 0, err
 	}
 	return contribution.Sign * value, nil
+}
+
+func explicitContributionScore(contribution AnswerContribution, base float64) (float64, error) {
+	if math.IsNaN(base) || math.IsInf(base, 0) {
+		return 0, fmt.Errorf("answer score for question %s must be finite", contribution.QuestionCode)
+	}
+	sign := contribution.Sign
+	if sign == 0 {
+		sign = 1
+	}
+	if sign != 1 && sign != -1 {
+		return 0, fmt.Errorf("sign for question %s must be 1 or -1", contribution.QuestionCode)
+	}
+	weight := contribution.Weight
+	if weight == 0 {
+		weight = 1
+	}
+	if math.IsNaN(weight) || math.IsInf(weight, 0) || weight <= 0 {
+		return 0, fmt.Errorf("weight for question %s must be finite and greater than zero", contribution.QuestionCode)
+	}
+	return base * sign * weight, nil
 }
 
 func scoreOptionAnswer(policy OptionScoringPolicy, optionScores map[string]float64, answer Answer) (float64, error) {

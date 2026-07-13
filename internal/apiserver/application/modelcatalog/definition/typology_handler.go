@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -34,7 +35,7 @@ func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
-	if len(issues) > 0 {
+	if domain.HasValidationErrors(issues) {
 		return issues
 	}
 	payload, err := modeltypology.PayloadFromDefinition(modeltypology.DefinitionEnvelope{
@@ -94,7 +95,7 @@ func (h TypologyDefinitionHandler) PreviewReport(ctx context.Context, model *dom
 	if len(input.Answers) == 0 {
 		return nil, previewInvalid("预览答卷 answers 不能为空")
 	}
-	if issues := h.ValidateForPublish(ctx, model); len(issues) > 0 {
+	if issues := h.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
 		return nil, NewValidationError(issues)
 	}
 	questionnaire, err := h.previewQuestionnaire(ctx, model)
@@ -192,13 +193,9 @@ func decodeTypologyPreviewInput(raw json.RawMessage) (typologyPreviewInput, erro
 
 // validateTypologyPreviewAnswers 验证人格类型预览答案
 func validateTypologyPreviewAnswers(answers []typologyPreviewAnswer, questionnaire *questionnaireapp.QuestionnaireResult) []domain.DomainValidationIssue {
-	options := make(map[string]map[string]struct{}, len(questionnaire.Questions))
+	questions := make(map[string]questionnaireapp.QuestionResult, len(questionnaire.Questions))
 	for _, question := range questionnaire.Questions {
-		values := make(map[string]struct{}, len(question.Options))
-		for _, option := range question.Options {
-			values[option.Value] = struct{}{}
-		}
-		options[question.Code] = values
+		questions[question.Code] = question
 	}
 	seen := make(map[string]struct{}, len(answers))
 	issues := make([]domain.DomainValidationIssue, 0)
@@ -213,19 +210,32 @@ func validateTypologyPreviewAnswers(answers []typologyPreviewAnswer, questionnai
 			issues = append(issues, domain.DomainValidationIssue{Field: field + ".question_code", Message: fmt.Sprintf("question_code %q 重复", codeValue), Code: "question_code.duplicate", Level: domain.ValidationLevelError})
 		}
 		seen[codeValue] = struct{}{}
-		values, exists := options[codeValue]
+		question, exists := questions[codeValue]
 		if !exists {
 			issues = append(issues, domain.DomainValidationIssue{Field: field + ".question_code", Message: fmt.Sprintf("question_code %q 不存在于绑定问卷", codeValue), Code: "question_code.not_found", Level: domain.ValidationLevelError})
 			continue
 		}
-		if answer.Score == nil && answer.Value == nil {
-			issues = append(issues, domain.DomainValidationIssue{Field: field, Message: "value 或 score 至少提供一个", Code: "answer.value_or_score.required", Level: domain.ValidationLevelError})
+		if len(question.Options) > 0 {
+			value, ok := answer.Value.(string)
+			value = strings.TrimSpace(value)
+			if !ok || value == "" {
+				issues = append(issues, domain.DomainValidationIssue{Field: field + ".value", Message: "有选项题目必须提供 value", Code: "answer.value.required", Level: domain.ValidationLevelError})
+				continue
+			}
+			option, valid := previewOption(question, value)
+			if !valid {
+				issues = append(issues, domain.DomainValidationIssue{Field: field + ".value", Message: fmt.Sprintf("value %q 不是题目 %q 的有效选项", value, codeValue), Code: "answer.value.invalid_option", Level: domain.ValidationLevelError})
+				continue
+			}
+			if answer.Score != nil && *answer.Score != float64(option.Score) {
+				issues = append(issues, domain.DomainValidationIssue{Field: field + ".score", Message: fmt.Sprintf("score 与问卷选项 %q 的分值不一致", value), Code: "answer.score.mismatch", Level: domain.ValidationLevelError})
+			}
 			continue
 		}
-		if value, ok := answer.Value.(string); ok && strings.TrimSpace(value) != "" {
-			if _, valid := values[value]; !valid {
-				issues = append(issues, domain.DomainValidationIssue{Field: field + ".value", Message: fmt.Sprintf("value %q 不是题目 %q 的有效选项", value, codeValue), Code: "answer.value.invalid_option", Level: domain.ValidationLevelError})
-			}
+		if answer.Score == nil {
+			issues = append(issues, domain.DomainValidationIssue{Field: field + ".score", Message: "无选项题目必须提供 score", Code: "answer.score.required", Level: domain.ValidationLevelError})
+		} else if math.IsNaN(*answer.Score) || math.IsInf(*answer.Score, 0) {
+			issues = append(issues, domain.DomainValidationIssue{Field: field + ".score", Message: "score 必须是有限数字", Code: "answer.score.invalid", Level: domain.ValidationLevelError})
 		}
 	}
 	return issues
@@ -233,11 +243,19 @@ func validateTypologyPreviewAnswers(answers []typologyPreviewAnswer, questionnai
 
 // typologyPreviewExecutionInput 人格类型预览执行输入
 func typologyPreviewExecutionInput(model *domain.AssessmentModel, questionnaire *questionnaireapp.QuestionnaireResult, payload *modeltypology.Payload, answers []typologyPreviewAnswer) *evaluationinput.InputSnapshot {
+	questionsByCode := make(map[string]questionnaireapp.QuestionResult, len(questionnaire.Questions))
+	for _, question := range questionnaire.Questions {
+		questionsByCode[question.Code] = question
+	}
 	answerSnapshots := make([]evaluationinput.AnswerSnapshot, 0, len(answers))
 	for _, answer := range answers {
 		score := 0.0
 		if answer.Score != nil {
 			score = *answer.Score
+		} else if value, ok := answer.Value.(string); ok {
+			if option, found := previewOption(questionsByCode[answer.QuestionCode], value); found {
+				score = float64(option.Score)
+			}
 		}
 		answerSnapshots = append(answerSnapshots, evaluationinput.AnswerSnapshot{QuestionCode: answer.QuestionCode, Score: score, Value: answer.Value})
 	}
@@ -263,13 +281,22 @@ func questionnaireSnapshotFromResult(questionnaire *questionnaireapp.Questionnai
 	}
 	snapshot := modeltypology.QuestionnaireSnapshot{Code: questionnaire.Code, Version: questionnaire.Version, Questions: make([]modeltypology.QuestionSnapshot, 0, len(questionnaire.Questions))}
 	for _, question := range questionnaire.Questions {
-		item := modeltypology.QuestionSnapshot{Code: question.Code, OptionCodes: make([]string, 0, len(question.Options))}
+		item := modeltypology.QuestionSnapshot{Code: question.Code, Type: question.Type, OptionCodes: make([]string, 0, len(question.Options))}
 		for _, option := range question.Options {
 			item.OptionCodes = append(item.OptionCodes, option.Value)
 		}
 		snapshot.Questions = append(snapshot.Questions, item)
 	}
 	return snapshot
+}
+
+func previewOption(question questionnaireapp.QuestionResult, value string) (questionnaireapp.OptionResult, bool) {
+	for _, option := range question.Options {
+		if option.Value == value {
+			return option, true
+		}
+	}
+	return questionnaireapp.OptionResult{}, false
 }
 
 // previewResultFromReport 从报告结果创建报告预览结果

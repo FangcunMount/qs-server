@@ -2,6 +2,7 @@ package typology
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
@@ -16,6 +17,7 @@ type QuestionnaireSnapshot struct {
 // QuestionSnapshot 是minimal question 结构 needed 到 有效ate references。
 type QuestionSnapshot struct {
 	Code        string
+	Type        string
 	OptionCodes []string
 }
 
@@ -33,9 +35,10 @@ type RuntimeSpecValidationContext struct {
 // ValidateRuntimeSpecForPublishWithContext performs strong 校验 gate 用于之前 发布。
 func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []binding.DomainValidationIssue {
 	validator := runtimeSpecValidator{
-		questions: map[string]map[string]struct{}{},
-		algorithm: validationContext.Algorithm,
-		outcomes:  map[string]Outcome{},
+		questions:     map[string]map[string]struct{}{},
+		questionTypes: map[string]string{},
+		algorithm:     validationContext.Algorithm,
+		outcomes:      map[string]Outcome{},
 	}
 	for _, question := range questionnaire.Questions {
 		options := make(map[string]struct{}, len(question.OptionCodes))
@@ -44,6 +47,7 @@ func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire Q
 		}
 		if question.Code != "" {
 			validator.questions[question.Code] = options
+			validator.questionTypes[question.Code] = question.Type
 		}
 	}
 	validator.loadOutcomes(validationContext.Outcomes)
@@ -52,10 +56,11 @@ func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire Q
 }
 
 type runtimeSpecValidator struct {
-	questions map[string]map[string]struct{}
-	algorithm binding.Algorithm
-	outcomes  map[string]Outcome
-	issues    []binding.DomainValidationIssue
+	questions     map[string]map[string]struct{}
+	questionTypes map[string]string
+	algorithm     binding.Algorithm
+	outcomes      map[string]Outcome
+	issues        []binding.DomainValidationIssue
 }
 
 func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
@@ -115,7 +120,12 @@ func (v *runtimeSpecValidator) validateFactor(key string, factor FactorSpec, fac
 		if len(factor.Contributions) == 0 {
 			v.add("factor_graph.factors."+key+".contributions", "factor_graph.leaf.contributions.required", "leaf factor 必须配置题目贡献")
 		}
+		seen := make(map[string]struct{}, len(factor.Contributions))
 		for _, contribution := range factor.Contributions {
+			if _, duplicate := seen[contribution.QuestionCode]; duplicate && contribution.QuestionCode != "" {
+				v.add("factor_graph.factors."+key+".contributions", "question_contribution.duplicate", fmt.Sprintf("题目 %s 对 factor %s 的贡献重复", contribution.QuestionCode, key))
+			}
+			seen[contribution.QuestionCode] = struct{}{}
 			v.validateContribution(key, contribution)
 		}
 	case FactorSpecKindComposite:
@@ -147,9 +157,52 @@ func (v *runtimeSpecValidator) validateContribution(factorKey string, contributi
 		v.add("factor_graph.factors."+factorKey+".contributions.question_code", "question_mapping.question_not_found", fmt.Sprintf("题目 %s 不存在", contribution.QuestionCode))
 		return
 	}
-	for optionCode := range contribution.OptionScores {
-		if _, ok := options[optionCode]; !ok {
-			v.add("factor_graph.factors."+factorKey+".contributions.option_scores", "question_mapping.option_not_found", fmt.Sprintf("题目 %s 的选项 %s 不存在", contribution.QuestionCode, optionCode))
+	field := "factor_graph.factors." + factorKey + ".contributions"
+	if contribution.ScoringMode == "" {
+		v.addWarning(field+".scoring_mode", "question_contribution.legacy_implicit", fmt.Sprintf("题目 %s 使用旧版隐式计分规则", contribution.QuestionCode))
+		for optionCode := range contribution.OptionScores {
+			if _, exists := options[optionCode]; !exists {
+				v.add(field+".option_scores", "question_mapping.option_not_found", fmt.Sprintf("题目 %s 的选项 %s 不存在", contribution.QuestionCode, optionCode))
+			}
+		}
+		return
+	}
+	if contribution.ScoringMode != QuestionScoringModeQuestionScore && contribution.ScoringMode != QuestionScoringModeOptionOverride {
+		v.add(field+".scoring_mode", "scoring_mode.invalid", fmt.Sprintf("scoring_mode %s 不支持", contribution.ScoringMode))
+	}
+	if contribution.Sign != 1 && contribution.Sign != -1 {
+		v.add(field+".sign", "sign.invalid", "sign 必须是 1 或 -1")
+	}
+	if math.IsNaN(contribution.Weight) || math.IsInf(contribution.Weight, 0) || contribution.Weight <= 0 {
+		v.add(field+".weight", "weight.invalid", "weight 必须是大于 0 的有限数字")
+	}
+	if contribution.ScoringMode == QuestionScoringModeQuestionScore {
+		if contribution.OptionScores != nil {
+			v.add(field+".option_scores", "option_scores.forbidden", "question_score 不能配置 option_scores")
+		}
+		return
+	}
+	if contribution.ScoringMode != QuestionScoringModeOptionOverride {
+		return
+	}
+	if v.questionTypes[contribution.QuestionCode] != "Radio" {
+		v.add(field+".scoring_mode", "scoring_mode.invalid", "option_override 仅支持单选题")
+	}
+	if len(contribution.OptionScores) == 0 {
+		v.add(field+".option_scores", "option_scores.required", "option_override 必须配置 option_scores")
+		return
+	}
+	for optionCode := range options {
+		if _, exists := contribution.OptionScores[optionCode]; !exists {
+			v.add(field+".option_scores", "option_scores.missing_option", fmt.Sprintf("题目 %s 缺少选项 %s 的覆盖分值", contribution.QuestionCode, optionCode))
+		}
+	}
+	for optionCode, score := range contribution.OptionScores {
+		if _, exists := options[optionCode]; !exists {
+			v.add(field+".option_scores", "option_scores.unknown_option", fmt.Sprintf("题目 %s 的选项 %s 不存在", contribution.QuestionCode, optionCode))
+		}
+		if math.IsNaN(score) || math.IsInf(score, 0) {
+			v.add(field+".option_scores", "option_scores.invalid", fmt.Sprintf("题目 %s 的选项 %s 分值必须是有限数字", contribution.QuestionCode, optionCode))
 		}
 	}
 }
@@ -355,6 +408,12 @@ func (v *runtimeSpecValidator) add(field, code, message string) {
 		Code:    code,
 		Message: message,
 		Level:   binding.ValidationLevelError,
+	})
+}
+
+func (v *runtimeSpecValidator) addWarning(field, code, message string) {
+	v.issues = append(v.issues, binding.DomainValidationIssue{
+		Field: field, Code: code, Message: message, Level: binding.ValidationLevelWarning,
 	})
 }
 

@@ -71,6 +71,27 @@ func TestValidateDefinitionUsesThePublishValidationHandler(t *testing.T) {
 	}
 }
 
+func TestValidateDefinitionReturnsWarningsWithoutFailing(t *testing.T) {
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "TYPOLOGY-WARNING", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Algorithm: domain.AlgorithmPersonalityTypology, Title: "Typology", Now: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := &recordingDefinitionHandler{validateIssues: []domain.DomainValidationIssue{{
+		Field: "factor_graph", Code: "question_contribution.legacy_implicit", Message: "legacy", Level: domain.ValidationLevelWarning,
+	}}}
+	service := Service{ModelRepo: &authoringModelRepo{model: model}, Authorizer: allowDefinitionAuthorizer{}, Registry: appdefinition.NewRegistry(handler)}
+	result, err := service.ValidateDefinition(context.Background(), modelcatalog.ActorContext{}, model.Code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Passed || !result.Valid || len(result.Issues) != 1 || len(result.Errors) != 0 {
+		t.Fatalf("result = %#v, want passed result with warning", result)
+	}
+}
+
 type recordingDefinitionHandler struct {
 	called         bool
 	validateCalled bool

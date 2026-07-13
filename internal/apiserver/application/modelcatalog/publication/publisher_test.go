@@ -58,7 +58,24 @@ func TestPublisherPublishCompensatesSnapshotWhenDraftUpdateFails(t *testing.T) {
 	}
 }
 
+func TestPublisherAllowsNonBlockingValidationWarnings(t *testing.T) {
+	model := newPublishedTestModel(t)
+	publisher := publication.Publisher{
+		Registry:  definition.NewRegistry(warningSnapshotHandler{}),
+		ModelRepo: &publishedModelRepo{}, Repo: &publishedRepo{},
+	}
+	if _, err := publisher.Publish(context.Background(), model, publication.PublishOptions{}); err != nil {
+		t.Fatalf("Publish() with warning: %v", err)
+	}
+}
+
 type snapshotHandler struct{}
+
+type warningSnapshotHandler struct{ snapshotHandler }
+
+func (warningSnapshotHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
+	return []domain.DomainValidationIssue{{Code: "question_contribution.legacy_implicit", Message: "legacy", Level: domain.ValidationLevelWarning}}
+}
 
 func (snapshotHandler) Supports(identity domain.Identity) bool {
 	return identity.Kind == domain.KindCognitive

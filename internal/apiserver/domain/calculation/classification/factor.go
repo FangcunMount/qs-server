@@ -30,10 +30,21 @@ const (
 	OptionScoringCompat OptionScoringPolicy = "compat"
 )
 
+// QuestionScoringMode selects the source of a question contribution's base score.
+// The empty value is reserved for published legacy snapshots.
+type QuestionScoringMode string
+
+const (
+	QuestionScoringModeQuestionScore  QuestionScoringMode = "question_score"
+	QuestionScoringModeOptionOverride QuestionScoringMode = "option_override"
+)
+
 // AnswerContribution 映射问卷题目 到 叶子 因子 score。
 type AnswerContribution struct {
 	QuestionCode string
+	ScoringMode  QuestionScoringMode
 	Sign         float64
+	Weight       float64
 	OptionScores map[string]float64
 }
 

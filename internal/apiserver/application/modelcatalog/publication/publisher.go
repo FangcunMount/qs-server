@@ -67,7 +67,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	if err != nil {
 		return nil, err
 	}
-	if issues := handler.ValidateForPublish(ctx, model); len(issues) > 0 {
+	if issues := handler.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
 		return nil, definition.NewValidationError(issues)
 	}
 	now := p.now()

@@ -1,11 +1,67 @@
 package typology_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
+
+func TestExplicitQuestionScoreContributionDoesNotRequireOptionScores(t *testing.T) {
+	spec := validRuntimeSpec()
+	factorSpec := spec.FactorGraph.Factors["EI"]
+	factorSpec.Contributions = []typology.FactorContributionSpec{{
+		QuestionCode: "q1", ScoringMode: typology.QuestionScoringModeQuestionScore, Sign: -1, Weight: 0.5,
+	}}
+	spec.FactorGraph.Factors["EI"] = factorSpec
+	issues := typology.ValidateRuntimeSpecForPublish(spec, validQuestionnaire())
+	if modelcatalog.HasValidationErrors(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestOptionOverrideRequiresExactOptionCoverage(t *testing.T) {
+	spec := validRuntimeSpec()
+	factorSpec := spec.FactorGraph.Factors["EI"]
+	factorSpec.Contributions[0].OptionScores = map[string]float64{"A": 1, "X": 2}
+	spec.FactorGraph.Factors["EI"] = factorSpec
+	issues := typology.ValidateRuntimeSpecForPublish(spec, validQuestionnaire())
+	for _, code := range []string{"option_scores.missing_option", "option_scores.unknown_option"} {
+		if !hasIssueCode(issues, code) {
+			t.Fatalf("issues = %#v, want %s", issues, code)
+		}
+	}
+}
+
+func TestLegacyContributionProducesNonBlockingWarning(t *testing.T) {
+	spec := validRuntimeSpec()
+	factorSpec := spec.FactorGraph.Factors["EI"]
+	factorSpec.Contributions[0].ScoringMode = ""
+	factorSpec.Contributions[0].Weight = 0
+	spec.FactorGraph.Factors["EI"] = factorSpec
+	issues := typology.ValidateRuntimeSpecForPublish(spec, validQuestionnaire())
+	if !hasIssueCode(issues, "question_contribution.legacy_implicit") || modelcatalog.HasValidationErrors(issues) {
+		t.Fatalf("issues = %#v, want non-blocking legacy warning", issues)
+	}
+}
+
+func TestExplicitContributionJSONAppliesOmittedDefaultsAndPreservesExplicitZero(t *testing.T) {
+	var omitted typology.FactorContributionSpec
+	if err := json.Unmarshal([]byte(`{"question_code":"q1","scoring_mode":"question_score"}`), &omitted); err != nil {
+		t.Fatal(err)
+	}
+	if omitted.Sign != 1 || omitted.Weight != 1 {
+		t.Fatalf("omitted defaults = sign %v weight %v", omitted.Sign, omitted.Weight)
+	}
+	var explicitZero typology.FactorContributionSpec
+	if err := json.Unmarshal([]byte(`{"question_code":"q1","scoring_mode":"question_score","sign":0,"weight":0}`), &explicitZero); err != nil {
+		t.Fatal(err)
+	}
+	if explicitZero.Sign != 0 || explicitZero.Weight != 0 {
+		t.Fatalf("explicit zero must be preserved: %#v", explicitZero)
+	}
+}
 
 func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) {
 	spec := &typology.RuntimeSpec{
@@ -196,6 +252,9 @@ func validRuntimeSpec() *typology.RuntimeSpec {
 					Kind: typology.FactorSpecKindLeaf,
 					Contributions: []typology.FactorContributionSpec{{
 						QuestionCode: "q1",
+						ScoringMode:  typology.QuestionScoringModeOptionOverride,
+						Sign:         1,
+						Weight:       1,
 						OptionScores: map[string]float64{"A": 1, "B": -1},
 					}},
 				},
@@ -216,7 +275,7 @@ func validRuntimeSpec() *typology.RuntimeSpec {
 
 func validQuestionnaire() typology.QuestionnaireSnapshot {
 	return typology.QuestionnaireSnapshot{
-		Questions: []typology.QuestionSnapshot{{Code: "q1", OptionCodes: []string{"A", "B"}}},
+		Questions: []typology.QuestionSnapshot{{Code: "q1", Type: "Radio", OptionCodes: []string{"A", "B"}}},
 	}
 }
 

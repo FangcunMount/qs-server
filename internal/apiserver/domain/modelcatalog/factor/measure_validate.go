@@ -1,6 +1,9 @@
 package factor
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // ValidateMeasureSpecParts checks measure-layer invariants after Factor is split from graph and scoring.
 func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Scoring) []HierarchyIssue {
@@ -110,6 +113,7 @@ func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 		})
 	}
 	var seenKind ScoringSourceKind
+	seenQuestions := make(map[string]struct{})
 	for _, source := range rule.Sources {
 		if source.Kind == "" || source.Code == "" {
 			issues = append(issues, HierarchyIssue{
@@ -135,19 +139,56 @@ func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 					Message: fmt.Sprintf("children_policy 引用不存在的子因子 %s", source.Code),
 				})
 			}
-			if len(source.OptionScores) > 0 {
+			if source.ScoringMode != "" || source.Sign != 0 || source.Weight != 0 || source.OptionScores != nil {
 				issues = append(issues, HierarchyIssue{
 					Field:   fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
 					Code:    "factor.scoring.option_scores.role_forbidden",
-					Message: "factor scoring source cannot define option_scores",
+					Message: "factor scoring source cannot define question contribution fields",
 				})
 			}
-		} else if source.Kind == ScoringSourceQuestion && source.OptionScores != nil && len(source.OptionScores) == 0 {
-			issues = append(issues, HierarchyIssue{
-				Field:   fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
-				Code:    "factor.scoring.option_scores.empty",
-				Message: "question option_scores cannot be an empty map",
-			})
+		} else if source.Kind == ScoringSourceQuestion {
+			if _, duplicate := seenQuestions[source.Code]; duplicate {
+				issues = append(issues, HierarchyIssue{Field: fmt.Sprintf("scoring[%s].sources", rule.FactorCode), Code: "question_contribution.duplicate", Message: fmt.Sprintf("question %s 对 factor %s 的贡献重复", source.Code, rule.FactorCode)})
+			}
+			seenQuestions[source.Code] = struct{}{}
+			issues = append(issues, validateQuestionContribution(rule.FactorCode, source)...)
+		}
+	}
+	return issues
+}
+
+func validateQuestionContribution(factorCode string, source ScoringSource) []HierarchyIssue {
+	field := fmt.Sprintf("scoring[%s].sources", factorCode)
+	if source.ScoringMode == "" {
+		if source.OptionScores != nil && len(source.OptionScores) == 0 {
+			return []HierarchyIssue{{Field: field, Code: "factor.scoring.option_scores.empty", Message: "question option_scores cannot be an empty map"}}
+		}
+		return nil
+	}
+	issues := make([]HierarchyIssue, 0)
+	if source.ScoringMode != QuestionScoringModeQuestionScore && source.ScoringMode != QuestionScoringModeOptionOverride {
+		issues = append(issues, HierarchyIssue{Field: field + ".scoring_mode", Code: "scoring_mode.invalid", Message: fmt.Sprintf("scoring_mode %s 不支持", source.ScoringMode)})
+	}
+	if source.Sign != 1 && source.Sign != -1 {
+		issues = append(issues, HierarchyIssue{Field: field + ".sign", Code: "sign.invalid", Message: "sign 必须是 1 或 -1"})
+	}
+	if math.IsNaN(source.Weight) || math.IsInf(source.Weight, 0) || source.Weight <= 0 {
+		issues = append(issues, HierarchyIssue{Field: field + ".weight", Code: "weight.invalid", Message: "weight 必须是大于 0 的有限数字"})
+	}
+	switch source.ScoringMode {
+	case QuestionScoringModeQuestionScore:
+		if source.OptionScores != nil {
+			issues = append(issues, HierarchyIssue{Field: field + ".option_scores", Code: "option_scores.forbidden", Message: "question_score 不能配置 option_scores"})
+		}
+	case QuestionScoringModeOptionOverride:
+		if len(source.OptionScores) == 0 {
+			issues = append(issues, HierarchyIssue{Field: field + ".option_scores", Code: "option_scores.required", Message: "option_override 必须配置 option_scores"})
+		}
+	}
+	for _, score := range source.OptionScores {
+		if math.IsNaN(score) || math.IsInf(score, 0) {
+			issues = append(issues, HierarchyIssue{Field: field + ".option_scores", Code: "option_scores.invalid", Message: "option_scores 必须是有限数字"})
+			break
 		}
 	}
 	return issues

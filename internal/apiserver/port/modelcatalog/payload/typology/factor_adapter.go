@@ -51,7 +51,7 @@ func canonicalMeasureFromExplicitGraph(fg FactorGraphSpec) definition.MeasureSpe
 		if code == "" {
 			code = spec.ID
 		}
-		scoring = appendQuestionScoring(scoring, code, questionCodesFromContributions(spec.Contributions))
+		scoring = appendContributionScoring(scoring, code, spec)
 	}
 	sort.Slice(factors, func(i, j int) bool {
 		return factors[i].Code < factors[j].Code
@@ -60,6 +60,24 @@ func canonicalMeasureFromExplicitGraph(fg FactorGraphSpec) definition.MeasureSpe
 		return scoring[i].FactorCode < scoring[j].FactorCode
 	})
 	return definition.MeasureSpec{Factors: factors, Scoring: scoring}
+}
+
+func appendContributionScoring(scoring []factor.Scoring, factorCode string, spec FactorSpec) []factor.Scoring {
+	if factorCode == "" || len(spec.Contributions) == 0 {
+		return scoring
+	}
+	sources := make([]factor.ScoringSource, 0, len(spec.Contributions))
+	for _, contribution := range spec.Contributions {
+		sources = append(sources, factor.ScoringSource{
+			Kind: factor.ScoringSourceQuestion, Code: contribution.QuestionCode,
+			ScoringMode: factor.QuestionScoringMode(contribution.ScoringMode), Sign: contribution.Sign, Weight: contribution.Weight,
+			OptionScores: cloneFloatMap(contribution.OptionScores),
+		})
+	}
+	return append(scoring, factor.Scoring{
+		FactorCode: factorCode, Sources: sources, Strategy: factor.ScoringStrategySum,
+		Constant: spec.Constant, OptionScoring: factor.OptionScoring(spec.OptionScoring),
+	})
 }
 
 func legacyDimensionToCanonical(dim Dimension) factor.Factor {
@@ -91,14 +109,6 @@ func appendQuestionScoring(scoring []factor.Scoring, factorCode string, question
 		sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: code})
 	}
 	return append(scoring, factor.Scoring{FactorCode: factorCode, Sources: sources})
-}
-
-func questionCodesFromContributions(contributions []FactorContributionSpec) []string {
-	codes := make([]string, 0, len(contributions))
-	for _, contribution := range contributions {
-		codes = append(codes, contribution.QuestionCode)
-	}
-	return codes
 }
 
 func questionCodesForDimension(dimensionCode string, mappings []QuestionMapping) []string {

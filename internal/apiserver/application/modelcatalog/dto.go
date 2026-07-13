@@ -202,16 +202,24 @@ type ValidationResult struct {
 }
 
 func NewValidationResult(issues []ValidationIssue) *ValidationResult {
-	passed := len(issues) == 0
+	passed := true
+	for _, issue := range issues {
+		if issue.Level == "" || issue.Level == string(domain.ValidationLevelError) {
+			passed = false
+			break
+		}
+	}
 	result := &ValidationResult{
 		Passed: passed,
 		Valid:  passed,
 		Issues: issues,
 	}
-	if len(issues) > 0 {
+	if !passed {
 		result.Errors = make([]string, 0, len(issues))
 		for _, issue := range issues {
-			result.Errors = append(result.Errors, issue.Message)
+			if issue.Level == "" || issue.Level == string(domain.ValidationLevelError) {
+				result.Errors = append(result.Errors, issue.Message)
+			}
 		}
 	}
 	return result

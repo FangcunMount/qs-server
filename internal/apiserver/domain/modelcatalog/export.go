@@ -184,6 +184,7 @@ var (
 	ResolveProductChannel     = binding.ResolveProductChannel
 	CompleteProductChannel    = binding.CompleteProductChannel
 	ValidateNewProductChannel = binding.ValidateNewProductChannel
+	HasValidationErrors       = binding.HasValidationErrors
 	AllProductChannels        = binding.AllProductChannels
 	LegacyKindMapping         = binding.LegacyKindMapping
 	ProductFromChannel        = binding.ProductFromChannel

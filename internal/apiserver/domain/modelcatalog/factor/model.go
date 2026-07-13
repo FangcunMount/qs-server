@@ -1,5 +1,7 @@
 package factor
 
+import "encoding/json"
+
 // Factor 是 ModelCatalog 的通用测量节点。
 type Factor struct {
 	Code  string
@@ -20,12 +22,45 @@ const (
 	ScoringSourceFactor   ScoringSourceKind = "factor"
 )
 
+// QuestionScoringMode selects the source of a question contribution's base score.
+type QuestionScoringMode string
+
+const (
+	QuestionScoringModeQuestionScore  QuestionScoringMode = "question_score"
+	QuestionScoringModeOptionOverride QuestionScoringMode = "option_override"
+)
+
 // ScoringSource 指向一个计分输入，可以是题目或子 Factor。
 type ScoringSource struct {
-	Kind         ScoringSourceKind
-	Code         string
-	Sign         float64
-	OptionScores map[string]float64
+	Kind         ScoringSourceKind   `json:"Kind"`
+	Code         string              `json:"Code"`
+	ScoringMode  QuestionScoringMode `json:"ScoringMode,omitempty"`
+	Sign         float64             `json:"Sign,omitempty"`
+	Weight       float64             `json:"Weight,omitempty"`
+	OptionScores map[string]float64  `json:"OptionScores,omitempty"`
+}
+
+// UnmarshalJSON distinguishes omitted defaults from explicitly invalid zero values.
+func (s *ScoringSource) UnmarshalJSON(data []byte) error {
+	type alias ScoringSource
+	var decoded alias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if decoded.ScoringMode != "" {
+		if _, ok := fields["Sign"]; !ok {
+			decoded.Sign = 1
+		}
+		if _, ok := fields["Weight"]; !ok {
+			decoded.Weight = 1
+		}
+	}
+	*s = ScoringSource(decoded)
+	return nil
 }
 
 // Scoring 描述一个 Factor 的分数如何由输入来源聚合得到。

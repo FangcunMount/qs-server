@@ -21,6 +21,8 @@ tags:
   description: AssessmentEntry
 - name: AssessmentModel
   description: AssessmentModel
+- name: AssessmentRelease
+  description: AssessmentRelease
 - name: Clinician
   description: Clinician
 - name: ClinicianRelation
@@ -1516,6 +1518,102 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AssessmentModelValidationResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-releases/{code}/archive:
+    post:
+      tags:
+      - AssessmentRelease
+      summary: 归档测评版本
+      operationId: 归档测评版本
+      description: 归档测评版本
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 模型编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/modelcatalog.AssessmentRelease'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-releases/{code}/publish:
+    post:
+      tags:
+      - AssessmentRelease
+      summary: 发布测评版本
+      operationId: 发布测评版本
+      description: 发布测评版本
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 模型编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/modelcatalog.AssessmentRelease'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -9801,6 +9899,14 @@ components:
       x-enum-varnames:
       - OptionScoringStrict
       - OptionScoringCompat
+    factor.QuestionScoringMode:
+      type: string
+      enum:
+      - question_score
+      - option_override
+      x-enum-varnames:
+      - QuestionScoringModeQuestionScore
+      - QuestionScoringModeOptionOverride
     factor.Scoring:
       type: object
       properties:
@@ -9834,15 +9940,19 @@ components:
     factor.ScoringSource:
       type: object
       properties:
-        code:
+        Code:
           type: string
-        kind:
+        Kind:
           $ref: '#/components/schemas/factor.ScoringSourceKind'
-        optionScores:
+        OptionScores:
           type: object
           additionalProperties:
             type: number
-        sign:
+        ScoringMode:
+          $ref: '#/components/schemas/factor.QuestionScoringMode'
+        Sign:
+          type: number
+        Weight:
           type: number
     factor.ScoringSourceKind:
       type: string
@@ -9883,6 +9993,23 @@ components:
       - 0
       x-enum-varnames:
       - ZeroID
+    modelcatalog.AssessmentRelease:
+      type: object
+      properties:
+        archived_at:
+          type: string
+        model_code:
+          type: string
+        model_status:
+          type: string
+        published_at:
+          type: string
+        questionnaire_code:
+          type: string
+        questionnaire_status:
+          type: string
+        questionnaire_version:
+          type: string
     modelcatalog.Definition:
       type: object
       properties:
@@ -11320,7 +11447,14 @@ components:
           type: object
           additionalProperties:
             type: number
+        ScoringMode:
+          type: string
+          enum:
+          - question_score
+          - option_override
         Sign:
+          type: number
+        Weight:
           type: number
     response.DefinitionScoringWire:
       type: object
@@ -11365,6 +11499,21 @@ components:
           type: number
         Kind:
           type: string
+        LevelRule:
+          $ref: '#/components/schemas/response.DefinitionTypeLevelRuleWire'
+        Poles:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.DefinitionTypePoleWire'
+        TopK:
+          type: integer
+    response.DefinitionTypeLevelRuleWire:
+      type: object
+      properties:
+        HighMin:
+          type: number
+        LowMax:
+          type: number
     response.DefinitionTypeOutcomeMappingWire:
       type: object
       properties:
@@ -11374,6 +11523,19 @@ components:
           type: string
         DetailKind:
           type: string
+    response.DefinitionTypePoleWire:
+      type: object
+      properties:
+        FactorCode:
+          type: string
+        LeftPole:
+          type: string
+        Model:
+          type: string
+        RightPole:
+          type: string
+        Threshold:
+          type: number
     response.DefinitionTypeProfileWire:
       type: object
       properties:
