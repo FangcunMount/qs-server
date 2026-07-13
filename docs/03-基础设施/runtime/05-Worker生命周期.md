@@ -29,4 +29,4 @@ worker running、handler duration、ACK / NACK count、consume error、reconnect
 - [../../../internal/worker/process](../../../internal/worker/process)
 - [../../../internal/worker/handlers](../../../internal/worker/handlers)
 - [../../../internal/worker/observability](../../../internal/worker/observability)
-- [../../../internal/pkg/eventruntime](../../../internal/pkg/eventruntime)
+- [../../../internal/pkg/eventing/runtime](../../../internal/pkg/eventing/runtime)

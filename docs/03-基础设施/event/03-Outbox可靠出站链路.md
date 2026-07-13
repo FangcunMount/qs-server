@@ -67,5 +67,5 @@ Outbox pending count、oldest pending age、claim duration、publish success / f
 - [../../../internal/apiserver/infra/mongo/eventoutbox](../../../internal/apiserver/infra/mongo/eventoutbox)
 - [../../../internal/apiserver/infra/mysql/eventoutbox](../../../internal/apiserver/infra/mysql/eventoutbox)
 - [../../../internal/apiserver/eventing/subsystem](../../../internal/apiserver/eventing/subsystem)
-- [../../../internal/pkg/eventcatalog](../../../internal/pkg/eventcatalog)
+- [../../../internal/pkg/eventing/catalog](../../../internal/pkg/eventing/catalog)
 - [../../../configs/events.yaml](../../../configs/events.yaml)
