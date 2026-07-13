@@ -16,8 +16,8 @@
 | 真值层 | `00-05` 是现行真值层，`06-宣讲` 是讲解层；历史材料只作参考，不作为当前事实源 |
 | 事实优先级 | 源码与机器契约优先于 prose 文档 |
 | 业务模块入口 | 统一从 [02-业务模块/README.md](./02-业务模块/README.md) 进入 |
-| 当前业务模块 | 4 个核心模块：`survey / model-catalog / evaluation / report`；3 个支撑模块：`actor / plan / statistics` |
-| 代码映射 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
+| 当前业务模块 | 4 个核心模块：`survey / model-catalog / evaluation / interpretation`；3 个支撑模块：`actor / plan / statistics` |
+| 代码映射 | 当前注册包是 `survey / modelcatalog / evaluation / interpretation / actor / plan / statistics` |
 | 执行主线 | Survey 提供答卷事实，Assessment Model 提供发布模型资产，Evaluation 执行测评并产出结果，Interpretation Model / Report 输出最终解释报告 |
 | 模型目录 | `modelcatalog` 是唯一模型资产模块；collection 可保留 `/typology-models` 业务 BFF，不对应独立模块或 gRPC |
 
@@ -144,13 +144,13 @@ Actor / Plan / Statistics
     再理解 Assessment / EvaluationRun / Result / Retry / Events
 
 40-interpretation
-    最后理解 report module 如何产出 InterpretReport
+    最后理解 interpretation 模块如何产出 InterpretReport
 
 50-actor / 60-plan / 70-statistics
     按参与者、计划编排、读侧统计问题进入
 ```
 
-旧 `scale/` 目录已经退出现行阅读路径。医学量表细节从 `20-model-catalog` 进入，历史材料只在 `docs/_archive/` 中保留。
+旧 `scale/` 目录已经退出现行阅读路径。医学量表细节从 `20-model-catalog` 进入；旧材料在重建期只作为 `_archive` 迁移输入。
 
 ### 5.3 需要看接口与运维
 
@@ -232,16 +232,17 @@ configs/events.yaml
 
 ---
 
-## 9. 历史材料政策
+## 9. 重建期的归档政策
 
-历史材料统一放在 `docs/_archive/`，只能作为信息源或迁移参考，不能直接视为现行事实。
+`docs/_archive/` 只是文档重建期的临时迁移输入，不是长期文档层，也不能直接视为现行事实。
 
 使用规则：
 
 ```text
 现行文档默认不依赖历史材料；
 从历史材料回迁内容前，必须重新核对源码和契约；
-docs/_archive 默认排除在 active truth layer 和 hygiene 规则之外。
+docs/_archive 默认排除在 active truth layer 和 hygiene 规则之外；
+所有模块重建完成、active docs 无 archive 依赖并通过验证后，删除整个 docs/_archive。
 ```
 
 ---

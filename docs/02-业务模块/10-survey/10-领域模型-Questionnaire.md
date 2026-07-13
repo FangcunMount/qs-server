@@ -82,7 +82,7 @@ classDiagram
 | `Textarea` | 是 | 无 | 支持文本校验 |
 | `Number` | 是 | 无 | 支持数值校验 |
 
-题型工厂由 `RegisterQuestionFactory` 注册。新增题型不能只增加常量，还必须同时处理构造、DTO 转换、提交值转换、校验、持久化映射和测试。
+题型工厂由 `RegisterQuestionFactory` 注册。但题型不能只从 Questionnaire 一侧理解：它还决定可接受的原始值、对应的 `AnswerValue`、校验和计分视图。完整映射见 [12-题型与答案值类型系统.md](./12-题型与答案值类型系统.md)，扩展步骤见 [22-新增题型与答案类型SOP.md](./22-新增题型与答案类型SOP.md)。
 
 ### 3.3 值对象与规则
 
@@ -95,7 +95,7 @@ classDiagram
 | `ValidationRule` | required、长度、数值等提交校验规则 |
 | `CalculationRule` | 题目级基础计算描述，不替代 ModelCatalog/Evaluation 机制 |
 | `ShowController` | 基于其它题答案决定题目是否可见，支持 `and / or` |
-| `SubmissionSpec` | 从某个发布版本派生的只读提交规格 |
+| `SubmissionSpec` | 从某个发布版本派生的只读提交规格；详见 [21-提交规格与答案校验.md](./21-提交规格与答案校验.md) |
 
 ## 4. Head 与发布快照
 
@@ -124,7 +124,7 @@ stateDiagram-v2
     Archived --> [*]
 ```
 
-当前版本规则由 `Versioning` 领域服务实现：
+当前版本规则由 `Versioning` 领域服务实现。这些规则与 AnswerSheet 历史解释的关系见 [20-版本化作答契约.md](./20-版本化作答契约.md)：
 
 | 动作 | 版本变化 |
 | --- | --- |

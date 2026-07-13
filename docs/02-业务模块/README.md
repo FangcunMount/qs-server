@@ -14,9 +14,9 @@
 | 核心阅读顺序 | `10-survey -> 20-model-catalog -> 30-evaluation -> 40-interpretation` |
 | 支撑阅读顺序 | `50-actor -> 60-plan -> 70-statistics` |
 | 代码注册事实 | 以 [`internal/apiserver/container/modules/registry.go`](../../internal/apiserver/container/modules/registry.go) 的 `BusinessPackages` 为准 |
-| 代码包名 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
+| 代码包名 | 当前注册包是 `survey / modelcatalog / evaluation / interpretation / actor / plan / statistics` |
 | 模型目录边界 | `modelcatalog` 是唯一模型资产模块；collection 的 `typology-models` 仅是业务 BFF facade |
-| 旧文档处理 | 旧未编号目录已归档到 [`docs/_archive/2026-07-06-business-module-redesign`](../_archive/2026-07-06-business-module-redesign/) |
+| 旧文档处理 | `_archive` 只是重建期迁移输入；所有模块完成并验证后统一删除，不作为现行文档依赖 |
 
 一句话概括：**qs-server 的测评业务由作答事实、模型资产、测评执行、解释报告四层核心链路组成，actor、plan、statistics 是围绕这条链路的支撑模块。**
 
@@ -84,13 +84,13 @@ Survey
 | `plan` | `plan` | 测评计划、周期任务、任务生命周期 |
 | `statistics` | `statistics` | 读侧统计、行为投影、指标聚合 |
 
-文档中的 `interpretation` 对应当前代码中的 `report module`。后续如果代码包重命名，应先调整容器注册、装配、测试和兼容策略，再同步文档。
+`interpretation` 的文档名和当前注册名一致。注册事实必须从 `registry.go` 校验，不得沿用归档文档中的 `report module` 旧称。
 
 ---
 
 ## 5. 模块文档统一写法
 
-每个模块 README 必须回答：
+每个模块 README 只做模块边界声明和阅读地图，必须回答：
 
 1. 这个模块负责什么。
 2. 这个模块不负责什么。
@@ -98,21 +98,32 @@ Survey
 4. 这个模块参与哪些关键业务链路。
 5. 它依赖哪些模块，又被哪些模块依赖。
 
-每个模块的 `02-领域模型.md` 必须包含：
+深度文档按语义编号：
 
-1. 模块核心概念。
-2. 领域模型图。
-3. 聚合根与实体。
-4. 值对象。
-5. 领域服务。
-6. 领域事件。
-7. 模型边界与反例。
+| 编号段 | 内容 | 必须讲清的问题 |
+| ------ | ---- | ---------------- |
+| `10-19` | 领域模型 | 聚合边界、实体、值对象、不变式、生命周期和领域事件 |
+| `20-29` | 领域规格、服务与扩展协议 | 规则为什么存在、如何约束聚合、与 application service 的边界 |
+| `30-69` | 关键路径 | 触发入口、transport、application、domain、repository/transaction/outbox、失败语义、幂等和测试 |
+| `80-89` | 模块边界 | 上下游合作、允许与禁止的依赖、跨模块编排位置 |
+| `90-99` | 代码索引与验证 | 分层落点、组合根、契约、配置和定向测试命令 |
 
-模块文档可以引用接口、事件、存储和代码路径，但不能让这些实现细节替代领域模型和业务链路。
+领域模型文档不能只列结构体字段；关键路径文档不能只列 handler/service 名称。每个结论都要回链到当前源码、机器契约或测试。核心模块可拆多个模型与关键路径文档，不为形式统一压缩为单文件。
 
 ---
 
-## 6. Verify
+## 6. 当前重建状态
+
+| 模块 | 状态 | 说明 |
+| ---- | ---- | ---- |
+| `10-survey` | 已按新规范重建 | 已覆盖 Questionnaire、AnswerSheet、题型/答案值类型系统、版本契约、提交规格、扩展 SOP 与关键路径 |
+| `20-model-catalog` 至 `70-statistics` | 待逐模块审核 | 现有内容仍需对照最新源码，不以占位文件数量判定完成 |
+
+每完成一个模块，就删除被其替代的 active 占位文档并修正引用；只在全部模块完成且通过链接检查后，才统一删除 `_archive`。
+
+---
+
+## 7. Verify
 
 ```bash
 make docs-hygiene

@@ -46,7 +46,7 @@ flowchart LR
 3. 从 options 创建 `config.Config`；
 4. 交给 `process.Run(cfg)`。
 
-它不应该创建业务 service，也不应该知道 `survey / modelcatalog / evaluation / report` 的装配细节。业务装配应该留在 `container`。
+它不应该创建业务 service，也不应该知道 `survey / modelcatalog / evaluation / interpretation` 的装配细节。业务装配应该留在 `container`。
 
 ### `process.Run` 的语义
 

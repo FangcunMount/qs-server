@@ -89,7 +89,7 @@ classDiagram
 - `OptionValue`；
 - `OptionsValue`。
 
-原始输入先由 Questionnaire 的 SubmissionSpec 确认题型和选项合法，再转换为对应 AnswerValue。客户端不能通过伪造 question type 改变服务端解释。
+原始输入先由 Questionnaire 的 SubmissionSpec 确认题型和选项合法，再转换为对应 AnswerValue。客户端不能通过伪造 question type 改变服务端解释。题型与答案值并非一一对应，完整类型关系见 [12-题型与答案值类型系统.md](./12-题型与答案值类型系统.md)。
 
 ## 5. 生命周期
 

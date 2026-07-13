@@ -135,7 +135,7 @@ flowchart LR
 | 文档组 | 负责什么 | 与 `00-总览` 的关系 |
 | ------ | -------- | ------------------- |
 | [01-运行时](../01-运行时/) | 三进程启动、进程间调用、HTTP/gRPC/MQ runtime、shutdown | 总览只讲拓扑和主方向，运行时讲具体装配和时序 |
-| [02-业务模块](../02-业务模块/) | survey / model-catalog / evaluation / report / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
+| [02-业务模块](../02-业务模块/) | survey / model-catalog / evaluation / interpretation / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
 | [03-基础设施](../03-基础设施/) | event、data-access、redis、resilience、security、integrations、runtime、observability 等横切能力 | 总览只说明这些能力存在和如何进入，基础设施文档讲机制与配置 |
 | [04-接口与运维](../04-接口与运维/) | REST、gRPC、internal gRPC、events.yaml、配置、部署、健康检查、排障 | 总览只列关键契约入口，接口与运维维护机器契约说明 |
 | [05-专题分析](../05-专题分析/) | 跨模块设计判断，例如为什么拆分 Survey / Assessment Model / Evaluation / Interpretation Model、为什么同步提交但异步评估 | 总览讲现状，专题分析讲取舍与原因 |
