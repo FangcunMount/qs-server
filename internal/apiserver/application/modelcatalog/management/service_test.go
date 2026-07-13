@@ -52,6 +52,44 @@ func TestUpdateBasicInfoForScaleAdvancesRevisionOnce(t *testing.T) {
 	}
 }
 
+func TestUpdateBasicInfoForksPublishedModelToDraftWithOneRevision(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "MEDICAL-SCALE", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: "Before", Now: now,
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel() error = %v", err)
+	}
+	if err := model.MarkPublished(now.Add(time.Minute)); err != nil {
+		t.Fatalf("MarkPublished() error = %v", err)
+	}
+	publishedRevision := model.Revision()
+	repo := &revisionCheckingModelRepo{model: model, persistedRevision: publishedRevision}
+	service := Service{
+		ModelRepo:  repo,
+		Authorizer: allowManagementAuthorizer{},
+		Now:        func() time.Time { return now.Add(2 * time.Minute) },
+	}
+
+	_, err = service.UpdateBasicInfo(context.Background(), modelcatalog.ActorContext{}, modelcatalog.UpdateBasicInfoDTO{
+		Code: "MEDICAL-SCALE", Title: "After", Description: "updated description",
+	})
+	if err != nil {
+		t.Fatalf("UpdateBasicInfo() error = %v", err)
+	}
+	if !model.IsDraft() {
+		t.Fatalf("status = %s, want draft", model.Status)
+	}
+	if model.PublishedAt != nil {
+		t.Fatalf("published_at = %v, want nil for the draft head", model.PublishedAt)
+	}
+	if got, want := model.Revision(), publishedRevision+1; got != want {
+		t.Fatalf("revision = %d, want %d", got, want)
+	}
+}
+
 type allowManagementAuthorizer struct{}
 
 func (allowManagementAuthorizer) Authorize(context.Context, modelcatalog.ActorContext, modelcatalog.Action, modelcatalog.Resource) error {

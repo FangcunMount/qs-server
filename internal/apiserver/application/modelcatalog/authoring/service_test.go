@@ -48,6 +48,44 @@ func TestSaveDefinitionBuildsPayloadFromDefinitionV2(t *testing.T) {
 	}
 }
 
+func TestSaveDefinitionForksPublishedModelToDraft(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "MEDICAL-SCALE", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: "Scale", Now: now,
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	if err := model.MarkPublished(now.Add(time.Minute)); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+	publishedRevision := model.Revision()
+	definition := &modeldefinition.Definition{Measure: modeldefinition.MeasureSpec{
+		Factors: []factor.Factor{{Code: "total", Title: "Total", Role: factor.FactorRoleTotal}},
+		Scoring: []factor.Scoring{{FactorCode: "total", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q1"}}}},
+	}}
+	repo := &authoringModelRepo{model: model}
+	service := Service{
+		ModelRepo: repo, Authorizer: allowDefinitionAuthorizer{}, Registry: appdefinition.NewRegistry(&recordingDefinitionHandler{}),
+		Now: func() time.Time { return now.Add(2 * time.Minute) },
+	}
+
+	if _, err := service.SaveDefinition(context.Background(), modelcatalog.ActorContext{}, model.Code, definition); err != nil {
+		t.Fatalf("SaveDefinition: %v", err)
+	}
+	if !model.IsDraft() {
+		t.Fatalf("status = %s, want draft", model.Status)
+	}
+	if model.PublishedAt != nil {
+		t.Fatalf("published_at = %v, want nil for the draft head", model.PublishedAt)
+	}
+	if got, want := model.Revision(), publishedRevision+1; got != want {
+		t.Fatalf("revision = %d, want %d", got, want)
+	}
+}
+
 func TestValidateDefinitionUsesThePublishValidationHandler(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code: "TYPOLOGY-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
