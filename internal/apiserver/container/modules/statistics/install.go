@@ -2,11 +2,11 @@ package statistics
 
 import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with statistics module bindings.
@@ -27,8 +27,8 @@ func InstallFrom(host InstallHost) error {
 	module, err := Wire(WireInput{
 		MySQLDB:                host.MySQLDB(),
 		RedisClient:            host.RedisCache(),
-		FallbackRedisClient:    host.CacheClient(cacheplane.FamilyQuery),
-		CacheBuilder:           host.CacheBuilder(cacheplane.FamilyQuery),
+		FallbackRedisClient:    host.CacheClient(redisruntime.FamilyQuery),
+		CacheBuilder:           host.CacheBuilder(redisruntime.FamilyQuery),
 		AnswerSheetReader:      answerSheetReader,
 		AnswerSheetScanSource:  answerSheetScanSource,
 		MongoDB:                host.MongoDB(),
@@ -44,7 +44,7 @@ func InstallFrom(host InstallHost) error {
 		WarmupCoordinator:      host.WarmupCoordinator(),
 		StatusService:          host.CacheGovernanceStatusService(),
 		DisableStatisticsCache: host.DisableStatisticsCache(),
-		MetaRedisClient:        host.CacheClient(cacheplane.FamilyMeta),
+		MetaRedisClient:        host.CacheClient(redisruntime.FamilyMeta),
 	})
 	if err != nil {
 		return err

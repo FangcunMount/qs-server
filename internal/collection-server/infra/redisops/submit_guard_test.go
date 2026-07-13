@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -22,13 +22,13 @@ func TestSubmitGuardSuppressesDuplicateAcrossInstances(t *testing.T) {
 		_ = lockClient.Close()
 	})
 
-	opsHandle := &cacheplane.Handle{
-		Family:  cacheplane.FamilyOps,
+	opsHandle := &redisruntime.Handle{
+		Family:  redisruntime.FamilyOps,
 		Client:  opsClient,
 		Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 	}
-	lockHandle := &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	lockHandle := &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  lockClient,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	}
@@ -75,13 +75,13 @@ func TestSubmitGuardReleasesInFlightLeaseOnAbort(t *testing.T) {
 	})
 
 	guard := NewSubmitGuard(
-		&cacheplane.Handle{
-			Family:  cacheplane.FamilyOps,
+		&redisruntime.Handle{
+			Family:  redisruntime.FamilyOps,
 			Client:  opsClient,
 			Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 		},
-		redisadapter.NewManager("collection-server", "lock_lease", &cacheplane.Handle{
-			Family:  cacheplane.FamilyLock,
+		redisadapter.NewManager("collection-server", "lock_lease", &redisruntime.Handle{
+			Family:  redisruntime.FamilyLock,
 			Client:  lockClient,
 			Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 		}),
@@ -119,22 +119,22 @@ func TestSubmitGuardCompleteKeepsInFlightLeaseWhenDoneMarkerWriteFails(t *testin
 		_ = lockClient.Close()
 	})
 
-	lockHandle := &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	lockHandle := &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  lockClient,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	}
 	instanceA := NewSubmitGuard(
-		&cacheplane.Handle{
-			Family:  cacheplane.FamilyOps,
+		&redisruntime.Handle{
+			Family:  redisruntime.FamilyOps,
 			Client:  opsClientA,
 			Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 		},
 		redisadapter.NewManager("collection-server-a", "lock_lease", lockHandle),
 	)
 	instanceB := NewSubmitGuard(
-		&cacheplane.Handle{
-			Family:  cacheplane.FamilyOps,
+		&redisruntime.Handle{
+			Family:  redisruntime.FamilyOps,
 			Client:  opsClientB,
 			Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 		},
@@ -213,13 +213,13 @@ func TestSubmitGuardUsesInjectedObserver(t *testing.T) {
 		_ = lockClient.Close()
 	})
 
-	opsHandle := &cacheplane.Handle{
-		Family:  cacheplane.FamilyOps,
+	opsHandle := &redisruntime.Handle{
+		Family:  redisruntime.FamilyOps,
 		Client:  opsClient,
 		Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 	}
-	lockHandle := &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	lockHandle := &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  lockClient,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	}
@@ -259,8 +259,8 @@ func TestSubmitGuardUsesInjectedObserver(t *testing.T) {
 	if err := closedOpsClient.Close(); err != nil {
 		t.Fatalf("close client: %v", err)
 	}
-	errorGuard := NewSubmitGuardWithObserver(&cacheplane.Handle{
-		Family:  cacheplane.FamilyOps,
+	errorGuard := NewSubmitGuardWithObserver(&redisruntime.Handle{
+		Family:  redisruntime.FamilyOps,
 		Client:  closedOpsClient,
 		Builder: keyspace.NewBuilderWithNamespace("ops:runtime"),
 	}, nil, observer)

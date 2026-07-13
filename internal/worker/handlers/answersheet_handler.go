@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 

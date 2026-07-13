@@ -7,9 +7,10 @@ import (
 	"time"
 
 	baseredisadapter "github.com/FangcunMount/component-base/pkg/locklease/redisadapter"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	lockkeyspace "github.com/FangcunMount/qs-server/internal/pkg/locklease/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -17,22 +18,30 @@ import (
 type Manager struct {
 	component string
 	name      string
-	handle    *cacheplane.Handle
+	handle    *redisruntime.Handle
 	observer  resilienceplane.Observer
+	family    cacheobserve.FamilyObserver
 }
 
 // NewManager 为一个进程级锁工作负载创建分布式锁管理器。
-func NewManager(component, name string, handle *cacheplane.Handle) *Manager {
+func NewManager(component, name string, handle *redisruntime.Handle) *Manager {
 	return NewManagerWithObserver(component, name, handle, nil)
 }
 
 // NewManagerWithObserver 创建带显式 resilience observer 的锁管理器。
-func NewManagerWithObserver(component, name string, handle *cacheplane.Handle, observer resilienceplane.Observer) *Manager {
+func NewManagerWithObserver(component, name string, handle *redisruntime.Handle, observer resilienceplane.Observer) *Manager {
+	return NewManagerWithObservers(component, name, handle, observer, nil)
+}
+
+// NewManagerWithObservers creates a lock manager with explicit resilience and
+// Redis-family health observers.
+func NewManagerWithObservers(component, name string, handle *redisruntime.Handle, observer resilienceplane.Observer, family cacheobserve.FamilyObserver) *Manager {
 	return &Manager{
 		component: component,
 		name:      name,
 		handle:    handle,
 		observer:  defaultObserver(observer),
+		family:    family,
 	}
 }
 
@@ -49,7 +58,7 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 		observability.ObserveLockDegraded(lockName, "redis_unavailable")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockDegraded)
 		err := fmt.Errorf("lock redis handle is unavailable")
-		observability.ObserveFamilyFailure(m.component, string(cacheplane.FamilyLock), err)
+		m.observeFamilyFailure(err)
 		return nil, false, err
 	}
 	lease, acquired, err := baseredisadapter.NewManager(m.handle.Client, nil).Acquire(ctx, Identity{
@@ -59,18 +68,18 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	if err != nil {
 		observability.ObserveLockAcquire(lockName, "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
-		observability.ObserveFamilyFailure(m.component, string(cacheplane.FamilyLock), err)
+		m.observeFamilyFailure(err)
 		return nil, false, err
 	}
 	if !acquired {
 		observability.ObserveLockAcquire(lockName, "contention")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockContention)
-		observability.ObserveFamilySuccess(m.component, string(cacheplane.FamilyLock))
+		m.observeFamilySuccess()
 		return nil, false, nil
 	}
 	observability.ObserveLockAcquire(lockName, "ok")
 	m.observe(ctx, identity, resilienceplane.OutcomeLockAcquired)
-	observability.ObserveFamilySuccess(m.component, string(cacheplane.FamilyLock))
+	m.observeFamilySuccess()
 	return lease, true, nil
 }
 
@@ -98,13 +107,25 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	if err := baseredisadapter.NewManager(m.handle.Client, nil).Release(ctx, identity, lease); err != nil {
 		observability.ObserveLockRelease(lockName, "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
-		observability.ObserveFamilyFailure(m.component, string(cacheplane.FamilyLock), err)
+		m.observeFamilyFailure(err)
 		return err
 	}
 	observability.ObserveLockRelease(lockName, "ok")
 	m.observe(ctx, identity, resilienceplane.OutcomeLockReleased)
-	observability.ObserveFamilySuccess(m.component, string(cacheplane.FamilyLock))
+	m.observeFamilySuccess()
 	return nil
+}
+
+func (m *Manager) observeFamilySuccess() {
+	if m != nil && m.family != nil {
+		m.family.ObserveFamilySuccess(string(redisruntime.FamilyLock))
+	}
+}
+
+func (m *Manager) observeFamilyFailure(err error) {
+	if m != nil && m.family != nil && err != nil {
+		m.family.ObserveFamilyFailure(string(redisruntime.FamilyLock), err)
+	}
 }
 
 // ReleaseSpec 按锁规格释放锁租约。

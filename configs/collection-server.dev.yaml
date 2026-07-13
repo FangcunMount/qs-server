@@ -132,39 +132,33 @@ submit_queue:
   worker_count: 8
   wait_timeout_ms: 200
 
-questionnaire_cache:
-  enabled: false
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
-
-scale_cache:
-  enabled: false
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
-
-typology_cache:
-  enabled: false
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
+cache:
+  capabilities:
+    catalog:
+      questionnaire:
+        enabled: false
+        ttl_seconds: 180
+        max_entries: 256
+        singleflight: true
+        signal_evict_enabled: true
+      typology:
+        enabled: false
+        ttl_seconds: 180
+        max_entries: 256
+        singleflight: true
+        signal_evict_enabled: true
+    report_status:
+      ttl_seconds: 172800
 
 wait_report:
   default_timeout_seconds: 20
   min_timeout_seconds: 1
   max_timeout_seconds: 25
   poll_interval_ms: 500
-  status_ttl_seconds: 172800
   max_active_waiters: 3000
   max_http_concurrency: 400
   degrade_immediate_enabled: true
   degrade_retry_after_seconds: 5
-  pubsub_enabled: true
-  pubsub_channel: "report_status_changed"
 
 report_events:
   enabled: false
@@ -173,9 +167,6 @@ report_events:
   max_per_testee: 2
   idle_timeout_seconds: 120
   heartbeat_interval_seconds: 30
-
-report_status:
-  ttl_seconds: 172800
 
 signaling:
   redis:

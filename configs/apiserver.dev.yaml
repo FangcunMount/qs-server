@@ -239,9 +239,6 @@ redis_runtime:
 # -------------------------------------------------------
 # 3.4.1 report_status / signaling（wait-report 唤醒）
 # -------------------------------------------------------
-report_status:
-  ttl_seconds: 172800
-
 signaling:
   redis:
     enabled: true
@@ -258,61 +255,57 @@ plan:
 # 3.6 缓存控制
 # -------------------------------------------------------
 cache:
-  disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
-  disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
-  compress_payload: false          # 是否压缩缓存 payload
-  static:
-    compress: false
-    singleflight: true
-    negative: false
-  object:
-    compress: false
-    singleflight: true
-    negative: false
-  query:
-    ttl: "5m"
-    compress: false
-    singleflight: true
-    negative: false
-  meta:
-  sdk:
-    compress: false
-    singleflight: false
-    negative: false
-  lock:
-    compress: false
-    singleflight: false
-    negative: false
-  ttl:
-    scale: "6h"
-    questionnaire: "8h"
-    assessment_detail: "1h30m"
-    assessment_list: "10m"
-    testee: "30m"
-    plan: "1h"
-    negative: "5m"
-  ttl_jitter_ratio: 0.1
-  statistics_warmup:
-    enable: false
-    warm_on_startup: true
-    org_ids: [1]
-    overview_presets: ["today", "7d", "30d"]
-    questionnaire_codes: []
-    plan_ids: []
-  statistics_system:
-    service_singleflight: true
-    disable_realtime_fallback: true
-    stale_on_timeout: true
-    load_timeout: 25s
-  warmup:
-    enable: true
-    startup:
-      static: true
-      query: true
-    hotset:
+  capabilities:
+    report_status:
+      ttl_seconds: 172800
+    disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
+    disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
+  defaults:
+    compress_payload: false          # 是否压缩缓存 payload
+    static:
+      compress: false
+      singleflight: true
+      negative: false
+    object:
+      compress: false
+      singleflight: true
+      negative: false
+    query:
+      ttl: "5m"
+      compress: false
+      singleflight: true
+      negative: false
+    ttl:
+      scale: "6h"
+      questionnaire: "8h"
+      assessment_detail: "1h30m"
+      assessment_list: "10m"
+      testee: "30m"
+      plan: "1h"
+      negative: "5m"
+    ttl_jitter_ratio: 0.1
+  governance:
+    statistics_warmup:
+      enable: false
+      warm_on_startup: true
+      org_ids: [1]
+      overview_presets: ["today", "7d", "30d"]
+      questionnaire_codes: []
+      plan_ids: []
+    statistics_system:
+      service_singleflight: true
+      disable_realtime_fallback: true
+      stale_on_timeout: true
+      load_timeout: 25s
+    warmup:
       enable: true
-      top_n: 20
-      max_items_per_kind: 200
+      startup:
+        static: true
+        query: true
+      hotset:
+        enable: true
+        top_n: 20
+        max_items_per_kind: 200
 
 # -------------------------------------------------------
 # 3.7 内建调度器配置

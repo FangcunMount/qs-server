@@ -6,8 +6,8 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with platform integration bindings.
@@ -33,8 +33,8 @@ func InstallFrom(host InstallHost) {
 		host.Printf("🔑 CodesService initialized\n")
 	}
 	gen := WireGenerator(GeneratorWireInput{
-		SDKRedis:   host.CacheClient(cacheplane.FamilySDK),
-		SDKBuilder: host.CacheBuilder(cacheplane.FamilySDK),
+		SDKRedis:   host.CacheClient(redisruntime.FamilySDK),
+		SDKBuilder: host.CacheBuilder(redisruntime.FamilySDK),
 	})
 	state.QRCodeGenerator = gen.QRCodeGenerator
 	state.SubscribeSender = gen.SubscribeSender

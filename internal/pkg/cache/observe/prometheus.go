@@ -2,7 +2,6 @@ package observe
 
 import (
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	legacy "github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 // FamilyObserver is the runtime-health seam used while cache metrics and Redis
@@ -30,19 +29,19 @@ func (o *Prometheus) Observe(event sharedcache.Event) {
 	}
 	switch event.Operation {
 	case sharedcache.OperationGet:
-		legacy.ObserveCacheGet(o.family, o.policy, string(event.Result))
-		legacy.ObserveCacheOperationDuration(o.family, o.policy, "get", event.Duration)
+		ObserveCacheGet(o.family, o.policy, string(event.Result))
+		ObserveCacheOperationDuration(o.family, o.policy, "get", event.Duration)
 	case sharedcache.OperationSourceLoad:
-		legacy.ObserveCacheOperationDuration(o.family, o.policy, "source_load", event.Duration)
+		ObserveCacheOperationDuration(o.family, o.policy, "source_load", event.Duration)
 	case sharedcache.OperationSet:
-		legacy.ObserveCacheWrite(o.family, o.policy, "set", string(event.Result))
-		legacy.ObserveCacheOperationDuration(o.family, o.policy, "set", event.Duration)
+		ObserveCacheWrite(o.family, o.policy, "set", string(event.Result))
+		ObserveCacheOperationDuration(o.family, o.policy, "set", event.Duration)
 	case sharedcache.OperationInvalidate:
-		legacy.ObserveCacheWrite(o.family, o.policy, "invalidate", string(event.Result))
+		ObserveCacheWrite(o.family, o.policy, "invalidate", string(event.Result))
 	case sharedcache.OperationPayloadRaw:
-		legacy.ObserveCachePayloadBytes(o.family, o.policy, "raw", event.Size)
+		ObserveCachePayloadBytes(o.family, o.policy, "raw", event.Size)
 	case sharedcache.OperationPayloadSet:
-		legacy.ObserveCachePayloadBytes(o.family, o.policy, "stored", event.Size)
+		ObserveCachePayloadBytes(o.family, o.policy, "stored", event.Size)
 	}
 	if event.Err != nil {
 		if o.health != nil {

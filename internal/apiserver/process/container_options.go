@@ -2,8 +2,8 @@ package process
 
 import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -30,7 +30,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		OutboxRelay:                buildContainerOutboxRelayOptions(s.config),
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
-		ReportStatus:               s.config.ReportStatus,
+		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
 		Signaling:                  s.config.Signaling,
 		SystemGovernance:           s.config.SystemGovernance,
 	}
@@ -55,7 +55,7 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 }
 
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
-	cacheCfg := s.config.Cache
+	cacheCfg := s.config.Cache.Effective()
 	if cacheCfg == nil {
 		return container.ContainerCacheOptions{}
 	}
@@ -87,13 +87,11 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 		Static:                  buildCacheFamilyOptions(cacheCfg.Static),
 		Object:                  buildCacheFamilyOptions(cacheCfg.Object),
 		Query:                   buildQueryFamilyOptions(cacheCfg.Query),
-		Meta:                    container.ContainerCacheFamilyOptions{},
-		SDK:                     buildCacheFamilyOptions(cacheCfg.SDK),
-		Lock:                    buildCacheFamilyOptions(cacheCfg.Lock),
 	}
 }
 
 func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cachegov.StatisticsWarmupConfig {
+	cacheCfg = cacheCfg.Effective()
 	if cacheCfg == nil || cacheCfg.StatisticsWarmup == nil || !cacheCfg.StatisticsWarmup.Enable {
 		return nil
 	}
@@ -107,6 +105,7 @@ func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cache
 }
 
 func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsSystemOptions {
+	cacheCfg = cacheCfg.Effective()
 	defaults := apiserveroptions.NewCacheOptions().StatisticsSystem
 	if cacheCfg == nil || cacheCfg.StatisticsSystem == nil {
 		if defaults == nil {
@@ -128,6 +127,7 @@ func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cache
 }
 
 func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
+	cacheCfg = cacheCfg.Effective()
 	defaults := apiserveroptions.NewCacheOptions().StatisticsOverview
 	if cacheCfg == nil || cacheCfg.StatisticsOverview == nil {
 		if defaults == nil {
@@ -147,6 +147,7 @@ func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cac
 }
 
 func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
+	cacheCfg = cacheCfg.Effective()
 	defaults := apiserveroptions.NewCacheOptions().StatisticsQuestionnaire
 	if cacheCfg == nil || cacheCfg.StatisticsQuestionnaire == nil {
 		if defaults == nil {
@@ -166,6 +167,7 @@ func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions
 }
 
 func buildWarmupOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerWarmupOptions {
+	cacheCfg = cacheCfg.Effective()
 	if cacheCfg == nil || cacheCfg.Warmup == nil {
 		return container.ContainerWarmupOptions{}
 	}

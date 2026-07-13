@@ -1,11 +1,11 @@
 package evaluation
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with evaluation module bindings.
@@ -26,11 +26,11 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:                             host.MySQLDB(),
 		MongoDB:                             host.MongoDB(),
 		EventPublisher:                      host.EventPublisher(),
-		RedisClient:                         host.CacheClient(cacheplane.FamilyObject),
-		CacheBuilder:                        host.CacheBuilder(cacheplane.FamilyObject),
-		QueryRedisClient:                    host.CacheClient(cacheplane.FamilyQuery),
-		QueryCacheBuilder:                   host.CacheBuilder(cacheplane.FamilyQuery),
-		MetaRedisClient:                     host.CacheClient(cacheplane.FamilyMeta),
+		RedisClient:                         host.CacheClient(redisruntime.FamilyObject),
+		CacheBuilder:                        host.CacheBuilder(redisruntime.FamilyObject),
+		QueryRedisClient:                    host.CacheClient(redisruntime.FamilyQuery),
+		QueryCacheBuilder:                   host.CacheBuilder(redisruntime.FamilyQuery),
+		MetaRedisClient:                     host.CacheClient(redisruntime.FamilyMeta),
 		AssessmentPolicy:                    host.CachePolicy(cachepolicy.PolicyAssessmentDetail),
 		AssessmentListPolicy:                host.CachePolicy(cachepolicy.PolicyAssessmentList),
 		DisableEvaluationCache:              host.DisableEvaluationCache(),
@@ -42,11 +42,11 @@ func InstallFrom(host InstallHost) error {
 		AssessmentOutboxRelayPublishWorkers: host.OutboxRelayAssessmentPublishWorkers(),
 		AssessmentOutboxRelayImmediateMaxConcurrent: host.OutboxRelayAssessmentImmediateMaxConcurrent(),
 		TesteeAccessChecker:                         NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
-		OpsHandle:                                   host.CacheHandle(cacheplane.FamilyOps),
+		OpsHandle:                                   host.CacheHandle(redisruntime.FamilyOps),
 		SurveyRuntimeInfra:                          host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:                       host.PublishedModelCatalog(),
-		StaticRedisClient:                           host.CacheClient(cacheplane.FamilyStatic),
-		StaticCacheBuilder:                          host.CacheBuilder(cacheplane.FamilyStatic),
+		StaticRedisClient:                           host.CacheClient(redisruntime.FamilyStatic),
+		StaticCacheBuilder:                          host.CacheBuilder(redisruntime.FamilyStatic),
 		PublishedModelPolicy:                        host.CachePolicy(cachepolicy.PolicyPublishedModel),
 		RuntimeDescriptorRegistry:                   catalog.RuntimeDescriptorRegistry,
 	})

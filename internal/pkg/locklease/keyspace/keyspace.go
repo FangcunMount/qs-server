@@ -1,6 +1,6 @@
 package keyspace
 
-import basekeyspace "github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+import basekeyspace "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 
 // Keyspace builds lock lease keys.
 type Keyspace struct {

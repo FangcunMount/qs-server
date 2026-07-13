@@ -12,9 +12,9 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/spf13/viper"
@@ -36,14 +36,14 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded apiserver options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
-				cacheplane.FamilyStatic,
-				cacheplane.FamilyObject,
-				cacheplane.FamilyQuery,
-				cacheplane.FamilyMeta,
-				cacheplane.FamilyRank,
-				cacheplane.FamilySDK,
-				cacheplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []redisruntime.Family{
+				redisruntime.FamilyStatic,
+				redisruntime.FamilyObject,
+				redisruntime.FamilyQuery,
+				redisruntime.FamilyMeta,
+				redisruntime.FamilyRank,
+				redisruntime.FamilySDK,
+				redisruntime.FamilyLock,
 			})
 			if opts.MessagingOptions == nil {
 				t.Fatal("messaging options must be traceable")
@@ -77,9 +77,9 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded collection options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
-				cacheplane.FamilyOps,
-				cacheplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []redisruntime.Family{
+				redisruntime.FamilyOps,
+				redisruntime.FamilyLock,
 			})
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
@@ -110,8 +110,8 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded worker options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
-				cacheplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []redisruntime.Family{
+				redisruntime.FamilyLock,
 			})
 			if cfg.Messaging == nil || cfg.Messaging.Provider == "" {
 				t.Fatal("worker messaging config must be traceable")
@@ -138,12 +138,11 @@ func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 		worker := workeroptions.NewOptions()
 		loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker."+suffix+".yaml"), worker)
 
-		want := api.ReportStatus.TTLSeconds
-		if collection.ReportStatus.TTLSeconds != want || worker.ReportStatus.TTLSeconds != want {
-			t.Fatalf("%s report status TTL mismatch: api=%d collection=%d worker=%d", suffix, want, collection.ReportStatus.TTLSeconds, worker.ReportStatus.TTLSeconds)
-		}
-		if collection.WaitReport.StatusTTLSeconds != want {
-			t.Fatalf("%s wait-report fallback TTL=%d, want report status TTL=%d", suffix, collection.WaitReport.StatusTTLSeconds, want)
+		want := api.Cache.Capabilities.ReportStatus.TTLSeconds
+		collectionTTL := collection.Cache.Capabilities.ReportStatus.TTLSeconds
+		workerTTL := worker.Cache.Capabilities.ReportStatus.TTLSeconds
+		if collectionTTL != want || workerTTL != want {
+			t.Fatalf("%s report status TTL mismatch: api=%d collection=%d worker=%d", suffix, want, collectionTTL, workerTTL)
 		}
 	}
 }
@@ -155,6 +154,11 @@ func loadConfig(t *testing.T, path string, target any) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	if err := v.ReadInConfig(); err != nil {
 		t.Fatalf("ReadInConfig(%s) error = %v", path, err)
+	}
+	if validator, ok := target.(interface{ ValidateRawSettings(map[string]any) error }); ok {
+		if err := validator.ValidateRawSettings(v.AllSettings()); err != nil {
+			t.Fatalf("ValidateRawSettings(%s) error = %v", path, err)
+		}
 	}
 	if err := v.Unmarshal(target); err != nil {
 		t.Fatalf("Unmarshal(%s) error = %v", path, err)
@@ -262,7 +266,7 @@ func completeAndValidate(t *testing.T, opts interface {
 	}
 }
 
-func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeOptions, families []cacheplane.Family) {
+func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeOptions, families []redisruntime.Family) {
 	t.Helper()
 	if runtimeOpts == nil {
 		t.Fatal("redis runtime options are nil")

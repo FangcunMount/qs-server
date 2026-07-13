@@ -1,20 +1,20 @@
 package compose
 
 import (
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
@@ -51,9 +51,9 @@ type Host interface {
 	StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions
 	StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions
 
-	CacheClient(family cacheplane.Family) redis.UniversalClient
-	CacheBuilder(family cacheplane.Family) *keyspace.Builder
-	CacheHandle(family cacheplane.Family) *cacheplane.Handle
+	CacheClient(family redisruntime.Family) redis.UniversalClient
+	CacheBuilder(family redisruntime.Family) *keyspace.Builder
+	CacheHandle(family redisruntime.Family) *redisruntime.Handle
 	CachePolicy(key cachepolicy.CachePolicyKey) cachepolicy.CachePolicy
 	CacheObserver() *observability.ComponentObserver
 	HotsetRecorder() cachetarget.HotsetRecorder

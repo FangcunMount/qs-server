@@ -1,10 +1,10 @@
 package plan
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with plan module bindings.
@@ -20,8 +20,8 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:         host.MySQLDB(),
 		EventPublisher:  host.EventPublisher(),
 		PublishedModels: host.PublishedModelLister(),
-		RedisClient:     host.CacheClient(cacheplane.FamilyObject),
-		CacheBuilder:    host.CacheBuilder(cacheplane.FamilyObject),
+		RedisClient:     host.CacheClient(redisruntime.FamilyObject),
+		CacheBuilder:    host.CacheBuilder(redisruntime.FamilyObject),
 		PlanPolicy:      host.CachePolicy(cachepolicy.PolicyPlan),
 		EntryBaseURL:    host.PlanEntryBaseURL(),
 		Observer:        host.CacheObserver(),

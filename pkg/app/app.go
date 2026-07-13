@@ -210,6 +210,11 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 		applyLegacyNSQEnvOverrides(envPrefix)
 		// 兼容 REDIS_DB 环境变量（映射到 redis.database）
 		applyLegacyRedisEnvOverrides(envPrefix)
+		if validator, ok := a.options.(RawSettingsValidatable); ok {
+			if err := validator.ValidateRawSettings(viper.AllSettings()); err != nil {
+				return err
+			}
+		}
 
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {

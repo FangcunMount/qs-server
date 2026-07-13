@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 )

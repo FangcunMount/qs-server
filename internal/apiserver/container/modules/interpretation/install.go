@@ -2,7 +2,7 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with report module bindings.
@@ -17,7 +17,7 @@ func InstallFrom(host InstallHost) error {
 		MongoDB:            host.MongoDB(),
 		TopicResolver:      host.TopicResolver(),
 		MongoLimiter:       host.MongoLimiter(),
-		OpsHandle:          host.CacheHandle(cacheplane.FamilyOps),
+		OpsHandle:          host.CacheHandle(redisruntime.FamilyOps),
 		ReportStatusConfig: host.ReportStatusConfig(),
 	})
 	if err != nil {

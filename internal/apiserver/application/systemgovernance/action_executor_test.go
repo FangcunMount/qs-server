@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 )
 
 func TestActionExecutorRequiresConfirmForManualWarmup(t *testing.T) {

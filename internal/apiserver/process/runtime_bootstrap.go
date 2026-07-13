@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
@@ -13,8 +12,7 @@ import (
 
 type runtimeStageDeps struct {
 	hasMongo               bool
-	warmup                 func()
-	startCacheSignals      func()
+	startCache             func()
 	startOutboxReconcilers func()
 	startSchedulers        func(*runtimeOutput)
 	relays                 []relayRuntimeDeps
@@ -46,10 +44,7 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		hasMongo: resources.handles.mongoDB != nil,
 	}
 	if containerOutput.container != nil {
-		deps.warmup = func() {
-			startWarmupContainer(containerOutput.container)
-		}
-		deps.startCacheSignals = func() {
+		deps.startCache = func() {
 			startCacheSignalWatcher(containerOutput.container)
 		}
 		deps.startOutboxReconcilers = func() {
@@ -101,14 +96,11 @@ func assessmentOutboxRelayInterval(cfg *config.Config) time.Duration {
 
 func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) {
 	logInitialization(deps.hasMongo)
-	if deps.startCacheSignals != nil {
-		deps.startCacheSignals()
+	if deps.startCache != nil {
+		deps.startCache()
 	}
 	if deps.startOutboxReconcilers != nil {
 		deps.startOutboxReconcilers()
-	}
-	if deps.warmup != nil {
-		deps.warmup()
 	}
 	if deps.startSchedulers != nil {
 		deps.startSchedulers(runtimeOutput)
@@ -116,20 +108,6 @@ func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) {
 	for _, relay := range deps.relays {
 		startRelayLoop(relay, runtimeOutput)
 	}
-}
-
-func startWarmupContainer(c *container.Container) {
-	if c == nil {
-		return
-	}
-	go func() {
-		ctx := context.Background()
-		if err := c.WarmupCache(ctx); err != nil {
-			logger.L(ctx).Warnw("Cache warmup failed", "error", err)
-		} else {
-			logger.L(ctx).Infow("Cache warmup completed")
-		}
-	}()
 }
 
 func startCacheSignalWatcher(c *container.Container) {

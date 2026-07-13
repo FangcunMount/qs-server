@@ -13,17 +13,17 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
-func TestRunRuntimeStageInvokesWarmupSchedulersAndRelays(t *testing.T) {
+func TestRunRuntimeStageInvokesCacheSchedulersAndRelays(t *testing.T) {
 	t.Parallel()
 
-	var warmupCalled bool
+	var cacheCalled bool
 	var schedulersCalled bool
 	dispatchCalled := make(chan struct{}, 1)
 	output := &runtimeOutput{}
 
 	runRuntimeStage(runtimeStageDeps{
-		warmup: func() {
-			warmupCalled = true
+		startCache: func() {
+			cacheCalled = true
 		},
 		startSchedulers: func(output *runtimeOutput) {
 			schedulersCalled = true
@@ -53,8 +53,8 @@ func TestRunRuntimeStageInvokesWarmupSchedulersAndRelays(t *testing.T) {
 		t.Fatal("relay dispatch was not called")
 	}
 
-	if !warmupCalled {
-		t.Fatal("warmup was not called")
+	if !cacheCalled {
+		t.Fatal("cache subsystem was not started")
 	}
 	if !schedulersCalled {
 		t.Fatal("startSchedulers was not called")

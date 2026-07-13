@@ -11,9 +11,9 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用

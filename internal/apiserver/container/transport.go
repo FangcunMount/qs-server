@@ -4,7 +4,6 @@ import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
@@ -14,6 +13,7 @@ import (
 	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -22,10 +22,10 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -331,7 +331,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		return deps
 	}
 
-	deps.LockBuilder = c.CacheBuilder(cacheplane.FamilyLock)
+	deps.LockBuilder = c.CacheBuilder(redisruntime.FamilyLock)
 	deps.LockManager = c.CacheLockManager()
 	deps.WarmupCoordinator = c.WarmupCoordinator()
 

@@ -25,11 +25,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
@@ -38,7 +38,7 @@ import (
 type Container struct {
 	initialized  bool
 	opts         *options.Options
-	opsHandle    *cacheplane.Handle
+	opsHandle    *redisruntime.Handle
 	lockManager  locklease.Manager
 	familyStatus *observability.FamilyStatusRegistry
 
@@ -108,7 +108,7 @@ func (c *Container) TesteeService() *testee.Service {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
+func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
 	c := &Container{
 		opts:           opts,
 		opsHandle:      opsHandle,
@@ -316,7 +316,7 @@ func (c *Container) RateLimitOptions() *options.RateLimitOptions {
 }
 
 // OpsHandle returns the collection-server operational Redis handle.
-func (c *Container) OpsHandle() *cacheplane.Handle {
+func (c *Container) OpsHandle() *redisruntime.Handle {
 	return c.opsHandle
 }
 

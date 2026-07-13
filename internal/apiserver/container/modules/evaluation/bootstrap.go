@@ -7,16 +7,16 @@ import (
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -40,7 +40,7 @@ type BootstrapInput struct {
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         evaluationoperator.AccessChecker
-	OpsHandle                                   *cacheplane.Handle
+	OpsHandle                                   *redisruntime.Handle
 	ExecutionPaths                              []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry                   *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader                        rulesetport.PublishedModelReader

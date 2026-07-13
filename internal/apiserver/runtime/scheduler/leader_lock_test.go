@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
 
 func TestLeaderLockRunExecutesBodyAndReleasesWhenAcquired(t *testing.T) {

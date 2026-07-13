@@ -144,20 +144,16 @@ redis_runtime:
       namespace_suffix: "ops:runtime"
       allow_fallback_default: true
 
-report_status:
-  ttl_seconds: 172800
+cache:
+  capabilities:
+    report_status:
+      ttl_seconds: 172800
 
 signaling:
   redis:
     enabled: true
     prefix: "qs:signal"
     buffer_size: 100
-
-# -------------------------------------------------------
-# 4.5 缓存控制
-# -------------------------------------------------------
-cache:
-  disable_statistics_cache: false  # 若想暂停统计缓存，请设为 true
 
 # ============================================================
 # 5. 系统配置

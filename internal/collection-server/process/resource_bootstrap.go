@@ -4,8 +4,8 @@ import (
 	"context"
 
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 )
 
 func (s *server) prepareResources() (resourceOutput, error) {
@@ -18,13 +18,13 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		Component:      "collection-server",
 		RuntimeOptions: s.config.RedisRuntime,
 		Resolver:       dbManager,
-		Defaults: map[cacheplane.Family]cacheplane.Route{
-			cacheplane.FamilyOps: {
+		Defaults: map[redisruntime.Family]redisruntime.Route{
+			redisruntime.FamilyOps: {
 				RedisProfile:         "ops_runtime",
 				NamespaceSuffix:      "ops:runtime",
 				AllowFallbackDefault: true,
 			},
-			cacheplane.FamilyLock: {
+			redisruntime.FamilyLock: {
 				RedisProfile:         "lock_cache",
 				NamespaceSuffix:      "cache:lock",
 				AllowFallbackDefault: true,
@@ -39,8 +39,8 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		redisRuntime: redisRuntimeOutput{
 			familyStatus: redisRuntime.StatusRegistry,
 			redisRuntime: redisRuntime.Runtime,
-			opsHandle:    redisRuntime.Handle(cacheplane.FamilyOps),
-			lockHandle:   redisRuntime.Handle(cacheplane.FamilyLock),
+			opsHandle:    redisRuntime.Handle(redisruntime.FamilyOps),
+			lockHandle:   redisRuntime.Handle(redisruntime.FamilyLock),
 			lockManager:  redisRuntime.LockManager,
 		},
 	}, nil

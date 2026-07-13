@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
-	"github.com/spf13/pflag"
 )
 
 // Options 包含 Worker 的所有配置项
@@ -34,11 +33,17 @@ type Options struct {
 	RedisProfiles map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	// 共享 Redis family runtime 路由
 	RedisRuntime *genericoptions.RedisRuntimeOptions `json:"redis_runtime" mapstructure:"redis_runtime"`
-	// Cache 控制缓存输出
-	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
+	Cache        *CacheOptions                       `json:"cache" mapstructure:"cache"`
 	// report_status 与 signaling
+	Signaling *genericoptions.SignalingOptions `json:"signaling" mapstructure:"signaling"`
+}
+
+type CacheOptions struct {
+	Capabilities *CacheCapabilities `json:"capabilities" mapstructure:"capabilities"`
+}
+
+type CacheCapabilities struct {
 	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
-	Signaling    *genericoptions.SignalingOptions    `json:"signaling" mapstructure:"signaling"`
 }
 
 // MetricsOptions worker 观测端口配置。
@@ -79,33 +84,6 @@ type NotificationOptions struct {
 	TimeoutMs    int    `json:"timeout_ms" mapstructure:"timeout-ms"`
 	SharedSecret string `json:"shared_secret" mapstructure:"shared-secret"`
 }
-
-// CacheOptions 缓存控制配置
-type CacheOptions struct {
-	DisableStatisticsCache bool               `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
-	Namespace              string             `json:"namespace" mapstructure:"namespace"`
-	Lock                   *CacheRouteOptions `json:"lock" mapstructure:"lock"`
-}
-
-// CacheRouteOptions worker 侧缓存/锁 keyspace 路由配置。
-type CacheRouteOptions struct {
-	RedisProfile    string `json:"redis_profile" mapstructure:"redis_profile"`
-	NamespaceSuffix string `json:"namespace_suffix" mapstructure:"namespace_suffix"`
-}
-
-// NewCacheOptions 创建缓存控制配置
-func NewCacheOptions() *CacheOptions {
-	return &CacheOptions{
-		DisableStatisticsCache: true,
-		Namespace:              "",
-		Lock: &CacheRouteOptions{
-			RedisProfile:    "lock_cache",
-			NamespaceSuffix: "cache:lock",
-		},
-	}
-}
-
-// WithDefaultsForProd keeps worker statistics cache disabled until explicitly turned back on.
 
 // GRPCOptions gRPC 客户端配置
 type GRPCOptions struct {
@@ -152,9 +130,10 @@ func NewOptions() *Options {
 		Redis:         genericoptions.NewRedisOptions(),
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
-		Cache:         NewCacheOptions(),
-		ReportStatus:  genericoptions.NewReportStatusOptions(),
-		Signaling:     genericoptions.NewSignalingOptions(),
+		Cache: &CacheOptions{Capabilities: &CacheCapabilities{
+			ReportStatus: genericoptions.NewReportStatusOptions(),
+		}},
+		Signaling: genericoptions.NewSignalingOptions(),
 	}
 }
 
@@ -249,7 +228,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	// Redis flags
 	o.Redis.AddFlags(fss.FlagSet("redis"))
 	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
-	o.Cache.AddFlags(fss.FlagSet("cache"))
 
 	return fss
 }
@@ -278,9 +256,9 @@ func (o *Options) Validate() []error {
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
-	errs = append(errs, cacheplane.ValidateRuntimeOptions(
+	errs = append(errs, redisruntime.ValidateRuntimeOptions(
 		o.RedisRuntime,
-		[]cacheplane.Family{cacheplane.FamilyOps, cacheplane.FamilyLock},
+		[]redisruntime.Family{redisruntime.FamilyOps, redisruntime.FamilyLock},
 		o.RedisProfiles,
 		"redis_runtime",
 	)...)
@@ -296,19 +274,4 @@ func (o *Options) Complete() error {
 // String 返回配置的字符串表示
 func (o *Options) String() string {
 	return configmask.String(o)
-}
-
-// AddFlags 注册 cache 相关命令行参数
-func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
-	if c == nil {
-		return
-	}
-	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
-		"Disable Redis-based statistics caching in worker event handlers")
-	if c.Lock == nil {
-		c.Lock = &CacheRouteOptions{
-			RedisProfile:    "lock_cache",
-			NamespaceSuffix: "cache:lock",
-		}
-	}
 }

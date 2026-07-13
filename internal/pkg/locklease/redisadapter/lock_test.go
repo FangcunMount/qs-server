@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -19,8 +19,8 @@ func TestManagerAcquireReleaseAndContention(t *testing.T) {
 		_ = client.Close()
 	})
 
-	manager := NewManager("worker", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManager("worker", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
@@ -69,8 +69,8 @@ func TestManagerAcquireSpecUsesSpecNameAndDefaultTTL(t *testing.T) {
 		_ = client.Close()
 	})
 
-	manager := NewManager("worker", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManager("worker", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
@@ -92,8 +92,8 @@ func TestManagerAcquireSpecUsesSpecNameAndDefaultTTL(t *testing.T) {
 }
 
 func TestManagerAcquireSpecRejectsInvalidSpec(t *testing.T) {
-	manager := NewManager("worker", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManager("worker", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
 
@@ -142,8 +142,8 @@ func TestManagerLockLeaseExpiresAfterTTL(t *testing.T) {
 		_ = client.Close()
 	})
 
-	manager := NewManager("collection-server", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManager("collection-server", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
@@ -171,8 +171,8 @@ func TestManagerReleaseSpecWithWrongTokenDoesNotUnlock(t *testing.T) {
 		_ = client.Close()
 	})
 
-	manager := NewManager("collection-server", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManager("collection-server", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
@@ -207,8 +207,8 @@ func TestManagerUsesInjectedObserver(t *testing.T) {
 	})
 
 	observer := &lockleaseRecordingObserver{}
-	manager := NewManagerWithObserver("worker", "lock_lease", &cacheplane.Handle{
-		Family:  cacheplane.FamilyLock,
+	manager := NewManagerWithObserver("worker", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	}, observer)

@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -28,7 +28,7 @@ type Container struct {
 	opts         *options.Options
 	logger       *slog.Logger
 	lockManager  locklease.Manager
-	opsHandle    *cacheplane.Handle
+	opsHandle    *redisruntime.Handle
 	lockBuilder  *keyspace.Builder
 	eventCatalog *eventcatalog.Catalog
 	reportStatus *reportstatus.Reporter
@@ -55,7 +55,7 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle, opsHandle *cacheplane.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle, opsHandle *redisruntime.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
 	lockBuilder := keyspace.NewBuilder()
 	if lockHandle != nil {
 		lockBuilder = lockHandle.Builder
@@ -80,8 +80,8 @@ func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
 	reportStatusOpts := genericoptions.NewReportStatusOptions()
 	signalingOpts := genericoptions.NewSignalingOptions()
 	if c.opts != nil {
-		if c.opts.ReportStatus != nil {
-			reportStatusOpts = c.opts.ReportStatus
+		if c.opts.Cache != nil && c.opts.Cache.Capabilities != nil && c.opts.Cache.Capabilities.ReportStatus != nil {
+			reportStatusOpts = c.opts.Cache.Capabilities.ReportStatus
 		}
 		if c.opts.Signaling != nil {
 			signalingOpts = c.opts.Signaling

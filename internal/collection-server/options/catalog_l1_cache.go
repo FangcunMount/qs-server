@@ -3,6 +3,7 @@ package options
 import (
 	"fmt"
 
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/spf13/pflag"
 )
 
@@ -21,14 +22,33 @@ type QuestionnaireCacheOptions struct {
 	CatalogL1CacheOptions `mapstructure:",squash"`
 }
 
-// ScaleCacheOptions 量表目录 BFF 进程内 L1 缓存。
-type ScaleCacheOptions struct {
-	CatalogL1CacheOptions `mapstructure:",squash"`
-}
-
 // TypologyCacheOptions 类型学模型目录 BFF 进程内 L1 缓存。
 type TypologyCacheOptions struct {
 	CatalogL1CacheOptions `mapstructure:",squash"`
+}
+
+type CacheOptions struct {
+	Capabilities *CacheCapabilities `json:"capabilities" mapstructure:"capabilities"`
+}
+
+type CacheCapabilities struct {
+	Catalog      *CatalogCacheCapabilities           `json:"catalog" mapstructure:"catalog"`
+	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
+}
+
+type CatalogCacheCapabilities struct {
+	Questionnaire *QuestionnaireCacheOptions `json:"questionnaire" mapstructure:"questionnaire"`
+	Typology      *TypologyCacheOptions      `json:"typology" mapstructure:"typology"`
+}
+
+func NewCacheOptions() *CacheOptions {
+	return &CacheOptions{Capabilities: &CacheCapabilities{
+		Catalog: &CatalogCacheCapabilities{
+			Questionnaire: NewQuestionnaireCacheOptions(),
+			Typology:      NewTypologyCacheOptions(),
+		},
+		ReportStatus: genericoptions.NewReportStatusOptions(),
+	}}
 }
 
 // NewCatalogL1CacheOptions 创建默认目录 L1 缓存配置。
@@ -47,11 +67,6 @@ func NewQuestionnaireCacheOptions() *QuestionnaireCacheOptions {
 	return &QuestionnaireCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
 }
 
-// NewScaleCacheOptions 创建默认量表目录 L1 缓存配置。
-func NewScaleCacheOptions() *ScaleCacheOptions {
-	return &ScaleCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
-}
-
 // NewTypologyCacheOptions 创建默认类型学模型目录 L1 缓存配置。
 func NewTypologyCacheOptions() *TypologyCacheOptions {
 	return &TypologyCacheOptions{CatalogL1CacheOptions: NewCatalogL1CacheOptions()}
@@ -62,23 +77,19 @@ func (o *CatalogL1CacheOptions) addFlags(fs *pflag.FlagSet, prefix, label string
 		return
 	}
 	fs.BoolVar(&o.Enabled, prefix+".enabled", o.Enabled, fmt.Sprintf("Enable in-process L1 cache for %s.", label))
-	fs.IntVar(&o.TTLSeconds, prefix+".ttl-seconds", o.TTLSeconds, fmt.Sprintf("TTL for %s L1 cache in seconds.", label))
-	fs.Float64Var(&o.TTLJitterRatio, prefix+".ttl-jitter-ratio", o.TTLJitterRatio, fmt.Sprintf("TTL jitter ratio (0-1) for %s L1 cache.", label))
-	fs.IntVar(&o.MaxEntries, prefix+".max-entries", o.MaxEntries, fmt.Sprintf("Maximum %s entries in L1 cache.", label))
+	fs.IntVar(&o.TTLSeconds, prefix+".ttl_seconds", o.TTLSeconds, fmt.Sprintf("TTL for %s L1 cache in seconds.", label))
+	fs.Float64Var(&o.TTLJitterRatio, prefix+".ttl_jitter_ratio", o.TTLJitterRatio, fmt.Sprintf("TTL jitter ratio (0-1) for %s L1 cache.", label))
+	fs.IntVar(&o.MaxEntries, prefix+".max_entries", o.MaxEntries, fmt.Sprintf("Maximum %s entries in L1 cache.", label))
 	fs.BoolVar(&o.Singleflight, prefix+".singleflight", o.Singleflight, fmt.Sprintf("Coalesce concurrent %s cache misses.", label))
-	fs.BoolVar(&o.SignalEvictEnabled, prefix+".signal-evict-enabled", o.SignalEvictEnabled, fmt.Sprintf("Subscribe Redis signal to evict %s L1 entries.", label))
+	fs.BoolVar(&o.SignalEvictEnabled, prefix+".signal_evict_enabled", o.SignalEvictEnabled, fmt.Sprintf("Subscribe Redis signal to evict %s L1 entries.", label))
 }
 
 func (q *QuestionnaireCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	q.addFlags(fs, "questionnaire_cache", "published questionnaire detail")
-}
-
-func (s *ScaleCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	s.addFlags(fs, "scale_cache", "scale catalog reads")
+	q.addFlags(fs, "cache.capabilities.catalog.questionnaire", "published questionnaire detail")
 }
 
 func (p *TypologyCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	p.addFlags(fs, "typology_cache", "typology model catalog reads")
+	p.addFlags(fs, "cache.capabilities.catalog.typology", "typology model catalog reads")
 }
 
 func validateCatalogL1CacheOptions(opts *CatalogL1CacheOptions, name string) []error {
@@ -103,13 +114,6 @@ func validateQuestionnaireCacheOptions(opts *QuestionnaireCacheOptions) []error 
 		return nil
 	}
 	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "questionnaire_cache")
-}
-
-func validateScaleCacheOptions(opts *ScaleCacheOptions) []error {
-	if opts == nil {
-		return nil
-	}
-	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "scale_cache")
 }
 
 func validateTypologyCacheOptions(opts *TypologyCacheOptions) []error {

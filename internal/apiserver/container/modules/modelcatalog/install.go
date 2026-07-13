@@ -1,10 +1,10 @@
 package modelcatalog
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost 扩展共享的容器组合接缝与模型目录绑定
@@ -24,14 +24,14 @@ func InstallFrom(host InstallHost) error {
 		MongoDB:                host.MongoDB(),
 		MongoLimiter:           host.MongoLimiter(),
 		EventPublisher:         host.EventPublisher(),
-		RankRedisClient:        host.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder:       host.CacheBuilder(cacheplane.FamilyRank),
+		RankRedisClient:        host.CacheClient(redisruntime.FamilyRank),
+		RankCacheBuilder:       host.CacheBuilder(redisruntime.FamilyRank),
 		CacheSignalNotifier:    host.CacheSignalNotifier(),
 		SurveyRuntimeInfra:     infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
-		StaticRedisClient:      host.CacheClient(cacheplane.FamilyStatic),
-		StaticCacheBuilder:     host.CacheBuilder(cacheplane.FamilyStatic),
+		StaticRedisClient:      host.CacheClient(redisruntime.FamilyStatic),
+		StaticCacheBuilder:     host.CacheBuilder(redisruntime.FamilyStatic),
 		PublishedModelPolicy:   host.CachePolicy(cachepolicy.PolicyPublishedModel),
 		CacheObserver:          host.CacheObserver(),
 	})

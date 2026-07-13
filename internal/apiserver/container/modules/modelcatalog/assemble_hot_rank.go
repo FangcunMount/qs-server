@@ -3,10 +3,10 @@ package modelcatalog
 import (
 	redis "github.com/redis/go-redis/v9"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
 
 // HotRank assembles the catalog hot-rank read model. It contains no authoring

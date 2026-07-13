@@ -7,17 +7,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"
 )
 
 var ErrCacheUnavailable = errors.New("report status cache unavailable")
 
 type Cache struct {
-	opsHandle *cacheplane.Handle
+	opsHandle *redisruntime.Handle
 }
 
-func NewCache(opsHandle *cacheplane.Handle) *Cache {
+func NewCache(opsHandle *redisruntime.Handle) *Cache {
 	return &Cache{opsHandle: opsHandle}
 }
 

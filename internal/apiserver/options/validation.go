@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // Validate 验证命令行参数
@@ -25,17 +25,17 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 
-	errs = append(errs, cacheplane.ValidateRuntimeOptions(
+	errs = append(errs, redisruntime.ValidateRuntimeOptions(
 		o.RedisRuntime,
-		[]cacheplane.Family{
-			cacheplane.FamilyStatic,
-			cacheplane.FamilyObject,
-			cacheplane.FamilyQuery,
-			cacheplane.FamilyMeta,
-			cacheplane.FamilyRank,
-			cacheplane.FamilySDK,
-			cacheplane.FamilyOps,
-			cacheplane.FamilyLock,
+		[]redisruntime.Family{
+			redisruntime.FamilyStatic,
+			redisruntime.FamilyObject,
+			redisruntime.FamilyQuery,
+			redisruntime.FamilyMeta,
+			redisruntime.FamilyRank,
+			redisruntime.FamilySDK,
+			redisruntime.FamilyOps,
+			redisruntime.FamilyLock,
 		},
 		o.RedisProfiles,
 		"redis_runtime",
@@ -264,6 +264,7 @@ func validateCacheOptions(opts *CacheOptions) []error {
 	if opts == nil {
 		return nil
 	}
+	opts = opts.Effective()
 
 	var errs []error
 	if opts.TTLJitterRatio < 0 || opts.TTLJitterRatio > 1 {
@@ -276,9 +277,6 @@ func validateCacheOptions(opts *CacheOptions) []error {
 		{name: "static", opt: opts.Static},
 		{name: "object", opt: opts.Object},
 		{name: "query", opt: opts.Query},
-		{name: "meta", opt: opts.Meta},
-		{name: "sdk", opt: opts.SDK},
-		{name: "lock", opt: opts.Lock},
 	} {
 		errs = append(errs, validateCacheFamilyPolicy(family.name, family.opt)...)
 	}

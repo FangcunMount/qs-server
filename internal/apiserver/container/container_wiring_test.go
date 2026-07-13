@@ -6,17 +6,17 @@ import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -30,15 +30,14 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 	}, nil)
 
 	wire := actormod.WireInput{
-		RedisClient:   c.CacheClient(cacheplane.FamilyObject),
-		CacheBuilder:  c.CacheBuilder(cacheplane.FamilyObject),
-		TesteePolicy:  c.CachePolicy(cachepolicy.PolicyTestee),
-		Observer:      c.cacheObserver(),
-		TopicResolver: c.eventCatalog,
-		MySQLLimiter:  c.backpressure.MySQL,
+		RedisClient:  c.CacheClient(redisruntime.FamilyObject),
+		CacheBuilder: c.CacheBuilder(redisruntime.FamilyObject),
+		TesteePolicy: c.CachePolicy(cachepolicy.PolicyTestee),
+		Observer:     c.cacheObserver(),
+		MySQLLimiter: c.backpressure.MySQL,
 	}
-	if wire.CacheBuilder != c.CacheBuilder(cacheplane.FamilyObject) {
-		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(cacheplane.FamilyObject))
+	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyObject) {
+		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyObject))
 	}
 	if wire.TesteePolicy != c.CachePolicy(cachepolicy.PolicyTestee) {
 		t.Fatalf("policy = %#v, want %#v", wire.TesteePolicy, c.CachePolicy(cachepolicy.PolicyTestee))
@@ -62,14 +61,14 @@ func TestContainerBuildSurveyModuleDepsUsesSharedApplicationWiring(t *testing.T)
 
 	wire := surveymod.WireInput{
 		EventPublisher:   c.eventPublisher,
-		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
+		RankCacheBuilder: c.CacheBuilder(redisruntime.FamilyRank),
 		IdentityService:  c.resolveIdentityService(),
 	}
 	if wire.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", wire.EventPublisher, c.eventPublisher)
 	}
-	if wire.RankCacheBuilder != c.CacheBuilder(cacheplane.FamilyRank) {
-		t.Fatalf("rank cache builder = %#v, want %#v", wire.RankCacheBuilder, c.CacheBuilder(cacheplane.FamilyRank))
+	if wire.RankCacheBuilder != c.CacheBuilder(redisruntime.FamilyRank) {
+		t.Fatalf("rank cache builder = %#v, want %#v", wire.RankCacheBuilder, c.CacheBuilder(redisruntime.FamilyRank))
 	}
 	if wire.IdentityService != nil {
 		t.Fatalf("identity service = %#v, want nil without IAM", wire.IdentityService)
@@ -87,13 +86,13 @@ func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) 
 
 	wire := ammod.WireInput{
 		EventPublisher:   c.eventPublisher,
-		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
+		RankCacheBuilder: c.CacheBuilder(redisruntime.FamilyRank),
 	}
 	if wire.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", wire.EventPublisher, c.eventPublisher)
 	}
-	if wire.RankCacheBuilder != c.CacheBuilder(cacheplane.FamilyRank) {
-		t.Fatalf("rank cache builder = %#v, want %#v", wire.RankCacheBuilder, c.CacheBuilder(cacheplane.FamilyRank))
+	if wire.RankCacheBuilder != c.CacheBuilder(redisruntime.FamilyRank) {
+		t.Fatalf("rank cache builder = %#v, want %#v", wire.RankCacheBuilder, c.CacheBuilder(redisruntime.FamilyRank))
 	}
 }
 
@@ -131,18 +130,18 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 
 	wire := statmod.WireInput{
 		RedisClient:         c.redisCache,
-		FallbackRedisClient: c.CacheClient(cacheplane.FamilyQuery),
-		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyQuery),
+		FallbackRedisClient: c.CacheClient(redisruntime.FamilyQuery),
+		CacheBuilder:        c.CacheBuilder(redisruntime.FamilyQuery),
 		QueryPolicy:         c.CachePolicy(cachepolicy.PolicyStatsQuery),
 		LockManager:         c.CacheLockManager(),
 		Observer:            c.cacheObserver(),
-		MetaRedisClient:     c.CacheClient(cacheplane.FamilyMeta),
+		MetaRedisClient:     c.CacheClient(redisruntime.FamilyMeta),
 	}
 	if wire.FallbackRedisClient != queryClient {
 		t.Fatalf("redis client = %#v, want query cache %#v", wire.FallbackRedisClient, queryClient)
 	}
-	if wire.CacheBuilder != c.CacheBuilder(cacheplane.FamilyQuery) {
-		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(cacheplane.FamilyQuery))
+	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyQuery) {
+		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyQuery))
 	}
 	if wire.QueryPolicy != c.CachePolicy(cachepolicy.PolicyStatsQuery) {
 		t.Fatalf("policy = %#v, want %#v", wire.QueryPolicy, c.CachePolicy(cachepolicy.PolicyStatsQuery))

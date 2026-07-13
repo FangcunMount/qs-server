@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/silenceper/wechat/v2/cache"
 )
@@ -133,9 +133,7 @@ func (a *RedisCacheAdapter) observeSuccess() {
 	}
 	if a.observer != nil {
 		a.observer.ObserveFamilySuccess("sdk_token")
-		return
 	}
-	observability.ObserveFamilySuccess("apiserver", "sdk_token")
 }
 
 func (a *RedisCacheAdapter) observeFailure(err error) {
@@ -144,7 +142,5 @@ func (a *RedisCacheAdapter) observeFailure(err error) {
 	}
 	if a.observer != nil {
 		a.observer.ObserveFamilyFailure("sdk_token", err)
-		return
 	}
-	observability.ObserveFamilyFailure("apiserver", "sdk_token", err)
 }

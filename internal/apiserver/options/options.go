@@ -37,7 +37,6 @@ type Options struct {
 	Backpressure                   *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
 	Cache                          *CacheOptions                           `json:"cache"     mapstructure:"cache"`
 	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
-	ReportStatus                   *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
 	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
 }
@@ -70,7 +69,6 @@ func NewOptions() *Options {
 		Backpressure:                   NewBackpressureOptions(),
 		Cache:                          NewCacheOptions(),
 		StatisticsSync:                 NewStatisticsSyncOptions(),
-		ReportStatus:                   genericoptions.NewReportStatusOptions(),
 		Signaling:                      genericoptions.NewSignalingOptions(),
 		SystemGovernance:               NewSystemGovernanceOptions(),
 	}
@@ -508,27 +506,50 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableEvaluationCache  bool                            `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
-	DisableStatisticsCache  bool                            `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
-	TTL                     *CacheTTLOptions                `json:"ttl" mapstructure:"ttl"`
-	TTLJitterRatio          float64                         `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	Capabilities            *CacheCapabilityOptions         `json:"capabilities" mapstructure:"capabilities"`
+	Defaults                *CacheDefaultsOptions           `json:"defaults" mapstructure:"defaults"`
+	Governance              *CacheGovernanceOptions         `json:"governance" mapstructure:"governance"`
+	DisableEvaluationCache  bool                            `json:"-" mapstructure:"-"`
+	DisableStatisticsCache  bool                            `json:"-" mapstructure:"-"`
+	TTL                     *CacheTTLOptions                `json:"-" mapstructure:"-"`
+	TTLJitterRatio          float64                         `json:"-" mapstructure:"-"`
+	StatisticsWarmup        *StatisticsWarmupOptions        `json:"-" mapstructure:"-"`
+	StatisticsSystem        *StatisticsSystemOptions        `json:"-" mapstructure:"-"`
+	StatisticsOverview      *StatisticsOverviewOptions      `json:"-" mapstructure:"-"`
+	StatisticsQuestionnaire *StatisticsQuestionnaireOptions `json:"-" mapstructure:"-"`
+	Warmup                  *WarmupOptions                  `json:"-" mapstructure:"-"`
+	CompressPayload         bool                            `json:"-" mapstructure:"-"`
+	Static                  *CacheFamilyOptions             `json:"-" mapstructure:"-"`
+	Object                  *CacheFamilyOptions             `json:"-" mapstructure:"-"`
+	Query                   *CacheFamilyOptions             `json:"-" mapstructure:"-"`
+}
+
+type CacheCapabilityOptions struct {
+	ReportStatus           *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
+	DisableEvaluationCache bool                                `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
+	DisableStatisticsCache bool                                `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+}
+
+type CacheDefaultsOptions struct {
+	CompressPayload bool                `json:"compress_payload" mapstructure:"compress_payload"`
+	TTLJitterRatio  float64             `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	TTL             *CacheTTLOptions    `json:"ttl" mapstructure:"ttl"`
+	Static          *CacheFamilyOptions `json:"static" mapstructure:"static"`
+	Object          *CacheFamilyOptions `json:"object" mapstructure:"object"`
+	Query           *CacheFamilyOptions `json:"query" mapstructure:"query"`
+}
+
+type CacheGovernanceOptions struct {
 	StatisticsWarmup        *StatisticsWarmupOptions        `json:"statistics_warmup" mapstructure:"statistics_warmup"`
 	StatisticsSystem        *StatisticsSystemOptions        `json:"statistics_system" mapstructure:"statistics_system"`
 	StatisticsOverview      *StatisticsOverviewOptions      `json:"statistics_overview" mapstructure:"statistics_overview"`
 	StatisticsQuestionnaire *StatisticsQuestionnaireOptions `json:"statistics_questionnaire" mapstructure:"statistics_questionnaire"`
 	Warmup                  *WarmupOptions                  `json:"warmup" mapstructure:"warmup"`
-	CompressPayload         bool                            `json:"compress_payload" mapstructure:"compress_payload"`
-	Static                  *CacheFamilyOptions             `json:"static" mapstructure:"static"`
-	Object                  *CacheFamilyOptions             `json:"object" mapstructure:"object"`
-	Query                   *CacheFamilyOptions             `json:"query" mapstructure:"query"`
-	Meta                    *CacheFamilyOptions             `json:"meta" mapstructure:"meta"`
-	SDK                     *CacheFamilyOptions             `json:"sdk" mapstructure:"sdk"`
-	Lock                    *CacheFamilyOptions             `json:"lock" mapstructure:"lock"`
 }
 
 // NewCacheOptions 创建默认缓存配置
 func NewCacheOptions() *CacheOptions {
-	return &CacheOptions{
+	result := &CacheOptions{
 		DisableEvaluationCache: false,
 		DisableStatisticsCache: false,
 		TTL: &CacheTTLOptions{
@@ -547,9 +568,6 @@ func NewCacheOptions() *CacheOptions {
 		Query: &CacheFamilyOptions{
 			TTL: 5 * time.Minute,
 		},
-		Meta: &CacheFamilyOptions{},
-		SDK:  &CacheFamilyOptions{},
-		Lock: &CacheFamilyOptions{},
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
 			WarmOnStartup:      true,
@@ -587,6 +605,39 @@ func NewCacheOptions() *CacheOptions {
 			},
 		},
 	}
+	result.Capabilities = &CacheCapabilityOptions{ReportStatus: genericoptions.NewReportStatusOptions()}
+	result.Defaults = &CacheDefaultsOptions{
+		CompressPayload: result.CompressPayload, TTLJitterRatio: result.TTLJitterRatio, TTL: result.TTL,
+		Static: result.Static, Object: result.Object, Query: result.Query,
+	}
+	result.Governance = &CacheGovernanceOptions{
+		StatisticsWarmup: result.StatisticsWarmup, StatisticsSystem: result.StatisticsSystem,
+		StatisticsOverview: result.StatisticsOverview, StatisticsQuestionnaire: result.StatisticsQuestionnaire,
+		Warmup: result.Warmup,
+	}
+	return result
+}
+
+// Effective resolves the nested cache schema into the runtime shape consumed
+// by the composition root.
+func (c *CacheOptions) Effective() *CacheOptions {
+	if c == nil {
+		return nil
+	}
+	effective := *c
+	if c.Capabilities != nil {
+		effective.DisableEvaluationCache = c.Capabilities.DisableEvaluationCache
+		effective.DisableStatisticsCache = c.Capabilities.DisableStatisticsCache
+	}
+	if d := c.Defaults; d != nil {
+		effective.CompressPayload, effective.TTLJitterRatio, effective.TTL = d.CompressPayload, d.TTLJitterRatio, d.TTL
+		effective.Static, effective.Object, effective.Query = d.Static, d.Object, d.Query
+	}
+	if g := c.Governance; g != nil {
+		effective.StatisticsWarmup, effective.StatisticsSystem = g.StatisticsWarmup, g.StatisticsSystem
+		effective.StatisticsOverview, effective.StatisticsQuestionnaire, effective.Warmup = g.StatisticsOverview, g.StatisticsQuestionnaire, g.Warmup
+	}
+	return &effective
 }
 
 // WithDefaultsForProd keeps caching disabled by default so redis writes stop unless explicitly re-enabled.
@@ -596,8 +647,17 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c == nil {
 		return
 	}
-	if c.TTL == nil {
-		c.TTL = &CacheTTLOptions{
+	if c.Capabilities == nil {
+		c.Capabilities = &CacheCapabilityOptions{ReportStatus: genericoptions.NewReportStatusOptions()}
+	}
+	if c.Defaults == nil {
+		c.Defaults = &CacheDefaultsOptions{}
+	}
+	if c.Governance == nil {
+		c.Governance = &CacheGovernanceOptions{}
+	}
+	if c.Defaults.TTL == nil {
+		c.Defaults.TTL = &CacheTTLOptions{
 			Scale:            24 * time.Hour,
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
@@ -606,42 +666,33 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			Plan:             2 * time.Hour,
 		}
 	}
-	fs.BoolVar(&c.DisableEvaluationCache, "cache.disable-evaluation-cache", c.DisableEvaluationCache,
+	fs.BoolVar(&c.Capabilities.DisableEvaluationCache, "cache.capabilities.disable_evaluation_cache", c.Capabilities.DisableEvaluationCache,
 		"Disable Redis caching for evaluation details")
-	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
+	fs.BoolVar(&c.Capabilities.DisableStatisticsCache, "cache.capabilities.disable_statistics_cache", c.Capabilities.DisableStatisticsCache,
 		"Disable Redis caching for statistics data")
-	fs.DurationVar(&c.TTL.Scale, "cache.ttl.scale", c.TTL.Scale, "TTL for scale cache entries.")
-	fs.DurationVar(&c.TTL.Questionnaire, "cache.ttl.questionnaire", c.TTL.Questionnaire, "TTL for questionnaire cache entries.")
-	fs.DurationVar(&c.TTL.AssessmentDetail, "cache.ttl.assessment-detail", c.TTL.AssessmentDetail, "TTL for assessment detail cache entries.")
-	fs.DurationVar(&c.TTL.AssessmentList, "cache.ttl.assessment-list", c.TTL.AssessmentList, "TTL for my-assessment-list cache entries.")
-	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
-	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
-	fs.DurationVar(&c.TTL.Negative, "cache.ttl.negative", c.TTL.Negative, "TTL for negative cache entries (cache penetration protection).")
-	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
-	fs.BoolVar(&c.CompressPayload, "cache.compress-payload", c.CompressPayload, "Compress cache payloads (gzip) to save memory/bandwidth.")
-	if c.Static == nil {
-		c.Static = &CacheFamilyOptions{}
+	fs.DurationVar(&c.Defaults.TTL.Scale, "cache.defaults.ttl.scale", c.Defaults.TTL.Scale, "TTL for scale cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.Questionnaire, "cache.defaults.ttl.questionnaire", c.Defaults.TTL.Questionnaire, "TTL for questionnaire cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.AssessmentDetail, "cache.defaults.ttl.assessment_detail", c.Defaults.TTL.AssessmentDetail, "TTL for assessment detail cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.AssessmentList, "cache.defaults.ttl.assessment_list", c.Defaults.TTL.AssessmentList, "TTL for my-assessment-list cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.Testee, "cache.defaults.ttl.testee", c.Defaults.TTL.Testee, "TTL for testee cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.Plan, "cache.defaults.ttl.plan", c.Defaults.TTL.Plan, "TTL for plan cache entries.")
+	fs.DurationVar(&c.Defaults.TTL.Negative, "cache.defaults.ttl.negative", c.Defaults.TTL.Negative, "TTL for negative cache entries (cache penetration protection).")
+	fs.Float64Var(&c.Defaults.TTLJitterRatio, "cache.defaults.ttl_jitter_ratio", c.Defaults.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
+	fs.BoolVar(&c.Defaults.CompressPayload, "cache.defaults.compress_payload", c.Defaults.CompressPayload, "Compress cache payloads (gzip) to save memory/bandwidth.")
+	if c.Defaults.Static == nil {
+		c.Defaults.Static = &CacheFamilyOptions{}
 	}
-	if c.Query == nil {
-		c.Query = &CacheFamilyOptions{}
+	if c.Defaults.Query == nil {
+		c.Defaults.Query = &CacheFamilyOptions{}
 	}
-	if c.Object == nil {
-		c.Object = &CacheFamilyOptions{}
+	if c.Defaults.Object == nil {
+		c.Defaults.Object = &CacheFamilyOptions{}
 	}
-	if c.SDK == nil {
-		c.SDK = &CacheFamilyOptions{}
-	}
-	if c.Meta == nil {
-		c.Meta = &CacheFamilyOptions{}
-	}
-	if c.Lock == nil {
-		c.Lock = &CacheFamilyOptions{}
-	}
-	fs.DurationVar(&c.Query.TTL, "cache.query.ttl", c.Query.TTL, "Default TTL used by query-result cache entries.")
-	fs.DurationVar(&c.Query.NegativeTTL, "cache.query.negative-ttl", c.Query.NegativeTTL, "Default negative-cache TTL used by query-result caches.")
-	fs.Float64Var(&c.Query.TTLJitterRatio, "cache.query.ttl-jitter-ratio", c.Query.TTLJitterRatio, "TTL jitter ratio override for query-result caches (0 uses the global cache.ttl-jitter-ratio).")
-	if c.StatisticsWarmup == nil {
-		c.StatisticsWarmup = &StatisticsWarmupOptions{
+	fs.DurationVar(&c.Defaults.Query.TTL, "cache.defaults.query.ttl", c.Defaults.Query.TTL, "Default TTL used by query-result cache entries.")
+	fs.DurationVar(&c.Defaults.Query.NegativeTTL, "cache.defaults.query.negative_ttl", c.Defaults.Query.NegativeTTL, "Default negative-cache TTL used by query-result caches.")
+	fs.Float64Var(&c.Defaults.Query.TTLJitterRatio, "cache.defaults.query.ttl_jitter_ratio", c.Defaults.Query.TTLJitterRatio, "TTL jitter ratio override for query-result caches (0 uses the global cache.defaults.ttl_jitter_ratio).")
+	if c.Governance.StatisticsWarmup == nil {
+		c.Governance.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,
 			WarmOnStartup:      true,
 			OrgIDs:             []int64{1},
@@ -650,30 +701,30 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			PlanIDs:            []uint64{},
 		}
 	}
-	if c.StatisticsSystem == nil {
-		c.StatisticsSystem = &StatisticsSystemOptions{
+	if c.Governance.StatisticsSystem == nil {
+		c.Governance.StatisticsSystem = &StatisticsSystemOptions{
 			ServiceSingleflight:     true,
 			DisableRealtimeFallback: true,
 			StaleOnTimeout:          true,
 			LoadTimeout:             25 * time.Second,
 		}
 	}
-	if c.StatisticsOverview == nil {
-		c.StatisticsOverview = &StatisticsOverviewOptions{
+	if c.Governance.StatisticsOverview == nil {
+		c.Governance.StatisticsOverview = &StatisticsOverviewOptions{
 			ServiceSingleflight: true,
 			StaleOnTimeout:      true,
 			LoadTimeout:         25 * time.Second,
 		}
 	}
-	if c.StatisticsQuestionnaire == nil {
-		c.StatisticsQuestionnaire = &StatisticsQuestionnaireOptions{
+	if c.Governance.StatisticsQuestionnaire == nil {
+		c.Governance.StatisticsQuestionnaire = &StatisticsQuestionnaireOptions{
 			ServiceSingleflight: true,
 			StaleOnTimeout:      true,
 			LoadTimeout:         15 * time.Second,
 		}
 	}
-	if c.Warmup == nil {
-		c.Warmup = &WarmupOptions{
+	if c.Governance.Warmup == nil {
+		c.Governance.Warmup = &WarmupOptions{
 			Enable: true,
 			Startup: &WarmupStartupOptions{
 				Static: true,
@@ -686,18 +737,18 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			},
 		}
 	}
-	if c.Warmup.Startup == nil {
-		c.Warmup.Startup = &WarmupStartupOptions{Static: true, Query: true}
+	if c.Governance.Warmup.Startup == nil {
+		c.Governance.Warmup.Startup = &WarmupStartupOptions{Static: true, Query: true}
 	}
-	if c.Warmup.Hotset == nil {
-		c.Warmup.Hotset = &WarmupHotsetOptions{Enable: true, TopN: 20, MaxItemsPerKind: 200}
+	if c.Governance.Warmup.Hotset == nil {
+		c.Governance.Warmup.Hotset = &WarmupHotsetOptions{Enable: true, TopN: 20, MaxItemsPerKind: 200}
 	}
-	fs.BoolVar(&c.Warmup.Enable, "cache.warmup.enable", c.Warmup.Enable, "Enable cache governance warmup orchestration.")
-	fs.BoolVar(&c.Warmup.Startup.Static, "cache.warmup.startup-static", c.Warmup.Startup.Static, "Enable startup warmup for static cache family.")
-	fs.BoolVar(&c.Warmup.Startup.Query, "cache.warmup.startup-query", c.Warmup.Startup.Query, "Enable startup warmup for query cache family.")
-	fs.BoolVar(&c.Warmup.Hotset.Enable, "cache.warmup.hotset-enable", c.Warmup.Hotset.Enable, "Enable internal hotset recording and selection for warmup governance.")
-	fs.Int64Var(&c.Warmup.Hotset.TopN, "cache.warmup.hotset-top-n", c.Warmup.Hotset.TopN, "Top-N hot targets loaded from meta_cache per warmup kind.")
-	fs.Int64Var(&c.Warmup.Hotset.MaxItemsPerKind, "cache.warmup.hotset-max-items-per-kind", c.Warmup.Hotset.MaxItemsPerKind, "Maximum hotset members retained per warmup kind.")
+	fs.BoolVar(&c.Governance.Warmup.Enable, "cache.governance.warmup.enable", c.Governance.Warmup.Enable, "Enable cache governance warmup orchestration.")
+	fs.BoolVar(&c.Governance.Warmup.Startup.Static, "cache.governance.warmup.startup.static", c.Governance.Warmup.Startup.Static, "Enable startup warmup for static cache family.")
+	fs.BoolVar(&c.Governance.Warmup.Startup.Query, "cache.governance.warmup.startup.query", c.Governance.Warmup.Startup.Query, "Enable startup warmup for query cache family.")
+	fs.BoolVar(&c.Governance.Warmup.Hotset.Enable, "cache.governance.warmup.hotset.enable", c.Governance.Warmup.Hotset.Enable, "Enable internal hotset recording and selection for warmup governance.")
+	fs.Int64Var(&c.Governance.Warmup.Hotset.TopN, "cache.governance.warmup.hotset.top_n", c.Governance.Warmup.Hotset.TopN, "Top-N hot targets loaded from meta_cache per warmup kind.")
+	fs.Int64Var(&c.Governance.Warmup.Hotset.MaxItemsPerKind, "cache.governance.warmup.hotset.max_items_per_kind", c.Governance.Warmup.Hotset.MaxItemsPerKind, "Maximum hotset members retained per warmup kind.")
 }
 
 // CacheFamilyOptions 定义单个缓存 family 的对象级策略。

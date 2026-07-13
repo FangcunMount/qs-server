@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )

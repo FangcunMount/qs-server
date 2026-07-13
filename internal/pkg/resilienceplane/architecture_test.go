@@ -19,13 +19,16 @@ func TestResiliencePathsDoNotImportPrometheusDirectly(t *testing.T) {
 		"internal/pkg/middleware",
 		"internal/pkg/backpressure",
 		"internal/pkg/locklease/redisadapter",
-		"internal/pkg/cacheplane",
+		"internal/pkg/redisruntime",
 		"internal/collection-server/application/answersheet",
 		"internal/collection-server/infra/redisops",
 		"internal/worker/handlers",
 	}
 	for _, rel := range paths {
 		scanGoFiles(t, filepath.Join(root, rel), func(path string, file *ast.File) {
+			if strings.Contains(path, "/internal/pkg/redisruntime/observability/") {
+				return
+			}
 			for _, imported := range file.Imports {
 				importPath := strings.Trim(imported.Path.Value, `"`)
 				if strings.HasPrefix(importPath, "github.com/prometheus/") {
@@ -57,9 +60,9 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 func TestBusinessCodeDoesNotImportLockLeaseRedisAdapterDirectly(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/pkg/cacheplane/bootstrap":   {},
+		"internal/pkg/redisruntime/bootstrap": {},
 		"internal/pkg/locklease/redisadapter": {},
-		"internal/apiserver/cachebootstrap":   {},
+		"internal/apiserver/cache/subsystem":  {},
 		"internal/pkg/resilienceplane":        {},
 		"internal/pkg/configcontract":         {},
 		"internal/collection-server/process":  {},
@@ -98,8 +101,8 @@ func TestProductionCodeDoesNotImportTopLevelRedisPackages(t *testing.T) {
 		}
 		for _, imported := range file.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/pkg/redis") {
-				t.Fatalf("%s imports top-level redis package %s; use cacheplane, cachegovernance, locklease, or layer-local redisadapter", rel, importPath)
+			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/pkg/redis/") {
+				t.Fatalf("%s imports top-level redis package %s; use redisruntime, cache, locklease, or a layer-local redisadapter", rel, importPath)
 			}
 		}
 	})
@@ -109,7 +112,7 @@ func TestBusinessCodeDoesNotImportGoRedisDirectly(t *testing.T) {
 	root := repoRoot(t)
 	paths := []string{
 		"internal/apiserver/application",
-		"internal/apiserver/cachetarget",
+		"internal/apiserver/cache/governance/target",
 		"internal/apiserver/domain",
 		"internal/collection-server/application",
 		"internal/worker/handlers",

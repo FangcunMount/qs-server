@@ -6,15 +6,15 @@ import (
 
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
@@ -72,8 +72,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	}
 
 	deps := c.BuildServerRuntimeDeps()
-	if deps.LockBuilder != c.CacheBuilder(cacheplane.FamilyLock) {
-		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.CacheBuilder(cacheplane.FamilyLock))
+	if deps.LockBuilder != c.CacheBuilder(redisruntime.FamilyLock) {
+		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.CacheBuilder(redisruntime.FamilyLock))
 	}
 	if deps.LockManager != c.CacheLockManager() {
 		t.Fatalf("LockManager = %#v, want %#v", deps.LockManager, c.CacheLockManager())

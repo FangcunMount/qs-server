@@ -28,11 +28,11 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -56,7 +56,7 @@ type Deps struct {
 	MongoDB            *mongo.Database
 	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
-	OpsHandle          *cacheplane.Handle
+	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
 }
 

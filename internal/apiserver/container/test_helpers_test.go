@@ -9,7 +9,7 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	redis "github.com/redis/go-redis/v9"

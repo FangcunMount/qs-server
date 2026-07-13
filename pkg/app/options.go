@@ -21,3 +21,9 @@ type CompleteableOptions interface {
 type PrintableOptions interface {
 	String() string
 }
+
+// RawSettingsValidatable optionally validates the raw configuration tree before
+// Viper decodes it into typed options.
+type RawSettingsValidatable interface {
+	ValidateRawSettings(map[string]any) error
+}

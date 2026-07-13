@@ -376,7 +376,7 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 		{
 			name: "rejects out-of-range jitter",
 			mutate: func(opts *Options) {
-				opts.Cache.TTLJitterRatio = 2
+				opts.Cache.Defaults.TTLJitterRatio = 2
 			},
 			wantErr: "cache.ttl_jitter_ratio must be between 0 and 1",
 		},
@@ -392,7 +392,7 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 		{
 			name: "rejects invalid hotset size",
 			mutate: func(opts *Options) {
-				opts.Cache.Warmup.Hotset.TopN = 0
+				opts.Cache.Governance.Warmup.Hotset.TopN = 0
 			},
 			wantErr: "cache.warmup.hotset.top_n must be greater than 0",
 		},

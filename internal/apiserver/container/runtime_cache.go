@@ -4,39 +4,39 @@ import (
 	"context"
 	"strings"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
 )
 
-func (c *Container) CacheHandle(family cacheplane.Family) *cacheplane.Handle {
+func (c *Container) CacheHandle(family redisruntime.Family) *redisruntime.Handle {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.Handle(family)
 }
 
-func (c *Container) CacheClient(family cacheplane.Family) redis.UniversalClient {
+func (c *Container) CacheClient(family redisruntime.Family) redis.UniversalClient {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.Client(family)
 }
 
-func (c *Container) CacheBuilder(family cacheplane.Family) *keyspace.Builder {
+func (c *Container) CacheBuilder(family redisruntime.Family) *keyspace.Builder {
 	if c == nil || c.cache == nil {
 		return nil
 	}
@@ -97,13 +97,15 @@ func (c *Container) initCacheSignalNotifier() error {
 		return nil
 	}
 	notifier, err := cachesignal.NewNotifier(
-		c.CacheHandle(cacheplane.FamilyOps),
+		c.CacheHandle(redisruntime.FamilyOps),
 		cachesignal.ConfigFromReportStatus(c.reportStatusConfig),
 	)
 	if err != nil {
 		return err
 	}
-	c.cacheSignalNotifier = notifier
+	if c.cache != nil {
+		c.cache.BindSignalNotifier(notifier)
+	}
 	return nil
 }
 
@@ -111,24 +113,17 @@ func (c *Container) CacheSignalNotifier() *cachesignal.Notifier {
 	if c == nil {
 		return nil
 	}
-	return c.cacheSignalNotifier
+	if c.cache == nil {
+		return nil
+	}
+	return c.cache.SignalNotifier()
 }
 
 func (c *Container) StartCacheSignalWatcher(ctx context.Context) {
-	if c == nil {
+	if c == nil || c.cache == nil {
 		return
 	}
-	notifier := c.CacheSignalNotifier()
-	if notifier == nil {
-		return
-	}
-	cachegov.StartCacheSignalWatcher(
-		ctx,
-		c.WarmupCoordinator(),
-		notifier.QuestionnaireSignaler(),
-		notifier.ScaleSignaler(),
-		notifier.TypologyModelSignaler(),
-	)
+	_ = c.cache.Start(ctx)
 }
 
 type cacheGovernanceAdapter struct {
@@ -143,7 +138,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	c := a.container
 	var warmScale func(context.Context, string) error
 	var warmQuestionnaire func(context.Context, string) error
-	if c != nil && c.CacheClient(cacheplane.FamilyStatic) != nil {
+	if c != nil && c.CacheClient(redisruntime.FamilyStatic) != nil {
 		warmScale = a.warmScaleCacheTarget
 		warmQuestionnaire = a.warmQuestionnaireCacheTarget
 	}
@@ -152,7 +147,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	var warmStatsOverview func(context.Context, int64, string) error
 	var warmStatsQuestionnaire func(context.Context, int64, string) error
 	var warmStatsPlan func(context.Context, int64, uint64) error
-	if c != nil && c.CacheClient(cacheplane.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
+	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
 		warmStatsOverview = a.warmOverviewStatsTarget
 		warmStatsSystem = a.warmSystemStatsTarget
 		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget

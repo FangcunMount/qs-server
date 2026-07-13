@@ -1,9 +1,9 @@
 package actor
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with actor module bindings.
@@ -17,8 +17,8 @@ func InstallFrom(host InstallHost) error {
 	iamPorts := host.ActorIAMPorts()
 	module, err := Wire(WireInput{
 		MySQLDB:             host.MySQLDB(),
-		RedisClient:         host.CacheClient(cacheplane.FamilyObject),
-		CacheBuilder:        host.CacheBuilder(cacheplane.FamilyObject),
+		RedisClient:         host.CacheClient(redisruntime.FamilyObject),
+		CacheBuilder:        host.CacheBuilder(redisruntime.FamilyObject),
 		TesteePolicy:        host.CachePolicy(cachepolicy.PolicyTestee),
 		Observer:            host.CacheObserver(),
 		MySQLLimiter:        host.MySQLLimiter(),

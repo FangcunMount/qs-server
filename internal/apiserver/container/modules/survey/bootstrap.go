@@ -6,13 +6,13 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -33,7 +33,7 @@ type BootstrapInput struct {
 	OutboxRelayPublishWorkers         int
 	OutboxRelayImmediateMaxConcurrent int
 	CacheSignalNotifier               quesApp.CacheSignalNotifier
-	OpsHandle                         *cacheplane.Handle
+	OpsHandle                         *redisruntime.Handle
 }
 
 // Bootstrap assembles the survey module from container integration inputs.

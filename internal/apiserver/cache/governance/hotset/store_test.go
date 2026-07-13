@@ -1,0 +1,120 @@
+package cachehotset
+
+import (
+	"context"
+	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/alicebob/miniredis/v2"
+	redis "github.com/redis/go-redis/v9"
+)
+
+type testFamilyObserver struct {
+	registry *observability.FamilyStatusRegistry
+}
+
+func (o testFamilyObserver) ObserveFamilySuccess(family string) {
+	o.registry.RecordSuccess(family)
+}
+
+func (o testFamilyObserver) ObserveFamilyFailure(family string, err error) {
+	o.registry.RecordFailure(family, err)
+}
+
+func TestRedisStoreTopWithScores(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+
+	recorder := NewRedisStore(
+		client,
+		keyspace.NewBuilderWithNamespace("prod:cache:meta"),
+		Options{Enable: true, TopN: 10, MaxItemsPerKind: 20},
+	)
+	store, ok := recorder.(*RedisStore)
+	if !ok {
+		t.Fatalf("recorder type = %T, want *RedisStore", recorder)
+	}
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
+	key := store.keys.WarmupHotset(string(target.Family), string(target.Kind))
+	if err := store.client.ZIncrBy(context.Background(), key, 1, target.Scope).Err(); err != nil {
+		t.Fatalf("seed hotset error = %v", err)
+	}
+	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScale, 10)
+	if err != nil {
+		t.Fatalf("TopWithScores() error = %v", err)
+	}
+	if len(items) != 1 || items[0].Target != target || items[0].Score != 1 {
+		t.Fatalf("items = %#v, want recorded target with score 1", items)
+	}
+}
+
+func TestRedisStoreNilDisabledNoOpAndSuppression(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+
+	if got := NewRedisStore(client, keyspace.NewBuilderWithNamespace("prod:cache:meta"), Options{}); got != nil {
+		t.Fatalf("disabled store = %T, want nil", got)
+	}
+
+	recorder := NewRedisStore(
+		client,
+		keyspace.NewBuilderWithNamespace("prod:cache:meta"),
+		Options{Enable: true},
+	)
+	store := recorder.(*RedisStore)
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
+	if err := store.Record(cachetarget.SuppressHotsetRecording(context.Background()), target); err != nil {
+		t.Fatalf("Record() suppressed error = %v", err)
+	}
+	items, err := store.TopWithScores(context.Background(), cachemodel.FamilyStatic, cachetarget.WarmupKindStaticScale, 10)
+	if err != nil {
+		t.Fatalf("TopWithScores() error = %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("items after suppressed record = %#v, want empty", items)
+	}
+}
+
+func TestRedisStoreObserverUsesInjectedComponent(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+
+	registry := observability.NewFamilyStatusRegistry("hotset-observer")
+	registry.Update(observability.FamilyStatus{
+		Component: "hotset-observer",
+		Family:    string(cachemodel.FamilyMeta),
+		Available: false,
+		Degraded:  true,
+		Mode:      observability.FamilyModeDegraded,
+	})
+
+	recorder := NewRedisStoreWithObserver(
+		client,
+		keyspace.NewBuilderWithNamespace("prod:cache:meta"),
+		Options{Enable: true, TopN: 10, MaxItemsPerKind: 20},
+		testFamilyObserver{registry: registry},
+	)
+	if recorder == nil {
+		t.Fatal("recorder = nil, want enabled hotset recorder")
+	}
+	store := recorder.(*RedisStore)
+	target := cachetarget.NewStaticScaleWarmupTarget("sds")
+	key := store.keys.WarmupHotset(string(target.Family), string(target.Kind))
+	if err := store.client.ZIncrBy(context.Background(), key, 1, target.Scope).Err(); err != nil {
+		t.Fatalf("seed hotset error = %v", err)
+	}
+	if _, err := store.TopWithScores(context.Background(), target.Family, target.Kind, 10); err != nil {
+		t.Fatalf("TopWithScores() error = %v", err)
+	}
+
+	snapshot := observability.SnapshotForComponent("hotset-observer", registry)
+	if !snapshot.Summary.Ready {
+		t.Fatalf("runtime summary ready = false, want true after observed success: %#v", snapshot.Summary)
+	}
+}

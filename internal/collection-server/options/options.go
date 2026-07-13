@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -26,12 +26,9 @@ type Options struct {
 	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
 	ReportEvents            *ReportEventsOptions                    `json:"report_events" mapstructure:"report_events"`
-	ReportStatus            *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
-	QuestionnaireCache      *QuestionnaireCacheOptions              `json:"questionnaire_cache" mapstructure:"questionnaire_cache"`
-	ScaleCache              *ScaleCacheOptions                      `json:"scale_cache" mapstructure:"scale_cache"`
-	TypologyCache           *TypologyCacheOptions                   `json:"typology_cache" mapstructure:"typology_cache"`
+	Cache                   *CacheOptions                           `json:"cache" mapstructure:"cache"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
@@ -149,17 +146,14 @@ type RateLimitOptions struct {
 }
 
 type WaitReportOptions struct {
-	DefaultTimeoutSeconds    int    `json:"default_timeout_seconds" mapstructure:"default_timeout_seconds"`
-	MinTimeoutSeconds        int    `json:"min_timeout_seconds" mapstructure:"min_timeout_seconds"`
-	MaxTimeoutSeconds        int    `json:"max_timeout_seconds" mapstructure:"max_timeout_seconds"`
-	PollIntervalMs           int    `json:"poll_interval_ms" mapstructure:"poll_interval_ms"`
-	StatusTTLSeconds         int    `json:"status_ttl_seconds" mapstructure:"status_ttl_seconds"`
-	MaxActiveWaiters         int    `json:"max_active_waiters" mapstructure:"max_active_waiters"`
-	MaxHTTPConcurrency       int    `json:"max_http_concurrency" mapstructure:"max_http_concurrency"`
-	DegradeImmediateEnabled  bool   `json:"degrade_immediate_enabled" mapstructure:"degrade_immediate_enabled"`
-	DegradeRetryAfterSeconds int    `json:"degrade_retry_after_seconds" mapstructure:"degrade_retry_after_seconds"`
-	PubSubEnabled            bool   `json:"pubsub_enabled" mapstructure:"pubsub_enabled"`
-	PubSubChannel            string `json:"pubsub_channel" mapstructure:"pubsub_channel"`
+	DefaultTimeoutSeconds    int  `json:"default_timeout_seconds" mapstructure:"default_timeout_seconds"`
+	MinTimeoutSeconds        int  `json:"min_timeout_seconds" mapstructure:"min_timeout_seconds"`
+	MaxTimeoutSeconds        int  `json:"max_timeout_seconds" mapstructure:"max_timeout_seconds"`
+	PollIntervalMs           int  `json:"poll_interval_ms" mapstructure:"poll_interval_ms"`
+	MaxActiveWaiters         int  `json:"max_active_waiters" mapstructure:"max_active_waiters"`
+	MaxHTTPConcurrency       int  `json:"max_http_concurrency" mapstructure:"max_http_concurrency"`
+	DegradeImmediateEnabled  bool `json:"degrade_immediate_enabled" mapstructure:"degrade_immediate_enabled"`
+	DegradeRetryAfterSeconds int  `json:"degrade_retry_after_seconds" mapstructure:"degrade_retry_after_seconds"`
 }
 
 // ReportEventsOptions WebSocket 报告事件推送配置。
@@ -232,15 +226,12 @@ func NewOptions() *Options {
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
-		RateLimit:          NewRateLimitOptions(),
-		WaitReport:         NewWaitReportOptions(),
-		ReportEvents:       NewReportEventsOptions(),
-		ReportStatus:       genericoptions.NewReportStatusOptions(),
-		Signaling:          genericoptions.NewSignalingOptions(),
-		SubmitQueue:        NewSubmitQueueOptions(),
-		QuestionnaireCache: NewQuestionnaireCacheOptions(),
-		ScaleCache:         NewScaleCacheOptions(),
-		TypologyCache:      NewTypologyCacheOptions(),
+		RateLimit:    NewRateLimitOptions(),
+		WaitReport:   NewWaitReportOptions(),
+		ReportEvents: NewReportEventsOptions(),
+		Signaling:    genericoptions.NewSignalingOptions(),
+		SubmitQueue:  NewSubmitQueueOptions(),
+		Cache:        NewCacheOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -327,13 +318,10 @@ func NewWaitReportOptions() *WaitReportOptions {
 		MinTimeoutSeconds:        1,
 		MaxTimeoutSeconds:        25,
 		PollIntervalMs:           500,
-		StatusTTLSeconds:         172800,
 		MaxActiveWaiters:         3000,
 		MaxHTTPConcurrency:       400,
 		DegradeImmediateEnabled:  true,
 		DegradeRetryAfterSeconds: 5,
-		PubSubEnabled:            false,
-		PubSubChannel:            "report_status_changed",
 	}
 }
 
@@ -352,9 +340,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.ReportEvents.AddFlags(fss.FlagSet("report_events"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
-	o.QuestionnaireCache.AddFlags(fss.FlagSet("questionnaire_cache"))
-	o.ScaleCache.AddFlags(fss.FlagSet("scale_cache"))
-	o.TypologyCache.AddFlags(fss.FlagSet("typology_cache"))
+	o.Cache.Capabilities.Catalog.Questionnaire.AddFlags(fss.FlagSet("cache.capabilities.catalog.questionnaire"))
+	o.Cache.Capabilities.Catalog.Typology.AddFlags(fss.FlagSet("cache.capabilities.catalog.typology"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -425,13 +412,10 @@ func (w *WaitReportOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&w.MinTimeoutSeconds, "wait_report.min-timeout-seconds", w.MinTimeoutSeconds, "Minimum wait-report timeout seconds.")
 	fs.IntVar(&w.MaxTimeoutSeconds, "wait_report.max-timeout-seconds", w.MaxTimeoutSeconds, "Maximum wait-report timeout seconds.")
 	fs.IntVar(&w.PollIntervalMs, "wait_report.poll-interval-ms", w.PollIntervalMs, "Wait-report polling interval in milliseconds.")
-	fs.IntVar(&w.StatusTTLSeconds, "wait_report.status-ttl-seconds", w.StatusTTLSeconds, "Report status cache TTL in seconds.")
 	fs.IntVar(&w.MaxActiveWaiters, "wait_report.max-active-waiters", w.MaxActiveWaiters, "Maximum active wait-report requests before degradation.")
 	fs.IntVar(&w.MaxHTTPConcurrency, "wait_report.max-http-concurrency", w.MaxHTTPConcurrency, "Maximum concurrent HTTP handlers for wait-report.")
 	fs.BoolVar(&w.DegradeImmediateEnabled, "wait_report.degrade-immediate-enabled", w.DegradeImmediateEnabled, "Return pending immediately when wait-report HTTP slots are exhausted.")
 	fs.IntVar(&w.DegradeRetryAfterSeconds, "wait_report.degrade-retry-after-seconds", w.DegradeRetryAfterSeconds, "Retry-After seconds for degraded wait-report responses.")
-	fs.BoolVar(&w.PubSubEnabled, "wait_report.pubsub-enabled", w.PubSubEnabled, "Enable Redis pubsub wakeups for wait-report.")
-	fs.StringVar(&w.PubSubChannel, "wait_report.pubsub-channel", w.PubSubChannel, "Redis pubsub channel for report status change.")
 }
 
 func (r *ReportEventsOptions) AddFlags(fs *pflag.FlagSet) {
@@ -479,9 +463,10 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionRedis(o.RedisOptions, o.RedisRuntime, o.RedisProfiles)...)
 	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
 	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
-	errs = append(errs, validateQuestionnaireCacheOptions(o.QuestionnaireCache)...)
-	errs = append(errs, validateScaleCacheOptions(o.ScaleCache)...)
-	errs = append(errs, validateTypologyCacheOptions(o.TypologyCache)...)
+	if o.Cache != nil && o.Cache.Capabilities != nil && o.Cache.Capabilities.Catalog != nil {
+		errs = append(errs, validateQuestionnaireCacheOptions(o.Cache.Capabilities.Catalog.Questionnaire)...)
+		errs = append(errs, validateTypologyCacheOptions(o.Cache.Capabilities.Catalog.Typology)...)
+	}
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)
@@ -524,9 +509,9 @@ func validateCollectionRedis(
 	if len(redisOpts.Addrs) == 0 && redisOpts.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
-	errs = append(errs, cacheplane.ValidateRuntimeOptions(
+	errs = append(errs, redisruntime.ValidateRuntimeOptions(
 		runtimeOpts,
-		[]cacheplane.Family{cacheplane.FamilyOps, cacheplane.FamilyLock},
+		[]redisruntime.Family{redisruntime.FamilyOps, redisruntime.FamilyLock},
 		profiles,
 		"redis_runtime",
 	)...)
@@ -646,9 +631,6 @@ func validateWaitReportOptions(opts *WaitReportOptions) []error {
 	if opts.PollIntervalMs <= 0 {
 		errs = append(errs, fmt.Errorf("wait_report.poll_interval_ms must be greater than 0"))
 	}
-	if opts.StatusTTLSeconds <= 0 {
-		errs = append(errs, fmt.Errorf("wait_report.status_ttl_seconds must be greater than 0"))
-	}
 	if opts.MaxActiveWaiters <= 0 {
 		errs = append(errs, fmt.Errorf("wait_report.max_active_waiters must be greater than 0"))
 	}
@@ -657,9 +639,6 @@ func validateWaitReportOptions(opts *WaitReportOptions) []error {
 	}
 	if opts.DegradeRetryAfterSeconds <= 0 {
 		errs = append(errs, fmt.Errorf("wait_report.degrade_retry_after_seconds must be greater than 0"))
-	}
-	if opts.PubSubEnabled && opts.PubSubChannel == "" {
-		errs = append(errs, fmt.Errorf("wait_report.pubsub_channel cannot be empty when pubsub is enabled"))
 	}
 	return errs
 }

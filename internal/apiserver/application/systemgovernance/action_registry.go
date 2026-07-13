@@ -1,6 +1,6 @@
 package systemgovernance
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+import "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 
 // ActionRegistry 暴露governance action 描述符。
 type ActionRegistry struct {

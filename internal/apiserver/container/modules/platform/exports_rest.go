@@ -2,9 +2,9 @@ package platform
 
 import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"

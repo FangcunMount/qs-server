@@ -6,8 +6,8 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
 // CacheWarmupProjection 是diagnostic 缓存 governance 视图。

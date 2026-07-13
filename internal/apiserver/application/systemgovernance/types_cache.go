@@ -3,10 +3,10 @@ package systemgovernance
 import (
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
 // CacheView 暴露缓存 governance detail。

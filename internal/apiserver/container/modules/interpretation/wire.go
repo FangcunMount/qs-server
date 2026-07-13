@@ -2,8 +2,8 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -13,7 +13,7 @@ type WireInput struct {
 	MongoDB            *mongo.Database
 	TopicResolver      eventcatalog.TopicResolver
 	MongoLimiter       backpressure.Acquirer
-	OpsHandle          *cacheplane.Handle
+	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
 }
 

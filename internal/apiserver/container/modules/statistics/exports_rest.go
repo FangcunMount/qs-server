@@ -2,7 +2,7 @@ package statistics
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )
 

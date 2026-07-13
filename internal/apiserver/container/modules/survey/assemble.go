@@ -11,21 +11,21 @@ import (
 	modelcatalogHotRank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -56,7 +56,7 @@ type Deps struct {
 	OutboxRelayPublishWorkers         int
 	OutboxRelayImmediateMaxConcurrent int
 	CacheSignalNotifier               quesApp.CacheSignalNotifier
-	OpsHandle                         *cacheplane.Handle
+	OpsHandle                         *redisruntime.Handle
 }
 
 // AnswerSheetStore combines answer-sheet persistence and outbox ports.
@@ -172,7 +172,7 @@ func (m *Module) SetCatalogManagementService(service modelcatalogApp.CatalogMana
 	m.bindingSyncer.SetCatalogManagementService(service)
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, outboxRelayImmediateMaxConcurrent int, opsHandle *cacheplane.Handle) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, outboxRelayImmediateMaxConcurrent int, opsHandle *redisruntime.Handle) error {
 	sub := m.AnswerSheet
 
 	batchValidator := ruleengineInfra.NewAnswerValidator()

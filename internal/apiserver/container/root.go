@@ -8,13 +8,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -41,7 +40,6 @@ type Container struct {
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
-	cacheSignalNotifier        *cachesignal.Notifier
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher

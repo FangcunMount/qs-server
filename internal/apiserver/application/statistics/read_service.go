@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"

@@ -1,6 +1,6 @@
 // Package redisadapter 提供 qs-server 基于 Redis 的 locklease adapter。
 //
-// 本包不是业务幂等框架或调度框架，只负责通过 cacheplane.Handle 构造锁 key、
+// 本包不是业务幂等框架或调度框架，只负责通过 redisruntime.Handle 构造锁 key、
 // 执行 token-based acquire/release，并上报 lock/family 观测结果。
 //
 // 调用方保留各自的领域语义：

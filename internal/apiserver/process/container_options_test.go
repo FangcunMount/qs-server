@@ -4,9 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
@@ -16,25 +15,25 @@ func boolPtr(v bool) *bool {
 
 func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
-	opts.Cache.DisableEvaluationCache = true
-	opts.Cache.DisableStatisticsCache = true
-	opts.Cache.TTL.Scale = time.Minute
-	opts.Cache.TTL.Questionnaire = 3 * time.Minute
-	opts.Cache.TTL.AssessmentDetail = 4 * time.Minute
-	opts.Cache.TTL.AssessmentList = 5 * time.Minute
-	opts.Cache.TTL.Testee = 6 * time.Minute
-	opts.Cache.TTL.Plan = 7 * time.Minute
-	opts.Cache.TTL.Negative = 8 * time.Second
-	opts.Cache.TTLJitterRatio = 0.25
-	opts.Cache.CompressPayload = true
-	opts.Cache.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
+	opts.Cache.Capabilities.DisableEvaluationCache = true
+	opts.Cache.Capabilities.DisableStatisticsCache = true
+	opts.Cache.Defaults.TTL.Scale = time.Minute
+	opts.Cache.Defaults.TTL.Questionnaire = 3 * time.Minute
+	opts.Cache.Defaults.TTL.AssessmentDetail = 4 * time.Minute
+	opts.Cache.Defaults.TTL.AssessmentList = 5 * time.Minute
+	opts.Cache.Defaults.TTL.Testee = 6 * time.Minute
+	opts.Cache.Defaults.TTL.Plan = 7 * time.Minute
+	opts.Cache.Defaults.TTL.Negative = 8 * time.Second
+	opts.Cache.Defaults.TTLJitterRatio = 0.25
+	opts.Cache.Defaults.CompressPayload = true
+	opts.Cache.Governance.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
 		Enable:             true,
 		OrgIDs:             []int64{101, 202},
 		OverviewPresets:    []string{"today", "30d"},
 		QuestionnaireCodes: []string{"phq9", "gad7"},
 		PlanIDs:            []uint64{11, 22},
 	}
-	opts.Cache.Warmup = &apiserveroptions.WarmupOptions{
+	opts.Cache.Governance.Warmup = &apiserveroptions.WarmupOptions{
 		Enable: true,
 		Startup: &apiserveroptions.WarmupStartupOptions{
 			Static: true,
@@ -46,41 +45,27 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 			MaxItemsPerKind: 8,
 		},
 	}
-	opts.Cache.Static = &apiserveroptions.CacheFamilyOptions{
+	opts.Cache.Defaults.Static = &apiserveroptions.CacheFamilyOptions{
 		NegativeTTL:    9 * time.Second,
 		TTLJitterRatio: 0.10,
 		Compress:       boolPtr(true),
 		Singleflight:   boolPtr(true),
 		Negative:       boolPtr(true),
 	}
-	opts.Cache.Object = &apiserveroptions.CacheFamilyOptions{
+	opts.Cache.Defaults.Object = &apiserveroptions.CacheFamilyOptions{
 		NegativeTTL:    10 * time.Second,
 		TTLJitterRatio: 0.20,
 		Compress:       boolPtr(false),
 		Singleflight:   boolPtr(true),
 		Negative:       boolPtr(false),
 	}
-	opts.Cache.Query = &apiserveroptions.CacheFamilyOptions{
+	opts.Cache.Defaults.Query = &apiserveroptions.CacheFamilyOptions{
 		TTL:            30 * time.Second,
 		NegativeTTL:    6 * time.Second,
 		TTLJitterRatio: 0.15,
 		Compress:       boolPtr(true),
 		Singleflight:   boolPtr(true),
 		Negative:       boolPtr(true),
-	}
-	opts.Cache.SDK = &apiserveroptions.CacheFamilyOptions{
-		NegativeTTL:    5 * time.Second,
-		TTLJitterRatio: 0.05,
-		Compress:       boolPtr(false),
-		Singleflight:   boolPtr(true),
-		Negative:       boolPtr(true),
-	}
-	opts.Cache.Lock = &apiserveroptions.CacheFamilyOptions{
-		NegativeTTL:    3 * time.Second,
-		TTLJitterRatio: 0.01,
-		Compress:       boolPtr(false),
-		Singleflight:   boolPtr(false),
-		Negative:       boolPtr(false),
 	}
 
 	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
@@ -127,15 +112,6 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	if got.Query.TTL != 30*time.Second || got.Query.NegativeTTL != 6*time.Second || got.Query.Compress == nil || !*got.Query.Compress {
 		t.Fatalf("Query family mapping mismatch: %+v", got.Query)
 	}
-	if got.SDK.NegativeTTL != 5*time.Second || got.SDK.Singleflight == nil || !*got.SDK.Singleflight {
-		t.Fatalf("SDK family mapping mismatch: %+v", got.SDK)
-	}
-	if got.Lock.NegativeTTL != 3*time.Second || got.Lock.Singleflight == nil || *got.Lock.Singleflight {
-		t.Fatalf("Lock family mapping mismatch: %+v", got.Lock)
-	}
-	if got.Meta != (container.ContainerCacheFamilyOptions{}) {
-		t.Fatalf("Meta family = %+v, want zero value", got.Meta)
-	}
 }
 
 func TestStatisticsRepairWindowDays(t *testing.T) {
@@ -181,7 +157,7 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 
 func TestBuildStatisticsOverviewOptionsMapsServiceSingleflight(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
-	opts.Cache.StatisticsOverview = &apiserveroptions.StatisticsOverviewOptions{
+	opts.Cache.Governance.StatisticsOverview = &apiserveroptions.StatisticsOverviewOptions{
 		ServiceSingleflight: false,
 		StaleOnTimeout:      true,
 		LoadTimeout:         11 * time.Second,
@@ -205,7 +181,7 @@ func TestBuildStatisticsOverviewOptionsDefaultsServiceSingleflightTrue(t *testin
 
 func TestBuildStatisticsQuestionnaireOptionsMapsGuardFields(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
-	opts.Cache.StatisticsQuestionnaire = &apiserveroptions.StatisticsQuestionnaireOptions{
+	opts.Cache.Governance.StatisticsQuestionnaire = &apiserveroptions.StatisticsQuestionnaireOptions{
 		ServiceSingleflight: false,
 		StaleOnTimeout:      false,
 		LoadTimeout:         9 * time.Second,

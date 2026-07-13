@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
 
 type fakeStatisticsSyncService struct {

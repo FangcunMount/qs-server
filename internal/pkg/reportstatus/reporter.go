@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // Reporter best-effort 写入 Redis 状态并发送唤醒信号。
@@ -20,7 +20,7 @@ type Reporter struct {
 	service  string
 }
 
-func NewReporter(opsHandle *cacheplane.Handle, cfg Config) (*Reporter, error) {
+func NewReporter(opsHandle *redisruntime.Handle, cfg Config) (*Reporter, error) {
 	cache := NewCache(opsHandle)
 	var signaler signaling.Notifier[ChangedSignal]
 	if cfg.Signaling.Enabled && opsHandle != nil && opsHandle.Client != nil {

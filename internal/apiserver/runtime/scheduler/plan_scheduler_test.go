@@ -9,8 +9,8 @@ import (
 
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
 
 type fakePlanCommandService struct {

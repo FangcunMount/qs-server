@@ -8,8 +8,9 @@ import (
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
@@ -20,14 +21,13 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
@@ -293,8 +293,8 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 		MongoDB:             c.mongoDB,
 		EventCatalog:        c.eventCatalog,
 		MongoLimiter:        c.backpressure.Mongo,
-		StaticRedis:         c.CacheClient(cacheplane.FamilyStatic),
-		StaticBuilder:       c.CacheBuilder(cacheplane.FamilyStatic),
+		StaticRedis:         c.CacheClient(redisruntime.FamilyStatic),
+		StaticBuilder:       c.CacheBuilder(redisruntime.FamilyStatic),
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
 		Observer:            c.cacheObserver(),
 	})
@@ -316,8 +316,8 @@ func (c *Container) ensurePublishedModelCatalog() (rulesetport.Catalog, error) {
 		MongoDB:              c.mongoDB,
 		MongoLimiter:         c.backpressure.Mongo,
 		Existing:             c.publishedModelCatalog,
-		StaticRedisClient:    c.CacheClient(cacheplane.FamilyStatic),
-		StaticCacheBuilder:   c.CacheBuilder(cacheplane.FamilyStatic),
+		StaticRedisClient:    c.CacheClient(redisruntime.FamilyStatic),
+		StaticCacheBuilder:   c.CacheBuilder(redisruntime.FamilyStatic),
 		PublishedModelPolicy: c.CachePolicy(cachepolicy.PolicyPublishedModel),
 		Observer:             c.cacheObserver(),
 	})

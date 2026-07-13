@@ -63,6 +63,11 @@ func (c *Container) checkModulesHealth(_ context.Context) error {
 // Cleanup 清理资源
 func (c *Container) Cleanup() error {
 	c.printf("🧹 Cleaning up container resources...\n")
+	if c.cache != nil {
+		if err := c.cache.Close(); err != nil {
+			return fmt.Errorf("failed to close cache subsystem: %w", err)
+		}
+	}
 
 	// 清理 IAM 模块
 	if c.IAMModule != nil {

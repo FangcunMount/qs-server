@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"

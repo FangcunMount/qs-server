@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -16,16 +16,16 @@ const (
 )
 
 type SubmitGuard struct {
-	opsHandle *cacheplane.Handle
+	opsHandle *redisruntime.Handle
 	lockMgr   locklease.Manager
 	observer  resilienceplane.Observer
 }
 
-func NewSubmitGuard(opsHandle *cacheplane.Handle, lockMgr locklease.Manager) *SubmitGuard {
+func NewSubmitGuard(opsHandle *redisruntime.Handle, lockMgr locklease.Manager) *SubmitGuard {
 	return NewSubmitGuardWithObserver(opsHandle, lockMgr, nil)
 }
 
-func NewSubmitGuardWithObserver(opsHandle *cacheplane.Handle, lockMgr locklease.Manager, observer resilienceplane.Observer) *SubmitGuard {
+func NewSubmitGuardWithObserver(opsHandle *redisruntime.Handle, lockMgr locklease.Manager, observer resilienceplane.Observer) *SubmitGuard {
 	return &SubmitGuard{
 		opsHandle: opsHandle,
 		lockMgr:   lockMgr,

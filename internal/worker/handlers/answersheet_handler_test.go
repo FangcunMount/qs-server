@@ -13,9 +13,9 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -424,7 +424,7 @@ func newAnswerSheetHandlerTestDeps(client workerTestClient, redisClient redis.Un
 	)
 	var lockManager *redisadapter.Manager
 	if redisClient != nil {
-		lockManager = redisadapter.NewManager("worker", "lock_lease", &cacheplane.Handle{
+		lockManager = redisadapter.NewManager("worker", "lock_lease", &redisruntime.Handle{
 			Client:  redisClient,
 			Builder: lockBuilder,
 		})

@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // Notifier best-effort 发送缓存失效唤醒信号。
@@ -23,7 +23,7 @@ type Config struct {
 	Service   string
 }
 
-func NewNotifier(opsHandle *cacheplane.Handle, cfg Config) (*Notifier, error) {
+func NewNotifier(opsHandle *redisruntime.Handle, cfg Config) (*Notifier, error) {
 	n := &Notifier{service: cfg.Service}
 	if !cfg.Signaling.Enabled || opsHandle == nil || opsHandle.Client == nil {
 		return n, nil

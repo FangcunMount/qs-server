@@ -8,8 +8,8 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	cacheadapter "github.com/FangcunMount/qs-server/internal/apiserver/cache/adapter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
@@ -19,10 +19,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,7 +50,7 @@ type WireInput struct {
 	AssessmentOutboxRelayPublishWorkers         int
 	AssessmentOutboxRelayImmediateMaxConcurrent int
 	TesteeAccessChecker                         evaluationoperator.AccessChecker
-	OpsHandle                                   *cacheplane.Handle
+	OpsHandle                                   *redisruntime.Handle
 	SurveyRuntimeInfra                          *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog                       rulesetport.Catalog
 	StaticRedisClient                           redis.UniversalClient

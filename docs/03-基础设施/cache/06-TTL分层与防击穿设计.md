@@ -52,7 +52,7 @@ TTL expiration burst、singleflight shared ratio、empty-cache hit、DB fallback
 
 ## 12. 代码事实源
 
-- [../../../internal/pkg/cacheutil/jitter.go](../../../internal/pkg/cacheutil/jitter.go)
-- [../../../internal/apiserver/infra/cache/singleflight.go](../../../internal/apiserver/infra/cache/singleflight.go)
-- [../../../internal/apiserver/infra/cachepolicy](../../../internal/apiserver/infra/cachepolicy)
-- [../../../internal/collection-server/application/catalogl1/options.go](../../../internal/collection-server/application/catalogl1/options.go)
+- [../../../internal/pkg/cache/policy.go](../../../internal/pkg/cache/policy.go)
+- [../../../internal/pkg/loadguard](../../../internal/pkg/loadguard)
+- [../../../internal/apiserver/cache/catalog](../../../internal/apiserver/cache/catalog)
+- [../../../internal/collection-server/options/catalog_l1_cache.go](../../../internal/collection-server/options/catalog_l1_cache.go)

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -48,7 +48,7 @@ func TestRedisCacheAdapterUsesInjectedObserver(t *testing.T) {
 	cache := NewRedisCacheAdapterWithBuilderAndObserver(
 		client,
 		keyspace.NewBuilderWithNamespace("prod:cache:sdk"),
-		observability.NewComponentObserver("wechat-sdk-test"),
+		observability.NewComponentObserver("wechat-sdk-test", registry),
 	)
 	if err := cache.Set("access_token", "token-1", time.Minute); err != nil {
 		t.Fatalf("cache set failed: %v", err)

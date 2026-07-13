@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 

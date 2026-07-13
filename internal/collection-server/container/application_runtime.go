@@ -97,7 +97,9 @@ func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService)
 	var reportOpts *genericoptions.ReportStatusOptions
 	var sigOpts *genericoptions.SignalingOptions
 	if c.opts != nil {
-		reportOpts = c.opts.ReportStatus
+		if c.opts.Cache != nil && c.opts.Cache.Capabilities != nil {
+			reportOpts = c.opts.Cache.Capabilities.ReportStatus
+		}
 		sigOpts = c.opts.Signaling
 	}
 	reportStatusRuntime := reportstatus.ConfigFromOptions(reportOpts, sigOpts, "collection-server")
@@ -112,12 +114,9 @@ func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService)
 		cfg.MinTimeout = time.Duration(c.opts.WaitReport.MinTimeoutSeconds) * time.Second
 		cfg.MaxTimeout = time.Duration(c.opts.WaitReport.MaxTimeoutSeconds) * time.Second
 		cfg.PollInterval = time.Duration(c.opts.WaitReport.PollIntervalMs) * time.Millisecond
-		cfg.StatusTTL = time.Duration(c.opts.WaitReport.StatusTTLSeconds) * time.Second
+		cfg.StatusTTL = reportStatusRuntime.TTL
 		cfg.MaxActiveWaiters = c.opts.WaitReport.MaxActiveWaiters
 		cfg.SignalingEnabled = reportStatusRuntime.Signaling.Enabled
-		if c.opts.WaitReport.PubSubEnabled {
-			cfg.SignalingEnabled = true
-		}
 	}
 
 	notifier := reportnotify.NewInMemoryNotifier()

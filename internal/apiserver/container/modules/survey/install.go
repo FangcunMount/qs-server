@@ -2,7 +2,7 @@ package survey
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
 // InstallHost extends the shared compose seam with survey-specific bindings.
@@ -21,8 +21,8 @@ func InstallFrom(host InstallHost) error {
 	module, err := Wire(WireInput{
 		MongoDB:                           host.MongoDB(),
 		EventPublisher:                    host.EventPublisher(),
-		RankRedisClient:                   host.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder:                  host.CacheBuilder(cacheplane.FamilyRank),
+		RankRedisClient:                   host.CacheClient(redisruntime.FamilyRank),
+		RankCacheBuilder:                  host.CacheBuilder(redisruntime.FamilyRank),
 		IdentityService:                   host.IdentityService(),
 		HotsetRecorder:                    host.HotsetRecorder(),
 		TopicResolver:                     host.TopicResolver(),
@@ -30,7 +30,7 @@ func InstallFrom(host InstallHost) error {
 		OutboxRelayPublishWorkers:         host.OutboxRelayMongoPublishWorkers(),
 		OutboxRelayImmediateMaxConcurrent: host.OutboxRelayMongoImmediateMaxConcurrent(),
 		CacheSignalNotifier:               host.CacheSignalNotifier(),
-		OpsHandle:                         host.CacheHandle(cacheplane.FamilyOps),
+		OpsHandle:                         host.CacheHandle(redisruntime.FamilyOps),
 		SurveyRuntimeInfra:                infra,
 	})
 	if err != nil {
