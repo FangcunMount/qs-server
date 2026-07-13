@@ -78,6 +78,9 @@ func questionnaireManageRoutes(handler *codesHandler.QuestionnaireHandler) []rou
 		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
 		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
 		{method: http.MethodPost, path: "/:code/draft", handlers: []gin.HandlerFunc{handler.SaveDraft}},
+		// Standalone questionnaire management remains available until every
+		// legacy survey is migrated to an assessment release. Questionnaire-bound
+		// assessment editors no longer call these routes.
 		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
 		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
 		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},

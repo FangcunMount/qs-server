@@ -82,6 +82,7 @@ type AssessmentModelDeps struct {
 	Management  assessmentModelApp.CatalogManagementService
 	Definition  assessmentModelApp.DefinitionAuthoringService
 	Publication assessmentModelApp.PublicationService
+	Release     assessmentModelApp.AssessmentReleaseService
 	Query       assessmentModelApp.CatalogQueryService
 }
 

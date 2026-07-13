@@ -4,6 +4,7 @@ import (
 	"context"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -24,4 +25,5 @@ type CatalogDeps struct {
 	NormRepo            port.NormRepository
 	QuestionnaireQuery  questionnaireapp.QuestionnaireQueryService
 	CacheSignalNotifier TypologyCacheSignalNotifier
+	Transactions        apptransaction.Runner
 }

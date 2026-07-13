@@ -159,6 +159,20 @@ type QuestionnaireBindingResult struct {
 	QuestionCount        int    `json:"question_count"`
 }
 
+// AssessmentRelease is the single public lifecycle view for a questionnaire
+// and its assessment model. QuestionnaireVersion is the release version; the
+// model's persisted revision is intentionally not exposed as a business
+// version.
+type AssessmentRelease struct {
+	ModelCode            string `json:"model_code"`
+	ModelStatus          string `json:"model_status"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	QuestionnaireStatus  string `json:"questionnaire_status"`
+	PublishedAt          string `json:"published_at,omitempty"`
+	ArchivedAt           string `json:"archived_at,omitempty"`
+}
+
 type OptionsResult struct {
 	Kinds             []Option `json:"kinds"`
 	ModelFamilies     []Option `json:"model_families,omitempty"`

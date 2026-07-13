@@ -116,6 +116,32 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 	return toQuestionnaireResult(q), nil
 }
 
+// ArchiveForRelease is the transactional questionnaire half of an
+// AssessmentRelease archive. Effects are emitted once by the release service
+// after both the questionnaire and model changes commit.
+func (s *lifecycleService) ArchiveForRelease(ctx context.Context, code string) (*QuestionnaireResult, error) {
+	if err := s.validateCode(ctx, code, "release_archive"); err != nil {
+		return nil, err
+	}
+	q, err := s.findQuestionnaireByCode(ctx, code, "release_archive")
+	if err != nil {
+		return nil, err
+	}
+	if q.IsArchived() {
+		return toQuestionnaireResult(q), nil
+	}
+	if err := s.lifecycle.Archive(ctx, q); err != nil {
+		return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "归档问卷失败")
+	}
+	if err := s.persistQuestionnaire(ctx, q, code, "release_archive", "状态"); err != nil {
+		return nil, err
+	}
+	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
+	}
+	return toQuestionnaireResult(q), nil
+}
+
 func (s *lifecycleService) loadUnpublishTarget(ctx context.Context, l *logger.RequestLogger, code string) (*domainQuestionnaire.Questionnaire, error) {
 	if err := s.validateCode(ctx, code, "unpublish"); err != nil {
 		return nil, err

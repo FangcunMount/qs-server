@@ -9,7 +9,7 @@ import (
 )
 
 func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) {
-	if r.deps.AssessmentModel.Management == nil || r.deps.AssessmentModel.Definition == nil || r.deps.AssessmentModel.Publication == nil || r.deps.AssessmentModel.Query == nil {
+	if r.deps.AssessmentModel.Management == nil || r.deps.AssessmentModel.Definition == nil || r.deps.AssessmentModel.Query == nil || r.deps.AssessmentModel.Release == nil {
 		return
 	}
 	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Publication, r.deps.AssessmentModel.Query)
@@ -23,6 +23,9 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 		registerRouteSpecs(definition, assessmentModelDefinitionRoutes(handler))
 		registerRouteSpecs(publication, assessmentModelPublicationRoutes(handler))
 		registerRouteSpecs(read, assessmentModelReadRoutes(handler))
+		releases := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
+		releaseHandler := codesHandler.NewAssessmentReleaseHandler(r.deps.AssessmentModel.Release)
+		registerRouteSpecs(releases, assessmentReleaseRoutes(releaseHandler))
 	}
 }
 
@@ -31,7 +34,6 @@ func assessmentModelManageRoutes(handler *codesHandler.AssessmentModelHandler) [
 		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
 		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
 		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
-		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
 		{method: http.MethodPut, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.BindQuestionnaire}},
 	}
 }
@@ -46,10 +48,12 @@ func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandle
 	}
 }
 
-func assessmentModelPublicationRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
+func assessmentModelPublicationRoutes(*codesHandler.AssessmentModelHandler) []routeSpec { return nil }
+
+func assessmentReleaseRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
 	return []routeSpec{
 		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
-		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
+		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
 	}
 }
 

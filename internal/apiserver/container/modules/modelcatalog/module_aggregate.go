@@ -6,6 +6,7 @@ import (
 	appmanagement "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/management"
 	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
+	apprelease "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/release"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -23,6 +24,7 @@ type Module struct {
 	Management       assessmentModelApp.CatalogManagementService
 	Authoring        *appauthoring.Service
 	Publication      assessmentModelApp.PublicationService
+	Release          assessmentModelApp.AssessmentReleaseService
 	Query            assessmentModelApp.CatalogQueryService
 	TitleResolver    assessmentModelApp.PublishedModelTitleResolver
 }
@@ -67,6 +69,13 @@ func New(deps Deps) (*Module, error) {
 		Bindings:   bindings,
 		Effects:    effects,
 	}
+	release := apprelease.Service{
+		Transactions: deps.Catalog.Transactions,
+		Models:       deps.Catalog.ModelRepo, Published: deps.Catalog.PublishedRepo,
+		Authorizer: assessmentModelApp.SnapshotAuthorizer{}, Registry: registry,
+		Bindings: bindings, Questionnaires: deps.Lifecycle.QuestionnairePublisher,
+		Effects: effects,
+	}
 	// 查询服务
 	query := appquery.NewService(appquery.Dependencies{
 		Models:     deps.Catalog.ModelRepo,
@@ -84,6 +93,7 @@ func New(deps Deps) (*Module, error) {
 		Management:       management,
 		Authoring:        authoring,
 		Publication:      publication,
+		Release:          release,
 		Query:            query,
 		TitleResolver:    modelcatalogRuntime.NewTitleResolver(deps.Catalog.PublishedLister),
 	}, nil

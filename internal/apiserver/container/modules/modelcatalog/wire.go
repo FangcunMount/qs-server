@@ -6,6 +6,7 @@ import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -124,5 +125,6 @@ func buildCatalogDeps(
 		NormRepo:            normRepo,
 		QuestionnaireQuery:  questionnaireQuery,
 		CacheSignalNotifier: cacheCfg.Notifier,
+		Transactions:        modtx.NewMongoRunner(mongoDB),
 	}
 }

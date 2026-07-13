@@ -22,6 +22,21 @@ type assessmentModelPublicationStub struct {
 	publishCalled bool
 }
 
+type assessmentReleaseStub struct {
+	publishCalled bool
+	archiveCalled bool
+}
+
+func (s *assessmentReleaseStub) PublishRelease(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.AssessmentRelease, error) {
+	s.publishCalled = true
+	return &modelcatalog.AssessmentRelease{ModelCode: code, ModelStatus: "published", QuestionnaireCode: "q1", QuestionnaireVersion: "1.0.0", QuestionnaireStatus: "published"}, nil
+}
+
+func (s *assessmentReleaseStub) ArchiveRelease(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.AssessmentRelease, error) {
+	s.archiveCalled = true
+	return &modelcatalog.AssessmentRelease{ModelCode: code, ModelStatus: "archived", QuestionnaireCode: "q1", QuestionnaireVersion: "1.0.0", QuestionnaireStatus: "archived"}, nil
+}
+
 func (s *assessmentModelPublicationStub) Publish(_ context.Context, _ modelcatalog.ActorContext, _ string) (*modelcatalog.ModelSummary, error) {
 	s.publishCalled = true
 	return s.publishResult, s.publishErr
@@ -106,6 +121,36 @@ func TestAssessmentModelPublishUsesPublicationService(t *testing.T) {
 	}
 	if !svc.publishCalled {
 		t.Fatal("publication service was not called")
+	}
+}
+
+func TestAssessmentReleaseHandlerUsesSinglePairService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &assessmentReleaseStub{}
+	handler := NewAssessmentReleaseHandler(svc)
+
+	for _, tc := range []struct {
+		name string
+		call func(*gin.Context)
+	}{
+		{name: "publish", call: handler.Publish},
+		{name: "archive", call: handler.Archive},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-releases/model_ok/"+tc.name, nil)
+			c.Params = gin.Params{{Key: "code", Value: "model_ok"}}
+			setAssessmentModelActor(c)
+
+			tc.call(c)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+	if !svc.publishCalled || !svc.archiveCalled {
+		t.Fatalf("release calls = publish:%t archive:%t, want both true", svc.publishCalled, svc.archiveCalled)
 	}
 }
 

@@ -33,6 +33,13 @@ type PublicationService interface {
 	Unpublish(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 }
 
+// AssessmentReleaseService owns the atomic lifecycle of a questionnaire and
+// assessment model pair. Standalone publication is intentionally absent.
+type AssessmentReleaseService interface {
+	PublishRelease(ctx context.Context, actor ActorContext, modelCode string) (*AssessmentRelease, error)
+	ArchiveRelease(ctx context.Context, actor ActorContext, modelCode string) (*AssessmentRelease, error)
+}
+
 // CatalogQueryService 拥有管理和服务发布的模型目录读模型
 type CatalogQueryService interface {
 	Get(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)

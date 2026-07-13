@@ -151,6 +151,9 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	if err := s.publishQuestionnaireVersion(ctx, l, q, code); err != nil {
 		return nil, err
 	}
+	if err := s.syncQuestionnaireBindingVersion(ctx, code, q.GetVersion().String()); err != nil {
+		return nil, err
+	}
 
 	s.publishEvents(ctx, q)
 	s.notifyCacheChanged(ctx, q, "published")
@@ -160,6 +163,31 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 		"status", q.GetStatus().String(),
 	)
 
+	return toQuestionnaireResult(q), nil
+}
+
+// PublishForRelease is the transactional questionnaire half of an
+// AssessmentRelease publish. The public Publish method retains the legacy
+// standalone event and binding-sync behaviour; this method intentionally does
+// neither so a model can never observe a partially published pair.
+func (s *lifecycleService) PublishForRelease(ctx context.Context, code string) (*QuestionnaireResult, error) {
+	l := logger.L(ctx)
+	if err := s.validateCode(ctx, code, "release_publish"); err != nil {
+		return nil, err
+	}
+	q, err := s.findQuestionnaireByCode(ctx, code, "release_publish")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkArchivedStatus(ctx, q, code, "release_publish", "发布"); err != nil {
+		return nil, err
+	}
+	if q.IsPublished() {
+		return toQuestionnaireResult(q), nil
+	}
+	if err := s.publishQuestionnaireVersion(ctx, l, q, code); err != nil {
+		return nil, err
+	}
 	return toQuestionnaireResult(q), nil
 }
 

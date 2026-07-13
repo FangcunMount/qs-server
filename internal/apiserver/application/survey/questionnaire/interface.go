@@ -42,6 +42,17 @@ type QuestionnaireLifecycleService interface {
 	// 场景：管理员归档不再使用的问卷，保留历史记录
 	Archive(ctx context.Context, code string) (*QuestionnaireResult, error)
 
+	// PublishForRelease publishes the questionnaire snapshot as part of an
+	// AssessmentRelease transaction. It deliberately does not fan out the
+	// legacy questionnaire lifecycle event or synchronize a model binding; the
+	// release service performs those effects after the pair commits.
+	PublishForRelease(ctx context.Context, code string) (*QuestionnaireResult, error)
+
+	// ArchiveForRelease archives the questionnaire as part of an
+	// AssessmentRelease transaction without independently emitting lifecycle
+	// effects.
+	ArchiveForRelease(ctx context.Context, code string) (*QuestionnaireResult, error)
+
 	// Delete 删除问卷
 	// 场景：管理员彻底删除问卷（只能删除草稿状态的问卷）
 	Delete(ctx context.Context, code string) error
