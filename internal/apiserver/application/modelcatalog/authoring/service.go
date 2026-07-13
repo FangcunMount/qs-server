@@ -68,11 +68,15 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 
 // ValidateDefinition 验证评估模型定义
 func (s Service) ValidateDefinition(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.ValidationResult, error) {
-	value, err := s.GetDefinition(ctx, actor, modelCode)
+	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {
 		return nil, err
 	}
-	issues := appdefinition.ValidateDefinitionV2(value)
+	handler, err := s.Registry.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
+	if err != nil {
+		return nil, err
+	}
+	issues := handler.ValidateForPublish(ctx, model)
 	result := make([]modelcatalog.ValidationIssue, 0, len(issues))
 	for _, item := range issues {
 		result = append(result, modelcatalog.ValidationIssue{Field: item.Field, Code: item.Code, Message: item.Message, Level: string(item.Level)})

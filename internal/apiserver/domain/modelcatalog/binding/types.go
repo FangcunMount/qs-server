@@ -35,6 +35,7 @@ const (
 	DecisionKindPoleComposition = identitypkg.DecisionKindPoleComposition
 	DecisionKindTraitProfile    = identitypkg.DecisionKindTraitProfile
 	DecisionKindNearestPattern  = identitypkg.DecisionKindNearestPattern
+	DecisionKindDominantFactor  = identitypkg.DecisionKindDominantFactor
 	DecisionKindNormLookup      = identitypkg.DecisionKindNormLookup
 	DecisionKindAbilityLevel    = identitypkg.DecisionKindAbilityLevel
 )

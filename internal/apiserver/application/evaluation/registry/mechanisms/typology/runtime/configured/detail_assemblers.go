@@ -104,7 +104,28 @@ func buildPersonalityDimensions(input DetailInput) ([]outcometypology.Personalit
 		input.Spec.Decision.Kind == modelcatalog.DecisionKindNearestPattern {
 		return buildPatternPersonalityDimensions(input)
 	}
+	if input.Decision.Kind == calcclassification.DecisionKindDominantFactor ||
+		input.Spec.Decision.Kind == modelcatalog.DecisionKindDominantFactor {
+		return buildDominantPersonalityDimensions(input)
+	}
 	return nil, nil
+}
+
+func buildDominantPersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {
+	dimensions := make([]outcometypology.PersonalityDimensionResult, 0, len(input.Candidate.RankedFactors))
+	for index, ranked := range input.Candidate.RankedFactors {
+		factorID := calcclassification.FactorID(ranked.Code)
+		score, ok := input.Vector.Scores[factorID]
+		if !ok {
+			return nil, fmt.Errorf("missing factor score for %s", factorID)
+		}
+		meta, ok := dimensionMetaForFactor(input.Spec.FactorGraph, string(factorID))
+		if !ok {
+			return nil, fmt.Errorf("dominant factor metadata for %s is not defined", factorID)
+		}
+		dimensions = append(dimensions, outcometypology.PersonalityDimensionResult{Code: meta.Code, Name: meta.Name, RawScore: score.Raw, Rank: index + 1})
+	}
+	return dimensions, nil
 }
 
 func buildPolePersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {

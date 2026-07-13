@@ -37,8 +37,12 @@ func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model
 	if len(issues) > 0 {
 		return issues
 	}
-	runtime, err := modeltypology.RuntimeSpecFromDefinition(model.DefinitionV2)
-	if err != nil || runtime == nil {
+	payload, err := modeltypology.PayloadFromDefinition(modeltypology.DefinitionEnvelope{
+		Code: model.Code, Version: modelRevisionVersion(model), Title: model.Title,
+		QuestionnaireCode: model.Binding.QuestionnaireCode, QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Algorithm: model.Algorithm,
+	}, model.DefinitionV2)
+	if err != nil || payload == nil || payload.Runtime == nil {
 		if err == nil {
 			err = fmt.Errorf("typology runtime specification is empty")
 		}
@@ -48,7 +52,7 @@ func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model
 	if len(questionnaireIssues) > 0 {
 		return append(issues, questionnaireIssues...)
 	}
-	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{})...)
+	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})...)
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载

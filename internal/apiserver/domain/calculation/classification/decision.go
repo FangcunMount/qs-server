@@ -7,6 +7,7 @@ const (
 	DecisionKindPoleComposition DecisionKind = "pole_composition"
 	DecisionKindNearestPattern  DecisionKind = "nearest_pattern"
 	DecisionKindTraitProfile    DecisionKind = "trait_profile"
+	DecisionKindDominantFactor  DecisionKind = "dominant_factor"
 )
 
 // PoleSpec 解析维度 原始分 为 pole letter。
@@ -34,6 +35,8 @@ type DecisionSpec struct {
 	LevelRule         LevelRule
 	FallbackThreshold float64
 	FallbackCode      string
+	FactorOrder       []FactorID
+	TopK              int
 }
 
 // LevelRule 映射原始 因子 分数 到 离散等级 用于 模式匹配。
@@ -44,9 +47,16 @@ type LevelRule struct {
 
 // OutcomeCandidate is the selected personality result before mapping to Execution.
 type OutcomeCandidate struct {
-	Code        string
-	Label       string
-	Summary     string
-	MatchScore  float64
-	TraitScores map[FactorID]float64
+	Code          string
+	Label         string
+	Summary       string
+	MatchScore    float64
+	TraitScores   map[FactorID]float64
+	RankedFactors []RankedFactor
+}
+
+// RankedFactor preserves the configured top-k dominant factors for reporting.
+type RankedFactor struct {
+	Code  string
+	Score float64
 }

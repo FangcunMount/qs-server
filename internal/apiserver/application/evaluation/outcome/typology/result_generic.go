@@ -13,6 +13,7 @@ type PersonalityDimensionResult struct {
 	Preference string  `json:"preference,omitempty"`
 	Strength   float64 `json:"strength,omitempty"`
 	Level      string  `json:"level,omitempty"`
+	Rank       int     `json:"rank,omitempty"`
 }
 
 // PersonalityTypeDetail 是通用明细载荷 用于 配置化 人格类型 运行时s。

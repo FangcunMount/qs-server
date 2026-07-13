@@ -218,7 +218,7 @@ func typeDecisionFromRuntime(runtime *RuntimeSpec, codes map[string]string) conc
 	if runtime == nil {
 		return conclusion.TypeDecision{}
 	}
-	out := conclusion.TypeDecision{Kind: runtime.Decision.Kind, FallbackSimilarityThreshold: runtime.Decision.FallbackSimilarityThreshold, FallbackCode: runtime.Decision.FallbackCode}
+	out := conclusion.TypeDecision{Kind: runtime.Decision.Kind, FallbackSimilarityThreshold: runtime.Decision.FallbackSimilarityThreshold, FallbackCode: runtime.Decision.FallbackCode, TopK: runtime.Decision.TopK}
 	if runtime.Decision.LevelRule != nil {
 		out.LevelRule = &conclusion.TypeLevelRule{LowMax: runtime.Decision.LevelRule.LowMax, HighMin: runtime.Decision.LevelRule.HighMin}
 	}
@@ -284,7 +284,7 @@ func RuntimeSpecFromDefinition(def *definition.Definition) (*RuntimeSpec, error)
 	report := reportSpecFromDefinition(def.ReportMap)
 	return &RuntimeSpec{
 		FactorGraph:    graph,
-		Decision:       PersonalityDecisionSpec{Kind: typeConclusion.Decision.Kind, FallbackSimilarityThreshold: typeConclusion.Decision.FallbackSimilarityThreshold, FallbackCode: typeConclusion.Decision.FallbackCode, LevelRule: levelRuleSpecFromConclusion(typeConclusion.Decision.LevelRule)},
+		Decision:       PersonalityDecisionSpec{Kind: typeConclusion.Decision.Kind, FallbackSimilarityThreshold: typeConclusion.Decision.FallbackSimilarityThreshold, FallbackCode: typeConclusion.Decision.FallbackCode, LevelRule: levelRuleSpecFromConclusion(typeConclusion.Decision.LevelRule), TopK: typeConclusion.Decision.TopK},
 		SpecialRules:   typeSpecialRulesToRuntime(typeConclusion.SpecialRules),
 		OutcomeMapping: OutcomeMappingSpec{DetailKind: OutcomeDetailKind(typeConclusion.OutcomeMapping.DetailKind), DetailAdapterKey: DetailAdapterKey(typeConclusion.OutcomeMapping.DetailAdapterKey), Algorithm: typeConclusion.OutcomeMapping.Algorithm},
 		Report:         report,

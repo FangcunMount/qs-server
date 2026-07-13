@@ -275,6 +275,8 @@ func createAlgorithm(kind domain.Kind, input string) domain.Algorithm {
 	switch kind {
 	case domain.KindScale:
 		return domain.AlgorithmScaleDefault
+	case domain.KindTypology:
+		return domain.AlgorithmPersonalityTypology
 	case domain.KindBehavioralRating:
 		return domain.AlgorithmBrief2
 	case domain.KindCognitive:

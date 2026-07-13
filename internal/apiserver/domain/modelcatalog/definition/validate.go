@@ -226,7 +226,7 @@ func validScoreBasis(value conclusion.ScoreBasis) bool {
 
 func validTypeDecision(kind binding.DecisionKind) bool {
 	switch kind {
-	case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern:
+	case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern, binding.DecisionKindDominantFactor:
 		return true
 	default:
 		return false

@@ -48,16 +48,42 @@ func TestSaveDefinitionBuildsPayloadFromDefinitionV2(t *testing.T) {
 	}
 }
 
+func TestValidateDefinitionUsesThePublishValidationHandler(t *testing.T) {
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "TYPOLOGY-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Algorithm: domain.AlgorithmPersonalityTypology, Title: "Typology", Now: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	model.DefinitionV2 = &modeldefinition.Definition{}
+	handler := &recordingDefinitionHandler{validateIssues: []domain.DomainValidationIssue{{
+		Field: "decision.poles", Code: "decision.poles.required", Message: "poles required", Level: domain.ValidationLevelError,
+	}}}
+	service := Service{ModelRepo: &authoringModelRepo{model: model}, Authorizer: allowDefinitionAuthorizer{}, Registry: appdefinition.NewRegistry(handler)}
+
+	result, err := service.ValidateDefinition(context.Background(), modelcatalog.ActorContext{}, model.Code)
+	if err != nil {
+		t.Fatalf("ValidateDefinition: %v", err)
+	}
+	if !handler.validateCalled || result.Passed || len(result.Issues) != 1 || result.Issues[0].Code != "decision.poles.required" {
+		t.Fatalf("result=%#v validateCalled=%t", result, handler.validateCalled)
+	}
+}
+
 type recordingDefinitionHandler struct {
-	called bool
+	called         bool
+	validateCalled bool
+	validateIssues []domain.DomainValidationIssue
 }
 
 func (*recordingDefinitionHandler) Supports(identity domain.Identity) bool {
-	return identity.Kind == domain.KindScale
+	return identity.Kind == domain.KindScale || identity.Kind == domain.KindTypology
 }
 
-func (*recordingDefinitionHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
-	return nil
+func (h *recordingDefinitionHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
+	h.validateCalled = true
+	return h.validateIssues
 }
 
 func (h *recordingDefinitionHandler) BuildSnapshotPayload(context.Context, *domain.AssessmentModel) (appdefinition.SnapshotBuildResult, error) {

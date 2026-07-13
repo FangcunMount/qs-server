@@ -86,6 +86,7 @@ type TypeDecision struct {
 	FallbackCode                string
 	LevelRule                   *TypeLevelRule
 	Poles                       []TypePole
+	TopK                        int
 }
 
 type TypeLevelRule struct {

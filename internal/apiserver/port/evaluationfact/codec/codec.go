@@ -163,7 +163,7 @@ func restoreTypedDetail(payload []byte, model evaluationfact.ModelIdentity, runt
 		return err
 	}
 	switch runtime.DecisionKind {
-	case modelcatalog.DecisionKindPoleComposition, modelcatalog.DecisionKindNearestPattern:
+	case modelcatalog.DecisionKindPoleComposition, modelcatalog.DecisionKindNearestPattern, modelcatalog.DecisionKindDominantFactor:
 		detail, err := decodePersonalityTypeDetail(wire.Detail.Payload, model.Algorithm)
 		if err != nil {
 			return err

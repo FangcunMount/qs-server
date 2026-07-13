@@ -135,6 +135,19 @@ func TestValidateRuntimeSpecForPublishRequiresDecisionKind(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeSpecForPublishValidatesDominantFactorTopKAndOutcomes(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Decision = typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindDominantFactor, TopK: 2}
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:  []typology.Outcome{{Code: "OTHER", Name: "Other"}},
+	})
+	if !hasIssueCode(issues, "decision.top_k.invalid") || !hasIssueCode(issues, "decision.dominant_factor.outcome.required") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestValidateRuntimeSpecForPublishRejectsLegacyAdapterKeys(t *testing.T) {
 	spec := validRuntimeSpec()
 	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterMBTI
@@ -174,6 +187,7 @@ func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T
 func validRuntimeSpec() *typology.RuntimeSpec {
 	return &typology.RuntimeSpec{
 		FactorGraph: typology.FactorGraphSpec{
+			Dimensions: map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
 			Factors: map[string]typology.FactorSpec{
 				"EI": {
 					ID:   "EI",

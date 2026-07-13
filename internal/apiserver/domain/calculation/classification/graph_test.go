@@ -230,3 +230,22 @@ func TestFactorGraphScoresWeightedAverageByChildrenOrder(t *testing.T) {
 		t.Fatalf("total raw = %v, want 6.5", vector.Scores["total"].Raw)
 	}
 }
+
+func TestSelectDominantFactorReturnsStableTopK(t *testing.T) {
+	vector := classification.ProfileVector{Scores: map[classification.FactorID]classification.FactorScore{
+		"A": {Raw: 8},
+		"B": {Raw: 10},
+		"C": {Raw: 10},
+	}}
+	outcome, err := classification.SelectOutcome(vector, classification.DecisionSpec{
+		Kind:        classification.DecisionKindDominantFactor,
+		FactorOrder: []classification.FactorID{"A", "B", "C"},
+		TopK:        2,
+	})
+	if err != nil {
+		t.Fatalf("SelectOutcome: %v", err)
+	}
+	if outcome.Code != "B" || len(outcome.RankedFactors) != 2 || outcome.RankedFactors[1].Code != "C" {
+		t.Fatalf("unexpected outcome: %+v", outcome)
+	}
+}

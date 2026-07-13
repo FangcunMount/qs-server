@@ -203,6 +203,12 @@ func buildDecisionSpec(payload *modeltypology.Payload, spec *modeltypology.Runti
 		return buildPatternDecision(payload, spec)
 	case modelcatalog.DecisionKindTraitProfile:
 		return calcclassification.DecisionSpec{Kind: calcclassification.DecisionKindTraitProfile}, nil
+	case modelcatalog.DecisionKindDominantFactor:
+		factorOrder := make([]calcclassification.FactorID, 0, len(spec.FactorGraph.DecisionFactorOrder()))
+		for _, factorID := range spec.FactorGraph.DecisionFactorOrder() {
+			factorOrder = append(factorOrder, calcclassification.FactorID(factorID))
+		}
+		return calcclassification.DecisionSpec{Kind: calcclassification.DecisionKindDominantFactor, FactorOrder: factorOrder, TopK: spec.Decision.TopK}, nil
 	default:
 		return calcclassification.DecisionSpec{}, fmt.Errorf("unsupported decision kind %s", spec.Decision.Kind)
 	}

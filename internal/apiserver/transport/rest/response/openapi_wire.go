@@ -98,9 +98,25 @@ type DefinitionOutcomeWire struct {
 }
 
 type DefinitionTypeDecisionWire struct {
-	Kind                        string  `json:"Kind,omitempty"`
-	FallbackSimilarityThreshold float64 `json:"FallbackSimilarityThreshold,omitempty"`
-	FallbackCode                string  `json:"FallbackCode,omitempty"`
+	Kind                        string                       `json:"Kind,omitempty"`
+	FallbackSimilarityThreshold float64                      `json:"FallbackSimilarityThreshold,omitempty"`
+	FallbackCode                string                       `json:"FallbackCode,omitempty"`
+	LevelRule                   *DefinitionTypeLevelRuleWire `json:"LevelRule,omitempty"`
+	Poles                       []DefinitionTypePoleWire     `json:"Poles,omitempty"`
+	TopK                        int                          `json:"TopK,omitempty"`
+}
+
+type DefinitionTypeLevelRuleWire struct {
+	LowMax  float64 `json:"LowMax,omitempty"`
+	HighMin float64 `json:"HighMin,omitempty"`
+}
+
+type DefinitionTypePoleWire struct {
+	FactorCode string  `json:"FactorCode"`
+	LeftPole   string  `json:"LeftPole"`
+	RightPole  string  `json:"RightPole"`
+	Threshold  float64 `json:"Threshold,omitempty"`
+	Model      string  `json:"Model,omitempty"`
 }
 
 type DefinitionTypeSpecialRuleWire struct {

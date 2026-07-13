@@ -106,6 +106,7 @@ func (TypologyBuilder) MechanismKeys() []Key {
 		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: policy.ReportTypeStandard},
 		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile, ReportType: policy.ReportTypeStandard},
 		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern, ReportType: policy.ReportTypeStandard},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindDominantFactor, ReportType: policy.ReportTypeStandard},
 	}
 }
 func (b TypologyBuilder) Build(_ context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {

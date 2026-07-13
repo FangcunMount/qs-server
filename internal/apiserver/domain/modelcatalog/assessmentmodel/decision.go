@@ -57,7 +57,7 @@ func typologyDecisionKind(items []conclusion.Conclusion) (binding.DecisionKind, 
 			continue
 		}
 		switch typed.Decision.Kind {
-		case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern:
+		case binding.DecisionKindPoleComposition, binding.DecisionKindTraitProfile, binding.DecisionKindNearestPattern, binding.DecisionKindDominantFactor:
 			return typed.Decision.Kind, nil
 		default:
 			return "", fmt.Errorf("typology type conclusion decision kind is required")

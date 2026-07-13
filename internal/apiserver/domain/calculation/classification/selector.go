@@ -3,6 +3,7 @@ package classification
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -15,9 +16,48 @@ func SelectOutcome(vector ProfileVector, spec DecisionSpec) (OutcomeCandidate, e
 		return selectTraitProfile(vector)
 	case DecisionKindNearestPattern:
 		return selectNearestPattern(vector, spec)
+	case DecisionKindDominantFactor:
+		return selectDominantFactor(vector, spec)
 	default:
 		return OutcomeCandidate{}, fmt.Errorf("unsupported decision kind %s", spec.Kind)
 	}
+}
+
+func selectDominantFactor(vector ProfileVector, spec DecisionSpec) (OutcomeCandidate, error) {
+	if len(spec.FactorOrder) == 0 {
+		return OutcomeCandidate{}, fmt.Errorf("dominant_factor requires factor order")
+	}
+	topK := spec.TopK
+	if topK <= 0 {
+		topK = 1
+	}
+	if topK > len(spec.FactorOrder) {
+		return OutcomeCandidate{}, fmt.Errorf("dominant_factor top_k %d exceeds factor count %d", topK, len(spec.FactorOrder))
+	}
+	type ranked struct {
+		id    FactorID
+		score float64
+		order int
+	}
+	rankedFactors := make([]ranked, 0, len(spec.FactorOrder))
+	for order, factorID := range spec.FactorOrder {
+		score, ok := vector.Scores[factorID]
+		if !ok {
+			return OutcomeCandidate{}, fmt.Errorf("missing factor score for %s", factorID)
+		}
+		rankedFactors = append(rankedFactors, ranked{id: factorID, score: score.Raw, order: order})
+	}
+	sort.SliceStable(rankedFactors, func(i, j int) bool {
+		if rankedFactors[i].score == rankedFactors[j].score {
+			return rankedFactors[i].order < rankedFactors[j].order
+		}
+		return rankedFactors[i].score > rankedFactors[j].score
+	})
+	result := make([]RankedFactor, 0, topK)
+	for _, factor := range rankedFactors[:topK] {
+		result = append(result, RankedFactor{Code: string(factor.id), Score: factor.score})
+	}
+	return OutcomeCandidate{Code: result[0].Code, RankedFactors: result}, nil
 }
 
 func selectPoleComposition(vector ProfileVector, spec DecisionSpec) (OutcomeCandidate, error) {

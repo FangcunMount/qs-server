@@ -85,6 +85,9 @@ func mergeRuntimeSpec(explicit, legacy *RuntimeSpec) {
 	if explicit.Decision.LevelRule == nil {
 		explicit.Decision.LevelRule = cloneLevelRule(legacy.Decision.LevelRule)
 	}
+	if explicit.Decision.TopK == 0 {
+		explicit.Decision.TopK = legacy.Decision.TopK
+	}
 	if len(explicit.SpecialRules) == 0 {
 		explicit.SpecialRules = cloneSpecialRules(legacy.SpecialRules)
 	}
@@ -184,6 +187,7 @@ func cloneRuntimeSpec(source *RuntimeSpec) *RuntimeSpec {
 			FallbackSimilarityThreshold: source.Decision.FallbackSimilarityThreshold,
 			FallbackCode:                source.Decision.FallbackCode,
 			LevelRule:                   cloneLevelRule(source.Decision.LevelRule),
+			TopK:                        source.Decision.TopK,
 		},
 		SpecialRules:   cloneSpecialRules(source.SpecialRules),
 		OutcomeMapping: source.OutcomeMapping,

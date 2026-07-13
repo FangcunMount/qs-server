@@ -200,6 +200,49 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 	if spec.Decision.LevelRule != nil && spec.Decision.LevelRule.LowMax >= spec.Decision.LevelRule.HighMin {
 		v.add("decision.level_rule", "decision.level_rule.invalid", "level_rule low_max 必须小于 high_min")
 	}
+	switch spec.Decision.Kind {
+	case binding.DecisionKindPoleComposition:
+		for _, factorCode := range spec.FactorGraph.DecisionFactorOrder() {
+			meta, ok := dimensionForValidation(spec.FactorGraph, factorCode)
+			if !ok || meta.LeftPole == "" || meta.RightPole == "" {
+				v.add("decision.poles."+factorCode, "decision.poles.required", fmt.Sprintf("factor %s 必须配置左右极", factorCode))
+			}
+		}
+	case binding.DecisionKindNearestPattern:
+		hasPattern := false
+		for _, outcome := range v.outcomes {
+			hasPattern = hasPattern || (!outcome.IsSpecial && outcome.Pattern != "")
+		}
+		if !hasPattern {
+			v.add("outcomes.pattern", "decision.patterns.required", "nearest_pattern 至少需要一个普通结果配置 pattern")
+		}
+	case binding.DecisionKindDominantFactor:
+		topK := spec.Decision.TopK
+		if topK <= 0 {
+			topK = 1
+		}
+		factorOrder := spec.FactorGraph.DecisionFactorOrder()
+		if topK > len(factorOrder) {
+			v.add("decision.top_k", "decision.top_k.invalid", fmt.Sprintf("top_k %d 不能超过决策因子数 %d", topK, len(factorOrder)))
+		}
+		for _, factorCode := range factorOrder {
+			if _, ok := v.outcomes[factorCode]; !ok {
+				v.add("outcomes."+factorCode, "decision.dominant_factor.outcome.required", fmt.Sprintf("dominant factor %s 必须有同 code 的结果", factorCode))
+			}
+		}
+	}
+}
+
+func dimensionForValidation(graph FactorGraphSpec, factorCode string) (Dimension, bool) {
+	if meta, ok := graph.Dimensions[factorCode]; ok {
+		return meta, true
+	}
+	if factor, ok := graph.Factors[factorCode]; ok {
+		if meta, ok := graph.Dimensions[factor.Code]; ok {
+			return meta, true
+		}
+	}
+	return Dimension{}, false
 }
 
 func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec, decisionKind binding.DecisionKind) {
@@ -319,7 +362,8 @@ func isSupportedDecisionKind(kind binding.DecisionKind) bool {
 	switch kind {
 	case binding.DecisionKindPoleComposition,
 		binding.DecisionKindNearestPattern,
-		binding.DecisionKindTraitProfile:
+		binding.DecisionKindTraitProfile,
+		binding.DecisionKindDominantFactor:
 		return true
 	default:
 		return false

@@ -59,6 +59,7 @@ const (
 	DecisionKindPoleComposition DecisionKind = "pole_composition"
 	DecisionKindTraitProfile    DecisionKind = "trait_profile"
 	DecisionKindNearestPattern  DecisionKind = "nearest_pattern"
+	DecisionKindDominantFactor  DecisionKind = "dominant_factor"
 	DecisionKindNormLookup      DecisionKind = "norm_lookup"
 	DecisionKindAbilityLevel    DecisionKind = "ability_level"
 

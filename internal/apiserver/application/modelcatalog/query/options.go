@@ -47,9 +47,7 @@ func catalogOptionsForKind(kind string) modelcatalog.OptionsResult {
 func algorithmOptions(kind string) []modelcatalog.Option {
 	all := []modelcatalog.Option{
 		{Label: "默认量表", Value: string(domain.AlgorithmScaleDefault)},
-		{Label: "MBTI", Value: string(domain.AlgorithmMBTI)},
-		{Label: "SBTI", Value: string(domain.AlgorithmSBTI)},
-		{Label: "Big Five", Value: string(domain.AlgorithmBigFive)},
+		{Label: "统一人格类型运行时", Value: string(domain.AlgorithmPersonalityTypology)},
 		{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)},
 		{Label: "SPM（感觉统合）", Value: string(domain.AlgorithmSPMSensory)},
 		{Label: "SPM", Value: string(domain.AlgorithmSPM)},
@@ -70,7 +68,7 @@ func algorithmOptions(kind string) []modelcatalog.Option {
 				filtered = append(filtered, item)
 			}
 		case modelcatalog.KindTypology:
-			if item.Value == string(domain.AlgorithmMBTI) || item.Value == string(domain.AlgorithmSBTI) || item.Value == string(domain.AlgorithmBigFive) {
+			if item.Value == string(domain.AlgorithmPersonalityTypology) {
 				filtered = append(filtered, item)
 			}
 		case modelcatalog.KindBehavioralRating:

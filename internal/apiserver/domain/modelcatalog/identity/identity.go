@@ -69,7 +69,7 @@ func AlgorithmFamilyFromDecisionKind(decision DecisionKind) (AlgorithmFamily, bo
 	switch decision {
 	case DecisionKindScoreRange, DecisionKindScoreRangeInterpretation:
 		return AlgorithmFamilyFactorScoring, true
-	case DecisionKindPoleComposition, DecisionKindTraitProfile, DecisionKindNearestPattern:
+	case DecisionKindPoleComposition, DecisionKindTraitProfile, DecisionKindNearestPattern, DecisionKindDominantFactor:
 		return AlgorithmFamilyFactorClassification, true
 	case DecisionKindNormLookup:
 		return AlgorithmFamilyFactorNorm, true

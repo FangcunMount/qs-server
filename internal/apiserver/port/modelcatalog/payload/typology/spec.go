@@ -87,6 +87,7 @@ type PersonalityDecisionSpec struct {
 	FallbackSimilarityThreshold float64              `json:"fallback_similarity_threshold,omitempty"`
 	FallbackCode                string               `json:"fallback_code,omitempty"`
 	LevelRule                   *LevelRuleSpec       `json:"level_rule,omitempty"`
+	TopK                        int                  `json:"top_k,omitempty"`
 }
 
 // LevelRuleSpec 映射原始 因子 分数 到 离散等级 用于 模式匹配。

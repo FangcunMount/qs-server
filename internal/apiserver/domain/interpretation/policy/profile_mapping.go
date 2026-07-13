@@ -20,7 +20,7 @@ func ReportProfileForDecisionKind(decision modelcatalog.DecisionKind) ReportProf
 		return ReportProfileNorm
 	case modelcatalog.DecisionKindAbilityLevel:
 		return ReportProfileTask
-	case modelcatalog.DecisionKindPoleComposition:
+	case modelcatalog.DecisionKindPoleComposition, modelcatalog.DecisionKindDominantFactor:
 		return ReportProfilePersonalityType
 	case modelcatalog.DecisionKindTraitProfile:
 		return ReportProfileTrait
