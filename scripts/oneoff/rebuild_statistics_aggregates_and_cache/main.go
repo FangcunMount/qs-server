@@ -13,10 +13,9 @@ import (
 	gormuow "github.com/FangcunMount/component-base/pkg/uow/gorm"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
-	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
-	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	driverMysql "github.com/go-sql-driver/mysql"
 	redis "github.com/redis/go-redis/v9"
@@ -508,7 +507,7 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 		queryClient,
 		keyspace.NewBuilderWithNamespace(cfg.redisQueryNS),
 		cachepolicy.CachePolicy{},
-		querycache.NewRedisVersionTokenStore(metaClient, nil),
+		statisticsCache.NewVersionTokenStore(metaClient, nil),
 		nil,
 	)
 	repo := statisticsInfra.NewStatisticsRepository(db)
