@@ -109,7 +109,7 @@ func validatePayloadAgainstQuestionnaire(payload *modeltypology.Payload, seed qu
 		Algorithm: payload.Algorithm,
 		Outcomes:  payload.Outcomes,
 	})
-	if len(issues) > 0 {
+	if domain.HasValidationErrors(issues) {
 		return fmt.Errorf("publish validation failed: %s", issues[0].Message)
 	}
 	return nil
@@ -122,8 +122,13 @@ func questionnaireQuestionsFromSeed(seed questionnaireSeedFile) []modeltypology.
 		for _, opt := range item.Options {
 			optionCodes = append(optionCodes, opt.Code)
 		}
+		qType := item.Type
+		if qType == "" {
+			qType = "Radio"
+		}
 		questions = append(questions, modeltypology.QuestionSnapshot{
 			Code:        item.Code,
+			Type:        qType,
 			OptionCodes: optionCodes,
 		})
 	}
@@ -136,11 +141,22 @@ func projectContributions(mappings []modeltypology.QuestionMapping, dimCode stri
 		if mapping.Dimension != dimCode {
 			continue
 		}
-		contributions = append(contributions, modeltypology.FactorContributionSpec{
+		sign := mapping.Sign
+		if sign == 0 {
+			sign = 1
+		}
+		contribution := modeltypology.FactorContributionSpec{
 			QuestionCode: mapping.QuestionCode,
-			Sign:         mapping.Sign,
-			OptionScores: normalizeOptionScores(mapping.OptionScores),
-		})
+			Sign:         sign,
+			Weight:       1,
+		}
+		if len(mapping.OptionScores) > 0 {
+			contribution.ScoringMode = modeltypology.QuestionScoringModeOptionOverride
+			contribution.OptionScores = normalizeOptionScores(mapping.OptionScores)
+		} else {
+			contribution.ScoringMode = modeltypology.QuestionScoringModeQuestionScore
+		}
+		contributions = append(contributions, contribution)
 	}
 	return contributions
 }

@@ -494,7 +494,7 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 		factorCode := catalog.order[9+offset]
 		sources := make([]factor.ScoringSource, 0, len(children))
 		for _, child := range children {
-			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceFactor, Code: child, Sign: 1})
+			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceFactor, Code: child})
 			definition.Measure.FactorGraph.Edges = append(definition.Measure.FactorGraph.Edges, factor.FactorEdge{ParentCode: factorCode, ChildCode: child})
 		}
 		definition.Measure.Scoring = append(definition.Measure.Scoring, factor.Scoring{FactorCode: factorCode, Sources: sources, Strategy: factor.ScoringStrategySum})
