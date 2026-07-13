@@ -1,61 +1,66 @@
-# event
+# Event 模块
 
-event 模块是 qs-server 的异步一致性治理层，用于把答卷提交、测评执行、报告生成拆成可追踪、可重试、可补偿的异步链路。
+Event 模块负责把进程内已经发生的业务事实，按明确的可靠性契约传播给其他处理器。它不是单一的 MQ 封装，而是由事件契约、发布路由、Outbox、消费结算、幂等策略、可观测性和进程级生命周期共同组成的基础设施。
 
-当前主链和工程化边界均已收口：`EventSpec + EffectiveRegistry` 提供有效契约，EventSubsystem 统一持有 Mongo/MySQL Outbox profile、publisher、consumer、status 与 lifecycle。详见 [10-事件工程化设计.md](10-事件工程化设计.md)。
+## 先看结论
 
-## 1. 这个模块解决什么问题
+- 跨事务边界且不能丢失的业务事实使用 `durable_outbox`：业务事实与 Outbox 在同一本地事务提交，提交后由 immediate 和 relay 共同推动投递。
+- 允许丢失、只用于轻量后置动作的通知使用 `best_effort`：生产者直接交给 RoutingPublisher，不获得持久化保证。
+- Redis Pub/Sub Signal 只负责一次性唤醒和缓存失效提示，不属于 EventSubsystem，不承担业务事实投递。
+- MQ 消费语义固定为：poison ACK、unknown ACK、handler error NACK、handled ACK。
+- 系统提供的是可治理的 at-least-once，不提供 exactly-once、统一 event-id ledger、DLQ、replay 或 schema negotiation。
+- `behavior_footprint` 不再有事件链；行为足迹仅由 `behavior_journey_scan` 后台扫描器从事实数据构建。
 
-答卷提交不能同步等待测评计算和报告生成，否则提交接口延迟不可控；但提交后的业务事件也不能丢。event 模块解决业务写入、可靠出站、异步消费和临时唤醒之间的边界问题。
+## 三种传播语义
 
-## 2. 它在 qs-server 中处于什么位置
+| 机制 | 适用场景 | 持久化 | 失败后的恢复 | 所有者 |
+| --- | --- | --- | --- | --- |
+| Durable Event | 不能因进程或 MQ 短暂故障丢失的业务事实 | Mongo/MySQL Outbox | immediate 失败后由 relay 重试 | EventSubsystem + 业务本地事务 |
+| Best-effort Event | 可丢失的轻量通知和后置动作 | 无 | 无持久化补偿 | RoutingPublisher |
+| Signal | 缓存失效、状态刷新等一次性唤醒 | 无 | TTL、下一次变更或主动查询 | 各进程 CacheSubsystem / report status runtime |
 
-event 位于领域服务和 worker 之间。领域服务产生业务事实，Outbox 记录可靠出站，relay 发布到 MQ，worker 消费事件推进评估和报告生成，一次性信令只唤醒等待中的报告查询请求。
+## 文档地图
 
-## 3. 整体架构是什么
+1. [事件模块整体架构](./01-事件模块整体架构.md)：模块边界、所有权、依赖方向和生命周期。
+2. [领域事件设计](./02-领域事件设计.md)：契约来源、wire envelope、完整事件矩阵和演进规则。
+3. [Outbox 可靠出站链路](./03-Outbox可靠出站链路.md)：事务、profile、ready-index、immediate、relay 和恢复语义。
+4. [MQ 发布与消费链路](./04-MQ发布与消费链路.md)：发布模式、消息封装、消费结算和逐事件幂等。
+5. [事件可观测性与故障处理](./05-事件可观测性与故障处理.md)：指标、状态接口、治理页面和排障路径。
+6. [一次性信令链路](./06-一次性信令链路.md)：Signal 与 Event 的边界、拓扑和失效语义。
+7. [新增 Event 与 Signal SOP](./07-新增Event与Signal-SOP.md)：新增、变更和验收清单。
 
-```mermaid
-flowchart LR
-    domain["Domain Service"]
-    event["Domain Event"]
-    outbox["Outbox"]
-    relay["Relay"]
-    mq["MQ"]
-    worker["Worker"]
-    status["Report Status"]
-    signal["Ephemeral Signal"]
+## 事实来源
 
-    domain --> event --> outbox --> relay --> mq --> worker --> status --> signal
+文档与实现冲突时，按以下顺序判断：
+
+1. wire contract 与基础抽象：`component-base/pkg/event`、`eventcodec`、`eventmessaging`。
+2. 事件路由清单：[`configs/events.yaml`](../../../configs/events.yaml)。
+3. 工程契约：`internal/pkg/eventing/catalog` 中的 `EventSpec` 与 `EffectiveRegistry`。
+4. 运行时行为：`internal/apiserver/eventing/subsystem`、Outbox Store/relay、worker eventing。
+5. 本目录文档。
+
+`EffectiveRegistry` 在启动时合并 YAML 与代码契约并做严格校验；[领域事件设计](./02-领域事件设计.md)中的矩阵还有同步测试保护。因此，文档矩阵不是手工维护的旁路清单。
+
+## 变更时更新哪里
+
+| 变更 | 必须同步 |
+| --- | --- |
+| 新增或删除事件 | `configs/events.yaml`、EventSpec、handler registry、事件矩阵、测试 |
+| 修改 delivery/profile/immediate/priority | EventSpec、事件矩阵、Outbox/Registry 测试 |
+| 新增附加消费者 | EventSpec、运行时 binding、配置、消费者矩阵、status 测试 |
+| 修改 envelope 或 payload JSON | component-base 或 payload DTO、兼容测试、领域事件文档 |
+| 修改 ACK/NACK | runtime settlement、worker 集成测试、MQ 文档和可观测 outcome |
+| 新增 Signal | `configs/signals.yaml`、代码常量/contract、拓扑测试、Signal 文档 |
+
+## 验证入口
+
+```bash
+go test ./internal/pkg/eventing/... \
+  ./internal/apiserver/application/eventing \
+  ./internal/apiserver/eventing/subsystem \
+  ./internal/worker/integration/eventing \
+  ./internal/worker/integration/messaging
+
+go test ./internal/pkg/signalcatalog ./internal/pkg/architecture
+make docs-hygiene
 ```
-
-## 4. 关键链路有哪些
-
-| 链路 | 文档 |
-| --- | --- |
-| 事件模块整体架构 | [01-事件模块整体架构.md](01-事件模块整体架构.md) |
-| 领域事件设计 | [02-领域事件设计.md](02-领域事件设计.md) |
-| Outbox 可靠出站 | [03-Outbox可靠出站链路.md](03-Outbox可靠出站链路.md) |
-| MQ 发布与消费 | [04-MQ发布与消费链路.md](04-MQ发布与消费链路.md) |
-| 一次性信令 | [05-一次性信令链路.md](05-一次性信令链路.md) |
-| 事件幂等 | [06-事件幂等与重复消费治理.md](06-事件幂等与重复消费治理.md) |
-| 积压补偿 | [07-事件积压与补偿机制.md](07-事件积压与补偿机制.md) |
-| 方案取舍 | [08-方案取舍.md](08-方案取舍.md) |
-| 事件契约矩阵 | [09-事件契约矩阵.md](09-事件契约矩阵.md) |
-| 事件工程化目标与路线 | [10-事件工程化设计.md](10-事件工程化设计.md) |
-| 新增 Event / Signal SOP | [11-新增Event与Signal-SOP.md](11-新增Event与Signal-SOP.md) |
-
-## 5. 为什么选择当前方案
-
-Outbox、MQ、Signal 不是替代关系。Outbox 解决“业务写入成功但消息发布失败”的可靠出站问题；MQ 解决跨进程异步消费问题；Signal 解决正在等待的 HTTP 请求被临时唤醒的问题。
-
-## 6. 代码事实源
-
-| 能力 | 事实源 |
-| --- | --- |
-| 事件契约 | [../../../configs/events.yaml](../../../configs/events.yaml) |
-| 信令契约 | [../../../configs/signals.yaml](../../../configs/signals.yaml) |
-| Outbox core / store | [../../../internal/apiserver/outboxcore](../../../internal/apiserver/outboxcore)、[../../../internal/apiserver/infra/mongo/eventoutbox](../../../internal/apiserver/infra/mongo/eventoutbox)、[../../../internal/apiserver/infra/mysql/eventoutbox](../../../internal/apiserver/infra/mysql/eventoutbox) |
-| 发布与 worker | [../../../internal/apiserver/application/eventing](../../../internal/apiserver/application/eventing)、[../../../internal/worker/handlers](../../../internal/worker/handlers) |
-| 有效契约与运行策略 | [../../../internal/pkg/eventing/catalog](../../../internal/pkg/eventing/catalog) |
-| EventSubsystem | [../../../internal/apiserver/eventing/subsystem](../../../internal/apiserver/eventing/subsystem) |
-| 工程化设计 | [10-事件工程化设计.md](10-事件工程化设计.md) |

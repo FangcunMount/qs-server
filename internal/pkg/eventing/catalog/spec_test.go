@@ -23,7 +23,7 @@ func loadDefaultRegistry(t *testing.T) *EffectiveRegistry {
 
 func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 	registry := loadDefaultRegistry(t)
-	matrixBytes, err := os.ReadFile("../../../../docs/03-基础设施/event/09-事件契约矩阵.md")
+	matrixBytes, err := os.ReadFile("../../../../docs/03-基础设施/event/02-领域事件设计.md")
 	if err != nil {
 		t.Fatalf("read event matrix: %v", err)
 	}

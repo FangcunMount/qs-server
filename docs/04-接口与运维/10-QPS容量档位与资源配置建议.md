@@ -44,7 +44,7 @@
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
 | collection typology_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
-目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/cache/01-缓存模块整体架构.md)。
+目录缓存分层说明见 [Cache 终局架构与责任边界](../03-基础设施/cache/10-终局架构与责任边界.md)。
 | collection concurrency | query **460** + submit **96**（catalog Try 503） | 4C/8G；280 档 169×503 后上调读池 |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |

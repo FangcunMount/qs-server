@@ -117,7 +117,7 @@ Architecture Decision Analysis
 | 为什么 MBTI 不放进 Scale | `05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
 | MBTI 如何作为模型资产接入 | `02-业务模块/20-model-catalog/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
 | MBTI 规则如何持久化 | `03-基础设施/data-access/README.md` |
-| MBTI 模型列表如何缓存 | `03-基础设施/cache/03-L2-Redis缓存设计.md` |
+| MBTI 模型列表如何缓存 | `03-基础设施/cache/30-缓存内核与读写链路.md` |
 | MBTI 报告权限如何控制 | `03-基础设施/security/05-安全边界与降级.md` |
 | MBTI 执行慢如何观测 | `03-基础设施/observability/06-告警与故障定位.md` |
 

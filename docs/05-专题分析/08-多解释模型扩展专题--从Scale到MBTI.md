@@ -1082,7 +1082,7 @@ Worker
 
 - `docs/03-基础设施/event/02-领域事件设计.md`
 - `docs/03-基础设施/data-access/README.md`
-- `docs/03-基础设施/cache/03-L2-Redis缓存设计.md`
+- `docs/03-基础设施/cache/30-缓存内核与读写链路.md`
 - `docs/03-基础设施/security/05-安全边界与降级.md`
 - `docs/03-基础设施/observability/03-指标设计.md`
 - `docs/03-基础设施/observability/06-告警与故障定位.md`
