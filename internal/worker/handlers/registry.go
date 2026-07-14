@@ -16,7 +16,6 @@ import (
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
@@ -59,6 +58,14 @@ type InterpretationAutomationClient interface {
 	GenerateReportFromOutcome(context.Context, string) (*interpretationpb.GenerateReportFromAssessmentResponse, error)
 }
 
+// ReportStatusWriter projects report lifecycle states for client polling.
+// Its Redis-backed implementation is supplied by the worker composition root.
+type ReportStatusWriter interface {
+	SetProcessing(ctx context.Context, assessmentID, answerSheetID, stage string)
+	SetCompleted(ctx context.Context, assessmentID, answerSheetID, reportID string)
+	SetFailed(ctx context.Context, assessmentID, answerSheetID, reason, message string)
+}
+
 // Dependencies 处理器依赖
 type Dependencies struct {
 	Logger                         *slog.Logger
@@ -70,7 +77,7 @@ type Dependencies struct {
 	LockManager                    locklease.Manager
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
-	ReportStatusReporter           *reportstatus.Reporter
+	ReportStatusReporter           ReportStatusWriter
 }
 
 // HandlerFactory 处理器工厂函数

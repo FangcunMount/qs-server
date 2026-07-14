@@ -12,14 +12,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
-// EvaluationConsistencyReconcileRunner periodically repairs scoring/reporting cross-store drift.
+// EvaluationConsistencyReconcileRunner
+// 评估一致性协调器，定期修复评分/报告跨存储漂移。
 type EvaluationConsistencyReconcileRunner struct {
 	opts    *apiserveroptions.EvaluationConsistencyReconcileOptions
 	service evaluationScheduler.Service
 	leader  leaderLeaseRunner
 }
 
-// NewEvaluationConsistencyReconcileRunner creates the reconcile runner when dependencies are available.
+// NewEvaluationConsistencyReconcileRunner 创建评估一致性协调器，当依赖项可用时创建协调器。
 func NewEvaluationConsistencyReconcileRunner(
 	opts *apiserveroptions.EvaluationConsistencyReconcileOptions,
 	service evaluationScheduler.Service,
@@ -40,15 +41,23 @@ func NewEvaluationConsistencyReconcileRunner(
 	)
 }
 
+// newEvaluationConsistencyReconcileRunnerWithHooks 创建评估一致性协调器，当依赖项可用时创建协调器。
+// 参数：
+// - opts: 配置选项
+// - service: 评估一致性协调器服务
+// - lockManager: 锁管理器
+// - lockBuilder: 锁构建器
+// - acquireLock: 获取锁函数
+// - releaseLock: 释放锁函数
 func newEvaluationConsistencyReconcileRunnerWithHooks(
-	opts *apiserveroptions.EvaluationConsistencyReconcileOptions,
-	service evaluationScheduler.Service,
-	lockManager locklease.Manager,
-	lockBuilder *keyspace.Builder,
-	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
-	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error,
+	opts *apiserveroptions.EvaluationConsistencyReconcileOptions, // 配置选项
+	service evaluationScheduler.Service, // 评估一致性协调器服务
+	lockManager locklease.Manager, // 锁管理器
+	lockBuilder *keyspace.Builder, // 锁构建器
+	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error), // 获取锁函数
+	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error, // 释放锁函数
 ) *EvaluationConsistencyReconcileRunner {
-	if opts == nil || !opts.Enable {
+	if opts == nil || !opts.Enable { // 如果配置选项不可用或禁用，则返回 nil
 		return nil
 	}
 	if service == nil {
@@ -81,59 +90,58 @@ func newEvaluationConsistencyReconcileRunnerWithHooks(
 		return nil
 	}
 
+	// 创建评估一致性协调器
 	return &EvaluationConsistencyReconcileRunner{
-		opts:    opts,
-		service: service,
-		leader: newLeaderLock(
-			locklease.Specs.EvaluationConsistencyReconcile,
-			opts.LockKey,
-			opts.LockTTL,
-			lockBuilder,
-			acquireLock,
-			releaseLock,
-		),
+		opts:    opts,                                                                                                                             // 配置选项
+		service: service,                                                                                                                          // 评估一致性协调器服务
+		leader:  newLeaderLock(locklease.Specs.EvaluationConsistencyReconcile, opts.LockKey, opts.LockTTL, lockBuilder, acquireLock, releaseLock), // 领导者锁
 	}
 }
 
-// Name returns the runner name.
+// Name 返回协调器名称。
 func (r *EvaluationConsistencyReconcileRunner) Name() string {
 	return "evaluation_consistency_reconcile"
 }
 
-// Start starts the reconcile ticker loop.
+// Start 启动协调器循环。
 func (r *EvaluationConsistencyReconcileRunner) Start(ctx context.Context) {
 	if r == nil {
 		return
 	}
 
-	lockKey := r.lockKey()
+	lockKey := r.lockKey() // 获取锁键
 	log.Infof("evaluation consistency reconcile started (interval=%s, batch_limit=%d, lock_key=%s, lock_ttl=%s)",
 		r.opts.Interval, r.opts.BatchLimit, lockKey, r.opts.LockTTL)
 
 	go func() {
+		// 执行第一次扫描
 		r.executeTick(ctx)
-
+		// 创建定时器，每隔一段时间执行一次扫描
 		ticker := time.NewTicker(r.opts.Interval)
 		defer ticker.Stop()
-
+		// 循环执行扫描
 		for {
 			select {
-			case <-ctx.Done():
+			case <-ctx.Done(): // 上下文取消，退出循环
 				return
-			case <-ticker.C:
+			case <-ticker.C: // 定时器触发，执行扫描
 				r.executeTick(ctx)
 			}
 		}
 	}()
 }
 
+// executeTick 执行一次扫描。
 func (r *EvaluationConsistencyReconcileRunner) executeTick(ctx context.Context) {
+	// 执行一次扫描
 	if err := r.runOnce(ctx); err != nil {
 		log.Warnf("evaluation consistency reconcile failed: %v", err)
 	}
 }
 
+// runOnce 执行一次扫描。
 func (r *EvaluationConsistencyReconcileRunner) runOnce(ctx context.Context) error {
+	// 执行一次扫描
 	return r.leader.Run(ctx, leaderLockRunOptions{
 		AcquireError: "failed to acquire evaluation consistency reconcile lock",
 		OnNotAcquired: func(lockKey string) {
@@ -148,6 +156,7 @@ func (r *EvaluationConsistencyReconcileRunner) runOnce(ctx context.Context) erro
 	})
 }
 
+// lockKey 返回锁键。
 func (r *EvaluationConsistencyReconcileRunner) lockKey() string {
 	if r == nil {
 		return ""

@@ -331,6 +331,13 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"
   lock_ttl: "30s"
 
+evaluation_consistency_reconcile:
+  enable: true
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:evaluation-consistency-reconcile:leader"
+  lock_ttl: "30s"
+
 behavior_journey_scan:
   enable: true
   org_ids: [1]

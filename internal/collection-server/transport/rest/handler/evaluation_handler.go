@@ -24,6 +24,7 @@ type evaluationQueryService interface {
 	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
+	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
 type waitReportService interface {

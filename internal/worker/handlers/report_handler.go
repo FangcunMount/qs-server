@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 func handleInterpretationReportGenerated(deps *Dependencies) HandlerFunc {
@@ -16,7 +18,7 @@ func handleInterpretationReportGenerated(deps *Dependencies) HandlerFunc {
 }
 
 func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
-	return func(_ context.Context, _ string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		var data eventoutcome.ReportFailedPayload
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
@@ -36,6 +38,11 @@ func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
 			slog.String("safe_reason", data.SafeReason),
 			slog.Time("failed_at", data.FailedAt),
 		)
+		if !data.Retryable {
+			if err := markReportFailed(ctx, deps, data.AssessmentID, "interpretation_report_failed", data.SafeReason); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }
@@ -58,11 +65,38 @@ func handleReportGeneratedOutcome(ctx context.Context, deps *Dependencies, paylo
 		slog.String("level_code", levelCode(data.Level)),
 		slog.String("severity", levelSeverity(data.Level)),
 	)
+	if err := markReportCompleted(ctx, deps, data.AssessmentID, data.ReportID); err != nil {
+		return err
+	}
 	riskLevel := attentionRiskLevelFromOutcome(data.Level)
 	handleHighRiskAlert(deps, riskLevel, primaryScoreValue(data.PrimaryScore), data.ReportID, data.TesteeID)
 	if deps.InternalClient != nil {
 		syncAssessmentAttention(ctx, deps, data.TesteeID, riskLevel, isHighRiskOutcomeLevel(data.Level))
 	}
+	return nil
+}
+
+func markReportCompleted(ctx context.Context, deps *Dependencies, assessmentID, reportID string) error {
+	if deps.ReportStatusReporter == nil {
+		return nil
+	}
+	id, err := strconv.ParseUint(assessmentID, 10, 64)
+	if err != nil || id == 0 {
+		return fmt.Errorf("invalid assessment id in report generated event: %q", assessmentID)
+	}
+	deps.ReportStatusReporter.SetCompleted(ctx, reportstatus.AssessmentKey(id), "", reportID)
+	return nil
+}
+
+func markReportFailed(ctx context.Context, deps *Dependencies, assessmentID, reason, message string) error {
+	if deps.ReportStatusReporter == nil {
+		return nil
+	}
+	id, err := strconv.ParseUint(assessmentID, 10, 64)
+	if err != nil || id == 0 {
+		return fmt.Errorf("invalid assessment id in report failed event: %q", assessmentID)
+	}
+	deps.ReportStatusReporter.SetFailed(ctx, reportstatus.AssessmentKey(id), "", reason, message)
 	return nil
 }
 

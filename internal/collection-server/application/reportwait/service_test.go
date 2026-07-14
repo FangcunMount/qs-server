@@ -9,6 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeStatusCache struct {
@@ -35,12 +37,18 @@ func (f *fakeStatusCache) SetIfHigherPriority(context.Context, *reportstatus.Sna
 }
 
 type fakeAssessmentQuery struct {
-	result *evaluation.AssessmentDetailResponse
-	err    error
+	result    *evaluation.AssessmentDetailResponse
+	err       error
+	report    *evaluation.AssessmentReportResponse
+	reportErr error
 }
 
 func (f *fakeAssessmentQuery) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
 	return f.result, f.err
+}
+
+func (f *fakeAssessmentQuery) GetAssessmentReport(context.Context, uint64, uint64) (*evaluation.AssessmentReportResponse, error) {
+	return f.report, f.reportErr
 }
 
 func TestToPublicAssessmentStatusMapsCompletedToInterpreted(t *testing.T) {
@@ -97,6 +105,36 @@ func TestGetStatusRedisMissPendingIncludesNextPoll(t *testing.T) {
 	}
 	if resp.NextPollAfterMs == 0 {
 		t.Fatal("expected next_poll_after_ms for non-terminal status")
+	}
+}
+
+func TestGetStatusRedisMissEvaluatedWithReportReturnsCompleted(t *testing.T) {
+	svc := NewService(&fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{Status: "evaluated"},
+		report: &evaluation.AssessmentReportResponse{AssessmentID: "99"},
+	}, &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{}}, nil, nil, DefaultConfig())
+
+	resp, err := svc.GetStatus(context.Background(), 1, 99)
+	if err != nil {
+		t.Fatalf("GetStatus: %v", err)
+	}
+	if resp.Status != "completed" || resp.Stage != "completed" || resp.NextPollAfterMs != 0 {
+		t.Fatalf("response = %#v", resp)
+	}
+}
+
+func TestGetStatusRedisMissEvaluatedWithoutReportStaysInterpreting(t *testing.T) {
+	svc := NewService(&fakeAssessmentQuery{
+		result:    &evaluation.AssessmentDetailResponse{Status: "evaluated"},
+		reportErr: status.Error(codes.NotFound, "report not found"),
+	}, &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{}}, nil, nil, DefaultConfig())
+
+	resp, err := svc.GetStatus(context.Background(), 1, 99)
+	if err != nil {
+		t.Fatalf("GetStatus: %v", err)
+	}
+	if resp.Status != "processing" || resp.Stage != "interpreting" || resp.NextPollAfterMs != 2000 {
+		t.Fatalf("response = %#v", resp)
 	}
 }
 

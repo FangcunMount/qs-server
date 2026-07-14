@@ -11,6 +11,25 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
+type reportStatusWriterStub struct {
+	completedAssessmentID string
+	completedReportID     string
+	failedAssessmentID    string
+	failedReason          string
+}
+
+func (s *reportStatusWriterStub) SetProcessing(context.Context, string, string, string) {}
+
+func (s *reportStatusWriterStub) SetCompleted(_ context.Context, assessmentID, _ string, reportID string) {
+	s.completedAssessmentID = assessmentID
+	s.completedReportID = reportID
+}
+
+func (s *reportStatusWriterStub) SetFailed(_ context.Context, assessmentID, _ string, reason, _ string) {
+	s.failedAssessmentID = assessmentID
+	s.failedReason = reason
+}
+
 func TestHandleInterpretationReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := &Dependencies{
@@ -55,6 +74,21 @@ func TestHandleInterpretationReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.
 	}
 }
 
+func TestHandleInterpretationReportGeneratedMarksReportStatusCompleted(t *testing.T) {
+	reporter := &reportStatusWriterStub{}
+	handler := handleInterpretationReportGenerated(&Dependencies{
+		Logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ReportStatusReporter: reporter,
+	})
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportGenerated, mustBuildReportGeneratedOutcomePayload(t, "low", "low")); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if reporter.completedAssessmentID != "123" || reporter.completedReportID != "report-1" {
+		t.Fatalf("completed status = assessment:%q report:%q", reporter.completedAssessmentID, reporter.completedReportID)
+	}
+}
+
 // A failed report is an auditable Interpretation fact, not a command to run
 // Interpretation again. Retrying is owned by delivery/retry policy or an
 // explicit command, never by the failed-event consumer.
@@ -66,11 +100,26 @@ func TestHandleInterpretationReportFailedDoesNotTriggerReportGeneration(t *testi
 	}
 	handler := handleInterpretationReportFailed(deps)
 
-	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t)); err != nil {
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, true)); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 	if client.generateReportCalls != 0 {
 		t.Fatalf("failed report event retriggered report generation: calls=%d", client.generateReportCalls)
+	}
+}
+
+func TestHandleInterpretationReportFailedMarksTerminalStatus(t *testing.T) {
+	reporter := &reportStatusWriterStub{}
+	handler := handleInterpretationReportFailed(&Dependencies{
+		Logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ReportStatusReporter: reporter,
+	})
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, false)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if reporter.failedAssessmentID != "123" || reporter.failedReason != "interpretation_report_failed" {
+		t.Fatalf("failed status = assessment:%q reason:%q", reporter.failedAssessmentID, reporter.failedReason)
 	}
 }
 
@@ -113,7 +162,7 @@ func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode st
 	return payload
 }
 
-func mustBuildReportFailedPayload(t *testing.T) []byte {
+func mustBuildReportFailedPayload(t *testing.T, retryable bool) []byte {
 	t.Helper()
 
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
@@ -135,7 +184,7 @@ func mustBuildReportFailedPayload(t *testing.T) []byte {
 			"template_version": "v2",
 			"failure_kind":     "template",
 			"failure_code":     "not_found",
-			"retryable":        true,
+			"retryable":        retryable,
 			"safe_reason":      "template unavailable",
 			"failed_at":        now,
 		},

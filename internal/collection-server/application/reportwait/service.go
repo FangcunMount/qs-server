@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -18,6 +20,7 @@ const (
 
 type QueryService interface {
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
+	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
 type StatusCache interface {
@@ -256,23 +259,41 @@ func (s *Service) loadStatusFromDB(
 	if result == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), false, nil
 	}
+	if result.Status == "evaluated" {
+		report, reportErr := s.query.GetAssessmentReport(ctx, testeeID, assessmentID)
+		if reportErr == nil && report != nil {
+			resp := completedResponse()
+			s.cacheStatus(ctx, assessmentKey, resp)
+			recordTerminalResponse(resp)
+			return resp, true, nil
+		}
+		if reportErr != nil && status.Code(reportErr) != codes.NotFound {
+			return nil, false, reportErr
+		}
+		return pendingResponse("interpreting", "报告生成中", 2000), false, nil
+	}
 
 	resp := fromAssessment(result)
-	if s.cache != nil {
-		_ = s.cache.SetIfHigherPriority(ctx, &reportstatus.Snapshot{
-			AssessmentID: assessmentKey,
-			Status:       resp.Status,
-			Stage:        resp.Stage,
-			Message:      resp.Message,
-			Reason:       resp.Reason,
-			UpdatedAt:    time.Now().UTC(),
-		}, s.cfg.StatusTTL)
-	}
+	s.cacheStatus(ctx, assessmentKey, resp)
 	if isTerminalStatus(resp.Status) {
 		recordTerminalResponse(resp)
 		return resp, true, nil
 	}
 	return resp, false, nil
+}
+
+func (s *Service) cacheStatus(ctx context.Context, assessmentKey string, resp *evaluation.AssessmentStatusResponse) {
+	if s.cache == nil || resp == nil {
+		return
+	}
+	_ = s.cache.SetIfHigherPriority(ctx, &reportstatus.Snapshot{
+		AssessmentID: assessmentKey,
+		Status:       resp.Status,
+		Stage:        resp.Stage,
+		Message:      resp.Message,
+		Reason:       resp.Reason,
+		UpdatedAt:    time.Now().UTC(),
+	}, s.cfg.StatusTTL)
 }
 
 func (s *Service) processingFromCache(ctx context.Context, assessmentKey string) *evaluation.AssessmentStatusResponse {
@@ -356,6 +377,8 @@ func mapAssessmentStatus(status string) string {
 		return "failed"
 	case "submitted":
 		return "processing"
+	case "evaluated":
+		return "processing"
 	default:
 		return "queued"
 	}
@@ -369,6 +392,8 @@ func mapAssessmentStage(status string) string {
 		return "failed"
 	case "submitted":
 		return "processing"
+	case "evaluated":
+		return "interpreting"
 	default:
 		return "queued"
 	}
@@ -382,8 +407,19 @@ func mapAssessmentMessage(status string) string {
 		return "报告生成失败"
 	case "submitted":
 		return "报告生成中"
+	case "evaluated":
+		return "报告生成中"
 	default:
 		return "报告排队生成中"
+	}
+}
+
+func completedResponse() *evaluation.AssessmentStatusResponse {
+	return &evaluation.AssessmentStatusResponse{
+		Status:    "completed",
+		Stage:     "completed",
+		Message:   "报告已生成",
+		UpdatedAt: time.Now().Unix(),
 	}
 }
 
