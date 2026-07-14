@@ -438,6 +438,17 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetAssessmentScores,
 		)...)
+		// 医学量表报告（总分、因子解读和建议）
+		assessments.GET("/:id/report", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetAssessmentReport,
+		)...)...)
 		// 测评趋势摘要
 		assessments.GET("/:id/trend-summary", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),

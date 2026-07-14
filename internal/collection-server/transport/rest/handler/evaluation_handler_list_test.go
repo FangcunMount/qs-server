@@ -12,7 +12,8 @@ import (
 )
 
 type fakeEvaluationQueryService struct {
-	listMyAssessments func(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
+	listMyAssessments   func(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
+	getAssessmentReport func(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
 func (f *fakeEvaluationQueryService) ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error) {
@@ -37,8 +38,11 @@ func (f *fakeEvaluationQueryService) GetHighRiskFactors(context.Context, uint64,
 func (f *fakeEvaluationQueryService) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationQueryService) GetAssessmentReport(context.Context, uint64, uint64) (*evaluation.AssessmentReportResponse, error) {
-	return nil, nil
+func (f *fakeEvaluationQueryService) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error) {
+	if f.getAssessmentReport == nil {
+		panic("unexpected GetAssessmentReport call")
+	}
+	return f.getAssessmentReport(ctx, testeeID, assessmentID)
 }
 
 func TestEvaluationHandlerListAssessmentsReturnsMedicalList(t *testing.T) {
@@ -101,5 +105,50 @@ func TestEvaluationHandlerListAssessmentsRejectsPersonalityKind(t *testing.T) {
 	handler.ListAssessments(c)
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", recorder.Code)
+	}
+}
+
+func TestEvaluationHandlerGetAssessmentReportReturnsInterpretation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewEvaluationHandler(&fakeEvaluationQueryService{
+		getAssessmentReport: func(_ context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error) {
+			if testeeID != 7 || assessmentID != 42 {
+				t.Fatalf("request = testee %d assessment %d, want testee 7 assessment 42", testeeID, assessmentID)
+			}
+			return &evaluation.AssessmentReportResponse{
+				AssessmentID: "42",
+				PrimaryScore: &evaluation.ScoreValueResponse{Value: 31},
+				Conclusion:   "整体表现正常",
+				Dimensions: []evaluation.DimensionInterpretResponse{{
+					FactorCode:  "attention",
+					FactorName:  "注意缺陷",
+					RawScore:    6,
+					Description: "注意力表现正常",
+					Suggestion:  "保持规律作息",
+				}},
+			}, nil
+		},
+	}, &fakeWaitReportService{})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/42/report?testee_id=7", nil)
+	c.Params = gin.Params{{Key: "id", Value: "42"}}
+	handler.GetAssessmentReport(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var resp struct {
+		Data evaluation.AssessmentReportResponse `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Data.PrimaryScore == nil || resp.Data.PrimaryScore.Value != 31 {
+		t.Fatalf("primary score = %#v, want 31", resp.Data.PrimaryScore)
+	}
+	if len(resp.Data.Dimensions) != 1 || resp.Data.Dimensions[0].Description == "" || resp.Data.Dimensions[0].Suggestion == "" {
+		t.Fatalf("dimensions = %#v, want interpretation and suggestion", resp.Data.Dimensions)
 	}
 }

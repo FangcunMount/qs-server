@@ -19,6 +19,7 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/answersheets", "post")
 	assertOpenAPIOperation(t, spec, "/answersheets/submit-status", "get")
 	assertOpenAPIOperation(t, spec, "/assessments", "get")
+	assertOpenAPIOperation(t, spec, "/assessments/{id}/report", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
@@ -91,7 +92,6 @@ func TestCollectionOpenAPIHasNoLegacyV1AssessmentReadPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
 		"/api/v1/assessments/{id}",
-		"/api/v1/assessments/{id}/report",
 		"/api/v1/answersheets/{id}/assessment",
 	} {
 		if _, ok := spec.Paths[path]; ok {

@@ -132,6 +132,36 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// GetAssessmentReport 获取医学量表测评报告。
+// @Summary 获取医学量表测评报告
+// @Description 仅在 report-status 终态 interpreted 后调用，返回总分、因子解读和建议。
+// @Tags 测评
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Success 200 {object} core.Response{data=evaluation.AssessmentReportResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/assessments/{id}/report [get]
+func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
+	testeeID, assessmentID, ok := h.parseReportStatusRequest(c)
+	if !ok {
+		return
+	}
+	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), testeeID, assessmentID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get assessment report failed", err)
+		return
+	}
+	if result == nil {
+		h.NotFoundResponse(c, "assessment report not found", nil)
+		return
+	}
+	h.Success(c, result)
+}
+
 // GetReportStatus 短轮询查询报告生成状态（非阻塞）。
 // @Summary 查询报告生成状态
 // @Description 立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试

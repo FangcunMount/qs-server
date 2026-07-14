@@ -90,7 +90,7 @@ collection RegisterRoutes 先设置：
 | ---- | ---- |
 | questionnaire | `GET /api/v1/questionnaires`、`GET /api/v1/questionnaires/:code` |
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
-| assessment（因子/趋势/状态） | `GET /api/v1/assessments/trend`、`/:id/factors/high-risk`、`/:id/scores`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
+| assessment（报告/因子/趋势/状态） | `GET /api/v1/assessments/:id/report`、`/:id/scores`、`/trend`、`/:id/factors/high-risk`、`/:id/trend-summary`、`/:id/report-status`、`/:id/wait-report` |
 | assessment-model | `GET /api/v1/assessment-models`、`/hot`、`/options`、`/:code`；公开读取仅覆盖前三项 |
 | typology-model | `GET /api/v1/typology-models`、`/categories`、`/:code`；由 generic catalog 的 DefinitionV2 投影 |
 | typology-session | `POST /api/v1/typology-assessment-sessions`（**小程序推荐入口**） |
