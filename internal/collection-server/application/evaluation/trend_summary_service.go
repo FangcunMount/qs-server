@@ -136,7 +136,11 @@ func (s *QueryService) listComparableAssessments(
 
 	for {
 		result, err := s.ListMyAssessments(ctx, testeeID, &ListAssessmentsRequest{
-			Status:    "interpreted",
+			// "done" is the participant-query vocabulary. The apiserver maps it
+			// to the assessment aggregate's evaluated terminal state. "interpreted"
+			// was a retired report projection status and excludes every current
+			// completed assessment from the trend history.
+			Status:    "done",
 			Page:      page,
 			PageSize:  trendSummaryPageSize,
 			ScaleCode: scaleCode,
