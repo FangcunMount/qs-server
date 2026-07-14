@@ -312,14 +312,14 @@ plan_scheduler:
   enable: true                  # 启用计划调度器
   org_ids: [1]                  # 组织ID列表（从配置读取，默认调度所有组织）
   initial_delay: "1m"           # 启动后首次调度延迟，避免与其他服务启动冲突
-  interval: "10m"               # 2C4G 临时降配阶段回到保守扫描频率
+  interval: "60m"               # 2C4G 临时降配阶段回到保守扫描频率
   pending_lookback: "24h"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
   lock_key: "qs:plan-scheduler:leader" # 分布式锁键，确保单实例执行
   lock_ttl: "2m"                # 锁过期时间，略长于调度间隔，避免死锁
 
 behavior_pending_reconcile:
   enable: true                  # 启用行为待处理项调和任务
-  interval: "5m"                # 2C4G 临时降配阶段回到保守扫描频率
+  interval: "60m"                # 2C4G 临时降配阶段回到保守扫描频率
   batch_limit: 50               # 降低单次调和负载，减少瞬时 CPU/DB 峰值
   lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
   lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
@@ -328,7 +328,7 @@ behavior_journey_scan:    # behavior_footprint 的唯一常规写入路径；不
   enable: true            # 启用行为轨迹扫描
   org_ids: [1]            # 组织ID列表（从配置读取，默认扫描所有组织）
   initial_delay: "2m"     # 启动后首次扫描延迟
-  interval: "30m"         # 扫描间隔
+  interval: "60m"         # 扫描间隔
   batch_size: 1000        # 每轮最多扫描的记录数
   lookback: "2h"          # 扫描时间窗口
   lock_key: "qs:behavior-journey-scan:leader" # 分布式锁键，确保单实例执行
