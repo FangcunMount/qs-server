@@ -44,3 +44,24 @@ func TestHandleEvaluationOutcomeCommittedRetriesTransientReportFailure(t *testin
 		t.Fatal("expected retryable report generation error")
 	}
 }
+
+func TestHandleEvaluationOutcomeCommittedRecordsReportResponse(t *testing.T) {
+	client := &reportGeneratingInternalClient{generateReportResp: &interpretationpb.GenerateReportFromAssessmentResponse{
+		Success:      true,
+		Status:       "generated",
+		GenerationId: "gen-2003",
+		RunId:        "run-2003",
+		ReportId:     "report-2003",
+	}}
+	handler := handleEvaluationOutcomeCommitted(&Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InterpretationAutomationClient: client})
+	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 2003)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if client.generateReportCalls != 1 || client.outcomeID != "9001" {
+		t.Fatalf("calls=%d outcome=%q", client.generateReportCalls, client.outcomeID)
+	}
+	resp := client.generateReportResp
+	if resp.GetGenerationId() != "gen-2003" || resp.GetRunId() != "run-2003" || resp.GetReportId() != "report-2003" {
+		t.Fatalf("report response = %#v, want generation/run/report ids", resp)
+	}
+}

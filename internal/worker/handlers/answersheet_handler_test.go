@@ -190,6 +190,9 @@ func TestHandleAnswerSheetSubmitted_UsesSingleCreateAssessmentCall(t *testing.T)
 			t.Fatalf("calls = %#v, want %#v", client.calls, want)
 		}
 	}
+	if client.createCalls != 1 {
+		t.Fatalf("createCalls = %d, want 1", client.createCalls)
+	}
 }
 
 func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {

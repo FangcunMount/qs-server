@@ -15,14 +15,17 @@ func TestSubmitQueueEnqueueReturnsImmediately(t *testing.T) {
 	release := make(chan struct{})
 	q := NewSubmitQueue(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 		<-release
-		return &SubmitAnswerSheetResponse{ID: "42"}, nil
+		return &SubmitAnswerSheetResponse{ID: "42", AssessmentID: "9001"}, nil
 	})
 	if q == nil {
 		t.Fatal("expected queue to be initialized")
 	}
 
 	start := time.Now()
-	if err := q.Enqueue(context.Background(), "req-1", 1, &SubmitAnswerSheetRequest{}); err != nil {
+	if err := q.Enqueue(context.Background(), "req-1", 1, &SubmitAnswerSheetRequest{
+		TesteeID:          7,
+		QuestionnaireCode: "QNR-001",
+	}); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed > 50*time.Millisecond {

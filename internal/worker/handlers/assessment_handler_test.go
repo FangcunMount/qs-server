@@ -19,7 +19,11 @@ func TestHandleEvaluationRequestedFailsWhenInternalClientMissing(t *testing.T) {
 }
 
 func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
-	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated"}}
+	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{
+		Status:    "evaluated",
+		RunId:     "42:1",
+		OutcomeId: "9001",
+	}}
 	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
 	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 42)); err != nil {
 		t.Fatalf("handler: %v", err)
@@ -27,16 +31,28 @@ func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
 	if client.evaluateCalls != 1 {
 		t.Fatalf("evaluate calls = %d, want 1", client.evaluateCalls)
 	}
+	if client.resp.GetStatus() != "evaluated" || client.resp.GetRunId() != "42:1" || client.resp.GetOutcomeId() != "9001" {
+		t.Fatalf("evaluate response = %#v, want status/run/outcome fields", client.resp)
+	}
 }
 
 func TestHandleEvaluationOutcomeCommittedCallsGenerateReport(t *testing.T) {
-	client := &assessmentGenerateReportClient{resp: &interpretationpb.GenerateReportFromAssessmentResponse{Success: true, Status: "generated"}}
+	client := &assessmentGenerateReportClient{resp: &interpretationpb.GenerateReportFromAssessmentResponse{
+		Success:      true,
+		Status:       "generated",
+		GenerationId: "gen-1",
+		RunId:        "run-1",
+		ReportId:     "report-1",
+	}}
 	handler := handleEvaluationOutcomeCommitted(newAnswerSheetHandlerTestDeps(client, nil))
 	if err := handler(context.Background(), eventcatalog.EvaluationOutcomeCommitted, mustBuildEvaluationOutcomeCommittedPayload(t, 42)); err != nil {
 		t.Fatalf("handler: %v", err)
 	}
 	if client.generateReportCalls != 1 {
 		t.Fatalf("generate report calls = %d, want 1", client.generateReportCalls)
+	}
+	if !client.resp.GetSuccess() || client.resp.GetStatus() != "generated" || client.resp.GetReportId() != "report-1" {
+		t.Fatalf("generate report response = %#v, want success generated report", client.resp)
 	}
 }
 

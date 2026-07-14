@@ -888,11 +888,11 @@ ensure-golangci-lint:
 
 lint: ensure-golangci-lint ## 运行代码检查
 	@echo "$(COLOR_CYAN)🔍 运行代码检查...$(COLOR_RESET)"
-	@"$(GOLANGCI_LINT_BIN)" run --timeout=5m
+	@env -u GOVERSION GOTOOLCHAIN="$(GO_TOOLCHAIN)" "$(GOLANGCI_LINT_BIN)" run --timeout=5m
 
 lint-boundaries: ensure-golangci-lint ## 运行分层边界检查（depguard: domain/application）
 	@echo "$(COLOR_CYAN)🧱 运行分层边界检查...$(COLOR_RESET)"
-	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-depguard.yml --timeout=5m
+	@env -u GOVERSION GOTOOLCHAIN="$(GO_TOOLCHAIN)" "$(GOLANGCI_LINT_BIN)" run -c .golangci-depguard.yml --timeout=5m
 
 vuln: security-govulncheck ## 运行依赖漏洞扫描（govulncheck）
 
@@ -901,7 +901,7 @@ verify: test lint lint-boundaries vuln ## AI 重构前后质量门禁（行为 +
 maintainability-lint: ensure-golangci-lint ## 运行 maintainability advisory 检查
 	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查...$(COLOR_RESET)"
 	@mkdir -p "$(MAINTAINABILITY_DIR)"
-	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+	@env -u GOVERSION GOTOOLCHAIN="$(GO_TOOLCHAIN)" "$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
 		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
 		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
 	@cat "$(MAINTAINABILITY_DIR)/maintainability.txt"
@@ -909,7 +909,7 @@ maintainability-lint: ensure-golangci-lint ## 运行 maintainability advisory �
 maintainability-lint-ci: ensure-golangci-lint ## 运行 maintainability advisory 检查并导出报告
 	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查（CI）...$(COLOR_RESET)"
 	@mkdir -p "$(MAINTAINABILITY_DIR)"
-	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+	@env -u GOVERSION GOTOOLCHAIN="$(GO_TOOLCHAIN)" "$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
 		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
 		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
 	@echo "$(COLOR_GREEN)✅ maintainability 报告已写入 $(MAINTAINABILITY_DIR)$(COLOR_RESET)"

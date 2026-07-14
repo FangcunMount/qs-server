@@ -16,7 +16,7 @@ func TestSubmitQueueWorkerPoolWritesSuccessStatusInOrder(t *testing.T) {
 		1,
 		jobs,
 		func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
-			return &SubmitAnswerSheetResponse{ID: "42"}, nil
+			return &SubmitAnswerSheetResponse{ID: "42", AssessmentID: "9001"}, nil
 		},
 		func(requestID, status, answerSheetID string) {
 			events <- submitQueueStatusEvent{requestID: requestID, status: status, answerSheetID: answerSheetID}
@@ -24,7 +24,12 @@ func TestSubmitQueueWorkerPoolWritesSuccessStatusInOrder(t *testing.T) {
 	)
 
 	pool.Start()
-	jobs <- submitJob{ctx: context.Background(), requestID: "req-1"}
+	jobs <- submitJob{
+		ctx:       context.Background(),
+		requestID: "req-1",
+		writerID:  11,
+		req:       &SubmitAnswerSheetRequest{TesteeID: 7, QuestionnaireCode: "QNR-001"},
+	}
 
 	first := waitSubmitQueueStatusEvent(t, events)
 	second := waitSubmitQueueStatusEvent(t, events)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -146,5 +147,57 @@ func TestConvertAnswersNormalizesRadioValuesForGRPC(t *testing.T) {
 	}
 	if got[0].Value != optionCode {
 		t.Fatalf("Convert() value = %q, want %q", got[0].Value, optionCode)
+	}
+}
+
+type idempotencyGuardStub struct {
+	doneID   string
+	acquired bool
+	err      error
+}
+
+func (s *idempotencyGuardStub) Begin(context.Context, string) (string, *locklease.Lease, bool, error) {
+	return s.doneID, &locklease.Lease{Key: "k", Token: "t"}, s.acquired, s.err
+}
+
+func (s *idempotencyGuardStub) Complete(context.Context, string, *locklease.Lease, string) error {
+	return nil
+}
+
+func (s *idempotencyGuardStub) Abort(context.Context, string, *locklease.Lease) error {
+	return nil
+}
+
+type assessmentIntakeStub struct {
+	assessmentID uint64
+	err          error
+}
+
+func (s *assessmentIntakeStub) EnsureAssessment(context.Context, EnsureAssessmentInput) (uint64, error) {
+	return s.assessmentID, s.err
+}
+
+func (s *assessmentIntakeStub) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error) {
+	return 7, s.assessmentID, s.err
+}
+
+func TestSubmitWithGuardReturnsIdempotentHit(t *testing.T) {
+	t.Parallel()
+
+	service := &SubmissionService{
+		submitGuard:      &idempotencyGuardStub{doneID: "42"},
+		assessmentIntake: &assessmentIntakeStub{assessmentID: 9001},
+	}
+
+	resp, err := service.Submit(context.Background(), 1, &SubmitAnswerSheetRequest{
+		IdempotencyKey:     "idem-42",
+		QuestionnaireCode:  "QNR-001",
+		TesteeID:           7,
+	})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if resp == nil || resp.ID != "42" || resp.AssessmentID != "9001" || resp.Message != "already submitted" {
+		t.Fatalf("Submit() = %#v, want idempotent hit with assessment 9001", resp)
 	}
 }
