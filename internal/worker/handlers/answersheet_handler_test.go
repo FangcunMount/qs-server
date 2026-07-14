@@ -34,6 +34,8 @@ type fakeWorkerInternalClient struct {
 	calculateScoreMessage          string
 	createSuccess                  bool
 	createMessage                  string
+	ensureCreated                  *bool
+	ensureAutoSubmitted            bool
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
@@ -54,10 +56,14 @@ func (f *fakeWorkerInternalClient) EnsureAssessment(
 	if !success {
 		return nil, errors.New(firstNonEmpty(f.createMessage, "assessment ensure failed"))
 	}
+	created := true
+	if f.ensureCreated != nil {
+		created = *f.ensureCreated
+	}
 	return &evalpb.EnsureAssessmentResponse{
 		AssessmentId:  1001,
-		Created:       true,
-		AutoSubmitted: false,
+		Created:       created,
+		AutoSubmitted: f.ensureAutoSubmitted,
 	}, nil
 }
 
@@ -192,6 +198,30 @@ func TestHandleAnswerSheetSubmitted_UsesSingleCreateAssessmentCall(t *testing.T)
 	}
 	if client.createCalls != 1 {
 		t.Fatalf("createCalls = %d, want 1", client.createCalls)
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_AcceptsExistingAutoSubmittedAssessment(t *testing.T) {
+	created := false
+	client := &fakeWorkerInternalClient{
+		ensureCreated:       &created,
+		ensureAutoSubmitted: true,
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-replay"}, true, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
+			return nil
+		},
+	})
+
+	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 125)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if client.createCalls != 1 {
+		t.Fatalf("createCalls = %d, want 1 EnsureAssessment call for idempotent replay", client.createCalls)
 	}
 }
 
