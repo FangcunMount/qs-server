@@ -12,8 +12,11 @@ import (
 )
 
 type fakeEvaluationReader struct {
-	detail *evaluationapp.AssessmentDetailResponse
-	err    error
+	detail        *evaluationapp.AssessmentDetailResponse
+	report        *evaluationapp.AssessmentReportResponse
+	list          *evaluationapp.ListAssessmentsResponse
+	err           error
+	listModelKind string
 }
 
 func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
@@ -29,11 +32,12 @@ func (f *fakeEvaluationReader) GetFactorTrend(context.Context, uint64, string, i
 func (f *fakeEvaluationReader) GetHighRiskFactors(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) ListMyAssessments(context.Context, uint64, string, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsResponse, error) {
-	return nil, nil
+func (f *fakeEvaluationReader) ListMyAssessments(_ context.Context, _ uint64, _ string, _ string, _ string, _ string, _ string, modelKind string, _ int32, _ int32) (*evaluationapp.ListAssessmentsResponse, error) {
+	f.listModelKind = modelKind
+	return f.list, f.err
 }
 func (f *fakeEvaluationReader) GetAssessmentReport(context.Context, uint64, uint64) (*evaluationapp.AssessmentReportResponse, error) {
-	return nil, nil
+	return f.report, f.err
 }
 func (f *fakeEvaluationReader) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error) {
 	return 0, 0, nil
@@ -71,6 +75,48 @@ func TestQueryServiceGetRejectsNonTypologyModel(t *testing.T) {
 	}
 }
 
+func TestQueryServiceGetAcceptsCanonicalTypologyModel(t *testing.T) {
+	t.Parallel()
+
+	svc := NewQueryService(&fakeEvaluationReader{
+		detail: &evaluationapp.AssessmentDetailResponse{
+			Model: evaluationapp.ModelIdentityResponse{Kind: typologyModelKind, Code: "mbti"},
+		},
+	}, nil)
+	got, err := svc.Get(context.Background(), 1, 2)
+	if err != nil || got == nil {
+		t.Fatalf("Get() = %#v, %v; want canonical typology model", got, err)
+	}
+}
+
+func TestQueryServiceGetReportAcceptsCanonicalTypologyModel(t *testing.T) {
+	t.Parallel()
+
+	svc := NewQueryService(&fakeEvaluationReader{
+		report: &evaluationapp.AssessmentReportResponse{
+			AssessmentID: "42",
+			Model:        evaluationapp.ModelIdentityResponse{Kind: typologyModelKind, Code: "SBTI_FUN"},
+		},
+	}, nil)
+	got, err := svc.GetReport(context.Background(), 1, 42)
+	if err != nil || got == nil || got.AssessmentID != "42" {
+		t.Fatalf("GetReport() = %#v, %v; want canonical typology report", got, err)
+	}
+}
+
+func TestQueryServiceListUsesCanonicalTypologyKind(t *testing.T) {
+	t.Parallel()
+
+	reader := &fakeEvaluationReader{list: &evaluationapp.ListAssessmentsResponse{}}
+	svc := NewQueryService(reader, nil)
+	if _, err := svc.List(context.Background(), 1, &ListAssessmentsRequest{}); err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if reader.listModelKind != typologyModelKind {
+		t.Fatalf("model kind = %q, want %q", reader.listModelKind, typologyModelKind)
+	}
+}
+
 func TestQueryServiceGetReportStatus(t *testing.T) {
 	t.Parallel()
 
@@ -96,7 +142,7 @@ func TestQueryServiceGetReturnsDetail(t *testing.T) {
 	svc := NewQueryService(&fakeEvaluationReader{
 		detail: &evaluationapp.AssessmentDetailResponse{
 			ID:    "42",
-			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "mbti"},
+			Model: evaluationapp.ModelIdentityResponse{Kind: typologyModelKind, Code: "mbti"},
 		},
 	}, nil)
 	got, err := svc.Get(context.Background(), 1, 42)
@@ -130,7 +176,7 @@ func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 	svc := NewQueryService(&fakeEvaluationReader{
 		detail: &evaluationapp.AssessmentDetailResponse{
 			ID:    "42",
-			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "sbti"},
+			Model: evaluationapp.ModelIdentityResponse{Kind: typologyModelKind, Code: "sbti"},
 			Level: &evaluationapp.ResultLevelResponse{Code: "INTJ"},
 		},
 	}, wait)

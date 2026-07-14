@@ -1,12 +1,29 @@
 package evaluation
 
-// personalityModelKind 是人格/类型学模型的领域 kind 数据值。
-// 注意：这是历史数据值（KindPersonality），非接口命名，本轮不迁移。
-const personalityModelKind = "personality"
+const (
+	// typologyModelKind 是当前类型学模型的规范 Kind。
+	typologyModelKind = "typology"
+	// personalityModelKind 是迁移前类型学记录的历史 Kind。
+	personalityModelKind = "personality"
+)
+
+// IsTypologyModel reports whether an assessment model belongs to the typology
+// facade. Canonical records use kind=typology; legacy personality records are
+// retained for read compatibility while old assessments are still present.
+func IsTypologyModel(model ModelIdentityResponse) bool {
+	switch model.Kind {
+	case typologyModelKind:
+		return true
+	case personalityModelKind:
+		return model.SubKind == "" || model.SubKind == "typology"
+	default:
+		return false
+	}
+}
 
 // scaleCodeFromModel 返回量表类模型的 code；人格类模型无量表码，返回空串。
 func scaleCodeFromModel(model ModelIdentityResponse) string {
-	if model.Kind == personalityModelKind {
+	if IsTypologyModel(model) {
 		return ""
 	}
 	return model.Code
@@ -14,7 +31,7 @@ func scaleCodeFromModel(model ModelIdentityResponse) string {
 
 // scaleNameFromModel 返回量表类模型的名称；人格类模型无量表名，返回空串。
 func scaleNameFromModel(model ModelIdentityResponse) string {
-	if model.Kind == personalityModelKind {
+	if IsTypologyModel(model) {
 		return ""
 	}
 	return model.Title

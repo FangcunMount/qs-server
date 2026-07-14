@@ -13,9 +13,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )
 
-const personalityModelKind = "personality"
+const typologyModelKind = "typology"
 
-var errNotTypologyAssessment = errors.New("assessment is not a personality evaluation")
+var errNotTypologyAssessment = errors.New("assessment is not a typology evaluation")
 
 type QueryService struct {
 	evaluationClient evaluationapp.BFFReader
@@ -31,7 +31,7 @@ func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *repor
 
 func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
 	page, pageSize := evaluationapp.NormalizeListPage(req.Page, req.PageSize, evaluationapp.AssessmentListPageDefault)
-	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", "", "", personalityModelKind, page, pageSize)
+	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", "", "", typologyModelKind, page, pageSize)
 	if err != nil {
 		logTypologyAssessmentError("list typology assessments failed", err)
 		return nil, err
@@ -116,7 +116,7 @@ func (s *QueryService) toPublicStatusResponse(
 }
 
 func ensureTypologyModel(model evaluationapp.ModelIdentityResponse) error {
-	if model.Kind != personalityModelKind {
+	if !evaluationapp.IsTypologyModel(model) {
 		return errNotTypologyAssessment
 	}
 	return nil
