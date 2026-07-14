@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 type profileSeed struct {
 	Pattern   string
+	Trigger   string
 	IsSpecial bool
 }
 
@@ -20,6 +20,10 @@ type repairCatalog struct {
 	Profiles       map[string]profileSeed
 	NormalCount    int
 	SpecialCount   int
+	Source         string
+	Revision       string
+	License        string
+	Attribution    string
 }
 
 type fieldChange struct {
@@ -35,66 +39,25 @@ type repairSummary struct {
 	SpecialCount       int
 	PatternChanges     int
 	SpecialFlagChanges int
+	TriggerChanges     int
 	Changes            []fieldChange
 }
 
 func (s repairSummary) Changed() bool { return len(s.Changes) > 0 }
 
-func catalogFromSBTI(model *modeltypology.SBTILegacyModel) (repairCatalog, error) {
-	if model == nil {
-		return repairCatalog{}, fmt.Errorf("SBTI seed model is nil")
-	}
-	if len(model.DimensionOrder) == 0 {
-		return repairCatalog{}, fmt.Errorf("SBTI seed dimension order is empty")
-	}
-	if duplicates := duplicateStrings(model.DimensionOrder); len(duplicates) > 0 {
-		return repairCatalog{}, fmt.Errorf("SBTI seed dimension order contains duplicates: %s", strings.Join(duplicates, ", "))
-	}
-
-	catalog := repairCatalog{
-		DimensionOrder: append([]string(nil), model.DimensionOrder...),
-		Profiles:       make(map[string]profileSeed, len(model.NormalOutcomes)+len(model.SpecialOutcomes)),
-		NormalCount:    len(model.NormalOutcomes),
-		SpecialCount:   len(model.SpecialOutcomes),
-	}
-	for _, outcome := range model.NormalOutcomes {
-		if outcome.IsSpecial {
-			return repairCatalog{}, fmt.Errorf("normal SBTI outcome %s is marked special in the seed", outcome.Code)
-		}
-		if err := addSeedProfile(catalog.Profiles, outcome.Code, outcome.Pattern, false, len(model.DimensionOrder)); err != nil {
-			return repairCatalog{}, err
-		}
-	}
-	for _, outcome := range model.SpecialOutcomes {
-		if !outcome.IsSpecial {
-			return repairCatalog{}, fmt.Errorf("special SBTI outcome %s is not marked special in the seed", outcome.Code)
-		}
-		if strings.TrimSpace(outcome.Pattern) != "" {
-			return repairCatalog{}, fmt.Errorf("special SBTI outcome %s must not have a pattern", outcome.Code)
-		}
-		if err := addSeedProfile(catalog.Profiles, outcome.Code, "", true, len(model.DimensionOrder)); err != nil {
-			return repairCatalog{}, err
-		}
-	}
-	if catalog.NormalCount == 0 || catalog.SpecialCount == 0 {
-		return repairCatalog{}, fmt.Errorf("SBTI seed must contain normal and special outcomes")
-	}
-	return catalog, nil
-}
-
-func addSeedProfile(profiles map[string]profileSeed, code, pattern string, special bool, dimensions int) error {
+func addSeedProfile(profiles map[string]profileSeed, code, pattern, trigger string, special bool, dimensions int) error {
 	if code == "" {
-		return fmt.Errorf("SBTI seed contains an outcome without code")
+		return fmt.Errorf("SBTI catalog contains an outcome without code")
 	}
 	if _, exists := profiles[code]; exists {
-		return fmt.Errorf("SBTI seed outcome code %s is duplicated", code)
+		return fmt.Errorf("SBTI catalog outcome code %s is duplicated", code)
 	}
 	if !special {
 		if err := validatePattern(code, pattern, dimensions); err != nil {
 			return err
 		}
 	}
-	profiles[code] = profileSeed{Pattern: pattern, IsSpecial: special}
+	profiles[code] = profileSeed{Pattern: pattern, Trigger: trigger, IsSpecial: special}
 	return nil
 }
 
@@ -211,6 +174,22 @@ func repairDefinition(input []byte, catalog repairCatalog) ([]byte, repairSummar
 			})
 		}
 
+		trigger, triggerPresent, err := rawString(profile, "Trigger")
+		if err != nil {
+			return nil, repairSummary{}, fmt.Errorf("decode profile %s Trigger: %w", code, err)
+		}
+		if seed.Trigger == "" {
+			if triggerPresent && trigger != "" {
+				delete(profile, "Trigger")
+				summary.TriggerChanges++
+				summary.Changes = append(summary.Changes, fieldChange{OutcomeCode: code, Field: "Trigger", Before: quoteOrMissing(trigger, true), After: "<missing>"})
+			}
+		} else if !triggerPresent || trigger != seed.Trigger {
+			profile["Trigger"] = mustJSON(seed.Trigger)
+			summary.TriggerChanges++
+			summary.Changes = append(summary.Changes, fieldChange{OutcomeCode: code, Field: "Trigger", Before: quoteOrMissing(trigger, triggerPresent), After: fmt.Sprintf("%q", seed.Trigger)})
+		}
+
 		updated, err := json.Marshal(profile)
 		if err != nil {
 			return nil, repairSummary{}, fmt.Errorf("encode profile %s: %w", code, err)
@@ -281,8 +260,12 @@ func verifyRepairedDefinition(input []byte, catalog repairCatalog) error {
 			if err != nil {
 				return fmt.Errorf("verify profile %s IsSpecial: %w", code, err)
 			}
-			if pattern != seed.Pattern || special != seed.IsSpecial {
-				return fmt.Errorf("profile %s does not match the canonical SBTI pattern/special flag", code)
+			trigger, _, err := rawString(profile, "Trigger")
+			if err != nil {
+				return fmt.Errorf("verify profile %s Trigger: %w", code, err)
+			}
+			if pattern != seed.Pattern || special != seed.IsSpecial || trigger != seed.Trigger {
+				return fmt.Errorf("profile %s does not match the canonical SBTI pattern/special flag/trigger", code)
 			}
 		}
 	}

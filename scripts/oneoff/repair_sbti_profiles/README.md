@@ -1,24 +1,48 @@
 # SBTI 结果 Profile 定点修复
 
-`repair_sbti_profiles` 修复历史 SBTI DefinitionV2 中缺失的结果 `Pattern` 和错误的 `IsSpecial` 标记。
+`repair_sbti_profiles` 修复历史 SBTI DefinitionV2 中缺失或错误的结果执行配置：
 
-脚本以服务内嵌的 `sbti_fun.json` 为唯一事实源：
-
-- 为 25 个普通结果写入对应的 15 位 L/M/H Pattern；
-- 将普通结果保持为 `IsSpecial=false`；
-- 将 `HHHH`、`DRUNK` 等 seed 中的特殊结果设置为 `IsSpecial=true`，并移除 Pattern；
+- 为 25 个普通结果写入对应的 15 位 L/M/H `Pattern`；
+- 将普通结果保持为 `IsSpecial=false` 并移除错误的 `Trigger`；
+- 将 `HHHH`、`DRUNK` 设置为 `IsSpecial=true`、移除 `Pattern`，并写入对应 `Trigger`；
 - 保留 DefinitionV2 中题目贡献、结果文案、报告配置及未知扩展字段；
 - 只保存草稿，不自动发布。
+
+## 配置来源与许可
+
+执行配置来自 [serenakeyitan/sbti-wiki](https://github.com/serenakeyitan/sbti-wiki) 的固定提交：
+
+- revision：`6fbd41d63c60b322bb695e92457baa1b72fc3917`；
+- 维度来源：`data/dimensions.json`；
+- 模式及特殊结果来源：`data/patterns.json`；
+- license：CC BY-NC-SA 4.0；
+- attribution：SBTI 原始文案版权归 B 站 up 主“蛆肉儿串儿”（UID 417038183），配置整理归 `serenakeyitan/sbti-wiki`。
+
+脚本目录下的 `data/` 是上述提交的最小执行投影，只保留维度顺序、维度元数据、普通 Pattern 和特殊 Trigger。脚本不会导入或覆盖以下 wiki 内容：
+
+- 结果完整文案与图片：受非商业、署名及相同方式共享条款约束；
+- `rarity.json`：它是均匀随机采样得到的理论分布，不是真实用户统计，也不是常模。
+
+因此，更新 wiki 快照时必须人工审查上游提交、许可和数据语义，不能直接跟随 `main`。
+
+## 更新快照
+
+1. 只读拉取上游并记录完整 commit SHA；
+2. 对比上游 `data/dimensions.json`、`data/patterns.json` 与当前 `data/`；
+3. 仅将脚本实际使用的字段投影到本目录，更新 `sbtiWikiRevision`；
+4. 运行测试，确认上游配置仍为 15 个维度、25 个普通结果、2 个特殊结果，并与服务内嵌 legacy seed 的执行字段一致；
+5. 在真实环境先 dry-run，审核逐字段变更后再使用 `--apply`。
 
 ## 安全约束
 
 脚本写入前必须满足以下条件，否则立即停止：
 
-1. `Measure.FactorGraph.Roots` 与内置 SBTI 因子顺序完全一致；
-2. 顶层 `Outcomes` 和 type conclusion 的 `Profiles` Code 集合与 seed 完全一致；
+1. `Measure.FactorGraph.Roots` 与固定 wiki 快照中的 SBTI 因子顺序完全一致；
+2. 顶层 `Outcomes` 和 type conclusion 的 `Profiles` Code 集合与快照完全一致；
 3. Code 不得为空或重复；
-4. 每个普通 Pattern 去掉连字符后必须与因子数量一致，且只能包含 `L/M/H`；
-5. 修复结果必须通过 DefinitionV2 领域结构校验。
+4. 每个普通 Pattern 去掉连字符后必须恰好包含 15 个级别，且只能使用 `L/M/H`；
+5. 特殊结果必须有 Trigger 且不能有 Pattern；
+6. 修复结果必须通过 DefinitionV2 领域结构校验。
 
 写入使用受保护的模型定义 API，不直接修改 MongoDB。`--apply` 前会以 `0600` 权限保存原始 DefinitionV2 备份；写入后会调用模型校验接口。如果校验未通过，草稿会保留但脚本返回失败，禁止继续发布。
 
@@ -35,7 +59,7 @@ go run ./scripts/oneoff/repair_sbti_profiles/ \
   --model-code SBTI_FUN
 ```
 
-确认输出的 25 个 Pattern 变更和 2 个特殊标记变更后写入草稿：
+确认变更后写入草稿：
 
 ```bash
 QS_APISERVER_URL=https://qs.example.com \

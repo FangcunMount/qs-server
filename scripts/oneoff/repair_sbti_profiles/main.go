@@ -1,5 +1,5 @@
-// Command repair_sbti_profiles backfills canonical SBTI outcome patterns and
-// special-result flags through the protected DefinitionV2 authoring API.
+// Command repair_sbti_profiles backfills canonical SBTI outcome patterns,
+// special-result flags, and triggers through the protected DefinitionV2 authoring API.
 // It is dry-run by default and never publishes a repaired draft.
 package main
 
@@ -20,8 +20,6 @@ import (
 	"syscall"
 	"time"
 	"unicode"
-
-	rulesetinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
 
 type config struct {
@@ -126,13 +124,9 @@ func parseConfig(args []string, out io.Writer, getenv func(string) string) (conf
 }
 
 func run(ctx context.Context, cfg config, out io.Writer) error {
-	seed, err := rulesetinfra.LoadDefaultSBTILegacyModel()
+	catalog, err := loadWikiRepairCatalog()
 	if err != nil {
-		return err
-	}
-	catalog, err := catalogFromSBTI(seed)
-	if err != nil {
-		return fmt.Errorf("build canonical SBTI repair catalog: %w", err)
+		return fmt.Errorf("load pinned sbti-wiki repair catalog: %w", err)
 	}
 	client := apiClient{
 		baseURL: cfg.APIBase,
@@ -148,9 +142,9 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("plan repair for %s: %w", cfg.ModelCode, err)
 	}
-	printSummary(out, cfg.ModelCode, summary)
+	printSummary(out, cfg.ModelCode, catalog, summary)
 	if !summary.Changed() {
-		_, _ = fmt.Fprintln(out, "DefinitionV2 already matches the canonical SBTI profile data; nothing to write.")
+		_, _ = fmt.Fprintln(out, "DefinitionV2 already matches the pinned sbti-wiki profile data; nothing to write.")
 		return nil
 	}
 	if !cfg.Apply {
@@ -224,10 +218,12 @@ func (c apiClient) request(ctx context.Context, method, requestPath string, body
 	return envelope.Data, nil
 }
 
-func printSummary(out io.Writer, modelCode string, summary repairSummary) {
+func printSummary(out io.Writer, modelCode string, catalog repairCatalog, summary repairSummary) {
 	_, _ = fmt.Fprintf(out, "Model: %s\n", modelCode)
+	_, _ = fmt.Fprintf(out, "Catalog: %s@%s (%s)\n", catalog.Source, catalog.Revision, catalog.License)
+	_, _ = fmt.Fprintf(out, "Attribution: %s\n", catalog.Attribution)
 	_, _ = fmt.Fprintf(out, "Profiles: total=%d normal=%d special=%d\n", summary.ProfileCount, summary.NormalCount, summary.SpecialCount)
-	_, _ = fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, len(summary.Changes))
+	_, _ = fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d triggers=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, summary.TriggerChanges, len(summary.Changes))
 	for _, change := range summary.Changes {
 		_, _ = fmt.Fprintf(out, "  %s.%s: %s -> %s\n", change.OutcomeCode, change.Field, change.Before, change.After)
 	}

@@ -29,7 +29,7 @@ func TestRepairDefinitionBackfillsCanonicalProfilesAndIsIdempotent(t *testing.T)
 	if summary.ProfileCount != 27 || summary.NormalCount != 25 || summary.SpecialCount != 2 {
 		t.Fatalf("unexpected profile counts: %+v", summary)
 	}
-	if summary.PatternChanges != 25 || summary.SpecialFlagChanges != 2 || len(summary.Changes) != 27 {
+	if summary.PatternChanges != 25 || summary.SpecialFlagChanges != 2 || summary.TriggerChanges != 2 || len(summary.Changes) != 29 {
 		t.Fatalf("unexpected changes: %+v", summary)
 	}
 	if err := verifyRepairedDefinition(repaired, catalog); err != nil {
@@ -44,6 +44,46 @@ func TestRepairDefinitionBackfillsCanonicalProfilesAndIsIdempotent(t *testing.T)
 		t.Fatalf("second repair should be a no-op: %+v", secondSummary)
 	}
 	assertJSONEqual(t, repaired, second)
+}
+
+func TestWikiRepairCatalogMatchesLegacySeedExecutionProfiles(t *testing.T) {
+	catalog, err := loadWikiRepairCatalog()
+	if err != nil {
+		t.Fatalf("loadWikiRepairCatalog: %v", err)
+	}
+	if catalog.Source != sbtiWikiRepository || catalog.Revision != sbtiWikiRevision || catalog.License != sbtiWikiLicense {
+		t.Fatalf("unexpected provenance: %+v", catalog)
+	}
+	seed, err := rulesetinfra.LoadDefaultSBTILegacyModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(catalog.DimensionOrder) != fmt.Sprint(seed.DimensionOrder) {
+		t.Fatalf("dimension order drifted: wiki=%v seed=%v", catalog.DimensionOrder, seed.DimensionOrder)
+	}
+	if len(catalog.Profiles) != 27 {
+		t.Fatalf("wiki profile count = %d, want 27", len(catalog.Profiles))
+	}
+	for code, want := range catalog.Profiles {
+		got, ok := legacySeedProfile(seed, code)
+		if !ok || got != want {
+			t.Fatalf("profile %s drifted: wiki=%+v seed=%+v present=%t", code, want, got, ok)
+		}
+	}
+}
+
+func legacySeedProfile(seed *modeltypology.SBTILegacyModel, code string) (profileSeed, bool) {
+	for _, outcome := range seed.NormalOutcomes {
+		if outcome.Code == code {
+			return profileSeed{Pattern: outcome.Pattern, IsSpecial: outcome.IsSpecial}, true
+		}
+	}
+	for _, outcome := range seed.SpecialOutcomes {
+		if outcome.Code == code {
+			return profileSeed{Pattern: outcome.Pattern, Trigger: outcome.Trigger, IsSpecial: outcome.IsSpecial}, true
+		}
+	}
+	return profileSeed{}, false
 }
 
 func TestRepairDefinitionPreservesUnknownFields(t *testing.T) {
@@ -236,7 +276,7 @@ func brokenSBTIDefinition(t *testing.T) ([]byte, repairCatalog) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := catalogFromSBTI(seed)
+	catalog, err := loadWikiRepairCatalog()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +297,7 @@ func brokenSBTIDefinition(t *testing.T) ([]byte, repairCatalog) {
 		for profileIndex := range typed.Profiles {
 			typed.Profiles[profileIndex].Pattern = ""
 			typed.Profiles[profileIndex].IsSpecial = false
+			typed.Profiles[profileIndex].Trigger = ""
 		}
 		definition.Conclusions[index] = typed
 	}
