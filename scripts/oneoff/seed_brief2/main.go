@@ -5,13 +5,17 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +46,9 @@ const (
 	brief2NormFactorCount       = 13
 )
 
+//go:embed data/brief2-parent-cn-legacy-gXkk9W-v1.json.gz.b64
+var embeddedBrief2NormSource []byte
+
 type config struct {
 	mongoURI          string
 	mongoDB           string
@@ -71,7 +78,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.modelCode, "model-code", defaultModelCode, "assessment model code")
 	flag.StringVar(&cfg.questionnaireCode, "questionnaire-code", defaultQuestionnaire, "existing published questionnaire code")
 	flag.StringVar(&cfg.questionnaireVer, "questionnaire-version", defaultQuestionnaireVersion, "required published questionnaire version")
-	flag.StringVar(&cfg.normSource, "norm-source", "", "path to the supplied BRIEF2_Norms PHP source")
+	flag.StringVar(&cfg.normSource, "norm-source", "", "optional path to a normalized BRIEF-2 norm JSON source (default: embedded versioned data)")
 	flag.StringVar(&cfg.factorMap, "factor-map", "", "JSON file mapping legacy factor codes to questionnaire question codes")
 	flag.StringVar(&cfg.normVersion, "norm-version", defaultNormVersion, "immutable norm table version")
 	flag.StringVar(&cfg.formVariant, "form-variant", defaultFormVariant, "BRIEF-2 form variant")
@@ -82,9 +89,6 @@ func parseFlags() config {
 }
 
 func run(cfg config) error {
-	if cfg.normSource == "" {
-		return errors.New("--norm-source is required; pass the supplied BRIEF2_Norms PHP file")
-	}
 	if cfg.factorMap == "" {
 		return errors.New("--factor-map is required; the supplied files contain no item-to-scale mapping")
 	}
@@ -92,7 +96,7 @@ func run(cfg config) error {
 		return errors.New("model-code, questionnaire-code, questionnaire-version, norm-version and form-variant are required")
 	}
 
-	source, err := loadPHPNormSource(cfg.normSource)
+	source, err := loadNormSource(cfg.normSource)
 	if err != nil {
 		return err
 	}
@@ -239,10 +243,10 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	return nil
 }
 
-type phpNormSource struct {
-	Factors map[string]string     `json:"factors"`
-	Briefs  map[string]normBrief  `json:"briefs"`
-	Scores  []phpNormScoreStratum `json:"scores"`
+type normSource struct {
+	Factors map[string]string    `json:"factors"`
+	Briefs  map[string]normBrief `json:"briefs"`
+	Scores  []normScoreStratum   `json:"scores"`
 }
 
 type normBrief struct {
@@ -250,29 +254,49 @@ type normBrief struct {
 	Desc  string `json:"desc"`
 }
 
-type phpNormScoreStratum struct {
+type normScoreStratum struct {
 	Ages   []int             `json:"ages"`
 	Sex    int               `json:"sex"`
 	Scores map[string]string `json:"scores"`
 }
 
-func loadPHPNormSource(path string) (phpNormSource, error) {
-	if _, err := os.Stat(path); err != nil {
-		return phpNormSource{}, fmt.Errorf("stat norm source: %w", err)
-	}
-	const program = `require $argv[1]; echo json_encode(array("factors" => BRIEF2_Norms::FACTOR_NORM_RELATION, "briefs" => BRIEF2_Norms::NORM_BRIEFS, "scores" => BRIEF2_Norms::SCORES));`
-	output, err := exec.Command("php", "-r", program, path).Output()
+func loadNormSource(path string) (normSource, error) {
+	output, err := readNormSource(path, embeddedBrief2NormSource)
 	if err != nil {
-		return phpNormSource{}, fmt.Errorf("export PHP norm source (php is required): %w", err)
+		return normSource{}, err
 	}
-	var source phpNormSource
+	var source normSource
 	if err := json.Unmarshal(output, &source); err != nil {
-		return phpNormSource{}, fmt.Errorf("decode PHP norm source: %w", err)
+		return normSource{}, fmt.Errorf("decode BRIEF-2 norm JSON source: %w", err)
 	}
 	if len(source.Factors) != brief2NormFactorCount || len(source.Scores) == 0 {
-		return phpNormSource{}, fmt.Errorf("unexpected BRIEF-2 source: factors=%d strata=%d", len(source.Factors), len(source.Scores))
+		return normSource{}, fmt.Errorf("unexpected BRIEF-2 source: factors=%d strata=%d", len(source.Factors), len(source.Scores))
 	}
 	return source, nil
+}
+
+func readNormSource(path string, embedded []byte) ([]byte, error) {
+	if path != "" {
+		output, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read norm source: %w", err)
+		}
+		return output, nil
+	}
+	compressed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(embedded)))
+	if err != nil {
+		return nil, fmt.Errorf("decode embedded norm source: %w", err)
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return nil, fmt.Errorf("open embedded norm source: %w", err)
+	}
+	defer func() { _ = reader.Close() }()
+	output, err := io.ReadAll(io.LimitReader(reader, 8<<20))
+	if err != nil {
+		return nil, fmt.Errorf("decompress embedded norm source: %w", err)
+	}
+	return output, nil
 }
 
 type factorMap map[string][]string
@@ -325,7 +349,7 @@ func (m factorMapping) excludedQuestionCount() int {
 	return count
 }
 
-func buildNormTable(source phpNormSource, version, formVariant string) (*modelnorm.Norm, normCatalog, error) {
+func buildNormTable(source normSource, version, formVariant string) (*modelnorm.Norm, normCatalog, error) {
 	catalog, err := newNormCatalog(source)
 	if err != nil {
 		return nil, normCatalog{}, err
@@ -386,7 +410,7 @@ type normCatalog struct {
 	order      []string
 }
 
-func newNormCatalog(source phpNormSource) (normCatalog, error) {
+func newNormCatalog(source normSource) (normCatalog, error) {
 	byNormName := make(map[string]string, len(source.Factors))
 	titles := make(map[string]string, len(source.Factors))
 	for factorCode, normName := range source.Factors {
@@ -410,7 +434,7 @@ func newNormCatalog(source phpNormSource) (normCatalog, error) {
 	return normCatalog{byNormName: byNormName, titles: titles, order: order}, nil
 }
 
-func stratumScope(value phpNormScoreStratum) (int, int, string, error) {
+func stratumScope(value normScoreStratum) (int, int, string, error) {
 	if len(value.Ages) == 0 {
 		return 0, 0, "", errors.New("ages is required")
 	}

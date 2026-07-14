@@ -1,8 +1,8 @@
 # SPM 感觉统合量表初始化脚本
 
-此脚本初始化的是 **Sensory Processing Measure（感觉统合量表）**，不是 Raven 标准推理测验。模型默认编码和问卷编码均为 `bJFKi3`。
+此脚本初始化 **Sensory Processing Measure（感觉统合量表）**，不是 Raven 标准推理测验。模型默认编码和问卷编码均为 `bJFKi3`。
 
-写入模型身份为：
+模型身份：
 
 ```text
 kind=behavioral_rating
@@ -11,38 +11,50 @@ product_channel=behavior_ability
 payload_format=assessmentmodel.behavioral_rating.default.v1
 ```
 
-它写入 `assessment_norms`、`assessment_models` 和 `published_assessment_models`，以 SOC、VIS、HEA、TOU、BOD、BAL、PLA 和 TOT 的原始分范围映射 T 分和百分位。源表中空白的顶端百分位按其已有顶码规则保存为 `99`；脚本会输出使用该回退的条数。
+脚本写入 `assessment_norms`、`assessment_models` 和 `published_assessment_models`。它只需要 MongoDB，不使用 MySQL。常模已经作为版本化、gzip+base64 编码的 JSON 资产内嵌在 `data/spm-sensory-cn-legacy-bJFKi3-v1.json.gz.b64`，服务器不需要 PHP，也不需要本地附件。Base64 不是加密，不应把未经授权的常模资产提交到公开仓库。
+
+内嵌资产解压后 JSON 的 SHA-256 为 `280841d9893b72ece1170417eeb0f1ead05e0aad5c8d605928576d59c0db473b`，可用于部署前完整性核验。
 
 ## 题目映射
 
 仓库已经根据已发布问卷 `bJFKi3@4.0.1` 准备好 [data/bJFKi3_4.0.1_factor_map.json](./data/bJFKi3_4.0.1_factor_map.json)。映射文件显式绑定问卷 code/version。
 
-`TOT` 不可填入映射。按现有常模口径，它汇总 VIS、HEA、TOU、BOD、BAL 五个标准感觉系统维度以及5个“味觉与嗅觉”题，共56题；SOC（社会参与）和 PLA（规划与想法）单独报告，不计入 TOT。味觉与嗅觉使用历史辅助因子编码 `wcgKM7uV`，只参与 TOT，不单独查常模或展示为标准维度。
+`TOT` 汇总 VIS、HEA、TOU、BOD、BAL 五个标准感觉系统维度以及 5 个“味觉与嗅觉”题，共 56 题；SOC 和 PLA 单独报告，不计入 TOT。味觉与嗅觉使用历史辅助因子编码 `wcgKM7uV`，只参与 TOT。
 
-脚本会拒绝：缺失维度、未在问卷中发布的题目、同一题归属多个维度，以及未分配的可作答题目。
+脚本校验四级选项计分方向：SOC 的 10 题和“拥有良好的平衡感”（`jenu1Rox`）必须反向计分，其余题目必须正向计分。
 
-脚本还会校验四级选项的计分方向：SOC 的10题和“拥有良好的平衡感”（`jenu1Rox`）必须反向计分，其余题目必须正向计分。这样即使后续有人改了问卷选项分值，也不会带着错误方向发布。
+## 服务器执行
 
-## 执行
+先验证内嵌常模和映射，不连接数据库：
 
 ```bash
-# 只校验常模源和映射文件
 go run ./scripts/oneoff/seed_spm_sensory/ \
-  --questionnaire-code bJFKi3 --questionnaire-version 4.0.1 \
-  --norm-source /path/to/SPM_Norms.php \
+  --questionnaire-code bJFKi3 \
+  --questionnaire-version 4.0.1 \
   --factor-map ./scripts/oneoff/seed_spm_sensory/data/bJFKi3_4.0.1_factor_map.json
+```
 
-# 实际写入
+确认 dry-run 输出后连接 MongoDB 写入：
+
+```bash
 go run ./scripts/oneoff/seed_spm_sensory/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs \
-  --questionnaire-code bJFKi3 --questionnaire-version 4.0.1 \
-  --norm-source /path/to/SPM_Norms.php \
+  --mongo-uri "$MONGO_URL" --mongo-db "${MONGO_DB:-qs}" \
+  --questionnaire-code bJFKi3 \
+  --questionnaire-version 4.0.1 \
   --factor-map ./scripts/oneoff/seed_spm_sensory/data/bJFKi3_4.0.1_factor_map.json \
   --apply
 ```
 
-已有同编码模型时，必须先审阅快照；仅在确认需要整体替换时使用 `--force`。常模版本不可覆盖，只有内容完全相同的重复导入才会幂等通过。
+若服务器使用 `MONGO_URI`，可以省略 `--mongo-uri`。`--norm-source` 仅用于传入同结构的规范化 JSON 覆盖文件，通常不要使用。
 
-当前 qs-server 尚未注册 `/norm-tables` 写入路由，因此 operating API token 只能用于只读核验问卷，不能替代 Mongo 完成常模导入。本脚本的 `--apply` 仍需要 `MONGO_URI`；在常模表 REST 契约上线前不要尝试用后台 token 绕过此限制。
+已有同编码模型时脚本会拒绝写入。只有在完成数据库备份、审阅当前草稿和发布快照并确认需要整体替换后，才允许增加 `--force`。常模版本不可覆盖，相同版本仅允许内容完全相同。
 
-`SPM_Texts.php` 的详细报告依赖敏感、低反应、感觉寻求等子因子。当前问卷映射只足以建立八个顶层常模因子，因此本脚本不会伪造这些子因子或写入无法被报告运行时消费的富文本。
+## 验收
+
+确认：
+
+- 常模版本为 `spm-sensory-cn-legacy-bJFKi3-v1`；
+- 模型算法为 `spm_sensory`，而不是 `spm`；
+- 问卷绑定为 `bJFKi3@4.0.1`；
+- 常模因子为 SOC、VIS、HEA、TOU、BOD、BAL、PLA、TOT；
+- 模型状态和发布快照均存在。

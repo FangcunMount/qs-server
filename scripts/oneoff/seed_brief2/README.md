@@ -1,62 +1,48 @@
 # BRIEF-2 初始化脚本
 
-此脚本将既有 BRIEF-2 家长版常模导入 canonical `behavioral_rating/brief2` 模型。默认模型编码和问卷编码均为 `gXkk9W`。
+此脚本将 BRIEF-2 家长版常模导入 canonical `behavioral_rating/brief2` 模型。默认模型编码和问卷编码均为 `gXkk9W`。
 
 它写入：
 
 - `assessment_norms`：`brief2-parent-cn-legacy-gXkk9W-v1`，以年龄（月）和性别分层的 T 分/百分位查表项；
-- `assessment_models`：已发布的 `behavioral_rating + brief2 + behavior_ability` 草稿；
+- `assessment_models`：`behavioral_rating + brief2 + behavior_ability` 草稿；
 - `published_assessment_models`：冻结的 BRIEF-2 运行快照。
+
+脚本只需要 MongoDB，不使用 MySQL。常模已经作为版本化、gzip+base64 编码的 JSON 资产内嵌在 `data/brief2-parent-cn-legacy-gXkk9W-v1.json.gz.b64`，服务器不需要 PHP，也不需要本地附件。Base64 不是加密，不应把未经授权的常模资产提交到公开仓库。
+
+内嵌资产解压后 JSON 的 SHA-256 为 `daaf5d9dc87d42b0db9f289066adfda35bc85355189e976994edeea46dbb3b12`，可用于部署前完整性核验。
 
 ## 题目映射
 
-仓库已经根据已发布问卷 `gXkk9W@4.0.1` 和 BRIEF-2 家长版标准题号准备好 [data/gXkk9W_4.0.1_factor_map.json](./data/gXkk9W_4.0.1_factor_map.json)。映射文件显式绑定问卷 code/version，避免将题目编码误用于其他版本。
+仓库已经根据已发布问卷 `gXkk9W@4.0.1` 和 BRIEF-2 家长版标准题号准备好 [data/gXkk9W_4.0.1_factor_map.json](./data/gXkk9W_4.0.1_factor_map.json)。映射文件显式绑定问卷 code/version。
 
-键必须保持以下历史因子编码，值为当前已发布问卷 `gXkk9W` 中对应的题目编码数组：
+标准 63 题中有 60 题进入九个临床分量表；Infrequency 的 3 个专用题不进入临床分，问卷末尾另有 7 个非 BRIEF-2 补充题。当前脚本不计算 Infrequency、Negativity 和 Inconsistency 效度指标。
 
-| 因子 | 中文名 |
-| --- | --- |
-| `p3O50jXO` | 抑制 |
-| `Aa7IbYHN` | 自我监控 |
-| `nJkTU8bM` | 情景转换 |
-| `AyvItzpm` | 情绪控制 |
-| `Tox3nsdt` | 任务启动 |
-| `CI01dlwX` | 工作记忆 |
-| `N279wV33` | 计划/组织 |
-| `WJI5vCPX` | 任务监控 |
-| `C5T60lQa` | 材料组织 |
+## 服务器执行
 
-标准63题中有60题进入九个临床分量表；Infrequency 的3个专用题不进入临床分，问卷末尾另有7个非 BRIEF-2 补充题。映射文件通过 `excluded_question_codes` 明确记录这10题。执行时脚本会校验：九个临床量表都存在、每一道可作答题恰好被计分或显式排除、所有题目和选项编码均来自已发布问卷。映射不完整、重复或版本不匹配时不会写入模型。
-
-当前脚本不计算 Infrequency、Negativity 和 Inconsistency 效度指标。尤其 Inconsistency 需要题目对差值策略，不能用普通求和冒充。
-
-## 执行
-
-先只校验输入：
+从仓库根目录运行。先验证内嵌常模和映射，不连接数据库：
 
 ```bash
 go run ./scripts/oneoff/seed_brief2/ \
-  --questionnaire-code gXkk9W --questionnaire-version 4.0.1 \
-  --norm-source /path/to/BRIEF2_Norms.php \
+  --questionnaire-code gXkk9W \
+  --questionnaire-version 4.0.1 \
   --factor-map ./scripts/oneoff/seed_brief2/data/gXkk9W_4.0.1_factor_map.json
 ```
 
-再写入（脚本会读取 `MONGO_URI`、`MONGO_DB`，也可显式传参数）：
+确认 dry-run 输出后连接 MongoDB 写入：
 
 ```bash
 go run ./scripts/oneoff/seed_brief2/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs \
-  --questionnaire-code gXkk9W --questionnaire-version 4.0.1 \
-  --norm-source /path/to/BRIEF2_Norms.php \
+  --mongo-uri "$MONGO_URL" --mongo-db "${MONGO_DB:-qs}" \
+  --questionnaire-code gXkk9W \
+  --questionnaire-version 4.0.1 \
   --factor-map ./scripts/oneoff/seed_brief2/data/gXkk9W_4.0.1_factor_map.json \
   --apply
 ```
 
-若同编码模型已存在，先审阅已发布快照；确认需要整体替换时才追加 `--force`。常模表版本不可覆盖：相同版本仅允许内容完全相同。
+若服务器使用 `MONGO_URI`，可以省略 `--mongo-uri`。`--norm-source` 仅用于传入同结构的规范化 JSON 覆盖文件，通常不要使用。
 
-当前 qs-server 尚未注册 `/norm-tables` 写入路由，因此 operating API token 只能用于只读核验问卷，不能替代 Mongo 完成常模导入。本脚本的 `--apply` 仍需要 `MONGO_URI`。
-
-`BRIEF2_Texts.php` 中的维度解释、通常表现和家庭建议可作为后续报告资产迁移来源，但当前 `DefinitionV2.ReportMap` 不承载该富文本结构，本脚本不会静默写入运行时无法消费的数据。
+已有同编码模型时脚本会拒绝写入。只有在完成数据库备份、审阅当前草稿和发布快照并确认需要整体替换后，才允许增加 `--force`。常模版本不可覆盖，相同版本仅允许内容完全相同。
 
 ## 验收
 

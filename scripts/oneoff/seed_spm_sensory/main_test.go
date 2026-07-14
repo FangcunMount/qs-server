@@ -84,6 +84,23 @@ func TestVersionedFactorMapCoversAllSPMQuestions(t *testing.T) {
 	}
 }
 
+func TestEmbeddedNormSourceIsUsableWithoutExternalFiles(t *testing.T) {
+	source, err := loadNormSource("")
+	if err != nil {
+		t.Fatalf("loadNormSource() error = %v", err)
+	}
+	if len(source.Factors) != 8 || source.Scores == "" {
+		t.Fatalf("embedded source factors=%d scores=%t, want 8 and non-empty", len(source.Factors), source.Scores != "")
+	}
+	table, _, fallbacks, err := buildNormTable(source, defaultNormVersion, defaultFormVariant)
+	if err != nil {
+		t.Fatalf("buildNormTable() error = %v", err)
+	}
+	if len(table.Factors) != 8 || fallbacks != 9 {
+		t.Fatalf("embedded norm factors=%d fallbacks=%d, want 8 and 9", len(table.Factors), fallbacks)
+	}
+}
+
 func testCatalog() normCatalog {
 	catalog := normCatalog{byNormName: map[string]string{}, titles: map[string]string{}, order: make([]string, 0, 8)}
 	for index := 0; index < 8; index++ {

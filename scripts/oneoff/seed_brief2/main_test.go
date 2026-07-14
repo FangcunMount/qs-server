@@ -75,6 +75,19 @@ func TestVersionedFactorMapCoversBRIEF2ClinicalAndExcludedQuestions(t *testing.T
 	}
 }
 
+func TestEmbeddedNormSourceIsUsableWithoutExternalFiles(t *testing.T) {
+	source, err := loadNormSource("")
+	if err != nil {
+		t.Fatalf("loadNormSource() error = %v", err)
+	}
+	if len(source.Factors) != 13 || len(source.Scores) != 6 {
+		t.Fatalf("embedded source factors=%d strata=%d, want 13 and 6", len(source.Factors), len(source.Scores))
+	}
+	if _, _, err := buildNormTable(source, defaultNormVersion, defaultFormVariant); err != nil {
+		t.Fatalf("buildNormTable() error = %v", err)
+	}
+}
+
 func testCatalog() normCatalog {
 	catalog := normCatalog{byNormName: map[string]string{}, titles: map[string]string{}, order: make([]string, 0, 13)}
 	for index := 0; index < 13; index++ {
