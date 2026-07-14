@@ -32,6 +32,7 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 func assessmentModelManageRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
 	return []routeSpec{
 		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
+		{method: http.MethodPost, path: "/:code/restore-draft", handlers: []gin.HandlerFunc{handler.RestoreDraftFromPublished}},
 		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
 		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
 		{method: http.MethodPut, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.BindQuestionnaire}},

@@ -159,6 +159,30 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
+// RestoreDraftFromPublished restores a mutable draft for a legacy orphaned
+// published snapshot. The operator must still make any edit and publish it via
+// the normal assessment release workflow.
+// @Summary 从发布快照恢复测评草稿
+// @Tags AssessmentModel
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
+// @Router /api/v1/assessment-models/{code}/restore-draft [post]
+func (h *AssessmentModelHandler) RestoreDraftFromPublished(c *gin.Context) {
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.management.RestoreDraftFromPublished(c.Request.Context(), actor, h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.AssessmentModelResponse)(result))
+}
+
 // @Summary 删除已归档测评模型
 // @Tags AssessmentModel
 // @Param Authorization header string true "Bearer 用户令牌"

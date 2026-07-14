@@ -4593,6 +4593,34 @@ paths:
       summary: 绑定问卷
       tags:
       - AssessmentModel
+  /api/v1/assessment-models/{code}/restore-draft:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 从发布快照恢复测评草稿
+      tags:
+      - AssessmentModel
   /api/v1/assessment-models/{code}/unpublish:
     post:
       parameters:

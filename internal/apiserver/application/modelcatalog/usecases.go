@@ -11,6 +11,9 @@ import (
 // CatalogManagementService 拥有模型目录生命周期命令
 type CatalogManagementService interface {
 	Create(ctx context.Context, actor ActorContext, input CreateModelDTO) (*ModelSummary, error)
+	// RestoreDraftFromPublished recreates a missing mutable draft head from an
+	// active immutable snapshot. The snapshot remains active until republished.
+	RestoreDraftFromPublished(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 	UpdateBasicInfo(ctx context.Context, actor ActorContext, input UpdateBasicInfoDTO) (*ModelSummary, error)
 	BindQuestionnaire(ctx context.Context, actor ActorContext, input BindQuestionnaireDTO) (*QuestionnaireBindingResult, error)
 	Archive(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)

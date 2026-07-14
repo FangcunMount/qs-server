@@ -18,6 +18,7 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/assessment-models", "post")
 	assertOpenAPIOperation(t, spec, "/assessment-models/options", "get")
 	assertOpenAPIOperation(t, spec, "/assessment-models/{code}", "get")
+	assertOpenAPIOperation(t, spec, "/assessment-models/{code}/restore-draft", "post")
 	assertOpenAPIOperation(t, spec, "/assessment-models/{code}/definition", "get")
 	assertOpenAPIOperation(t, spec, "/assessment-models/{code}/definition", "put")
 	assertOpenAPIOperation(t, spec, "/assessment-models/{code}/questionnaire", "get")

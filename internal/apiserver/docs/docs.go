@@ -1371,6 +1371,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessment-models/{code}/restore-draft": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "从发布快照恢复测评草稿",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessment-models/{code}/unpublish": {
             "post": {
                 "produces": [

@@ -22,6 +22,35 @@ type assessmentModelPublicationStub struct {
 	publishCalled bool
 }
 
+type assessmentModelManagementStub struct {
+	restoreResult *modelcatalog.ModelSummary
+	restoreErr    error
+	restoredCode  string
+}
+
+func (*assessmentModelManagementStub) Create(context.Context, modelcatalog.ActorContext, modelcatalog.CreateModelDTO) (*modelcatalog.ModelSummary, error) {
+	return nil, nil
+}
+func (s *assessmentModelManagementStub) RestoreDraftFromPublished(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.ModelSummary, error) {
+	s.restoredCode = code
+	return s.restoreResult, s.restoreErr
+}
+func (*assessmentModelManagementStub) UpdateBasicInfo(context.Context, modelcatalog.ActorContext, modelcatalog.UpdateBasicInfoDTO) (*modelcatalog.ModelSummary, error) {
+	return nil, nil
+}
+func (*assessmentModelManagementStub) BindQuestionnaire(context.Context, modelcatalog.ActorContext, modelcatalog.BindQuestionnaireDTO) (*modelcatalog.QuestionnaireBindingResult, error) {
+	return nil, nil
+}
+func (*assessmentModelManagementStub) Archive(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ModelSummary, error) {
+	return nil, nil
+}
+func (*assessmentModelManagementStub) Delete(context.Context, modelcatalog.ActorContext, string) error {
+	return nil
+}
+func (*assessmentModelManagementStub) SynchronizeQuestionnaireVersion(context.Context, modelcatalog.ActorContext, string, string) error {
+	return nil
+}
+
 type assessmentReleaseStub struct {
 	publishCalled bool
 	archiveCalled bool
@@ -121,6 +150,27 @@ func TestAssessmentModelPublishUsesPublicationService(t *testing.T) {
 	}
 	if !svc.publishCalled {
 		t.Fatal("publication service was not called")
+	}
+}
+
+func TestAssessmentModelRestoreDraftUsesManagementService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &assessmentModelManagementStub{restoreResult: &modelcatalog.ModelSummary{Code: "IPIP_BF50", Status: "draft"}}
+	handler := NewAssessmentModelHandler(svc, nil, nil, nil)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-models/IPIP_BF50/restore-draft", nil)
+	c.Params = gin.Params{{Key: "code", Value: "IPIP_BF50"}}
+	setAssessmentModelActor(c)
+
+	handler.RestoreDraftFromPublished(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if svc.restoredCode != "IPIP_BF50" {
+		t.Fatalf("restored code = %q, want IPIP_BF50", svc.restoredCode)
 	}
 }
 
