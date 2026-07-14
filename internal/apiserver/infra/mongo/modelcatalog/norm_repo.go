@@ -98,7 +98,7 @@ func (r *NormRepository) ListNorms(ctx context.Context, filter port.NormListFilt
 	if err != nil {
 		return nil, 0, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	var rows []NormPO
 	if err := cursor.All(ctx, &rows); err != nil {
 		return nil, 0, err

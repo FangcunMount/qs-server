@@ -64,7 +64,7 @@ func main() {
 		if errors.Is(err, flag.ErrHelp) {
 			return
 		}
-		fmt.Fprintf(os.Stderr, "repair SBTI profiles failed: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "repair SBTI profiles failed: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -95,11 +95,11 @@ func parseConfig(args []string, out io.Writer, getenv func(string) string) (conf
 	flags.BoolVar(&cfg.Apply, "apply", false, "save the repaired DefinitionV2 draft (default dry-run)")
 	flags.DurationVar(&cfg.Timeout, "timeout", cfg.Timeout, "per-request timeout")
 	flags.Usage = func() {
-		fmt.Fprintln(out, "Usage:")
-		fmt.Fprintln(out, "  QS_APISERVER_URL=https://qs.example.com QS_OPERATOR_TOKEN=... \\")
-		fmt.Fprintln(out, "    go run ./scripts/oneoff/repair_sbti_profiles/ --model-code SBTI_FUN [--apply]")
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "The operator token is read only from QS_OPERATOR_TOKEN or QS_TOKEN and is never accepted as a flag.")
+		_, _ = fmt.Fprintln(out, "Usage:")
+		_, _ = fmt.Fprintln(out, "  QS_APISERVER_URL=https://qs.example.com QS_OPERATOR_TOKEN=... \\")
+		_, _ = fmt.Fprintln(out, "    go run ./scripts/oneoff/repair_sbti_profiles/ --model-code SBTI_FUN [--apply]")
+		_, _ = fmt.Fprintln(out)
+		_, _ = fmt.Fprintln(out, "The operator token is read only from QS_OPERATOR_TOKEN or QS_TOKEN and is never accepted as a flag.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -150,11 +150,11 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 	}
 	printSummary(out, cfg.ModelCode, summary)
 	if !summary.Changed() {
-		fmt.Fprintln(out, "DefinitionV2 already matches the canonical SBTI profile data; nothing to write.")
+		_, _ = fmt.Fprintln(out, "DefinitionV2 already matches the canonical SBTI profile data; nothing to write.")
 		return nil
 	}
 	if !cfg.Apply {
-		fmt.Fprintln(out, "Dry run complete. No draft or published snapshot was changed. Pass --apply to save the repaired draft.")
+		_, _ = fmt.Fprintln(out, "Dry run complete. No draft or published snapshot was changed. Pass --apply to save the repaired draft.")
 		return nil
 	}
 
@@ -162,7 +162,7 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("write pre-repair backup: %w", err)
 	}
-	fmt.Fprintf(out, "Backup written: %s\n", backupPath)
+	_, _ = fmt.Fprintf(out, "Backup written: %s\n", backupPath)
 	written, err := client.request(ctx, http.MethodPut, definitionPath, repaired)
 	if err != nil {
 		return fmt.Errorf("save repaired DefinitionV2 for %s: %w", cfg.ModelCode, err)
@@ -180,12 +180,12 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 		return fmt.Errorf("DefinitionV2 was saved as a draft, but validation response could not be decoded: %w", err)
 	}
 	for _, issue := range validation.Issues {
-		fmt.Fprintf(out, "validation %s %s: %s\n", firstNonEmpty(issue.Level, "error"), issue.Field, issue.Message)
+		_, _ = fmt.Fprintf(out, "validation %s %s: %s\n", firstNonEmpty(issue.Level, "error"), issue.Field, issue.Message)
 	}
 	if !validation.Passed {
 		return fmt.Errorf("DefinitionV2 was saved as a draft, but server validation did not pass; inspect the issues above and do not publish")
 	}
-	fmt.Fprintln(out, "Repair saved and server validation passed. The draft was not published.")
+	_, _ = fmt.Fprintln(out, "Repair saved and server validation passed. The draft was not published.")
 	return nil
 }
 
@@ -206,7 +206,7 @@ func (c apiClient) request(ctx context.Context, method, requestPath string, body
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 	if err != nil {
 		return nil, err
@@ -225,11 +225,11 @@ func (c apiClient) request(ctx context.Context, method, requestPath string, body
 }
 
 func printSummary(out io.Writer, modelCode string, summary repairSummary) {
-	fmt.Fprintf(out, "Model: %s\n", modelCode)
-	fmt.Fprintf(out, "Profiles: total=%d normal=%d special=%d\n", summary.ProfileCount, summary.NormalCount, summary.SpecialCount)
-	fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, len(summary.Changes))
+	_, _ = fmt.Fprintf(out, "Model: %s\n", modelCode)
+	_, _ = fmt.Fprintf(out, "Profiles: total=%d normal=%d special=%d\n", summary.ProfileCount, summary.NormalCount, summary.SpecialCount)
+	_, _ = fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, len(summary.Changes))
 	for _, change := range summary.Changes {
-		fmt.Fprintf(out, "  %s.%s: %s -> %s\n", change.OutcomeCode, change.Field, change.Before, change.After)
+		_, _ = fmt.Fprintf(out, "  %s.%s: %s -> %s\n", change.OutcomeCode, change.Field, change.Before, change.After)
 	}
 }
 
@@ -243,7 +243,7 @@ func writeBackup(directory, modelCode string, definition []byte, now time.Time) 
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	var pretty bytes.Buffer
 	if err := json.Indent(&pretty, definition, "", "  "); err != nil {
 		return "", err
