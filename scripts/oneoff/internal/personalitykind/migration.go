@@ -76,7 +76,7 @@ func Findings(ctx context.Context, collection *mongo.Collection, spec Collection
 	if err != nil {
 		return nil, fmt.Errorf("find %s legacy kind values: %w", spec.Name, err)
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	findings := make([]Finding, 0)
 	for cursor.Next(ctx) {

@@ -60,7 +60,7 @@ func run(cfg config, output *os.File) error {
 	if err != nil {
 		return fmt.Errorf("connect mongo: %w", err)
 	}
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 
 	db := client.Database(cfg.mongoDB)
 	items := make([]personalitykind.Finding, 0)
@@ -104,12 +104,12 @@ func run(cfg config, output *os.File) error {
 		if item.Eligible {
 			state = "READY"
 		}
-		fmt.Fprintf(output, "%s collection=%s code=%s kind=%s sub_kind=%s algorithm=%s product_channel=%s reason=%s\n", state, item.Collection, item.Code, item.Kind, item.SubKind, item.Algorithm, item.ProductChannel, item.Reason)
+		_, _ = fmt.Fprintf(output, "%s collection=%s code=%s kind=%s sub_kind=%s algorithm=%s product_channel=%s reason=%s\n", state, item.Collection, item.Code, item.Kind, item.SubKind, item.Algorithm, item.ProductChannel, item.Reason)
 	}
 	if cfg.apply {
-		fmt.Fprintf(output, "applied %d verified normalization(s); skipped %d unsafe row(s)\n", rep.Applied, rep.Skipped)
+		_, _ = fmt.Fprintf(output, "applied %d verified normalization(s); skipped %d unsafe row(s)\n", rep.Applied, rep.Skipped)
 	} else {
-		fmt.Fprintf(output, "audit complete: %d verified normalization(s), %d unsafe row(s); re-run with --apply after review\n", rep.Eligible, rep.Skipped)
+		_, _ = fmt.Fprintf(output, "audit complete: %d verified normalization(s), %d unsafe row(s); re-run with --apply after review\n", rep.Eligible, rep.Skipped)
 	}
 	return nil
 }
