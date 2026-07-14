@@ -69,7 +69,7 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 	if incoming != nil || model == nil {
 		return nil, incoming
 	}
-	if model.Kind != string(modeldomain.KindTypology) {
+	if !isTypologyCatalogModel(model) {
 		return nil, fmt.Errorf("catalog model kind %q is not typology", model.Kind)
 	}
 	var definition modeldomain.Definition
@@ -103,6 +103,30 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 		response.Outcomes = append(response.Outcomes, typologymodel.TypologyOutcomeResponse{Code: outcome.Code, Name: outcome.Name, OneLiner: outcome.OneLiner, ImageURL: imageURL})
 	}
 	return response, nil
+}
+
+// isTypologyCatalogModel keeps the BFF readable while the data migration is
+// rolled out. The retired personality kind is accepted only when the remaining
+// identity fields prove that the row is one of the old typology records.
+func isTypologyCatalogModel(model *modelcatalog.ModelResponse) bool {
+	if model == nil {
+		return false
+	}
+	if model.Kind == string(modeldomain.KindTypology) {
+		return true
+	}
+	if model.Kind != "personality" || model.SubKind != string(modeldomain.SubKindTypology) {
+		return false
+	}
+	switch modeldomain.Algorithm(model.Algorithm) {
+	case modeldomain.AlgorithmPersonalityTypology,
+		modeldomain.AlgorithmBigFive,
+		modeldomain.AlgorithmMBTI,
+		modeldomain.AlgorithmSBTI:
+		return true
+	default:
+		return false
+	}
 }
 
 func typologySummaryResponse(value *typologymodel.TypologyModelResponse) typologymodel.TypologyModelSummaryResponse {

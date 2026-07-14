@@ -54,6 +54,56 @@ func TestTypologyCatalogProjectorUsesCanonicalDefinition(t *testing.T) {
 	}
 }
 
+func TestTypologyCatalogProjectorNormalizesVerifiedLegacyPersonalityKind(t *testing.T) {
+	t.Parallel()
+
+	definition := typologyDefinitionFixture(t)
+	result, err := typologyResponseFromCatalog(&appcatalog.ModelResponse{
+		Code:       "SBTI_FUN",
+		Kind:       "personality",
+		SubKind:    string(modeldomain.SubKindTypology),
+		Algorithm:  string(modeldomain.AlgorithmSBTI),
+		Definition: definition,
+	}, nil)
+	if err != nil {
+		t.Fatalf("typologyResponseFromCatalog: %v", err)
+	}
+	if result.Kind != string(modeldomain.KindTypology) {
+		t.Fatalf("normalized kind = %q, want typology", result.Kind)
+	}
+}
+
+func TestTypologyCatalogProjectorRejectsUnverifiedLegacyPersonalityKind(t *testing.T) {
+	t.Parallel()
+
+	_, err := typologyResponseFromCatalog(&appcatalog.ModelResponse{
+		Code:      "NOT_A_TYPOLOGY",
+		Kind:      "personality",
+		SubKind:   "trait",
+		Algorithm: string(modeldomain.AlgorithmSBTI),
+	}, nil)
+	if err == nil {
+		t.Fatal("typologyResponseFromCatalog error = nil, want rejected legacy personality record")
+	}
+}
+
+func typologyDefinitionFixture(t *testing.T) json.RawMessage {
+	t.Helper()
+	payload, err := os.ReadFile(filepath.Join("..", "..", "..", "apiserver", "testdata", "personality", "frontend_payload_mbti.json"))
+	if err != nil {
+		t.Fatalf("read typology fixture: %v", err)
+	}
+	materialized, err := modeltypology.ImportLegacyDefinition(payload, modeldomain.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("ImportLegacyDefinition: %v", err)
+	}
+	definition, err := json.Marshal(materialized.Definition)
+	if err != nil {
+		t.Fatalf("marshal definition: %v", err)
+	}
+	return definition
+}
+
 type catalogReaderStub struct {
 	model *appcatalog.CatalogModel
 }
