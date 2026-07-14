@@ -28,14 +28,26 @@ type QuestionnaireResult struct {
 
 // QuestionResult 问题结果
 type QuestionResult struct {
-	Code            string                              // 问题编码
-	Stem            string                              // 题干
-	Type            string                              // 问题类型
-	Options         []OptionResult                      // 选项列表
-	ValidationRules []ValidationRuleResult              // 校验规则
-	Required        bool                                // 是否必填
-	Description     string                              // 问题描述
-	ShowController  *domainQuestionnaire.ShowController // 显示控制器
+	Code            string                 // 问题编码
+	Stem            string                 // 题干
+	Type            string                 // 问题类型
+	Options         []OptionResult         // 选项列表
+	ValidationRules []ValidationRuleResult // 校验规则
+	Required        bool                   // 是否必填
+	Description     string                 // 问题描述
+	ShowController  *ShowControllerResult  // 显示控制器
+}
+
+// ShowControllerResult is the application-layer projection of a question's
+// conditional display configuration.
+type ShowControllerResult struct {
+	Rule       string
+	Conditions []ShowControllerConditionResult
+}
+
+type ShowControllerConditionResult struct {
+	QuestionCode string
+	OptionCodes  []string
 }
 
 // ValidationRuleResult 校验规则结果
@@ -145,7 +157,20 @@ func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 	}
 
 	// 转换显示控制器（如果有）
-	result.ShowController = q.GetShowController()
+	if controller := q.GetShowController(); controller != nil && !controller.IsEmpty() {
+		conditions := make([]ShowControllerConditionResult, 0, len(controller.GetQuestions()))
+		for _, condition := range controller.GetQuestions() {
+			optionCodes := make([]string, 0, len(condition.SelectOptionCodes))
+			for _, optionCode := range condition.SelectOptionCodes {
+				optionCodes = append(optionCodes, optionCode.Value())
+			}
+			conditions = append(conditions, ShowControllerConditionResult{
+				QuestionCode: condition.Code.Value(),
+				OptionCodes:  optionCodes,
+			})
+		}
+		result.ShowController = &ShowControllerResult{Rule: controller.GetRule(), Conditions: conditions}
+	}
 
 	return result
 }

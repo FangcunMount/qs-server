@@ -51,6 +51,7 @@ message Question {
   repeated Option options = 6;
   repeated ValidationRule validation_rules = 7;
   CalculationRule calculation_rule = 8;
+  ShowController show_controller = 9;
 }
 
 // 选项信息
@@ -69,6 +70,17 @@ message ValidationRule {
 // 计算规则
 message CalculationRule {
   string formula_type = 1;
+}
+
+// 条件显示控制器。供 collection-server 提交预校验使用。
+message ShowController {
+  string rule = 1;
+  repeated ShowControllerCondition conditions = 2;
+}
+
+message ShowControllerCondition {
+  string question_code = 1;
+  repeated string option_codes = 2;
 }
 
 // 获取问卷请求

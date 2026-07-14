@@ -32,6 +32,7 @@ type QuestionOutput struct {
 	Options         []OptionOutput
 	ValidationRules []ValidationRuleOutput
 	CalculationRule *CalculationRuleOutput
+	ShowController  *ShowControllerOutput
 }
 
 // OptionOutput 选项输出
@@ -50,6 +51,16 @@ type ValidationRuleOutput struct {
 // CalculationRuleOutput 计算规则输出
 type CalculationRuleOutput struct {
 	FormulaType string
+}
+
+type ShowControllerOutput struct {
+	Rule       string
+	Conditions []ShowControllerConditionOutput
+}
+
+type ShowControllerConditionOutput struct {
+	QuestionCode string
+	OptionCodes  []string
 }
 
 // ListQuestionnairesOutput 问卷列表输出
@@ -197,6 +208,17 @@ func (c *QuestionnaireClient) convertQuestion(q *pb.Question) QuestionOutput {
 			FormulaType: q.GetCalculationRule().GetFormulaType(),
 		}
 	}
+	var showController *ShowControllerOutput
+	if controller := q.GetShowController(); controller != nil {
+		conditions := make([]ShowControllerConditionOutput, len(controller.GetConditions()))
+		for i, condition := range controller.GetConditions() {
+			conditions[i] = ShowControllerConditionOutput{
+				QuestionCode: condition.GetQuestionCode(),
+				OptionCodes:  append([]string(nil), condition.GetOptionCodes()...),
+			}
+		}
+		showController = &ShowControllerOutput{Rule: controller.GetRule(), Conditions: conditions}
+	}
 
 	return QuestionOutput{
 		Code:            q.GetCode(),
@@ -207,5 +229,6 @@ func (c *QuestionnaireClient) convertQuestion(q *pb.Question) QuestionOutput {
 		Options:         options,
 		ValidationRules: validationRules,
 		CalculationRule: calcRule,
+		ShowController:  showController,
 	}
 }

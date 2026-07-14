@@ -367,7 +367,7 @@ func newRouterTestContainer() *container.Container {
 			QueryService:     questionnaireApp.NewQueryService(nil, nil, nil, nil),
 		},
 		AnswerSheet: &surveymod.AnswerSheetSubModule{
-			SubmissionService: answerSheetApp.NewSubmissionService(nil, nil, nil, nil, nil),
+			SubmissionService: answerSheetApp.NewSubmissionService(nil, nil, nil, nil),
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}

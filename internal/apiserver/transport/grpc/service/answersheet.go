@@ -2,10 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"google.golang.org/grpc"
@@ -14,13 +11,8 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-)
-
-const (
-	questionTypeCheckbox = "Checkbox"
-	questionTypeNumber   = "Number"
+	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 )
 
 // AnswerSheetService 答卷 gRPC 服务 - C端接口
@@ -67,7 +59,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	// 转换请求为 DTO
 	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
 	for _, a := range req.Answers {
-		rawValue, err := decodeAnswerValue(a.QuestionType, a.Value)
+		rawValue, err := surveyvalidation.DecodeAnswerValue(a.QuestionType, a.Value)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", a.QuestionCode, err))
 		}
@@ -239,51 +231,6 @@ func (s *AnswerSheetService) valueToString(value interface{}) string {
 	default:
 		// 对于复杂类型，可以使用 JSON 序列化
 		return fmt.Sprintf("%v", v)
-	}
-}
-
-func decodeAnswerValue(questionType string, raw string) (interface{}, error) {
-	switch questionType {
-	case questionTypeCheckbox:
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
-			return []string{}, nil
-		}
-		var values []string
-		if err := json.Unmarshal([]byte(raw), &values); err == nil {
-			return values, nil
-		}
-		return []string{raw}, nil
-	case questionTypeNumber:
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
-			return nil, fmt.Errorf("empty numeric answer")
-		}
-		var value float64
-		if err := json.Unmarshal([]byte(raw), &value); err == nil {
-			return value, nil
-		}
-		var encoded string
-		if err := json.Unmarshal([]byte(raw), &encoded); err == nil {
-			raw = encoded
-		}
-		value, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return nil, fmt.Errorf("expected numeric value, got %q", raw)
-		}
-		return value, nil
-	default:
-		var value string
-		if err := json.Unmarshal([]byte(raw), &value); err == nil {
-			if option, ok := answervalue.NormalizeSingleOption(value); ok {
-				return option, nil
-			}
-			return value, nil
-		}
-		if option, ok := answervalue.NormalizeSingleOption(raw); ok {
-			return option, nil
-		}
-		return raw, nil
 	}
 }
 

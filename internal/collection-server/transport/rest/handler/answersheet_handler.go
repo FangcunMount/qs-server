@@ -128,6 +128,11 @@ func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
 			Code:    http.StatusTooManyRequests,
 			Message: st.Message(),
 		})
+	case codes.Unavailable:
+		c.JSON(http.StatusServiceUnavailable, core.ErrResponse{
+			Code:    http.StatusServiceUnavailable,
+			Message: st.Message(),
+		})
 	default:
 		h.InternalErrorResponse(c, "save answer sheet failed", err)
 	}

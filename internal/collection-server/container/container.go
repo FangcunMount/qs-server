@@ -239,13 +239,13 @@ func (c *Container) initApplicationServices() {
 
 	profileLinkService, profileService := c.profileServices()
 
-	submitRuntime := c.buildSubmitRuntime(profileLinkService)
-	c.submissionService = submitRuntime.submission
-
 	catalogRuntime := c.buildCatalogRuntime()
 	c.questionnaireQueryService = catalogRuntime.questionnaire
 	c.assessmentModelCatalogQueryService = catalogRuntime.assessmentModels
 	c.typologyModelQueryService = catalogRuntime.typology
+
+	submitRuntime := c.buildSubmitRuntime(profileLinkService, c.questionnaireQueryService)
+	c.submissionService = submitRuntime.submission
 
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),

@@ -106,6 +106,17 @@ func toQuestionResponse(q *QuestionOutput) questionnaire.QuestionResponse {
 			FormulaType: q.CalculationRule.FormulaType,
 		}
 	}
+	var showController *questionnaire.ShowControllerResponse
+	if q.ShowController != nil {
+		conditions := make([]questionnaire.ShowControllerConditionResponse, len(q.ShowController.Conditions))
+		for i, condition := range q.ShowController.Conditions {
+			conditions[i] = questionnaire.ShowControllerConditionResponse{
+				QuestionCode: condition.QuestionCode,
+				OptionCodes:  append([]string(nil), condition.OptionCodes...),
+			}
+		}
+		showController = &questionnaire.ShowControllerResponse{Rule: q.ShowController.Rule, Conditions: conditions}
+	}
 	return questionnaire.QuestionResponse{
 		Code:            q.Code,
 		Type:            q.Type,
@@ -115,5 +126,6 @@ func toQuestionResponse(q *QuestionOutput) questionnaire.QuestionResponse {
 		Options:         options,
 		ValidationRules: validationRules,
 		CalculationRule: calcRule,
+		ShowController:  showController,
 	}
 }

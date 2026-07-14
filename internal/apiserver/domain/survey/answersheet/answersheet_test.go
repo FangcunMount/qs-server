@@ -151,28 +151,6 @@ func TestOptionsValueClonesInputAndRawOutput(t *testing.T) {
 	}
 }
 
-func TestAnswerValueAdapterAsArrayReturnsCopy(t *testing.T) {
-	t.Parallel()
-
-	source := []string{"A"}
-	adapter := NewAnswerValueAdapter(mutableArrayAnswerValue{values: source})
-
-	got := adapter.AsArray()
-	got[0] = "B"
-
-	if again := adapter.AsArray(); again[0] != "A" {
-		t.Fatalf("AsArray() after caller mutation = %q, want A", again[0])
-	}
-}
-
-type mutableArrayAnswerValue struct {
-	values []string
-}
-
-func (v mutableArrayAnswerValue) Raw() any {
-	return v.values
-}
-
 func mustQuestionnaireRef(t *testing.T) QuestionnaireRef {
 	t.Helper()
 	ref, err := NewQuestionnaireRef("QNR-1", "1.0.0", "Questionnaire")

@@ -2,6 +2,8 @@ package questionnaire
 
 import (
 	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 )
 
 // ValidationError 验证错误
@@ -128,6 +130,14 @@ func validateQuestion(q Question) []ValidationError {
 	}
 
 	questionCode := q.GetCode().Value()
+	for _, rule := range q.GetValidationRules() {
+		if !surveyvalidation.IsSupportedRule(string(rule.GetRuleType())) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field: "validation_rules", Code: questionCode,
+				Message: fmt.Sprintf("不支持的校验规则类型: %s", rule.GetRuleType()),
+			})
+		}
+	}
 
 	// 验证题干
 	if q.GetStem() == "" {

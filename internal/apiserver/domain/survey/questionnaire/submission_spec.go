@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 )
 
 // RawSubmissionAnswer 是提交规格消费的原始答案输入。
@@ -67,38 +68,82 @@ func (s SubmissionSpec) QuestionnaireTitle() string {
 	return s.title
 }
 
-// PrepareAnswers 按提交规格归一化答案，并拒绝未知问题或客户端题型不一致。
+// PrepareAnswers delegates executable submission policy to the shared package
+// so collection-server preflight and apiserver final validation cannot drift.
 func (s SubmissionSpec) PrepareAnswers(rawAnswers []RawSubmissionAnswer) ([]PreparedSubmissionAnswer, error) {
-	prepared := make([]PreparedSubmissionAnswer, 0, len(rawAnswers))
-	for _, raw := range rawAnswers {
-		questionCode := strings.TrimSpace(raw.QuestionCode)
-		if questionCode == "" {
-			return nil, newError(ErrorKindInvalidQuestion, "question code cannot be empty")
-		}
-		question, ok := s.questions[questionCode]
-		if !ok {
-			return nil, newError(ErrorKindQuestionNotFound, "question %s is not in questionnaire", questionCode)
-		}
-		if strings.TrimSpace(raw.QuestionType) == "" {
-			return nil, newError(ErrorKindInvalidQuestion, "question %s type cannot be empty", questionCode)
-		}
-		if raw.QuestionType != question.typ.Value() {
-			return nil, newError(ErrorKindInvalidQuestion, "question %s type mismatch: got %s, want %s", questionCode, raw.QuestionType, question.typ.Value())
-		}
-		if err := validateOptionSelection(question, raw.Value); err != nil {
-			return nil, err
-		}
+	raw := make([]surveyvalidation.Answer, 0, len(rawAnswers))
+	for _, answer := range rawAnswers {
+		raw = append(raw, surveyvalidation.Answer{QuestionCode: answer.QuestionCode, QuestionType: answer.QuestionType, Value: answer.Value})
+	}
+	accepted, err := s.sharedSpec().Validate(raw)
+	if err != nil {
+		return nil, newError(ErrorKindInvalidAnswer, "%s", err)
+	}
+	prepared := make([]PreparedSubmissionAnswer, 0, len(accepted))
+	for _, answer := range accepted {
+		question := s.questions[answer.QuestionCode]
 		prepared = append(prepared, PreparedSubmissionAnswer{
-			questionCode:    question.code,
-			questionType:    question.typ,
-			value:           raw.Value,
+			questionCode: question.code, questionType: question.typ, value: answer.Value,
 			validationRules: slices.Clone(question.validationRules),
 		})
 	}
-	if err := ensureVisibleRequiredQuestionsAnswered(s.questions, rawAnswers); err != nil {
-		return nil, err
-	}
 	return prepared, nil
+}
+
+func (s SubmissionSpec) sharedSpec() surveyvalidation.Spec {
+	questions := make([]surveyvalidation.Question, 0, len(s.questions))
+	for _, question := range s.questions {
+		optionCodes := make([]string, 0, len(question.optionCodes))
+		for code := range question.optionCodes {
+			optionCodes = append(optionCodes, code)
+		}
+		rules := make([]surveyvalidation.Rule, 0, len(question.validationRules))
+		for _, rule := range question.validationRules {
+			rules = append(rules, surveyvalidation.Rule{Type: string(rule.GetRuleType()), TargetValue: rule.GetTargetValue()})
+		}
+		questions = append(questions, surveyvalidation.Question{
+			Code: question.code.Value(), Type: question.typ.Value(), OptionCodes: optionCodes, Rules: rules,
+			ShowController: sharedShowController(question.showController),
+		})
+	}
+	return surveyvalidation.Spec{QuestionnaireCode: s.code.Value(), QuestionnaireVersion: s.version.Value(), Questions: questions}
+}
+
+func sharedShowController(controller *ShowController) *surveyvalidation.ShowController {
+	if controller == nil || controller.IsEmpty() {
+		return nil
+	}
+	conditions := make([]surveyvalidation.ShowCondition, 0, len(controller.GetQuestions()))
+	for _, condition := range controller.GetQuestions() {
+		codes := make([]string, 0, len(condition.SelectOptionCodes))
+		for _, code := range condition.SelectOptionCodes {
+			codes = append(codes, code.Value())
+		}
+		conditions = append(conditions, surveyvalidation.ShowCondition{QuestionCode: condition.Code.Value(), OptionCodes: codes})
+	}
+	return &surveyvalidation.ShowController{Rule: controller.GetRule(), Conditions: conditions}
+}
+
+func optionCodesFromQuestion(question Question) map[string]struct{} {
+	withOptions, ok := question.(HasOptions)
+	if !ok {
+		return nil
+	}
+	codes := make(map[string]struct{}, len(withOptions.GetOptions()))
+	for _, option := range withOptions.GetOptions() {
+		code := strings.TrimSpace(option.GetCode().Value())
+		if code != "" {
+			codes[code] = struct{}{}
+		}
+	}
+	return codes
+}
+
+func showControllerFromQuestion(question Question) *ShowController {
+	if question == nil {
+		return nil
+	}
+	return question.GetShowController()
 }
 
 // EnsureSubmittable 校验问卷是否可提交。

@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -22,7 +21,6 @@ type submissionService struct {
 	reader            surveyreadmodel.AnswerSheetReader
 	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
-	answerValidator   ruleengine.AnswerValidator
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -30,7 +28,6 @@ func NewSubmissionService(
 	repo answersheet.Repository,
 	durableStore SubmissionDurableStore,
 	questionnaireRepo questionnaire.Repository,
-	answerValidator ruleengine.AnswerValidator,
 	reader surveyreadmodel.AnswerSheetReader,
 ) AnswerSheetSubmissionService {
 	return &submissionService{
@@ -38,7 +35,6 @@ func NewSubmissionService(
 		reader:            reader,
 		durableStore:      durableStore,
 		questionnaireRepo: questionnaireRepo,
-		answerValidator:   answerValidator,
 	}
 }
 
@@ -65,17 +61,12 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 3. 构建答案值对象和校验任务
-	answerResults, validationTasks, err := buildAnswerValuesAndTasks(l, spec, rawSubmissionAnswersFromDTO(dto.Answers))
+	answerResults, err := buildAnswerValues(l, spec, rawSubmissionAnswersFromDTO(dto.Answers))
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. 批量校验答案
-	if err := s.validateAnswersBatch(ctx, l, validationTasks); err != nil {
-		return nil, err
-	}
-
-	// 5. 创建答案对象
+	// 4. 创建答案对象。规则已由共享提交规格校验器执行。
 	answers, err := createAnswers(l, answerResults)
 	if err != nil {
 		return nil, err
@@ -83,7 +74,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 
 	l.Infow("答案验证完成", "validated_count", len(answers), "total_count", len(dto.Answers), "result", "success")
 
-	// 6. 创建并保存答卷
+	// 5. 创建并保存答卷
 	sheet, err := s.createAndSaveAnswerSheet(ctx, l, dto, qnr, answers)
 	if err != nil {
 		return nil, err
@@ -143,42 +134,6 @@ func (s *submissionService) validateSubmitDTO(l *logger.RequestLogger, dto Submi
 	}
 	l.Debugw("输入参数验证通过", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "testee_id", dto.TesteeID)
 	return nil
-}
-
-// validateAnswersBatch 批量校验答案
-func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.RequestLogger, tasks []ruleengine.AnswerValidationTask) error {
-	if s.answerValidator == nil {
-		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答案验证器未配置")
-	}
-	results, err := s.answerValidator.ValidateAnswers(ctx, tasks)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "答案验证失败")
-	}
-
-	// 收集失败的问题
-	var failedQuestions []string
-	resultMap := make(map[string]ruleengine.AnswerValidationResult, len(results))
-	for _, tr := range results {
-		resultMap[tr.ID] = tr
-		if !tr.Valid {
-			failedQuestions = append(failedQuestions, tr.ID)
-		}
-	}
-
-	if len(failedQuestions) == 0 {
-		return nil
-	}
-
-	// 构建错误详情
-	errDetails := make([]string, 0, len(failedQuestions))
-	for _, qCode := range failedQuestions {
-		for _, validationErr := range resultMap[qCode].Errors {
-			errDetails = append(errDetails, fmt.Sprintf("%s: %s", qCode, validationErr.Message))
-		}
-	}
-
-	l.Warnw("批量答案验证失败", "failed_count", len(failedQuestions), "failed_questions", failedQuestions, "validation_errors", errDetails, "result", "failed")
-	return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("答案验证失败: %v", errDetails))
 }
 
 // GetMyAnswerSheet 获取我的答卷

@@ -39,5 +39,18 @@ func cloneQuestionResponse(src QuestionResponse) QuestionResponse {
 		rule := *src.CalculationRule
 		dst.CalculationRule = &rule
 	}
+	if src.ShowController != nil {
+		controller := *src.ShowController
+		if len(src.ShowController.Conditions) > 0 {
+			controller.Conditions = make([]ShowControllerConditionResponse, len(src.ShowController.Conditions))
+			for i, condition := range src.ShowController.Conditions {
+				controller.Conditions[i] = ShowControllerConditionResponse{
+					QuestionCode: condition.QuestionCode,
+					OptionCodes:  append([]string(nil), condition.OptionCodes...),
+				}
+			}
+		}
+		dst.ShowController = &controller
+	}
 	return dst
 }

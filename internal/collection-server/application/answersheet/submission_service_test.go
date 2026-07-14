@@ -3,7 +3,9 @@ package answersheet
 import (
 	"context"
 	"testing"
+	"time"
 
+	collectionquestionnaire "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -104,10 +106,104 @@ func TestNewSubmissionServiceAlwaysInitializesQueue(t *testing.T) {
 		Enabled:     false,
 		QueueSize:   8,
 		WorkerCount: 1,
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	if service.queue == nil {
 		t.Fatal("expected submit queue to be initialized even when enabled=false")
+	}
+}
+
+type submissionQuestionnaireReaderStub struct {
+	questionnaire *collectionquestionnaire.QuestionnaireResponse
+	err           error
+}
+
+type questionnaireCatalogReaderStub struct {
+	getCalls int
+}
+
+func (s *questionnaireCatalogReaderStub) GetQuestionnaire(context.Context, string, string) (*collectionquestionnaire.QuestionnaireResponse, error) {
+	s.getCalls++
+	return nil, status.Error(codes.Internal, "unexpected questionnaire gRPC read")
+}
+
+func (*questionnaireCatalogReaderStub) ListQuestionnaires(context.Context, int32, int32, string, string) (*collectionquestionnaire.ListQuestionnairesResponse, error) {
+	return &collectionquestionnaire.ListQuestionnairesResponse{}, nil
+}
+
+func (s submissionQuestionnaireReaderStub) Get(context.Context, string, string) (*collectionquestionnaire.QuestionnaireResponse, error) {
+	return s.questionnaire, s.err
+}
+
+func TestValidateBeforeQueueRejectsInvalidAnswerWithoutQueueing(t *testing.T) {
+	service := NewSubmissionService(nil, nil, nil, nil, &options.SubmitQueueOptions{QueueSize: 1, WorkerCount: 1}, nil, nil,
+		submissionQuestionnaireReaderStub{questionnaire: &collectionquestionnaire.QuestionnaireResponse{
+			Code: "Q", Version: "1", Status: "published",
+			Questions: []collectionquestionnaire.QuestionResponse{{
+				Code: "q1", Type: "Radio", Options: []collectionquestionnaire.OptionResponse{{Code: "allowed"}},
+			}},
+		}},
+	)
+
+	err := service.SubmitQueued(context.Background(), "req-invalid", 1, &SubmitAnswerSheetRequest{
+		QuestionnaireCode: "Q", QuestionnaireVersion: "1", Answers: []Answer{{QuestionCode: "q1", QuestionType: "Radio", Value: `"blocked"`}},
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("SubmitQueued() error = %v, want InvalidArgument", err)
+	}
+	if _, ok := service.GetSubmitStatus(context.Background(), "req-invalid"); ok {
+		t.Fatal("invalid answer must not create a queue status")
+	}
+}
+
+func TestValidateBeforeQueueFailsClosedWhenQuestionnaireUnavailable(t *testing.T) {
+	service := &SubmissionService{questionnaire: submissionQuestionnaireReaderStub{err: status.Error(codes.Unavailable, "down")}}
+	err := service.validateBeforeQueue(context.Background(), &SubmitAnswerSheetRequest{QuestionnaireCode: "Q", QuestionnaireVersion: "1"})
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("validateBeforeQueue() error = %v, want Unavailable", err)
+	}
+}
+
+func TestValidateBeforeQueueUsesConditionalRequiredRuleFromQuestionnaireProjection(t *testing.T) {
+	service := &SubmissionService{questionnaire: submissionQuestionnaireReaderStub{questionnaire: &collectionquestionnaire.QuestionnaireResponse{
+		Code: "Q", Version: "1", Status: "published", Questions: []collectionquestionnaire.QuestionResponse{
+			{Code: "trigger", Type: "Radio", Options: []collectionquestionnaire.OptionResponse{{Code: "yes"}, {Code: "no"}}},
+			{Code: "follow", Type: "Text", ValidationRules: []collectionquestionnaire.ValidationRuleResponse{{RuleType: "required"}}, ShowController: &collectionquestionnaire.ShowControllerResponse{
+				Rule: "and", Conditions: []collectionquestionnaire.ShowControllerConditionResponse{{QuestionCode: "trigger", OptionCodes: []string{"yes"}}},
+			}},
+		},
+	}}}
+
+	if err := service.validateBeforeQueue(context.Background(), &SubmitAnswerSheetRequest{
+		QuestionnaireCode: "Q", QuestionnaireVersion: "1", Answers: []Answer{{QuestionCode: "trigger", QuestionType: "Radio", Value: `"no"`}},
+	}); err != nil {
+		t.Fatalf("hidden follow-up validation error = %v", err)
+	}
+	if err := service.validateBeforeQueue(context.Background(), &SubmitAnswerSheetRequest{
+		QuestionnaireCode: "Q", QuestionnaireVersion: "1", Answers: []Answer{{QuestionCode: "trigger", QuestionType: "Radio", Value: `"yes"`}},
+	}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("visible required error = %v, want InvalidArgument", err)
+	}
+}
+
+func TestValidateBeforeQueueUsesExistingQuestionnaireL1Cache(t *testing.T) {
+	cache := collectionquestionnaire.NewLocalCache(collectionquestionnaire.LocalCacheOptions{TTL: time.Minute, MaxEntries: 1})
+	cache.Set("Q", "1", &collectionquestionnaire.QuestionnaireResponse{
+		Code: "Q", Version: "1", Status: "published",
+		Questions: []collectionquestionnaire.QuestionResponse{{Code: "q1", Type: "Text"}},
+	})
+	client := &questionnaireCatalogReaderStub{}
+	service := &SubmissionService{questionnaire: collectionquestionnaire.NewQueryService(client, cache, false)}
+
+	err := service.validateBeforeQueue(context.Background(), &SubmitAnswerSheetRequest{
+		QuestionnaireCode: "Q", QuestionnaireVersion: "1",
+		Answers: []Answer{{QuestionCode: "q1", QuestionType: "Text", Value: `"valid"`}},
+	})
+	if err != nil {
+		t.Fatalf("validateBeforeQueue() error = %v", err)
+	}
+	if client.getCalls != 0 {
+		t.Fatalf("questionnaire gRPC reads = %d, want 0 on L1 cache hit", client.getCalls)
 	}
 }
 

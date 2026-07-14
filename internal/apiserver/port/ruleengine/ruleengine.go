@@ -1,16 +1,6 @@
 package ruleengine
 
-import (
-	"context"
-)
-
-// ValidatableValue is the value surface needed by validation execution.
-type ValidatableValue interface {
-	IsEmpty() bool
-	AsString() string
-	AsNumber() (float64, error)
-	AsArray() []string
-}
+import "context"
 
 // ScorableValue is the value surface needed by answer scoring execution.
 type ScorableValue interface {
@@ -18,51 +8,6 @@ type ScorableValue interface {
 	AsSingleSelection() (string, bool)
 	AsMultipleSelections() ([]string, bool)
 	AsNumber() (float64, bool)
-}
-
-// AnswerValidationTask describes one answer validation execution request.
-type AnswerValidationTask struct {
-	ID    string
-	Value ValidatableValue
-	Rules []ValidationRuleSpec
-}
-
-// ValidationRuleSpec is the execution-facing rule representation.
-type ValidationRuleSpec struct {
-	RuleType    ValidationRuleType
-	TargetValue string
-}
-
-// ValidationRuleType names built-in validation rules without importing domain rule packages.
-type ValidationRuleType string
-
-const (
-	ValidationRuleTypeRequired      ValidationRuleType = "required"
-	ValidationRuleTypeMinLength     ValidationRuleType = "min_length"
-	ValidationRuleTypeMaxLength     ValidationRuleType = "max_length"
-	ValidationRuleTypeMinValue      ValidationRuleType = "min_value"
-	ValidationRuleTypeMaxValue      ValidationRuleType = "max_value"
-	ValidationRuleTypeMinSelections ValidationRuleType = "min_selections"
-	ValidationRuleTypeMaxSelections ValidationRuleType = "max_selections"
-	ValidationRuleTypePattern       ValidationRuleType = "pattern"
-)
-
-// ValidationError is a stable application-facing validation error.
-type ValidationError struct {
-	RuleType string
-	Message  string
-}
-
-// AnswerValidationResult describes one answer validation execution result.
-type AnswerValidationResult struct {
-	ID     string
-	Valid  bool
-	Errors []ValidationError
-}
-
-// AnswerValidator executes answer validation rules.
-type AnswerValidator interface {
-	ValidateAnswers(ctx context.Context, tasks []AnswerValidationTask) ([]AnswerValidationResult, error)
 }
 
 // AnswerScoreTask describes one answer score execution request.

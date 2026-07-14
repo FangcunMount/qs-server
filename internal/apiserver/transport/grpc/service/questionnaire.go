@@ -140,6 +140,7 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 			Tips:            q.Description,
 			Options:         options,
 			ValidationRules: s.toProtoValidationRules(q.ValidationRules),
+			ShowController:  s.toProtoShowController(q.ShowController),
 		})
 	}
 
@@ -153,6 +154,20 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 		Type:        result.Type,
 		Questions:   protoQuestions,
 	}, nil
+}
+
+func (s *QuestionnaireService) toProtoShowController(controller *questionnaire.ShowControllerResult) *pb.ShowController {
+	if controller == nil || len(controller.Conditions) == 0 {
+		return nil
+	}
+	conditions := make([]*pb.ShowControllerCondition, 0, len(controller.Conditions))
+	for _, condition := range controller.Conditions {
+		conditions = append(conditions, &pb.ShowControllerCondition{
+			QuestionCode: condition.QuestionCode,
+			OptionCodes:  append([]string(nil), condition.OptionCodes...),
+		})
+	}
+	return &pb.ShowController{Rule: controller.Rule, Conditions: conditions}
 }
 
 // toProtoOptions 转换选项列表

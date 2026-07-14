@@ -15,17 +15,14 @@ func TestBuildAnswerValuesAndTasksUsesSubmissionSpecQuestionType(t *testing.T) {
 	t.Parallel()
 
 	spec := mustAnswerAssemblerSubmissionSpec(t)
-	results, tasks, err := buildAnswerValuesAndTasks(logger.L(context.Background()), spec, []domainQuestionnaire.RawSubmissionAnswer{
+	results, err := buildAnswerValues(logger.L(context.Background()), spec, []domainQuestionnaire.RawSubmissionAnswer{
 		{QuestionCode: "Q1", QuestionType: domainQuestionnaire.TypeText.Value(), Value: "hello"},
 	})
 	if err != nil {
-		t.Fatalf("buildAnswerValuesAndTasks() error = %v", err)
+		t.Fatalf("buildAnswerValues() error = %v", err)
 	}
 	if len(results) != 1 || results[0].questionType != domainQuestionnaire.TypeText {
 		t.Fatalf("answer results = %+v, want text question type from spec", results)
-	}
-	if len(tasks) != 1 || tasks[0].ID != "Q1" {
-		t.Fatalf("validation tasks = %+v, want task for Q1", tasks)
 	}
 }
 
@@ -33,11 +30,11 @@ func TestBuildAnswerValuesAndTasksRejectsDTOQuestionTypeMismatch(t *testing.T) {
 	t.Parallel()
 
 	spec := mustAnswerAssemblerSubmissionSpec(t)
-	_, _, err := buildAnswerValuesAndTasks(logger.L(context.Background()), spec, []domainQuestionnaire.RawSubmissionAnswer{
+	_, err := buildAnswerValues(logger.L(context.Background()), spec, []domainQuestionnaire.RawSubmissionAnswer{
 		{QuestionCode: "Q1", QuestionType: domainQuestionnaire.TypeRadio.Value(), Value: "A"},
 	})
 	if err == nil {
-		t.Fatal("buildAnswerValuesAndTasks() error = nil, want type mismatch")
+		t.Fatal("buildAnswerValues() error = nil, want type mismatch")
 	}
 	if code := errors.ParseCoder(err).Code(); code != errorCode.ErrAnswerSheetInvalid {
 		t.Fatalf("error code = %d, want %d", code, errorCode.ErrAnswerSheetInvalid)

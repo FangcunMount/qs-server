@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,22 +18,22 @@ type answerBuildResult struct {
 	questionType questionnaire.QuestionType
 }
 
-// buildAnswerValuesAndTasks 构建答案值对象和校验任务。
-func buildAnswerValuesAndTasks(
+// buildAnswerValues constructs answer values after the shared submission
+// policy has accepted the decoded payload.
+func buildAnswerValues(
 	l *logger.RequestLogger,
 	spec questionnaire.SubmissionSpec,
 	rawAnswers []questionnaire.RawSubmissionAnswer,
-) ([]answerBuildResult, []ruleengine.AnswerValidationTask, error) {
+) ([]answerBuildResult, error) {
 	l.Infow("开始验证答案", "answer_count", len(rawAnswers), "action", "validate", "resource", "answer")
 
 	preparedAnswers, err := spec.PrepareAnswers(rawAnswers)
 	if err != nil {
 		l.Warnw("提交答案不符合问卷规格", "error", err.Error(), "result", "failed")
-		return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "提交答案不符合问卷规格")
+		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "提交答案不符合问卷规格")
 	}
 
 	results := make([]answerBuildResult, 0, len(preparedAnswers))
-	tasks := make([]ruleengine.AnswerValidationTask, 0, len(preparedAnswers))
 
 	for _, prepared := range preparedAnswers {
 		questionType := prepared.QuestionType()
@@ -42,7 +41,7 @@ func buildAnswerValuesAndTasks(
 		answerValue, err := answersheet.CreateAnswerValueFromRaw(questionType, prepared.Value())
 		if err != nil {
 			l.Warnw("创建答案值失败", "question_code", questionCode, "question_type", questionType.Value(), "error", err.Error(), "result", "failed")
-			return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案值失败 [%s]", questionCode))
+			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案值失败 [%s]", questionCode))
 		}
 
 		results = append(results, answerBuildResult{
@@ -51,14 +50,9 @@ func buildAnswerValuesAndTasks(
 			questionType: questionType,
 		})
 
-		tasks = append(tasks, ruleengine.AnswerValidationTask{
-			ID:    questionCode,
-			Value: answersheet.NewAnswerValueAdapter(answerValue),
-			Rules: validationRuleSpecsFromPreparedAnswer(prepared),
-		})
 	}
 
-	return results, tasks, nil
+	return results, nil
 }
 
 func rawSubmissionAnswersFromDTO(answerDTOs []AnswerDTO) []questionnaire.RawSubmissionAnswer {
@@ -71,21 +65,6 @@ func rawSubmissionAnswersFromDTO(answerDTOs []AnswerDTO) []questionnaire.RawSubm
 		})
 	}
 	return rawAnswers
-}
-
-func validationRuleSpecsFromPreparedAnswer(answer questionnaire.PreparedSubmissionAnswer) []ruleengine.ValidationRuleSpec {
-	rules := answer.ValidationRules()
-	if len(rules) == 0 {
-		return nil
-	}
-	specs := make([]ruleengine.ValidationRuleSpec, 0, len(rules))
-	for _, rule := range rules {
-		specs = append(specs, ruleengine.ValidationRuleSpec{
-			RuleType:    ruleengine.ValidationRuleType(rule.GetRuleType()),
-			TargetValue: rule.GetTargetValue(),
-		})
-	}
-	return specs
 }
 
 // createAnswers 创建答案对象列表。

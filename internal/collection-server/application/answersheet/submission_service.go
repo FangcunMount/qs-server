@@ -8,9 +8,11 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	collectionquestionnaire "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -44,6 +46,12 @@ type profileLinkChecker interface {
 	HasActiveProfileLink(ctx context.Context, userID, iamProfileID string) (bool, error)
 }
 
+// submissionQuestionnaireReader supplies the exact published version used for
+// synchronous BFF preflight. QueryService provides this through its existing L1.
+type submissionQuestionnaireReader interface {
+	Get(ctx context.Context, code, version string) (*collectionquestionnaire.QuestionnaireResponse, error)
+}
+
 // SubmissionService 答卷提交服务
 // 作为 BFF 层的薄服务，主要职责：
 // 1. 转换 REST DTO 到 gRPC 请求
@@ -60,6 +68,7 @@ type SubmissionService struct {
 	queue              *SubmitQueue
 	submitGuard        IdempotencyGuard
 	assessmentIntake   SubmitAssessmentIntake
+	questionnaire      submissionQuestionnaireReader
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -71,6 +80,7 @@ func NewSubmissionService(
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard IdempotencyGuard,
 	assessmentIntake SubmitAssessmentIntake,
+	questionnaire submissionQuestionnaireReader,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetWriter:  answerSheetWriter,
@@ -82,6 +92,7 @@ func NewSubmissionService(
 		committer:          NewSubmissionCommitter(answerSheetWriter),
 		submitGuard:        submitGuard,
 		assessmentIntake:   assessmentIntake,
+		questionnaire:      questionnaire,
 	}
 
 	if queueOptions == nil {
@@ -107,8 +118,70 @@ func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, 
 	if s.queue == nil {
 		return fmt.Errorf("submit queue not initialized")
 	}
+	if err := s.validateBeforeQueue(ctx, req); err != nil {
+		return err
+	}
 
 	return s.queue.Enqueue(ctx, requestID, writerID, req)
+}
+
+func (s *SubmissionService) validateBeforeQueue(ctx context.Context, req *SubmitAnswerSheetRequest) error {
+	if req == nil {
+		return status.Error(codes.InvalidArgument, "answersheet request is required")
+	}
+	if s.questionnaire == nil {
+		return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
+	}
+	qnr, err := s.questionnaire.Get(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
+	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return status.Error(codes.InvalidArgument, "只能提交已发布的问卷版本")
+		}
+		return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
+	}
+	if qnr == nil || qnr.Code != req.QuestionnaireCode || qnr.Version != req.QuestionnaireVersion || qnr.Status != "published" {
+		return status.Error(codes.InvalidArgument, "只能提交已发布的问卷版本")
+	}
+	answers := make([]surveyvalidation.Answer, 0, len(req.Answers))
+	for _, answer := range req.Answers {
+		value, err := surveyvalidation.DecodeAnswerValue(answer.QuestionType, answer.Value)
+		if err != nil {
+			return status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", answer.QuestionCode, err))
+		}
+		answers = append(answers, surveyvalidation.Answer{QuestionCode: answer.QuestionCode, QuestionType: answer.QuestionType, Value: value})
+	}
+	if _, err := questionnaireSubmissionSpec(qnr).Validate(answers); err != nil {
+		if validationErr, ok := err.(*surveyvalidation.Error); ok && validationErr.Kind != surveyvalidation.ErrorInvalidInput {
+			log.Errorf("已发布问卷包含不可执行的提交校验配置: code=%s version=%s error=%v", qnr.Code, qnr.Version, validationErr)
+			return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
+		}
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("提交答案不符合问卷规格: %v", err))
+	}
+	return nil
+}
+
+func questionnaireSubmissionSpec(qnr *collectionquestionnaire.QuestionnaireResponse) surveyvalidation.Spec {
+	questions := make([]surveyvalidation.Question, 0, len(qnr.Questions))
+	for _, question := range qnr.Questions {
+		optionCodes := make([]string, 0, len(question.Options))
+		for _, option := range question.Options {
+			optionCodes = append(optionCodes, option.Code)
+		}
+		rules := make([]surveyvalidation.Rule, 0, len(question.ValidationRules))
+		for _, rule := range question.ValidationRules {
+			rules = append(rules, surveyvalidation.Rule{Type: rule.RuleType, TargetValue: rule.TargetValue})
+		}
+		var controller *surveyvalidation.ShowController
+		if question.ShowController != nil {
+			conditions := make([]surveyvalidation.ShowCondition, 0, len(question.ShowController.Conditions))
+			for _, condition := range question.ShowController.Conditions {
+				conditions = append(conditions, surveyvalidation.ShowCondition{QuestionCode: condition.QuestionCode, OptionCodes: append([]string(nil), condition.OptionCodes...)})
+			}
+			controller = &surveyvalidation.ShowController{Rule: question.ShowController.Rule, Conditions: conditions}
+		}
+		questions = append(questions, surveyvalidation.Question{Code: question.Code, Type: question.Type, OptionCodes: optionCodes, Rules: rules, ShowController: controller})
+	}
+	return surveyvalidation.Spec{QuestionnaireCode: qnr.Code, QuestionnaireVersion: qnr.Version, Questions: questions}
 }
 
 func requestKey(requestID string, req *SubmitAnswerSheetRequest) string {

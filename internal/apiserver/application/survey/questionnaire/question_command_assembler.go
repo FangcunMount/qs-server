@@ -1,12 +1,14 @@
 package questionnaire
 
 import (
+	"fmt"
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 )
 
 // buildQuestionFromDTO 从 DTO 构建问题领域对象。
@@ -19,6 +21,11 @@ func buildQuestionFromDTO(
 	calculationRule *calculation.CalculationRule,
 	showController *domainQuestionnaire.ShowController,
 ) (domainQuestionnaire.Question, error) {
+	for _, rule := range validationRules {
+		if !surveyvalidation.IsSupportedRule(string(rule.GetRuleType())) {
+			return nil, fmt.Errorf("unsupported validation rule type: %s", rule.GetRuleType())
+		}
+	}
 	opts := make([]domainQuestionnaire.Option, 0, len(options))
 	for i, optDTO := range options {
 		optionCode := optDTO.Value

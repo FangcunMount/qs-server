@@ -66,19 +66,15 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 		// 转换 show_controller
 		var showController *viewmodel.ShowControllerDTO
 		if q.ShowController != nil {
-			conditions := make([]viewmodel.ShowControllerConditionDTO, 0, len(q.ShowController.GetQuestions()))
-			for _, cond := range q.ShowController.GetQuestions() {
-				optionCodes := make([]string, 0, len(cond.SelectOptionCodes))
-				for _, code := range cond.SelectOptionCodes {
-					optionCodes = append(optionCodes, code.Value())
-				}
+			conditions := make([]viewmodel.ShowControllerConditionDTO, 0, len(q.ShowController.Conditions))
+			for _, cond := range q.ShowController.Conditions {
 				conditions = append(conditions, viewmodel.ShowControllerConditionDTO{
-					Code:              cond.Code.Value(),
-					SelectOptionCodes: optionCodes,
+					Code:              cond.QuestionCode,
+					SelectOptionCodes: append([]string(nil), cond.OptionCodes...),
 				})
 			}
 			showController = &viewmodel.ShowControllerDTO{
-				Rule:      q.ShowController.GetRule(),
+				Rule:      q.ShowController.Rule,
 				Questions: conditions,
 			}
 		}

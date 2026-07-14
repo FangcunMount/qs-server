@@ -147,7 +147,6 @@ func (m *Module) SetCatalogManagementService(service modelcatalogApp.CatalogMana
 func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
 	sub := m.AnswerSheet
 
-	batchValidator := ruleengineInfra.NewAnswerValidator()
 	answerScorer := ruleengineInfra.NewAnswerScorer()
 
 	mongoTxRunner := modtx.NewMongoRunner(mongoDB)
@@ -155,7 +154,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSh
 		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
-	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
+	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, reader)
 	sub.ManagementService = asApp.NewManagementService(repo, reader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	return nil

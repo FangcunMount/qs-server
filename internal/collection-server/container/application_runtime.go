@@ -48,7 +48,7 @@ func (c *Container) profileServices() (*iam.ProfileLinkService, *iam.ProfileServ
 	return c.IAMModule.ProfileLinkService(), c.IAMModule.ProfileService()
 }
 
-func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkService) submitRuntime {
+func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkService, questionnaireReader *questionnaire.QueryService) submitRuntime {
 	// answersheet / testee 经 acl 适配（REST↔gRPC 字段差异）；catalog / evaluation 经 grpcbridge 直出 application DTO。
 	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
 	return submitRuntime{
@@ -60,6 +60,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 			c.opts.SubmitQueue,
 			submitGuard,
 			c.assessmentIntakeClient,
+			questionnaireReader,
 		),
 	}
 }

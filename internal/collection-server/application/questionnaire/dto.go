@@ -24,6 +24,9 @@ type QuestionResponse struct {
 	Options         []OptionResponse         `json:"options,omitempty"`
 	ValidationRules []ValidationRuleResponse `json:"validation_rules,omitempty"`
 	CalculationRule *CalculationRuleResponse `json:"calculation_rule,omitempty"`
+	// ShowController is only used by BFF submission preflight; keep the
+	// existing questionnaire REST response shape unchanged.
+	ShowController *ShowControllerResponse `json:"-"`
 }
 
 // OptionResponse 选项响应
@@ -42,6 +45,16 @@ type ValidationRuleResponse struct {
 // CalculationRuleResponse 计算规则响应
 type CalculationRuleResponse struct {
 	FormulaType string `json:"formula_type"`
+}
+
+type ShowControllerResponse struct {
+	Rule       string                            `json:"rule"`
+	Conditions []ShowControllerConditionResponse `json:"conditions"`
+}
+
+type ShowControllerConditionResponse struct {
+	QuestionCode string   `json:"question_code"`
+	OptionCodes  []string `json:"option_codes"`
 }
 
 // ListQuestionnairesRequest 问卷列表请求

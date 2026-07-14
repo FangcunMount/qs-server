@@ -13,6 +13,8 @@ import (
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeAnswerSheetSubmissionService struct {
@@ -124,5 +126,26 @@ func TestAnswerSheetHandlerSubmitQueueFull(t *testing.T) {
 	}
 	if resp.Message != "submit queue full" {
 		t.Fatalf("expected queue full message, got %q", resp.Message)
+	}
+}
+
+func TestAnswerSheetHandlerSubmitMapsPreflightUnavailableToServiceUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewAnswerSheetHandler(&fakeAnswerSheetSubmissionService{
+		submitQueued: func(context.Context, string, uint64, *answersheet.SubmitAnswerSheetRequest) error {
+			return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
+		},
+	})
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/answersheets", strings.NewReader(`{
+		"questionnaire_code":"qs", "questionnaire_version":"v1", "testee_id":1,
+		"answers":[{"question_code":"q1","question_type":"Radio","value":"A"}]
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set(collectionmiddleware.UserIDKey, uint64(99))
+	handler.Submit(c)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
 	}
 }
