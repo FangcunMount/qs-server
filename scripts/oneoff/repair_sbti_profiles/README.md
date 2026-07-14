@@ -5,7 +5,8 @@
 - 为 25 个普通结果写入对应的 15 位 L/M/H `Pattern`；
 - 将普通结果保持为 `IsSpecial=false` 并移除错误的 `Trigger`；
 - 将 `HHHH`、`DRUNK` 设置为 `IsSpecial=true`、移除 `Pattern`，并写入对应 `Trigger`；
-- 保留 DefinitionV2 中题目贡献、结果文案、报告配置及未知扩展字段；
+- 将已废弃的 `sbti` outcome/report adapter 迁移为通用 `personality_type` adapter；
+- 保留 DefinitionV2 中题目贡献、结果文案、其他报告配置及未知扩展字段；
 - 只保存草稿，不自动发布。
 
 ## 配置来源与许可
@@ -42,7 +43,9 @@
 3. Code 不得为空或重复；
 4. 每个普通 Pattern 去掉连字符后必须恰好包含 15 个级别，且只能使用 `L/M/H`；
 5. 特殊结果必须有 Trigger 且不能有 Pattern；
-6. 修复结果必须通过 DefinitionV2 领域结构校验。
+6. `OutcomeMapping.DetailKind` 和首个报告 section 的 Kind 必须为 `personality_type`；
+7. adapter 只允许从空值或 `sbti` 迁移为 `personality_type`，不会覆盖 `trait_profile` 等无关配置；
+8. 修复结果必须通过 DefinitionV2 领域结构校验。
 
 写入使用受保护的模型定义 API，不直接修改 MongoDB。`--apply` 前会以 `0600` 权限保存原始 DefinitionV2 备份；写入后会调用模型校验接口。如果校验未通过，草稿会保留但脚本返回失败，禁止继续发布。
 
@@ -71,6 +74,14 @@ go run ./scripts/oneoff/repair_sbti_profiles/ \
 ```
 
 `QS_APISERVER_URL` 可以是服务 origin，也可以直接包含 `/api/v1`。修复完成后仍需在后台完成报告预览和人工发布。
+
+如果之前已经保存 Pattern/Trigger，但因 `sbti` adapter 废弃而校验失败，更新脚本后重新 dry-run，期望只出现：
+
+```text
+Planned changes: patterns=0 special_flags=0 triggers=0 adapters=2 total=2
+```
+
+确认两项均为 `sbti -> personality_type` 后，使用新的备份目录再次执行 `--apply`。旧版隐式 `scoring_mode` 信息属于兼容 warning，不阻塞校验；任何 `validation error` 都仍然禁止发布。
 
 ## 验证
 

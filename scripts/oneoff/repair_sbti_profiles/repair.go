@@ -40,6 +40,7 @@ type repairSummary struct {
 	PatternChanges     int
 	SpecialFlagChanges int
 	TriggerChanges     int
+	AdapterChanges     int
 	Changes            []fieldChange
 }
 
@@ -196,10 +197,16 @@ func repairDefinition(input []byte, catalog repairCatalog) ([]byte, repairSummar
 		}
 		profiles[index] = updated
 	}
+	if err := repairOutcomeAdapter(typeConclusion, &summary); err != nil {
+		return nil, repairSummary{}, err
+	}
 
 	typeConclusion["Profiles"] = mustJSON(profiles)
 	conclusions[typeIndex] = mustJSON(typeConclusion)
 	root["Conclusions"] = mustJSON(conclusions)
+	if err := repairReportAdapter(root, &summary); err != nil {
+		return nil, repairSummary{}, err
+	}
 	output, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
 		return nil, repairSummary{}, fmt.Errorf("encode repaired DefinitionV2: %w", err)
@@ -271,6 +278,131 @@ func verifyRepairedDefinition(input []byte, catalog repairCatalog) error {
 	}
 	if !found {
 		return fmt.Errorf("DefinitionV2 does not contain a type conclusion")
+	}
+	if err := verifyCanonicalAdapters(root); err != nil {
+		return err
+	}
+	return nil
+}
+
+func repairOutcomeAdapter(typeConclusion map[string]json.RawMessage, summary *repairSummary) error {
+	var mapping map[string]json.RawMessage
+	if err := json.Unmarshal(typeConclusion["OutcomeMapping"], &mapping); err != nil {
+		return fmt.Errorf("decode type conclusion OutcomeMapping: %w", err)
+	}
+	detailKind, _, err := rawString(mapping, "DetailKind")
+	if err != nil {
+		return fmt.Errorf("decode OutcomeMapping.DetailKind: %w", err)
+	}
+	if detailKind != "personality_type" {
+		return fmt.Errorf("SBTI OutcomeMapping.DetailKind is %q, want personality_type", detailKind)
+	}
+	adapter, present, err := rawString(mapping, "DetailAdapterKey")
+	if err != nil {
+		return fmt.Errorf("decode OutcomeMapping.DetailAdapterKey: %w", err)
+	}
+	if adapter == "personality_type" {
+		return nil
+	}
+	if adapter != "" && adapter != "sbti" {
+		return fmt.Errorf("SBTI OutcomeMapping.DetailAdapterKey is %q; refusing to replace an unrelated adapter", adapter)
+	}
+	mapping["DetailAdapterKey"] = mustJSON("personality_type")
+	typeConclusion["OutcomeMapping"] = mustJSON(mapping)
+	summary.AdapterChanges++
+	summary.Changes = append(summary.Changes, fieldChange{
+		OutcomeCode: "DefinitionV2",
+		Field:       "OutcomeMapping.DetailAdapterKey",
+		Before:      quoteOrMissing(adapter, present),
+		After:       `"personality_type"`,
+	})
+	return nil
+}
+
+func repairReportAdapter(root map[string]json.RawMessage, summary *repairSummary) error {
+	var reportMap map[string]json.RawMessage
+	if err := json.Unmarshal(root["ReportMap"], &reportMap); err != nil {
+		return fmt.Errorf("decode ReportMap: %w", err)
+	}
+	var sections []map[string]json.RawMessage
+	if err := json.Unmarshal(reportMap["Sections"], &sections); err != nil {
+		return fmt.Errorf("decode ReportMap.Sections: %w", err)
+	}
+	if len(sections) == 0 {
+		return fmt.Errorf("SBTI ReportMap.Sections must contain a personality_type section")
+	}
+	kind, _, err := rawString(sections[0], "Kind")
+	if err != nil {
+		return fmt.Errorf("decode ReportMap.Sections[0].Kind: %w", err)
+	}
+	if kind != "personality_type" {
+		return fmt.Errorf("SBTI ReportMap.Sections[0].Kind is %q, want personality_type", kind)
+	}
+	adapter, present, err := rawString(sections[0], "AdapterKey")
+	if err != nil {
+		return fmt.Errorf("decode ReportMap.Sections[0].AdapterKey: %w", err)
+	}
+	if adapter == "personality_type" {
+		return nil
+	}
+	if adapter != "" && adapter != "sbti" {
+		return fmt.Errorf("SBTI ReportMap.Sections[0].AdapterKey is %q; refusing to replace an unrelated adapter", adapter)
+	}
+	sections[0]["AdapterKey"] = mustJSON("personality_type")
+	reportMap["Sections"] = mustJSON(sections)
+	root["ReportMap"] = mustJSON(reportMap)
+	summary.AdapterChanges++
+	summary.Changes = append(summary.Changes, fieldChange{
+		OutcomeCode: "DefinitionV2",
+		Field:       "ReportMap.Sections[0].AdapterKey",
+		Before:      quoteOrMissing(adapter, present),
+		After:       `"personality_type"`,
+	})
+	return nil
+}
+
+func verifyCanonicalAdapters(root map[string]json.RawMessage) error {
+	var conclusions []map[string]json.RawMessage
+	if err := json.Unmarshal(root["Conclusions"], &conclusions); err != nil {
+		return fmt.Errorf("verify adapter Conclusions: %w", err)
+	}
+	for _, item := range conclusions {
+		kind, _, err := rawString(item, "Kind")
+		if err != nil {
+			return err
+		}
+		if kind != "type" {
+			continue
+		}
+		var mapping map[string]json.RawMessage
+		if err := json.Unmarshal(item["OutcomeMapping"], &mapping); err != nil {
+			return fmt.Errorf("verify OutcomeMapping: %w", err)
+		}
+		adapter, _, err := rawString(mapping, "DetailAdapterKey")
+		if err != nil {
+			return err
+		}
+		if adapter != "personality_type" {
+			return fmt.Errorf("SBTI OutcomeMapping.DetailAdapterKey is %q after repair, want personality_type", adapter)
+		}
+	}
+	var reportMap map[string]json.RawMessage
+	if err := json.Unmarshal(root["ReportMap"], &reportMap); err != nil {
+		return fmt.Errorf("verify ReportMap: %w", err)
+	}
+	var sections []map[string]json.RawMessage
+	if err := json.Unmarshal(reportMap["Sections"], &sections); err != nil {
+		return fmt.Errorf("verify ReportMap.Sections: %w", err)
+	}
+	if len(sections) == 0 {
+		return fmt.Errorf("SBTI ReportMap.Sections is empty after repair")
+	}
+	adapter, _, err := rawString(sections[0], "AdapterKey")
+	if err != nil {
+		return err
+	}
+	if adapter != "personality_type" {
+		return fmt.Errorf("SBTI ReportMap.Sections[0].AdapterKey is %q after repair, want personality_type", adapter)
 	}
 	return nil
 }

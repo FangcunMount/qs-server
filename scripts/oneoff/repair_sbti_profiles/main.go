@@ -1,5 +1,5 @@
 // Command repair_sbti_profiles backfills canonical SBTI outcome patterns,
-// special-result flags, and triggers through the protected DefinitionV2 authoring API.
+// special-result flags, triggers, and generic personality adapters through the protected DefinitionV2 authoring API.
 // It is dry-run by default and never publishes a repaired draft.
 package main
 
@@ -223,7 +223,7 @@ func printSummary(out io.Writer, modelCode string, catalog repairCatalog, summar
 	_, _ = fmt.Fprintf(out, "Catalog: %s@%s (%s)\n", catalog.Source, catalog.Revision, catalog.License)
 	_, _ = fmt.Fprintf(out, "Attribution: %s\n", catalog.Attribution)
 	_, _ = fmt.Fprintf(out, "Profiles: total=%d normal=%d special=%d\n", summary.ProfileCount, summary.NormalCount, summary.SpecialCount)
-	_, _ = fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d triggers=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, summary.TriggerChanges, len(summary.Changes))
+	_, _ = fmt.Fprintf(out, "Planned changes: patterns=%d special_flags=%d triggers=%d adapters=%d total=%d\n", summary.PatternChanges, summary.SpecialFlagChanges, summary.TriggerChanges, summary.AdapterChanges, len(summary.Changes))
 	for _, change := range summary.Changes {
 		_, _ = fmt.Fprintf(out, "  %s.%s: %s -> %s\n", change.OutcomeCode, change.Field, change.Before, change.After)
 	}

@@ -29,7 +29,7 @@ func TestRepairDefinitionBackfillsCanonicalProfilesAndIsIdempotent(t *testing.T)
 	if summary.ProfileCount != 27 || summary.NormalCount != 25 || summary.SpecialCount != 2 {
 		t.Fatalf("unexpected profile counts: %+v", summary)
 	}
-	if summary.PatternChanges != 25 || summary.SpecialFlagChanges != 2 || summary.TriggerChanges != 2 || len(summary.Changes) != 29 {
+	if summary.PatternChanges != 25 || summary.SpecialFlagChanges != 2 || summary.TriggerChanges != 2 || summary.AdapterChanges != 2 || len(summary.Changes) != 31 {
 		t.Fatalf("unexpected changes: %+v", summary)
 	}
 	if err := verifyRepairedDefinition(repaired, catalog); err != nil {
@@ -44,6 +44,35 @@ func TestRepairDefinitionBackfillsCanonicalProfilesAndIsIdempotent(t *testing.T)
 		t.Fatalf("second repair should be a no-op: %+v", secondSummary)
 	}
 	assertJSONEqual(t, repaired, second)
+}
+
+func TestRepairDefinitionResumesAfterProfilesWereAlreadySaved(t *testing.T) {
+	broken, catalog := brokenSBTIDefinition(t)
+	profileRepaired, _, err := repairDefinition(broken, catalog)
+	if err != nil {
+		t.Fatalf("initial repairDefinition: %v", err)
+	}
+	partial := setSBTIAdapters(t, profileRepaired, "sbti")
+
+	repaired, summary, err := repairDefinition(partial, catalog)
+	if err != nil {
+		t.Fatalf("resume repairDefinition: %v", err)
+	}
+	if summary.PatternChanges != 0 || summary.SpecialFlagChanges != 0 || summary.TriggerChanges != 0 || summary.AdapterChanges != 2 || len(summary.Changes) != 2 {
+		t.Fatalf("resume summary = %+v, want only two adapter changes", summary)
+	}
+	if err := verifyRepairedDefinition(repaired, catalog); err != nil {
+		t.Fatalf("verify resumed repair: %v", err)
+	}
+}
+
+func TestRepairDefinitionRejectsUnrelatedAdapter(t *testing.T) {
+	broken, catalog := brokenSBTIDefinition(t)
+	input := setSBTIAdapters(t, broken, "trait_profile")
+	_, _, err := repairDefinition(input, catalog)
+	if err == nil || !strings.Contains(err.Error(), "refusing to replace an unrelated adapter") {
+		t.Fatalf("repairDefinition() error = %v, want unrelated adapter rejection", err)
+	}
 }
 
 func TestWikiRepairCatalogMatchesLegacySeedExecutionProfiles(t *testing.T) {
@@ -299,13 +328,61 @@ func brokenSBTIDefinition(t *testing.T) ([]byte, repairCatalog) {
 			typed.Profiles[profileIndex].IsSpecial = false
 			typed.Profiles[profileIndex].Trigger = ""
 		}
+		typed.OutcomeMapping.DetailAdapterKey = "sbti"
 		definition.Conclusions[index] = typed
 	}
+	if len(definition.ReportMap.Sections) == 0 {
+		t.Fatal("SBTI definition report map is empty")
+	}
+	definition.ReportMap.Sections[0].AdapterKey = "sbti"
 	raw, err := json.Marshal(definition)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return raw, catalog
+}
+
+func setSBTIAdapters(t *testing.T, input []byte, adapter string) []byte {
+	t.Helper()
+	var definition map[string]json.RawMessage
+	if err := json.Unmarshal(input, &definition); err != nil {
+		t.Fatal(err)
+	}
+	var conclusions []map[string]json.RawMessage
+	if err := json.Unmarshal(definition["Conclusions"], &conclusions); err != nil {
+		t.Fatal(err)
+	}
+	for index := range conclusions {
+		var kind string
+		if err := json.Unmarshal(conclusions[index]["Kind"], &kind); err != nil {
+			t.Fatal(err)
+		}
+		if kind != "type" {
+			continue
+		}
+		var mapping map[string]json.RawMessage
+		if err := json.Unmarshal(conclusions[index]["OutcomeMapping"], &mapping); err != nil {
+			t.Fatal(err)
+		}
+		mapping["DetailAdapterKey"] = mustJSON(adapter)
+		conclusions[index]["OutcomeMapping"] = mustJSON(mapping)
+	}
+	definition["Conclusions"] = mustJSON(conclusions)
+	var reportMap map[string]json.RawMessage
+	if err := json.Unmarshal(definition["ReportMap"], &reportMap); err != nil {
+		t.Fatal(err)
+	}
+	var sections []map[string]json.RawMessage
+	if err := json.Unmarshal(reportMap["Sections"], &sections); err != nil {
+		t.Fatal(err)
+	}
+	if len(sections) == 0 {
+		t.Fatal("report sections are empty")
+	}
+	sections[0]["AdapterKey"] = mustJSON(adapter)
+	reportMap["Sections"] = mustJSON(sections)
+	definition["ReportMap"] = mustJSON(reportMap)
+	return mustJSON(definition)
 }
 
 func writeEnvelope(t *testing.T, w http.ResponseWriter, data []byte) {
