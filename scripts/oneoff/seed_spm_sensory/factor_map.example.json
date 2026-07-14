@@ -1,9 +1,14 @@
 {
-  "hwYAqCSd": ["replace-with-social-participation-question-code"],
-  "TPRrr0hh": ["replace-with-visual-question-code"],
-  "JxzqkoP3": ["replace-with-hearing-question-code"],
-  "Hs5rKy8b": ["replace-with-touch-question-code"],
-  "2OEnsR1F": ["replace-with-body-awareness-question-code"],
-  "wZTNmKJk": ["replace-with-balance-motion-question-code"],
-  "oaj20O9N": ["replace-with-planning-ideas-question-code"]
+  "questionnaire_code": "replace-with-questionnaire-code",
+  "questionnaire_version": "replace-with-questionnaire-version",
+  "factors": {
+    "hwYAqCSd": ["replace-with-social-participation-question-code"],
+    "TPRrr0hh": ["replace-with-visual-question-code"],
+    "JxzqkoP3": ["replace-with-hearing-question-code"],
+    "Hs5rKy8b": ["replace-with-touch-question-code"],
+    "wcgKM7uV": ["replace-with-taste-smell-question-code"],
+    "2OEnsR1F": ["replace-with-body-awareness-question-code"],
+    "wZTNmKJk": ["replace-with-balance-motion-question-code"],
+    "oaj20O9N": ["replace-with-planning-ideas-question-code"]
+  }
 }

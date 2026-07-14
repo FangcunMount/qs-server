@@ -105,3 +105,14 @@ func TestDecideAnyCapability(t *testing.T) {
 		t.Fatalf("denied = %#v, want denied", denied)
 	}
 }
+
+func TestNormTableCapabilities(t *testing.T) {
+	t.Parallel()
+	snapshot := &Snapshot{Permissions: []Permission{{Resource: "qs:modelcatalog:collection:norm_tables", Action: "read|list|import"}}}
+	if !DecideCapability(snapshot, CapabilityReadNormTables).Allowed {
+		t.Fatal("read_norm_tables should be allowed")
+	}
+	if !DecideCapability(snapshot, CapabilityManageNormTables).Allowed {
+		t.Fatal("manage_norm_tables should be allowed")
+	}
+}

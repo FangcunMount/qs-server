@@ -1,0 +1,19 @@
+{
+  "questionnaire_code": "gXkk9W",
+  "questionnaire_version": "4.0.1",
+  "factors": {
+    "p3O50jXO": ["d3mhtvC0", "apCglCam", "O0dSsrGY", "MYKCrryu", "DGHUCIOy", "5LYE5Lno", "3xyNFRqH", "Xy4GJRCH"],
+    "Aa7IbYHN": ["dcKrhgSD", "wOw1DmWl", "c1nTtiyq", "1zMObAkc"],
+    "nJkTU8bM": ["shHdBmku", "ZIijfL2N", "HA43FTb7", "01heXfX8", "18ekiTYl", "IeOXFFBf", "s1ptBD4e", "RdLIWU7n"],
+    "AyvItzpm": ["2AV31pOp", "l7b2UrXI", "5TLTn3uB", "kjTayvDu", "kdUg1yeO", "o4mEtUrE", "pmIZLxzw", "sQZxncby"],
+    "Tox3nsdt": ["nI3nJX3E", "pGSxiVXZ", "iVKX9zor", "9YcnQvLd", "1PoAu3zh"],
+    "CI01dlwX": ["04MPK2aB", "4fG7thZW", "A9zg02wp", "VamEIkmv", "noTQ2cv4", "6AiutKRz", "gPnY9aDB", "H4WhB1Aw"],
+    "N279wV33": ["fZDaEwRX", "gNDXXjz7", "Lc8nh6rq", "qMazWL4Y", "X6MNUKHP", "aug1Epsr", "V7t6KdI3", "GCybCryn"],
+    "WJI5vCPX": ["hlxIgrhd", "VIWa9uCm", "Nl99u5YD", "wYKMbhTg", "3JgFYHzN"],
+    "C5T60lQa": ["p7UThavX", "Bn9yt7Za", "SoCWYofz", "dz2GNa5F", "RrkSbg5a", "TWEGMY1W"]
+  },
+  "excluded_question_codes": {
+    "infrequency_validity": ["FKWlXmrS", "S12Q8g1w", "pdUp29Lg"],
+    "supplemental_non_brief2": ["PYqsqyxE", "mFQbd9AO", "7epUoNCz", "mNdpQAwa", "nE03v6S0", "LMbr8fMq", "7bmb651A"]
+  }
+}

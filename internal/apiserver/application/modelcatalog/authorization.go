@@ -25,6 +25,8 @@ const (
 	ActionPublishCatalog   Action = "publish_catalog"   // 发布评估模型
 	ActionReadCatalog      Action = "read_catalog"      // 读取评估模型
 	ActionResolvePublished Action = "resolve_published" // 解析已发布评估模型
+	ActionReadNormTables   Action = "read_norm_tables"
+	ActionManageNormTables Action = "manage_norm_tables"
 )
 
 // Resource 标识应用命令的目标模型
@@ -90,6 +92,10 @@ func capabilityForAction(action Action) appauthz.Capability {
 		return appauthz.CapabilityReadAssessmentModels
 	case ActionResolvePublished:
 		return appauthz.CapabilityResolvePublishedAssessmentModels
+	case ActionReadNormTables:
+		return appauthz.CapabilityReadNormTables
+	case ActionManageNormTables:
+		return appauthz.CapabilityManageNormTables
 	default:
 		return ""
 	}

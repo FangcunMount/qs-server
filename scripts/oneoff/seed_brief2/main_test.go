@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	surveyquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -11,9 +12,9 @@ import (
 func TestBuildDefinitionAssignsAllQuestionsAndCompositeIndexes(t *testing.T) {
 	questionnaire := testQuestionnaire(t, 9)
 	catalog := testCatalog()
-	mapping := factorMap{}
+	mapping := factorMapping{Factors: factorMap{}}
 	for index, code := range catalog.order[:9] {
-		mapping[code] = []string{fmt.Sprintf("q%d", index)}
+		mapping.Factors[code] = []string{fmt.Sprintf("q%d", index)}
 	}
 
 	definition, err := buildDefinition(questionnaire, mapping, catalog, "brief2-test", "parent")
@@ -34,14 +35,43 @@ func TestBuildDefinitionAssignsAllQuestionsAndCompositeIndexes(t *testing.T) {
 func TestBuildDefinitionRejectsDuplicateQuestionAssignment(t *testing.T) {
 	questionnaire := testQuestionnaire(t, 9)
 	catalog := testCatalog()
-	mapping := factorMap{}
+	mapping := factorMapping{Factors: factorMap{}}
 	for index, code := range catalog.order[:9] {
-		mapping[code] = []string{fmt.Sprintf("q%d", index)}
+		mapping.Factors[code] = []string{fmt.Sprintf("q%d", index)}
 	}
-	mapping[catalog.order[1]] = []string{"q0", "q1"}
+	mapping.Factors[catalog.order[1]] = []string{"q0", "q1"}
 
 	if _, err := buildDefinition(questionnaire, mapping, catalog, "brief2-test", "parent"); err == nil {
 		t.Fatal("buildDefinition() error = nil, want duplicate question error")
+	}
+}
+
+func TestBuildDefinitionAllowsExplicitlyExcludedQuestions(t *testing.T) {
+	questionnaire := testQuestionnaire(t, 10)
+	catalog := testCatalog()
+	mapping := factorMapping{Factors: factorMap{}, ExcludedQuestions: map[string][]string{"infrequency_validity": {"q9"}}}
+	for index, code := range catalog.order[:9] {
+		mapping.Factors[code] = []string{fmt.Sprintf("q%d", index)}
+	}
+
+	if _, err := buildDefinition(questionnaire, mapping, catalog, "brief2-test", "parent"); err != nil {
+		t.Fatalf("buildDefinition() error = %v", err)
+	}
+}
+
+func TestVersionedFactorMapCoversBRIEF2ClinicalAndExcludedQuestions(t *testing.T) {
+	mapping, err := loadFactorMap(filepath.Join("data", "gXkk9W_4.0.1_factor_map.json"))
+	if err != nil {
+		t.Fatalf("loadFactorMap() error = %v", err)
+	}
+	if err := mapping.validateTarget("gXkk9W", "4.0.1"); err != nil {
+		t.Fatalf("validateTarget() error = %v", err)
+	}
+	if got := mapping.mappedQuestionCount(); got != 60 {
+		t.Fatalf("mapped questions = %d, want 60", got)
+	}
+	if got := mapping.excludedQuestionCount(); got != 10 {
+		t.Fatalf("excluded questions = %d, want 10", got)
 	}
 }
 

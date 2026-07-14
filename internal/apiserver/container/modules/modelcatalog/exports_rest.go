@@ -30,6 +30,7 @@ func (m *Module) ExportRESTDeps(
 	deps.AssessmentModel.Definition = m.Authoring
 	deps.AssessmentModel.Publication = m.Publication
 	deps.AssessmentModel.Release = m.Release
+	deps.AssessmentModel.NormTables = m.NormTables
 	deps.AssessmentModel.Query = appquery.NewService(appquery.Dependencies{
 		Models: m.ModelRepo, Published: m.PublishedLister, Authorizer: assessmentModelApp.SnapshotAuthorizer{}, QRCode: qrCodeService, HotRank: m.HotRank.ReadModel,
 	})

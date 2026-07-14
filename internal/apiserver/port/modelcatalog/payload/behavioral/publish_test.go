@@ -156,6 +156,13 @@ type normRepositoryStub struct {
 
 func (s normRepositoryStub) UpsertNorm(context.Context, *norm.Norm) error { return nil }
 
+func (s normRepositoryStub) ListNorms(context.Context, modelcatalogport.NormListFilter) ([]*norm.Norm, int64, error) {
+	if s.table == nil {
+		return nil, 0, s.err
+	}
+	return []*norm.Norm{s.table}, 1, s.err
+}
+
 func (s normRepositoryStub) FindNorm(context.Context, string) (*norm.Norm, error) {
 	return s.table, s.err
 }

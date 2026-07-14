@@ -32,13 +32,18 @@ import (
 )
 
 const (
-	defaultModelCode     = "bJFKi3"
-	defaultQuestionnaire = "bJFKi3"
-	defaultNormVersion   = "spm-sensory-cn-legacy-bJFKi3-v1"
-	defaultFormVariant   = "home"
+	defaultModelCode              = "bJFKi3"
+	defaultQuestionnaire          = "bJFKi3"
+	defaultQuestionnaireVersion   = "4.0.1"
+	defaultNormVersion            = "spm-sensory-cn-legacy-bJFKi3-v1"
+	defaultFormVariant            = "home"
+	tasteSmellFactorCode          = "wcgKM7uV"
+	tasteSmellFactorTitle         = "味觉与嗅觉（仅计入 TOT）"
+	spmReverseBalanceQuestionCode = "jenu1Rox"
 )
 
 var normOrder = []string{"SOC", "VIS", "HEA", "TOU", "BOD", "BAL", "PLA", "TOT"}
+var expectedQuestionCounts = map[string]int{"SOC": 10, "VIS": 11, "HEA": 8, "TOU": 11, "BOD": 10, "BAL": 11, "PLA": 9}
 
 type config struct {
 	mongoURI          string
@@ -68,7 +73,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database name")
 	flag.StringVar(&cfg.modelCode, "model-code", defaultModelCode, "assessment model code")
 	flag.StringVar(&cfg.questionnaireCode, "questionnaire-code", defaultQuestionnaire, "existing published questionnaire code")
-	flag.StringVar(&cfg.questionnaireVer, "questionnaire-version", "", "expected published questionnaire version (default: active version)")
+	flag.StringVar(&cfg.questionnaireVer, "questionnaire-version", defaultQuestionnaireVersion, "required published questionnaire version")
 	flag.StringVar(&cfg.normSource, "norm-source", "", "path to the supplied SPM_Norms PHP source")
 	flag.StringVar(&cfg.factorMap, "factor-map", "", "JSON map from the seven SPM factor codes to questionnaire question codes")
 	flag.StringVar(&cfg.normVersion, "norm-version", defaultNormVersion, "immutable norm table version")
@@ -84,24 +89,27 @@ func run(cfg config) error {
 		return errors.New("--norm-source is required; pass the supplied SPM_Norms PHP file")
 	}
 	if cfg.factorMap == "" {
-		return errors.New("--factor-map is required; export the seven clinical factor question groups from legacy assessment_mode bJFKi3")
+		return errors.New("--factor-map is required; provide the seven clinical factors plus the taste/smell item group for bJFKi3")
 	}
-	if cfg.modelCode == "" || cfg.questionnaireCode == "" || cfg.normVersion == "" || cfg.formVariant == "" {
-		return errors.New("model-code, questionnaire-code, norm-version and form-variant are required")
+	if cfg.modelCode == "" || cfg.questionnaireCode == "" || cfg.questionnaireVer == "" || cfg.normVersion == "" || cfg.formVariant == "" {
+		return errors.New("model-code, questionnaire-code, questionnaire-version, norm-version and form-variant are required")
 	}
 	source, err := loadPHPNormSource(cfg.normSource)
 	if err != nil {
 		return err
 	}
-	factorMap, err := loadFactorMap(cfg.factorMap)
+	mapping, err := loadFactorMap(cfg.factorMap)
 	if err != nil {
+		return err
+	}
+	if err := mapping.validateTarget(cfg.questionnaireCode, cfg.questionnaireVer); err != nil {
 		return err
 	}
 	table, catalog, percentileFallbacks, err := buildNormTable(source, cfg.normVersion, cfg.formVariant)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("plan: model=%s questionnaire=%s norm=%s factors=%d lookups=%d percentile_fallbacks=%d\n", cfg.modelCode, cfg.questionnaireCode, table.TableVersion, len(table.Factors), lookupCount(table), percentileFallbacks)
+	fmt.Printf("plan: model=%s questionnaire=%s@%s norm=%s factors=%d lookups=%d percentile_fallbacks=%d mapped_questions=%d\n", cfg.modelCode, cfg.questionnaireCode, cfg.questionnaireVer, table.TableVersion, len(table.Factors), lookupCount(table), percentileFallbacks, mapping.mappedQuestionCount())
 	if !cfg.apply {
 		fmt.Println("dry-run validated source files; Mongo questionnaire and existing model will be checked with --apply")
 		return nil
@@ -129,10 +137,10 @@ func run(cfg config) error {
 	if questionnaire == nil {
 		return fmt.Errorf("published questionnaire %s not found", cfg.questionnaireCode)
 	}
-	if cfg.questionnaireVer != "" && cfg.questionnaireVer != questionnaire.GetVersion().Value() {
+	if cfg.questionnaireVer != questionnaire.GetVersion().Value() {
 		return fmt.Errorf("questionnaire %s active version is %s, want %s", cfg.questionnaireCode, questionnaire.GetVersion().Value(), cfg.questionnaireVer)
 	}
-	definition, err := buildDefinition(questionnaire, factorMap, catalog, table.TableVersion)
+	definition, err := buildDefinition(questionnaire, mapping.Factors, catalog, table.TableVersion)
 	if err != nil {
 		return err
 	}
@@ -262,19 +270,43 @@ func loadPHPNormSource(path string) (phpNormSource, error) {
 
 type factorMap map[string][]string
 
-func loadFactorMap(path string) (factorMap, error) {
+type factorMapping struct {
+	QuestionnaireCode    string    `json:"questionnaire_code"`
+	QuestionnaireVersion string    `json:"questionnaire_version"`
+	Factors              factorMap `json:"factors"`
+}
+
+func loadFactorMap(path string) (factorMapping, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read factor map: %w", err)
+		return factorMapping{}, fmt.Errorf("read factor map: %w", err)
 	}
-	var result factorMap
+	var result factorMapping
 	if err := json.Unmarshal(raw, &result); err != nil {
-		return nil, fmt.Errorf("decode factor map: %w", err)
+		return factorMapping{}, fmt.Errorf("decode factor map: %w", err)
 	}
-	if len(result) == 0 {
-		return nil, errors.New("factor map is empty")
+	if len(result.Factors) == 0 {
+		return factorMapping{}, errors.New("factor map is empty")
 	}
 	return result, nil
+}
+
+func (m factorMapping) validateTarget(code, version string) error {
+	if m.QuestionnaireCode == "" || m.QuestionnaireVersion == "" {
+		return errors.New("factor map must declare questionnaire_code and questionnaire_version")
+	}
+	if m.QuestionnaireCode != code || m.QuestionnaireVersion != version {
+		return fmt.Errorf("factor map targets questionnaire %s@%s, want %s@%s", m.QuestionnaireCode, m.QuestionnaireVersion, code, version)
+	}
+	return nil
+}
+
+func (m factorMapping) mappedQuestionCount() int {
+	count := 0
+	for _, codes := range m.Factors {
+		count += len(codes)
+	}
+	return count
 }
 
 type normCatalog struct {
@@ -364,31 +396,55 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 		return nil, errors.New("questionnaire is nil")
 	}
 	leafCodes := catalog.order[:len(catalog.order)-1]
+	scoringCodes := append(append([]string(nil), leafCodes...), tasteSmellFactorCode)
+	reverseQuestions := make(map[string]struct{}, len(factorMap[catalog.byNormName["SOC"]])+1)
+	for _, questionCode := range factorMap[catalog.byNormName["SOC"]] {
+		reverseQuestions[questionCode] = struct{}{}
+	}
+	reverseQuestions[spmReverseBalanceQuestionCode] = struct{}{}
 	questionScores := make(map[string]map[string]float64)
 	for _, question := range questionnaire.GetQuestions() {
 		if len(question.GetOptions()) == 0 {
 			continue
 		}
+		questionCode := question.GetCode().Value()
+		_, reverse := reverseQuestions[questionCode]
+		if err := validateSPMOptionScores(questionCode, question.GetOptions(), reverse); err != nil {
+			return nil, err
+		}
 		optionScores := make(map[string]float64, len(question.GetOptions()))
 		for _, option := range question.GetOptions() {
 			optionScores[option.GetCode().Value()] = option.GetScore()
 		}
-		questionScores[question.GetCode().Value()] = optionScores
+		questionScores[questionCode] = optionScores
 	}
 	if len(questionScores) == 0 {
 		return nil, fmt.Errorf("questionnaire %s has no scored questions", questionnaire.GetCode().Value())
 	}
-	leafSet := make(map[string]struct{}, len(leafCodes))
+	leafSet := make(map[string]struct{}, len(scoringCodes))
 	for _, code := range leafCodes {
 		leafSet[code] = struct{}{}
 		if len(factorMap[code]) == 0 {
 			return nil, fmt.Errorf("factor map is missing SPM factor %s", code)
 		}
 	}
+	leafSet[tasteSmellFactorCode] = struct{}{}
+	if len(factorMap[tasteSmellFactorCode]) == 0 {
+		return nil, fmt.Errorf("factor map is missing SPM taste/smell item group %s", tasteSmellFactorCode)
+	}
 	for code := range factorMap {
 		if _, ok := leafSet[code]; !ok {
-			return nil, fmt.Errorf("factor map contains unsupported factor %s; only the seven non-total SPM factors are allowed", code)
+			return nil, fmt.Errorf("factor map contains unsupported factor %s; only the seven non-total SPM factors and taste/smell item group are allowed", code)
 		}
+	}
+	for normName, expected := range expectedQuestionCounts {
+		factorCode := catalog.byNormName[normName]
+		if got := len(factorMap[factorCode]); got != expected {
+			return nil, fmt.Errorf("SPM factor %s (%s) has %d questions, want %d", normName, factorCode, got, expected)
+		}
+	}
+	if got := len(factorMap[tasteSmellFactorCode]); got != 5 {
+		return nil, fmt.Errorf("SPM taste/smell item group %s has %d questions, want 5", tasteSmellFactorCode, got)
 	}
 
 	definition := &modeldefinition.Definition{}
@@ -401,8 +457,9 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 		definition.Calibration.NormRefs = append(definition.Calibration.NormRefs, modelnorm.Ref{FactorCode: code, NormTableVersion: normVersion})
 		definition.Conclusions = append(definition.Conclusions, spmConclusion(code, role == factor.FactorRoleTotal))
 	}
+	definition.Measure.Factors = append(definition.Measure.Factors, factor.Factor{Code: tasteSmellFactorCode, Title: tasteSmellFactorTitle, Role: factor.FactorRoleSubtest})
 	seenQuestions := make(map[string]string, len(questionScores))
-	for _, code := range leafCodes {
+	for _, code := range scoringCodes {
 		sources := make([]factor.ScoringSource, 0, len(factorMap[code]))
 		for _, questionCode := range factorMap[code] {
 			optionScores, ok := questionScores[questionCode]
@@ -422,23 +479,60 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 			return nil, fmt.Errorf("questionnaire question %s is not assigned to an SPM factor", questionCode)
 		}
 	}
-	totalCode := catalog.order[len(catalog.order)-1]
-	totalSources := make([]factor.ScoringSource, 0, len(leafCodes))
-	for _, childCode := range leafCodes {
+	totalCode := catalog.byNormName["TOT"]
+	totalComponentCodes := []string{
+		catalog.byNormName["VIS"],
+		catalog.byNormName["HEA"],
+		catalog.byNormName["TOU"],
+		tasteSmellFactorCode,
+		catalog.byNormName["BOD"],
+		catalog.byNormName["BAL"],
+	}
+	totalSources := make([]factor.ScoringSource, 0, len(totalComponentCodes))
+	for _, childCode := range totalComponentCodes {
+		if childCode == "" {
+			return nil, errors.New("SPM total component is missing")
+		}
 		totalSources = append(totalSources, factor.ScoringSource{Kind: factor.ScoringSourceFactor, Code: childCode})
 		definition.Measure.FactorGraph.Edges = append(definition.Measure.FactorGraph.Edges, factor.FactorEdge{ParentCode: totalCode, ChildCode: childCode})
 	}
 	definition.Measure.Scoring = append(definition.Measure.Scoring, factor.Scoring{FactorCode: totalCode, Sources: totalSources, Strategy: factor.ScoringStrategySum})
-	definition.Measure.FactorGraph.Roots = []string{totalCode}
-	definition.Measure.FactorGraph.SortOrders = make(map[string]int, len(catalog.order))
+	definition.Measure.FactorGraph.Roots = []string{catalog.byNormName["SOC"], totalCode, catalog.byNormName["PLA"]}
+	definition.Measure.FactorGraph.SortOrders = make(map[string]int, len(catalog.order)+1)
 	for index, code := range catalog.order {
 		definition.Measure.FactorGraph.SortOrders[code] = index + 1
 	}
+	definition.Measure.FactorGraph.SortOrders[tasteSmellFactorCode] = len(catalog.order) + 1
 	definition.ReportMap = modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{Code: "spm_sensory_scores", Title: "SPM 感觉处理维度", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: append([]string(nil), catalog.order...)}}}
 	if issues := modeldefinition.Validate(*definition); len(issues) > 0 {
 		return nil, fmt.Errorf("generated DefinitionV2 is invalid: %s", issues[0].Message)
 	}
 	return definition, nil
+}
+
+func validateSPMOptionScores(questionCode string, options []surveyquestionnaire.Option, reverse bool) error {
+	if len(options) != 4 {
+		return fmt.Errorf("SPM question %s has %d options, want 4", questionCode, len(options))
+	}
+	normal := map[string]float64{"从不": 1, "偶尔": 2, "经常": 3, "常常": 3, "总是": 4}
+	for _, option := range options {
+		content := strings.TrimSpace(option.GetContent())
+		expected, ok := normal[content]
+		if !ok {
+			return fmt.Errorf("SPM question %s has unsupported option %q", questionCode, content)
+		}
+		if reverse {
+			expected = 5 - expected
+		}
+		if option.GetScore() != expected {
+			direction := "正向"
+			if reverse {
+				direction = "反向"
+			}
+			return fmt.Errorf("SPM question %s option %q score is %.1f, want %.1f (%s计分)", questionCode, content, option.GetScore(), expected, direction)
+		}
+	}
+	return nil
 }
 
 func spmConclusion(factorCode string, primary bool) conclusion.NormConclusion {

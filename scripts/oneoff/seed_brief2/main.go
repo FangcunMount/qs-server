@@ -34,11 +34,12 @@ import (
 )
 
 const (
-	defaultModelCode      = "gXkk9W"
-	defaultQuestionnaire  = "gXkk9W"
-	defaultNormVersion    = "brief2-parent-cn-legacy-gXkk9W-v1"
-	defaultFormVariant    = "parent"
-	brief2NormFactorCount = 13
+	defaultModelCode            = "gXkk9W"
+	defaultQuestionnaire        = "gXkk9W"
+	defaultQuestionnaireVersion = "4.0.1"
+	defaultNormVersion          = "brief2-parent-cn-legacy-gXkk9W-v1"
+	defaultFormVariant          = "parent"
+	brief2NormFactorCount       = 13
 )
 
 type config struct {
@@ -69,7 +70,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database name")
 	flag.StringVar(&cfg.modelCode, "model-code", defaultModelCode, "assessment model code")
 	flag.StringVar(&cfg.questionnaireCode, "questionnaire-code", defaultQuestionnaire, "existing published questionnaire code")
-	flag.StringVar(&cfg.questionnaireVer, "questionnaire-version", "", "expected published questionnaire version (default: active version)")
+	flag.StringVar(&cfg.questionnaireVer, "questionnaire-version", defaultQuestionnaireVersion, "required published questionnaire version")
 	flag.StringVar(&cfg.normSource, "norm-source", "", "path to the supplied BRIEF2_Norms PHP source")
 	flag.StringVar(&cfg.factorMap, "factor-map", "", "JSON file mapping legacy factor codes to questionnaire question codes")
 	flag.StringVar(&cfg.normVersion, "norm-version", defaultNormVersion, "immutable norm table version")
@@ -87,16 +88,19 @@ func run(cfg config) error {
 	if cfg.factorMap == "" {
 		return errors.New("--factor-map is required; the supplied files contain no item-to-scale mapping")
 	}
-	if cfg.modelCode == "" || cfg.questionnaireCode == "" || cfg.normVersion == "" || cfg.formVariant == "" {
-		return errors.New("model-code, questionnaire-code, norm-version and form-variant are required")
+	if cfg.modelCode == "" || cfg.questionnaireCode == "" || cfg.questionnaireVer == "" || cfg.normVersion == "" || cfg.formVariant == "" {
+		return errors.New("model-code, questionnaire-code, questionnaire-version, norm-version and form-variant are required")
 	}
 
 	source, err := loadPHPNormSource(cfg.normSource)
 	if err != nil {
 		return err
 	}
-	factorMap, err := loadFactorMap(cfg.factorMap)
+	mapping, err := loadFactorMap(cfg.factorMap)
 	if err != nil {
+		return err
+	}
+	if err := mapping.validateTarget(cfg.questionnaireCode, cfg.questionnaireVer); err != nil {
 		return err
 	}
 	normTable, catalog, err := buildNormTable(source, cfg.normVersion, cfg.formVariant)
@@ -104,8 +108,8 @@ func run(cfg config) error {
 		return err
 	}
 
-	fmt.Printf("plan: model=%s questionnaire=%s norm=%s factors=%d strata=%d\n",
-		cfg.modelCode, cfg.questionnaireCode, normTable.TableVersion, len(normTable.Factors), len(source.Scores))
+	fmt.Printf("plan: model=%s questionnaire=%s@%s norm=%s factors=%d strata=%d mapped_questions=%d excluded_questions=%d\n",
+		cfg.modelCode, cfg.questionnaireCode, cfg.questionnaireVer, normTable.TableVersion, len(normTable.Factors), len(source.Scores), mapping.mappedQuestionCount(), mapping.excludedQuestionCount())
 	if !cfg.apply {
 		fmt.Println("dry-run validated source files; Mongo questionnaire and existing model will be checked with --apply")
 		return nil
@@ -134,10 +138,10 @@ func run(cfg config) error {
 	if questionnaire == nil {
 		return fmt.Errorf("published questionnaire %s not found", cfg.questionnaireCode)
 	}
-	if cfg.questionnaireVer != "" && questionnaire.GetVersion().Value() != cfg.questionnaireVer {
+	if questionnaire.GetVersion().Value() != cfg.questionnaireVer {
 		return fmt.Errorf("questionnaire %s active version is %s, want %s", cfg.questionnaireCode, questionnaire.GetVersion().Value(), cfg.questionnaireVer)
 	}
-	definition, err := buildDefinition(questionnaire, factorMap, catalog, normTable.TableVersion, cfg.formVariant)
+	definition, err := buildDefinition(questionnaire, mapping, catalog, normTable.TableVersion, cfg.formVariant)
 	if err != nil {
 		return err
 	}
@@ -273,19 +277,52 @@ func loadPHPNormSource(path string) (phpNormSource, error) {
 
 type factorMap map[string][]string
 
-func loadFactorMap(path string) (factorMap, error) {
+type factorMapping struct {
+	QuestionnaireCode    string              `json:"questionnaire_code"`
+	QuestionnaireVersion string              `json:"questionnaire_version"`
+	Factors              factorMap           `json:"factors"`
+	ExcludedQuestions    map[string][]string `json:"excluded_question_codes"`
+}
+
+func loadFactorMap(path string) (factorMapping, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read factor map: %w", err)
+		return factorMapping{}, fmt.Errorf("read factor map: %w", err)
 	}
-	var result factorMap
+	var result factorMapping
 	if err := json.Unmarshal(raw, &result); err != nil {
-		return nil, fmt.Errorf("decode factor map: %w", err)
+		return factorMapping{}, fmt.Errorf("decode factor map: %w", err)
 	}
-	if len(result) == 0 {
-		return nil, errors.New("factor map is empty")
+	if len(result.Factors) == 0 {
+		return factorMapping{}, errors.New("factor map is empty")
 	}
 	return result, nil
+}
+
+func (m factorMapping) validateTarget(code, version string) error {
+	if m.QuestionnaireCode == "" || m.QuestionnaireVersion == "" {
+		return errors.New("factor map must declare questionnaire_code and questionnaire_version")
+	}
+	if m.QuestionnaireCode != code || m.QuestionnaireVersion != version {
+		return fmt.Errorf("factor map targets questionnaire %s@%s, want %s@%s", m.QuestionnaireCode, m.QuestionnaireVersion, code, version)
+	}
+	return nil
+}
+
+func (m factorMapping) mappedQuestionCount() int {
+	count := 0
+	for _, codes := range m.Factors {
+		count += len(codes)
+	}
+	return count
+}
+
+func (m factorMapping) excludedQuestionCount() int {
+	count := 0
+	for _, codes := range m.ExcludedQuestions {
+		count += len(codes)
+	}
+	return count
 }
 
 func buildNormTable(source phpNormSource, version, formVariant string) (*modelnorm.Norm, normCatalog, error) {
@@ -413,7 +450,7 @@ func parseNumber(value string) (float64, error) {
 	return strconv.ParseFloat(parsed, 64)
 }
 
-func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap factorMap, catalog normCatalog, normVersion, formVariant string) (*modeldefinition.Definition, error) {
+func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, mapping factorMapping, catalog normCatalog, normVersion, formVariant string) (*modeldefinition.Definition, error) {
 	if questionnaire == nil {
 		return nil, errors.New("questionnaire is nil")
 	}
@@ -436,6 +473,7 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 	}
 
 	leafCodes := catalog.order[:9]
+	factorMap := mapping.Factors
 	leafSet := make(map[string]struct{}, len(leafCodes))
 	for _, code := range leafCodes {
 		leafSet[code] = struct{}{}
@@ -450,6 +488,21 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 	}
 
 	seenQuestions := make(map[string]string, len(questionScores))
+	excludedQuestions := make(map[string]string, mapping.excludedQuestionCount())
+	for reason, questionCodes := range mapping.ExcludedQuestions {
+		if reason == "" || len(questionCodes) == 0 {
+			return nil, errors.New("excluded question groups require a non-empty reason and at least one question code")
+		}
+		for _, questionCode := range questionCodes {
+			if _, ok := questionScores[questionCode]; !ok {
+				return nil, fmt.Errorf("excluded question %s (%s) is missing or unscored", questionCode, reason)
+			}
+			if previous, duplicate := excludedQuestions[questionCode]; duplicate {
+				return nil, fmt.Errorf("question %s is excluded by both %s and %s", questionCode, previous, reason)
+			}
+			excludedQuestions[questionCode] = reason
+		}
+	}
 	definition := &modeldefinition.Definition{}
 	for index, code := range catalog.order {
 		role := factor.FactorRoleDimension
@@ -466,6 +519,9 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 	for _, code := range leafCodes {
 		sources := make([]factor.ScoringSource, 0, len(factorMap[code]))
 		for _, questionCode := range factorMap[code] {
+			if reason, excluded := excludedQuestions[questionCode]; excluded {
+				return nil, fmt.Errorf("factor %s references excluded question %s (%s)", code, questionCode, reason)
+			}
 			optionScores, ok := questionScores[questionCode]
 			if !ok {
 				return nil, fmt.Errorf("factor %s references missing or unscored questionnaire question %s", code, questionCode)
@@ -479,7 +535,10 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 		definition.Measure.Scoring = append(definition.Measure.Scoring, factor.Scoring{FactorCode: code, Sources: sources, Strategy: factor.ScoringStrategySum, OptionScoring: factor.OptionScoringStrict})
 	}
 	for questionCode := range questionScores {
-		if _, ok := seenQuestions[questionCode]; !ok {
+		if _, ok := seenQuestions[questionCode]; ok {
+			continue
+		}
+		if _, ok := excludedQuestions[questionCode]; !ok {
 			return nil, fmt.Errorf("questionnaire question %s is not assigned to a BRIEF-2 clinical scale", questionCode)
 		}
 	}

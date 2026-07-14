@@ -55,6 +55,13 @@ type CatalogQueryService interface {
 	GetQRCode(ctx context.Context, actor ActorContext, code string) (string, error)
 }
 
+// NormTableService owns immutable norm-table import and administration reads.
+type NormTableService interface {
+	Import(ctx context.Context, actor ActorContext, table *domain.Norm) (*NormTableDetail, error)
+	Get(ctx context.Context, actor ActorContext, tableVersion string) (*NormTableDetail, error)
+	List(ctx context.Context, actor ActorContext, input ListNormTablesDTO) (*NormTableListResult, error)
+}
+
 // PublishedModelResolver 是运行时只读的不可变模型访问路径
 type PublishedModelResolver interface {
 	ResolveByRef(ctx context.Context, actor ActorContext, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error)

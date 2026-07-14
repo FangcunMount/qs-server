@@ -33,3 +33,34 @@ func ModelSummaryFromAssessmentModel(model *domain.AssessmentModel) *ModelSummar
 	PopulateModelSummaryIdentity(result, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
 	return result
 }
+
+// NormTableDetailFromDomain projects immutable norm reference material for
+// administration reads without exposing persistence models.
+func NormTableDetailFromDomain(table *domain.Norm) *NormTableDetail {
+	if table == nil {
+		return nil
+	}
+	out := &NormTableDetail{NormTableSummary: NormTableSummary{
+		TableVersion: table.TableVersion, FormVariant: table.FormVariant,
+		Kind: string(table.Kind), Algorithm: string(table.Algorithm), FactorCount: len(table.Factors),
+	}, Factors: make([]NormFactorTable, 0, len(table.Factors))}
+	for _, factor := range table.Factors {
+		item := NormFactorTable{FactorCode: factor.FactorCode}
+		for _, band := range factor.Bands {
+			item.Bands = append(item.Bands, NormBand{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender, Mean: cloneNormFloat(band.Mean), StdDev: cloneNormFloat(band.StdDev)})
+		}
+		for _, lookup := range factor.Lookup {
+			item.Lookup = append(item.Lookup, NormLookupEntry{RawScoreMin: lookup.RawScoreMin, RawScoreMax: lookup.RawScoreMax, MinAgeMonths: lookup.MinAgeMonths, MaxAgeMonths: lookup.MaxAgeMonths, Gender: lookup.Gender, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneNormFloat(lookup.StandardScore)})
+		}
+		out.Factors = append(out.Factors, item)
+	}
+	return out
+}
+
+func cloneNormFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}

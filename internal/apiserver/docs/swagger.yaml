@@ -419,6 +419,51 @@ definitions:
     - ScoringStrategyMax
     - ScoringStrategyMin
     - ScoringStrategyCnt
+  github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand:
+    properties:
+      gender:
+        type: string
+      max_age_months:
+        type: integer
+      mean:
+        type: number
+      min_age_months:
+        type: integer
+      std_dev:
+        type: number
+    type: object
+  github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable:
+    properties:
+      bands:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand'
+        type: array
+      factor_code:
+        type: string
+      lookup:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry'
+        type: array
+    type: object
+  github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry:
+    properties:
+      gender:
+        type: string
+      max_age_months:
+        type: integer
+      min_age_months:
+        type: integer
+      percentile:
+        type: number
+      raw_score_max:
+        type: number
+      raw_score_min:
+        type: number
+      standard_score:
+        type: number
+      t_score:
+        type: number
+    type: object
   handler.questionnaireBatchRequest:
     properties:
       codes:
@@ -571,6 +616,19 @@ definitions:
       title:
         type: string
       updated_at:
+        type: string
+    type: object
+  modelcatalog.NormTableSummary:
+    properties:
+      algorithm:
+        type: string
+      factor_count:
+        type: integer
+      form_variant:
+        type: string
+      kind:
+        type: string
+      table_version:
         type: string
     type: object
   modelcatalog.Option:
@@ -947,6 +1005,28 @@ definitions:
       time.Time:
         type: string
     type: object
+  request.ImportNormTableRequest:
+    properties:
+      algorithm:
+        type: string
+      factors:
+        items:
+          $ref: '#/definitions/request.NormFactorTable'
+        minItems: 1
+        type: array
+      form_variant:
+        type: string
+      kind:
+        type: string
+      table_version:
+        type: string
+    required:
+    - algorithm
+    - factors
+    - form_variant
+    - kind
+    - table_version
+    type: object
   request.IntakeByAssessmentEntryRequest:
     properties:
       birthday:
@@ -978,6 +1058,61 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  request.NormBand:
+    properties:
+      gender:
+        type: string
+      max_age_months:
+        type: integer
+      mean:
+        type: number
+      min_age_months:
+        type: integer
+      std_dev:
+        type: number
+    required:
+    - mean
+    - std_dev
+    type: object
+  request.NormFactorTable:
+    properties:
+      bands:
+        items:
+          $ref: '#/definitions/request.NormBand'
+        type: array
+      factor_code:
+        type: string
+      lookup:
+        items:
+          $ref: '#/definitions/request.NormLookupEntry'
+        type: array
+    required:
+    - factor_code
+    type: object
+  request.NormLookupEntry:
+    properties:
+      gender:
+        type: string
+      max_age_months:
+        type: integer
+      min_age_months:
+        type: integer
+      percentile:
+        type: number
+      raw_score_max:
+        type: number
+      raw_score_min:
+        type: number
+      standard_score:
+        type: number
+      t_score:
+        type: number
+    required:
+    - percentile
+    - raw_score_max
+    - raw_score_min
+    - t_score
     type: object
   request.ReorderQuestionsRequest:
     properties:
@@ -2340,6 +2475,36 @@ definitions:
         type: integer
       percent:
         type: number
+    type: object
+  response.NormTableDetailResponse:
+    properties:
+      algorithm:
+        type: string
+      factor_count:
+        type: integer
+      factors:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable'
+        type: array
+      form_variant:
+        type: string
+      kind:
+        type: string
+      table_version:
+        type: string
+    type: object
+  response.NormTableListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/modelcatalog.NormTableSummary'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
     type: object
   response.PeriodicProjectResponse:
     properties:
@@ -6003,6 +6168,119 @@ paths:
       summary: 获取因子趋势
       tags:
       - Evaluation-Score
+  /api/v1/norm-tables:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      - description: 算法
+        in: query
+        name: algorithm
+        type: string
+      - description: 表单变体
+        in: query
+        name: form_variant
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.NormTableListResponse'
+              type: object
+      summary: 获取常模表列表
+      tags:
+      - NormTable
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 常模表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ImportNormTableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.NormTableDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 导入版本化常模表
+      tags:
+      - NormTable
+  /api/v1/norm-tables/{version}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 常模表版本
+        in: path
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.NormTableDetailResponse'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取常模表详情
+      tags:
+      - NormTable
   /api/v1/plans:
     get:
       description: 分页查询计划列表，支持条件筛选。可通过量表编码（scale_code）筛选特定量表的计划

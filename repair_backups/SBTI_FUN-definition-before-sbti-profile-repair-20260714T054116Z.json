@@ -1,0 +1,1572 @@
+{
+  "Measure": {
+    "Factors": [
+      {
+        "Code": "A1",
+        "Title": "A1 世界观倾向",
+        "Role": "dimension"
+      },
+      {
+        "Code": "A2",
+        "Title": "A2 规则与灵活度",
+        "Role": "dimension"
+      },
+      {
+        "Code": "A3",
+        "Title": "A3 人生意义感",
+        "Role": "dimension"
+      },
+      {
+        "Code": "Ac1",
+        "Title": "Ac1 动机导向",
+        "Role": "dimension"
+      },
+      {
+        "Code": "Ac2",
+        "Title": "Ac2 决策风格",
+        "Role": "dimension"
+      },
+      {
+        "Code": "Ac3",
+        "Title": "Ac3 执行模式",
+        "Role": "dimension"
+      },
+      {
+        "Code": "E1",
+        "Title": "E1 依恋安全感",
+        "Role": "dimension"
+      },
+      {
+        "Code": "E2",
+        "Title": "E2 情感投入度",
+        "Role": "dimension"
+      },
+      {
+        "Code": "E3",
+        "Title": "E3 边界与依赖",
+        "Role": "dimension"
+      },
+      {
+        "Code": "S1",
+        "Title": "S1 自尊自信",
+        "Role": "dimension"
+      },
+      {
+        "Code": "S2",
+        "Title": "S2 自我清晰度",
+        "Role": "dimension"
+      },
+      {
+        "Code": "S3",
+        "Title": "S3 核心价值",
+        "Role": "dimension"
+      },
+      {
+        "Code": "So1",
+        "Title": "So1 社交主动性",
+        "Role": "dimension"
+      },
+      {
+        "Code": "So2",
+        "Title": "So2 人际边界感",
+        "Role": "dimension"
+      },
+      {
+        "Code": "So3",
+        "Title": "So3 表达与真实度",
+        "Role": "dimension"
+      }
+    ],
+    "FactorGraph": {
+      "Roots": [
+        "S1",
+        "S2",
+        "S3",
+        "E1",
+        "E2",
+        "E3",
+        "A1",
+        "A2",
+        "A3",
+        "Ac1",
+        "Ac2",
+        "Ac3",
+        "So1",
+        "So2",
+        "So3"
+      ],
+      "Edges": [],
+      "SortOrders": {
+        "A1": 1,
+        "A2": 2,
+        "A3": 3,
+        "Ac1": 4,
+        "Ac2": 5,
+        "Ac3": 6,
+        "E1": 7,
+        "E2": 8,
+        "E3": 9,
+        "S1": 10,
+        "S2": 11,
+        "S3": 12,
+        "So1": 13,
+        "So2": 14,
+        "So3": 15
+      }
+    },
+    "Scoring": [
+      {
+        "FactorCode": "A1",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q13",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q14",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "A2",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q15",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q16",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "A3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q17",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q18",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "Ac1",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q19",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q20",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "Ac2",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q21",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q22",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "Ac3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q23",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q24",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "E1",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q07",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q08",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "E2",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q09",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q10",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "E3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q11",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q12",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "S1",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q01",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q02",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "S2",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q03",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q04",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "S3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q05",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q06",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "So1",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q25",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q26",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "So2",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q27",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q28",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      },
+      {
+        "FactorCode": "So3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q29",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SBTI_Q30",
+            "OptionScores": {
+              "1": 1,
+              "2": 2,
+              "3": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "compat"
+      }
+    ]
+  },
+  "Calibration": {
+    "NormRefs": []
+  },
+  "Execution": {
+    "Brief2": null,
+    "SPM": null
+  },
+  "Conclusions": [
+    {
+      "Kind": "type",
+      "FactorCode": "",
+      "FactorCodes": [
+        "A1",
+        "A2",
+        "A3",
+        "Ac1",
+        "Ac2",
+        "Ac3",
+        "E1",
+        "E2",
+        "E3",
+        "S1",
+        "S2",
+        "S3",
+        "So1",
+        "So2",
+        "So3"
+      ],
+      "ScoreBasis": "",
+      "Primary": false,
+      "Rules": null,
+      "Outcomes": [
+        {
+          "Code": "CTRL",
+          "Title": "拿捏者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "ATM-er",
+          "Title": "送钱者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "Dior-s",
+          "Title": "屌丝",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "BOSS",
+          "Title": "领导者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "THAN-K",
+          "Title": "感恩者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "OH-NO",
+          "Title": "哦不人",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "GOGO",
+          "Title": "行者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "SEXY",
+          "Title": "尤物",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "LOVE-R",
+          "Title": "多情者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "MUM",
+          "Title": "妈妈",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "FAKE",
+          "Title": "伪人",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "OJBK",
+          "Title": "无所谓人",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "MALO",
+          "Title": "吗喽",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "JOKE-R",
+          "Title": "小丑",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "WOC!",
+          "Title": "握草人",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "THIN-K",
+          "Title": "思考者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "SHIT",
+          "Title": "愤世者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "ZZZZ",
+          "Title": "装死者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "POOR",
+          "Title": "贫困者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "MONK",
+          "Title": "僧人",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "IMSB",
+          "Title": "傻者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "SOLO",
+          "Title": "孤儿",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "FUCK",
+          "Title": "草者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "DEAD",
+          "Title": "死者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "IMFW",
+          "Title": "废物",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "HHHH",
+          "Title": "傻乐者",
+          "Summary": "",
+          "Description": ""
+        },
+        {
+          "Code": "DRUNK",
+          "Title": "酒鬼",
+          "Summary": "",
+          "Description": ""
+        }
+      ],
+      "Decision": {
+        "Kind": "nearest_pattern",
+        "FallbackSimilarityThreshold": 0.6,
+        "FallbackCode": "HHHH",
+        "LevelRule": {
+          "LowMax": 3,
+          "HighMin": 5
+        },
+        "Poles": [
+          {
+            "FactorCode": "S1",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "自我模型"
+          },
+          {
+            "FactorCode": "S2",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "自我模型"
+          },
+          {
+            "FactorCode": "S3",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "自我模型"
+          },
+          {
+            "FactorCode": "E1",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "情感模型"
+          },
+          {
+            "FactorCode": "E2",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "情感模型"
+          },
+          {
+            "FactorCode": "E3",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "情感模型"
+          },
+          {
+            "FactorCode": "A1",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "态度模型"
+          },
+          {
+            "FactorCode": "A2",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "态度模型"
+          },
+          {
+            "FactorCode": "A3",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "态度模型"
+          },
+          {
+            "FactorCode": "Ac1",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "行动驱力模型"
+          },
+          {
+            "FactorCode": "Ac2",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "行动驱力模型"
+          },
+          {
+            "FactorCode": "Ac3",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "行动驱力模型"
+          },
+          {
+            "FactorCode": "So1",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "社交模型"
+          },
+          {
+            "FactorCode": "So2",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "社交模型"
+          },
+          {
+            "FactorCode": "So3",
+            "LeftPole": "",
+            "RightPole": "",
+            "Threshold": 0,
+            "Model": "社交模型"
+          }
+        ],
+        "TopK": 0
+      },
+      "SpecialRules": [
+        {
+          "Code": "HHHH",
+          "Kind": "fallback_threshold",
+          "Phase": "after_decision",
+          "Trigger": "fallback:best_match\u003c60%",
+          "OutcomeCode": "HHHH",
+          "QuestionCodes": null,
+          "OptionValues": null
+        },
+        {
+          "Code": "DRUNK",
+          "Kind": "answer_match",
+          "Phase": "before_score",
+          "Trigger": "hidden:drink_gate_q2_answer=2",
+          "OutcomeCode": "DRUNK",
+          "QuestionCodes": [
+            "drink_gate_q2"
+          ],
+          "OptionValues": [
+            "2"
+          ]
+        },
+        {
+          "Code": "fallback:HHHH",
+          "Kind": "fallback_threshold",
+          "Phase": "after_decision",
+          "Trigger": "",
+          "OutcomeCode": "HHHH",
+          "QuestionCodes": null,
+          "OptionValues": null
+        }
+      ],
+      "OutcomeMapping": {
+        "DetailKind": "personality_type",
+        "DetailAdapterKey": "sbti",
+        "Algorithm": "sbti"
+      },
+      "Profiles": [
+        {
+          "OutcomeCode": "CTRL",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "ATM-er",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "Dior-s",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "BOSS",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "THAN-K",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "OH-NO",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "GOGO",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "SEXY",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "LOVE-R",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "MUM",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "FAKE",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "OJBK",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "MALO",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "JOKE-R",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "WOC!",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "THIN-K",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "SHIT",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "ZZZZ",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "POOR",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "MONK",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "IMSB",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "SOLO",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "FUCK",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "DEAD",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "IMFW",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "HHHH",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        },
+        {
+          "OutcomeCode": "DRUNK",
+          "Pattern": "",
+          "Traits": null,
+          "Strengths": null,
+          "Weaknesses": null,
+          "Suggestions": null,
+          "ImageURL": "",
+          "Image": "",
+          "Rarity": {
+            "Percent": 0,
+            "Label": "",
+            "OneInX": 0
+          },
+          "IsSpecial": false,
+          "Trigger": "",
+          "Commentary": ""
+        }
+      ]
+    }
+  ],
+  "Outcomes": [
+    {
+      "Code": "CTRL",
+      "Title": "拿捏者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "ATM-er",
+      "Title": "送钱者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "Dior-s",
+      "Title": "屌丝",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "BOSS",
+      "Title": "领导者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "THAN-K",
+      "Title": "感恩者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "OH-NO",
+      "Title": "哦不人",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "GOGO",
+      "Title": "行者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "SEXY",
+      "Title": "尤物",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "LOVE-R",
+      "Title": "多情者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "MUM",
+      "Title": "妈妈",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "FAKE",
+      "Title": "伪人",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "OJBK",
+      "Title": "无所谓人",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "MALO",
+      "Title": "吗喽",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "JOKE-R",
+      "Title": "小丑",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "WOC!",
+      "Title": "握草人",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "THIN-K",
+      "Title": "思考者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "SHIT",
+      "Title": "愤世者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "ZZZZ",
+      "Title": "装死者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "POOR",
+      "Title": "贫困者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "MONK",
+      "Title": "僧人",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "IMSB",
+      "Title": "傻者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "SOLO",
+      "Title": "孤儿",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "FUCK",
+      "Title": "草者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "DEAD",
+      "Title": "死者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "IMFW",
+      "Title": "废物",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "HHHH",
+      "Title": "傻乐者",
+      "Summary": "",
+      "Description": ""
+    },
+    {
+      "Code": "DRUNK",
+      "Title": "酒鬼",
+      "Summary": "",
+      "Description": ""
+    }
+  ],
+  "ReportMap": {
+    "Sections": [
+      {
+        "Code": "personality_type",
+        "Title": "SBTI",
+        "SourceRefs": null,
+        "Kind": "personality_type",
+        "AdapterKey": "sbti",
+        "TemplateID": "sbti",
+        "CategoryLabel": "SBTI"
+      }
+    ]
+  }
+}

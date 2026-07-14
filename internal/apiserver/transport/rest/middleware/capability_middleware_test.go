@@ -31,6 +31,7 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		Permissions: []authzapp.Permission{
 			{Resource: "qs:questionnaires", Action: "create|read|list|update|delete|publish|unpublish|archive|statistics"},
 			{Resource: "qs:assessment_models", Action: "create|read|list|update|delete|publish|unpublish|archive"},
+			{Resource: "qs:modelcatalog:collection:norm_tables", Action: "read|list|import"},
 		},
 	}
 	adminSnap := &authzapp.Snapshot{
@@ -78,6 +79,13 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		{
 			name:        "content manager can read assessment models",
 			capability:  CapabilityReadAssessmentModels,
+			snapshot:    contentManagerSnap,
+			wantStatus:  http.StatusOK,
+			wantNextRun: true,
+		},
+		{
+			name:        "content manager can import norm tables",
+			capability:  CapabilityManageNormTables,
 			snapshot:    contentManagerSnap,
 			wantStatus:  http.StatusOK,
 			wantNextRun: true,

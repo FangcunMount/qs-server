@@ -243,3 +243,56 @@ type PreviewReportResult struct {
 	Issues         []ValidationIssue      `json:"issues,omitempty"`
 	RawReport      *report.Draft          `json:"raw_report,omitempty"`
 }
+
+type ListNormTablesDTO struct {
+	Kind        string
+	Algorithm   string
+	FormVariant string
+	Page        int
+	PageSize    int
+}
+
+type NormTableSummary struct {
+	TableVersion string `json:"table_version"`
+	FormVariant  string `json:"form_variant,omitempty"`
+	Kind         string `json:"kind"`
+	Algorithm    string `json:"algorithm"`
+	FactorCount  int    `json:"factor_count"`
+}
+
+type NormTableListResult struct {
+	Items    []NormTableSummary `json:"items"`
+	Total    int64              `json:"total"`
+	Page     int                `json:"page"`
+	PageSize int                `json:"page_size"`
+}
+
+type NormTableDetail struct {
+	NormTableSummary
+	Factors []NormFactorTable `json:"factors"`
+}
+
+type NormFactorTable struct {
+	FactorCode string            `json:"factor_code"`
+	Bands      []NormBand        `json:"bands,omitempty"`
+	Lookup     []NormLookupEntry `json:"lookup,omitempty"`
+}
+
+type NormBand struct {
+	MinAgeMonths int      `json:"min_age_months,omitempty"`
+	MaxAgeMonths int      `json:"max_age_months,omitempty"`
+	Gender       string   `json:"gender,omitempty"`
+	Mean         *float64 `json:"mean,omitempty"`
+	StdDev       *float64 `json:"std_dev,omitempty"`
+}
+
+type NormLookupEntry struct {
+	RawScoreMin   float64  `json:"raw_score_min"`
+	RawScoreMax   float64  `json:"raw_score_max"`
+	MinAgeMonths  int      `json:"min_age_months,omitempty"`
+	MaxAgeMonths  int      `json:"max_age_months,omitempty"`
+	Gender        string   `json:"gender,omitempty"`
+	TScore        float64  `json:"t_score"`
+	Percentile    float64  `json:"percentile"`
+	StandardScore *float64 `json:"standard_score,omitempty"`
+}

@@ -3388,6 +3388,191 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/norm-tables": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NormTable"
+                ],
+                "summary": "获取常模表列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型类型",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "算法",
+                        "name": "algorithm",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "表单变体",
+                        "name": "form_variant",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.NormTableListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NormTable"
+                ],
+                "summary": "导入版本化常模表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "常模表",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ImportNormTableRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.NormTableDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/norm-tables/{version}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NormTable"
+                ],
+                "summary": "获取常模表详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "常模表版本",
+                        "name": "version",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.NormTableDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/plans": {
             "get": {
                 "description": "分页查询计划列表，支持条件筛选。可通过量表编码（scale_code）筛选特定量表的计划",
@@ -9828,6 +10013,75 @@ const docTemplate = `{
                 "ScoringStrategyCnt"
             ]
         },
+        "github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand": {
+            "type": "object",
+            "properties": {
+                "gender": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "type": "integer"
+                },
+                "mean": {
+                    "type": "number"
+                },
+                "min_age_months": {
+                    "type": "integer"
+                },
+                "std_dev": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable": {
+            "type": "object",
+            "properties": {
+                "bands": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand"
+                    }
+                },
+                "factor_code": {
+                    "type": "string"
+                },
+                "lookup": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry"
+                    }
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry": {
+            "type": "object",
+            "properties": {
+                "gender": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "type": "integer"
+                },
+                "min_age_months": {
+                    "type": "integer"
+                },
+                "percentile": {
+                    "type": "number"
+                },
+                "raw_score_max": {
+                    "type": "number"
+                },
+                "raw_score_min": {
+                    "type": "number"
+                },
+                "standard_score": {
+                    "type": "number"
+                },
+                "t_score": {
+                    "type": "number"
+                }
+            }
+        },
         "handler.questionnaireBatchRequest": {
             "type": "object",
             "properties": {
@@ -10054,6 +10308,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.NormTableSummary": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "factor_count": {
+                    "type": "integer"
+                },
+                "form_variant": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "table_version": {
                     "type": "string"
                 }
             }
@@ -10614,6 +10888,37 @@ const docTemplate = `{
                 }
             }
         },
+        "request.ImportNormTableRequest": {
+            "type": "object",
+            "required": [
+                "algorithm",
+                "factors",
+                "form_variant",
+                "kind",
+                "table_version"
+            ],
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "factors": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/request.NormFactorTable"
+                    }
+                },
+                "form_variant": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "table_version": {
+                    "type": "string"
+                }
+            }
+        },
         "request.IntakeByAssessmentEntryRequest": {
             "type": "object",
             "required": [
@@ -10660,6 +10965,88 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "request.NormBand": {
+            "type": "object",
+            "required": [
+                "mean",
+                "std_dev"
+            ],
+            "properties": {
+                "gender": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "type": "integer"
+                },
+                "mean": {
+                    "type": "number"
+                },
+                "min_age_months": {
+                    "type": "integer"
+                },
+                "std_dev": {
+                    "type": "number"
+                }
+            }
+        },
+        "request.NormFactorTable": {
+            "type": "object",
+            "required": [
+                "factor_code"
+            ],
+            "properties": {
+                "bands": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.NormBand"
+                    }
+                },
+                "factor_code": {
+                    "type": "string"
+                },
+                "lookup": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.NormLookupEntry"
+                    }
+                }
+            }
+        },
+        "request.NormLookupEntry": {
+            "type": "object",
+            "required": [
+                "percentile",
+                "raw_score_max",
+                "raw_score_min",
+                "t_score"
+            ],
+            "properties": {
+                "gender": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "type": "integer"
+                },
+                "min_age_months": {
+                    "type": "integer"
+                },
+                "percentile": {
+                    "type": "number"
+                },
+                "raw_score_max": {
+                    "type": "number"
+                },
+                "raw_score_min": {
+                    "type": "number"
+                },
+                "standard_score": {
+                    "type": "number"
+                },
+                "t_score": {
+                    "type": "number"
                 }
             }
         },
@@ -12688,6 +13075,52 @@ const docTemplate = `{
                 },
                 "percent": {
                     "type": "number"
+                }
+            }
+        },
+        "response.NormTableDetailResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "factor_count": {
+                    "type": "integer"
+                },
+                "factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable"
+                    }
+                },
+                "form_variant": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "table_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.NormTableListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.NormTableSummary"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

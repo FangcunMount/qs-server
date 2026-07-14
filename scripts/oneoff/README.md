@@ -43,6 +43,7 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `rebuild_seeddata_access_statistics/main.go` | 一站式修复 seeddata 接入统计历史数据 | MySQL intake/resolve log、`behavior_footprint`、`statistics_journey_daily` |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
 | `seed_personality_typology/` | **统一入口**：重初始化 MBTI@2.0.1、MBTI_FC_93、SBTI、Big5、九型 问卷与解释模型 | Mongo `questionnaires` + `assessment_models` + `published_assessment_models` |
+| `repair_sbti_profiles/` | 通过受保护 DefinitionV2 API 定点补齐 SBTI Pattern 和特殊结果标记；默认 dry-run，不自动发布 | `assessment_models` 草稿 |
 | `seed_brief2/` | 从历史 BRIEF-2 常模 PHP 和经过核验的题目-因子映射，初始化 BRIEF-2 家长版行为能力模型 | Mongo `assessment_norms` + `assessment_models` + `published_assessment_models` |
 | `seed_spm_sensory/` | 从历史 SPM 感觉统合常模 PHP 和经过核验的题目-因子映射，初始化 `spm_sensory` 行为能力模型 | Mongo `assessment_norms` + `assessment_models` + `published_assessment_models` |
 | `audit_scale_models/` | 只读审计所有 canonical Scale 草稿、发布快照、绑定问卷、DefinitionV2 与 payload 投影一致性 | 无写入 |

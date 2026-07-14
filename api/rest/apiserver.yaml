@@ -45,6 +45,8 @@ tags:
   description: Interpretation-Clinician
 - name: Interpretation-Operations
   description: Interpretation-Operations
+- name: NormTable
+  description: NormTable
 - name: Plan-Enrollment
   description: Plan-Enrollment
 - name: Plan-Lifecycle
@@ -3638,6 +3640,183 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/norm-tables:
+    get:
+      tags:
+      - NormTable
+      summary: 获取常模表列表
+      operationId: 获取常模表列表
+      description: 获取常模表列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 模型类型
+        name: kind
+        in: query
+      - type: string
+        description: 算法
+        name: algorithm
+        in: query
+      - type: string
+        description: 表单变体
+        name: form_variant
+        in: query
+      - type: integer
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.NormTableListResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    post:
+      tags:
+      - NormTable
+      summary: 导入版本化常模表
+      operationId: 导入版本化常模表
+      description: 导入版本化常模表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ImportNormTableRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.NormTableDetailResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/norm-tables/{version}:
+    get:
+      tags:
+      - NormTable
+      summary: 获取常模表详情
+      operationId: 获取常模表详情
+      description: 获取常模表详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 常模表版本
+        name: version
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.NormTableDetailResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -10028,6 +10207,51 @@ components:
       - ScoringStrategyMax
       - ScoringStrategyMin
       - ScoringStrategyCnt
+    github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand:
+      type: object
+      properties:
+        gender:
+          type: string
+        max_age_months:
+          type: integer
+        mean:
+          type: number
+        min_age_months:
+          type: integer
+        std_dev:
+          type: number
+    github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable:
+      type: object
+      properties:
+        bands:
+          type: array
+          items:
+            $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand'
+        factor_code:
+          type: string
+        lookup:
+          type: array
+          items:
+            $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry'
+    github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormLookupEntry:
+      type: object
+      properties:
+        gender:
+          type: string
+        max_age_months:
+          type: integer
+        min_age_months:
+          type: integer
+        percentile:
+          type: number
+        raw_score_max:
+          type: number
+        raw_score_min:
+          type: number
+        standard_score:
+          type: number
+        t_score:
+          type: number
     handler.questionnaireBatchRequest:
       type: object
       properties:
@@ -10181,6 +10405,19 @@ components:
         title:
           type: string
         updated_at:
+          type: string
+    modelcatalog.NormTableSummary:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        factor_count:
+          type: integer
+        form_variant:
+          type: string
+        kind:
+          type: string
+        table_version:
           type: string
     modelcatalog.Option:
       type: object
@@ -10556,6 +10793,28 @@ components:
       properties:
         time.Time:
           type: string
+    request.ImportNormTableRequest:
+      type: object
+      required:
+      - algorithm
+      - factors
+      - form_variant
+      - kind
+      - table_version
+      properties:
+        algorithm:
+          type: string
+        factors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/request.NormFactorTable'
+        form_variant:
+          type: string
+        kind:
+          type: string
+        table_version:
+          type: string
     request.IntakeByAssessmentEntryRequest:
       type: object
       required:
@@ -10588,6 +10847,61 @@ components:
           type: array
           items:
             type: string
+    request.NormBand:
+      type: object
+      required:
+      - mean
+      - std_dev
+      properties:
+        gender:
+          type: string
+        max_age_months:
+          type: integer
+        mean:
+          type: number
+        min_age_months:
+          type: integer
+        std_dev:
+          type: number
+    request.NormFactorTable:
+      type: object
+      required:
+      - factor_code
+      properties:
+        bands:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.NormBand'
+        factor_code:
+          type: string
+        lookup:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.NormLookupEntry'
+    request.NormLookupEntry:
+      type: object
+      required:
+      - percentile
+      - raw_score_max
+      - raw_score_min
+      - t_score
+      properties:
+        gender:
+          type: string
+        max_age_months:
+          type: integer
+        min_age_months:
+          type: integer
+        percentile:
+          type: number
+        raw_score_max:
+          type: number
+        raw_score_min:
+          type: number
+        standard_score:
+          type: number
+        t_score:
+          type: number
     request.ReorderQuestionsRequest:
       type: object
       properties:
@@ -11950,6 +12264,36 @@ components:
           type: integer
         percent:
           type: number
+    response.NormTableDetailResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        factor_count:
+          type: integer
+        factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormFactorTable'
+        form_variant:
+          type: string
+        kind:
+          type: string
+        table_version:
+          type: string
+    response.NormTableListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/modelcatalog.NormTableSummary'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
     response.PeriodicProjectResponse:
       type: object
       properties:

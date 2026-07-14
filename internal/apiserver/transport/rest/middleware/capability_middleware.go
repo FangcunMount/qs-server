@@ -20,6 +20,8 @@ const (
 	CapabilityEditAssessmentModelDefinitions   = authzapp.CapabilityEditAssessmentModelDefinitions
 	CapabilityPublishAssessmentModels          = authzapp.CapabilityPublishAssessmentModels
 	CapabilityResolvePublishedAssessmentModels = authzapp.CapabilityResolvePublishedAssessmentModels
+	CapabilityReadNormTables                   = authzapp.CapabilityReadNormTables
+	CapabilityManageNormTables                 = authzapp.CapabilityManageNormTables
 	CapabilityReadAnswersheets                 = authzapp.CapabilityReadAnswersheets
 	CapabilityManageEvaluationPlans            = authzapp.CapabilityManageEvaluationPlans
 	CapabilityEvaluateAssessments              = authzapp.CapabilityEvaluateAssessments

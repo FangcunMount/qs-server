@@ -4,6 +4,7 @@ import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appauthoring "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
 	appmanagement "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/management"
+	appnormtable "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/normtable"
 	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
 	apprelease "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/release"
@@ -26,6 +27,7 @@ type Module struct {
 	Publication      assessmentModelApp.PublicationService
 	Release          assessmentModelApp.AssessmentReleaseService
 	Query            assessmentModelApp.CatalogQueryService
+	NormTables       assessmentModelApp.NormTableService
 	TitleResolver    assessmentModelApp.PublishedModelTitleResolver
 }
 
@@ -83,6 +85,7 @@ func New(deps Deps) (*Module, error) {
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		HotRank:    hotRank.ReadModel,
 	})
+	normTables := appnormtable.Service{Repository: deps.Catalog.NormRepo, Authorizer: assessmentModelApp.SnapshotAuthorizer{}}
 	// 组合模块
 	return &Module{
 		HotRank:          hotRank,
@@ -95,6 +98,7 @@ func New(deps Deps) (*Module, error) {
 		Publication:      publication,
 		Release:          release,
 		Query:            query,
+		NormTables:       normTables,
 		TitleResolver:    modelcatalogRuntime.NewTitleResolver(deps.Catalog.PublishedLister),
 	}, nil
 }

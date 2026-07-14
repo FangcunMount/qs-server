@@ -112,6 +112,10 @@ type stubNormRepository struct {
 
 func (s stubNormRepository) UpsertNorm(context.Context, *norm.Norm) error { return nil }
 
+func (s stubNormRepository) ListNorms(context.Context, rulesetport.NormListFilter) ([]*norm.Norm, int64, error) {
+	return s.tables, int64(len(s.tables)), nil
+}
+
 func (s stubNormRepository) FindNorm(_ context.Context, version string) (*norm.Norm, error) {
 	for _, table := range s.tables {
 		if table != nil && table.TableVersion == version {

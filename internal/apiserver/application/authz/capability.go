@@ -18,6 +18,8 @@ const (
 	CapabilityEditAssessmentModelDefinitions   Capability = "edit_assessment_model_definitions"
 	CapabilityPublishAssessmentModels          Capability = "publish_assessment_models"
 	CapabilityResolvePublishedAssessmentModels Capability = "resolve_published_assessment_models"
+	CapabilityReadNormTables                   Capability = "read_norm_tables"
+	CapabilityManageNormTables                 Capability = "manage_norm_tables"
 	CapabilityReadAnswersheets                 Capability = "read_answersheets"
 	CapabilityManageEvaluationPlans            Capability = "manage_evaluation_plans"
 	CapabilityEvaluateAssessments              Capability = "evaluate_assessments"
@@ -139,6 +141,8 @@ func isKnownCapability(c Capability) bool {
 	case CapabilityEditAssessmentModelDefinitions:
 	case CapabilityPublishAssessmentModels:
 	case CapabilityResolvePublishedAssessmentModels:
+	case CapabilityReadNormTables:
+	case CapabilityManageNormTables:
 	case CapabilityReadAnswersheets:
 	case CapabilityManageEvaluationPlans:
 	case CapabilityEvaluateAssessments:
@@ -191,6 +195,16 @@ func capabilityAllowed(s *Snapshot, c Capability) bool {
 			return true
 		}
 		return hasAnyResourceAction(s, "qs:assessment_models", []string{"resolve"})
+	case CapabilityReadNormTables:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:modelcatalog:collection:norm_tables", []string{"read", "list"})
+	case CapabilityManageNormTables:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:modelcatalog:collection:norm_tables", []string{"import"})
 	case CapabilityReadAnswersheets:
 		if s.IsQSAdmin() {
 			return true

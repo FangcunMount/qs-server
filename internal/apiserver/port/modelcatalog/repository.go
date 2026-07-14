@@ -46,4 +46,13 @@ type PublishedModelRepository interface {
 type NormRepository interface {
 	UpsertNorm(ctx context.Context, table *norm.Norm) error
 	FindNorm(ctx context.Context, tableVersion string) (*norm.Norm, error)
+	ListNorms(ctx context.Context, filter NormListFilter) ([]*norm.Norm, int64, error)
+}
+
+type NormListFilter struct {
+	Kind        domain.Kind
+	Algorithm   domain.Algorithm
+	FormVariant string
+	Page        int
+	PageSize    int
 }
