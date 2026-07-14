@@ -118,7 +118,10 @@ func TestRunApplyAndPublishUsesProtectedAPIsAndVerifiesNewSnapshot(t *testing.T)
 			writeEnvelope(t, w, map[string]any{"passed": true, "issues": []any{}})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/assessment-releases/MBTI_FC_93/publish":
 			currentStatus = "published"
-			currentVersion = nextVersion(currentVersion)
+			// The published snapshot version is derived from the model's current
+			// configuration revision, which may be unrelated to the old snapshot
+			// version. This mirrors a legacy snapshot v15 being republished as v40.
+			currentVersion = "v40"
 			writeEnvelope(t, w, map[string]any{"model_code": target.Code, "model_status": currentStatus})
 		default:
 			http.Error(w, "unexpected request", http.StatusNotFound)
@@ -160,6 +163,36 @@ func TestRunApplyAndPublishUsesProtectedAPIsAndVerifiesNewSnapshot(t *testing.T)
 		"POST /api/v1/assessment-releases/MBTI_FC_93/publish",
 		"GET /api/v1/assessment-models/published/MBTI_FC_93",
 	}
+	if fmt.Sprint(requests) != fmt.Sprint(want) {
+		t.Fatalf("requests = %v, want %v", requests, want)
+	}
+}
+
+func TestRunSkipsPreviouslyNormalizedTargetAfterVersionChanged(t *testing.T) {
+	target := migrationTarget{Code: "MBTI_OEJTS", ExpectedVersion: "v25", LegacyAdapter: "mbti", GenericAdapter: "personality_type"}
+	normalized, _, err := normalizeDefinition(definitionFixture(t, target, "already-migrated"), target)
+	if err != nil {
+		t.Fatalf("normalize fixture: %v", err)
+	}
+	requests := make([]string, 0, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/api/v1/assessment-models/MBTI_OEJTS":
+			writeEnvelope(t, w, map[string]any{"code": target.Code, "status": "published"})
+		case "/api/v1/assessment-models/published/MBTI_OEJTS":
+			writeEnvelope(t, w, map[string]any{"code": target.Code, "status": "published", "version": "v40", "definition": json.RawMessage(normalized)})
+		default:
+			http.Error(w, "unexpected request", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	err = run(context.Background(), config{APIBase: server.URL + "/api/v1", Token: "test-token", Apply: true, Publish: true, BackupDir: t.TempDir(), Timeout: 5 * time.Second, Targets: []migrationTarget{target}}, io.Discard)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	want := []string{"GET /api/v1/assessment-models/MBTI_OEJTS", "GET /api/v1/assessment-models/published/MBTI_OEJTS"}
 	if fmt.Sprint(requests) != fmt.Sprint(want) {
 		t.Fatalf("requests = %v, want %v", requests, want)
 	}

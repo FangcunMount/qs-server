@@ -30,6 +30,6 @@ QS_APISERVER_URL=https://qs.example.com QS_OPERATOR_TOKEN=... \
   go run ./scripts/oneoff/migrate_personality_runtime_adapters/ --apply --publish
 ```
 
-`--apply` 会在 `migration_backups/`（可用 `--backup-dir` 覆盖）保存每一份写入前的 DefinitionV2，权限为仅当前用户可读。`--publish` 必须和 `--apply` 一起使用。每个目标会先确认当前模型没有未发布草稿，并确认已发布版本仍是脚本锁定版本；任一检查失败即停止，避免覆盖人工编辑或回退新版本。
+`--apply` 会在 `migration_backups/`（可用 `--backup-dir` 覆盖）保存每一份写入前的 DefinitionV2，权限为仅当前用户可读。`--publish` 必须和 `--apply` 一起使用。每个目标会先确认当前模型没有未发布草稿；仍包含旧 adapter 的目标还必须处于脚本锁定版本，任一检查失败即停止，避免覆盖人工编辑或回退新版本。已经归一化的目标即使因本次或此前发布产生了新版本，也会安全跳过。
 
-运行令牌需要读取模型、编辑 DefinitionV2 与发布 assessment release 的权限。发布后脚本会重新读取已发布快照，确认版本恰好递增一版且两个 adapter 都已归一化。
+运行令牌需要读取模型、编辑 DefinitionV2 与发布 assessment release 的权限。发布后脚本会重新读取已发布快照，确认它已是不同于发布前的新版本，且两个 adapter 都已归一化。不能假定版本只加一：保存草稿和发布都会推进模型配置修订，历史快照版本也可能与当前修订不连续。

@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -195,9 +194,6 @@ func migrateOne(ctx context.Context, client apiClient, cfg config, target migrat
 	if published.Code != target.Code || published.Status != "published" {
 		return fmt.Errorf("refusing %s: unexpected published response (code=%q status=%q)", target.Code, published.Code, published.Status)
 	}
-	if published.Version != target.ExpectedVersion {
-		return fmt.Errorf("refusing %s: published version is %q, want pinned %q", target.Code, published.Version, target.ExpectedVersion)
-	}
 	if len(published.Definition) == 0 || string(published.Definition) == "null" {
 		return fmt.Errorf("refusing %s: published DefinitionV2 is missing", target.Code)
 	}
@@ -210,6 +206,9 @@ func migrateOne(ctx context.Context, client apiClient, cfg config, target migrat
 	if !summary.Changed() {
 		_, _ = fmt.Fprintln(out, "  already normalized; skipped")
 		return nil
+	}
+	if published.Version != target.ExpectedVersion {
+		return fmt.Errorf("refusing %s: published version is %q, want pinned %q before normalizing legacy adapters", target.Code, published.Version, target.ExpectedVersion)
 	}
 	_, _ = fmt.Fprintf(out, "  planned: OutcomeMapping.DetailAdapterKey and ReportMap section AdapterKey -> %s\n", target.GenericAdapter)
 	if !cfg.Apply {
@@ -251,14 +250,14 @@ func migrateOne(ctx context.Context, client apiClient, cfg config, target migrat
 	if _, err := client.request(ctx, http.MethodPost, "/assessment-releases/"+url.PathEscape(target.Code)+"/publish", nil); err != nil {
 		return fmt.Errorf("publish normalized %s: %w", target.Code, err)
 	}
-	if err := verifyPublishedRelease(ctx, client, target); err != nil {
+	if err := verifyPublishedRelease(ctx, client, target, published.Version); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintln(out, "  published and verified")
 	return nil
 }
 
-func verifyPublishedRelease(ctx context.Context, client apiClient, target migrationTarget) error {
+func verifyPublishedRelease(ctx context.Context, client apiClient, target migrationTarget, previousVersion string) error {
 	data, err := client.request(ctx, http.MethodGet, "/assessment-models/published/"+url.PathEscape(target.Code), nil)
 	if err != nil {
 		return fmt.Errorf("verify published %s: %w", target.Code, err)
@@ -270,8 +269,8 @@ func verifyPublishedRelease(ctx context.Context, client apiClient, target migrat
 	if published.Code != target.Code || published.Status != "published" {
 		return fmt.Errorf("verify published %s: unexpected response code=%q status=%q", target.Code, published.Code, published.Status)
 	}
-	if published.Version != nextVersion(target.ExpectedVersion) {
-		return fmt.Errorf("verify published %s: version is %q, want %q", target.Code, published.Version, nextVersion(target.ExpectedVersion))
+	if published.Version == "" || published.Version == previousVersion {
+		return fmt.Errorf("verify published %s: version is %q, want a new published snapshot after %q", target.Code, published.Version, previousVersion)
 	}
 	if err := verifyNormalizedDefinition(published.Definition, target); err != nil {
 		return fmt.Errorf("verify published %s DefinitionV2: %w", target.Code, err)
@@ -345,14 +344,6 @@ func normalizeAPIBase(value string) string {
 		return value
 	}
 	return value + "/api/v1"
-}
-
-func nextVersion(value string) string {
-	number, err := strconv.ParseInt(strings.TrimPrefix(value, "v"), 10, 64)
-	if err != nil || number < 0 {
-		return ""
-	}
-	return "v" + strconv.FormatInt(number+1, 10)
 }
 
 func firstNonEmpty(values ...string) string {
