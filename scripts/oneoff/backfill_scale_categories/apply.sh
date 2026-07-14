@@ -59,6 +59,8 @@ fi
 QS_COLLECTION_URL="${QS_COLLECTION_URL:-https://collect.fangcunmount.cn}"
 API_BASE="${QS_APISERVER_URL%/}/api/v1"
 COLLECTION_BASE="${QS_COLLECTION_URL%/}/api/v1"
+PREFLIGHT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qs-scale-categories.XXXXXX")"
+trap 'rm -rf "$PREFLIGHT_DIR"' EXIT
 
 request() {
   local method="$1" url="$2" body="${3:-}"
@@ -80,12 +82,32 @@ request() {
   printf '%s' "$response"
 }
 
+preflight_failures=()
+while IFS=$'\t' read -r code category skip; do
+  if [[ "$skip" == "true" ]]; then
+    echo "preflight skip ${code}: explicitly archived"
+    continue
+  fi
+  if ! model="$(request GET "${API_BASE}/assessment-models/${code}")"; then
+    preflight_failures+=("${code}")
+    continue
+  fi
+  printf '%s' "$model" > "${PREFLIGHT_DIR}/${code}.json"
+done < <(jq -r '.[] | [.code, .category, (.skip // false)] | @tsv' "$ASSIGNMENTS_FILE")
+
+if (( ${#preflight_failures[@]} > 0 )); then
+  echo "Backfill was not applied. The following models cannot be read as editable drafts:" >&2
+  printf '  %s\n' "${preflight_failures[@]}" >&2
+  echo "Repair or explicitly archive/remove their stale published snapshots before rerunning." >&2
+  exit 2
+fi
+
 while IFS=$'\t' read -r code category skip; do
   if [[ "$skip" == "true" ]]; then
     echo "skip ${code}: explicitly archived; no metadata update or republish"
     continue
   fi
-  model="$(request GET "${API_BASE}/assessment-models/${code}")"
+  model="$(<"${PREFLIGHT_DIR}/${code}.json")"
   current_category="$(jq -r '.data.category // ""' <<<"$model")"
   if [[ "$current_category" == "$category" ]]; then
     echo "skip ${code}: category already ${category}"
@@ -117,7 +139,7 @@ asd 2
 pressure 1
 sii 2
 efn 1
-emt 4
+emt 3
 slp 2
 EOF
 

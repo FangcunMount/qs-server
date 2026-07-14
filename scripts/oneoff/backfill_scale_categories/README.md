@@ -15,7 +15,7 @@
 | 情绪 | `emt` |
 | 睡眠 | `slp` |
 
-IPIP Big-Five 与 MBTI 风格偏好均已归档。清单将它们保留为带 `skip: true` 的审计记录；脚本不会尝试编辑或重新发布归档模型。
+IPIP Big-Five 与 MBTI 风格偏好均已归档。清单将它们保留为带 `skip: true` 的审计记录；脚本不会尝试编辑或重新发布归档模型。SCL-90 当前存在历史读取错误，也暂以 `skip: true` 保留；因此本轮情绪分类的验收数量为 3，待其发布快照清理后再单独补齐。
 
 ## 执行方式
 
@@ -36,7 +36,7 @@ bash scripts/oneoff/backfill_scale_categories/apply.sh --apply
 
 脚本对每个分类变更按以下顺序调用受保护 API：
 
-1. 读取草稿模型；
+1. 先读取所有非归档模型，确认它们都能作为可编辑草稿读取；这些读取结果会在本次运行内复用。任一读取失败就以状态码 `2` 退出，不进行任何新的写入；
 2. `PUT /assessment-models/{code}/basic-info` 更新分类（已发布模型会 fork 为草稿）；
 3. `POST /assessment-releases/{code}/publish` 走正常发布事务，生成新的 `published_assessment_models` 快照；
 4. 查询 8 个分类接口并校验预期数量。
