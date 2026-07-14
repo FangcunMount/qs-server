@@ -47,7 +47,7 @@ go run ./scripts/oneoff/seed_spm_sensory/ \
 
 若服务器使用 `MONGO_URI`，可以省略 `--mongo-uri`。`--norm-source` 仅用于传入同结构的规范化 JSON 覆盖文件，通常不要使用。
 
-已有同编码模型时脚本会拒绝写入。只有在完成数据库备份、审阅当前草稿和发布快照并确认需要整体替换后，才允许增加 `--force`。常模版本不可覆盖，相同版本仅允许内容完全相同。
+常模、草稿和发布快照在一个 MongoDB 多文档事务中写入，目标 MongoDB 必须是副本集或分片集群。已有同编码模型时脚本会拒绝普通写入。只有在完成数据库备份、审阅当前草稿和发布快照并确认需要整体替换后，才允许增加 `--force`。强制迁移按 model code 和问卷 code/version 识别历史快照，不依赖旧模型的 kind/algorithm，因此支持历史 `scale` 迁移到 `behavioral_rating/spm_sensory`；无关 model code 或其他问卷版本冲突会被拒绝。常模版本不可覆盖，相同版本仅允许内容完全相同。
 
 ## 验收
 

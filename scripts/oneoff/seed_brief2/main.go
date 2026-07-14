@@ -35,6 +35,7 @@ import (
 	surveyquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	"github.com/FangcunMount/qs-server/scripts/oneoff/internal/modelseed"
 )
 
 const (
@@ -155,10 +156,13 @@ func run(cfg config) error {
 	}
 
 	normRepo := mongomodelcatalog.NewNormRepository(db)
-	if err := normRepo.UpsertNorm(ctx, normTable); err != nil {
-		return fmt.Errorf("upsert norm %s: %w", normTable.TableVersion, err)
-	}
-	if err := seedModel(ctx, db, cfg, questionnaire.GetVersion().Value(), definition, definitionJSON, normRepo); err != nil {
+	runner := modelseed.NewMongoTransactionRunner(client)
+	if err := modelseed.RunAtomically(ctx, runner, func(txCtx context.Context) error {
+		if err := normRepo.UpsertNorm(txCtx, normTable); err != nil {
+			return fmt.Errorf("upsert norm %s: %w", normTable.TableVersion, err)
+		}
+		return seedModel(txCtx, db, cfg, questionnaire.GetVersion().Value(), definition, definitionJSON, normRepo)
+	}); err != nil {
 		return err
 	}
 	fmt.Printf("seeded BRIEF-2 model %s -> questionnaire %s@%s, norm=%s\n", cfg.modelCode, cfg.questionnaireCode, questionnaire.GetVersion().Value(), normTable.TableVersion)
@@ -167,28 +171,18 @@ func run(cfg config) error {
 
 func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnaireVersion string, definition *modeldefinition.Definition, definitionJSON []byte, normRepo *mongomodelcatalog.NormRepository) error {
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
-	publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(mongomodelcatalog.NewRepository(db))
+	publishedRepository := mongomodelcatalog.NewRepository(db)
+	publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(publishedRepository)
 	existing, err := draftRepo.FindByCode(ctx, cfg.modelCode)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("find draft %s: %w", cfg.modelCode, err)
 	}
-	if existing != nil && !cfg.force {
-		return fmt.Errorf("draft model %s already exists; pass --force only after reviewing the published snapshot", cfg.modelCode)
+	state, err := modelseed.InspectActivePublished(ctx, publishedRepository.Collection(), cfg.modelCode, cfg.questionnaireCode, questionnaireVersion)
+	if err != nil {
+		return err
 	}
-	if existing != nil {
-		if err := draftRepo.Delete(ctx, cfg.modelCode); err != nil && !errors.Is(err, domain.ErrNotFound) {
-			return fmt.Errorf("delete draft %s: %w", cfg.modelCode, err)
-		}
-		if _, err := draftRepo.Collection().DeleteMany(ctx, bson.M{"code": cfg.modelCode}); err != nil {
-			return fmt.Errorf("purge draft %s: %w", cfg.modelCode, err)
-		}
-	}
-	existingPublished, err := publishedRepo.FindLatestPublishedByModelCode(ctx, domain.KindBehavioralRating, cfg.modelCode)
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return fmt.Errorf("find published model %s: %w", cfg.modelCode, err)
-	}
-	if existingPublished != nil && !cfg.force {
-		return fmt.Errorf("published model %s already exists; pass --force only after reviewing the published snapshot", cfg.modelCode)
+	if err := state.ValidateReplacement(cfg.force, existing != nil, cfg.modelCode, cfg.questionnaireCode, questionnaireVersion); err != nil {
+		return err
 	}
 
 	now := time.Now().UTC()
@@ -218,14 +212,6 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	if issues := handler.ValidateForPublish(ctx, model); len(issues) > 0 {
 		return fmt.Errorf("generated BRIEF-2 model is not publishable: %s", issues[0].Message)
 	}
-	if err := draftRepo.Create(ctx, model); err != nil {
-		return fmt.Errorf("create draft model: %w", err)
-	}
-	if cfg.force {
-		if err := publishedRepo.DeletePublished(ctx, domain.KindBehavioralRating, cfg.modelCode); err != nil {
-			return fmt.Errorf("delete published model: %w", err)
-		}
-	}
 	publisher := publication.Publisher{Registry: appdefinition.NewRegistry(handler)}
 	if err := model.MarkPublished(now); err != nil {
 		return fmt.Errorf("mark model published: %w", err)
@@ -234,11 +220,25 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	if err != nil {
 		return fmt.Errorf("build published snapshot: %w", err)
 	}
+	if existing != nil {
+		result, err := draftRepo.Collection().DeleteMany(ctx, bson.M{"code": cfg.modelCode})
+		if err != nil {
+			return fmt.Errorf("purge draft %s: %w", cfg.modelCode, err)
+		}
+		if result.DeletedCount == 0 {
+			return fmt.Errorf("purge draft %s: deleted=0 after preflight found an active draft", cfg.modelCode)
+		}
+	}
+	if cfg.force {
+		if err := modelseed.RetireMatchingPublished(ctx, publishedRepository.Collection(), cfg.modelCode, cfg.questionnaireCode, questionnaireVersion, state.MatchingCount, now); err != nil {
+			return err
+		}
+	}
 	if err := publishedRepo.Save(ctx, snapshot); err != nil {
 		return fmt.Errorf("save published snapshot: %w", err)
 	}
-	if err := draftRepo.Update(ctx, model); err != nil {
-		return fmt.Errorf("update published draft: %w", err)
+	if err := draftRepo.Create(ctx, model); err != nil {
+		return fmt.Errorf("create published draft: %w", err)
 	}
 	return nil
 }
