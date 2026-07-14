@@ -190,9 +190,9 @@ func TestSubmitWithGuardReturnsIdempotentHit(t *testing.T) {
 	}
 
 	resp, err := service.Submit(context.Background(), 1, &SubmitAnswerSheetRequest{
-		IdempotencyKey:     "idem-42",
-		QuestionnaireCode:  "QNR-001",
-		TesteeID:           7,
+		IdempotencyKey:    "idem-42",
+		QuestionnaireCode: "QNR-001",
+		TesteeID:          7,
 	})
 	if err != nil {
 		t.Fatalf("Submit() error = %v", err)
