@@ -15,7 +15,7 @@
 | 情绪 | `emt` |
 | 睡眠 | `slp` |
 
-IPIP Big-Five 与 MBTI 风格偏好被显式标为 `personality`；小程序医学量表目录会排除该类，而不是把它们混在医学量表中。
+IPIP Big-Five 与 MBTI 风格偏好均已归档。清单将它们保留为带 `skip: true` 的审计记录；脚本不会尝试编辑或重新发布归档模型。
 
 ## 执行方式
 

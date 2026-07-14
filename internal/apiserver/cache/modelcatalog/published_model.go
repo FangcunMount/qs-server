@@ -14,6 +14,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
@@ -29,14 +30,17 @@ type publishedModelInner interface {
 
 // CachedPublishedModelStore decorates PublishedStore with Redis read-through cache on submit hot paths.
 type CachedPublishedModelStore struct {
-	inner             publishedModelInner
-	keys              *keyspace.Builder
-	policies          sharedcache.PolicyProvider
-	observer          *observability.ComponentObserver
-	catalogList       *adapterkit.ObjectCacheStore[publishedModelCatalogListPage]
-	catalogAlgorithms *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
-	latestByCode      *adapterkit.ObjectCacheStore[port.PublishedModel]
+	inner              publishedModelInner
+	keys               *keyspace.Builder
+	policies           sharedcache.PolicyProvider
+	observer           *observability.ComponentObserver
+	catalogList        *adapterkit.ObjectCacheStore[publishedModelCatalogListPage]
+	catalogListVersion querycache.VersionTokenStore
+	catalogAlgorithms  *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
+	latestByCode       *adapterkit.ObjectCacheStore[port.PublishedModel]
 }
+
+const publishedModelCatalogListVersionKind = "modelcatalog:published:list"
 
 type publishedModelCatalogListPage struct {
 	Models []*port.PublishedModel `json:"models"`
@@ -59,6 +63,10 @@ func NewCachedPublishedModelStore(
 		panic("redis builder is required")
 	}
 	redisCache := adapterkit.NewRedisStoreIfAvailable(client)
+	catalogListVersion := querycache.NewStaticVersionTokenStore(0)
+	if client != nil {
+		catalogListVersion = adapterkit.NewVersionTokenStore(client, cachepolicy.CapabilityModelCatalogPublished, observer)
+	}
 	return &CachedPublishedModelStore{
 		inner:    inner,
 		keys:     builder,
@@ -69,6 +77,7 @@ func NewCachedPublishedModelStore(
 			PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec:     newPublishedModelCatalogListCodec(),
 		}),
+		catalogListVersion: catalogListVersion,
 		catalogAlgorithms: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[publishedModelCatalogAlgorithms]{
 			Cache:     redisCache,
 			PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
@@ -224,7 +233,12 @@ func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, fil
 	if c.catalogList == nil || !c.catalogList.Available() {
 		return c.inner.ListPublishedModels(ctx, filter)
 	}
-	cacheKey := c.listCatalogCacheKey(filter)
+	cacheKey, keyErr := c.listCatalogCacheKey(ctx, filter)
+	if keyErr != nil {
+		// A version-token read failure must degrade to the source of truth rather
+		// than make a catalogue read unavailable.
+		return c.inner.ListPublishedModels(ctx, filter)
+	}
 	page, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[publishedModelCatalogListPage]{
 		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
 		CacheKey:       cacheKey,
@@ -283,10 +297,22 @@ func (c *CachedPublishedModelStore) ListPublishedAlgorithms(ctx context.Context)
 	return payload.Algorithms, nil
 }
 
-func (c *CachedPublishedModelStore) listCatalogCacheKey(filter port.ListPublishedFilter) string {
-	// A catalog-list entry must vary by every query predicate. In particular,
-	// GetPublished uses this list path with Code set, so omitting Code here can
-	// make one model's cached page appear as another model's not-found result.
+func (c *CachedPublishedModelStore) listCatalogCacheKey(ctx context.Context, filter port.ListPublishedFilter) (string, error) {
+	version := uint64(0)
+	if c != nil && c.catalogListVersion != nil {
+		value, err := c.catalogListVersion.Current(ctx, c.catalogListVersionKey())
+		if err != nil {
+			return "", err
+		}
+		version = value
+	}
+	return c.listCatalogCacheKeyAtVersion(filter, version), nil
+}
+
+func (c *CachedPublishedModelStore) listCatalogCacheKeyAtVersion(filter port.ListPublishedFilter, catalogVersion uint64) string {
+	// A catalog-list entry must vary by every query predicate and by the global
+	// catalogue version. The version token invalidates every filtered list after
+	// a publish without requiring Redis pattern deletion.
 	raw := fmt.Sprintf(
 		"code=%q&kind=%q&sub_kind=%q&algorithm=%q&product_channel=%q&category=%q&keyword=%q&questionnaire_code=%q&questionnaire_version=%q&page=%d&page_size=%d",
 		filter.Code,
@@ -304,8 +330,12 @@ func (c *CachedPublishedModelStore) listCatalogCacheKey(filter port.ListPublishe
 	hash := sha256.Sum256([]byte(raw))
 	return c.refCacheKey(port.Ref{
 		Code:    "catalog-list",
-		Version: fmt.Sprintf("v2-%x", hash[:8]),
+		Version: fmt.Sprintf("v3-%d-%x", catalogVersion, hash[:8]),
 	})
+}
+
+func (c *CachedPublishedModelStore) catalogListVersionKey() string {
+	return c.keys.BuildQueryVersionKey(publishedModelCatalogListVersionKind, "global")
 }
 
 func (c *CachedPublishedModelStore) algorithmsCatalogCacheKey() string {
@@ -359,13 +389,23 @@ func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Cont
 	for _, filter := range filters {
 		c.invalidateCatalogListCache(ctx, filter)
 	}
+	if c.catalogListVersion == nil {
+		return
+	}
+	if _, err := c.catalogListVersion.Bump(ctx, c.catalogListVersionKey()); err != nil {
+		logger.L(ctx).Warnw("failed to invalidate published model catalog list version", "error", err)
+	}
 }
 
 func (c *CachedPublishedModelStore) invalidateCatalogListCache(ctx context.Context, filter port.ListPublishedFilter) {
 	if c.catalogList == nil || !c.catalogList.Available() {
 		return
 	}
-	key := c.listCatalogCacheKey(filter)
+	key, err := c.listCatalogCacheKey(ctx, filter)
+	if err != nil {
+		logger.L(ctx).Warnw("failed to resolve published model catalog list cache key", "error", err)
+		return
+	}
 	if err := c.catalogList.Delete(ctx, key); err != nil {
 		logger.L(ctx).Warnw("failed to invalidate published model catalog list cache",
 			"key", key,

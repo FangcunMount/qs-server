@@ -210,10 +210,10 @@ func TestCachedPublishedModelStoreListCatalogCacheKeyIncludesAllQueryPredicates(
 		{name: "page", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Page: 2, PageSize: 100}},
 		{name: "page size", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Page: 1, PageSize: 50}},
 	}
-	baseKey := cached.listCatalogCacheKey(base)
+	baseKey := cached.listCatalogCacheKeyAtVersion(base, 0)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if key := cached.listCatalogCacheKey(tc.filter); key == baseKey {
+			if key := cached.listCatalogCacheKeyAtVersion(tc.filter, 0); key == baseKey {
 				t.Fatalf("cache key collision: base=%+v filter=%+v key=%q", base, tc.filter, key)
 			}
 		})
@@ -235,7 +235,10 @@ func TestCachedPublishedModelStoreInvalidatePublishedModelClearsExactGetPublishe
 		nil,
 	)
 	filter := port.ListPublishedFilter{Code: "model-a", Page: 1, PageSize: 100}
-	key := cached.listCatalogCacheKey(filter)
+	key, err := cached.listCatalogCacheKey(context.Background(), filter)
+	if err != nil {
+		t.Fatalf("resolve exact GetPublished cache key: %v", err)
+	}
 	if err := cached.catalogList.Set(context.Background(), key, &publishedModelCatalogListPage{}, sharedcache.Policy{TTL: time.Hour}); err != nil {
 		t.Fatalf("populate exact GetPublished cache entry: %v", err)
 	}
@@ -246,6 +249,44 @@ func TestCachedPublishedModelStoreInvalidatePublishedModelClearsExactGetPublishe
 	cached.invalidatePublishedModel(context.Background(), &port.PublishedModel{Code: "model-a"})
 	if mr.Exists(key) {
 		t.Fatalf("exact GetPublished cache entry %q was not invalidated", key)
+	}
+}
+
+func TestCachedPublishedModelStoreInvalidatePublishedModelVersionsOutFilteredCatalogPages(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+	cached := NewCachedPublishedModelStore(
+		&publishedModelStoreStub{},
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}),
+		nil,
+	)
+	ctx := context.Background()
+	filter := port.ListPublishedFilter{Kind: domain.KindScale, Category: "emt", Page: 1, PageSize: 20}
+	oldKey, err := cached.listCatalogCacheKey(ctx, filter)
+	if err != nil {
+		t.Fatalf("resolve filtered catalog cache key: %v", err)
+	}
+	if err := cached.catalogList.Set(ctx, oldKey, &publishedModelCatalogListPage{}, sharedcache.Policy{TTL: time.Hour}); err != nil {
+		t.Fatalf("populate filtered catalog cache entry: %v", err)
+	}
+
+	cached.invalidatePublishedModel(ctx, &port.PublishedModel{Kind: domain.KindScale, Code: "scale-001"})
+
+	newKey, err := cached.listCatalogCacheKey(ctx, filter)
+	if err != nil {
+		t.Fatalf("resolve filtered catalog cache key after invalidation: %v", err)
+	}
+	if newKey == oldKey {
+		t.Fatalf("filtered catalog cache key was not versioned: %q", newKey)
+	}
+	if mr.Exists(newKey) {
+		t.Fatalf("new filtered catalog cache entry %q must not reuse stale data", newKey)
 	}
 }
 

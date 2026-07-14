@@ -40,14 +40,14 @@ allowed_categories='["adhd","td","asd","pressure","sii","efn","emt","slp","perso
 jq -e --argjson allowed "$allowed_categories" '
   type == "array" and length == 21 and
   (([.[].code] | length) == ([.[].code] | unique | length)) and
-  all(.[]; (.code | type == "string" and length > 0) and (.category as $category | $allowed | index($category) != null))
+  all(.[]; (.code | type == "string" and length > 0) and (.category as $category | $allowed | index($category) != null) and ((.skip // false) | type == "boolean"))
 ' "$ASSIGNMENTS_FILE" >/dev/null || {
   echo "assignment manifest must contain 21 unique reviewed codes and supported categories" >&2
   exit 1
 }
 
 echo "Reviewed assignments:"
-jq -r '.[] | "  \(.code)  \(.category)  \(.reason)"' "$ASSIGNMENTS_FILE"
+jq -r '.[] | "  \(.code)  \(.category)  \(.reason)\(if (.skip // false) then " [skip]" else "" end)"' "$ASSIGNMENTS_FILE"
 
 if ! "$APPLY"; then
   echo "Dry run only. No model or published snapshot was changed."
@@ -80,7 +80,11 @@ request() {
   printf '%s' "$response"
 }
 
-while IFS=$'\t' read -r code category; do
+while IFS=$'\t' read -r code category skip; do
+  if [[ "$skip" == "true" ]]; then
+    echo "skip ${code}: explicitly archived; no metadata update or republish"
+    continue
+  fi
   model="$(request GET "${API_BASE}/assessment-models/${code}")"
   current_category="$(jq -r '.data.category // ""' <<<"$model")"
   if [[ "$current_category" == "$category" ]]; then
@@ -95,7 +99,7 @@ while IFS=$'\t' read -r code category; do
   request PUT "${API_BASE}/assessment-models/${code}/basic-info" "$payload" >/dev/null
   request POST "${API_BASE}/assessment-releases/${code}/publish" >/dev/null
   echo "published ${code}: ${current_category:-<empty>} -> ${category}"
-done < <(jq -r '.[] | [.code, .category] | @tsv' "$ASSIGNMENTS_FILE")
+done < <(jq -r '.[] | [.code, .category, (.skip // false)] | @tsv' "$ASSIGNMENTS_FILE")
 
 echo "Verifying public medical catalogue categories:"
 while read -r category expected; do
