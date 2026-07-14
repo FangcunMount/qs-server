@@ -131,7 +131,7 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"asApp.NewTransactionalSubmissionDurableStore(",
-		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)",
+		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, reader)",
 		"profile.Stager",
 		"profile.PostCommit",
 	}
