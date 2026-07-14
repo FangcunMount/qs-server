@@ -44,9 +44,9 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 		})
 	}
 
-	return r.UpdateAndSync(ctx, po, func(po *AssessmentPO) {
-		r.mapper.SyncID(po, a)
-	})
+	// ID is assigned only by the create path. Re-syncing it on an update would
+	// violate Assessment.AssignID's one-time assignment invariant.
+	return r.UpdateAndSync(ctx, po, nil)
 }
 
 // FindByID 根据ID查找

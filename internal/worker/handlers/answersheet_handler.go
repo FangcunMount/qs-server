@@ -59,9 +59,10 @@ func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks
 
 // handleAnswerSheetSubmitted 返回答卷提交处理函数
 // 业务逻辑：
-// 1. 解析答卷提交事件
-// 2. 调用 InternalClient 创建 Assessment
-// 3. 创建 Assessment；如果关联量表，由内部服务显式提交并触发评估
+//  1. 解析答卷提交事件
+//  2. 调用 InternalClient 确保 Assessment 存在
+//  3. 对关联量表，内部服务创建后自动提交；若已存在但仍为 pending，
+//     则本次 worker 重放负责幂等补提交并触发评估
 func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 	return handleAnswerSheetSubmittedWithHooks(deps, defaultAnswerSheetProcessingGateHooks)
 }

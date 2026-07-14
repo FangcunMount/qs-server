@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -18,6 +19,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
+
+const assessmentStatusPending = "pending"
 
 // Command 评估入库命令
 type Command struct {
@@ -123,14 +126,20 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 
 	// 查找已存在的评估
 	if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
+		autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
+		if submitErr != nil {
+			return nil, submitErr
+		}
 		s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
 		l.Infow("答卷已有关联测评，复用已有测评",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
 			"assessment_id", existing.ID,
+			"assessment_status", existing.Status,
+			"auto_submitted", autoSubmitted,
 			"result", "idempotent_hit",
 		)
-		return &Result{AssessmentID: existing.ID}, nil
+		return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
 	}
 
 	// 创建评估
@@ -138,8 +147,12 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	if err != nil {
 		if errors.IsCode(err, code.ErrAssessmentDuplicate) {
 			if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
+				autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
+				if submitErr != nil {
+					return nil, submitErr
+				}
 				s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
-				return &Result{AssessmentID: existing.ID}, nil
+				return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
 			}
 		}
 		return nil, err
@@ -147,11 +160,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 
 	// 创建结果
 	result := &Result{AssessmentID: created.ID, Created: true}
-	if bound {
-		// 自动提交评估
-		if _, submitErr := s.intake.SubmitForEvaluation(ctx, created.ID); submitErr == nil {
-			result.AutoSubmitted = true
-		}
+	result.AutoSubmitted, err = s.submitPendingBoundAssessment(ctx, command, created, bound)
+	if err != nil {
+		return nil, err
 	}
 
 	// 完成计划最佳实践
@@ -171,6 +182,36 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		"result", "success",
 	)
 	return result, nil
+}
+
+// submitPendingBoundAssessment submits only a bound, pending assessment. This
+// makes answersheet.submitted worker replays recover an assessment that was
+// created before a prior automatic submission failed, while leaving submitted
+// and terminal assessments idempotent.
+func (s *service) submitPendingBoundAssessment(ctx context.Context, command Command, item *evaluationintake.Assessment, bound bool) (bool, error) {
+	if !bound || item == nil || item.Status != assessmentStatusPending {
+		return false, nil
+	}
+
+	if _, err := s.intake.SubmitForEvaluation(ctx, item.ID); err != nil {
+		logger.L(ctx).Errorw("测评自动提交失败",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"assessment_id", item.ID,
+			"assessment_status", item.Status,
+			"error", err.Error(),
+		)
+		return false, evalerrors.AssessmentSubmitFailed(err, "自动提交测评失败")
+	}
+
+	logger.L(ctx).Infow("测评已自动提交，等待评估事件处理",
+		"action", "ensure_assessment",
+		"answersheet_id", command.AnswerSheetID,
+		"assessment_id", item.ID,
+		"assessment_status", item.Status,
+		"result", "auto_submitted",
+	)
+	return true, nil
 }
 
 func valueOrEmpty(value *string) string {
