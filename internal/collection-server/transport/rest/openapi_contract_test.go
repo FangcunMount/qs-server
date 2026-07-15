@@ -33,6 +33,11 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/report", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/report-status", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessments/{id}/wait-report", "get")
+	assertOpenAPIOperation(t, spec, "/behavior-assessments", "get")
+	assertOpenAPIOperation(t, spec, "/behavior-assessments/{id}", "get")
+	assertOpenAPIOperation(t, spec, "/behavior-assessments/{id}/report", "get")
+	assertOpenAPIOperation(t, spec, "/behavior-assessments/{id}/report-status", "get")
+	assertOpenAPIOperation(t, spec, "/behavior-assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/report-events", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}/care-context", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
@@ -48,7 +53,7 @@ func TestCollectionOpenAPIUsesStringTesteeIDAndCurrentReportStatuses(t *testing.
 		t.Fatalf("testee_id schema type = %v, want string", testeeID["type"])
 	}
 
-	for _, name := range []string{"evaluation.AssessmentStatusResponse", "typologyassessment.AssessmentStatusResponse"} {
+	for _, name := range []string{"evaluation.AssessmentStatusResponse", "typologyassessment.AssessmentStatusResponse", "behaviorassessment.AssessmentStatusResponse"} {
 		status := schemas[name].(map[string]any)["properties"].(map[string]any)["status"].(map[string]any)
 		if !openAPIEnumEquals(status["enum"], "processing", "interpreted", "failed") {
 			t.Fatalf("%s.status enum = %v, want processing/interpreted/failed", name, status["enum"])

@@ -5,6 +5,7 @@ import (
 
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	assessmentassets "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/assets"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/aliyunoss"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -39,7 +40,7 @@ func (c *Container) InitAssessmentImageService(assetOptions *apiserveroptions.As
 		return fmt.Errorf("assessment model repository is not initialized")
 	}
 	c.AssessmentImageService = assessmentassets.Service{
-		Models: c.AssessmentModelModule.ModelRepo, Authorizer: modelcatalogApp.SnapshotAuthorizer{}, Store: store,
+		Models: c.AssessmentModelModule.ModelRepo, Authorizer: modelcatalogApp.SnapshotAuthorizer{}, Store: objectstorage.NewAssessmentAssetStore(store),
 		Config: assessmentassets.Config{ObjectKeyPrefix: assetOptions.ObjectKeyPrefix, PublicURLPrefix: assetOptions.PublicURLPrefix, MaxUploadBytes: assetOptions.MaxUploadBytes},
 	}
 	return nil

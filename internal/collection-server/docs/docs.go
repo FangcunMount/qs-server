@@ -1027,6 +1027,264 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/behavior-assessments": {
+            "get": {
+                "description": "聚合行为评分（behavioral_rating）与认知（cognitive）测评；不包含医学量表或类型学测评。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "行为能力测评"
+                ],
+                "summary": "查询行为能力测评列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者ID（建议字符串）",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/behaviorassessment.ListAssessmentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/behavior-assessments/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "行为能力测评"
+                ],
+                "summary": "获取行为能力测评详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID（建议字符串）",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/behaviorassessment.AssessmentDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/behavior-assessments/{id}/report": {
+            "get": {
+                "description": "仅在 report-status 终态 interpreted 后调用。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "行为能力测评"
+                ],
+                "summary": "获取行为能力测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID（建议字符串）",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/behaviorassessment.AssessmentReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/behavior-assessments/{id}/report-status": {
+            "get": {
+                "description": "非终态按 next_poll_after_ms 退避；也可使用 WSS /report-events（subscribe.kind=behavior）。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "行为能力测评"
+                ],
+                "summary": "查询行为能力测评报告状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID（建议字符串）",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/behaviorassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/behavior-assessments/{id}/wait-report": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "行为能力测评"
+                ],
+                "summary": "长轮询等待行为能力测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID（建议字符串）",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "超时时间（秒）",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/behaviorassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/info": {
             "get": {
                 "description": "获取服务基本信息",
@@ -1186,7 +1444,7 @@ const docTemplate = `{
         },
         "/api/v1/report-events": {
             "get": {
-                "description": "升级 WebSocket 后发送 subscribe 帧等待测评终态。每条连接仅允许一次 subscribe。人格线 kind=personality；量表线 kind=medical。需 report_events.enabled=true。",
+                "description": "升级 WebSocket 后发送 subscribe 帧等待测评终态。每条连接仅允许一次 subscribe。人格线 kind=personality；量表线 kind=medical；行为能力线 kind=behavior。需 report_events.enabled=true。",
                 "consumes": [
                     "application/json"
                 ],
@@ -2287,6 +2545,207 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "integer"
+                }
+            }
+        },
+        "behaviorassessment.AssessmentDetailResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "behaviorassessment.AssessmentReportResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                }
+            }
+        },
+        "behaviorassessment.AssessmentStatusResponse": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "$ref": "#/definitions/behaviorassessment.ResultLevelResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "model": {
+                    "$ref": "#/definitions/behaviorassessment.ModelIdentityResponse"
+                },
+                "next_poll_after_ms": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "processing",
+                        "interpreted",
+                        "failed"
+                    ]
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "behaviorassessment.ListAssessmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "behaviorassessment.ModelIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
+                    "type": "string",
+                    "enum": [
+                        "typology",
+                        "personality"
+                    ],
+                    "example": "typology"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string",
+                    "example": "typology"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "behaviorassessment.ResultLevelResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
                 }
             }
         },

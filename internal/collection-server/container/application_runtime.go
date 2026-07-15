@@ -155,6 +155,7 @@ func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 			c.evaluationQueryService,
 			c.waitReportService,
 			c.typologyAssessmentQueryService,
+			c.behaviorAssessmentQueryService,
 		)),
 		Options:      c.opts.ReportEvents,
 		RateLimit:    c.RateLimitBackend(),

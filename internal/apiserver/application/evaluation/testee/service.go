@@ -67,7 +67,7 @@ func (s *service) ListAssessments(ctx context.Context, actor Actor, q ListQuery)
 	if err != nil {
 		return nil, evalerrors.InvalidArgument("date_to 格式不正确")
 	}
-	rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{TesteeID: &actor.TesteeID, Statuses: normalizeStatuses(q.Status), ScaleCode: q.ScaleCode, RiskLevel: q.RiskLevel, ModelKind: q.ModelKind, ModelCode: q.ModelCode, DateFrom: from, DateTo: to}, evaluationreadmodel.PageRequest{Page: page, PageSize: size})
+	rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{TesteeID: &actor.TesteeID, Statuses: normalizeStatuses(q.Status), ScaleCode: q.ScaleCode, RiskLevel: q.RiskLevel, ModelKind: q.ModelKind, ModelKinds: q.ModelKinds, ModelCode: q.ModelCode, DateFrom: from, DateTo: to}, evaluationreadmodel.PageRequest{Page: page, PageSize: size})
 	if err != nil {
 		return nil, evalerrors.Database(err, "查询测评列表失败")
 	}

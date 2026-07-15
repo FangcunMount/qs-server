@@ -180,6 +180,9 @@ message ListMyAssessmentsRequest {
   reserved 10;
   reserved "model_algorithm";
   string model_code = 11;
+  // Optional exact model-kind set. When present, it replaces model_kind and
+  // keeps pagination/counting in the read model instead of the caller.
+  repeated string model_kinds = 12;
 }
 
 message ListMyAssessmentsResponse {

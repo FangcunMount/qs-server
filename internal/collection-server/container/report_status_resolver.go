@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	behaviorassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/behaviorassessment"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
@@ -48,6 +49,41 @@ type typologyKindReader struct {
 		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
 		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	}
+}
+
+type behaviorKindReader struct {
+	behavior interface {
+		Get(ctx context.Context, testeeID, assessmentID uint64) (*behaviorassessment.AssessmentDetailResponse, error)
+		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*behaviorassessment.AssessmentStatusResponse, error)
+	}
+}
+
+func (p behaviorKindReader) Authorize(ctx context.Context, testeeID, assessmentID uint64) error {
+	if p.behavior == nil {
+		return fmt.Errorf("behavior assessment query service is not configured")
+	}
+	result, err := p.behavior.Get(ctx, testeeID, assessmentID)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		return reportstatus.ErrAssessmentAccess
+	}
+	return nil
+}
+
+func (p behaviorKindReader) CurrentStatus(ctx context.Context, testeeID, assessmentID uint64) (*reportstatus.View, error) {
+	if p.behavior == nil {
+		return nil, fmt.Errorf("behavior assessment query service is not configured")
+	}
+	status, err := p.behavior.GetReportStatus(ctx, testeeID, assessmentID)
+	if err != nil {
+		return nil, err
+	}
+	if status == nil {
+		return nil, nil
+	}
+	return reportstatus.ViewFromFields(reportstatus.StatusFields{Status: status.Status, Stage: status.Stage, Message: status.Message, Reason: status.Reason, NextPollAfterMs: status.NextPollAfterMs, UpdatedAt: status.UpdatedAt}), nil
 }
 
 func (p typologyKindReader) Authorize(ctx context.Context, testeeID, assessmentID uint64) error {
@@ -96,6 +132,10 @@ func newReportStatusResolver(
 		Get(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentDetailResponse, error)
 		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*typologyassessment.AssessmentStatusResponse, error)
 	},
+	behavior interface {
+		Get(ctx context.Context, testeeID, assessmentID uint64) (*behaviorassessment.AssessmentDetailResponse, error)
+		GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*behaviorassessment.AssessmentStatusResponse, error)
+	},
 ) *reportstatus.Resolver {
 	return reportstatus.NewResolver(map[string]reportstatus.KindReader{
 		reportstatus.KindMedical: medicalKindReader{
@@ -103,5 +143,6 @@ func newReportStatusResolver(
 			waitReport: waitReport,
 		},
 		reportstatus.KindPersonality: typologyKindReader{typology: typology},
+		reportstatus.KindBehavior:    behaviorKindReader{behavior: behavior},
 	})
 }

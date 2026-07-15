@@ -21,7 +21,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	objectstorage "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	assessmentasset "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentasset"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -37,7 +37,7 @@ type Config struct {
 type Service struct {
 	Models     modelcatalogport.ModelRepository
 	Authorizer modelcatalog.Authorizer
-	Store      objectstorage.ObjectStore
+	Store      assessmentasset.ObjectStore
 	Config     Config
 }
 

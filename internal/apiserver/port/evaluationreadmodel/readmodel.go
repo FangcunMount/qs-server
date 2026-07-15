@@ -38,6 +38,7 @@ type AssessmentFilter struct {
 	ScaleCode             string
 	RiskLevel             string
 	ModelKind             string
+	ModelKinds            []string
 	ModelAlgorithm        string
 	ModelCode             string
 	DateFrom              *time.Time

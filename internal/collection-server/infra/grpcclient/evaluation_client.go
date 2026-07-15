@@ -308,6 +308,41 @@ func (c *TesteeEvaluationClient) ListMyAssessments(
 	}, nil
 }
 
+// ListMyAssessmentsByModelKinds keeps aggregation and pagination in apiserver
+// for product surfaces that span more than one executable model family.
+func (c *TesteeEvaluationClient) ListMyAssessmentsByModelKinds(
+	ctx context.Context,
+	testeeID uint64,
+	status string,
+	modelKinds []string,
+	page, pageSize int32,
+) (*ListAssessmentsOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+
+	resp, err := c.grpcClient.ListMyAssessments(ctx, &pb.ListMyAssessmentsRequest{
+		TesteeId:   testeeID,
+		Status:     status,
+		Page:       page,
+		PageSize:   pageSize,
+		ModelKinds: modelKinds,
+	})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]AssessmentSummaryOutput, 0, len(resp.GetItems()))
+	for _, item := range resp.GetItems() {
+		items = append(items, convertAssessmentSummary(item))
+	}
+	return &ListAssessmentsOutput{
+		Items:      items,
+		Total:      resp.GetTotal(),
+		Page:       resp.GetPage(),
+		PageSize:   resp.GetPageSize(),
+		TotalPages: resp.GetTotalPages(),
+	}, nil
+}
+
 type ParticipantReportClient struct {
 	client       *Client
 	reportClient interpretationpb.ParticipantReportServiceClient

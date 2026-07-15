@@ -10,6 +10,7 @@ type Actor struct{ TesteeID uint64 }
 type ListQuery struct {
 	Page, PageSize                                                       int
 	Status, ScaleCode, RiskLevel, ModelKind, ModelCode, DateFrom, DateTo string
+	ModelKinds                                                           []string
 }
 
 type TrendQuery struct {

@@ -76,6 +76,140 @@ definitions:
       updated_at:
         type: integer
     type: object
+  behaviorassessment.AssessmentDetailResponse:
+    properties:
+      answer_sheet_id:
+        type: string
+      created_at:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
+      org_id:
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      primary_score:
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: string
+    type: object
+  behaviorassessment.AssessmentReportResponse:
+    properties:
+      assessment_id:
+        type: string
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
+        type: array
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
+      model_extra:
+        $ref: '#/definitions/evaluation.ModelExtraResponse'
+      primary_score:
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
+      suggestions:
+        items:
+          $ref: '#/definitions/evaluation.SuggestionResponse'
+        type: array
+    type: object
+  behaviorassessment.AssessmentStatusResponse:
+    properties:
+      level:
+        $ref: '#/definitions/behaviorassessment.ResultLevelResponse'
+      message:
+        type: string
+      model:
+        $ref: '#/definitions/behaviorassessment.ModelIdentityResponse'
+      next_poll_after_ms:
+        type: integer
+      reason:
+        type: string
+      stage:
+        type: string
+      status:
+        enum:
+        - processing
+        - interpreted
+        - failed
+        type: string
+      updated_at:
+        type: integer
+    type: object
+  behaviorassessment.ListAssessmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  behaviorassessment.ModelIdentityResponse:
+    properties:
+      algorithm:
+        type: string
+      algorithm_family:
+        type: string
+      code:
+        type: string
+      kind:
+        description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
+        enum:
+        - typology
+        - personality
+        example: typology
+        type: string
+      product_channel:
+        type: string
+      sub_kind:
+        example: typology
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  behaviorassessment.ResultLevelResponse:
+    properties:
+      code:
+        type: string
+      label:
+        type: string
+      severity:
+        type: string
+    type: object
   core.ErrResponse:
     properties:
       code:
@@ -1833,6 +1967,163 @@ paths:
       summary: 获取因子得分趋势
       tags:
       - 测评
+  /api/v1/behavior-assessments:
+    get:
+      description: 聚合行为评分（behavioral_rating）与认知（cognitive）测评；不包含医学量表或类型学测评。
+      parameters:
+      - description: 受试者ID（建议字符串）
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      - description: 测评状态
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/behaviorassessment.ListAssessmentsResponse'
+              type: object
+      summary: 查询行为能力测评列表
+      tags:
+      - 行为能力测评
+  /api/v1/behavior-assessments/{id}:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID（建议字符串）
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/behaviorassessment.AssessmentDetailResponse'
+              type: object
+      summary: 获取行为能力测评详情
+      tags:
+      - 行为能力测评
+  /api/v1/behavior-assessments/{id}/report:
+    get:
+      description: 仅在 report-status 终态 interpreted 后调用。
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID（建议字符串）
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/behaviorassessment.AssessmentReportResponse'
+              type: object
+      summary: 获取行为能力测评报告
+      tags:
+      - 行为能力测评
+  /api/v1/behavior-assessments/{id}/report-status:
+    get:
+      description: 非终态按 next_poll_after_ms 退避；也可使用 WSS /report-events（subscribe.kind=behavior）。
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID（建议字符串）
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/behaviorassessment.AssessmentStatusResponse'
+              type: object
+      summary: 查询行为能力测评报告状态
+      tags:
+      - 行为能力测评
+  /api/v1/behavior-assessments/{id}/wait-report:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID（建议字符串）
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      - default: 20
+        description: 超时时间（秒）
+        in: query
+        name: timeout
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/behaviorassessment.AssessmentStatusResponse'
+              type: object
+      summary: 长轮询等待行为能力测评报告
+      tags:
+      - 行为能力测评
   /api/v1/public/info:
     get:
       description: 获取服务基本信息
@@ -1937,7 +2228,7 @@ paths:
       consumes:
       - application/json
       description: 升级 WebSocket 后发送 subscribe 帧等待测评终态。每条连接仅允许一次 subscribe。人格线 kind=personality；量表线
-        kind=medical。需 report_events.enabled=true。
+        kind=medical；行为能力线 kind=behavior。需 report_events.enabled=true。
       parameters:
       - description: Bearer 用户令牌
         in: header

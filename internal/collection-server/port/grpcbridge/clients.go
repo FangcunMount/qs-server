@@ -15,6 +15,7 @@ type EvaluationReader interface {
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error)
 	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*ListAssessmentsOutput, error)
+	ListMyAssessmentsByModelKinds(ctx context.Context, testeeID uint64, status string, modelKinds []string, page, pageSize int32) (*ListAssessmentsOutput, error)
 }
 type ParticipantReportReader interface {
 	GetAssessmentReport(context.Context, uint64, uint64) (*AssessmentReportOutput, error)

@@ -11,7 +11,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
-	objectstorage "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	assessmentasset "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentasset"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -104,8 +104,8 @@ func (s *memoryStore) Put(_ context.Context, key, _ string, body []byte) error {
 	s.objects[key] = append([]byte(nil), body...)
 	return nil
 }
-func (s *memoryStore) Get(context.Context, string) (*objectstorage.ObjectReader, error) {
-	return nil, objectstorage.ErrObjectNotFound
+func (s *memoryStore) Get(context.Context, string) (*assessmentasset.ObjectReader, error) {
+	return nil, assessmentasset.ErrObjectNotFound
 }
 
 func mbtiDraft() *domain.AssessmentModel {

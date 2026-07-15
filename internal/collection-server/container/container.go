@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/behaviorassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -63,6 +64,7 @@ type Container struct {
 	assessmentModelCatalogQueryService *appmodelcatalog.QueryService
 	typologyModelQueryService          *typologymodel.QueryService
 	typologyAssessmentQueryService     *typologyassessment.QueryService
+	behaviorAssessmentQueryService     *behaviorassessment.QueryService
 	typologySessionService             *typologysession.Service
 	testeeService                      *testee.Service
 	reportStatusReporter               *reportstatus.Reporter
@@ -79,6 +81,7 @@ type Container struct {
 	assessmentModelCatalogHandler    *handler.AssessmentModelCatalogHandler
 	typologyModelHandler             *handler.TypologyModelHandler
 	typologyAssessmentHandler        *handler.TypologyAssessmentHandler
+	behaviorAssessmentHandler        *handler.BehaviorAssessmentHandler
 	typologyAssessmentSessionHandler *handler.TypologyAssessmentSessionHandler
 	testeeHandler                    *handler.TesteeHandler
 	healthHandler                    *handler.HealthHandler
@@ -261,6 +264,10 @@ func (c *Container) initApplicationServices() {
 		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
 		c.waitReportService,
 	)
+	c.behaviorAssessmentQueryService = behaviorassessment.NewQueryService(
+		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
+		c.waitReportService,
+	)
 	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
 	c.reportEventsHandler = c.buildReportEventsHandler()
@@ -284,6 +291,7 @@ func (c *Container) initHandlers() {
 	c.assessmentModelCatalogHandler = handler.NewAssessmentModelCatalogHandler(c.assessmentModelCatalogQueryService)
 	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
 	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.typologyAssessmentQueryService, c.waitReportService)
+	c.behaviorAssessmentHandler = handler.NewBehaviorAssessmentHandler(c.behaviorAssessmentQueryService, c.waitReportService)
 	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.typologySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
@@ -364,6 +372,11 @@ func (c *Container) TypologyAssessmentSessionHandler() *handler.TypologyAssessme
 // TypologyAssessmentHandler 获取人格测评处理器
 func (c *Container) TypologyAssessmentHandler() *handler.TypologyAssessmentHandler {
 	return c.typologyAssessmentHandler
+}
+
+// BehaviorAssessmentHandler 获取行为能力测评处理器。
+func (c *Container) BehaviorAssessmentHandler() *handler.BehaviorAssessmentHandler {
+	return c.behaviorAssessmentHandler
 }
 
 // RateLimitOptions 获取限流配置

@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strings"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
@@ -55,10 +56,14 @@ func (s *TesteeEvaluationService) ListMyAssessments(ctx context.Context, req *pb
 	if pageSize <= 0 {
 		pageSize = 10
 	}
+	modelKinds, err := normalizeModelKinds(req.GetModelKind(), req.GetModelKinds())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	listResult, err := s.testeeService.ListAssessments(ctx, evaluationtestee.Actor{TesteeID: req.TesteeId}, evaluationtestee.ListQuery{
 		Page: page, PageSize: pageSize, Status: req.Status, ScaleCode: req.ScaleCode,
-		RiskLevel: req.RiskLevel, ModelKind: req.ModelKind, ModelCode: req.ModelCode,
+		RiskLevel: req.RiskLevel, ModelKind: req.ModelKind, ModelKinds: modelKinds, ModelCode: req.ModelCode,
 		DateFrom: req.DateFrom, DateTo: req.DateTo,
 	})
 	if err != nil {
@@ -87,6 +92,29 @@ func (s *TesteeEvaluationService) ListMyAssessments(ctx context.Context, req *pb
 	return &pb.ListMyAssessmentsResponse{
 		Items: items, Total: total, Page: pageOut, PageSize: pageSizeOut, TotalPages: totalPages,
 	}, nil
+}
+
+func normalizeModelKinds(modelKind string, modelKinds []string) ([]string, error) {
+	if len(modelKinds) == 0 {
+		return nil, nil
+	}
+	if strings.TrimSpace(modelKind) != "" {
+		return nil, status.Error(codes.InvalidArgument, "model_kind and model_kinds cannot be used together")
+	}
+	seen := make(map[string]struct{}, len(modelKinds))
+	result := make([]string, 0, len(modelKinds))
+	for _, raw := range modelKinds {
+		kind := strings.TrimSpace(raw)
+		if kind == "" {
+			return nil, status.Error(codes.InvalidArgument, "model_kinds cannot contain an empty value")
+		}
+		if _, ok := seen[kind]; ok {
+			continue
+		}
+		seen[kind] = struct{}{}
+		result = append(result, kind)
+	}
+	return result, nil
 }
 
 func toAssessmentQueryGRPCError(err error) error {

@@ -251,6 +251,9 @@ func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.A
 	if filter.ModelKind != "" {
 		query = query.Where("evaluation_model_kind = ?", filter.ModelKind)
 	}
+	if len(filter.ModelKinds) > 0 {
+		query = query.Where("evaluation_model_kind IN ?", filter.ModelKinds)
+	}
 	if filter.ModelAlgorithm != "" {
 		query = query.Where("evaluation_model_algorithm = ?", filter.ModelAlgorithm)
 	}

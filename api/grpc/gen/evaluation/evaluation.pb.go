@@ -1210,17 +1210,20 @@ func (x *ExecuteEvaluationResponse) GetInputSnapshotRef() string {
 }
 
 type ListMyAssessmentsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	ScaleCode     string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
-	RiskLevel     string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	DateFrom      string                 `protobuf:"bytes,7,opt,name=date_from,json=dateFrom,proto3" json:"date_from,omitempty"`
-	DateTo        string                 `protobuf:"bytes,8,opt,name=date_to,json=dateTo,proto3" json:"date_to,omitempty"`
-	ModelKind     string                 `protobuf:"bytes,9,opt,name=model_kind,json=modelKind,proto3" json:"model_kind,omitempty"`
-	ModelCode     string                 `protobuf:"bytes,11,opt,name=model_code,json=modelCode,proto3" json:"model_code,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId  uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Status    string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Page      int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize  int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	ScaleCode string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
+	RiskLevel string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	DateFrom  string                 `protobuf:"bytes,7,opt,name=date_from,json=dateFrom,proto3" json:"date_from,omitempty"`
+	DateTo    string                 `protobuf:"bytes,8,opt,name=date_to,json=dateTo,proto3" json:"date_to,omitempty"`
+	ModelKind string                 `protobuf:"bytes,9,opt,name=model_kind,json=modelKind,proto3" json:"model_kind,omitempty"`
+	ModelCode string                 `protobuf:"bytes,11,opt,name=model_code,json=modelCode,proto3" json:"model_code,omitempty"`
+	// Optional exact model-kind set. When present, it replaces model_kind and
+	// keeps pagination/counting in the read model instead of the caller.
+	ModelKinds    []string `protobuf:"bytes,12,rep,name=model_kinds,json=modelKinds,proto3" json:"model_kinds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1323,6 +1326,13 @@ func (x *ListMyAssessmentsRequest) GetModelCode() string {
 		return x.ModelCode
 	}
 	return ""
+}
+
+func (x *ListMyAssessmentsRequest) GetModelKinds() []string {
+	if x != nil {
+		return x.ModelKinds
+	}
+	return nil
 }
 
 type ListMyAssessmentsResponse struct {
@@ -1897,7 +1907,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0ffailure_message\x18\t \x01(\tR\x0efailureMessage\x12\x19\n" +
 	"\btrace_id\x18\n" +
 	" \x01(\tR\atraceId\x12,\n" +
-	"\x12input_snapshot_ref\x18\v \x01(\tR\x10inputSnapshotRef\"\xc9\x02\n" +
+	"\x12input_snapshot_ref\x18\v \x01(\tR\x10inputSnapshotRef\"\xea\x02\n" +
 	"\x18ListMyAssessmentsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x12\n" +
@@ -1912,7 +1922,9 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"model_kind\x18\t \x01(\tR\tmodelKind\x12\x1d\n" +
 	"\n" +
-	"model_code\x18\v \x01(\tR\tmodelCodeJ\x04\b\n" +
+	"model_code\x18\v \x01(\tR\tmodelCode\x12\x1f\n" +
+	"\vmodel_kinds\x18\f \x03(\tR\n" +
+	"modelKindsJ\x04\b\n" +
 	"\x10\vR\x0fmodel_algorithm\"\xb8\x01\n" +
 	"\x19ListMyAssessmentsResponse\x123\n" +
 	"\x05items\x18\x01 \x03(\v2\x1d.evaluation.AssessmentSummaryR\x05items\x12\x14\n" +

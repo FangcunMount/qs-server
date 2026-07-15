@@ -111,6 +111,9 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	r.registerTypologyAssessmentRoutes(api)
 	r.registerTypologyAssessmentSessionRoutes(api)
 
+	// 行为能力测评相关路由
+	r.registerBehaviorAssessmentRoutes(api)
+
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
 
@@ -590,6 +593,26 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.Get,
 		)...)
+	}
+}
+
+// registerBehaviorAssessmentRoutes registers the product-level behavior ability facade.
+func (r *Router) registerBehaviorAssessmentRoutes(api *gin.RouterGroup) {
+	handler := r.container.BehaviorAssessmentHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+	var profileLinks *iam.ProfileLinkService
+	if r.container.IAMModule != nil {
+		profileLinks = r.container.IAMModule.ProfileLinkService()
+	}
+	reportIdentity := collectionmiddleware.TesteeProfileLinkMiddleware(r.container.TesteeService(), profileLinks, "testee_id")
+
+	assessments := api.Group("/behavior-assessments")
+	{
+		assessments.GET("", r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.List)...)
+		assessments.GET("/:id/report-status", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedReportStatusHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.GetReportStatus)...)...)
+		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(rateLimitedHandlers(r.container.RateLimitBackend(), "wait-report", rateCfg, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst, handler.WaitReport)...)...)...)
+		assessments.GET("/:id/report", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.GetReport)...)...)
+		assessments.GET("/:id", r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.Get)...)
 	}
 }
 

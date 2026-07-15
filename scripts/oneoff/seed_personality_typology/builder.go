@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
@@ -37,6 +38,7 @@ func enrichPayloadWithExplicitRuntime(payload *modeltypology.Payload) (*modeltyp
 	if payload == nil {
 		return nil, fmt.Errorf("payload is nil")
 	}
+	ensureMBTIOutcomeImageURLs(payload)
 	runtime, err := payload.ToRuntimeSpec()
 	if err != nil {
 		return nil, fmt.Errorf("derive runtime spec: %w", err)
@@ -93,6 +95,18 @@ func enrichPayloadWithExplicitRuntime(payload *modeltypology.Payload) (*modeltyp
 
 	payload.Runtime = runtime
 	return payload, nil
+}
+
+func ensureMBTIOutcomeImageURLs(payload *modeltypology.Payload) {
+	if payload == nil || payload.Algorithm != domain.AlgorithmMBTI {
+		return
+	}
+	prefix := fmt.Sprintf("/api/v1/assessment-assets/typology/%s", payload.Code)
+	for i := range payload.Outcomes {
+		if strings.TrimSpace(payload.Outcomes[i].ImageURL) == "" {
+			payload.Outcomes[i].ImageURL = fmt.Sprintf("%s/%s/placeholder.png", prefix, payload.Outcomes[i].Code)
+		}
+	}
 }
 
 func validatePayloadAgainstQuestionnaire(payload *modeltypology.Payload, seed questionnaireSeedFile) error {

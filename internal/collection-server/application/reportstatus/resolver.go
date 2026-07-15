@@ -9,6 +9,7 @@ import (
 const (
 	KindMedical     = "medical"
 	KindPersonality = "personality"
+	KindBehavior    = "behavior"
 )
 
 var (
@@ -22,7 +23,7 @@ type KindReader interface {
 	CurrentStatus(ctx context.Context, testeeID, assessmentID uint64) (*View, error)
 }
 
-// Resolver 统一 medical / personality 状态读取。
+// Resolver 统一 medical / personality / behavior 状态读取。
 type Resolver struct {
 	readers map[string]KindReader
 }

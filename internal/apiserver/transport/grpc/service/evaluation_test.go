@@ -73,3 +73,42 @@ func TestToAssessmentQueryGRPCError(t *testing.T) {
 		}
 	})
 }
+
+func TestNormalizeModelKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		modelKind  string
+		modelKinds []string
+		want       []string
+		wantCode   codes.Code
+	}{
+		{name: "absent keeps legacy filter", modelKind: "typology"},
+		{name: "deduplicates exact kinds", modelKinds: []string{"behavioral_rating", "cognitive", "behavioral_rating"}, want: []string{"behavioral_rating", "cognitive"}},
+		{name: "rejects mixed filters", modelKind: "typology", modelKinds: []string{"cognitive"}, wantCode: codes.InvalidArgument},
+		{name: "rejects empty kind", modelKinds: []string{"cognitive", ""}, wantCode: codes.InvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeModelKinds(tt.modelKind, tt.modelKinds)
+			if tt.wantCode != codes.OK {
+				if status.Code(err) != tt.wantCode {
+					t.Fatalf("status = %s, want %s", status.Code(err), tt.wantCode)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("normalizeModelKinds() error = %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("model kinds = %#v, want %#v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("model kinds = %#v, want %#v", got, tt.want)
+				}
+			}
+		})
+	}
+}

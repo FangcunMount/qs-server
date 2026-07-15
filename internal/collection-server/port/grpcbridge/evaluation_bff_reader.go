@@ -73,6 +73,17 @@ func (r *EvaluationBFFReader) ListMyAssessments(ctx context.Context, testeeID ui
 	return toListAssessmentsResponse(out), nil
 }
 
+func (r *EvaluationBFFReader) ListMyAssessmentsByModelKinds(ctx context.Context, testeeID uint64, status string, modelKinds []string, page, pageSize int32) (*evaluation.ListAssessmentsResponse, error) {
+	if r == nil || r.evaluation == nil {
+		return nil, nil
+	}
+	out, err := r.evaluation.ListMyAssessmentsByModelKinds(ctx, testeeID, status, modelKinds, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return toListAssessmentsResponse(out), nil
+}
+
 func (r *EvaluationBFFReader) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error) {
 	if r == nil || r.reports == nil {
 		return nil, nil
