@@ -99,7 +99,7 @@ func run(cfg config) error {
 
 	if !cfg.skipModel {
 		draftRepo := mongomodelcatalog.NewDraftRepository(db)
-		publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(mongomodelcatalog.NewRepository(db))
+		publishedRepo := mongomodelcatalog.NewRepository(db)
 		for _, plan := range plans {
 			payload, err := plan.modelPlan.Build()
 			if err != nil {

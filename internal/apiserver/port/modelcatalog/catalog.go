@@ -38,7 +38,7 @@ type ListPublishedFilter struct {
 // AssessmentSnapshot 是已发布测评模型的不可变运行快照。
 //
 // 它是查询、缓存、评估执行共享的 read model/value object，不是 domain aggregate。
-// 字段形态直接对应 published_assessment_models 的现有 BSON 契约。
+// 字段形态对应 assessment_models 内 record_role=published_snapshot 的 BSON 契约。
 type AssessmentSnapshot struct {
 	SchemaVersion        string
 	PayloadFormat        string

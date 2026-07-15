@@ -2,8 +2,8 @@
 
 `audit_scale_models` 是只读检查器，审计当前 canonical Scale 数据：
 
-- `assessment_models` 中未删除的 `kind=scale` 草稿；
-- `published_assessment_models` 中未删除、已发布的 `model_kind=scale` 快照；
+- `assessment_models` 中未删除的 `record_role=head, kind=scale` 草稿；
+- `assessment_models` 中 active 的 `record_role=published_snapshot, kind=scale` 快照；
 - 草稿/快照绑定的精确问卷发布版本；
 - `DefinitionV2` 的结构、题目与选项引用；
 - 发布 payload 是否等于该 `DefinitionV2` 的 Scale 投影；

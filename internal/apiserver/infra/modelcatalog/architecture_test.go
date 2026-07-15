@@ -42,7 +42,7 @@ func TestRuntimeReadPathsDoNotImportMongoRuleSetRepository(t *testing.T) {
 			return err
 		}
 		if strings.Contains(string(data), modulePrefix) {
-			t.Fatalf("%s imports %s; runtime reads must use published_assessment_models only", rel, modulePrefix)
+			t.Fatalf("%s imports %s; runtime reads must use modelcatalog published snapshots only", rel, modulePrefix)
 		}
 		return nil
 	})

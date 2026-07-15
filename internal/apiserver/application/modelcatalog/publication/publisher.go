@@ -13,10 +13,10 @@ import (
 
 // Publisher 协调快照物质化和持久化
 type Publisher struct {
-	Registry  definition.Registry           // 定义注册表
-	ModelRepo port.ModelRepository          // 模型存储库
-	Repo      port.PublishedModelRepository // 已发布模型存储库
-	Now       func() time.Time              // 当前时间
+	Registry  definition.Registry              // 定义注册表
+	ModelRepo port.ModelRepository             // 模型存储库
+	Repo      port.PublishedSnapshotRepository // 已发布模型快照存储库
+	Now       func() time.Time                 // 当前时间
 }
 
 // PublishOptions 发布选项
@@ -80,18 +80,10 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	if err != nil {
 		return nil, err
 	}
-	replaceKind := options.ReplaceKind
-	if replaceKind == "" {
-		replaceKind = snapshot.Kind
-	}
-	if err := p.Repo.DeletePublished(ctx, replaceKind, model.Code); err != nil {
-		return nil, err
-	}
 	if err := p.Repo.Save(ctx, snapshot); err != nil {
 		return nil, err
 	}
 	if err := p.ModelRepo.Update(ctx, model); err != nil {
-		_ = p.Repo.DeletePublished(ctx, replaceKind, model.Code)
 		return nil, err
 	}
 	if options.AfterPublished != nil {

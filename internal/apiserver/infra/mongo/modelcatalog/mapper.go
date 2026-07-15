@@ -33,12 +33,14 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:           schemaVersion,
 		PayloadFormat:           model.PayloadFormat,
-		ModelProductChannel:     string(productChannel),
-		ModelKind:               string(kind),
-		ModelSubKind:            string(model.SubKind),
-		ModelAlgorithm:          string(model.Algorithm),
-		ModelCode:               model.Code,
-		ModelVersion:            model.Version,
+		RecordRole:              recordRolePublishedSnapshot,
+		IsActivePublished:       true,
+		ProductChannel:          string(productChannel),
+		Kind:                    string(kind),
+		SubKind:                 string(model.SubKind),
+		Algorithm:               string(model.Algorithm),
+		Code:                    model.Code,
+		ReleaseVersion:          model.Version,
 		Title:                   model.Title,
 		Description:             model.Description,
 		Category:                model.Category,
@@ -65,8 +67,8 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 	for key, value := range po.Source {
 		source[key] = value
 	}
-	kind := domain.Kind(po.ModelKind)
-	productChannel := domain.ProductChannel(po.ModelProductChannel)
+	kind := domain.Kind(po.Kind)
+	productChannel := domain.ProductChannel(po.ProductChannel)
 	if productChannel == "" {
 		productChannel = domain.DefaultProductChannelFor(kind)
 	}
@@ -75,10 +77,10 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		PayloadFormat:        po.PayloadFormat,
 		ProductChannel:       productChannel,
 		Kind:                 kind,
-		SubKind:              domain.SubKind(po.ModelSubKind),
-		Algorithm:            domain.Algorithm(po.ModelAlgorithm),
-		Code:                 po.ModelCode,
-		Version:              po.ModelVersion,
+		SubKind:              domain.SubKind(po.SubKind),
+		Algorithm:            domain.Algorithm(po.Algorithm),
+		Code:                 po.Code,
+		Version:              po.ReleaseVersion,
 		Title:                po.Title,
 		Description:          po.Description,
 		Category:             po.Category,

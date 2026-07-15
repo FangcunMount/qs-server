@@ -23,8 +23,11 @@ type Repository struct {
 }
 
 var (
-	_ port.PublishedWriter          = (*Repository)(nil)
-	_ port.PublishedAlgorithmLister = (*Repository)(nil)
+	_ port.PublishedModelReader        = (*Repository)(nil)
+	_ port.PublishedModelLister        = (*Repository)(nil)
+	_ port.PublishedWriter             = (*Repository)(nil)
+	_ port.PublishedAlgorithmLister    = (*Repository)(nil)
+	_ port.PublishedSnapshotRepository = (*Repository)(nil)
 )
 
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
@@ -42,6 +45,42 @@ func (r *Repository) UpsertPublishedModel(ctx context.Context, model *port.Publi
 	return r.upsertPublishedModel(ctx, model)
 }
 
+func (r *Repository) Save(ctx context.Context, model *port.PublishedModel) error {
+	return r.UpsertPublishedModel(ctx, model)
+}
+
+func (r *Repository) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
+	return r.FindActivePublishedModelByModelCode(ctx, kind, code)
+}
+
+func (r *Repository) FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
+	return r.FindLatestPublishedModelByModelCode(ctx, kind, code)
+}
+
+func (r *Repository) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*port.PublishedModel, error) {
+	return r.GetPublishedModelByRef(ctx, port.Ref{Kind: kind, Code: code, Version: version})
+}
+
+func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
+	return r.ListPublishedModels(ctx, filter)
+}
+
+// DeletePublished only deactivates the externally visible snapshot. Retained
+// releases remain available to exact-version readers and draft recovery.
+func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code string) error {
+	if code == "" {
+		return domain.ErrNotFound
+	}
+	_, err := r.Collection().UpdateMany(ctx, activePublishedFilter(bson.M{
+		"kind": kindBSONFilter(kind),
+		"code": code,
+	}), bson.M{"$set": bson.M{
+		"is_active_published": false,
+		"updated_at":          time.Now(),
+	}})
+	return err
+}
+
 // BackfillPublishedDefinitionV2 updates only DefinitionV2 on the exact
 // historical published row. It intentionally does not normalize identity or
 // rewrite payload fields, which makes it safe for one-off migrations.
@@ -50,9 +89,9 @@ func (r *Repository) BackfillPublishedDefinitionV2(ctx context.Context, model *p
 		return fmt.Errorf("%w: published model and definition_v2 are required", domain.ErrInvalidArgument)
 	}
 	filter := publishedFilter(bson.M{
-		"model_code":    model.Code,
-		"model_version": model.Version,
-		"payload":       model.Payload,
+		"code":            model.Code,
+		"release_version": model.Version,
+		"payload":         model.Payload,
 	})
 	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": bson.M{
 		"definition_schema_version": definitionSchemaVersion(definitionV2),
@@ -75,6 +114,19 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.Publi
 	po.PublishedAt = &now
 
 	filter := publishedModelUpsertFilter(po)
+	// A release is immutable once persisted. Only the exact same release is
+	// upserted for idempotency; all earlier active releases are retained and
+	// merely made invisible to catalog queries.
+	_, err := r.Collection().UpdateMany(ctx, activePublishedFilter(bson.M{
+		"kind": po.Kind,
+		"code": po.Code,
+	}), bson.M{"$set": bson.M{
+		"is_active_published": false,
+		"updated_at":          now,
+	}})
+	if err != nil {
+		return err
+	}
 
 	var existing PublishedAssessmentModelPO
 	findErr := r.FindOne(ctx, filter, &existing)
@@ -114,7 +166,7 @@ func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (
 }
 
 func (r *Repository) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error) {
-	filter := publishedFilter(bson.M{
+	filter := activePublishedFilter(bson.M{
 		"questionnaire_code": questionnaireCode,
 	})
 	if questionnaireVersion != "" {
@@ -128,10 +180,27 @@ func (r *Repository) FindLatestPublishedModelByModelCode(ctx context.Context, ki
 		return nil, domain.ErrNotFound
 	}
 	filter := publishedFilter(bson.M{
-		"model_kind": kindBSONFilter(kind),
-		"model_code": code,
+		"kind": kindBSONFilter(kind),
+		"code": code,
 	})
 	return r.findLatestPublished(ctx, filter)
+}
+
+// FindActivePublishedModelByModelCode resolves the one snapshot visible to
+// runtime callers. Historical snapshots deliberately stay readable through
+// FindLatestPublishedModelByModelCode and GetPublishedModelByRef.
+func (r *Repository) FindActivePublishedModelByModelCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
+	if code == "" {
+		return nil, domain.ErrNotFound
+	}
+	return r.findLatestPublished(ctx, activePublishedFilter(bson.M{
+		"kind": kindBSONFilter(kind),
+		"code": code,
+	}))
+}
+
+func (r *Repository) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
+	return r.FindActivePublishedModelByModelCode(ctx, kind, code)
 }
 
 func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
@@ -149,19 +218,19 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 
 	extra := bson.M{}
 	if codeValue := strings.TrimSpace(filter.Code); codeValue != "" {
-		extra["model_code"] = codeValue
+		extra["code"] = codeValue
 	}
 	if filter.Kind != "" {
-		extra["model_kind"] = kindBSONFilter(filter.Kind)
+		extra["kind"] = kindBSONFilter(filter.Kind)
 	}
 	if filter.Algorithm != "" {
-		extra["model_algorithm"] = string(filter.Algorithm)
+		extra["algorithm"] = string(filter.Algorithm)
 	}
 	if filter.ProductChannel != "" {
-		extra["model_product_channel"] = string(filter.ProductChannel)
+		extra["product_channel"] = string(filter.ProductChannel)
 	}
 	if filter.SubKind != "" {
-		extra["model_sub_kind"] = string(filter.SubKind)
+		extra["sub_kind"] = string(filter.SubKind)
 	}
 	if filter.Category != "" {
 		extra["category"] = filter.Category
@@ -172,7 +241,7 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	if filter.QuestionnaireVersion != "" {
 		extra["questionnaire_version"] = filter.QuestionnaireVersion
 	}
-	mongoFilter := publishedFilter(extra)
+	mongoFilter := activePublishedFilter(extra)
 	if filter.Keyword != "" {
 		mongoFilter["title"] = bson.M{"$regex": strings.TrimSpace(filter.Keyword), "$options": "i"}
 	}
@@ -183,7 +252,7 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "model_code", Value: 1}}).
+		SetSort(bson.D{{Key: "code", Value: 1}}).
 		SetSkip(int64((page - 1) * pageSize)).
 		SetLimit(int64(pageSize))
 
@@ -211,13 +280,13 @@ func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algo
 	if r == nil {
 		return nil, domain.ErrNotFound
 	}
-	mongoFilter := publishedFilter(bson.M{
-		"model_kind":     kindBSONFilter(domain.KindTypology),
-		"model_sub_kind": string(domain.SubKindTypology),
+	mongoFilter := activePublishedFilter(bson.M{
+		"kind":     kindBSONFilter(domain.KindTypology),
+		"sub_kind": string(domain.SubKindTypology),
 	})
 	pipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: mongoFilter}},
-		bson.D{{Key: "$group", Value: bson.M{"_id": "$model_algorithm"}}},
+		bson.D{{Key: "$group", Value: bson.M{"_id": "$algorithm"}}},
 	}
 	cursor, err := r.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
@@ -273,15 +342,15 @@ func sortAlgorithms(algorithms []domain.Algorithm) {
 
 func (r *Repository) refFilter(ref port.Ref) bson.M {
 	filter := bson.M{
-		"model_kind":    kindBSONFilter(ref.Kind),
-		"model_code":    ref.Code,
-		"model_version": ref.Version,
+		"kind":            kindBSONFilter(ref.Kind),
+		"code":            ref.Code,
+		"release_version": ref.Version,
 	}
 	if ref.SubKind != "" {
-		filter["model_sub_kind"] = string(ref.SubKind)
+		filter["sub_kind"] = string(ref.SubKind)
 	}
 	if ref.Algorithm != "" {
-		filter["model_algorithm"] = string(ref.Algorithm)
+		filter["algorithm"] = string(ref.Algorithm)
 	}
 	return filter
 }
@@ -303,7 +372,7 @@ func (r *Repository) findLatestPublished(ctx context.Context, filter bson.M) (*p
 	opts := options.FindOne().SetSort(bson.D{
 		{Key: "published_at", Value: -1},
 		{Key: "updated_at", Value: -1},
-		{Key: "model_version", Value: -1},
+		{Key: "release_version", Value: -1},
 	})
 	err := r.Collection().FindOne(ctx, filter, opts).Decode(&po)
 	if err != nil {

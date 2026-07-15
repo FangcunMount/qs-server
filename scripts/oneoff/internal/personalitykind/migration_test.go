@@ -42,7 +42,7 @@ func TestClassifyAcceptsOnlyKnownLegacyTypologyIdentities(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := classify(Drafts, tc.raw)
+			got := classify(Heads, tc.raw)
 			if got.Eligible != tc.eligible {
 				t.Fatalf("eligible = %v, want %v (%s)", got.Eligible, tc.eligible, got.Reason)
 			}
@@ -52,12 +52,12 @@ func TestClassifyAcceptsOnlyKnownLegacyTypologyIdentities(t *testing.T) {
 
 func TestClassifyUsesCanonicalTypologyConstants(t *testing.T) {
 	t.Parallel()
-	got := classify(Published, bson.M{
-		"model_code":            "SBTI_FUN",
-		"model_kind":            "personality",
-		"model_sub_kind":        string(domain.SubKindTypology),
-		"model_algorithm":       string(domain.AlgorithmSBTI),
-		"model_product_channel": "",
+	got := classify(Snapshots, bson.M{
+		"code":            "SBTI_FUN",
+		"kind":            "personality",
+		"sub_kind":        string(domain.SubKindTypology),
+		"algorithm":       string(domain.AlgorithmSBTI),
+		"product_channel": "",
 	})
 	if !got.Eligible {
 		t.Fatalf("published legacy typology should be eligible: %s", got.Reason)

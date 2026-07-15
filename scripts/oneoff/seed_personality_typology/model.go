@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
@@ -25,7 +26,7 @@ type modelSeedPlan struct {
 func seedAssessmentModel(
 	ctx context.Context,
 	draftRepo *mongomodelcatalog.DraftRepository,
-	publishedRepo *mongomodelcatalog.PublishedModelRepoAdapter,
+	publishedRepo modelcatalogport.PublishedSnapshotRepository,
 	plan modelSeedPlan,
 	payload *modeltypology.Payload,
 	force bool,

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	surveyquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -29,6 +30,23 @@ func TestBuildDefinitionAssignsAllQuestionsAndCompositeIndexes(t *testing.T) {
 	}
 	if len(definition.Measure.FactorGraph.Edges) != 12 {
 		t.Fatalf("factor graph edges = %d, want 12", len(definition.Measure.FactorGraph.Edges))
+	}
+	if len(definition.Conclusions) != 13 {
+		t.Fatalf("conclusions = %d, want 13", len(definition.Conclusions))
+	}
+	for _, item := range definition.Conclusions {
+		norm, ok := item.(conclusion.NormConclusion)
+		if !ok {
+			t.Fatalf("conclusion = %T, want NormConclusion", item)
+		}
+		if len(norm.Rules) != 4 {
+			t.Fatalf("rules for %s = %d, want 4", norm.FactorCode, len(norm.Rules))
+		}
+		for _, rule := range norm.Rules {
+			if rule.Summary == "" || rule.Description == "" {
+				t.Fatalf("rule %s/%s must include summary and description: %#v", norm.FactorCode, rule.Level, rule)
+			}
+		}
 	}
 }
 

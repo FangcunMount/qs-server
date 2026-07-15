@@ -172,7 +172,7 @@ func run(cfg config) error {
 func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnaireVersion string, definition *modeldefinition.Definition, definitionJSON []byte, normRepo *mongomodelcatalog.NormRepository) error {
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
 	publishedRepository := mongomodelcatalog.NewRepository(db)
-	publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(publishedRepository)
+	publishedRepo := publishedRepository
 	existing, err := draftRepo.FindByCode(ctx, cfg.modelCode)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("find draft %s: %w", cfg.modelCode, err)
@@ -538,7 +538,7 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, mapping f
 		}
 		definition.Measure.Factors = append(definition.Measure.Factors, factor.Factor{Code: code, Title: catalog.titles[code], Role: role})
 		definition.Calibration.NormRefs = append(definition.Calibration.NormRefs, modelnorm.Ref{FactorCode: code, NormTableVersion: normVersion})
-		definition.Conclusions = append(definition.Conclusions, brief2Conclusion(code, index == 12))
+		definition.Conclusions = append(definition.Conclusions, brief2Conclusion(code, catalog.titles[code], index == 12))
 	}
 	for _, code := range leafCodes {
 		sources := make([]factor.ScoringSource, 0, len(factorMap[code]))
@@ -604,16 +604,132 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, mapping f
 	return definition, nil
 }
 
-func brief2Conclusion(factorCode string, primary bool) conclusion.NormConclusion {
+// brief2ReportProfile keeps the explanatory copy with the BRIEF-2 definition
+// rather than relying on the client to infer meaning from a T score alone. The
+// result is a screening interpretation, not a clinical diagnosis.
+type brief2ReportProfile struct {
+	aspect   string
+	context  string
+	strategy string
+	impact   string
+}
+
+var brief2ReportProfiles = map[string]brief2ReportProfile{
+	"抑制": {
+		aspect:   "抑制冲动、等待以及停止不合适行为",
+		context:  "兴奋、等待、被打断或规则要求较多时",
+		strategy: "用简短而一致的规则、视觉提示和“先停一停再行动”的练习，并及时肯定能够等待或自我停止的行为",
+		impact:   "遵守规则、课堂秩序、同伴互动或安全行为",
+	},
+	"自我监控": {
+		aspect:   "觉察自己的言行对他人和事情结果的影响",
+		context:  "与同伴互动、完成后复查或需要调整行为方式时",
+		strategy: "在具体情境后共同回顾“我做了什么、别人有什么感受、下次可以怎样做”，并一次只练习一个可观察的目标",
+		impact:   "人际互动、遵守约定和从经验中调整行为",
+	},
+	"情景转换": {
+		aspect:   "适应变化、在活动之间切换以及转换解决问题的方法",
+		context:  "计划临时改变、结束喜欢的活动或任务要求转换时",
+		strategy: "提前预告变化，使用可视化日程和倒计时；从小幅度、可预期的转换开始练习，并为替代方案提供选择",
+		impact:   "日常过渡、课堂转换和面对变化时的合作",
+	},
+	"情绪控制": {
+		aspect:   "识别、表达和调节情绪反应",
+		context:  "受挫、被拒绝、疲劳或要求较高时",
+		strategy: "在情绪平稳时练习给情绪命名、识别身体信号和使用冷静步骤；成人先共情并示范，再讨论可行的解决办法",
+		impact:   "家庭互动、同伴关系以及完成日常要求的能力",
+	},
+	"任务启动": {
+		aspect:   "主动开始任务，并产生完成任务的想法或步骤",
+		context:  "面对不熟悉、步骤较多或缺少即时兴趣的任务时",
+		strategy: "把任务拆成清晰的第一步，配合开始提示、计时器和完成后的即时反馈；逐步减少成人代劳",
+		impact:   "作业、晨间准备和独立完成日常任务",
+	},
+	"工作记忆": {
+		aspect:   "暂时保留信息，并按步骤完成任务",
+		context:  "听取多步指令、心算、抄写或同时处理多项信息时",
+		strategy: "把口头要求分成一至两步，配合清单、图示或复述确认；复杂任务可提供外部记录，完成一段再进入下一段",
+		impact:   "学习效率、遵循指令和多步骤活动的完成质量",
+	},
+	"计划/组织": {
+		aspect:   "预估任务要求、安排步骤并整理信息",
+		context:  "长期作业、需要准备材料或需要自己安排时间时",
+		strategy: "共同使用“目标—步骤—所需材料—完成时间”清单；先示范如何把大任务拆小，再逐渐让孩子承担计划和检查",
+		impact:   "学习安排、问题解决和按时完成任务",
+	},
+	"任务监控": {
+		aspect:   "在任务过程中检查进度、发现并修正错误",
+		context:  "书面作业、需要持续注意或任务接近结束时",
+		strategy: "设置中途检查点和固定的复查顺序，例如“看要求、做任务、对答案”；反馈具体指出已发现和修正的部分",
+		impact:   "作业准确性、做事的完整度和独立性",
+	},
+	"材料组织": {
+		aspect:   "整理、保管和及时找到个人物品",
+		context:  "上学准备、收拾书包或在多个活动地点切换时",
+		strategy: "为常用物品设置固定位置和标签，使用出门前/结束后的简短清单，并安排固定的整理时间而非临时催促",
+		impact:   "上学准备、物品管理和日常生活效率",
+	},
+	"行为调节": {
+		aspect:   "控制行为反应并觉察自身行为影响的整体能力",
+		context:  "需要遵守规则、等待、与人协作或受挫时",
+		strategy: "优先在家庭和学校统一少量关键规则，明确期望行为和即时反馈；将“暂停—想一想—再行动”作为共同练习流程",
+		impact:   "课堂适应、亲子互动、同伴关系和安全行为",
+	},
+	"情绪调节": {
+		aspect:   "适应变化并调节情绪反应的整体能力",
+		context:  "计划改变、挫折、冲突或情绪被激发时",
+		strategy: "提前预告变化，建立可重复使用的冷静流程，并在平稳时练习替代反应；成人保持一致、简洁的回应",
+		impact:   "过渡情境、冲突处理和参与日常活动的稳定性",
+	},
+	"认知调节": {
+		aspect:   "启动任务、保持信息、计划组织并监控完成过程的整体能力",
+		context:  "学习任务、日常准备和需要独立完成多步骤活动时",
+		strategy: "优先减少一次性信息量，使用外部清单和固定流程；家长与教师可共同选择一至两个最影响功能的目标持续跟进",
+		impact:   "学习效率、时间管理和日常独立性",
+	},
+	"总分": {
+		aspect:   "日常执行功能表现的整体水平",
+		context:  "家庭、学校和社交等不同环境的日常要求中",
+		strategy: "结合得分较高的分量表确定优先目标，在家庭和学校使用一致、可执行的支持方式，并定期根据实际变化调整",
+		impact:   "学习、生活自理、情绪行为和人际适应的整体功能",
+	},
+}
+
+func brief2Conclusion(factorCode, title string, primary bool) conclusion.NormConclusion {
+	profile, ok := brief2ReportProfiles[title]
+	if !ok {
+		profile = brief2ReportProfile{
+			aspect:   title + "相关的日常执行功能表现",
+			context:  "任务要求增加、环境变化或疲劳时",
+			strategy: "结合具体情境设置清晰、可观察的小目标，并给予一致的提示和反馈",
+			impact:   "日常学习、生活和人际适应",
+		}
+	}
 	return conclusion.NormConclusion{
 		FactorCode: factorCode,
 		ScoreBasis: conclusion.ScoreBasisTScore,
 		Primary:    primary,
 		Rules: []conclusion.ScoreRangeOutcome{
-			{MinScore: 0, MaxScore: 59, Level: "normal", Title: "与同龄儿童相似"},
-			{MinScore: 60, MaxScore: 64, Level: "mild", Title: "轻微执行功能障碍"},
-			{MinScore: 65, MaxScore: 69, Level: "moderate", Title: "中度执行功能障碍"},
-			{MinScore: 70, MaxScore: 200, Level: "severe", Title: "严重执行功能障碍"},
+			{
+				MinScore: 0, MaxScore: 59, Level: "normal", Title: "与同龄儿童相似",
+				Summary:     fmt.Sprintf("在%s方面的表现与同龄儿童相近；本次问卷未提示明显困难。", profile.aspect),
+				Description: fmt.Sprintf("可继续提供清晰、稳定的日常规则和作息，并在%s等压力较大的情境中留意表现变化。若困难只偶尔出现，宜结合睡眠、任务难度和环境变化综合观察。", profile.context),
+			},
+			{
+				MinScore: 60, MaxScore: 64, Level: "mild", Title: "轻微执行功能障碍",
+				Summary:     fmt.Sprintf("在%s方面可能偶有困难，通常在%s时更容易表现出来。", profile.aspect, profile.context),
+				Description: fmt.Sprintf("建议先从一个高频场景开始：%s。连续观察一段时间，记录哪些提示有效，并避免把偶发困难直接等同于能力不足。", profile.strategy),
+			},
+			{
+				MinScore: 65, MaxScore: 69, Level: "moderate", Title: "中度执行功能障碍",
+				Summary:     fmt.Sprintf("问卷提示%s方面的困难较为明显，可能已影响%s。", profile.aspect, profile.impact),
+				Description: fmt.Sprintf("建议家长与教师共同确定一至两个可观察的目标，并在多个场景使用一致支持：%s。定期根据实际完成情况调整目标和支持强度。", profile.strategy),
+			},
+			{
+				MinScore: 70, MaxScore: 200, Level: "severe", Title: "严重执行功能障碍",
+				Summary:     fmt.Sprintf("问卷提示%s方面存在显著困难，可能持续影响%s。", profile.aspect, profile.impact),
+				Description: fmt.Sprintf("除实施日常支持外，建议尽快与学校或照护团队沟通，形成具体支持计划：%s。若困难已持续影响学习、家庭互动、同伴关系或生活自理，可携带本报告向儿童发育行为、心理或康复等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。", profile.strategy),
+			},
 		},
 	}
 }

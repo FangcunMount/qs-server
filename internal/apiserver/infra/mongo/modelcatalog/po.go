@@ -11,18 +11,27 @@ import (
 
 const statusPublished = "published"
 
-// PublishedAssessmentModelPO v2 已发布测评模型 Mongo 文档。
+const (
+	recordRoleHead              = "head"
+	recordRolePublishedSnapshot = "published_snapshot"
+)
+
+// PublishedAssessmentModelPO is an immutable runtime snapshot stored beside the
+// editable head in assessment_models. Field names intentionally distinguish a
+// release version from the head revision during the storage migration.
 type PublishedAssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
 	SchemaVersion           string        `bson:"schema_version,omitempty"`
 	PayloadFormat           string        `bson:"payload_format,omitempty"`
-	ModelProductChannel     string        `bson:"model_product_channel,omitempty"`
-	ModelKind               string        `bson:"model_kind"`
-	ModelSubKind            string        `bson:"model_sub_kind,omitempty"`
-	ModelAlgorithm          string        `bson:"model_algorithm,omitempty"`
-	ModelCode               string        `bson:"model_code"`
-	ModelVersion            string        `bson:"model_version"`
+	RecordRole              string        `bson:"record_role"`
+	IsActivePublished       bool          `bson:"is_active_published"`
+	ProductChannel          string        `bson:"product_channel,omitempty"`
+	Kind                    string        `bson:"kind"`
+	SubKind                 string        `bson:"sub_kind,omitempty"`
+	Algorithm               string        `bson:"algorithm,omitempty"`
+	Code                    string        `bson:"code"`
+	ReleaseVersion          string        `bson:"release_version"`
 	Title                   string        `bson:"title"`
 	Description             string        `bson:"description,omitempty"`
 	Category                string        `bson:"category,omitempty"`
@@ -42,7 +51,7 @@ type PublishedAssessmentModelPO struct {
 }
 
 func (PublishedAssessmentModelPO) CollectionName() string {
-	return "published_assessment_models"
+	return "assessment_models"
 }
 
 func (p *PublishedAssessmentModelPO) BeforeInsert() {
@@ -74,8 +83,9 @@ func (p *PublishedAssessmentModelPO) ToBsonM() (bson.M, error) {
 
 func publishedFilter(extra bson.M) bson.M {
 	filter := bson.M{
-		"status":     statusPublished,
-		"deleted_at": nil,
+		"record_role": recordRolePublishedSnapshot,
+		"status":      statusPublished,
+		"deleted_at":  nil,
 	}
 	for key, value := range extra {
 		filter[key] = value
@@ -83,19 +93,26 @@ func publishedFilter(extra bson.M) bson.M {
 	return filter
 }
 
-// publishedModelUpsertFilter matches the active published row for a model code.
-// model_version is intentionally excluded: draft edits bump optimistic version and
-// republication must replace the existing snapshot instead of inserting a new row.
+func activePublishedFilter(extra bson.M) bson.M {
+	filter := publishedFilter(extra)
+	filter["is_active_published"] = true
+	return filter
+}
+
+// publishedModelUpsertFilter matches one immutable release. Repeating a publish
+// for the same revision is idempotent; a later revision inserts a new snapshot.
 func publishedModelUpsertFilter(po *PublishedAssessmentModelPO) bson.M {
 	filter := bson.M{
-		"model_kind":      po.ModelKind,
-		"model_algorithm": po.ModelAlgorithm,
-		"model_code":      po.ModelCode,
+		"record_role":     recordRolePublishedSnapshot,
+		"kind":            po.Kind,
+		"algorithm":       po.Algorithm,
+		"code":            po.Code,
+		"release_version": po.ReleaseVersion,
 		"deleted_at":      nil,
 	}
 	// Empty sub_kind must not be written as "" — legacy rows store null/absent.
-	if po.ModelSubKind != "" {
-		filter["model_sub_kind"] = po.ModelSubKind
+	if po.SubKind != "" {
+		filter["sub_kind"] = po.SubKind
 	}
 	return filter
 }

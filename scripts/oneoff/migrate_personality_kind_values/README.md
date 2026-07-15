@@ -6,7 +6,7 @@
 - 算法为 `personality_typology`、`bigfive`、`mbti` 或 `sbti`；
 - 产品通道为空、`personality` 或 `typology`。
 
-它同时处理草稿集合 `assessment_models` 和已发布集合 `published_assessment_models`；不满足条件的行会列为 `SKIP`，不会被自动修改。
+它在 `assessment_models` 中分别处理 `head` 与 `published_snapshot` 两类记录；不满足条件的行会列为 `SKIP`，不会被自动修改。
 
 ```bash
 go run ./scripts/oneoff/migrate_personality_kind_values --mongo-uri "$MONGO_URI" --mongo-db qs

@@ -32,8 +32,10 @@ type ModelRepository interface {
 	Delete(ctx context.Context, code string) error
 }
 
-// PublishedModelRepository persists published model runtime records for admin publish flows.
-type PublishedModelRepository interface {
+// PublishedSnapshotRepository persists immutable published snapshots for admin
+// publication flows. FindPublishedByModelCode resolves the active snapshot;
+// FindLatestPublishedByModelCode may return a retained inactive snapshot.
+type PublishedSnapshotRepository interface {
 	Save(ctx context.Context, model *PublishedModel) error
 	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
 	FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
@@ -41,6 +43,10 @@ type PublishedModelRepository interface {
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*PublishedModel, int64, error)
 	DeletePublished(ctx context.Context, kind domain.Kind, code string) error
 }
+
+// PublishedModelRepository is kept as a source-compatible name while callers
+// migrate to the snapshot-oriented port.
+type PublishedModelRepository = PublishedSnapshotRepository
 
 // NormRepository persists immutable norm tables addressed by table version.
 type NormRepository interface {

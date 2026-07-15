@@ -25,7 +25,7 @@ import (
 type Service struct {
 	Transactions   apptransaction.Runner
 	Models         modelcatalogport.ModelRepository
-	Published      modelcatalogport.PublishedModelRepository
+	Published      modelcatalogport.PublishedSnapshotRepository
 	Authorizer     modelcatalog.Authorizer
 	Registry       appdefinition.Registry
 	Bindings       appbinding.Policies

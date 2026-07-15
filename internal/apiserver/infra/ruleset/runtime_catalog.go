@@ -12,7 +12,7 @@ type runtimePublishedStore interface {
 	port.PublishedModelLister
 }
 
-// RuntimePublishedCatalog reads only published_assessment_models v2 at runtime.
+// RuntimePublishedCatalog reads only active published snapshots at runtime.
 type RuntimePublishedCatalog struct {
 	store runtimePublishedStore
 }

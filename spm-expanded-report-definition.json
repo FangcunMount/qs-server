@@ -1,0 +1,1526 @@
+{
+  "Measure": {
+    "Factors": [
+      {
+        "Code": "hwYAqCSd",
+        "Title": "社会参与",
+        "Role": "dimension"
+      },
+      {
+        "Code": "TPRrr0hh",
+        "Title": "视觉",
+        "Role": "dimension"
+      },
+      {
+        "Code": "JxzqkoP3",
+        "Title": "听觉",
+        "Role": "dimension"
+      },
+      {
+        "Code": "Hs5rKy8b",
+        "Title": "触觉",
+        "Role": "dimension"
+      },
+      {
+        "Code": "2OEnsR1F",
+        "Title": "身体意识",
+        "Role": "dimension"
+      },
+      {
+        "Code": "wZTNmKJk",
+        "Title": "运动与平衡",
+        "Role": "dimension"
+      },
+      {
+        "Code": "oaj20O9N",
+        "Title": "规划与想法",
+        "Role": "dimension"
+      },
+      {
+        "Code": "DXnCfrnq",
+        "Title": "总分",
+        "Role": "total"
+      },
+      {
+        "Code": "wcgKM7uV",
+        "Title": "味觉与嗅觉（仅计入 TOT）",
+        "Role": "subtest"
+      }
+    ],
+    "FactorGraph": {
+      "Roots": [
+        "hwYAqCSd",
+        "DXnCfrnq",
+        "oaj20O9N"
+      ],
+      "Edges": [
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "TPRrr0hh"
+        },
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "JxzqkoP3"
+        },
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "Hs5rKy8b"
+        },
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "wcgKM7uV"
+        },
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "2OEnsR1F"
+        },
+        {
+          "ParentCode": "DXnCfrnq",
+          "ChildCode": "wZTNmKJk"
+        }
+      ],
+      "SortOrders": {
+        "2OEnsR1F": 5,
+        "DXnCfrnq": 8,
+        "Hs5rKy8b": 4,
+        "JxzqkoP3": 3,
+        "TPRrr0hh": 2,
+        "hwYAqCSd": 1,
+        "oaj20O9N": 7,
+        "wZTNmKJk": 6,
+        "wcgKM7uV": 9
+      }
+    },
+    "Scoring": [
+      {
+        "FactorCode": "hwYAqCSd",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "b9B0JQRD",
+            "Sign": 1,
+            "OptionScores": {
+              "7KK0SSVW": 2,
+              "N4ABATQy": 4,
+              "hpiCUsmE": 3,
+              "uwtoIVqj": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "j62Vdcmo",
+            "Sign": 1,
+            "OptionScores": {
+              "1zMKQo1Y": 3,
+              "cmiKHx1A": 2,
+              "e0HBiWH2": 4,
+              "reNs1b3x": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "EgTDQjyD",
+            "Sign": 1,
+            "OptionScores": {
+              "QcsAijmu": 2,
+              "ffcpnUWo": 3,
+              "rdUyOkI6": 4,
+              "zEhOUSBZ": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "zIc0w2yu",
+            "Sign": 1,
+            "OptionScores": {
+              "LIysHdHf": 3,
+              "R0Jv4jUP": 1,
+              "SDh0s67i": 4,
+              "uOfnzIbD": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "QycVHb2X",
+            "Sign": 1,
+            "OptionScores": {
+              "3XINeVeR": 3,
+              "7U7bJ5cq": 1,
+              "U2B6mKmN": 2,
+              "uZXyOubs": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "46gVkf5c",
+            "Sign": 1,
+            "OptionScores": {
+              "9A9OSM5k": 1,
+              "CKP6gnCZ": 4,
+              "SOq15XN2": 3,
+              "XXwQUWAn": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "2PrUEwHv",
+            "Sign": 1,
+            "OptionScores": {
+              "2OgtszgS": 3,
+              "FToUa9wT": 4,
+              "WZRBeVmR": 2,
+              "o40YQ6A6": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "ZdtUVcF4",
+            "Sign": 1,
+            "OptionScores": {
+              "ZkWeLF1O": 1,
+              "ePUrG7HP": 4,
+              "sQe4Cdmc": 2,
+              "yywuLR1F": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "VbEVZR8C",
+            "Sign": 1,
+            "OptionScores": {
+              "JZQle2hG": 1,
+              "a6JxO5jC": 4,
+              "bh9m9hng": 2,
+              "cF8UO28i": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "gR2AqEKH",
+            "Sign": 1,
+            "OptionScores": {
+              "9Ofn95GS": 3,
+              "OHsssx6W": 2,
+              "ZSrSTWQk": 4,
+              "zFIS9HG0": 1
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "TPRrr0hh",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "yJwHeohd",
+            "Sign": 1,
+            "OptionScores": {
+              "30rKhgsR": 4,
+              "O9rkxAQ9": 2,
+              "hTL4sqTT": 1,
+              "r4PdpW0k": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "m8YdHfz9",
+            "Sign": 1,
+            "OptionScores": {
+              "1rswhckP": 3,
+              "EiKzk5sN": 4,
+              "O1kUVrGD": 1,
+              "YWC7G8Kz": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "2fulkgpW",
+            "Sign": 1,
+            "OptionScores": {
+              "5QKIai2i": 4,
+              "d73bOOW4": 1,
+              "yNm1mC4E": 3,
+              "yW7TkDgL": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "tIJWKUO1",
+            "Sign": 1,
+            "OptionScores": {
+              "3IzHgRQC": 2,
+              "GvTgnVhK": 1,
+              "iBX9fCuc": 4,
+              "yYiuaegj": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "hwj8FZcM",
+            "Sign": 1,
+            "OptionScores": {
+              "9dTqWGh1": 2,
+              "Bh7tc99y": 1,
+              "OQmsNca0": 3,
+              "bpcFTFYy": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "SFmACMhX",
+            "Sign": 1,
+            "OptionScores": {
+              "ARqrL2NR": 4,
+              "CPM3OeHe": 1,
+              "VFfnCt2r": 3,
+              "d12qBHVj": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "tThPgmfn",
+            "Sign": 1,
+            "OptionScores": {
+              "SNSsd9sI": 2,
+              "gB3V8qUq": 1,
+              "hzGqZ7M5": 4,
+              "vfGBtypl": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "jVzATj1i",
+            "Sign": 1,
+            "OptionScores": {
+              "7q3VoZPf": 4,
+              "UBk435U5": 2,
+              "b6v7iPV6": 1,
+              "mAhZeOYb": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "wzVBgcun",
+            "Sign": 1,
+            "OptionScores": {
+              "3WXnVv6n": 4,
+              "RLiSkGom": 1,
+              "ldI3o1OP": 2,
+              "uuAFrVv8": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "UIv6av11",
+            "Sign": 1,
+            "OptionScores": {
+              "3BzqbLPu": 2,
+              "5aaZzcph": 3,
+              "dTtxdPwv": 1,
+              "h4OsOe3C": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "sCHyiUap",
+            "Sign": 1,
+            "OptionScores": {
+              "DummTJL8": 1,
+              "PQPczaS5": 2,
+              "Xaqq4ysC": 3,
+              "fx6uY8T8": 4
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "JxzqkoP3",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "28aTB9fa",
+            "Sign": 1,
+            "OptionScores": {
+              "0wcAW3ol": 1,
+              "CHbsbwh4": 4,
+              "Xl1aSfjc": 3,
+              "mLjoZKCv": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "Orttib18",
+            "Sign": 1,
+            "OptionScores": {
+              "QuqjZjDP": 3,
+              "UOs7Kyix": 2,
+              "X42vGUUw": 1,
+              "iLVYWKBe": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "BuyMy62v",
+            "Sign": 1,
+            "OptionScores": {
+              "PZcPhG1e": 4,
+              "YLepi77G": 3,
+              "dmq1pmIk": 1,
+              "enzzmfoU": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "D4MLKOt7",
+            "Sign": 1,
+            "OptionScores": {
+              "WzDkO658": 2,
+              "jjsI9apZ": 4,
+              "vjfS0mU8": 3,
+              "xHR7ctel": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "nIppGa1m",
+            "Sign": 1,
+            "OptionScores": {
+              "091FyRkG": 3,
+              "H5KaguPy": 1,
+              "pM1DI3jO": 2,
+              "rpn9dVzz": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "oKNBL8Xt",
+            "Sign": 1,
+            "OptionScores": {
+              "0l2rF9J0": 1,
+              "BAhgZE4Z": 4,
+              "L8xxSsIZ": 2,
+              "gkn2KxBR": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "WGSI46Bv",
+            "Sign": 1,
+            "OptionScores": {
+              "60QWfF3R": 2,
+              "AM9hlrCQ": 4,
+              "g6w2tDk2": 3,
+              "vEtGHpWX": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "dOibv9O3",
+            "Sign": 1,
+            "OptionScores": {
+              "IcAMwZqq": 1,
+              "Mq4gcBEn": 2,
+              "eyBO3GX9": 3,
+              "oQEN3kUk": 4
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "Hs5rKy8b",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "2C78lyQh",
+            "Sign": 1,
+            "OptionScores": {
+              "5Wfhoxnx": 1,
+              "Xgb4mYy1": 2,
+              "pyJTdTTY": 3,
+              "sfmIfIUz": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "c6BoB6SK",
+            "Sign": 1,
+            "OptionScores": {
+              "5PTScRDh": 1,
+              "UaQNSpS6": 4,
+              "YQ201Dob": 3,
+              "uTIYCIth": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "iX7GxLgR",
+            "Sign": 1,
+            "OptionScores": {
+              "5YEvAjIk": 4,
+              "AKNY35Sx": 1,
+              "DBbFmWzf": 2,
+              "RCvsTvTM": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "OUWctpqj",
+            "Sign": 1,
+            "OptionScores": {
+              "6iw9mDnT": 2,
+              "J75MaWjs": 3,
+              "SUmAXd0u": 4,
+              "eic0hZVW": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "H89SLgUR",
+            "Sign": 1,
+            "OptionScores": {
+              "0IT88NL1": 3,
+              "3vroBK3b": 2,
+              "V9nm4vr6": 1,
+              "bPIOMx2O": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "M324WDDY",
+            "Sign": 1,
+            "OptionScores": {
+              "5mjGiOi6": 3,
+              "6BrlmtYu": 2,
+              "9dmyPzL5": 1,
+              "XQ54EgM8": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "RUEH0sPY",
+            "Sign": 1,
+            "OptionScores": {
+              "0dNmcDFE": 3,
+              "CIFjdFSJ": 1,
+              "IRupISj9": 4,
+              "lqxdiODn": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "aLVEAEo4",
+            "Sign": 1,
+            "OptionScores": {
+              "6HSxYrD2": 3,
+              "DmE0efuN": 4,
+              "XreKe4Kj": 2,
+              "ilTPG7c2": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "qq66RyQY",
+            "Sign": 1,
+            "OptionScores": {
+              "QHUilPHk": 2,
+              "UaWQRjTD": 4,
+              "Z35jgtmC": 1,
+              "q1CVmv6G": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "JyJg1yPh",
+            "Sign": 1,
+            "OptionScores": {
+              "DICU60fF": 2,
+              "dE254VNb": 1,
+              "j6E7f0n2": 3,
+              "stgcPF8p": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "p7ELbMo0",
+            "Sign": 1,
+            "OptionScores": {
+              "SA6bi8fG": 1,
+              "blFyNHZu": 3,
+              "kdeS1tdK": 4,
+              "oQE4zyoe": 2
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "2OEnsR1F",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "KC9oihLp",
+            "Sign": 1,
+            "OptionScores": {
+              "DfRthgFG": 4,
+              "USwIkpn7": 3,
+              "n5wjATxn": 2,
+              "pesjsSv6": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "2CcnQtP7",
+            "Sign": 1,
+            "OptionScores": {
+              "Wa0S3HXS": 1,
+              "f3aToNas": 4,
+              "fqbVFTqe": 3,
+              "hIUr8fdj": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "3jm6amhP",
+            "Sign": 1,
+            "OptionScores": {
+              "4TXfpqTH": 3,
+              "8AX0MWSY": 4,
+              "Fs7ntfH1": 1,
+              "KWLXG2VE": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "mbUTszzW",
+            "Sign": 1,
+            "OptionScores": {
+              "99vBKIUv": 1,
+              "AH59dnO5": 2,
+              "kRHEL9MP": 3,
+              "l2Wrh5IM": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "yoJrSnJY",
+            "Sign": 1,
+            "OptionScores": {
+              "0Z7Wt5c4": 2,
+              "NcjNvysO": 3,
+              "pOYb6eLp": 4,
+              "qHkKzBSi": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "niYKUWYg",
+            "Sign": 1,
+            "OptionScores": {
+              "Fo6ZQ7uV": 3,
+              "Gm2bJSnT": 4,
+              "NhIGSE6w": 2,
+              "w4moKnPE": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "8KGls02b",
+            "Sign": 1,
+            "OptionScores": {
+              "2Vh9uBM5": 4,
+              "H6mDOTfh": 1,
+              "tbm00cKi": 3,
+              "yUCwzBaR": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "sxOMMqDE",
+            "Sign": 1,
+            "OptionScores": {
+              "0NmAkQTd": 1,
+              "N3CZccYM": 3,
+              "gPeVhJ7z": 2,
+              "qUrkY5dg": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "2BlmUGbB",
+            "Sign": 1,
+            "OptionScores": {
+              "IP0ZOmbE": 2,
+              "SHPotNFN": 3,
+              "r2CM7goN": 4,
+              "xyx0RKsg": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "WDSrpdm7",
+            "Sign": 1,
+            "OptionScores": {
+              "E2aX4Mdl": 3,
+              "GgRdZAFU": 4,
+              "MBPAVm0b": 2,
+              "VRi6An9h": 1
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "wZTNmKJk",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "QfngTdc1",
+            "Sign": 1,
+            "OptionScores": {
+              "CbetK3LG": 4,
+              "q6vJt5EO": 2,
+              "uMC9wO82": 3,
+              "vlzjBvh8": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "jenu1Rox",
+            "Sign": 1,
+            "OptionScores": {
+              "H5kH2YL4": 3,
+              "PiVoLkqb": 1,
+              "PwYjDYuG": 4,
+              "sAwpw8If": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "e0Til1aK",
+            "Sign": 1,
+            "OptionScores": {
+              "6BCtiqH2": 1,
+              "V4qNBmO0": 3,
+              "VwZf3zQl": 2,
+              "bvfhqdqM": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "PpUXNw7I",
+            "Sign": 1,
+            "OptionScores": {
+              "A3QjFV8k": 1,
+              "GgogMkpZ": 2,
+              "j5R83xfi": 4,
+              "tBgxyvUc": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "6zM2Mxwz",
+            "Sign": 1,
+            "OptionScores": {
+              "2sV3p9UK": 1,
+              "Cljv7t4V": 4,
+              "LNGyh7n8": 2,
+              "parU3PKo": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "hAmkPvkP",
+            "Sign": 1,
+            "OptionScores": {
+              "CVeoRKYk": 1,
+              "DeEsbGPd": 3,
+              "hwXs9wbB": 2,
+              "m1iw4xIh": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "CfYbBw76",
+            "Sign": 1,
+            "OptionScores": {
+              "4sJYkCKP": 1,
+              "FVVrDBil": 4,
+              "JmpcmJYL": 3,
+              "hbrNGPkX": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "bzVuUL7x",
+            "Sign": 1,
+            "OptionScores": {
+              "6NcfElDG": 1,
+              "ZMK2YMFH": 2,
+              "dS3EQ2DN": 4,
+              "qNc0dQgm": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "5zW04vzj",
+            "Sign": 1,
+            "OptionScores": {
+              "QEQkSNNh": 3,
+              "i4eE3xXQ": 1,
+              "klTtsYFt": 2,
+              "vrGdSIfF": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "WIVfnYai",
+            "Sign": 1,
+            "OptionScores": {
+              "0jl8MJur": 2,
+              "HQgqQF2M": 4,
+              "RBbkRBdA": 1,
+              "dzUj8PGU": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "RKJ8PIni",
+            "Sign": 1,
+            "OptionScores": {
+              "64BnmISp": 2,
+              "kDAweM5H": 4,
+              "o5uDeGUT": 3,
+              "xqHR7ETz": 1
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "oaj20O9N",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "UXL6WMCr",
+            "Sign": 1,
+            "OptionScores": {
+              "44jMLjeu": 4,
+              "FZNUkHha": 2,
+              "RsrHhnvw": 3,
+              "t26X0ub3": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "KfxgbkZ9",
+            "Sign": 1,
+            "OptionScores": {
+              "0kADprxe": 1,
+              "8M3eyI56": 3,
+              "fpvFUFoS": 2,
+              "v2mLtIbo": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "tUKxiRnI",
+            "Sign": 1,
+            "OptionScores": {
+              "EmMQTKOY": 1,
+              "dbAAkO0H": 3,
+              "eT4m5ZT8": 4,
+              "rkn1LklI": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "cKk972Jk",
+            "Sign": 1,
+            "OptionScores": {
+              "LSHEeWOO": 2,
+              "ccHqm2gd": 1,
+              "vnR165bD": 4,
+              "xFNBxRwQ": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "hrrAXUN1",
+            "Sign": 1,
+            "OptionScores": {
+              "TCC9HgnA": 2,
+              "pckMRIS2": 4,
+              "q82QZRvB": 3,
+              "r3oN1sRO": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "nLwVTQqP",
+            "Sign": 1,
+            "OptionScores": {
+              "02Y9DFk0": 4,
+              "6R1kSnbp": 3,
+              "7zKOfaPz": 1,
+              "Mlto7mVZ": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "J2c3A614",
+            "Sign": 1,
+            "OptionScores": {
+              "0tQ0el4X": 4,
+              "NjFg5clN": 1,
+              "OVJrj8ze": 2,
+              "Xq7Q3YZj": 3
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "nn5iv3wX",
+            "Sign": 1,
+            "OptionScores": {
+              "HJwAVkj2": 1,
+              "MOOXhUtA": 3,
+              "XUTUB7UB": 2,
+              "eAq8tS6p": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "ZeUv05sT",
+            "Sign": 1,
+            "OptionScores": {
+              "0KKkRYxk": 1,
+              "DTQwEkaa": 2,
+              "SlL74b1r": 3,
+              "mFhYFafm": 4
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "wcgKM7uV",
+        "Sources": [
+          {
+            "Kind": "question",
+            "Code": "xlxragzC",
+            "Sign": 1,
+            "OptionScores": {
+              "64np4dpd": 3,
+              "PoD9Co8X": 4,
+              "YM6ak6W3": 1,
+              "rXGsC49O": 2
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "66qmjvbe",
+            "Sign": 1,
+            "OptionScores": {
+              "AS9S08F6": 3,
+              "QvBICpfJ": 2,
+              "ZgqaFffy": 4,
+              "aYBQjHan": 1
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "g8wCpA8B",
+            "Sign": 1,
+            "OptionScores": {
+              "7PquEkIA": 2,
+              "WTXsHIiN": 1,
+              "ZFkWgc2Y": 3,
+              "aYMU2iZd": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "H9zHyIzA",
+            "Sign": 1,
+            "OptionScores": {
+              "R82hi4hK": 1,
+              "XDMyStqH": 2,
+              "kxwv0UUD": 3,
+              "zVQAfZ7l": 4
+            }
+          },
+          {
+            "Kind": "question",
+            "Code": "TbJdMGrJ",
+            "Sign": 1,
+            "OptionScores": {
+              "RGxALXWP": 1,
+              "gRwairF1": 4,
+              "pvaR5W5o": 2,
+              "rWATWXtx": 3
+            }
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": "strict"
+      },
+      {
+        "FactorCode": "DXnCfrnq",
+        "Sources": [
+          {
+            "Kind": "factor",
+            "Code": "TPRrr0hh"
+          },
+          {
+            "Kind": "factor",
+            "Code": "JxzqkoP3"
+          },
+          {
+            "Kind": "factor",
+            "Code": "Hs5rKy8b"
+          },
+          {
+            "Kind": "factor",
+            "Code": "wcgKM7uV"
+          },
+          {
+            "Kind": "factor",
+            "Code": "2OEnsR1F"
+          },
+          {
+            "Kind": "factor",
+            "Code": "wZTNmKJk"
+          }
+        ],
+        "Strategy": "sum",
+        "Params": null,
+        "MaxScore": null,
+        "Weights": null,
+        "Constant": 0,
+        "OptionScoring": ""
+      }
+    ]
+  },
+  "Calibration": {
+    "NormRefs": [
+      {
+        "FactorCode": "hwYAqCSd",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "TPRrr0hh",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "JxzqkoP3",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "Hs5rKy8b",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "2OEnsR1F",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "wZTNmKJk",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "oaj20O9N",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      },
+      {
+        "FactorCode": "DXnCfrnq",
+        "NormTableVersion": "spm-sensory-cn-legacy-bJFKi3-v1"
+      }
+    ]
+  },
+  "Execution": {
+    "Brief2": null,
+    "SPM": null
+  },
+  "Conclusions": [
+    {
+      "Kind": "norm",
+      "FactorCode": "hwYAqCSd",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在在与家人、同伴和集体活动中的参与及适应方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在陌生环境、多人互动、活动转换或社交规则较多时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在在与家人、同伴和集体活动中的参与及适应方面存在轻度到中度困难，陌生环境、多人互动、活动转换或社交规则较多时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：提前说明活动流程和角色，提供可选择的参与方式与短暂休息机会；以具体、积极的反馈支持孩子逐步加入互动。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在在与家人、同伴和集体活动中的参与及适应方面存在明显困难，可能持续影响家庭活动、同伴交往和学校集体参与。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：提前说明活动流程和角色，提供可选择的参与方式与短暂休息机会；以具体、积极的反馈支持孩子逐步加入互动。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "TPRrr0hh",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在接收和应对视觉信息方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在环境杂乱、光线强烈、需要在多个视觉信息间切换或进行视觉细节任务时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在接收和应对视觉信息方面存在轻度到中度困难，环境杂乱、光线强烈、需要在多个视觉信息间切换或进行视觉细节任务时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：减少不必要的视觉干扰，使用清晰的图片或文字提示，并给任务提供固定位置和完成顺序；观察哪些光线、距离和材料更容易参与。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在接收和应对视觉信息方面存在明显困难，可能持续影响阅读书写、课堂注意、日常出行和环境适应。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：减少不必要的视觉干扰，使用清晰的图片或文字提示，并给任务提供固定位置和完成顺序；观察哪些光线、距离和材料更容易参与。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "JxzqkoP3",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在接收和应对声音信息方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在背景噪声较大、多人同时说话、突发声音或需要听取多步指令时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在接收和应对声音信息方面存在轻度到中度困难，背景噪声较大、多人同时说话、突发声音或需要听取多步指令时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：尽量在较安静的位置给予简短、分步骤的指令，并提前预告可能出现的嘈杂情境；允许在需要时短暂到安静处调整。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在接收和应对声音信息方面存在明显困难，可能持续影响课堂学习、家庭沟通、公共场所活动和情绪稳定。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：尽量在较安静的位置给予简短、分步骤的指令，并提前预告可能出现的嘈杂情境；允许在需要时短暂到安静处调整。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "Hs5rKy8b",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在接收和应对触觉信息方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在穿衣洗漱、进食、被他人碰触或接触不同材质时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在接收和应对触觉信息方面存在轻度到中度困难，穿衣洗漱、进食、被他人碰触或接触不同材质时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：尊重孩子对接触方式和节奏的选择，提前说明并提供可接受的替代材料或方法；避免强迫接触，逐步在安全、可预期的情境中练习。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在接收和应对触觉信息方面存在明显困难，可能持续影响自我照护、游戏、进餐和与他人的身体互动。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：尊重孩子对接触方式和节奏的选择，提前说明并提供可接受的替代材料或方法；避免强迫接触，逐步在安全、可预期的情境中练习。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "2OEnsR1F",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在感知身体位置、用力程度和动作反馈方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在需要控制力量、判断身体位置、使用工具或完成精细与大动作任务时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在感知身体位置、用力程度和动作反馈方面存在轻度到中度困难，需要控制力量、判断身体位置、使用工具或完成精细与大动作任务时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：把动作要求说得具体并示范，可通过安全、目标明确的日常活动练习力度和身体位置；留意疲劳、碰撞或用力过大/过小的情境。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在感知身体位置、用力程度和动作反馈方面存在明显困难，可能持续影响书写操作、运动游戏、个人安全和日常自理。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：把动作要求说得具体并示范，可通过安全、目标明确的日常活动练习力度和身体位置；留意疲劳、碰撞或用力过大/过小的情境。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "wZTNmKJk",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在处理运动与平衡相关信息，并在移动中保持姿势稳定方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在上下楼、跑跳、乘车、游乐设施或头部位置变化时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在处理运动与平衡相关信息，并在移动中保持姿势稳定方面存在轻度到中度困难，上下楼、跑跳、乘车、游乐设施或头部位置变化时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：在安全看护下提供可预期、可暂停的运动活动，提前说明变化并允许孩子自主调节速度和休息；记录哪些运动形式更容易适应。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在处理运动与平衡相关信息，并在移动中保持姿势稳定方面存在明显困难，可能持续影响出行、体育游戏、课堂坐姿和参与日常活动的舒适度。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：在安全看护下提供可预期、可暂停的运动活动，提前说明变化并允许孩子自主调节速度和休息；记录哪些运动形式更容易适应。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "oaj20O9N",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": false,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在构思、组织并执行新的动作或多步骤活动方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在学习新游戏、模仿动作、完成手工、整理物品或面对不熟悉任务时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在构思、组织并执行新的动作或多步骤活动方面存在轻度到中度困难，学习新游戏、模仿动作、完成手工、整理物品或面对不熟悉任务时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：把活动分成少量清晰步骤，先示范再一起完成，并使用图片、范例或清单提示；在熟悉任务中建立成功经验后再逐步增加新要求。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在构思、组织并执行新的动作或多步骤活动方面存在明显困难，可能持续影响游戏参与、学习活动、生活自理和解决实际问题。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：把活动分成少量清晰步骤，先示范再一起完成，并使用图片、范例或清单提示；在熟悉任务中建立成功经验后再逐步增加新要求。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    },
+    {
+      "Kind": "norm",
+      "FactorCode": "DXnCfrnq",
+      "FactorCodes": null,
+      "ScoreBasis": "t_score",
+      "Primary": true,
+      "Rules": [
+        {
+          "MinScore": 0,
+          "MaxScore": 59,
+          "Level": "normal",
+          "OutcomeCode": "",
+          "Title": "与同龄儿童相似",
+          "Summary": "在不同感觉处理领域对日常参与的整体影响方面的表现与同龄儿童相近；本次问卷未提示明显困难。",
+          "Description": "可继续提供稳定、可预期的日常环境，并在家庭、学校、社区等环境要求增加或感觉刺激较多时等要求较高的情境中留意表现变化。单次反应会受疲劳、健康状态和环境影响，宜结合日常观察理解。"
+        },
+        {
+          "MinScore": 60,
+          "MaxScore": 69,
+          "Level": "mild_moderate",
+          "OutcomeCode": "",
+          "Title": "轻度到中度困难",
+          "Summary": "问卷提示在不同感觉处理领域对日常参与的整体影响方面存在轻度到中度困难，家庭、学校、社区等环境要求增加或感觉刺激较多时时可能更容易影响参与。",
+          "Description": "建议从最常见、最影响生活的场景开始调整：优先关注得分较高且最影响日常参与的领域，家长与教师共同调整环境、任务步骤和休息安排；持续记录哪些支持最有效。与家长、教师或照护者共同记录触发因素和有效支持，并根据实际反应逐步调整。"
+        },
+        {
+          "MinScore": 70,
+          "MaxScore": 200,
+          "Level": "severe",
+          "OutcomeCode": "",
+          "Title": "严重困难",
+          "Summary": "问卷提示在不同感觉处理领域对日常参与的整体影响方面存在明显困难，可能持续影响学习、生活自理、社交参与和情绪行为的整体适应。",
+          "Description": "建议尽快与家长、教师或照护团队沟通，制定具体而可观察的支持计划：优先关注得分较高且最影响日常参与的领域，家长与教师共同调整环境、任务步骤和休息安排；持续记录哪些支持最有效。如困难持续影响学习、社交、生活自理或安全，可携带本报告向儿童发育行为、康复或作业治疗等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。"
+        }
+      ],
+      "Outcomes": null,
+      "Decision": {
+        "Kind": "",
+        "FallbackSimilarityThreshold": 0,
+        "FallbackCode": "",
+        "LevelRule": null,
+        "Poles": null,
+        "TopK": 0
+      },
+      "SpecialRules": null,
+      "OutcomeMapping": {
+        "DetailKind": "",
+        "DetailAdapterKey": "",
+        "Algorithm": ""
+      },
+      "Profiles": null
+    }
+  ],
+  "Outcomes": null,
+  "ReportMap": {
+    "Sections": [
+      {
+        "Code": "spm_sensory_scores",
+        "Title": "SPM 感觉处理维度",
+        "SourceRefs": [
+          "hwYAqCSd",
+          "TPRrr0hh",
+          "JxzqkoP3",
+          "Hs5rKy8b",
+          "2OEnsR1F",
+          "wZTNmKJk",
+          "oaj20O9N",
+          "DXnCfrnq"
+        ],
+        "Kind": "factor_scores",
+        "AdapterKey": "",
+        "TemplateID": "",
+        "CategoryLabel": ""
+      }
+    ]
+  }
+}

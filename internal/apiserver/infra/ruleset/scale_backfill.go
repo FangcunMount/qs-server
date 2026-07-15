@@ -8,7 +8,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PublishedScaleSnapshots builds v2 published snapshots from published_assessment_models scale rows (oneoff seed).
+// PublishedScaleSnapshots builds v2 published snapshots from active scale snapshots (oneoff seed).
 func PublishedScaleSnapshots(ctx context.Context, repo *mongomodelcatalog.Repository) ([]*port.PublishedModel, error) {
 	if repo == nil {
 		return nil, nil

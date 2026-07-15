@@ -18,7 +18,7 @@ Publish
   -> Evaluation / Plan / collection
 ```
 
-`DefinitionV2` 是模型语义事实；published payload 是由 Definition 投影出的兼容 wire artifact。运行时只能读取 `published_assessment_models`，不能读取 draft、旧 `scales` collection，也不能从 payload 反向补齐 Definition 语义。
+`DefinitionV2` 是模型语义事实；published payload 是由 Definition 投影出的兼容 wire artifact。运行时只能读取 `assessment_models` 中 `record_role=published_snapshot` 且 `is_active_published=true` 的记录，不能读取 head、旧 `scales` collection，也不能从 payload 反向补齐 Definition 语义。
 
 ## 2. 模块边界
 
@@ -43,7 +43,7 @@ Publish
 | 10 | [领域模型](./10-领域模型.md) | AssessmentModel、Definition、Norm 与 AssessmentSnapshot 各自保护什么事实 |
 | 20 | [核心设计：DefinitionV2 与模型扩展](./20-核心设计-DefinitionV2与模型扩展.md) | 五层 Definition、跨层校验和四类模型策略如何扩展 |
 | 21 | [核心设计：模型身份、绑定与运行时路由](./21-核心设计-模型身份绑定与运行时路由.md) | 产品分类、模型身份、判定方式、执行家族、问卷绑定和版本如何解耦 |
-| 22 | [核心设计：数据存储模型](./22-核心设计-数据存储模型.md) | 三个 Mongo collection、BSON 映射、查询键、软删除、乐观锁和索引证据边界 |
+| 22 | [核心设计：数据存储模型](./22-核心设计-数据存储模型.md) | 统一 Mongo collection、head/snapshot 映射、查询键、历史保留和索引 |
 | 23 | [核心设计：人格题目贡献与因子计分](./23-核心设计-人格题目贡献与因子计分.md) | 问卷分值、题目贡献、因子聚合、结果决策、预览一致性和旧快照兼容如何分工 |
 | 30 | [关键链路：模型创建、编辑与发布](./30-关键链路-模型创建编辑与发布.md) | 从管理命令到 Definition 保存、快照发布和生命周期 effect 的执行顺序 |
 | 31 | [关键链路：已发布模型解析与消费](./31-关键链路-已发布模型解析与消费.md) | Evaluation、Plan 和 collection 如何只读已发布模型并处理失败 |

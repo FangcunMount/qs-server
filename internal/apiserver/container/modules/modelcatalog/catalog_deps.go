@@ -21,7 +21,7 @@ type CatalogDeps struct {
 	PublishedCatalog    port.Catalog
 	PublishedWarmer     cachetarget.PublishedModelWarmer
 	ModelRepo           port.ModelRepository
-	PublishedRepo       port.PublishedModelRepository
+	PublishedRepo       port.PublishedSnapshotRepository
 	NormRepo            port.NormRepository
 	QuestionnaireQuery  questionnaireapp.QuestionnaireQueryService
 	CacheSignalNotifier TypologyCacheSignalNotifier

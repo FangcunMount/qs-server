@@ -9,7 +9,9 @@ import (
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 
-// AssessmentModelPO persists draft assessment models for admin configuration.
+// AssessmentModelPO persists the editable head of an assessment model. Published
+// runtime snapshots share the assessment_models collection but use their own PO
+// and record_role so authoring writes can never update a runtime snapshot.
 type AssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
@@ -32,7 +34,8 @@ type AssessmentModelPO struct {
 	DefinitionPayload       []byte        `bson:"definition_payload,omitempty"`
 	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
 	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
-	Version                 int64         `bson:"version"`
+	RecordRole              string        `bson:"record_role"`
+	Revision                int64         `bson:"revision"`
 	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
 	ArchivedAt              *time.Time    `bson:"archived_at,omitempty"`
 }
@@ -69,7 +72,7 @@ func (p *AssessmentModelPO) ToBsonM() (bson.M, error) {
 }
 
 func draftFilter(extra bson.M) bson.M {
-	filter := bson.M{"deleted_at": nil}
+	filter := bson.M{"deleted_at": nil, "record_role": recordRoleHead}
 	for key, value := range extra {
 		filter[key] = value
 	}

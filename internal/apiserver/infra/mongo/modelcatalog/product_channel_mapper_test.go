@@ -70,8 +70,8 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 
 	mapper := NewMapper()
 	po := mapper.ToPO(original)
-	if po.ModelProductChannel != string(domain.ProductChannelMedicalScale) {
-		t.Fatalf("po.ModelProductChannel = %q", po.ModelProductChannel)
+	if po.ProductChannel != string(domain.ProductChannelMedicalScale) {
+		t.Fatalf("po.ProductChannel = %q", po.ProductChannel)
 	}
 	got := mapper.ToPublished(po)
 	if got.ProductChannel != domain.ProductChannelMedicalScale {
@@ -81,11 +81,12 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 
 func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ModelKind:      string(domain.KindTypology),
-		ModelSubKind:   string(domain.SubKindTypology),
-		ModelAlgorithm: string(domain.AlgorithmMBTI),
-		ModelCode:      "mbti",
-		ModelVersion:   "v1",
+		RecordRole:     recordRolePublishedSnapshot,
+		Kind:           string(domain.KindTypology),
+		SubKind:        string(domain.SubKindTypology),
+		Algorithm:      string(domain.AlgorithmMBTI),
+		Code:           "mbti",
+		ReleaseVersion: "v1",
 		Title:          "MBTI",
 		Status:         "published",
 		DecisionKind:   string(domain.DecisionKindPoleComposition),
@@ -99,15 +100,16 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 
 func TestPublishedMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ModelProductChannel: string(domain.ProductChannelBehaviorAbility),
-		ModelKind:           string(domain.KindCognitive),
-		ModelAlgorithm:      string(domain.AlgorithmSPM),
-		ModelCode:           "spm",
-		ModelVersion:        "v1",
-		Title:               "SPM",
-		Status:              "published",
-		DecisionKind:        string(domain.DecisionKindAbilityLevel),
-		Payload:             []byte(`{}`),
+		ProductChannel: string(domain.ProductChannelBehaviorAbility),
+		RecordRole:     recordRolePublishedSnapshot,
+		Kind:           string(domain.KindCognitive),
+		Algorithm:      string(domain.AlgorithmSPM),
+		Code:           "spm",
+		ReleaseVersion: "v1",
+		Title:          "SPM",
+		Status:         "published",
+		DecisionKind:   string(domain.DecisionKindAbilityLevel),
+		Payload:        []byte(`{}`),
 	}
 	got := NewMapper().ToPublished(po)
 	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
@@ -117,19 +119,20 @@ func TestPublishedMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 
 func TestPublishedModelUpsertFilterExcludesProductChannel(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ModelProductChannel: string(domain.ProductChannelMedicalScale),
-		ModelKind:           string(domain.KindBehavioralRating),
-		ModelSubKind:        "",
-		ModelAlgorithm:      string(domain.AlgorithmBrief2),
-		ModelCode:           "brief2",
+		ProductChannel: string(domain.ProductChannelMedicalScale),
+		RecordRole:     recordRolePublishedSnapshot,
+		Kind:           string(domain.KindBehavioralRating),
+		SubKind:        "",
+		Algorithm:      string(domain.AlgorithmBrief2),
+		Code:           "brief2",
 	}
 	filter := publishedModelUpsertFilter(po)
 	for key := range filter {
-		if key == "model_product_channel" {
-			t.Fatalf("upsert filter must not include model_product_channel: %#v", filter)
+		if key == "product_channel" {
+			t.Fatalf("upsert filter must not include product_channel: %#v", filter)
 		}
 	}
-	if _, ok := filter["model_sub_kind"]; ok {
-		t.Fatalf("upsert filter must not include empty model_sub_kind: %#v", filter)
+	if _, ok := filter["sub_kind"]; ok {
+		t.Fatalf("upsert filter must not include empty sub_kind: %#v", filter)
 	}
 }

@@ -57,7 +57,7 @@ func (f *fakePublishedCollection) UpdateMany(_ context.Context, filter, update i
 	return f.updateResult, f.updateErr
 }
 
-func TestInspectActivePublishedMatchesLegacyKindByStableIdentity(t *testing.T) {
+func TestInspectActivePublishedMatchesUnifiedSnapshotByStableIdentity(t *testing.T) {
 	collection := &fakePublishedCollection{counts: []int64{1, 0, 0}}
 	state, err := InspectActivePublished(context.Background(), collection, "gXkk9W", "gXkk9W", "4.0.1")
 	if err != nil {
@@ -67,10 +67,10 @@ func TestInspectActivePublishedMatchesLegacyKindByStableIdentity(t *testing.T) {
 		t.Fatalf("state = %#v", state)
 	}
 	matching := collection.countFilters[0].(bson.M)
-	if _, exists := matching["model_kind"]; exists {
-		t.Fatalf("matching filter must not depend on legacy model_kind: %#v", matching)
+	if matching["record_role"] != "published_snapshot" || matching["is_active_published"] != true {
+		t.Fatalf("matching filter must require active snapshot role: %#v", matching)
 	}
-	if matching["model_code"] != "gXkk9W" || matching["questionnaire_version"] != "4.0.1" {
+	if matching["code"] != "gXkk9W" || matching["questionnaire_version"] != "4.0.1" {
 		t.Fatalf("matching filter = %#v", matching)
 	}
 	if err := state.ValidateReplacement(true, true, "gXkk9W", "gXkk9W", "4.0.1"); err != nil {
@@ -113,8 +113,8 @@ func TestRetireMatchingPublishedUsesQuestionnaireIdentityAndNoKind(t *testing.T)
 		t.Fatalf("RetireMatchingPublished() error = %v", err)
 	}
 	filter := collection.updateFilter.(bson.M)
-	if _, exists := filter["model_kind"]; exists {
-		t.Fatalf("retire filter must not depend on legacy model_kind: %#v", filter)
+	if filter["record_role"] != "published_snapshot" || filter["is_active_published"] != true {
+		t.Fatalf("retire filter must select active snapshot: %#v", filter)
 	}
 	want := matchingPublishedFilter("gXkk9W", "gXkk9W", "4.0.1")
 	if !reflect.DeepEqual(filter, want) {

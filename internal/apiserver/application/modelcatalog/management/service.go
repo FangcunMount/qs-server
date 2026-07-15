@@ -23,7 +23,7 @@ import (
 // publication remain separate use cases.
 type Service struct {
 	ModelRepo         modelcatalogport.ModelRepository
-	Published         modelcatalogport.PublishedModelRepository
+	Published         modelcatalogport.PublishedSnapshotRepository
 	Authorizer        modelcatalog.Authorizer
 	BindingPolicies   appbinding.Policies
 	Effects           lifecycle.EffectsRegistry
@@ -284,6 +284,17 @@ func (s Service) loadAndAuthorize(ctx context.Context, actor modelcatalog.ActorC
 func (s Service) findPublishedSnapshot(ctx context.Context, codeValue string) (*modelcatalogport.PublishedModel, error) {
 	for _, kind := range []domain.Kind{domain.KindScale, domain.KindTypology, domain.KindBehavioralRating, domain.KindCognitive} {
 		snapshot, err := s.Published.FindPublishedByModelCode(ctx, kind, codeValue)
+		if err == nil {
+			return snapshot, nil
+		}
+		if !domain.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	// A deactivated snapshot is still a valid source for draft repair. This
+	// keeps archive/unpublish semantics while preserving historical recovery.
+	for _, kind := range []domain.Kind{domain.KindScale, domain.KindTypology, domain.KindBehavioralRating, domain.KindCognitive} {
+		snapshot, err := s.Published.FindLatestPublishedByModelCode(ctx, kind, codeValue)
 		if err == nil {
 			return snapshot, nil
 		}

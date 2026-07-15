@@ -28,7 +28,7 @@ type publishedModelInner interface {
 	port.PublishedAlgorithmLister
 }
 
-// CachedPublishedModelStore decorates PublishedStore with Redis read-through cache on submit hot paths.
+// CachedPublishedModelStore decorates the unified snapshot repository with Redis read-through cache on submit hot paths.
 type CachedPublishedModelStore struct {
 	inner              publishedModelInner
 	keys               *keyspace.Builder

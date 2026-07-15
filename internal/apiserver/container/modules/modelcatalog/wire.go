@@ -8,7 +8,6 @@ import (
 	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
@@ -101,8 +100,8 @@ func buildCatalogDeps(
 	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
 	normRepo := mongomodelcatalog.NewNormRepository(mongoDB, mongoOpts)
 	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
-	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
-	dualStore := modelcatalog.NewPublishedStore(v2Repo)
+	publishedRepo := port.PublishedSnapshotRepository(v2Repo)
+	dualStore := v2Repo
 	var publishedStore interface {
 		port.PublishedModelReader
 		port.PublishedModelLister

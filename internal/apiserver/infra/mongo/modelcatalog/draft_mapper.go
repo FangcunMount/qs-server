@@ -34,7 +34,8 @@ func (DraftMapper) ToPO(model *domain.AssessmentModel) *AssessmentModelPO {
 		DefinitionPayload:       append([]byte(nil), model.Definition.Data...),
 		DefinitionSchemaVersion: definitionSchemaVersion(model.DefinitionV2),
 		DefinitionV2:            definitionToPO(model.DefinitionV2),
-		Version:                 model.Version,
+		RecordRole:              recordRoleHead,
+		Revision:                model.Version,
 		PublishedAt:             model.PublishedAt,
 		ArchivedAt:              model.ArchivedAt,
 	}
@@ -73,7 +74,7 @@ func (DraftMapper) ToDomain(po *AssessmentModelPO) *domain.AssessmentModel {
 			Data:   append([]byte(nil), po.DefinitionPayload...),
 		},
 		DefinitionV2: definitionFromPO(po.DefinitionV2),
-		Version:      po.Version,
+		Version:      po.Revision,
 		CreatedAt:    po.CreatedAt,
 		UpdatedAt:    po.UpdatedAt,
 		PublishedAt:  po.PublishedAt,

@@ -9,6 +9,7 @@ import (
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -17,13 +18,14 @@ import (
 // Service owns actor-authorized publish and unpublish
 // commands. Definition identity is resolved only by Registry.
 type Service struct {
-	ModelRepo  modelcatalogport.ModelRepository
-	Published  modelcatalogport.PublishedModelRepository
-	Authorizer modelcatalog.Authorizer
-	Registry   appdefinition.Registry
-	Bindings   appbinding.Policies
-	Effects    lifecycle.EffectsRegistry
-	Now        func() time.Time
+	Transactions apptransaction.Runner
+	ModelRepo    modelcatalogport.ModelRepository
+	Published    modelcatalogport.PublishedSnapshotRepository
+	Authorizer   modelcatalog.Authorizer
+	Registry     appdefinition.Registry
+	Bindings     appbinding.Policies
+	Effects      lifecycle.EffectsRegistry
+	Now          func() time.Time
 }
 
 func (s Service) Publish(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.ModelSummary, error) {
@@ -31,16 +33,22 @@ func (s Service) Publish(ctx context.Context, actor modelcatalog.ActorContext, m
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Bindings.BeforePublish(ctx, model); err != nil {
-		return nil, err
+	if s.Transactions == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "publication transaction runner is not configured")
 	}
-	if model.Kind == domain.KindScale {
-		if err := appdefinition.RefreshScaleDraftProjection(model); err != nil {
-			return nil, err
+	if err := s.Transactions.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.Bindings.BeforePublish(txCtx, model); err != nil {
+			return err
 		}
-	}
-	publisher := Publisher{Registry: s.Registry, ModelRepo: s.ModelRepo, Repo: s.Published, Now: s.Now}
-	if _, err := publisher.Publish(ctx, model, PublishOptions{ReplaceKind: model.Kind}); err != nil {
+		if model.Kind == domain.KindScale {
+			if err := appdefinition.RefreshScaleDraftProjection(model); err != nil {
+				return err
+			}
+		}
+		publisher := Publisher{Registry: s.Registry, ModelRepo: s.ModelRepo, Repo: s.Published, Now: s.Now}
+		_, err := publisher.Publish(txCtx, model, PublishOptions{ReplaceKind: model.Kind})
+		return err
+	}); err != nil {
 		return nil, err
 	}
 	s.Effects.AfterTransition(ctx, model, lifecycle.ActionPublished)

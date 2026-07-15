@@ -64,12 +64,13 @@ func New(deps Deps) (*Module, error) {
 	}
 	// 发布服务
 	publication := &apppublication.Service{
-		ModelRepo:  deps.Catalog.ModelRepo,
-		Published:  deps.Catalog.PublishedRepo,
-		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
-		Registry:   registry,
-		Bindings:   bindings,
-		Effects:    effects,
+		Transactions: deps.Catalog.Transactions,
+		ModelRepo:    deps.Catalog.ModelRepo,
+		Published:    deps.Catalog.PublishedRepo,
+		Authorizer:   assessmentModelApp.SnapshotAuthorizer{},
+		Registry:     registry,
+		Bindings:     bindings,
+		Effects:      effects,
 	}
 	release := apprelease.Service{
 		Transactions: deps.Catalog.Transactions,

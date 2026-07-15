@@ -12,8 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-// MongoTransactionRunner keeps a one-off model seed atomic across norm, draft,
-// and published snapshot collections. The target MongoDB must support
+// MongoTransactionRunner keeps a one-off model seed atomic across norm and
+// the head/snapshot records in assessment_models. The target MongoDB must support
 // multi-document transactions.
 type MongoTransactionRunner struct {
 	client *mongo.Client
@@ -83,19 +83,23 @@ func InspectActivePublished(ctx context.Context, collection PublishedCollection,
 		return ActivePublishedState{}, fmt.Errorf("count matching published snapshots: %w", err)
 	}
 	questionnaireOtherModel, err := collection.CountDocuments(ctx, bson.M{
+		"record_role":           "published_snapshot",
+		"is_active_published":   true,
 		"status":                "published",
 		"deleted_at":            nil,
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
-		"model_code":            bson.M{"$ne": modelCode},
+		"code":                  bson.M{"$ne": modelCode},
 	})
 	if err != nil {
 		return ActivePublishedState{}, fmt.Errorf("count questionnaire conflicts: %w", err)
 	}
 	modelOtherQuestionnaire, err := collection.CountDocuments(ctx, bson.M{
-		"status":     "published",
-		"deleted_at": nil,
-		"model_code": modelCode,
+		"record_role":         "published_snapshot",
+		"is_active_published": true,
+		"status":              "published",
+		"deleted_at":          nil,
+		"code":                modelCode,
 		"$nor": []bson.M{{
 			"questionnaire_code":    questionnaireCode,
 			"questionnaire_version": questionnaireVersion,
@@ -141,9 +145,8 @@ func RetireMatchingPublished(ctx context.Context, collection PublishedCollection
 		return fmt.Errorf("refusing to retire %d published snapshots; expected exactly one", expected)
 	}
 	result, err := collection.UpdateMany(ctx, matchingPublishedFilter(modelCode, questionnaireCode, questionnaireVersion), bson.M{"$set": bson.M{
-		"deleted_at": now,
-		"updated_at": now,
-		"status":     "unpublished",
+		"is_active_published": false,
+		"updated_at":          now,
 	}})
 	if err != nil {
 		return fmt.Errorf("retire matching published snapshot: %w", err)
@@ -156,9 +159,11 @@ func RetireMatchingPublished(ctx context.Context, collection PublishedCollection
 
 func matchingPublishedFilter(modelCode, questionnaireCode, questionnaireVersion string) bson.M {
 	return bson.M{
+		"record_role":           "published_snapshot",
+		"is_active_published":   true,
 		"status":                "published",
 		"deleted_at":            nil,
-		"model_code":            modelCode,
+		"code":                  modelCode,
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
 	}

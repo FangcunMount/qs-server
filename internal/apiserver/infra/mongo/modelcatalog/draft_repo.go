@@ -64,8 +64,8 @@ func (r *DraftRepository) Update(ctx context.Context, model *domain.AssessmentMo
 	delete(updateData, "created_by")
 
 	filter := draftFilter(bson.M{
-		"code":    model.Code,
-		"version": model.Version - 1,
+		"code":     model.Code,
+		"revision": model.Version - 1,
 	})
 	result, err := r.UpdateOne(ctx, filter, bson.M{"$set": updateData})
 	if err != nil {

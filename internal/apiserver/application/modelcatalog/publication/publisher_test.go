@@ -35,7 +35,7 @@ func TestPublisherBuildSnapshotUsesDefinitionHandler(t *testing.T) {
 	}
 }
 
-func TestPublisherPublishCompensatesSnapshotWhenDraftUpdateFails(t *testing.T) {
+func TestPublisherPublishLeavesTransactionRollbackToCallerWhenDraftUpdateFails(t *testing.T) {
 	t.Parallel()
 
 	model := newPublishedTestModel(t)
@@ -50,10 +50,10 @@ func TestPublisherPublishCompensatesSnapshotWhenDraftUpdateFails(t *testing.T) {
 	if _, err := publisher.Publish(context.Background(), model, publication.PublishOptions{ReplaceKind: domain.KindCognitive}); err == nil {
 		t.Fatal("Publish() error = nil, want draft update error")
 	}
-	if len(publishedRepo.snapshots) != 0 {
-		t.Fatalf("snapshots = %#v, want compensated empty store", publishedRepo.snapshots)
+	if len(publishedRepo.snapshots) != 1 {
+		t.Fatalf("snapshots = %#v, want transaction caller to roll back persisted snapshot", publishedRepo.snapshots)
 	}
-	if !reflect.DeepEqual(publishedRepo.calls, []string{"delete:SPM", "save:SPM", "delete:SPM"}) {
+	if !reflect.DeepEqual(publishedRepo.calls, []string{"save:SPM"}) {
 		t.Fatalf("published calls = %#v", publishedRepo.calls)
 	}
 }

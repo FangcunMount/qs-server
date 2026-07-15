@@ -170,7 +170,7 @@ func run(cfg config) error {
 func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnaireVersion string, definition *modeldefinition.Definition, definitionJSON []byte, normRepo *mongomodelcatalog.NormRepository) error {
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
 	publishedRepository := mongomodelcatalog.NewRepository(db)
-	publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(publishedRepository)
+	publishedRepo := publishedRepository
 	existing, err := draftRepo.FindByCode(ctx, cfg.modelCode)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("find draft %s: %w", cfg.modelCode, err)

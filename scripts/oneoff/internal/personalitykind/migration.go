@@ -24,29 +24,33 @@ type CollectionSpec struct {
 	SubKindField        string
 	AlgorithmField      string
 	ProductChannelField string
+	RecordRole          string
 }
 
 var (
-	Drafts = CollectionSpec{
+	Heads = CollectionSpec{
 		Name:                "assessment_models",
 		CodeField:           "code",
 		KindField:           "kind",
 		SubKindField:        "sub_kind",
 		AlgorithmField:      "algorithm",
 		ProductChannelField: "product_channel",
+		RecordRole:          "head",
 	}
-	Published = CollectionSpec{
-		Name:                "published_assessment_models",
-		CodeField:           "model_code",
-		KindField:           "model_kind",
-		SubKindField:        "model_sub_kind",
-		AlgorithmField:      "model_algorithm",
-		ProductChannelField: "model_product_channel",
+	Snapshots = CollectionSpec{
+		Name:                "assessment_models",
+		CodeField:           "code",
+		KindField:           "kind",
+		SubKindField:        "sub_kind",
+		AlgorithmField:      "algorithm",
+		ProductChannelField: "product_channel",
+		RecordRole:          "published_snapshot",
 	}
 )
 
 type Record struct {
 	ID             primitive.ObjectID
+	RecordRole     string
 	Code           string
 	Kind           string
 	SubKind        string
@@ -66,7 +70,8 @@ func Findings(ctx context.Context, collection *mongo.Collection, spec Collection
 		return nil, fmt.Errorf("%s collection is not configured", spec.Name)
 	}
 	filter := bson.M{
-		"deleted_at": nil,
+		"deleted_at":  nil,
+		"record_role": spec.RecordRole,
 		"$or": []bson.M{
 			{spec.KindField: legacyPersonalityKind},
 			{spec.KindField: string(domain.KindTypology), spec.ProductChannelField: legacyPersonalityKind},
@@ -102,7 +107,7 @@ func Apply(ctx context.Context, collection *mongo.Collection, spec CollectionSpe
 	if !finding.Eligible {
 		return fmt.Errorf("%s/%s is not eligible: %s", finding.Collection, finding.Code, finding.Reason)
 	}
-	filter := bson.M{"_id": finding.ID, "deleted_at": nil, spec.KindField: finding.Kind}
+	filter := bson.M{"_id": finding.ID, "deleted_at": nil, "record_role": spec.RecordRole, spec.KindField: finding.Kind}
 	if finding.ProductChannel == "" {
 		filter[spec.ProductChannelField] = bson.M{"$in": bson.A{nil, ""}}
 	} else {
@@ -132,6 +137,7 @@ func Apply(ctx context.Context, collection *mongo.Collection, spec CollectionSpe
 func classify(spec CollectionSpec, raw bson.M) Finding {
 	record := Record{
 		ID:             objectID(raw["_id"]),
+		RecordRole:     spec.RecordRole,
 		Code:           stringValue(raw[spec.CodeField]),
 		Kind:           stringValue(raw[spec.KindField]),
 		SubKind:        stringValue(raw[spec.SubKindField]),

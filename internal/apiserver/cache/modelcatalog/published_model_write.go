@@ -9,14 +9,14 @@ import (
 
 // InvalidatingPublishedModelRepository decorates published writes with cache invalidation.
 type InvalidatingPublishedModelRepository struct {
-	inner catalogport.PublishedModelRepository
+	inner catalogport.PublishedSnapshotRepository
 	cache *CachedPublishedModelStore
 }
 
 func NewInvalidatingPublishedModelRepository(
-	inner catalogport.PublishedModelRepository,
+	inner catalogport.PublishedSnapshotRepository,
 	cache *CachedPublishedModelStore,
-) catalogport.PublishedModelRepository {
+) catalogport.PublishedSnapshotRepository {
 	if inner == nil {
 		return nil
 	}
@@ -32,7 +32,7 @@ func (r *InvalidatingPublishedModelRepository) Save(ctx context.Context, model *
 }
 
 func (r *InvalidatingPublishedModelRepository) DeletePublished(ctx context.Context, kind catalogdomain.Kind, code string) error {
-	existing, _ := r.inner.FindLatestPublishedByModelCode(ctx, kind, code)
+	existing, _ := r.inner.FindPublishedByModelCode(ctx, kind, code)
 	if err := r.inner.DeletePublished(ctx, kind, code); err != nil {
 		return err
 	}

@@ -128,7 +128,7 @@ func audit(ctx context.Context, db *mongo.Database, codes []string) (*report, er
 }
 
 func loadDrafts(ctx context.Context, db *mongo.Database, codes []string) ([]*domain.AssessmentModel, error) {
-	filter := bson.M{"deleted_at": nil, "kind": string(domain.KindScale)}
+	filter := bson.M{"deleted_at": nil, "record_role": "head", "kind": string(domain.KindScale)}
 	if len(codes) > 0 {
 		filter["code"] = bson.M{"$in": codes}
 	}
@@ -150,11 +150,11 @@ func loadDrafts(ctx context.Context, db *mongo.Database, codes []string) ([]*dom
 }
 
 func loadPublished(ctx context.Context, db *mongo.Database, codes []string) ([]*modelcatalogport.AssessmentSnapshot, error) {
-	filter := bson.M{"deleted_at": nil, "status": "published", "model_kind": string(domain.KindScale)}
+	filter := bson.M{"deleted_at": nil, "record_role": "published_snapshot", "is_active_published": true, "status": "published", "kind": string(domain.KindScale)}
 	if len(codes) > 0 {
-		filter["model_code"] = bson.M{"$in": codes}
+		filter["code"] = bson.M{"$in": codes}
 	}
-	cursor, err := db.Collection("published_assessment_models").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "model_code", Value: 1}}))
+	cursor, err := db.Collection("assessment_models").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "code", Value: 1}}))
 	if err != nil {
 		return nil, fmt.Errorf("find published scale snapshots: %w", err)
 	}

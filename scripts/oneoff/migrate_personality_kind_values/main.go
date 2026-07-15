@@ -64,7 +64,7 @@ func run(cfg config, output *os.File) error {
 
 	db := client.Database(cfg.mongoDB)
 	items := make([]personalitykind.Finding, 0)
-	for _, spec := range []personalitykind.CollectionSpec{personalitykind.Drafts, personalitykind.Published} {
+	for _, spec := range []personalitykind.CollectionSpec{personalitykind.Heads, personalitykind.Snapshots} {
 		findings, err := personalitykind.Findings(ctx, db.Collection(spec.Name), spec)
 		if err != nil {
 			return err
@@ -84,9 +84,9 @@ func run(cfg config, output *os.File) error {
 			if !item.Eligible {
 				continue
 			}
-			spec := personalitykind.Drafts
-			if item.Collection == personalitykind.Published.Name {
-				spec = personalitykind.Published
+			spec := personalitykind.Heads
+			if item.RecordRole == personalitykind.Snapshots.RecordRole {
+				spec = personalitykind.Snapshots
 			}
 			if err := personalitykind.Apply(ctx, db.Collection(spec.Name), spec, item); err != nil {
 				return err
