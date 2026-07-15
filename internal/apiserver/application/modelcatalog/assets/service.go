@@ -1,4 +1,4 @@
-// Package assets owns private, immutable image objects referenced by MBTI
+// Package assets owns private, immutable image objects referenced by typology
 // model definitions. It deliberately does not mutate DefinitionV2: callers
 // save the returned image_url through the normal authoring workflow.
 package assets
@@ -42,11 +42,11 @@ type Service struct {
 	Config     Config
 }
 
-type UploadInput = modelcatalog.AssessmentImageUploadInput
+type UploadInput = modelcatalog.OutcomeImageUploadInput
 
 func (s Service) MaxUploadBytes() int64 { return s.Config.MaxUploadBytes }
 
-func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.ActorContext, input UploadInput) (*modelcatalog.AssessmentImageUploadResult, error) {
+func (s Service) UploadOutcomeImage(ctx context.Context, actor modelcatalog.ActorContext, input UploadInput) (*modelcatalog.OutcomeImageUploadResult, error) {
 	if s.Models == nil || s.Authorizer == nil || s.Store == nil || s.Config.MaxUploadBytes <= 0 {
 		return nil, errors.WithCode(code.ErrInternalServerError, "assessment image assets are not configured")
 	}
@@ -66,8 +66,8 @@ func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.
 	if err := s.Authorizer.Authorize(ctx, actor, modelcatalog.ActionEditDefinition, modelcatalog.Resource{Code: model.Code, Kind: model.Kind}); err != nil {
 		return nil, err
 	}
-	if model.Kind != domain.KindTypology || model.Algorithm != domain.AlgorithmMBTI || model.IsArchived() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "only editable MBTI models may upload outcome images")
+	if model.Kind != domain.KindTypology || model.IsArchived() {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "only editable typology models may upload outcome images")
 	}
 	contentType, extension, err := validateImage(input.Content)
 	if err != nil {
@@ -77,7 +77,7 @@ func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.
 	filename := hex.EncodeToString(digest[:]) + "." + extension
 	objectKey := path.Join(strings.Trim(s.Config.ObjectKeyPrefix, "/"), input.ModelCode, input.OutcomeCode, filename)
 	if err := s.Store.Put(ctx, objectKey, contentType, input.Content); err != nil {
-		return nil, fmt.Errorf("store MBTI outcome image: %w", err)
+		return nil, fmt.Errorf("store outcome image: %w", err)
 	}
 	// Definition edits already fork a published head into a mutable draft. An
 	// uploaded portrait is the first step of that same edit flow, so preserve
@@ -88,10 +88,10 @@ func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.
 			return nil, err
 		}
 		if err := s.Models.Update(ctx, model); err != nil {
-			return nil, fmt.Errorf("fork draft for MBTI outcome image: %w", err)
+			return nil, fmt.Errorf("fork draft for outcome image: %w", err)
 		}
 	}
-	return &modelcatalog.AssessmentImageUploadResult{
+	return &modelcatalog.OutcomeImageUploadResult{
 		ImageURL:    strings.TrimRight(s.Config.PublicURLPrefix, "/") + "/" + path.Join(input.ModelCode, input.OutcomeCode, filename),
 		ContentType: contentType,
 		Size:        int64(len(input.Content)),
@@ -132,4 +132,4 @@ func ReadAllLimited(reader io.Reader, maxBytes int64) ([]byte, error) {
 	return content, nil
 }
 
-var _ modelcatalog.AssessmentImageService = Service{}
+var _ modelcatalog.OutcomeImageService = Service{}

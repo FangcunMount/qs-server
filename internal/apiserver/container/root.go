@@ -68,7 +68,7 @@ type Container struct {
 
 	// 应用层服务
 	QRCodeService                      qrcodeApp.QRCodeService                            // 小程序码生成服务（可选）
-	AssessmentImageService             modelcatalogApp.AssessmentImageService             // MBTI 人物图片上传服务（可选）
+	OutcomeImageService                modelcatalogApp.OutcomeImageService                // 类型学结果图片上传服务（可选）
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService // 小程序 task 消息服务（可选）
 
 	// 容器状态

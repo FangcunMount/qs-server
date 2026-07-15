@@ -42,7 +42,7 @@ func TestAssessmentImageHandlerStreamsPrivateObjectWithStableCacheHeaders(t *tes
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-assets/typology/MBTI_DEMO/INTJ/"+filename, nil)
 	c.Params = gin.Params{{Key: "model", Value: "MBTI_DEMO"}, {Key: "outcome", Value: "INTJ"}, {Key: "filename", Value: filename}}
-	handler.GetMBTIOutcomeImage(c)
+	handler.GetOutcomeImage(c)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
@@ -68,7 +68,7 @@ func TestAssessmentImageHandlerRejectsUnsafePath(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-assets/typology/../INTJ/not-an-asset.txt", nil)
 	c.Params = gin.Params{{Key: "model", Value: ".."}, {Key: "outcome", Value: "INTJ"}, {Key: "filename", Value: "not-an-asset.txt"}}
-	handler.GetMBTIOutcomeImage(c)
+	handler.GetOutcomeImage(c)
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}

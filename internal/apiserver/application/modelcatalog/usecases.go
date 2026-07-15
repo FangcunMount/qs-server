@@ -30,21 +30,23 @@ type DefinitionAuthoringService interface {
 	ApplyCodes(ctx context.Context, actor ActorContext, input ApplyCodesDTO) ([]string, error)
 }
 
-// AssessmentImageService owns immutable MBTI outcome image uploads. Persisting
+// OutcomeImageService owns immutable typology-outcome image uploads. Persisting
 // the returned URL remains part of the normal DefinitionV2 authoring flow.
-type AssessmentImageService interface {
+// The use case intentionally has no named-algorithm dependency: all typology
+// models use the same DefinitionV2 outcome profile asset contract.
+type OutcomeImageService interface {
 	MaxUploadBytes() int64
-	UploadMBTIOutcomeImage(ctx context.Context, actor ActorContext, input AssessmentImageUploadInput) (*AssessmentImageUploadResult, error)
+	UploadOutcomeImage(ctx context.Context, actor ActorContext, input OutcomeImageUploadInput) (*OutcomeImageUploadResult, error)
 }
 
-type AssessmentImageUploadInput struct {
+type OutcomeImageUploadInput struct {
 	ModelCode   string
 	OutcomeCode string
 	Filename    string
 	Content     []byte
 }
 
-type AssessmentImageUploadResult struct {
+type OutcomeImageUploadResult struct {
 	ImageURL    string `json:"image_url"`
 	ContentType string `json:"content_type"`
 	Size        int64  `json:"size"`

@@ -46,7 +46,7 @@ func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandle
 		{method: http.MethodPost, path: "/:code/codes/apply", handlers: []gin.HandlerFunc{handler.ApplyCodes}},
 		{method: http.MethodPost, path: "/:code/validate", handlers: []gin.HandlerFunc{handler.Validate}},
 		{method: http.MethodPost, path: "/:code/preview-report", handlers: []gin.HandlerFunc{handler.PreviewReport}},
-		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: []gin.HandlerFunc{handler.UploadMBTIOutcomeImage}},
+		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: []gin.HandlerFunc{handler.UploadOutcomeImage}},
 	}
 }
 

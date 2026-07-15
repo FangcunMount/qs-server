@@ -11,9 +11,9 @@ import (
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
-// InitAssessmentImageService wires private OSS-backed MBTI outcome assets
+// InitOutcomeImageService wires private OSS-backed typology outcome assets
 // independently from WeChat QR-code availability.
-func (c *Container) InitAssessmentImageService(assetOptions *apiserveroptions.AssessmentAssetsOptions, ossOptions *genericoptions.OSSOptions) error {
+func (c *Container) InitOutcomeImageService(assetOptions *apiserveroptions.AssessmentAssetsOptions, ossOptions *genericoptions.OSSOptions) error {
 	if c == nil || assetOptions == nil || !assetOptions.Enabled {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (c *Container) InitAssessmentImageService(assetOptions *apiserveroptions.As
 	if c.AssessmentModelModule == nil || c.AssessmentModelModule.ModelRepo == nil {
 		return fmt.Errorf("assessment model repository is not initialized")
 	}
-	c.AssessmentImageService = assessmentassets.Service{
+	c.OutcomeImageService = assessmentassets.Service{
 		Models: c.AssessmentModelModule.ModelRepo, Authorizer: modelcatalogApp.SnapshotAuthorizer{}, Store: objectstorage.NewAssessmentAssetStore(store),
 		Config: assessmentassets.Config{ObjectKeyPrefix: assetOptions.ObjectKeyPrefix, PublicURLPrefix: assetOptions.PublicURLPrefix, MaxUploadBytes: assetOptions.MaxUploadBytes},
 	}

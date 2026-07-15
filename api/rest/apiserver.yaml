@@ -385,9 +385,9 @@ paths:
     get:
       tags:
       - AssessmentAssets
-      summary: 获取 MBTI 人物图片
-      operationId: 获取MBTI人物图片
-      description: 获取 MBTI 人物图片
+      summary: 获取类型学结果图片
+      operationId: 获取类型学结果图片
+      description: 获取类型学结果图片
       security: []
       parameters:
       - type: string
@@ -396,7 +396,7 @@ paths:
         in: path
         required: true
       - type: string
-        description: MBTI 结果编码
+        description: 类型学结果编码
         name: outcome
         in: path
         required: true
@@ -1234,9 +1234,9 @@ paths:
     post:
       tags:
       - AssessmentModel
-      summary: 上传 MBTI 结果人物图片
-      operationId: 上传MBTI结果人物图片
-      description: 上传 MBTI 结果人物图片
+      summary: 上传类型学结果图片
+      operationId: 上传类型学结果图片
+      description: 上传类型学结果图片
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1249,7 +1249,7 @@ paths:
         in: path
         required: true
       - type: string
-        description: MBTI 结果编码
+        description: 类型学结果编码
         name: outcome_code
         in: path
         required: true

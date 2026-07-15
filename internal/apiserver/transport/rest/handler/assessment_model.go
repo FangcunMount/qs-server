@@ -26,7 +26,7 @@ type AssessmentModelHandler struct {
 	definition  modelcatalog.DefinitionAuthoringService
 	publication modelcatalog.PublicationService
 	query       modelcatalog.CatalogQueryService
-	assets      modelcatalog.AssessmentImageService
+	assets      modelcatalog.OutcomeImageService
 }
 
 func NewAssessmentModelHandler(
@@ -34,9 +34,9 @@ func NewAssessmentModelHandler(
 	definition modelcatalog.DefinitionAuthoringService,
 	publication modelcatalog.PublicationService,
 	query modelcatalog.CatalogQueryService,
-	assets ...modelcatalog.AssessmentImageService,
+	assets ...modelcatalog.OutcomeImageService,
 ) *AssessmentModelHandler {
-	var imageService modelcatalog.AssessmentImageService
+	var imageService modelcatalog.OutcomeImageService
 	if len(assets) > 0 {
 		imageService = assets[0]
 	}
@@ -374,19 +374,19 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelDefinitionResponse)(result))
 }
 
-// UploadMBTIOutcomeImage uploads one immutable MBTI outcome portrait. The
+// UploadOutcomeImage uploads one immutable typology outcome image. The
 // returned URL is intentionally not persisted until the editor saves DefinitionV2.
-// @Summary 上传 MBTI 结果人物图片
+// @Summary 上传类型学结果图片
 // @Tags AssessmentModel
 // @Accept mpfd
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
-// @Param outcome_code path string true "MBTI 结果编码"
+// @Param outcome_code path string true "类型学结果编码"
 // @Param file formData file true "PNG/JPEG/WebP 图片，最大 5 MiB"
 // @Success 200 {object} core.Response{data=response.AssessmentModelImageUploadResponse}
 // @Router /api/v1/assessment-models/{code}/outcomes/{outcome_code}/image [post]
-func (h *AssessmentModelHandler) UploadMBTIOutcomeImage(c *gin.Context) {
+func (h *AssessmentModelHandler) UploadOutcomeImage(c *gin.Context) {
 	if h.assets == nil || h.assets.MaxUploadBytes() <= 0 {
 		h.Error(c, errors.WithCode(code.ErrInternalServerError, "assessment image assets are not configured"))
 		return
@@ -414,7 +414,7 @@ func (h *AssessmentModelHandler) UploadMBTIOutcomeImage(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.assets.UploadMBTIOutcomeImage(c.Request.Context(), actor, modelcatalog.AssessmentImageUploadInput{
+	result, err := h.assets.UploadOutcomeImage(c.Request.Context(), actor, modelcatalog.OutcomeImageUploadInput{
 		ModelCode: h.modelCode(c), OutcomeCode: c.Param("outcome_code"), Filename: fileHeader.Filename, Content: content,
 	})
 	if err != nil {

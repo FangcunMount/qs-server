@@ -23,15 +23,15 @@ var onePixelPNG = []byte{
 	0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 }
 
-func TestUploadMBTIOutcomeImageStoresImmutableURL(t *testing.T) {
+func TestUploadOutcomeImageStoresImmutableURL(t *testing.T) {
 	store := &memoryStore{}
 	service := Service{
 		Models: modelRepoStub{model: mbtiDraft()}, Authorizer: allowAuthorizer{}, Store: store,
 		Config: Config{ObjectKeyPrefix: "assessment-assets/typology", PublicURLPrefix: "https://qs.example/api/v1/assessment-assets/typology", MaxUploadBytes: 1024},
 	}
-	result, err := service.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG})
+	result, err := service.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG})
 	if err != nil {
-		t.Fatalf("UploadMBTIOutcomeImage: %v", err)
+		t.Fatalf("UploadOutcomeImage: %v", err)
 	}
 	if result.ContentType != "image/png" || result.Size != int64(len(onePixelPNG)) {
 		t.Fatalf("result = %#v", result)
@@ -44,9 +44,9 @@ func TestUploadMBTIOutcomeImageStoresImmutableURL(t *testing.T) {
 	}
 }
 
-func TestUploadMBTIOutcomeImageRejectsInvalidOrOversizedContent(t *testing.T) {
+func TestUploadOutcomeImageRejectsInvalidOrOversizedContent(t *testing.T) {
 	service := Service{Models: modelRepoStub{model: mbtiDraft()}, Authorizer: allowAuthorizer{}, Store: &memoryStore{}, Config: Config{ObjectKeyPrefix: "assets", PublicURLPrefix: "https://qs.example/assets", MaxUploadBytes: 8}}
-	if _, err := service.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: []byte("not-image")}); err == nil {
+	if _, err := service.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: []byte("not-image")}); err == nil {
 		t.Fatal("expected invalid image error")
 	}
 	if _, err := ReadAllLimited(bytes.NewReader(make([]byte, 9)), 8); err == nil {
@@ -54,20 +54,32 @@ func TestUploadMBTIOutcomeImageRejectsInvalidOrOversizedContent(t *testing.T) {
 	}
 }
 
-func TestUploadMBTIOutcomeImageRequiresPermissionAndForksPublishedModelToDraft(t *testing.T) {
+func TestUploadOutcomeImageRequiresPermissionAndForksPublishedModelToDraft(t *testing.T) {
 	config := Config{ObjectKeyPrefix: "assets", PublicURLPrefix: "https://qs.example/assets", MaxUploadBytes: 1024}
 	denied := Service{Models: modelRepoStub{model: mbtiDraft()}, Authorizer: denyAuthorizer{}, Store: &memoryStore{}, Config: config}
-	if _, err := denied.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err == nil {
+	if _, err := denied.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err == nil {
 		t.Fatal("expected authorization error")
 	}
 	published := mbtiDraft()
 	published.Status = domain.ModelStatusPublished
 	notDraft := Service{Models: modelRepoStub{model: published}, Authorizer: allowAuthorizer{}, Store: &memoryStore{}, Config: config}
-	if _, err := notDraft.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
-		t.Fatalf("UploadMBTIOutcomeImage published model: %v", err)
+	if _, err := notDraft.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
+		t.Fatalf("UploadOutcomeImage published model: %v", err)
 	}
 	if !published.IsDraft() {
 		t.Fatalf("published model status = %q, want draft", published.Status)
+	}
+}
+
+func TestUploadOutcomeImageAcceptsUnifiedTypologyAlgorithm(t *testing.T) {
+	model := mbtiDraft()
+	model.Algorithm = binding.AlgorithmPersonalityTypology
+	service := Service{
+		Models: modelRepoStub{model: model}, Authorizer: allowAuthorizer{}, Store: &memoryStore{},
+		Config: Config{ObjectKeyPrefix: "assets", PublicURLPrefix: "https://qs.example/assets", MaxUploadBytes: 1024},
+	}
+	if _, err := service.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
+		t.Fatalf("UploadOutcomeImage unified typology model: %v", err)
 	}
 }
 

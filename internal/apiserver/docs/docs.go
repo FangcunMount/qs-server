@@ -313,7 +313,7 @@ const docTemplate = `{
                 "tags": [
                     "AssessmentAssets"
                 ],
-                "summary": "获取 MBTI 人物图片",
+                "summary": "获取类型学结果图片",
                 "parameters": [
                     {
                         "type": "string",
@@ -324,7 +324,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "MBTI 结果编码",
+                        "description": "类型学结果编码",
                         "name": "outcome",
                         "in": "path",
                         "required": true
@@ -1169,7 +1169,7 @@ const docTemplate = `{
                 "tags": [
                     "AssessmentModel"
                 ],
-                "summary": "上传 MBTI 结果人物图片",
+                "summary": "上传类型学结果图片",
                 "parameters": [
                     {
                         "type": "string",
@@ -1187,7 +1187,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "MBTI 结果编码",
+                        "description": "类型学结果编码",
                         "name": "outcome_code",
                         "in": "path",
                         "required": true

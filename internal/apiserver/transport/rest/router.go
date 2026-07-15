@@ -87,7 +87,7 @@ type AssessmentModelDeps struct {
 	Release     assessmentModelApp.AssessmentReleaseService
 	Query       assessmentModelApp.CatalogQueryService
 	NormTables  assessmentModelApp.NormTableService
-	Assets      assessmentModelApp.AssessmentImageService
+	Assets      assessmentModelApp.OutcomeImageService
 }
 
 type ActorDeps struct {

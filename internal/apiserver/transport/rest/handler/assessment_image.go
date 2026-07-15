@@ -28,16 +28,16 @@ func NewAssessmentImageHandler(store objectstorage.ObjectStore, keyPrefix string
 	return &AssessmentImageHandler{store: store, keyPrefix: strings.Trim(keyPrefix, "/")}
 }
 
-// GetMBTIOutcomeImage streams one immutable MBTI portrait.
-// @Summary 获取 MBTI 人物图片
+// GetOutcomeImage streams one immutable typology outcome image.
+// @Summary 获取类型学结果图片
 // @Tags AssessmentAssets
 // @Produce image/png,image/jpeg,image/webp
 // @Param model path string true "模型编码"
-// @Param outcome path string true "MBTI 结果编码"
+// @Param outcome path string true "类型学结果编码"
 // @Param filename path string true "内容哈希文件名"
 // @Success 200 {file} binary
 // @Router /api/v1/assessment-assets/typology/{model}/{outcome}/{filename} [get]
-func (h *AssessmentImageHandler) GetMBTIOutcomeImage(c *gin.Context) {
+func (h *AssessmentImageHandler) GetOutcomeImage(c *gin.Context) {
 	modelCode, outcomeCode, filename := c.Param("model"), c.Param("outcome"), c.Param("filename")
 	if !assetPathSegment.MatchString(modelCode) || !assetPathSegment.MatchString(outcomeCode) || !assetFilename.MatchString(filename) {
 		h.NotFoundResponse(c, "assessment image not found", nil)

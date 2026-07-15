@@ -4258,7 +4258,7 @@ paths:
         name: model
         required: true
         type: string
-      - description: MBTI 结果编码
+      - description: 类型学结果编码
         in: path
         name: outcome
         required: true
@@ -4277,7 +4277,7 @@ paths:
           description: OK
           schema:
             type: file
-      summary: 获取 MBTI 人物图片
+      summary: 获取类型学结果图片
       tags:
       - AssessmentAssets
   /api/v1/assessment-entries/{id}:
@@ -4657,7 +4657,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: MBTI 结果编码
+      - description: 类型学结果编码
         in: path
         name: outcome_code
         required: true
@@ -4679,7 +4679,7 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentModelImageUploadResponse'
               type: object
-      summary: 上传 MBTI 结果人物图片
+      summary: 上传类型学结果图片
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}/preview-report:

@@ -20,4 +20,4 @@ type AssessmentModelCodesResponse struct {
 	Codes []string `json:"codes"`
 }
 
-type AssessmentModelImageUploadResponse = modelcatalog.AssessmentImageUploadResult
+type AssessmentModelImageUploadResponse = modelcatalog.OutcomeImageUploadResult

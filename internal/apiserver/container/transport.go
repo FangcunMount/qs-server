@@ -60,7 +60,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportRESTDeps(c.QRCodeService, c.CodesService, deps.Survey.QuestionnaireQueryService)
 		deps.AssessmentModel = exports.AssessmentModel
-		deps.AssessmentModel.Assets = c.AssessmentImageService
+		deps.AssessmentModel.Assets = c.OutcomeImageService
 	}
 	if c.ActorModule != nil {
 		deps.Actor = c.ActorModule.ExportRESTDeps(c.QRCodeService)

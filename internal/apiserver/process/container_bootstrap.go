@@ -118,7 +118,7 @@ func (s *server) initializeWeChatServices(c *container.Container) error {
 	if s == nil || s.config == nil || c == nil {
 		return nil
 	}
-	if err := c.InitAssessmentImageService(s.config.AssessmentAssets, s.config.OSSOptions); err != nil {
+	if err := c.InitOutcomeImageService(s.config.AssessmentAssets, s.config.OSSOptions); err != nil {
 		return err
 	}
 	if s.config.WeChatOptions == nil {
