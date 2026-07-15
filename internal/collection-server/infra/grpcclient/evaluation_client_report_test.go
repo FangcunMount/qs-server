@@ -9,9 +9,9 @@ import (
 
 func TestConvertAssessmentReportMapsDimensionNormContext(t *testing.T) {
 	input := &interpretationpb.AssessmentReport{Dimensions: []*interpretationpb.DimensionInterpret{{
-		FactorCode: "gec",
+		FactorCode:    "gec",
 		DerivedScores: []*evaluationpb.ScoreValue{{Kind: "t_score", Value: 65}, {Kind: "percentile", Value: 90}},
-		Level: &evaluationpb.ResultLevel{Code: "elevated", Label: "偏高", Severity: "high"},
+		Level:         &evaluationpb.ResultLevel{Code: "elevated", Label: "偏高", Severity: "high"},
 		NormReference: &interpretationpb.NormReference{ScoreKind: "t_score", Benchmark: 50, TableVersion: "2026", MinAgeMonths: 60, MaxAgeMonths: 95},
 	}}}
 
