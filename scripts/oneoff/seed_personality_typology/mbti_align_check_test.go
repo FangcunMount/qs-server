@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,32 @@ func TestQuestionnaireSeedAlignsWithMBTIModel(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestMBTIQuestionStemsRepeatBothLikertAnchors(t *testing.T) {
+	seed := loadMBTIQuestionnaireSeed(t)
+	for _, q := range seed.Questions {
+		left, right, ok := mbtiLikertAnchors(q.Placeholder)
+		if !ok {
+			t.Fatalf("%s placeholder %q does not define Likert anchors", q.Code, q.Placeholder)
+		}
+		if !strings.Contains(q.Stem, "1="+left) || !strings.Contains(q.Stem, "5="+right) {
+			t.Fatalf("%s stem %q must repeat placeholder anchors 1=%q and 5=%q", q.Code, q.Stem, left, right)
+		}
+	}
+}
+
+func mbtiLikertAnchors(placeholder string) (left, right string, ok bool) {
+	const prefix = "更偏向："
+	const separator = " ← 1 · 2 · 3 · 4 · 5 → "
+	if !strings.HasPrefix(placeholder, prefix) {
+		return "", "", false
+	}
+	parts := strings.SplitN(strings.TrimPrefix(placeholder, prefix), separator, 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
 
 func loadMBTIQuestionnaireSeed(t *testing.T) questionnaireSeedFile {
