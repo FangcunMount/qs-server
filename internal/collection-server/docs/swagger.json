@@ -651,6 +651,77 @@
                 }
             }
         },
+        "/api/v1/assessments/{id}/report": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "仅在 report-status 终态 interpreted 后调用，返回总分、因子解读和建议。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评"
+                ],
+                "summary": "获取医学量表测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessments/{id}/report-status": {
             "get": {
                 "security": [
@@ -1712,7 +1783,7 @@
         },
         "/api/v1/typology-assessments/{id}/report": {
             "get": {
-                "description": "仅在 report-status 终态 interpreted 后调用。model.kind 当前为 personality（测评层），与目录层 typology 并存。",
+                "description": "仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology，读兼容历史 personality。",
                 "produces": [
                     "application/json"
                 ],
@@ -2310,6 +2381,44 @@
                 }
             }
         },
+        "evaluation.AssessmentReportResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                }
+            }
+        },
         "evaluation.AssessmentStatusResponse": {
             "type": "object",
             "properties": {
@@ -2600,13 +2709,13 @@
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。",
+                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
                     "enum": [
-                        "personality",
-                        "typology"
+                        "typology",
+                        "personality"
                     ],
-                    "example": "personality"
+                    "example": "typology"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3535,13 +3644,13 @@
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。",
+                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
                     "enum": [
-                        "personality",
-                        "typology"
+                        "typology",
+                        "personality"
                     ],
-                    "example": "personality"
+                    "example": "typology"
                 },
                 "product_channel": {
                     "type": "string"

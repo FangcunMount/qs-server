@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -58,13 +59,16 @@ type Container struct {
 	surveyRuntimeInfra *surveymod.SurveyRuntimeInfra
 
 	// 基础设施服务
-	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
-	SubscribeSender       wechatmini.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
-	QRCodeObjectStore     objectstorageport.PublicObjectStore   // 二维码对象存储（可选）
-	QRCodeObjectKeyPrefix string                                // 二维码对象 key 前缀
+	QRCodeGenerator          wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
+	SubscribeSender          wechatmini.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
+	QRCodeObjectStore        objectstorageport.PublicObjectStore   // 二维码对象存储（可选）
+	QRCodeObjectKeyPrefix    string                                // 二维码对象 key 前缀
+	AssessmentAssetStore     objectstorageport.ObjectStore         // 测评人物图片对象存储（可选）
+	AssessmentAssetKeyPrefix string                                // 测评人物图片对象 key 前缀
 
 	// 应用层服务
 	QRCodeService                      qrcodeApp.QRCodeService                            // 小程序码生成服务（可选）
+	AssessmentImageService             modelcatalogApp.AssessmentImageService             // MBTI 人物图片上传服务（可选）
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService // 小程序 task 消息服务（可选）
 
 	// 容器状态

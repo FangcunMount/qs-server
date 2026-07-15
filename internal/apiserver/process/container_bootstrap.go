@@ -115,7 +115,13 @@ func bootstrapIntegrationStage(deps integrationStageDeps) (integrationOutput, er
 }
 
 func (s *server) initializeWeChatServices(c *container.Container) error {
-	if s == nil || s.config == nil || s.config.WeChatOptions == nil || c == nil {
+	if s == nil || s.config == nil || c == nil {
+		return nil
+	}
+	if err := c.InitAssessmentImageService(s.config.AssessmentAssets, s.config.OSSOptions); err != nil {
+		return err
+	}
+	if s.config.WeChatOptions == nil {
 		return nil
 	}
 	if err := c.InitQRCodeService(s.config.WeChatOptions, s.config.OSSOptions); err != nil {

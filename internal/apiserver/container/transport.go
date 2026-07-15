@@ -45,6 +45,8 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.CodesService = platformDeps.CodesService
 	deps.QRCodeObjectStore = platformDeps.QRCodeObjectStore
 	deps.QRCodeObjectKeyPrefix = platformDeps.QRCodeObjectKeyPrefix
+	deps.AssessmentAssetStore = c.AssessmentAssetStore
+	deps.AssessmentAssetKeyPrefix = c.AssessmentAssetKeyPrefix
 	deps.GovernanceStatusService = platformDeps.GovernanceStatusService
 	deps.EventStatusService = platformDeps.EventStatusService
 	deps.Backpressure = platformDeps.Backpressure
@@ -58,6 +60,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	if c.AssessmentModelModule != nil {
 		exports := c.AssessmentModelModule.ExportRESTDeps(c.QRCodeService, c.CodesService, deps.Survey.QuestionnaireQueryService)
 		deps.AssessmentModel = exports.AssessmentModel
+		deps.AssessmentModel.Assets = c.AssessmentImageService
 	}
 	if c.ActorModule != nil {
 		deps.Actor = c.ActorModule.ExportRESTDeps(c.QRCodeService)

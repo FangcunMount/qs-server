@@ -59,14 +59,16 @@ type Deps struct {
 	Statistics      StatisticsDeps
 	Workbench       WorkbenchDeps
 
-	CodesService            codesapp.CodesService
-	QRCodeObjectStore       objectstorageport.PublicObjectStore
-	QRCodeObjectKeyPrefix   string
-	GovernanceStatusService statisticsApp.GovernanceStatusReader
-	EventStatusService      appEventing.StatusService
-	SystemGovernanceFacade  systemgovApp.Facade
-	Backpressure            []resilienceplane.BackpressureSnapshot
-	IAM                     IAMDeps
+	CodesService             codesapp.CodesService
+	QRCodeObjectStore        objectstorageport.PublicObjectStore
+	QRCodeObjectKeyPrefix    string
+	AssessmentAssetStore     objectstorageport.ObjectStore
+	AssessmentAssetKeyPrefix string
+	GovernanceStatusService  statisticsApp.GovernanceStatusReader
+	EventStatusService       appEventing.StatusService
+	SystemGovernanceFacade   systemgovApp.Facade
+	Backpressure             []resilienceplane.BackpressureSnapshot
+	IAM                      IAMDeps
 }
 
 type SurveyDeps struct {
@@ -85,6 +87,7 @@ type AssessmentModelDeps struct {
 	Release     assessmentModelApp.AssessmentReleaseService
 	Query       assessmentModelApp.CatalogQueryService
 	NormTables  assessmentModelApp.NormTableService
+	Assets      assessmentModelApp.AssessmentImageService
 }
 
 type ActorDeps struct {

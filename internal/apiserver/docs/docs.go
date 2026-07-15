@@ -303,6 +303,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessment-assets/typology/{model}/{outcome}/{filename}": {
+            "get": {
+                "produces": [
+                    "image/png",
+                    "image/jpeg",
+                    "image/webp"
+                ],
+                "tags": [
+                    "AssessmentAssets"
+                ],
+                "summary": "获取 MBTI 人物图片",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "model",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "MBTI 结果编码",
+                        "name": "outcome",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "内容哈希文件名",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessment-entries/{id}": {
             "get": {
                 "produces": [
@@ -1105,6 +1149,70 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.DefinitionV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-models/{code}/outcomes/{outcome_code}/image": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentModel"
+                ],
+                "summary": "上传 MBTI 结果人物图片",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "MBTI 结果编码",
+                        "name": "outcome_code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "PNG/JPEG/WebP 图片，最大 5 MiB",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentModelImageUploadResponse"
                                         }
                                     }
                                 }
@@ -11542,6 +11650,20 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "response.AssessmentModelImageUploadResponse": {
+            "type": "object",
+            "properties": {
+                "content_type": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
                 }
             }
         },

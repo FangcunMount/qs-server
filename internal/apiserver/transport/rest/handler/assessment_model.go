@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	assessmentassets "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/assets"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -25,6 +26,7 @@ type AssessmentModelHandler struct {
 	definition  modelcatalog.DefinitionAuthoringService
 	publication modelcatalog.PublicationService
 	query       modelcatalog.CatalogQueryService
+	assets      modelcatalog.AssessmentImageService
 }
 
 func NewAssessmentModelHandler(
@@ -32,8 +34,13 @@ func NewAssessmentModelHandler(
 	definition modelcatalog.DefinitionAuthoringService,
 	publication modelcatalog.PublicationService,
 	query modelcatalog.CatalogQueryService,
+	assets ...modelcatalog.AssessmentImageService,
 ) *AssessmentModelHandler {
-	return &AssessmentModelHandler{management: management, definition: definition, publication: publication, query: query}
+	var imageService modelcatalog.AssessmentImageService
+	if len(assets) > 0 {
+		imageService = assets[0]
+	}
+	return &AssessmentModelHandler{management: management, definition: definition, publication: publication, query: query, assets: imageService}
 }
 
 // List lists draft catalogue records. Use the published endpoints for
@@ -365,6 +372,56 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 		return
 	}
 	h.Success(c, (*response.AssessmentModelDefinitionResponse)(result))
+}
+
+// UploadMBTIOutcomeImage uploads one immutable MBTI outcome portrait. The
+// returned URL is intentionally not persisted until the editor saves DefinitionV2.
+// @Summary 上传 MBTI 结果人物图片
+// @Tags AssessmentModel
+// @Accept mpfd
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "模型编码"
+// @Param outcome_code path string true "MBTI 结果编码"
+// @Param file formData file true "PNG/JPEG/WebP 图片，最大 5 MiB"
+// @Success 200 {object} core.Response{data=response.AssessmentModelImageUploadResponse}
+// @Router /api/v1/assessment-models/{code}/outcomes/{outcome_code}/image [post]
+func (h *AssessmentModelHandler) UploadMBTIOutcomeImage(c *gin.Context) {
+	if h.assets == nil || h.assets.MaxUploadBytes() <= 0 {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "assessment image assets are not configured"))
+		return
+	}
+	maxBytes := h.assets.MaxUploadBytes()
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes+1024)
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "image file is required"))
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "open image file: %v", err))
+		return
+	}
+	defer file.Close()
+	content, err := assessmentassets.ReadAllLimited(file, maxBytes)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "read image file: %v", err))
+		return
+	}
+	actor, err := assessmentModelActorContext(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.assets.UploadMBTIOutcomeImage(c.Request.Context(), actor, modelcatalog.AssessmentImageUploadInput{
+		ModelCode: h.modelCode(c), OutcomeCode: c.Param("outcome_code"), Filename: fileHeader.Filename, Content: content,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, (*response.AssessmentModelImageUploadResponse)(result))
 }
 
 // Options exposes presentation metadata for a model kind.

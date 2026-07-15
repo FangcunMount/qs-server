@@ -1443,6 +1443,15 @@ definitions:
           type: string
         type: array
     type: object
+  response.AssessmentModelImageUploadResponse:
+    properties:
+      content_type:
+        type: string
+      image_url:
+        type: string
+      size:
+        type: integer
+    type: object
   response.AssessmentModelListResponse:
     properties:
       items:
@@ -4241,6 +4250,36 @@ paths:
       summary: 管理员提交答卷
       tags:
       - AnswerSheet-Management
+  /api/v1/assessment-assets/typology/{model}/{outcome}/{filename}:
+    get:
+      parameters:
+      - description: 模型编码
+        in: path
+        name: model
+        required: true
+        type: string
+      - description: MBTI 结果编码
+        in: path
+        name: outcome
+        required: true
+        type: string
+      - description: 内容哈希文件名
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - image/png
+      - image/jpeg
+      - image/webp
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 获取 MBTI 人物图片
+      tags:
+      - AssessmentAssets
   /api/v1/assessment-entries/{id}:
     get:
       parameters:
@@ -4601,6 +4640,46 @@ paths:
                   $ref: '#/definitions/response.DefinitionV2Wire'
               type: object
       summary: 更新测评模型定义
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/outcomes/{outcome_code}/image:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: MBTI 结果编码
+        in: path
+        name: outcome_code
+        required: true
+        type: string
+      - description: PNG/JPEG/WebP 图片，最大 5 MiB
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelImageUploadResponse'
+              type: object
+      summary: 上传 MBTI 结果人物图片
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}/preview-report:

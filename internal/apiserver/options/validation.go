@@ -15,6 +15,10 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.MySQLOptions.Validate()...)
 	errs = append(errs, o.Log.Validate()...)
 	errs = append(errs, o.OSSOptions.Validate()...)
+	errs = append(errs, o.AssessmentAssets.Validate()...)
+	if o.AssessmentAssets != nil && o.AssessmentAssets.Enabled && (o.OSSOptions == nil || !o.OSSOptions.Enabled) {
+		errs = append(errs, fmt.Errorf("oss.enabled must be true when assessment_assets.enabled is true"))
+	}
 	errs = append(errs, validateRateLimit(o.RateLimit)...)
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)

@@ -5,6 +5,7 @@
       "code": "INTJ",
       "name": "建筑师",
       "one_liner": "独立战略家",
+      "image_url": "https://qs.example/api/v1/assessment-assets/typology/FRONTEND_MBTI/INTJ/portrait.png",
       "summary": "善于长远规划",
       "strengths": [
         "系统思考"

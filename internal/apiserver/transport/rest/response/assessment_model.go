@@ -19,3 +19,5 @@ type HotAssessmentModelListResponse = modelcatalog.HotModelListResult
 type AssessmentModelCodesResponse struct {
 	Codes []string `json:"codes"`
 }
+
+type AssessmentModelImageUploadResponse = modelcatalog.AssessmentImageUploadResult

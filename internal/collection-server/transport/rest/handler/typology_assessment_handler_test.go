@@ -94,7 +94,10 @@ func TestTypologyAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
 				if testeeID != 7 || assessmentID != 42 {
 					t.Fatalf("unexpected ids: testee=%d assessment=%d", testeeID, assessmentID)
 				}
-				return &personalityassessment.AssessmentReportResponse{AssessmentID: "42"}, nil
+				return &personalityassessment.AssessmentReportResponse{
+					AssessmentID: "42",
+					ModelExtra:   &personalityassessment.ModelExtraResponse{ImageURL: "https://qs.example/api/v1/assessment-assets/typology/MBTI/INTJ/portrait.png"},
+				}, nil
 			},
 		},
 		nil,
@@ -114,6 +117,9 @@ func TestTypologyAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
 		Code int `json:"code"`
 		Data struct {
 			AssessmentID string `json:"assessment_id"`
+			ModelExtra   struct {
+				ImageURL string `json:"image_url"`
+			} `json:"model_extra"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
@@ -121,5 +127,8 @@ func TestTypologyAssessmentHandlerGetReportReturnsReportForOwner(t *testing.T) {
 	}
 	if resp.Data.AssessmentID != "42" {
 		t.Fatalf("expected assessment_id 42, got %q", resp.Data.AssessmentID)
+	}
+	if resp.Data.ModelExtra.ImageURL != "https://qs.example/api/v1/assessment-assets/typology/MBTI/INTJ/portrait.png" {
+		t.Fatalf("model_extra.image_url = %q", resp.Data.ModelExtra.ImageURL)
 	}
 }

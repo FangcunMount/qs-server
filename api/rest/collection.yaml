@@ -577,6 +577,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/report:
+    get:
+      tags:
+      - 测评
+      summary: 获取医学量表测评报告
+      description: 仅在 report-status 终态 interpreted 后调用，返回总分、因子解读和建议。
+      security:
+      - BearerAuth: []
+      operationId: 获取医学量表测评报告
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentReportResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/assessments/{id}/report-status:
     get:
       tags:
@@ -675,74 +737,6 @@ paths:
                         $ref: '#/components/schemas/evaluation.FactorScoreResponse'
         '400':
           description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/assessments/{id}/report:
-    get:
-      tags:
-      - 测评
-      summary: 获取医学量表测评报告
-      description: 获取已生成的医学量表报告，包含总分、因子解读和建议
-      security:
-      - BearerAuth: []
-      operationId: 获取医学量表测评报告
-      parameters:
-      - type: integer
-        description: 测评ID
-        name: id
-        in: path
-        required: true
-      - type: integer
-        description: 受试者ID
-        name: testee_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/evaluation.AssessmentReportResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '404':
-          description: 报告不存在或尚未生成
           content:
             application/json:
               schema:
@@ -1584,8 +1578,8 @@ paths:
       tags:
       - 类型学测评
       summary: 获取类型学测评报告
-      description: 仅在 report-status 终态 interpreted 后调用。model.kind 当前为 personality（测评层），与目录层
-        typology 并存。
+      description: 仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology，读兼容历史
+        personality。
       operationId: 获取类型学测评报告
       parameters:
       - type: integer
@@ -2104,31 +2098,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/evaluation.AssessmentFactorTrendPointResponse'
-    evaluation.AssessmentStatusResponse:
-      type: object
-      properties:
-        message:
-          type: string
-        next_poll_after_ms:
-          type: integer
-        reason:
-          type: string
-        risk_level:
-          type: string
-        stage:
-          type: string
-        status:
-          description: 对外报告状态：处理中、已生成、失败
-          type: string
-          enum:
-          - processing
-          - interpreted
-          - failed
-        total_score:
-          type: number
-        updated_at:
-          description: Unix timestamp
-          type: integer
     evaluation.AssessmentReportResponse:
       type: object
       properties:
@@ -2154,6 +2123,31 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/evaluation.SuggestionResponse'
+    evaluation.AssessmentStatusResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        next_poll_after_ms:
+          type: integer
+        reason:
+          type: string
+        risk_level:
+          type: string
+        stage:
+          type: string
+        status:
+          description: 对外报告状态：处理中、已生成、失败
+          type: string
+          enum:
+          - processing
+          - interpreted
+          - failed
+        total_score:
+          type: number
+        updated_at:
+          description: Unix timestamp
+          type: integer
     evaluation.AssessmentSummaryResponse:
       type: object
       properties:
@@ -2322,12 +2316,12 @@ components:
         code:
           type: string
         kind:
-          description: 测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。
+          description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
           type: string
           enum:
-          - personality
           - typology
-          example: personality
+          - personality
+          example: typology
         product_channel:
           type: string
         sub_kind:
@@ -2945,12 +2939,12 @@ components:
         code:
           type: string
         kind:
-          description: 测评层 kind；人格线当前输出 personality（evaluation 过滤值），读兼容 typology。
+          description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
           type: string
           enum:
-          - personality
           - typology
-          example: personality
+          - personality
+          example: typology
         product_channel:
           type: string
         sub_kind:

@@ -3,6 +3,7 @@ package typology
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
@@ -76,6 +77,9 @@ func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
 		v.outcomes[outcome.Code] = outcome
 		if outcome.Name == "" {
 			v.add("outcomes."+outcome.Code+".title", "outcome.title.required", fmt.Sprintf("outcome %s 标题不能为空", outcome.Code))
+		}
+		if v.algorithm == binding.AlgorithmMBTI && strings.TrimSpace(outcome.ImageURL) == "" {
+			v.add("outcomes."+outcome.Code+".image_url", "outcome.image_url.required", fmt.Sprintf("MBTI 结果 %s 必须配置人物图片", outcome.Code))
 		}
 	}
 }

@@ -12,7 +12,7 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 	if r.deps.AssessmentModel.Management == nil || r.deps.AssessmentModel.Definition == nil || r.deps.AssessmentModel.Query == nil || r.deps.AssessmentModel.Release == nil {
 		return
 	}
-	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Publication, r.deps.AssessmentModel.Query)
+	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Publication, r.deps.AssessmentModel.Query, r.deps.AssessmentModel.Assets)
 	models := apiV1.Group("/assessment-models")
 	{
 		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageAssessmentModels))
@@ -46,6 +46,7 @@ func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandle
 		{method: http.MethodPost, path: "/:code/codes/apply", handlers: []gin.HandlerFunc{handler.ApplyCodes}},
 		{method: http.MethodPost, path: "/:code/validate", handlers: []gin.HandlerFunc{handler.Validate}},
 		{method: http.MethodPost, path: "/:code/preview-report", handlers: []gin.HandlerFunc{handler.PreviewReport}},
+		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: []gin.HandlerFunc{handler.UploadMBTIOutcomeImage}},
 	}
 }
 

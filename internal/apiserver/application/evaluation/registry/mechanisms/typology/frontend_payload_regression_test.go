@@ -41,6 +41,7 @@ func TestFrontendPayloadMBTIEndToEndContract(t *testing.T) {
 			{Code: "Q_JP"},
 		},
 		wantProfileCode: "INTJ",
+		wantImageURL:    "https://qs.example/api/v1/assessment-assets/typology/FRONTEND_MBTI/INTJ/portrait.png",
 	})
 }
 
@@ -75,6 +76,7 @@ type frontendPayloadCase struct {
 	answers         []port.AnswerSnapshot
 	questions       []modeltypology.QuestionSnapshot
 	wantProfileCode string
+	wantImageURL    string
 }
 
 func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
@@ -188,6 +190,11 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	}
 	if draft == nil {
 		t.Fatal("report is nil")
+	}
+	if tc.wantImageURL != "" {
+		if extra := draft.Content().ModelExtra; extra == nil || extra.ImageURL != tc.wantImageURL {
+			t.Fatalf("report model_extra.image_url = %#v, want %q", extra, tc.wantImageURL)
+		}
 	}
 }
 

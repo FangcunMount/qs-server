@@ -605,6 +605,15 @@ oss:
   # access-key-id: ""
   # access-key-secret: ""
 
+# ----------------------------------------------------------------------------
+# 4.4 测评人物图片（复用上方私有 OSS，由 qs-server 稳定代理）
+# ----------------------------------------------------------------------------
+assessment_assets:
+  enabled: true
+  object-key-prefix: "assessment-assets/typology"
+  public-url-prefix: "https://qs.fangcunmount.cn/api/v1/assessment-assets/typology"
+  max-upload-bytes: 5242880
+
 # ============================================================================
 # 5. 系统运行配置
 # ============================================================================

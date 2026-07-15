@@ -30,6 +30,26 @@ type DefinitionAuthoringService interface {
 	ApplyCodes(ctx context.Context, actor ActorContext, input ApplyCodesDTO) ([]string, error)
 }
 
+// AssessmentImageService owns immutable MBTI outcome image uploads. Persisting
+// the returned URL remains part of the normal DefinitionV2 authoring flow.
+type AssessmentImageService interface {
+	MaxUploadBytes() int64
+	UploadMBTIOutcomeImage(ctx context.Context, actor ActorContext, input AssessmentImageUploadInput) (*AssessmentImageUploadResult, error)
+}
+
+type AssessmentImageUploadInput struct {
+	ModelCode   string
+	OutcomeCode string
+	Filename    string
+	Content     []byte
+}
+
+type AssessmentImageUploadResult struct {
+	ImageURL    string `json:"image_url"`
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
+}
+
 // PublicationService 拥有发布状态过渡和快照创建
 type PublicationService interface {
 	Publish(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)

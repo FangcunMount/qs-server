@@ -132,6 +132,20 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRequiresImagesForMBTIOutcomes(t *testing.T) {
+	spec := validRuntimeSpec()
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmMBTI,
+		Outcomes: []typology.Outcome{
+			{Code: "INTJ", Name: "建筑师", ImageURL: "https://qs.example/INTJ.png"},
+			{Code: "ENFP", Name: "竞选者"},
+		},
+	})
+	if !hasIssueCode(issues, "outcome.image_url.required") {
+		t.Fatalf("issues = %#v, want outcome.image_url.required", issues)
+	}
+}
+
 func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *testing.T) {
 	spec := validRuntimeSpec()
 	spec.Decision.FallbackCode = "MISSING_FALLBACK"

@@ -52,6 +52,9 @@ func TestTypologyCatalogProjectorUsesCanonicalDefinition(t *testing.T) {
 	if result.DecisionKind != string(modeldomain.DecisionKindPoleComposition) || len(result.Dimensions) != 4 || len(result.Outcomes) != 1 {
 		t.Fatalf("DefinitionV2 projection lost typology semantics: %#v", result)
 	}
+	if got := result.Outcomes[0].ImageURL; got != "https://qs.example/api/v1/assessment-assets/typology/FRONTEND_MBTI/INTJ/portrait.png" {
+		t.Fatalf("projected outcome image_url = %q", got)
+	}
 }
 
 func TestTypologyCatalogProjectorNormalizesVerifiedLegacyPersonalityKind(t *testing.T) {

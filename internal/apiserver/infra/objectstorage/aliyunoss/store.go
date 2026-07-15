@@ -20,10 +20,11 @@ type publicObjectStore struct {
 	cacheControl string
 }
 
-var _ objectstorageport.PublicObjectStore = (*publicObjectStore)(nil)
+var _ objectstorageport.ObjectStore = (*publicObjectStore)(nil)
 
-// NewPublicObjectStore creates an OSS-backed public object store.
-func NewPublicObjectStore(opts *options.OSSOptions) (objectstorageport.PublicObjectStore, error) {
+// NewObjectStore creates an OSS-backed object store. Object visibility is
+// controlled by the HTTP proxy that consumes the store, rather than OSS ACLs.
+func NewObjectStore(opts *options.OSSOptions) (objectstorageport.ObjectStore, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("oss options are required")
 	}
@@ -64,6 +65,11 @@ func NewPublicObjectStore(opts *options.OSSOptions) (objectstorageport.PublicObj
 	}, nil
 }
 
+// NewPublicObjectStore is retained for QR-code wiring compatibility.
+func NewPublicObjectStore(opts *options.OSSOptions) (objectstorageport.PublicObjectStore, error) {
+	return NewObjectStore(opts)
+}
+
 func buildCredentialsProvider(opts *options.OSSOptions) (credentials.CredentialsProvider, error) {
 	if opts.AccessKeyID != "" && opts.AccessKeySecret != "" {
 		if opts.SessionToken != "" {
@@ -86,7 +92,7 @@ func normalizeObjectKey(key string) (string, error) {
 	return normalized, nil
 }
 
-// Put uploads a QR code object to OSS.
+// Put uploads an object to OSS.
 func (s *publicObjectStore) Put(ctx context.Context, key string, contentType string, body []byte) error {
 	objectKey, err := normalizeObjectKey(key)
 	if err != nil {
@@ -105,8 +111,8 @@ func (s *publicObjectStore) Put(ctx context.Context, key string, contentType str
 	}
 
 	if _, err := s.client.PutObject(ctx, req); err != nil {
-		logger.L(ctx).Errorw("upload qrcode to oss failed",
-			"action", "upload_qrcode_oss",
+		logger.L(ctx).Errorw("upload object to oss failed",
+			"action", "upload_object_oss",
 			"bucket", s.bucket,
 			"object_key", objectKey,
 			"error", err.Error(),
@@ -132,8 +138,8 @@ func (s *publicObjectStore) Get(ctx context.Context, key string) (*objectstorage
 		if isObjectNotFound(err) {
 			return nil, objectstorageport.ErrObjectNotFound
 		}
-		logger.L(ctx).Errorw("open qrcode object from oss failed",
-			"action", "get_qrcode_object_oss",
+		logger.L(ctx).Errorw("open object from oss failed",
+			"action", "get_object_oss",
 			"bucket", s.bucket,
 			"object_key", objectKey,
 			"error", err.Error(),

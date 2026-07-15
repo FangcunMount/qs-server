@@ -17,6 +17,8 @@ tags:
   description: Admin
 - name: AnswerSheet-Management
   description: 答卷管理
+- name: AssessmentAssets
+  description: AssessmentAssets
 - name: AssessmentEntry
   description: AssessmentEntry
 - name: AssessmentModel
@@ -373,6 +375,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-assets/typology/{model}/{outcome}/{filename}:
+    get:
+      tags:
+      - AssessmentAssets
+      summary: 获取 MBTI 人物图片
+      operationId: 获取MBTI人物图片
+      description: 获取 MBTI 人物图片
+      security: []
+      parameters:
+      - type: string
+        description: 模型编码
+        name: model
+        in: path
+        required: true
+      - type: string
+        description: MBTI 结果编码
+        name: outcome
+        in: path
+        required: true
+      - type: string
+        description: 内容哈希文件名
+        name: filename
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: file
         '500':
           description: 服务内部错误
           content:
@@ -1173,6 +1212,72 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.DefinitionV2Wire'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessment-models/{code}/outcomes/{outcome_code}/image:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 上传 MBTI 结果人物图片
+      operationId: 上传MBTI结果人物图片
+      description: 上传 MBTI 结果人物图片
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 模型编码
+        name: code
+        in: path
+        required: true
+      - type: string
+        description: MBTI 结果编码
+        name: outcome_code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PNG/JPEG/WebP 图片，最大 5 MiB
+              required:
+              - file
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentModelImageUploadResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -11231,6 +11336,15 @@ components:
           type: array
           items:
             type: string
+    response.AssessmentModelImageUploadResponse:
+      type: object
+      properties:
+        content_type:
+          type: string
+        image_url:
+          type: string
+        size:
+          type: integer
     response.AssessmentModelListResponse:
       type: object
       properties:

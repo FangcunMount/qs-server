@@ -62,6 +62,8 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 	}
 	qrcodeHandler := codesHandler.NewQRCodeHandler(r.deps.QRCodeObjectStore, objectKeyPrefix)
 	engine.GET("/api/v1/qrcodes/:filename", qrcodeHandler.GetQRCodeImage)
+	assessmentImageHandler := codesHandler.NewAssessmentImageHandler(r.deps.AssessmentAssetStore, r.deps.AssessmentAssetKeyPrefix)
+	engine.GET("/api/v1/assessment-assets/typology/:model/:outcome/:filename", assessmentImageHandler.GetMBTIOutcomeImage)
 }
 
 func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {

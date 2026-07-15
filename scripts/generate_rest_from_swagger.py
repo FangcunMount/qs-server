@@ -6,7 +6,7 @@
 1) 从 swagger v2 读取 info/tags/paths/definitions/securityDefinitions。
 2) 自动转换为 OpenAPI 3.1 结构，处理 $ref (#/definitions -> #/components/schemas)。
 3) 保留 Swagger 的完整运行时路径；servers 只表示 host，绝不隐式拼接 basePath。
-4) requestBody：将 in: body/formData 合并为 application/json；其他参数直接保留。
+4) requestBody：将 in: body/formData 合并；表单请求保留 Swagger 的 consumes 类型，其他参数直接保留。
 5) servers：可通过 --server 指定多个；若未指定则使用 "/"。
 6) 输出采用紧凑的新格式：添加 contact、servers 带描述、tags 带描述、operationId 等。
 
@@ -44,7 +44,7 @@ def rewrite_refs(obj: Any) -> Any:
     return obj
 
 
-def to_request_body(params: List[Dict[str, Any]]) -> Tuple[Dict[str, Any] | None, List[Dict[str, Any]]]:
+def to_request_body(params: List[Dict[str, Any]], consumes: List[str] | None = None) -> Tuple[Dict[str, Any] | None, List[Dict[str, Any]]]:
     """将 body/formData 参数转为 requestBody，其余参数原样返回。"""
     body_param = None
     form_params: List[Dict[str, Any]] = []
@@ -72,7 +72,11 @@ def to_request_body(params: List[Dict[str, Any]]) -> Tuple[Dict[str, Any] | None
         required = []
         for p in form_params:
             name = p.get("name", "")
-            properties[name] = {k: v for k, v in p.items() if k not in {"in", "name", "required"}}
+            property_schema = {k: v for k, v in p.items() if k not in {"in", "name", "required"}}
+            # Swagger 2's `file` type becomes binary string in OpenAPI 3.
+            if property_schema.get("type") == "file":
+                property_schema = {"type": "string", "format": "binary", **{k: v for k, v in property_schema.items() if k != "type"}}
+            properties[name] = property_schema
             if p.get("required"):
                 required.append(name)
         schema: Dict[str, Any] = {"type": "object", "properties": rewrite_refs(properties)}
@@ -81,7 +85,7 @@ def to_request_body(params: List[Dict[str, Any]]) -> Tuple[Dict[str, Any] | None
         return (
             {
                 "required": any(p.get("required") for p in form_params),
-                "content": {"application/json": {"schema": schema}},
+                "content": {(consumes or ["application/x-www-form-urlencoded"])[0]: {"schema": schema}},
             },
             normal_params,
         )
@@ -239,7 +243,7 @@ def convert(
                 op["security"] = []
 
             params = deepcopy(spec.get("parameters", []))
-            request_body, remain_params = to_request_body(params)
+            request_body, remain_params = to_request_body(params, spec.get("consumes"))
             if remain_params:
                 op["parameters"] = rewrite_refs(remain_params)
             if request_body:
