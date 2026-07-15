@@ -3,6 +3,7 @@ package outcome
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -46,9 +47,17 @@ func AssessmentModelRefFromExecution(ref domainoutcome.ModelRef) assessment.Eval
 // ModelRefFromAssessment captures Assessment model identity for a new
 // canonical Execution.
 func ModelRefFromAssessment(ref assessment.EvaluationModelRef) domainoutcome.ModelRef {
-	identity := ref.ExecutionIdentity()
+	kind, subKind, algorithm := modelcatalog.Kind(ref.Kind()), ref.SubKind(), ref.Algorithm()
+	if algorithm == "" {
+		legacyIdentity := ref.ExecutionIdentity()
+		kind = legacyIdentity.Kind
+		if subKind == "" {
+			subKind = legacyIdentity.SubKind
+		}
+		algorithm = legacyIdentity.Algorithm
+	}
 	return domainoutcome.ModelRef{
-		ModelKind: identity.Kind, ModelSubKind: identity.SubKind, ModelAlgorithm: identity.Algorithm,
+		ModelKind: kind, ModelSubKind: subKind, ModelAlgorithm: algorithm,
 		ModelCode: ref.Code().String(), ModelVersion: ref.Version(), ModelTitle: ref.Title(),
 	}
 }
