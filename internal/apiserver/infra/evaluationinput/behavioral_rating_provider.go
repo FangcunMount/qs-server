@@ -53,7 +53,7 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 	}
 	payload := port.BehavioralRatingModelPayload{Snapshot: model}
 	return &port.InputSnapshot{
-		Model:         port.NewBehavioralRatingModelSnapshot(model),
+		Model:         port.NewBehavioralRatingModelSnapshot(model, modelcatalog.Algorithm(ref.ModelRef.Algorithm)),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,

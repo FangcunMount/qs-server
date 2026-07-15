@@ -302,7 +302,7 @@ func behavioralRatingInputSnapshot() *evaluationinput.InputSnapshot {
 		},
 	}
 	return &evaluationinput.InputSnapshot{
-		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
+		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot, modelcatalog.AlgorithmBehavioralRatingDefault),
 		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
@@ -356,7 +356,7 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 		},
 	}
 	return &evaluationinput.InputSnapshot{
-		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
+		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot, modelcatalog.AlgorithmBrief2),
 		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
 		NormSubject:  &evaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "male"},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{

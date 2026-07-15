@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -78,5 +79,40 @@ func TestAssessmentMapperWritesModelOnlyAssessment(t *testing.T) {
 	if roundTrip.EvaluationModelRef().Kind() != assessment.EvaluationModelKindTypology ||
 		roundTrip.EvaluationModelRef().Code().String() != "MBTI-16P" {
 		t.Fatalf("unexpected round trip assessment ref: model=%#v", roundTrip.EvaluationModelRef())
+	}
+}
+
+func TestAssessmentMapperPreservesBehavioralRatingAlgorithm(t *testing.T) {
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		modelcatalog.KindBehavioralRating,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmSPMSensory,
+		meta.ID(0),
+		meta.NewCode("bJFKi3"),
+		"v11",
+		"SPM Sensory",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(2001),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("bJFKi3"), "5.0.1"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(5001)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(103)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+
+	mapper := NewAssessmentMapper()
+	po := mapper.ToPO(a)
+	if po.EvaluationModelAlgorithm == nil || *po.EvaluationModelAlgorithm != string(modelcatalog.AlgorithmSPMSensory) {
+		t.Fatalf("evaluation model algorithm = %v, want %s", po.EvaluationModelAlgorithm, modelcatalog.AlgorithmSPMSensory)
+	}
+
+	roundTrip := mapper.ToDomain(po)
+	if roundTrip.EvaluationModelRef() == nil || roundTrip.EvaluationModelRef().Algorithm() != modelcatalog.AlgorithmSPMSensory {
+		t.Fatalf("round trip model ref = %#v, want algorithm %s", roundTrip.EvaluationModelRef(), modelcatalog.AlgorithmSPMSensory)
 	}
 }

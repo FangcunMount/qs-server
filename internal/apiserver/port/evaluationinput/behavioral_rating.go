@@ -18,18 +18,20 @@ func (BehavioralRatingModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindBehavioralRating
 }
 
-func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot) *ModelSnapshot {
+func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, algorithm modelcatalog.Algorithm) *ModelSnapshot {
 	if snapshot == nil {
 		return nil
 	}
 	version := snapshot.Version
-	algorithm := string(modelcatalog.AlgorithmBehavioralRatingDefault)
-	if snapshot.Norming != nil {
-		algorithm = string(modelcatalog.AlgorithmBrief2)
+	if algorithm == "" {
+		algorithm = modelcatalog.AlgorithmBehavioralRatingDefault
+		if snapshot.Norming != nil {
+			algorithm = modelcatalog.AlgorithmBrief2
+		}
 	}
 	return &ModelSnapshot{
 		Kind:           EvaluationModelKindBehavioralRating,
-		Algorithm:      algorithm,
+		Algorithm:      string(algorithm),
 		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
 		Code:           snapshot.Code,
 		Version:        version,
