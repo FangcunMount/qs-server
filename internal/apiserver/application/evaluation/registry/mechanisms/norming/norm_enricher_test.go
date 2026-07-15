@@ -23,10 +23,12 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 		Norming: &behavioralsnapshot.NormingProfile{
 			PrimaryDimensionCode: "gec",
 			NormTables: &calcnorm.NormTables{
+				NormTableVersion: "2026",
+				FormVariant:      "teacher",
 				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",
 					Lookup: []calcnorm.NormLookupEntry{
-						{RawMin: 0, RawMax: 10, TScore: 65, Percentile: 90},
+						{RawMin: 0, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 65, Percentile: 90},
 					},
 				}},
 				TScoreRules: []calcnorm.TScoreInterpretRule{{
@@ -39,7 +41,7 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 		},
 	}
 
-	enriched := factornorm.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{})
+	enriched := factornorm.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{AgeMonths: 72, Gender: "female"})
 	if len(enriched.Dimensions) != 1 {
 		t.Fatalf("dimensions = %#v", enriched.Dimensions)
 	}
@@ -52,6 +54,9 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	}
 	if dim.Level == nil || dim.Level.Code != "elevated" {
 		t.Fatalf("level = %#v", dim.Level)
+	}
+	if dim.NormReference == nil || dim.NormReference.ScoreKind != domainoutcome.ScoreKindTScore || dim.NormReference.Benchmark != 50 || dim.NormReference.TableVersion != "2026" || dim.NormReference.FormVariant != "teacher" || dim.NormReference.MinAgeMonths != 60 || dim.NormReference.MaxAgeMonths != 95 || dim.NormReference.Gender != "female" {
+		t.Fatalf("norm reference = %#v", dim.NormReference)
 	}
 	if enriched.Level == nil || enriched.Level.Code != "elevated" {
 		t.Fatalf("outcome level = %#v", enriched.Level)

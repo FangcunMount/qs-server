@@ -9,12 +9,22 @@ import (
 func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
 	dimensions := make([]Dimension, 0, len(row.Dimensions))
 	for _, dimension := range row.Dimensions {
-		dimensions = append(dimensions, Dimension{
+		item := Dimension{
 			FactorCode: dimension.FactorCode, FactorName: dimension.FactorName,
 			RawScore: dimension.RawScore, MaxScore: dimension.MaxScore, RiskLevel: dimension.RiskLevel,
 			Role: dimension.Role, ParentCode: dimension.ParentCode, HierarchyLevel: dimension.HierarchyLevel,
 			SortOrder: dimension.SortOrder, Description: dimension.Description, Suggestion: dimension.Suggestion,
-		})
+		}
+		for _, score := range dimension.DerivedScores {
+			item.DerivedScores = append(item.DerivedScores, ScoreValue{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max})
+		}
+		if dimension.Level != nil {
+			item.Level = &ResultLevel{Code: dimension.Level.Code, Label: dimension.Level.Label, Severity: dimension.Level.Severity}
+		}
+		if dimension.NormReference != nil {
+			item.NormReference = &NormReference{ScoreKind: dimension.NormReference.ScoreKind, Benchmark: dimension.NormReference.Benchmark, TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant, MinAgeMonths: dimension.NormReference.MinAgeMonths, MaxAgeMonths: dimension.NormReference.MaxAgeMonths, Gender: dimension.NormReference.Gender}
+		}
+		dimensions = append(dimensions, item)
 	}
 	suggestions := make([]Suggestion, 0, len(row.Suggestions))
 	for _, suggestion := range row.Suggestions {

@@ -115,7 +115,17 @@ func toProtoParticipantReport(result *interpretationParticipant.Report) *interpr
 		report.Level = &evaluationpb.ResultLevel{Code: result.Level.Code, Label: result.Level.Label, Severity: result.Level.Severity}
 	}
 	for _, d := range result.Dimensions {
-		report.Dimensions = append(report.Dimensions, &interpretationpb.DimensionInterpret{FactorCode: d.FactorCode, FactorName: d.FactorName, RawScore: d.RawScore, MaxScore: derefFloat64(d.MaxScore), RiskLevel: d.RiskLevel, Description: d.Description, Suggestion: d.Suggestion})
+		dimension := &interpretationpb.DimensionInterpret{FactorCode: d.FactorCode, FactorName: d.FactorName, RawScore: d.RawScore, MaxScore: derefFloat64(d.MaxScore), RiskLevel: d.RiskLevel, Description: d.Description, Suggestion: d.Suggestion}
+		for _, score := range d.DerivedScores {
+			dimension.DerivedScores = append(dimension.DerivedScores, &evaluationpb.ScoreValue{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max})
+		}
+		if d.Level != nil {
+			dimension.Level = &evaluationpb.ResultLevel{Code: d.Level.Code, Label: d.Level.Label, Severity: d.Level.Severity}
+		}
+		if d.NormReference != nil {
+			dimension.NormReference = &interpretationpb.NormReference{ScoreKind: d.NormReference.ScoreKind, Benchmark: d.NormReference.Benchmark, TableVersion: d.NormReference.TableVersion, FormVariant: d.NormReference.FormVariant, MinAgeMonths: int32(d.NormReference.MinAgeMonths), MaxAgeMonths: int32(d.NormReference.MaxAgeMonths), Gender: d.NormReference.Gender}
+		}
+		report.Dimensions = append(report.Dimensions, dimension)
 	}
 	for _, s := range result.Suggestions {
 		item := &interpretationpb.Suggestion{Category: s.Category, Content: s.Content}

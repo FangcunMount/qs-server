@@ -13,6 +13,9 @@ type DimensionInterpret struct {
 	maxScore       *float64
 	riskLevel      RiskLevel
 	severity       string
+	derivedScores  []ScoreValue
+	level          *ResultLevel
+	normReference  *NormReference
 	description    string
 	suggestion     string
 	role           string
@@ -73,9 +76,25 @@ func NewNeutralDimensionInterpret(
 		maxScore:    maxScore,
 		riskLevel:   risk,
 		severity:    severity,
+		level:       cloneResultLevel(level),
 		description: description,
 		suggestion:  suggestion,
 	}
+}
+
+// WithScoreContext attaches immutable derived score, level and norm facts to
+// the dimension while retaining the existing report composition API.
+func (d DimensionInterpret) WithScoreContext(derivedScores []ScoreValue, level *ResultLevel, reference *NormReference) DimensionInterpret {
+	d.derivedScores = cloneScoreValues(derivedScores)
+	if level != nil {
+		d.level = cloneResultLevel(level)
+		d.severity = level.Severity
+		if eventoutcome.IsRiskLevelCode(level.Code) {
+			d.riskLevel = RiskLevel(level.Code)
+		}
+	}
+	d.normReference = cloneNormReference(reference)
+	return d
 }
 
 func severityFromRiskLevel(risk RiskLevel) string {
@@ -128,6 +147,18 @@ func (d DimensionInterpret) MaxScore() *float64 {
 	return d.maxScore
 }
 
+func (d DimensionInterpret) DerivedScores() []ScoreValue {
+	return cloneScoreValues(d.derivedScores)
+}
+
+func (d DimensionInterpret) Level() *ResultLevel {
+	return cloneResultLevel(d.level)
+}
+
+func (d DimensionInterpret) NormReference() *NormReference {
+	return cloneNormReference(d.normReference)
+}
+
 // Role 返回目录因子角色 when 存在。
 func (d DimensionInterpret) Role() string {
 	return d.role
@@ -155,4 +186,35 @@ func (d DimensionInterpret) WithHierarchy(role, parentCode string, hierarchyLeve
 	d.hierarchyLevel = hierarchyLevel
 	d.sortOrder = sortOrder
 	return d
+}
+
+func cloneScoreValues(values []ScoreValue) []ScoreValue {
+	if len(values) == 0 {
+		return nil
+	}
+	cloned := make([]ScoreValue, len(values))
+	for i, value := range values {
+		cloned[i] = value
+		if value.Max != nil {
+			max := *value.Max
+			cloned[i].Max = &max
+		}
+	}
+	return cloned
+}
+
+func cloneResultLevel(level *ResultLevel) *ResultLevel {
+	if level == nil {
+		return nil
+	}
+	copy := *level
+	return &copy
+}
+
+func cloneNormReference(reference *NormReference) *NormReference {
+	if reference == nil {
+		return nil
+	}
+	copy := *reference
+	return &copy
 }

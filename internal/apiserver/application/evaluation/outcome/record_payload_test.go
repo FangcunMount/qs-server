@@ -1,6 +1,7 @@
 package outcome
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -17,7 +18,8 @@ func TestExecutionForRecordV2ExcludesReportProse(t *testing.T) {
 		Profile:  &domainoutcome.ProfileResult{Code: "INTJ", Name: "display profile"},
 		Dimensions: []domainoutcome.DimensionResult{{
 			Code: "EI", Name: "display dimension", Score: &domainoutcome.ScoreValue{Value: 1, Label: "display dimension score"},
-			Level: &domainoutcome.ResultLevel{Code: "high", Label: "display dimension level"}, LeftPole: "left display", RightPole: "right display", Model: "display dimension model",
+			DerivedScores: []domainoutcome.ScoreValue{{Kind: domainoutcome.ScoreKindTScore, Value: 65}},
+			Level:         &domainoutcome.ResultLevel{Code: "high", Label: "display dimension level"}, NormReference: &domainoutcome.NormReference{ScoreKind: domainoutcome.ScoreKindTScore, Benchmark: 50, TableVersion: "2026", MinAgeMonths: 60, MaxAgeMonths: 95}, LeftPole: "left display", RightPole: "right display", Model: "display dimension model",
 		}},
 		Validity: []domainoutcome.ValidityResult{{Code: "valid", Label: "display validity", Passed: true, Message: "display validity message"}},
 		Detail: domainoutcome.Detail{Payload: outcometypology.PersonalityTypeDetail{
@@ -41,5 +43,14 @@ func TestExecutionForRecordV2ExcludesReportProse(t *testing.T) {
 	}
 	if len(execution.Summary.Tags) != 2 {
 		t.Fatal("source execution was mutated")
+	}
+	var durable struct {
+		Dimensions []domainoutcome.DimensionResult
+	}
+	if err := json.Unmarshal(payload, &durable); err != nil {
+		t.Fatal(err)
+	}
+	if len(durable.Dimensions) != 1 || len(durable.Dimensions[0].DerivedScores) != 1 || durable.Dimensions[0].NormReference == nil || durable.Dimensions[0].NormReference.TableVersion != "2026" || durable.Dimensions[0].NormReference.Benchmark != 50 {
+		t.Fatalf("durable norm facts = %#v", durable.Dimensions)
 	}
 }

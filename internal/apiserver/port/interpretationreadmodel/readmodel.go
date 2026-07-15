@@ -63,6 +63,9 @@ type ReportDimensionRow struct {
 	RawScore       float64
 	MaxScore       *float64
 	RiskLevel      string
+	DerivedScores  []ScoreValueRow
+	Level          *ResultLevelRow
+	NormReference  *NormReferenceRow
 	Role           string
 	ParentCode     string
 	HierarchyLevel int
@@ -115,6 +118,16 @@ type ResultLevelRow struct {
 	Code     string
 	Label    string
 	Severity string
+}
+
+type NormReferenceRow struct {
+	ScoreKind    string
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
 }
 
 type ReportModelExtraRow struct {

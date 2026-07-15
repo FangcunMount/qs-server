@@ -97,6 +97,16 @@ type ResultLevel struct {
 	Severity string
 }
 
+type NormReference struct {
+	ScoreKind    ScoreKind
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
+}
+
 type ProfileKind string
 
 const (
@@ -123,6 +133,7 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
+	NormReference  *NormReference
 	// Typology classification facts. Display prose remains in the frozen
 	// ReportInput attached to the durable Outcome record.
 	Preference string

@@ -191,7 +191,10 @@ func dimensionToPO(d domainreport.DimensionInterpret) DimensionInterpretPO {
 		Description: d.Description(), Suggestion: d.Suggestion(),
 	}
 	po.Score = scoreValueToPO(domainreport.NewRawTotalScore(d.RawScore(), d.MaxScore()))
-	if isArtifactRiskLevelCode(d.Severity()) {
+	po.DerivedScores = scoreValuesToPO(d.DerivedScores())
+	po.Level = resultLevelToPO(d.Level())
+	po.NormReference = normReferenceToPO(d.NormReference())
+	if po.Level == nil && d.Severity() != "none" && isArtifactRiskLevelCode(d.Severity()) {
 		po.Level = resultLevelToPO(domainreport.LevelFromRisk(domainreport.RiskLevel(d.Severity())))
 	}
 	return po
@@ -206,10 +209,13 @@ func dimensionToDomain(po DimensionInterpretPO) domainreport.DimensionInterpret 
 		risk = domainreport.RiskLevel(level.Code)
 	}
 	kind := domainreport.DimensionKind(po.Kind)
+	var dimension domainreport.DimensionInterpret
 	if kind != "" && kind != domainreport.DimensionKindFactor {
-		return domainreport.NewNeutralDimensionInterpret(domainreport.NewDimensionCode(po.FactorCode), kind, po.FactorName, rawScore, maxScore, resultLevelToDomain(po.Level), po.Description, po.Suggestion).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
+		dimension = domainreport.NewNeutralDimensionInterpret(domainreport.NewDimensionCode(po.FactorCode), kind, po.FactorName, rawScore, maxScore, resultLevelToDomain(po.Level), po.Description, po.Suggestion)
+	} else {
+		dimension = domainreport.NewDimensionInterpret(domainreport.NewFactorCode(po.FactorCode), po.FactorName, rawScore, maxScore, risk, po.Description, po.Suggestion)
 	}
-	return domainreport.NewDimensionInterpret(domainreport.NewFactorCode(po.FactorCode), po.FactorName, rawScore, maxScore, risk, po.Description, po.Suggestion).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
+	return dimension.WithScoreContext(scoreValuesToDomain(po.DerivedScores), resultLevelToDomain(po.Level), normReferenceToDomain(po.NormReference)).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
 }
 
 func toSuggestionPOs(items []domainreport.Suggestion) []SuggestionPO {
@@ -309,4 +315,40 @@ func resultLevelToDomain(po *ResultLevelPO) *domainreport.ResultLevel {
 		return nil
 	}
 	return &domainreport.ResultLevel{Code: po.Code, Label: po.Label, Severity: po.Severity}
+}
+
+func scoreValuesToPO(scores []domainreport.ScoreValue) []ScoreValuePO {
+	if len(scores) == 0 {
+		return nil
+	}
+	result := make([]ScoreValuePO, len(scores))
+	for i := range scores {
+		result[i] = *scoreValueToPO(&scores[i])
+	}
+	return result
+}
+
+func scoreValuesToDomain(scores []ScoreValuePO) []domainreport.ScoreValue {
+	if len(scores) == 0 {
+		return nil
+	}
+	result := make([]domainreport.ScoreValue, len(scores))
+	for i := range scores {
+		result[i] = *scoreValueToDomain(&scores[i])
+	}
+	return result
+}
+
+func normReferenceToPO(reference *domainreport.NormReference) *NormReferencePO {
+	if reference == nil {
+		return nil
+	}
+	return &NormReferencePO{ScoreKind: reference.ScoreKind, Benchmark: reference.Benchmark, TableVersion: reference.TableVersion, FormVariant: reference.FormVariant, MinAgeMonths: reference.MinAgeMonths, MaxAgeMonths: reference.MaxAgeMonths, Gender: reference.Gender}
+}
+
+func normReferenceToDomain(reference *NormReferencePO) *domainreport.NormReference {
+	if reference == nil {
+		return nil
+	}
+	return &domainreport.NormReference{ScoreKind: reference.ScoreKind, Benchmark: reference.Benchmark, TableVersion: reference.TableVersion, FormVariant: reference.FormVariant, MinAgeMonths: reference.MinAgeMonths, MaxAgeMonths: reference.MaxAgeMonths, Gender: reference.Gender}
 }

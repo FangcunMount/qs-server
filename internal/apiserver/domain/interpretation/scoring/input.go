@@ -9,6 +9,9 @@ type FactorReportScore struct {
 	FactorName     string
 	RawScore       float64
 	RiskLevel      report.RiskLevel
+	DerivedScores  []report.ScoreValue
+	Level          *report.ResultLevel
+	NormReference  *report.NormReference
 	Conclusion     string
 	Suggestion     string
 	IsTotalScore   bool

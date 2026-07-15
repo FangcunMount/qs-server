@@ -90,7 +90,7 @@ func (h *BehaviorAssessmentHandler) Get(c *gin.Context) {
 
 // GetReport returns a behavior ability assessment report.
 // @Summary 获取行为能力测评报告
-// @Description 仅在 report-status 终态 interpreted 后调用。
+// @Description 仅在 report-status 终态 interpreted 后调用。dimensions 提供原始分、派生分、维度等级及实际命中的常模引用，可直接用于 T 分与常模基准对比。
 // @Tags 行为能力测评
 // @Produce json
 // @Param id path int true "测评ID"

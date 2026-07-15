@@ -162,6 +162,16 @@ type ResultLevel struct {
 	Severity string
 }
 
+type NormReference struct {
+	ScoreKind    ScoreKind
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
+}
+
 type ProfileResult struct {
 	Kind   ProfileKind
 	Code   string
@@ -180,6 +190,7 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
+	NormReference  *NormReference
 	Preference     string
 	Strength       *float64
 	LeftPole       string

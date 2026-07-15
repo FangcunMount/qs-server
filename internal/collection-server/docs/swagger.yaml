@@ -417,14 +417,22 @@ definitions:
     type: object
   evaluation.DimensionInterpretResponse:
     properties:
+      derived_scores:
+        items:
+          $ref: '#/definitions/evaluation.ScoreValueResponse'
+        type: array
       description:
         type: string
       factor_code:
         type: string
       factor_name:
         type: string
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
       max_score:
         type: number
+      norm_reference:
+        $ref: '#/definitions/evaluation.NormReferenceResponse'
       raw_score:
         type: number
       risk_level:
@@ -516,6 +524,25 @@ definitions:
         type: integer
       percent:
         type: number
+    type: object
+  evaluation.NormReferenceResponse:
+    properties:
+      benchmark:
+        example: 50
+        type: number
+      form_variant:
+        type: string
+      gender:
+        type: string
+      max_age_months:
+        type: integer
+      min_age_months:
+        type: integer
+      score_kind:
+        example: t_score
+        type: string
+      table_version:
+        type: string
     type: object
   evaluation.ResultLevelResponse:
     properties:
@@ -2035,7 +2062,8 @@ paths:
       - 行为能力测评
   /api/v1/behavior-assessments/{id}/report:
     get:
-      description: 仅在 report-status 终态 interpreted 后调用。
+      description: 仅在 report-status 终态 interpreted 后调用。dimensions 提供原始分、派生分、维度等级及实际命中的常模引用，可直接用于
+        T 分与常模基准对比。
       parameters:
       - description: 测评ID
         in: path

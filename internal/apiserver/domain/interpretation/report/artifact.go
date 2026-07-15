@@ -145,6 +145,9 @@ func cloneDimensions(items []DimensionInterpret) []DimensionInterpret {
 			max := *item.maxScore
 			cloned[i].maxScore = &max
 		}
+		cloned[i].derivedScores = cloneScoreValues(item.derivedScores)
+		cloned[i].level = cloneResultLevel(item.level)
+		cloned[i].normReference = cloneNormReference(item.normReference)
 	}
 	return cloned
 }

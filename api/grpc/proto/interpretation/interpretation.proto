@@ -16,9 +16,17 @@ service InterpretationAutomationService {
 }
 
 message Suggestion { string category = 1; string content = 2; string factor_code = 3; }
+message NormReference {
+  string score_kind = 1; double benchmark = 2; string table_version = 3;
+  string form_variant = 4; int32 min_age_months = 5; int32 max_age_months = 6;
+  string gender = 7;
+}
 message DimensionInterpret {
   string factor_code = 1; string factor_name = 2; double raw_score = 3;
   string risk_level = 4; string description = 5; double max_score = 6; string suggestion = 7;
+  repeated evaluation.ScoreValue derived_scores = 8;
+  evaluation.ResultLevel level = 9;
+  NormReference norm_reference = 10;
 }
 message ModelRarity { double percent = 1; string label = 2; int32 one_in_x = 3; }
 message ModelExtra {

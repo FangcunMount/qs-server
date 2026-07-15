@@ -15,6 +15,12 @@ type ScoreValue struct {
 
 type ResultLevel struct{ Code, Label, Severity string }
 
+type NormReference struct {
+	ScoreKind, TableVersion, FormVariant, Gender string
+	Benchmark                                    float64
+	MinAgeMonths, MaxAgeMonths                   int
+}
+
 type ModelRarity struct {
 	Percent float64
 	Label   string
@@ -34,6 +40,9 @@ type Dimension struct {
 	RawScore               float64
 	MaxScore               *float64
 	RiskLevel, Role        string
+	DerivedScores          []ScoreValue
+	Level                  *ResultLevel
+	NormReference          *NormReference
 	ParentCode             string
 	HierarchyLevel         int
 	SortOrder              int

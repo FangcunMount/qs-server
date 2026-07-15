@@ -26,13 +26,26 @@ type SuggestionOutput struct {
 
 // DimensionInterpretOutput 维度解读输出
 type DimensionInterpretOutput struct {
-	FactorCode  string
-	FactorName  string
-	RawScore    float64
-	MaxScore    *float64
-	RiskLevel   string
-	Description string
-	Suggestion  string
+	FactorCode    string
+	FactorName    string
+	RawScore      float64
+	MaxScore      *float64
+	RiskLevel     string
+	DerivedScores []ScoreValueOutput
+	Level         *ResultLevelOutput
+	NormReference *NormReferenceOutput
+	Description   string
+	Suggestion    string
+}
+
+type NormReferenceOutput struct {
+	ScoreKind    string
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int32
+	MaxAgeMonths int32
+	Gender       string
 }
 
 // TrendPointOutput 趋势数据点输出
@@ -449,7 +462,7 @@ func convertAssessmentReport(report *interpretationpb.AssessmentReport) *Assessm
 			score := dim.GetMaxScore()
 			maxScore = &score
 		}
-		dimensions = append(dimensions, DimensionInterpretOutput{
+		dimension := DimensionInterpretOutput{
 			FactorCode:  dim.GetFactorCode(),
 			FactorName:  dim.GetFactorName(),
 			RawScore:    dim.GetRawScore(),
@@ -457,7 +470,17 @@ func convertAssessmentReport(report *interpretationpb.AssessmentReport) *Assessm
 			RiskLevel:   dim.GetRiskLevel(),
 			Description: dim.GetDescription(),
 			Suggestion:  dim.GetSuggestion(),
-		})
+			Level:       convertResultLevel(dim.GetLevel()),
+		}
+		for _, score := range dim.GetDerivedScores() {
+			if converted := convertScoreValue(score); converted != nil {
+				dimension.DerivedScores = append(dimension.DerivedScores, *converted)
+			}
+		}
+		if reference := dim.GetNormReference(); reference != nil {
+			dimension.NormReference = &NormReferenceOutput{ScoreKind: reference.GetScoreKind(), Benchmark: reference.GetBenchmark(), TableVersion: reference.GetTableVersion(), FormVariant: reference.GetFormVariant(), MinAgeMonths: reference.GetMinAgeMonths(), MaxAgeMonths: reference.GetMaxAgeMonths(), Gender: reference.GetGender()}
+		}
+		dimensions = append(dimensions, dimension)
 	}
 	return &AssessmentReportOutput{
 		AssessmentID: report.GetAssessmentId(),

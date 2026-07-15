@@ -18,6 +18,7 @@ func TestCalculationAdapterRoundTripsScoringFactsDirectlyThroughExecution(t *tes
 
 	calculated := CalcResultFromOutcome(execution)
 	calculated.Dimensions[0].DerivedScores = []calculation.ScoreValue{{Kind: calculation.ScoreKindTScore, Value: 55}}
+	calculated.Dimensions[0].NormReference = &calculation.NormReference{ScoreKind: calculation.ScoreKindTScore, Benchmark: 50, TableVersion: "2026", MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female"}
 	calculated.Dimensions[0].Description = "report prose must not enter Execution"
 	calculated.Dimensions[0].Suggestion = "report suggestion must not enter Execution"
 
@@ -27,5 +28,8 @@ func TestCalculationAdapterRoundTripsScoringFactsDirectlyThroughExecution(t *tes
 	}
 	if len(merged.Dimensions) != 1 || len(merged.Dimensions[0].DerivedScores) != 1 || merged.Dimensions[0].DerivedScores[0].Value != 55 {
 		t.Fatalf("merged dimensions = %#v", merged.Dimensions)
+	}
+	if merged.Dimensions[0].NormReference == nil || merged.Dimensions[0].NormReference.TableVersion != "2026" || merged.Dimensions[0].NormReference.Benchmark != 50 {
+		t.Fatalf("merged norm reference = %#v", merged.Dimensions[0].NormReference)
 	}
 }

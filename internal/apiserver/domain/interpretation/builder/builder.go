@@ -60,6 +60,7 @@ func (b *DefaultReportBuilder) buildDimensions(input report.GenerateReportInput)
 			fs.Description,
 			fs.Suggestion,
 		)
+		dim = dim.WithScoreContext(fs.DerivedScores, fs.Level, fs.NormReference)
 		if fs.Role != "" || fs.ParentCode != "" || fs.HierarchyLevel > 0 || fs.SortOrder > 0 {
 			dim = dim.WithHierarchy(fs.Role, fs.ParentCode, fs.HierarchyLevel, fs.SortOrder)
 		}

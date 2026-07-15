@@ -1014,7 +1014,8 @@ paths:
       tags:
       - 行为能力测评
       summary: 获取行为能力测评报告
-      description: 仅在 report-status 终态 interpreted 后调用。
+      description: 仅在 report-status 终态 interpreted 后调用。dimensions 提供原始分、派生分、维度等级及实际命中的常模引用，可直接用于
+        T 分与常模基准对比。
       operationId: 获取行为能力测评报告
       parameters:
       - type: integer
@@ -2631,14 +2632,22 @@ components:
     evaluation.DimensionInterpretResponse:
       type: object
       properties:
+        derived_scores:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.ScoreValueResponse'
         description:
           type: string
         factor_code:
           type: string
         factor_name:
           type: string
+        level:
+          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
         max_score:
           type: number
+        norm_reference:
+          $ref: '#/components/schemas/evaluation.NormReferenceResponse'
         raw_score:
           type: number
         risk_level:
@@ -2730,6 +2739,25 @@ components:
           type: integer
         percent:
           type: number
+    evaluation.NormReferenceResponse:
+      type: object
+      properties:
+        benchmark:
+          type: number
+          example: 50
+        form_variant:
+          type: string
+        gender:
+          type: string
+        max_age_months:
+          type: integer
+        min_age_months:
+          type: integer
+        score_kind:
+          type: string
+          example: t_score
+        table_version:
+          type: string
     evaluation.ResultLevelResponse:
       type: object
       properties:

@@ -1137,7 +1137,7 @@ const docTemplate = `{
         },
         "/api/v1/behavior-assessments/{id}/report": {
             "get": {
-                "description": "仅在 report-status 终态 interpreted 后调用。",
+                "description": "仅在 report-status 终态 interpreted 后调用。dimensions 提供原始分、派生分、维度等级及实际命中的常模引用，可直接用于 T 分与常模基准对比。",
                 "produces": [
                     "application/json"
                 ],
@@ -3057,6 +3057,12 @@ const docTemplate = `{
         "evaluation.DimensionInterpretResponse": {
             "type": "object",
             "properties": {
+                "derived_scores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                    }
+                },
                 "description": {
                     "type": "string"
                 },
@@ -3066,8 +3072,14 @@ const docTemplate = `{
                 "factor_name": {
                     "type": "string"
                 },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
                 "max_score": {
                     "type": "number"
+                },
+                "norm_reference": {
+                    "$ref": "#/definitions/evaluation.NormReferenceResponse"
                 },
                 "raw_score": {
                     "type": "number"
@@ -3205,6 +3217,34 @@ const docTemplate = `{
                 },
                 "percent": {
                     "type": "number"
+                }
+            }
+        },
+        "evaluation.NormReferenceResponse": {
+            "type": "object",
+            "properties": {
+                "benchmark": {
+                    "type": "number",
+                    "example": 50
+                },
+                "form_variant": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string"
+                },
+                "max_age_months": {
+                    "type": "integer"
+                },
+                "min_age_months": {
+                    "type": "integer"
+                },
+                "score_kind": {
+                    "type": "string",
+                    "example": "t_score"
+                },
+                "table_version": {
+                    "type": "string"
                 }
             }
         },

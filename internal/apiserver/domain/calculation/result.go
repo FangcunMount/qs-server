@@ -37,6 +37,19 @@ type ResultLevel struct {
 	Severity string
 }
 
+// NormReference records the exact norm table and cohort used to derive a
+// dimension score. Empty cohort fields mean the table's generic entry was
+// selected.
+type NormReference struct {
+	ScoreKind    ScoreKind
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
+}
+
 // DimensionResult 记录一个scored 维度 on 计算结果。
 type DimensionResult struct {
 	Code           string
@@ -49,6 +62,7 @@ type DimensionResult struct {
 	Score          *ScoreValue
 	DerivedScores  []ScoreValue
 	Level          *ResultLevel
+	NormReference  *NormReference
 	Description    string
 	Suggestion     string
 }

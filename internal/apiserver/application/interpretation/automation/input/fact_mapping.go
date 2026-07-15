@@ -3,6 +3,7 @@ package input
 import (
 	"fmt"
 
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
@@ -87,9 +88,67 @@ func factorScores(execution *domainoutcome.Execution, model *reportscore.ReportM
 		if dimension.Level != nil && eventoutcome.IsRiskLevelCode(dimension.Level.Code) {
 			risk = report.RiskLevel(dimension.Level.Code)
 		}
-		items = append(items, reportscore.FactorReportScore{FactorCode: dimension.Code, FactorName: dimension.Name, RawScore: dimension.Score.Value, RiskLevel: risk, IsTotalScore: totalCodes[dimension.Code] || dimension.Role == "total", Role: dimension.Role, ParentCode: dimension.ParentCode, HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder})
+		item := reportscore.FactorReportScore{FactorCode: dimension.Code, FactorName: dimension.Name, RawScore: dimension.Score.Value, RiskLevel: risk, IsTotalScore: totalCodes[dimension.Code] || dimension.Role == "total", Role: dimension.Role, ParentCode: dimension.ParentCode, HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder}
+		for _, score := range dimension.DerivedScores {
+			item.DerivedScores = append(item.DerivedScores, report.ScoreValue{Kind: string(score.Kind), Value: score.Value, Label: score.Label, Max: score.Max})
+		}
+		if dimension.Level != nil {
+			item.Level = &report.ResultLevel{Code: dimension.Level.Code, Label: dimension.Level.Label, Severity: dimension.Level.Severity}
+		}
+		if dimension.NormReference != nil {
+			item.NormReference = &report.NormReference{
+				ScoreKind: string(dimension.NormReference.ScoreKind), Benchmark: dimension.NormReference.Benchmark,
+				TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant,
+				MinAgeMonths: dimension.NormReference.MinAgeMonths, MaxAgeMonths: dimension.NormReference.MaxAgeMonths,
+				Gender: dimension.NormReference.Gender,
+			}
+		}
+		items = append(items, item)
 	}
 	return items
+}
+
+// applyFrozenNormInterpretation restores display prose from the immutable
+// report-input snapshot. Evaluation outcomes retain only scoring facts.
+func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets *evaluationinput.InputSnapshot) {
+	payload, ok := evaluationinput.BehavioralRatingPayload(assets)
+	if !ok || payload.Snapshot == nil || payload.Snapshot.Norming == nil {
+		return
+	}
+	tables := payload.Snapshot.Norming.NormTablesOrNil()
+	if tables == nil {
+		return
+	}
+	for i := range items {
+		tScore, ok := reportScoreValue(items[i].DerivedScores, report.ScoreKindTScore)
+		if !ok {
+			continue
+		}
+		level, conclusion, suggestion, interpreted := calcnorm.InterpretTScore(tables, items[i].FactorCode, tScore)
+		if !interpreted {
+			continue
+		}
+		items[i].Conclusion = conclusion
+		items[i].Suggestion = suggestion
+		if items[i].Level == nil {
+			items[i].Level = &report.ResultLevel{Code: level}
+		}
+		if items[i].Level.Code == "" {
+			items[i].Level.Code = level
+		}
+		if items[i].Level.Label == "" && (level == "" || items[i].Level.Code == level) {
+			items[i].Level.Label = conclusion
+		}
+	}
+}
+
+func reportScoreValue(scores []report.ScoreValue, kind string) (float64, bool) {
+	for _, score := range scores {
+		if score.Kind == kind {
+			return score.Value, true
+		}
+	}
+	return 0, false
 }
 
 func populateTypologyFacts(input *interpinput.InterpretationInput, execution *domainoutcome.Execution, assets *evaluationinput.InputSnapshot) error {

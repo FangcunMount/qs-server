@@ -58,6 +58,13 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 			PrimaryScore: &domainreport.ScoreValue{Kind: domainreport.ScoreKindRawTotal, Value: 42},
 			Level:        &domainreport.ResultLevel{Code: "high", Severity: "high"},
 			Conclusion:   "高风险",
+			Dimensions: []domainreport.DimensionInterpret{
+				domainreport.NewDimensionInterpret(domainreport.NewFactorCode("gec"), "GEC", 12, nil, domainreport.RiskLevelHigh, "偏高", "建议").WithScoreContext(
+					[]domainreport.ScoreValue{{Kind: domainreport.ScoreKindTScore, Value: 65}, {Kind: domainreport.ScoreKindPercentile, Value: 90}},
+					&domainreport.ResultLevel{Code: "elevated", Label: "偏高", Severity: "high"},
+					&domainreport.NormReference{ScoreKind: domainreport.ScoreKindTScore, Benchmark: 50, TableVersion: "2026", FormVariant: "teacher", MinAgeMonths: 60, MaxAgeMonths: 95},
+				),
+			},
 		},
 		GeneratedAt: now,
 	})
@@ -67,5 +74,9 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 	restoredArtifact, err := mapper.ReportToDomain(mapper.ReportToPO(artifact))
 	if err != nil || restoredArtifact.Association().AssessmentID != meta.FromUint64(7) || restoredArtifact.Content().Model.Code != "SDS" || restoredArtifact.Content().PrimaryScore.Value != 42 {
 		t.Fatalf("artifact round trip = %#v err=%v", restoredArtifact, err)
+	}
+	dimension := restoredArtifact.Content().Dimensions[0]
+	if len(dimension.DerivedScores()) != 2 || dimension.Level() == nil || dimension.Level().Code != "elevated" || dimension.NormReference() == nil || dimension.NormReference().TableVersion != "2026" {
+		t.Fatalf("dimension score context did not round trip: %#v %#v %#v", dimension.DerivedScores(), dimension.Level(), dimension.NormReference())
 	}
 }

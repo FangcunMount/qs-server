@@ -104,6 +104,10 @@ func pureFactDimensions(source []domainoutcome.DimensionResult) []domainoutcome.
 			level.Label = ""
 			item.Level = &level
 		}
+		if dimension.NormReference != nil {
+			reference := *dimension.NormReference
+			item.NormReference = &reference
+		}
 		result = append(result, item)
 	}
 	return result

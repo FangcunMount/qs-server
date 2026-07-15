@@ -82,22 +82,117 @@ func (x *Suggestion) GetFactorCode() string {
 	return ""
 }
 
-type DimensionInterpret struct {
+type NormReference struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	FactorCode    string                 `protobuf:"bytes,1,opt,name=factor_code,json=factorCode,proto3" json:"factor_code,omitempty"`
-	FactorName    string                 `protobuf:"bytes,2,opt,name=factor_name,json=factorName,proto3" json:"factor_name,omitempty"`
-	RawScore      float64                `protobuf:"fixed64,3,opt,name=raw_score,json=rawScore,proto3" json:"raw_score,omitempty"`
-	RiskLevel     string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	MaxScore      float64                `protobuf:"fixed64,6,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"`
-	Suggestion    string                 `protobuf:"bytes,7,opt,name=suggestion,proto3" json:"suggestion,omitempty"`
+	ScoreKind     string                 `protobuf:"bytes,1,opt,name=score_kind,json=scoreKind,proto3" json:"score_kind,omitempty"`
+	Benchmark     float64                `protobuf:"fixed64,2,opt,name=benchmark,proto3" json:"benchmark,omitempty"`
+	TableVersion  string                 `protobuf:"bytes,3,opt,name=table_version,json=tableVersion,proto3" json:"table_version,omitempty"`
+	FormVariant   string                 `protobuf:"bytes,4,opt,name=form_variant,json=formVariant,proto3" json:"form_variant,omitempty"`
+	MinAgeMonths  int32                  `protobuf:"varint,5,opt,name=min_age_months,json=minAgeMonths,proto3" json:"min_age_months,omitempty"`
+	MaxAgeMonths  int32                  `protobuf:"varint,6,opt,name=max_age_months,json=maxAgeMonths,proto3" json:"max_age_months,omitempty"`
+	Gender        string                 `protobuf:"bytes,7,opt,name=gender,proto3" json:"gender,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NormReference) Reset() {
+	*x = NormReference{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NormReference) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NormReference) ProtoMessage() {}
+
+func (x *NormReference) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NormReference.ProtoReflect.Descriptor instead.
+func (*NormReference) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *NormReference) GetScoreKind() string {
+	if x != nil {
+		return x.ScoreKind
+	}
+	return ""
+}
+
+func (x *NormReference) GetBenchmark() float64 {
+	if x != nil {
+		return x.Benchmark
+	}
+	return 0
+}
+
+func (x *NormReference) GetTableVersion() string {
+	if x != nil {
+		return x.TableVersion
+	}
+	return ""
+}
+
+func (x *NormReference) GetFormVariant() string {
+	if x != nil {
+		return x.FormVariant
+	}
+	return ""
+}
+
+func (x *NormReference) GetMinAgeMonths() int32 {
+	if x != nil {
+		return x.MinAgeMonths
+	}
+	return 0
+}
+
+func (x *NormReference) GetMaxAgeMonths() int32 {
+	if x != nil {
+		return x.MaxAgeMonths
+	}
+	return 0
+}
+
+func (x *NormReference) GetGender() string {
+	if x != nil {
+		return x.Gender
+	}
+	return ""
+}
+
+type DimensionInterpret struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	FactorCode    string                   `protobuf:"bytes,1,opt,name=factor_code,json=factorCode,proto3" json:"factor_code,omitempty"`
+	FactorName    string                   `protobuf:"bytes,2,opt,name=factor_name,json=factorName,proto3" json:"factor_name,omitempty"`
+	RawScore      float64                  `protobuf:"fixed64,3,opt,name=raw_score,json=rawScore,proto3" json:"raw_score,omitempty"`
+	RiskLevel     string                   `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Description   string                   `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	MaxScore      float64                  `protobuf:"fixed64,6,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"`
+	Suggestion    string                   `protobuf:"bytes,7,opt,name=suggestion,proto3" json:"suggestion,omitempty"`
+	DerivedScores []*evaluation.ScoreValue `protobuf:"bytes,8,rep,name=derived_scores,json=derivedScores,proto3" json:"derived_scores,omitempty"`
+	Level         *evaluation.ResultLevel  `protobuf:"bytes,9,opt,name=level,proto3" json:"level,omitempty"`
+	NormReference *NormReference           `protobuf:"bytes,10,opt,name=norm_reference,json=normReference,proto3" json:"norm_reference,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DimensionInterpret) Reset() {
 	*x = DimensionInterpret{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[1]
+	mi := &file_interpretation_interpretation_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +204,7 @@ func (x *DimensionInterpret) String() string {
 func (*DimensionInterpret) ProtoMessage() {}
 
 func (x *DimensionInterpret) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[1]
+	mi := &file_interpretation_interpretation_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +217,7 @@ func (x *DimensionInterpret) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DimensionInterpret.ProtoReflect.Descriptor instead.
 func (*DimensionInterpret) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{1}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DimensionInterpret) GetFactorCode() string {
@@ -174,6 +269,27 @@ func (x *DimensionInterpret) GetSuggestion() string {
 	return ""
 }
 
+func (x *DimensionInterpret) GetDerivedScores() []*evaluation.ScoreValue {
+	if x != nil {
+		return x.DerivedScores
+	}
+	return nil
+}
+
+func (x *DimensionInterpret) GetLevel() *evaluation.ResultLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+func (x *DimensionInterpret) GetNormReference() *NormReference {
+	if x != nil {
+		return x.NormReference
+	}
+	return nil
+}
+
 type ModelRarity struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Percent       float64                `protobuf:"fixed64,1,opt,name=percent,proto3" json:"percent,omitempty"`
@@ -185,7 +301,7 @@ type ModelRarity struct {
 
 func (x *ModelRarity) Reset() {
 	*x = ModelRarity{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[2]
+	mi := &file_interpretation_interpretation_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -197,7 +313,7 @@ func (x *ModelRarity) String() string {
 func (*ModelRarity) ProtoMessage() {}
 
 func (x *ModelRarity) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[2]
+	mi := &file_interpretation_interpretation_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +326,7 @@ func (x *ModelRarity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelRarity.ProtoReflect.Descriptor instead.
 func (*ModelRarity) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{2}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ModelRarity) GetPercent() float64 {
@@ -252,7 +368,7 @@ type ModelExtra struct {
 
 func (x *ModelExtra) Reset() {
 	*x = ModelExtra{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[3]
+	mi := &file_interpretation_interpretation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -264,7 +380,7 @@ func (x *ModelExtra) String() string {
 func (*ModelExtra) ProtoMessage() {}
 
 func (x *ModelExtra) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[3]
+	mi := &file_interpretation_interpretation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -277,7 +393,7 @@ func (x *ModelExtra) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelExtra.ProtoReflect.Descriptor instead.
 func (*ModelExtra) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{3}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ModelExtra) GetKind() string {
@@ -367,7 +483,7 @@ type AssessmentReport struct {
 
 func (x *AssessmentReport) Reset() {
 	*x = AssessmentReport{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[4]
+	mi := &file_interpretation_interpretation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -379,7 +495,7 @@ func (x *AssessmentReport) String() string {
 func (*AssessmentReport) ProtoMessage() {}
 
 func (x *AssessmentReport) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[4]
+	mi := &file_interpretation_interpretation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -392,7 +508,7 @@ func (x *AssessmentReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssessmentReport.ProtoReflect.Descriptor instead.
 func (*AssessmentReport) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{4}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AssessmentReport) GetAssessmentId() uint64 {
@@ -468,7 +584,7 @@ type GetAssessmentReportRequest struct {
 
 func (x *GetAssessmentReportRequest) Reset() {
 	*x = GetAssessmentReportRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[5]
+	mi := &file_interpretation_interpretation_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +596,7 @@ func (x *GetAssessmentReportRequest) String() string {
 func (*GetAssessmentReportRequest) ProtoMessage() {}
 
 func (x *GetAssessmentReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[5]
+	mi := &file_interpretation_interpretation_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +609,7 @@ func (x *GetAssessmentReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentReportRequest.ProtoReflect.Descriptor instead.
 func (*GetAssessmentReportRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{5}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetAssessmentReportRequest) GetAssessmentId() uint64 {
@@ -519,7 +635,7 @@ type GetAssessmentReportResponse struct {
 
 func (x *GetAssessmentReportResponse) Reset() {
 	*x = GetAssessmentReportResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[6]
+	mi := &file_interpretation_interpretation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -531,7 +647,7 @@ func (x *GetAssessmentReportResponse) String() string {
 func (*GetAssessmentReportResponse) ProtoMessage() {}
 
 func (x *GetAssessmentReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[6]
+	mi := &file_interpretation_interpretation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -544,7 +660,7 @@ func (x *GetAssessmentReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentReportResponse.ProtoReflect.Descriptor instead.
 func (*GetAssessmentReportResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{6}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetAssessmentReportResponse) GetReport() *AssessmentReport {
@@ -565,7 +681,7 @@ type ListMyReportsRequest struct {
 
 func (x *ListMyReportsRequest) Reset() {
 	*x = ListMyReportsRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[7]
+	mi := &file_interpretation_interpretation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -577,7 +693,7 @@ func (x *ListMyReportsRequest) String() string {
 func (*ListMyReportsRequest) ProtoMessage() {}
 
 func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[7]
+	mi := &file_interpretation_interpretation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -590,7 +706,7 @@ func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyReportsRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{7}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListMyReportsRequest) GetTesteeId() uint64 {
@@ -627,7 +743,7 @@ type ListMyReportsResponse struct {
 
 func (x *ListMyReportsResponse) Reset() {
 	*x = ListMyReportsResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	mi := &file_interpretation_interpretation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -639,7 +755,7 @@ func (x *ListMyReportsResponse) String() string {
 func (*ListMyReportsResponse) ProtoMessage() {}
 
 func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	mi := &file_interpretation_interpretation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -652,7 +768,7 @@ func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyReportsResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{8}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListMyReportsResponse) GetItems() []*AssessmentReport {
@@ -700,7 +816,7 @@ type GenerateReportFromAssessmentRequest struct {
 
 func (x *GenerateReportFromAssessmentRequest) Reset() {
 	*x = GenerateReportFromAssessmentRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[9]
+	mi := &file_interpretation_interpretation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +828,7 @@ func (x *GenerateReportFromAssessmentRequest) String() string {
 func (*GenerateReportFromAssessmentRequest) ProtoMessage() {}
 
 func (x *GenerateReportFromAssessmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[9]
+	mi := &file_interpretation_interpretation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +841,7 @@ func (x *GenerateReportFromAssessmentRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GenerateReportFromAssessmentRequest.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromAssessmentRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{9}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GenerateReportFromAssessmentRequest) GetAssessmentId() uint64 {
@@ -759,7 +875,7 @@ type GenerateReportFromAssessmentResponse struct {
 
 func (x *GenerateReportFromAssessmentResponse) Reset() {
 	*x = GenerateReportFromAssessmentResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[10]
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -771,7 +887,7 @@ func (x *GenerateReportFromAssessmentResponse) String() string {
 func (*GenerateReportFromAssessmentResponse) ProtoMessage() {}
 
 func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[10]
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -784,7 +900,7 @@ func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GenerateReportFromAssessmentResponse.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromAssessmentResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{10}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GenerateReportFromAssessmentResponse) GetSuccess() bool {
@@ -860,7 +976,16 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x1f\n" +
 	"\vfactor_code\x18\x03 \x01(\tR\n" +
-	"factorCode\"\xf1\x01\n" +
+	"factorCode\"\xf8\x01\n" +
+	"\rNormReference\x12\x1d\n" +
+	"\n" +
+	"score_kind\x18\x01 \x01(\tR\tscoreKind\x12\x1c\n" +
+	"\tbenchmark\x18\x02 \x01(\x01R\tbenchmark\x12#\n" +
+	"\rtable_version\x18\x03 \x01(\tR\ftableVersion\x12!\n" +
+	"\fform_variant\x18\x04 \x01(\tR\vformVariant\x12$\n" +
+	"\x0emin_age_months\x18\x05 \x01(\x05R\fminAgeMonths\x12$\n" +
+	"\x0emax_age_months\x18\x06 \x01(\x05R\fmaxAgeMonths\x12\x16\n" +
+	"\x06gender\x18\a \x01(\tR\x06gender\"\xa5\x03\n" +
 	"\x12DimensionInterpret\x12\x1f\n" +
 	"\vfactor_code\x18\x01 \x01(\tR\n" +
 	"factorCode\x12\x1f\n" +
@@ -873,7 +998,11 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\tmax_score\x18\x06 \x01(\x01R\bmaxScore\x12\x1e\n" +
 	"\n" +
 	"suggestion\x18\a \x01(\tR\n" +
-	"suggestion\"W\n" +
+	"suggestion\x12=\n" +
+	"\x0ederived_scores\x18\b \x03(\v2\x16.evaluation.ScoreValueR\rderivedScores\x12-\n" +
+	"\x05level\x18\t \x01(\v2\x17.evaluation.ResultLevelR\x05level\x12D\n" +
+	"\x0enorm_reference\x18\n" +
+	" \x01(\v2\x1d.interpretation.NormReferenceR\rnormReference\"W\n" +
 	"\vModelRarity\x12\x18\n" +
 	"\apercent\x18\x01 \x01(\x01R\apercent\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x18\n" +
@@ -962,44 +1091,48 @@ func file_interpretation_interpretation_proto_rawDescGZIP() []byte {
 	return file_interpretation_interpretation_proto_rawDescData
 }
 
-var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_interpretation_interpretation_proto_goTypes = []any{
 	(*Suggestion)(nil),                           // 0: interpretation.Suggestion
-	(*DimensionInterpret)(nil),                   // 1: interpretation.DimensionInterpret
-	(*ModelRarity)(nil),                          // 2: interpretation.ModelRarity
-	(*ModelExtra)(nil),                           // 3: interpretation.ModelExtra
-	(*AssessmentReport)(nil),                     // 4: interpretation.AssessmentReport
-	(*GetAssessmentReportRequest)(nil),           // 5: interpretation.GetAssessmentReportRequest
-	(*GetAssessmentReportResponse)(nil),          // 6: interpretation.GetAssessmentReportResponse
-	(*ListMyReportsRequest)(nil),                 // 7: interpretation.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil),                // 8: interpretation.ListMyReportsResponse
-	(*GenerateReportFromAssessmentRequest)(nil),  // 9: interpretation.GenerateReportFromAssessmentRequest
-	(*GenerateReportFromAssessmentResponse)(nil), // 10: interpretation.GenerateReportFromAssessmentResponse
-	(*evaluation.ModelIdentity)(nil),             // 11: evaluation.ModelIdentity
+	(*NormReference)(nil),                        // 1: interpretation.NormReference
+	(*DimensionInterpret)(nil),                   // 2: interpretation.DimensionInterpret
+	(*ModelRarity)(nil),                          // 3: interpretation.ModelRarity
+	(*ModelExtra)(nil),                           // 4: interpretation.ModelExtra
+	(*AssessmentReport)(nil),                     // 5: interpretation.AssessmentReport
+	(*GetAssessmentReportRequest)(nil),           // 6: interpretation.GetAssessmentReportRequest
+	(*GetAssessmentReportResponse)(nil),          // 7: interpretation.GetAssessmentReportResponse
+	(*ListMyReportsRequest)(nil),                 // 8: interpretation.ListMyReportsRequest
+	(*ListMyReportsResponse)(nil),                // 9: interpretation.ListMyReportsResponse
+	(*GenerateReportFromAssessmentRequest)(nil),  // 10: interpretation.GenerateReportFromAssessmentRequest
+	(*GenerateReportFromAssessmentResponse)(nil), // 11: interpretation.GenerateReportFromAssessmentResponse
 	(*evaluation.ScoreValue)(nil),                // 12: evaluation.ScoreValue
 	(*evaluation.ResultLevel)(nil),               // 13: evaluation.ResultLevel
+	(*evaluation.ModelIdentity)(nil),             // 14: evaluation.ModelIdentity
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
-	2,  // 0: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
-	1,  // 1: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
-	0,  // 2: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
-	3,  // 3: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
-	11, // 4: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
-	12, // 5: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
-	13, // 6: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
-	4,  // 7: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
-	4,  // 8: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
-	5,  // 9: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	7,  // 10: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	9,  // 11: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	6,  // 12: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	8,  // 13: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	10, // 14: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	12, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
+	13, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
+	1,  // 2: interpretation.DimensionInterpret.norm_reference:type_name -> interpretation.NormReference
+	3,  // 3: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
+	2,  // 4: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
+	0,  // 5: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
+	4,  // 6: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
+	14, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
+	12, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
+	13, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
+	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
+	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
+	6,  // 12: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
+	8,  // 13: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	10, // 14: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	7,  // 15: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	9,  // 16: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	11, // 17: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	15, // [15:18] is the sub-list for method output_type
+	12, // [12:15] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_interpretation_interpretation_proto_init() }
@@ -1013,7 +1146,7 @@ func file_interpretation_interpretation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpretation_interpretation_proto_rawDesc), len(file_interpretation_interpretation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

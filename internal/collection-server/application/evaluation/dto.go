@@ -139,13 +139,28 @@ type SuggestionResponse struct {
 
 // DimensionInterpretResponse 维度解读响应
 type DimensionInterpretResponse struct {
-	FactorCode  string   `json:"factor_code"`
-	FactorName  string   `json:"factor_name"`
-	RawScore    float64  `json:"raw_score"`
-	MaxScore    *float64 `json:"max_score,omitempty"`
-	RiskLevel   string   `json:"risk_level"`
-	Description string   `json:"description"`
-	Suggestion  string   `json:"suggestion,omitempty"`
+	FactorCode    string                 `json:"factor_code"`
+	FactorName    string                 `json:"factor_name"`
+	RawScore      float64                `json:"raw_score"`
+	MaxScore      *float64               `json:"max_score,omitempty"`
+	RiskLevel     string                 `json:"risk_level"`
+	DerivedScores []ScoreValueResponse   `json:"derived_scores,omitempty"`
+	Level         *ResultLevelResponse   `json:"level,omitempty"`
+	NormReference *NormReferenceResponse `json:"norm_reference,omitempty"`
+	Description   string                 `json:"description"`
+	Suggestion    string                 `json:"suggestion,omitempty"`
+}
+
+// NormReferenceResponse 是生成维度常模分时实际命中的常模表与分组。
+// 年龄与性别为空表示命中了不区分人口学信息的通用常模。
+type NormReferenceResponse struct {
+	ScoreKind    string  `json:"score_kind" example:"t_score"`
+	Benchmark    float64 `json:"benchmark" example:"50"`
+	TableVersion string  `json:"table_version,omitempty"`
+	FormVariant  string  `json:"form_variant,omitempty"`
+	MinAgeMonths int32   `json:"min_age_months,omitempty"`
+	MaxAgeMonths int32   `json:"max_age_months,omitempty"`
+	Gender       string  `json:"gender,omitempty"`
 }
 
 // ListAssessmentsRequest 测评列表请求

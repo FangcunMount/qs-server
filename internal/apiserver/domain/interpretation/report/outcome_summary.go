@@ -1,8 +1,11 @@
 package report
 
 const (
-	ScoreKindRawTotal     = "raw_total"
-	ScoreKindMatchPercent = "match_percent"
+	ScoreKindRawTotal      = "raw_total"
+	ScoreKindMatchPercent  = "match_percent"
+	ScoreKindTScore        = "t_score"
+	ScoreKindPercentile    = "percentile"
+	ScoreKindStandardScore = "standard_score"
 )
 
 // ScoreValue 是规范主 score on report。
@@ -18,6 +21,18 @@ type ResultLevel struct {
 	Code     string
 	Label    string
 	Severity string
+}
+
+// NormReference identifies the norm table and selected cohort used for a
+// dimension's derived score.
+type NormReference struct {
+	ScoreKind    string
+	Benchmark    float64
+	TableVersion string
+	FormVariant  string
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
 }
 
 func NewRawTotalScore(value float64, max *float64) *ScoreValue {

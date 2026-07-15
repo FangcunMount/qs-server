@@ -12,7 +12,7 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 	}
 	dimensions := make([]evaluationreadmodel.ReportDimensionRow, 0, len(po.Dimensions))
 	for _, d := range po.Dimensions {
-		dimensions = append(dimensions, evaluationreadmodel.ReportDimensionRow{
+		dimension := evaluationreadmodel.ReportDimensionRow{
 			FactorCode:     d.FactorCode,
 			FactorName:     d.FactorName,
 			RawScore:       d.RawScore,
@@ -24,7 +24,17 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 			SortOrder:      d.SortOrder,
 			Description:    d.Description,
 			Suggestion:     d.Suggestion,
-		})
+		}
+		for _, score := range d.DerivedScores {
+			dimension.DerivedScores = append(dimension.DerivedScores, evaluationreadmodel.ScoreValueRow{Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max})
+		}
+		if d.Level != nil {
+			dimension.Level = &evaluationreadmodel.ResultLevelRow{Code: d.Level.Code, Label: d.Level.Label, Severity: d.Level.Severity}
+		}
+		if d.NormReference != nil {
+			dimension.NormReference = &evaluationreadmodel.NormReferenceRow{ScoreKind: d.NormReference.ScoreKind, Benchmark: d.NormReference.Benchmark, TableVersion: d.NormReference.TableVersion, FormVariant: d.NormReference.FormVariant, MinAgeMonths: d.NormReference.MinAgeMonths, MaxAgeMonths: d.NormReference.MaxAgeMonths, Gender: d.NormReference.Gender}
+		}
+		dimensions = append(dimensions, dimension)
 	}
 	suggestions := make([]evaluationreadmodel.ReportSuggestionRow, 0, len(po.Suggestions))
 	for _, s := range po.Suggestions {

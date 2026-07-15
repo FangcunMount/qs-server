@@ -42,9 +42,15 @@ func TestLookupNormScoreSelectsDemographicDirectLookup(t *testing.T) {
 	if !ok || score.TScore != 55 || score.Percentile != 69 {
 		t.Fatalf("female lookup = %#v, ok = %v", score, ok)
 	}
+	if score.Reference.MinAgeMonths != 60 || score.Reference.MaxAgeMonths != 95 || score.Reference.Gender != "female" {
+		t.Fatalf("selected norm reference = %#v", score.Reference)
+	}
 	score, ok = calcnorm.LookupNormScore(tables, "gec", 10, calcnorm.Subject{AgeMonths: 120, Gender: "female"})
 	if !ok || score.TScore != 50 || score.Percentile != 50 {
 		t.Fatalf("generic fallback = %#v, ok = %v", score, ok)
+	}
+	if score.Reference != (calcnorm.NormReference{}) {
+		t.Fatalf("generic norm reference = %#v, want empty cohort", score.Reference)
 	}
 }
 

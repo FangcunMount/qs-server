@@ -33,6 +33,12 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 				if normScore.StandardScore != nil {
 					enriched.DerivedScores = append(enriched.DerivedScores, calculation.ScoreValue{Kind: calculation.ScoreKindStandardScore, Value: *normScore.StandardScore})
 				}
+				enriched.NormReference = &calculation.NormReference{
+					ScoreKind: calculation.ScoreKindTScore, Benchmark: 50,
+					TableVersion: p.Tables.NormTableVersion, FormVariant: p.Tables.FormVariant,
+					MinAgeMonths: normScore.Reference.MinAgeMonths, MaxAgeMonths: normScore.Reference.MaxAgeMonths,
+					Gender: normScore.Reference.Gender,
+				}
 				if level, conclusion, suggestion, interpreted := InterpretTScore(p.Tables, dim.Code, normScore.TScore); interpreted {
 					enriched.Level = &calculation.ResultLevel{Code: level, Label: conclusion}
 					if conclusion != "" {

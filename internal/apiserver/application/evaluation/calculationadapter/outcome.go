@@ -84,6 +84,14 @@ func dimensionResultFromOutcome(dimension domainoutcome.DimensionResult) calcula
 		HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder,
 		Score: scoreValueFromOutcome(dimension.Score), Level: levelFromOutcome(dimension.Level),
 	}
+	if dimension.NormReference != nil {
+		result.NormReference = &calculation.NormReference{
+			ScoreKind: calculation.ScoreKind(dimension.NormReference.ScoreKind), Benchmark: dimension.NormReference.Benchmark,
+			TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant,
+			MinAgeMonths: dimension.NormReference.MinAgeMonths, MaxAgeMonths: dimension.NormReference.MaxAgeMonths,
+			Gender: dimension.NormReference.Gender,
+		}
+	}
 	for _, score := range dimension.DerivedScores {
 		result.DerivedScores = append(result.DerivedScores, *scoreValueFromOutcome(&score))
 	}
@@ -96,6 +104,14 @@ func dimensionResultToOutcome(dimension calculation.DimensionResult) domainoutco
 		Role: dimension.Role, ParentCode: dimension.ParentCode,
 		HierarchyLevel: dimension.HierarchyLevel, SortOrder: dimension.SortOrder,
 		Score: scoreValueToOutcome(dimension.Score), Level: levelToOutcome(dimension.Level),
+	}
+	if dimension.NormReference != nil {
+		result.NormReference = &domainoutcome.NormReference{
+			ScoreKind: domainoutcome.ScoreKind(dimension.NormReference.ScoreKind), Benchmark: dimension.NormReference.Benchmark,
+			TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant,
+			MinAgeMonths: dimension.NormReference.MinAgeMonths, MaxAgeMonths: dimension.NormReference.MaxAgeMonths,
+			Gender: dimension.NormReference.Gender,
+		}
 	}
 	for _, score := range dimension.DerivedScores {
 		result.DerivedScores = append(result.DerivedScores, *scoreValueToOutcome(&score))

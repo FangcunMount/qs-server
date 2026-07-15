@@ -61,7 +61,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 	switch in.Runtime.AlgorithmFamily {
 	case modelcatalog.AlgorithmFamilyFactorScoring, modelcatalog.AlgorithmFamilyFactorNorm, modelcatalog.AlgorithmFamilyTaskPerformance:
 		assetModel := factorModel(assets, in.Runtime.AlgorithmFamily)
-		in.FactorScoring = &interpinput.FactorScoringFacts{Model: assetModel, Factors: factorScores(execution, assetModel)}
+		factors := factorScores(execution, assetModel)
+		applyFrozenNormInterpretation(factors, assets)
+		in.FactorScoring = &interpinput.FactorScoringFacts{Model: assetModel, Factors: factors}
 	case modelcatalog.AlgorithmFamilyFactorClassification:
 		if err := populateTypologyFacts(&in, execution, assets); err != nil {
 			return interpinput.InterpretationInput{}, err

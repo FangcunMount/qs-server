@@ -26,13 +26,16 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 		Conclusion: "高风险",
 		Dimensions: []DimensionInterpretPO{
 			{
-				FactorCode:  "total",
-				FactorName:  "总分",
-				RawScore:    88,
-				MaxScore:    &maxScore,
-				RiskLevel:   "high",
-				Description: "高风险描述",
-				Suggestion:  "建议干预",
+				FactorCode:    "total",
+				FactorName:    "总分",
+				RawScore:      88,
+				MaxScore:      &maxScore,
+				RiskLevel:     "high",
+				DerivedScores: []ScoreValuePO{{Kind: "t_score", Value: 65}, {Kind: "percentile", Value: 90}},
+				Level:         &ResultLevelPO{Code: "elevated", Label: "偏高", Severity: "high"},
+				NormReference: &NormReferencePO{ScoreKind: "t_score", Benchmark: 50, TableVersion: "2026", MinAgeMonths: 60, MaxAgeMonths: 95},
+				Description:   "高风险描述",
+				Suggestion:    "建议干预",
 			},
 		},
 		Suggestions: []SuggestionPO{
@@ -58,6 +61,9 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 	}
 	if len(row.Dimensions) != 1 || row.Dimensions[0].FactorCode != "total" || row.Dimensions[0].MaxScore == nil || *row.Dimensions[0].MaxScore != maxScore {
 		t.Fatalf("unexpected dimensions: %#v", row.Dimensions)
+	}
+	if len(row.Dimensions[0].DerivedScores) != 2 || row.Dimensions[0].Level == nil || row.Dimensions[0].Level.Code != "elevated" || row.Dimensions[0].NormReference == nil || row.Dimensions[0].NormReference.Benchmark != 50 {
+		t.Fatalf("unexpected dimension score context: %#v", row.Dimensions[0])
 	}
 	if len(row.Suggestions) != 2 || row.Suggestions[1].FactorCode == nil || *row.Suggestions[1].FactorCode != factorCode {
 		t.Fatalf("unexpected suggestions: %#v", row.Suggestions)

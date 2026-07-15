@@ -57,6 +57,9 @@ type FactorScoreInput struct {
 	RawScore       float64
 	MaxScore       *float64
 	RiskLevel      RiskLevel
+	DerivedScores  []ScoreValue
+	Level          *ResultLevel
+	NormReference  *NormReference
 	Description    string
 	Suggestion     string
 	IsTotalScore   bool

@@ -61,6 +61,15 @@ type NormScore struct {
 	TScore        float64
 	Percentile    float64
 	StandardScore *float64
+	Reference     NormReference
+}
+
+// NormReference identifies the selected norm cohort. Zero-value cohort fields
+// represent a generic lookup entry.
+type NormReference struct {
+	MinAgeMonths int
+	MaxAgeMonths int
+	Gender       string
 }
 
 // LookupNormScore 解析原始分 到 T 分 和 百分位 using 配置化 tables。
@@ -115,7 +124,7 @@ func lookupDirect(table FactorNormTable, rawScore float64, subject Subject) (Nor
 			continue
 		}
 		if entryMatchesSubject(entry, subject) {
-			return NormScore{TScore: entry.TScore, Percentile: entry.Percentile, StandardScore: cloneFloat64(entry.StandardScore)}, true
+			return NormScore{TScore: entry.TScore, Percentile: entry.Percentile, StandardScore: cloneFloat64(entry.StandardScore), Reference: referenceFromLookup(entry)}, true
 		}
 		if entry.MinAgeMonths == 0 && entry.MaxAgeMonths == 0 && entry.Gender == "" && generic == nil {
 			copy := entry
@@ -123,7 +132,7 @@ func lookupDirect(table FactorNormTable, rawScore float64, subject Subject) (Nor
 		}
 	}
 	if generic != nil {
-		return NormScore{TScore: generic.TScore, Percentile: generic.Percentile, StandardScore: cloneFloat64(generic.StandardScore)}, true
+		return NormScore{TScore: generic.TScore, Percentile: generic.Percentile, StandardScore: cloneFloat64(generic.StandardScore), Reference: referenceFromLookup(*generic)}, true
 	}
 	return NormScore{}, false
 }
@@ -171,9 +180,18 @@ func lookupParametric(table FactorNormTable, rawScore float64, subject Subject) 
 		return NormScore{
 			TScore:     roundScore(tScore),
 			Percentile: percentileFromTScore(tScore),
+			Reference:  referenceFromBand(band),
 		}, true
 	}
 	return NormScore{}, false
+}
+
+func referenceFromLookup(entry NormLookupEntry) NormReference {
+	return NormReference{MinAgeMonths: entry.MinAgeMonths, MaxAgeMonths: entry.MaxAgeMonths, Gender: entry.Gender}
+}
+
+func referenceFromBand(band NormBand) NormReference {
+	return NormReference{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender}
 }
 
 func bandMatchesSubject(band NormBand, subject Subject) bool {

@@ -19,15 +19,23 @@ func toDimensionInterpretResponses(outputs []DimensionInterpretOutput) []evaluat
 	}
 	dimensions := make([]evaluation.DimensionInterpretResponse, 0, len(outputs))
 	for _, dim := range outputs {
-		dimensions = append(dimensions, evaluation.DimensionInterpretResponse{
+		item := evaluation.DimensionInterpretResponse{
 			FactorCode:  dim.FactorCode,
 			FactorName:  dim.FactorName,
 			RawScore:    dim.RawScore,
 			MaxScore:    dim.MaxScore,
 			RiskLevel:   dim.RiskLevel,
+			Level:       toResultLevelResponse(dim.Level),
 			Description: dim.Description,
 			Suggestion:  dim.Suggestion,
-		})
+		}
+		for _, score := range dim.DerivedScores {
+			item.DerivedScores = append(item.DerivedScores, *toScoreValueResponse(&score))
+		}
+		if dim.NormReference != nil {
+			item.NormReference = &evaluation.NormReferenceResponse{ScoreKind: dim.NormReference.ScoreKind, Benchmark: dim.NormReference.Benchmark, TableVersion: dim.NormReference.TableVersion, FormVariant: dim.NormReference.FormVariant, MinAgeMonths: dim.NormReference.MinAgeMonths, MaxAgeMonths: dim.NormReference.MaxAgeMonths, Gender: dim.NormReference.Gender}
+		}
+		dimensions = append(dimensions, item)
 	}
 	return dimensions
 }
