@@ -56,7 +56,7 @@ func (h *AssessmentImageHandler) GetMBTIOutcomeImage(c *gin.Context) {
 		h.InternalErrorResponse(c, "get assessment image failed", err)
 		return
 	}
-	defer reader.Body.Close()
+	defer func() { _ = reader.Body.Close() }()
 	contentType := reader.ContentType
 	if contentType == "" {
 		contentType = contentTypeForFilename(filename)

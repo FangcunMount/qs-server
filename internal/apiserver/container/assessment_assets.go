@@ -6,7 +6,6 @@ import (
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	assessmentassets "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/assets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/aliyunoss"
-	objectstorage "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
@@ -20,7 +19,7 @@ func (c *Container) InitAssessmentImageService(assetOptions *apiserveroptions.As
 	if ossOptions == nil || !ossOptions.Enabled {
 		return fmt.Errorf("assessment image assets require enabled OSS")
 	}
-	var store objectstorage.ObjectStore = c.AssessmentAssetStore
+	store := c.AssessmentAssetStore
 	if store == nil {
 		store = c.QRCodeObjectStore
 	}

@@ -403,7 +403,7 @@ func (h *AssessmentModelHandler) UploadMBTIOutcomeImage(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "open image file: %v", err))
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := assessmentassets.ReadAllLimited(file, maxBytes)
 	if err != nil {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "read image file: %v", err))
