@@ -54,7 +54,7 @@ func TestUploadMBTIOutcomeImageRejectsInvalidOrOversizedContent(t *testing.T) {
 	}
 }
 
-func TestUploadMBTIOutcomeImageRequiresPermissionAndEditableDraft(t *testing.T) {
+func TestUploadMBTIOutcomeImageRequiresPermissionAndForksPublishedModelToDraft(t *testing.T) {
 	config := Config{ObjectKeyPrefix: "assets", PublicURLPrefix: "https://qs.example/assets", MaxUploadBytes: 1024}
 	denied := Service{Models: modelRepoStub{model: mbtiDraft()}, Authorizer: denyAuthorizer{}, Store: &memoryStore{}, Config: config}
 	if _, err := denied.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err == nil {
@@ -63,8 +63,11 @@ func TestUploadMBTIOutcomeImageRequiresPermissionAndEditableDraft(t *testing.T) 
 	published := mbtiDraft()
 	published.Status = domain.ModelStatusPublished
 	notDraft := Service{Models: modelRepoStub{model: published}, Authorizer: allowAuthorizer{}, Store: &memoryStore{}, Config: config}
-	if _, err := notDraft.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err == nil {
-		t.Fatal("expected published model rejection")
+	if _, err := notDraft.UploadMBTIOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
+		t.Fatalf("UploadMBTIOutcomeImage published model: %v", err)
+	}
+	if !published.IsDraft() {
+		t.Fatalf("published model status = %q, want draft", published.Status)
 	}
 }
 

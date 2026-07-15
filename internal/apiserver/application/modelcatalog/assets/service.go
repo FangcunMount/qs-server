@@ -17,6 +17,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -65,8 +66,8 @@ func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.
 	if err := s.Authorizer.Authorize(ctx, actor, modelcatalog.ActionEditDefinition, modelcatalog.Resource{Code: model.Code, Kind: model.Kind}); err != nil {
 		return nil, err
 	}
-	if model.Kind != domain.KindTypology || model.Algorithm != domain.AlgorithmMBTI || !model.IsDraft() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "only editable MBTI draft models may upload outcome images")
+	if model.Kind != domain.KindTypology || model.Algorithm != domain.AlgorithmMBTI || model.IsArchived() {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "only editable MBTI models may upload outcome images")
 	}
 	contentType, extension, err := validateImage(input.Content)
 	if err != nil {
@@ -77,6 +78,18 @@ func (s Service) UploadMBTIOutcomeImage(ctx context.Context, actor modelcatalog.
 	objectKey := path.Join(strings.Trim(s.Config.ObjectKeyPrefix, "/"), input.ModelCode, input.OutcomeCode, filename)
 	if err := s.Store.Put(ctx, objectKey, contentType, input.Content); err != nil {
 		return nil, fmt.Errorf("store MBTI outcome image: %w", err)
+	}
+	// Definition edits already fork a published head into a mutable draft. An
+	// uploaded portrait is the first step of that same edit flow, so preserve
+	// the active published snapshot and make the following definition save use
+	// a draft head as well.
+	if model.IsPublished() {
+		if err := model.ForkDraftFromPublished(time.Now()); err != nil {
+			return nil, err
+		}
+		if err := s.Models.Update(ctx, model); err != nil {
+			return nil, fmt.Errorf("fork draft for MBTI outcome image: %w", err)
+		}
 	}
 	return &modelcatalog.AssessmentImageUploadResult{
 		ImageURL:    strings.TrimRight(s.Config.PublicURLPrefix, "/") + "/" + path.Join(input.ModelCode, input.OutcomeCode, filename),
