@@ -85,6 +85,23 @@ func TestResilienceCoreDoesNotImportChildPackages(t *testing.T) {
 	}
 }
 
+func TestResilienceControlDoesNotImportDataPlanePackages(t *testing.T) {
+	root := repoRoot(t)
+	dataPlaneImports := []string{
+		"internal/pkg/resilience/ratelimit",
+		"internal/pkg/resilience/backpressure",
+		"internal/pkg/resilience/admission",
+		"internal/pkg/resilience/locklease",
+	}
+	walkGoFiles(t, filepath.Join(root, "internal", "pkg", "resilience", "control"), func(path, text string) {
+		for _, dataPlane := range dataPlaneImports {
+			if strings.Contains(text, `"github.com/FangcunMount/qs-server/`+dataPlane) {
+				t.Fatalf("%s imports data-plane package %s; control must remain protocol-only", mustRel(t, root, path), dataPlane)
+			}
+		}
+	})
+}
+
 func TestTransportsDoNotConstructRateLimiters(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
