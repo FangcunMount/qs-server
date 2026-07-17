@@ -249,7 +249,7 @@ func (s *Store) WatchStateSignals(ctx context.Context) (<-chan string, error) {
 	out := make(chan string, 1)
 	go func() {
 		defer close(out)
-		defer subscription.Close()
+		defer func() { _ = subscription.Close() }()
 		for {
 			select {
 			case <-ctx.Done():

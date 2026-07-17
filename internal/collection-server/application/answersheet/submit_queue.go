@@ -260,24 +260,20 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 		return
 	}
 	cleaned := q.statuses.SetStatus(requestID, status, answerSheetID, false)
-	if status == SubmitStatusProcessing {
-		q.inFlight.Add(1)
-	} else if status == SubmitStatusDone {
-		q.inFlight.Add(-1)
-		q.outstanding.Add(-1)
-	}
-	q.observeCleaned(context.Background(), cleaned)
-	q.observeQueueDepth()
-	q.observeQueueStatusCounts()
-
 	switch status {
 	case SubmitStatusProcessing:
+		q.inFlight.Add(1)
 		q.observe(context.Background(), resilienceplane.OutcomeQueueProcessing)
 	case SubmitStatusDone:
+		q.inFlight.Add(-1)
+		q.outstanding.Add(-1)
 		q.observe(context.Background(), resilienceplane.OutcomeQueueDone)
 	case SubmitStatusFailed:
 		q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
 	}
+	q.observeCleaned(context.Background(), cleaned)
+	q.observeQueueDepth()
+	q.observeQueueStatusCounts()
 }
 
 func (q *SubmitQueue) setFailed(requestID string, err error) {
