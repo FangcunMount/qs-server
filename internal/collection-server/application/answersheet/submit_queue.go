@@ -25,12 +25,11 @@ type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest)
 
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
-	jobs              chan submitJob
-	statuses          *submitQueueStatusStore
-	workerPool        *submitQueueWorkerPool
-	retryableFailures sync.Map
-	observer          resilienceplane.Observer
-	subject           resilienceplane.Subject
+	jobs       chan submitJob
+	statuses   *submitQueueStatusStore
+	workerPool *submitQueueWorkerPool
+	observer   resilienceplane.Observer
+	subject    resilienceplane.Subject
 }
 
 type SubmitQueueRuntimeOptions struct {
@@ -63,7 +62,7 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 			Strategy:  "memory_channel",
 		},
 	}
-	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus, q.recordFailure)
+	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus, q.setFailed)
 	q.workerPool.Start()
 
 	return q
@@ -81,24 +80,6 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 		return errors.New("request id is required")
 	}
 
-	// 幂等：若已有状态，直接复用现有状态。
-	if status, ok := q.getStatus(requestID); ok {
-		switch status.Status {
-		case SubmitStatusDone:
-			q.observe(ctx, resilienceplane.OutcomeQueueDuplicate)
-			return nil
-		case SubmitStatusQueued, SubmitStatusProcessing:
-			q.observe(ctx, resilienceplane.OutcomeQueueDuplicate)
-			return nil
-		case SubmitStatusFailed:
-			if retryable, _ := q.retryableFailures.Load(requestID); retryable == true {
-				break
-			}
-			q.observe(ctx, resilienceplane.OutcomeQueueFailed)
-			return errors.New("previous request failed, please retry with a new request_id")
-		}
-	}
-
 	job := submitJob{
 		ctx:       context.WithoutCancel(ctx),
 		requestID: requestID,
@@ -112,9 +93,10 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 	default:
 	}
 
-	select {
-	case q.jobs <- job:
-		q.setStatus(requestID, SubmitStatusQueued, "")
+	admission, cleaned := q.admit(job)
+	q.observeCleaned(ctx, cleaned)
+	switch admission {
+	case submitQueueAdmissionAccepted:
 		q.observe(ctx, resilienceplane.OutcomeQueueAccepted)
 		q.observeQueueDepth()
 		logger.L(ctx).Infow("答卷提交请求已进入处理队列",
@@ -126,13 +108,67 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 			"queue_depth", len(q.jobs),
 			"queue_capacity", cap(q.jobs),
 		)
-	default:
+	case submitQueueAdmissionDuplicate:
+		q.observe(ctx, resilienceplane.OutcomeQueueDuplicate)
+		return nil
+	case submitQueueAdmissionRejected:
+		q.observe(ctx, resilienceplane.OutcomeQueueFailed)
+		return errors.New("previous request failed, please retry with a new request_id")
+	case submitQueueAdmissionFull:
 		q.observe(ctx, resilienceplane.OutcomeQueueFull)
 		q.observeQueueDepth()
 		return ErrQueueFull
 	}
 
 	return nil
+}
+
+type submitQueueAdmission uint8
+
+const (
+	submitQueueAdmissionAccepted submitQueueAdmission = iota
+	submitQueueAdmissionDuplicate
+	submitQueueAdmissionRejected
+	submitQueueAdmissionFull
+)
+
+func (q *SubmitQueue) admit(job submitJob) (submitQueueAdmission, int) {
+	if q == nil || q.statuses == nil {
+		return submitQueueAdmissionRejected, 0
+	}
+	store := q.statuses
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	cleaned := store.cleanupLocked(time.Now())
+	previous, exists := store.statuses[job.requestID]
+	if exists {
+		switch previous.Response.Status {
+		case SubmitStatusDone, SubmitStatusQueued, SubmitStatusProcessing:
+			return submitQueueAdmissionDuplicate, cleaned
+		case SubmitStatusFailed:
+			if !previous.RetryableLeaseFailure {
+				return submitQueueAdmissionRejected, cleaned
+			}
+		}
+	}
+
+	queued := SubmitStatusResponse{Status: SubmitStatusQueued, UpdatedAt: time.Now().Unix()}
+	if exists {
+		queued.AssessmentID = previous.Response.AssessmentID
+	}
+	store.statuses[job.requestID] = submitQueueStatusEntry{Response: queued}
+	select {
+	case q.jobs <- job:
+		return submitQueueAdmissionAccepted, cleaned
+	default:
+		if exists {
+			store.statuses[job.requestID] = previous
+		} else {
+			delete(store.statuses, job.requestID)
+		}
+		return submitQueueAdmissionFull, cleaned
+	}
 }
 
 // GetStatus returns submit status for a request ID.
@@ -188,17 +224,7 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	if requestID == "" {
 		return
 	}
-	if status != SubmitStatusFailed {
-		q.retryableFailures.Delete(requestID)
-	}
-
-	existing, _ := q.getStatus(requestID)
-	cleaned := q.statuses.Set(requestID, SubmitStatusResponse{
-		Status:        status,
-		AnswerSheetID: answerSheetID,
-		AssessmentID:  existing.AssessmentID,
-		UpdatedAt:     time.Now().Unix(),
-	})
+	cleaned := q.statuses.SetStatus(requestID, status, answerSheetID, false)
 	q.observeCleaned(context.Background(), cleaned)
 	q.observeQueueDepth()
 	q.observeQueueStatusCounts()
@@ -213,32 +239,23 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	}
 }
 
-func (q *SubmitQueue) recordFailure(requestID string, err error) {
+func (q *SubmitQueue) setFailed(requestID string, err error) {
 	if q == nil || requestID == "" || err == nil {
 		return
 	}
 	retryable := errors.Is(err, locklease.ErrLeaseLost) || errors.Is(err, locklease.ErrLeaseRenewFailed)
-	q.retryableFailures.Store(requestID, retryable)
+	cleaned := q.statuses.SetStatus(requestID, SubmitStatusFailed, "", retryable)
+	q.observeCleaned(context.Background(), cleaned)
+	q.observeQueueDepth()
+	q.observeQueueStatusCounts()
+	q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
 }
 
 func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {
 	if q == nil || requestID == "" || assessmentID == "" {
 		return
 	}
-	status, ok := q.getStatus(requestID)
-	if !ok {
-		status = SubmitStatusResponse{}
-	}
-	status.AssessmentID = assessmentID
-	status.UpdatedAt = time.Now().Unix()
-	q.statuses.Set(requestID, status)
-}
-
-func (q *SubmitQueue) getStatus(requestID string) (SubmitStatusResponse, bool) {
-	if q == nil || q.statuses == nil {
-		return SubmitStatusResponse{}, false
-	}
-	return q.statuses.GetFresh(requestID)
+	q.statuses.SetAssessmentID(requestID, assessmentID)
 }
 
 func (q *SubmitQueue) observe(ctx context.Context, outcome resilienceplane.Outcome) {
@@ -291,47 +308,74 @@ func defaultSubmitQueueObserver(observer resilienceplane.Observer) resiliencepla
 type submitQueueStatusStore struct {
 	statusTTL   time.Duration
 	mu          sync.Mutex
-	statuses    map[string]SubmitStatusResponse
+	statuses    map[string]submitQueueStatusEntry
 	lastCleanup time.Time
+}
+
+type submitQueueStatusEntry struct {
+	Response              SubmitStatusResponse
+	RetryableLeaseFailure bool
 }
 
 func newSubmitQueueStatusStore(statusTTL time.Duration) *submitQueueStatusStore {
 	return &submitQueueStatusStore{
 		statusTTL: statusTTL,
-		statuses:  make(map[string]SubmitStatusResponse),
+		statuses:  make(map[string]submitQueueStatusEntry),
 	}
 }
 
 func (s *submitQueueStatusStore) Set(requestID string, status SubmitStatusResponse) int {
+	return s.SetEntry(requestID, submitQueueStatusEntry{Response: status})
+}
+
+func (s *submitQueueStatusStore) SetEntry(requestID string, entry submitQueueStatusEntry) int {
 	if s == nil || requestID == "" {
 		return 0
 	}
-	cleaned := s.cleanup()
 	s.mu.Lock()
-	s.statuses[requestID] = status
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	cleaned := s.cleanupLocked(time.Now())
+	s.statuses[requestID] = entry
 	return cleaned
+}
+
+func (s *submitQueueStatusStore) SetStatus(requestID, status, answerSheetID string, retryable bool) int {
+	if s == nil || requestID == "" {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cleaned := s.cleanupLocked(time.Now())
+	entry := s.statuses[requestID]
+	entry.Response.Status = status
+	entry.Response.AnswerSheetID = answerSheetID
+	entry.Response.UpdatedAt = time.Now().Unix()
+	entry.RetryableLeaseFailure = retryable
+	s.statuses[requestID] = entry
+	return cleaned
+}
+
+func (s *submitQueueStatusStore) SetAssessmentID(requestID, assessmentID string) {
+	if s == nil || requestID == "" || assessmentID == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry := s.statuses[requestID]
+	entry.Response.AssessmentID = assessmentID
+	entry.Response.UpdatedAt = time.Now().Unix()
+	s.statuses[requestID] = entry
 }
 
 func (s *submitQueueStatusStore) Get(requestID string) (SubmitStatusResponse, bool, int) {
 	if s == nil || requestID == "" {
 		return SubmitStatusResponse{}, false, 0
 	}
-	cleaned := s.cleanup()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	status, ok := s.statuses[requestID]
-	return status, ok, cleaned
-}
-
-func (s *submitQueueStatusStore) GetFresh(requestID string) (SubmitStatusResponse, bool) {
-	if s == nil || requestID == "" {
-		return SubmitStatusResponse{}, false
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	status, ok := s.statuses[requestID]
-	return status, ok
+	cleaned := s.cleanupLocked(time.Now())
+	entry, ok := s.statuses[requestID]
+	return entry.Response, ok, cleaned
 }
 
 func (s *submitQueueStatusStore) Snapshot(now time.Time) (map[string]int, int) {
@@ -354,14 +398,10 @@ func (s *submitQueueStatusStore) Counts() map[string]int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, status := range s.statuses {
-		counts[status.Status]++
+	for _, entry := range s.statuses {
+		counts[entry.Response.Status]++
 	}
 	return counts
-}
-
-func (s *submitQueueStatusStore) cleanup() int {
-	return s.cleanupAt(time.Now())
 }
 
 func (s *submitQueueStatusStore) cleanupAt(now time.Time) int {
@@ -370,12 +410,16 @@ func (s *submitQueueStatusStore) cleanupAt(now time.Time) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.cleanupLocked(now)
+}
+
+func (s *submitQueueStatusStore) cleanupLocked(now time.Time) int {
 	if now.Sub(s.lastCleanup) < time.Minute {
 		return 0
 	}
 	cleaned := 0
-	for key, status := range s.statuses {
-		if now.Sub(time.Unix(status.UpdatedAt, 0)) > s.statusTTL {
+	for key, entry := range s.statuses {
+		if now.Sub(time.Unix(entry.Response.UpdatedAt, 0)) > s.statusTTL {
 			delete(s.statuses, key)
 			cleaned++
 		}

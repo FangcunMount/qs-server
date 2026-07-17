@@ -13,14 +13,7 @@ func (r *Router) registerEventStatusInternalRoutes(internalV1 *gin.RouterGroup) 
 	}
 
 	events := internalV1.Group("/events", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-	events.GET("/status", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		r.eventStatus,
-	)...)
+	events.GET("/status", r.rateLimitedHandlers(rateLimitBudgetQuery, r.eventStatus)...)
 }
 
 // eventStatus returns the event delivery status.

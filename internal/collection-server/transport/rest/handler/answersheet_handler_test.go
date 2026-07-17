@@ -119,6 +119,9 @@ func TestAnswerSheetHandlerSubmitQueueFull(t *testing.T) {
 	if recorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", recorder.Code)
 	}
+	if got := recorder.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
 
 	var resp core.ErrResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {

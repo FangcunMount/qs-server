@@ -24,42 +24,14 @@ func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup
 	{
 		assessments := evaluations.Group("/assessments")
 		{
-			assessments.GET("", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.ListAssessmentsOutcome,
-			)...)
-			assessments.GET("/:id", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.GetAssessmentOutcome,
-			)...)
-			assessments.GET("/:id/report", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.GetReportOutcome,
-			)...)
+			assessments.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.ListAssessmentsOutcome)...)
+			assessments.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetAssessmentOutcome)...)
+			assessments.GET("/:id/report", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.GetReportOutcome)...)
 		}
 
 		reports := evaluations.Group("/reports")
 		{
-			reports.GET("", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.ListReportsOutcome,
-			)...)
+			reports.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.ListReportsOutcome)...)
 		}
 	}
 }

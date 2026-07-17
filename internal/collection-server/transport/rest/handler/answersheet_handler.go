@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 	uuid "github.com/satori/go.uuid"
@@ -75,6 +76,7 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 
 	if err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req); err != nil {
 		if errors.Is(err, answersheet.ErrQueueFull) {
+			ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
 			c.JSON(http.StatusTooManyRequests, core.ErrResponse{
 				Code:    http.StatusTooManyRequests,
 				Message: "submit queue full",

@@ -177,7 +177,7 @@ redis_profiles:
     database: 0
 
 lock_lease:
-  renewal_enabled: true
+  renewal_enabled: false
 
 redis_runtime:
   namespace: ""

@@ -12,52 +12,10 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	}
 	governanceHandler := handler.NewSystemGovernanceHandler(r.deps.SystemGovernanceFacade)
 	governance := internalV1.Group("/system-governance", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-	governance.GET("/overview", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		governanceHandler.Overview,
-	)...)
-	governance.GET("/events", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		governanceHandler.Events,
-	)...)
-	governance.GET("/cache", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		governanceHandler.Cache,
-	)...)
-	governance.GET("/resilience", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		governanceHandler.Resilience,
-	)...)
-	governance.GET("/actions", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		governanceHandler.Actions,
-	)...)
-	governance.POST("/actions/:action_id/runs", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		governanceHandler.RunAction,
-	)...)
+	governance.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Overview)...)
+	governance.GET("/events", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Events)...)
+	governance.GET("/cache", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Cache)...)
+	governance.GET("/resilience", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Resilience)...)
+	governance.GET("/actions", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Actions)...)
+	governance.POST("/actions/:action_id/runs", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.RunAction)...)
 }

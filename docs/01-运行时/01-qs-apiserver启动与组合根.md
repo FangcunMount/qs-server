@@ -452,7 +452,7 @@ assessment_mysql_events.DispatchDue
 | `initialize container` | 模块依赖缺失；IAM module 初始化失败；repository/adapter 构造失败 | `internal/apiserver/container/*`、`container/modules/*` |
 | `initialize integrations` | WeChat / OSS / notification 配置错误；authz version subscriber 创建失败 | integration config、IAM authz sync |
 | `initialize transports` | 端口冲突；TLS/mTLS 证书错误；gRPC auth/ACL 配置错误；路由注册依赖缺失 | server/gRPC config、证书、`BuildRESTDeps`、`BuildGRPCDeps` |
-| `start background runtimes` | scheduler 配置错误；lock manager 不可用；relay 依赖缺失 | `runtime_bootstrap.go`、plan/statistics/behavior 配置 |
+| `start background runtimes` | scheduler 配置错误；LockLease subsystem 不可用；relay 依赖缺失 | `runtime_bootstrap.go`、plan/statistics/behavior 配置 |
 | `Run` 阶段 | HTTP/gRPC listener 启动失败；运行时服务异常退出 | 端口、进程日志、shutdown hook |
 
 ---

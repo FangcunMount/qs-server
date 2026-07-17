@@ -24,114 +24,34 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		r.deps.Interpretation.ReportQueryJourney,
 		r.deps.Interpretation.ReportWaitJourney,
 	)
-	apiV1.GET("/assessments/:id/wait-report", r.rateLimitedHandlers(
-		r.rateCfg, r.rateCfg.QueryGlobalQPS, r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS, r.rateCfg.QueryUserBurst, journeyHandler.WaitReport,
-	)...)
+	apiV1.GET("/assessments/:id/wait-report", r.rateLimitedHandlers(rateLimitBudgetWaitReport, journeyHandler.WaitReport)...)
 
 	evaluations := apiV1.Group("/evaluations")
 	{
 		assessments := evaluations.Group("/assessments")
 		{
-			assessments.GET("", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.ListAssessments,
-			)...)
-			assessments.GET("/:id", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.GetAssessment,
-			)...)
-			assessments.GET("/:id/scores", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.GetScores,
-			)...)
-			assessments.GET("/:id/report", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.GetReport,
-			)...)
-			assessments.GET("/:id/high-risk-factors", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.GetHighRiskFactors,
-			)...)
-			assessments.GET("/:id/runs/latest", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.GetLatestAssessmentRun,
-			)...)
-			assessments.GET("/:id/runs", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.ListAssessmentRuns,
-			)...)
+			assessments.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.ListAssessments)...)
+			assessments.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.GetAssessment)...)
+			assessments.GET("/:id/scores", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetScores)...)
+			assessments.GET("/:id/report", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.GetReport)...)
+			assessments.GET("/:id/high-risk-factors", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetHighRiskFactors)...)
+			assessments.GET("/:id/runs/latest", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetLatestAssessmentRun)...)
+			assessments.GET("/:id/runs", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.ListAssessmentRuns)...)
 			assessmentAdmin := assessments.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
-			assessmentAdmin.POST("/:id/retry", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.SubmitGlobalQPS,
-				r.rateCfg.SubmitGlobalBurst,
-				r.rateCfg.SubmitUserQPS,
-				r.rateCfg.SubmitUserBurst,
-				evalHandler.RetryFailed,
-			)...)
+			assessmentAdmin.POST("/:id/retry", r.rateLimitedHandlers(rateLimitBudgetSubmit, evalHandler.RetryFailed)...)
 		}
 
 		scores := evaluations.Group("/scores")
 		{
-			scores.GET("/trend", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				evalHandler.GetFactorTrend,
-			)...)
+			scores.GET("/trend", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetFactorTrend)...)
 		}
 
 		reports := evaluations.Group("/reports")
 		{
-			reports.GET("", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.QueryGlobalQPS,
-				r.rateCfg.QueryGlobalBurst,
-				r.rateCfg.QueryUserQPS,
-				r.rateCfg.QueryUserBurst,
-				journeyHandler.ListReports,
-			)...)
+			reports.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.ListReports)...)
 		}
 
 		evaluationAdmin := evaluations.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
-		evaluationAdmin.POST("/batch-evaluate", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			evalHandler.BatchEvaluate,
-		)...)
+		evaluationAdmin.POST("/batch-evaluate", r.rateLimitedHandlers(rateLimitBudgetSubmit, evalHandler.BatchEvaluate)...)
 	}
 }

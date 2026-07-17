@@ -45,7 +45,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				redisruntime.FamilySDK,
 				redisruntime.FamilyLock,
 			})
-			assertRenewalEnabled(t, opts.LockLease)
+			assertRenewalMode(t, name, opts.LockLease)
 			if opts.MessagingOptions == nil {
 				t.Fatal("messaging options must be traceable")
 			}
@@ -82,7 +82,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 				redisruntime.FamilyOps,
 				redisruntime.FamilyLock,
 			})
-			assertRenewalEnabled(t, opts.LockLease)
+			assertRenewalMode(t, name, opts.LockLease)
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
 			}
@@ -115,7 +115,7 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			assertRedisFamilies(t, opts.RedisRuntime, []redisruntime.Family{
 				redisruntime.FamilyLock,
 			})
-			assertRenewalEnabled(t, opts.LockLease)
+			assertRenewalMode(t, name, opts.LockLease)
 			if cfg.Messaging == nil || cfg.Messaging.Provider == "" {
 				t.Fatal("worker messaging config must be traceable")
 			}
@@ -285,10 +285,14 @@ func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeO
 	}
 }
 
-func assertRenewalEnabled(t *testing.T, opts *genericoptions.LockLeaseOptions) {
+func assertRenewalMode(t *testing.T, configName string, opts *genericoptions.LockLeaseOptions) {
 	t.Helper()
-	if opts == nil || !opts.RenewalEnabled {
-		t.Fatal("lock_lease.renewal_enabled must be explicitly enabled in dev/prod config")
+	if opts == nil {
+		t.Fatal("lock_lease config must be explicit in dev/prod config")
+	}
+	wantEnabled := strings.Contains(configName, ".dev.")
+	if opts.RenewalEnabled != wantEnabled {
+		t.Fatalf("lock_lease.renewal_enabled = %v, want %v for %s", opts.RenewalEnabled, wantEnabled, configName)
 	}
 }
 

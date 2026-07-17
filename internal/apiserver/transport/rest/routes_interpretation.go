@@ -12,8 +12,8 @@ func (r *Router) registerInterpretationProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 	h := handler.NewInterpretationClinicianHandler(r.deps.Interpretation.ClinicianService)
 	reports := apiV1.Group("/clinicians/me/testees/:testee_id/reports")
-	reports.GET("", r.rateLimitedHandlers(r.rateCfg, r.rateCfg.QueryGlobalQPS, r.rateCfg.QueryGlobalBurst, r.rateCfg.QueryUserQPS, r.rateCfg.QueryUserBurst, h.List)...)
-	reports.GET("/:assessment_id", r.rateLimitedHandlers(r.rateCfg, r.rateCfg.QueryGlobalQPS, r.rateCfg.QueryGlobalBurst, r.rateCfg.QueryUserQPS, r.rateCfg.QueryUserBurst, h.Get)...)
+	reports.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, h.List)...)
+	reports.GET("/:assessment_id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Get)...)
 }
 
 func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGroup) {

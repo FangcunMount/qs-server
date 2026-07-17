@@ -56,6 +56,10 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		return nil, false, err
 	}
+	if cause := cancellationCause(ctx); cause != nil {
+		m.observeCanceled("acquire", lockName)
+		return nil, false, cause
+	}
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		observability.ObserveLockDegraded(lockName, "redis_unavailable")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "unavailable")
@@ -69,6 +73,10 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 		Key:  key,
 	}, ttl)
 	if err != nil {
+		if cause := cancellationCause(ctx); cause != nil {
+			m.observeCanceled("acquire", lockName)
+			return nil, false, cause
+		}
 		observability.ObserveLockAcquire(lockName, "error")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
@@ -119,6 +127,10 @@ func (m *Manager) RenewSpec(ctx context.Context, spec Spec, key string, lease *L
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
 		return false, fmt.Errorf("lock spec ttl must be greater than 0")
 	}
+	if cause := cancellationCause(ctx); cause != nil {
+		m.observeCanceled("renew", lockName)
+		return false, cause
+	}
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "unavailable")
 		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
@@ -129,6 +141,10 @@ func (m *Manager) RenewSpec(ctx context.Context, spec Spec, key string, lease *L
 
 	owned, err := baseredisadapter.NewManager(m.handle.Client, nil).RenewSpec(ctx, spec, key, lease, ttl)
 	if err != nil {
+		if cause := cancellationCause(ctx); cause != nil {
+			m.observeCanceled("renew", lockName)
+			return false, cause
+		}
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
 		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
 		m.observeFamilyFailure(err)
@@ -152,7 +168,15 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	if m == nil || m.handle == nil || m.handle.Client == nil || lease == nil || lease.Token == "" {
 		return nil
 	}
+	if cause := cancellationCause(ctx); cause != nil {
+		m.observeCanceled("release", lockName)
+		return cause
+	}
 	if err := baseredisadapter.NewManager(m.handle.Client, nil).Release(ctx, identity, lease); err != nil {
+		if cause := cancellationCause(ctx); cause != nil {
+			m.observeCanceled("release", lockName)
+			return cause
+		}
 		observability.ObserveLockRelease(lockName, "error")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "release", "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
@@ -164,6 +188,23 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	m.observe(ctx, identity, resilienceplane.OutcomeLockReleased)
 	m.observeFamilySuccess()
 	return nil
+}
+
+func cancellationCause(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return context.Cause(ctx)
+}
+
+func (m *Manager) observeCanceled(operation, lockName string) {
+	switch operation {
+	case "acquire":
+		observability.ObserveLockAcquire(lockName, "canceled")
+	case "release":
+		observability.ObserveLockRelease(lockName, "canceled")
+	}
+	lockobserve.ObserveOperation(m.componentName(), lockName, operation, "canceled")
 }
 
 func (m *Manager) observeFamilySuccess() {

@@ -43,18 +43,21 @@ sequenceDiagram
             Runner->>Body: cancel cause ErrLeaseRenewFailed
         end
         Body-->>Runner: exit after cancellation
+        Runner->>Runner: cancel renewal-only context and join renew loop
         Runner->>Redis: token-safe best-effort release
         Runner-->>Caller: body or renewal result
     end
 ```
 
-续租没有比例、重试次数等动态参数：周期固定为 `TTL / 3`，一次失败立即 fail-closed。Runner 会等待 body 响应取消；业务代码必须把 child context 继续传给数据库、gRPC 和循环。若 body 不退出，Runner 不会伪装成功或遗留后台写入，并按续租周期持续告警。
+续租没有比例、重试次数等动态参数：周期固定为 `TTL / 3`，一次失败立即 fail-closed。Runner 分离 `bodyCtx` 和 `renewCtx`：body 先完成时立即取消正在进行的 Redis renew，等续租 goroutine 退出后再 release；父 context 或租约失败时则取消 body。业务代码必须把 child context 继续传给数据库、gRPC 和循环。若 body 不退出，Runner 不会伪装成功或遗留后台写入，从下一个续租周期开始持续告警，日志包含 component、workload 和 cancellation cause。
 
 错误分类：
 
 - `ErrLeaseAcquireFailed`：初次 Redis 获取失败；worker 保持 degraded-open。
 - `ErrLeaseLost`：token 不匹配或 key 已过期；取消 child context。
 - `ErrLeaseRenewFailed`：Redis 无法确认所有权；取消 child context。
+- 父 context 取消：直接返回父 cause，不包装成 acquire/renew failure，也不触发 worker degraded-open。
+- body 因 context 或 gRPC `Canceled` 退出时，已确认的 lease error 优先；body 的非取消业务错误优先于 lease error。
 - release 始终 token-safe、best-effort，错误记录在 `RunResult.ReleaseErr`，不覆盖主体结果。
 
 ## 3. 调用方语义
@@ -71,24 +74,24 @@ lock_lease:
   renewal_enabled: true
 ```
 
-代码零值为 `false`，兼容没有该字段的旧配置；当前 dev/prod 配置显式启用。发生异常时可将单个进程配置改为 `false` 并重启，只关闭续租，不回退模块结构、key 或竞争语义。
+代码零值为 `false`，兼容没有该字段的旧配置。当前 apiserver、worker、collection-server 的 dev 配置显式开启，prod 配置显式关闭；生产应按 apiserver、worker、collection-server 的顺序逐个开启并观察完整业务周期。发生异常时可将单个进程改为 `false` 并重启，只关闭续租，不回退模块结构、key 或竞争语义。
 
 ## 5. 观测与治理
 
 Canonical 指标：
 
 ```text
-qs_locklease_operation_total{component,name,operation="acquire|renew|release",result="ok|contention|error|unavailable|lost"}
+qs_locklease_operation_total{component,name,operation="acquire|renew|release",result="ok|contention|error|unavailable|lost|canceled"}
 ```
 
-韧性 outcome 包含 `lock_renewed`、`lock_lost`、`lock_renew_error`。治理快照按进程从目录派生，展示 `ttl_seconds`、`renewal_mode`、`renew_every_seconds`，并结合 workload enable binding 与 `lock_lease` family 实际健康状态生成 `configured/degraded/reason`。
+韧性 outcome 包含 `lock_renewed`、`lock_lost`、`lock_renew_error`。Context cancellation 只记录 canonical `result="canceled"`：不发布 `lock_renew_error`，不将 Redis family 标记为失败或 degraded。治理快照按进程从目录派生，展示 `ttl_seconds`、`renewal_mode`、`renew_every_seconds`，并结合 workload enable binding 与 `lock_lease` family 实际健康状态生成 `configured/degraded/reason`。
 
 兼容期继续双写 `qs_cache_lock_acquire_total`、`qs_cache_lock_release_total`、`qs_cache_lock_degraded_total`；这些指标已 deprecated，本版本不删除。治理接口不返回完整 Redis key，也没有任意强制释放能力。
 
 ## 6. 排障顺序
 
 1. 查看 `lock_lease` family 的 configured、available、last_error。
-2. 按 component/workload 检查 `qs_locklease_operation_total` 的 `renew/error/lost`。
+2. 按 component/workload 检查 `qs_locklease_operation_total` 的 `renew/error/lost/canceled`；`canceled` 通常表示正常请求或进程取消。
 3. 检查 `qs_resilience_decision_total` 的 `lock_renew_error` 与 `lock_lost`。
 4. scheduler 查看 tick failure；worker 查看 NACK/retry；collection 查看 failed/retry 与 effective idempotency key。
 5. 确认业务 body 使用 Runner 提供的 child context；否则丢锁后 Runner 会等待并告警。

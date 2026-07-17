@@ -3,6 +3,7 @@ package process
 import (
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
@@ -39,6 +40,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		Handle:         lockHandle,
 		StatusRegistry: lockStatus,
 		RenewalEnabled: renewalEnabled,
+		Warn:           func(message string) { log.Warn(message) },
 		EnabledWorkloads: map[locklease.WorkloadID]bool{
 			locklease.WorkloadPlanSchedulerLeader:            s.config.PlanScheduler != nil && s.config.PlanScheduler.Enable,
 			locklease.WorkloadStatisticsSyncLeader:           s.config.StatisticsSync != nil && s.config.StatisticsSync.Enable,

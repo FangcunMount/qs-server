@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -252,6 +253,26 @@ type idempotencyGuardStub struct {
 	err      error
 }
 
+type leaseIdempotencyGuardStub struct {
+	err error
+}
+
+func (s leaseIdempotencyGuardStub) Run(context.Context, string, func(context.Context) (string, error)) (string, bool, error) {
+	return "", true, s.err
+}
+
+func (s leaseIdempotencyGuardStub) Begin(context.Context, string) (string, *locklease.Lease, bool, error) {
+	return "", nil, false, errors.New("legacy Begin must not be called")
+}
+
+func (s leaseIdempotencyGuardStub) Complete(context.Context, string, *locklease.Lease, string) error {
+	return errors.New("legacy Complete must not be called")
+}
+
+func (s leaseIdempotencyGuardStub) Abort(context.Context, string, *locklease.Lease) error {
+	return errors.New("legacy Abort must not be called")
+}
+
 func (s *idempotencyGuardStub) Begin(context.Context, string) (string, *locklease.Lease, bool, error) {
 	return s.doneID, &locklease.Lease{Key: "k", Token: "t"}, s.acquired, s.err
 }
@@ -295,6 +316,22 @@ func TestSubmitWithGuardReturnsIdempotentHit(t *testing.T) {
 	}
 	if resp == nil || resp.ID != "42" || resp.AssessmentID != "9001" || resp.Message != "already submitted" {
 		t.Fatalf("Submit() = %#v, want idempotent hit with assessment 9001", resp)
+	}
+}
+
+func TestSubmitWithLeaseGuardMapsRenewFailureToRetryableUnavailable(t *testing.T) {
+	service := &SubmissionService{
+		submitGuard: leaseIdempotencyGuardStub{err: locklease.ErrLeaseRenewFailed},
+	}
+
+	_, err := service.Submit(context.Background(), 1, &SubmitAnswerSheetRequest{
+		IdempotencyKey: "idem-renew-failed",
+	})
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("Submit() status = %s, want Unavailable; error = %v", status.Code(err), err)
+	}
+	if !errors.Is(err, locklease.ErrLeaseRenewFailed) {
+		t.Fatalf("Submit() error = %v, want ErrLeaseRenewFailed", err)
 	}
 }
 

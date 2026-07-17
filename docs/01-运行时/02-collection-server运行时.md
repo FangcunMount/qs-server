@@ -112,7 +112,7 @@ flowchart TB
 
 | 阶段 | 代码锚点 | 职责 | 失败时优先看 |
 | ---- | -------- | ---- | ------------ |
-| `prepare resources` | `process/resource_bootstrap.go` | 初始化 Redis registry，构建 cacheplane runtime、ops handle、lock handle、lock manager | Redis profile、ACL 用户、RedisRuntime family |
+| `prepare resources` | `process/resource_bootstrap.go` | 初始化 Redis registry，构建 cacheplane runtime、ops handle、lock handle和独立 LockLease subsystem | Redis profile、ACL 用户、RedisRuntime family |
 | `initialize container` | `process/container_bootstrap.go` | 创建 collection container，初始化 IAM module | IAM 配置、JWKS、gRPC IAM、service auth |
 | `initialize integrations` | `process/integration_bootstrap.go` | 创建 apiserver gRPC manager，注入 client bundle，启动 authz sync | gRPC endpoint、mTLS 证书、服务端名称、service JWT |
 | `initialize transports` | `process/transport_bootstrap.go` | 创建 HTTP server，挂并发限制，注册 REST routes | HTTP/HTTPS bind、middleware、router |
@@ -122,7 +122,7 @@ collection-server 没有像 apiserver 那样独立的 `runtimeStage`，因为它
 
 ---
 
-## 4. Resource Stage：Redis runtime 与 lock manager
+## 4. Resource Stage：Redis runtime 与 LockLease subsystem
 
 collection-server 的资源阶段只初始化 Redis 相关能力。虽然类型名是 `DatabaseManager`，但代码注释明确写的是 **manages collection-server Redis connectivity**。
 
@@ -134,7 +134,7 @@ flowchart LR
     runtime[cacheplane Runtime]
     ops[ops_runtime handle]
     lock[lock_lease handle]
-    lm[LockManager]
+    lm[LockLease subsystem]
 
     cfg --> mgr
     mgr --> redis
@@ -152,7 +152,7 @@ flowchart LR
 | `redisRuntime` | collection 的 Redis runtime |
 | `opsHandle` | 操作型 Redis handle，主要给限流、提交状态、运维能力使用 |
 | `lockHandle` | lock family handle |
-| `lockManager` | SubmitGuard 等幂等 / 锁能力使用 |
+| `lockSubsystem` | 提供 SubmitGuard 所需 Runner、manager 和 key builder，并接入续租告警 |
 
 默认 Redis family 主要有两类：
 
@@ -172,7 +172,7 @@ container stage 创建 `collection-server/container.Container`，并给它注入
 ```text
 options.Options
 opsHandle
-lockManager
+lockSubsystem
 familyStatus
 IAMModule
 ```
@@ -486,7 +486,7 @@ collection 的保护层包括：
 | ---- | ---- | ---- |
 | RateLimit | Router / `rateLimitedHandlers` | 支持 Redis distributed limiter，不可用时本地 limiter |
 | SubmitQueue | `answersheet.SubmitQueue` | 削峰，HTTP 202 后异步 gRPC |
-| SubmitGuard | `redisops.NewSubmitGuard` | 基于 Redis / lock manager 的提交幂等前置保护 |
+| SubmitGuard | `redisops.NewSubmitGuard` | 基于 Redis / LockLease Runner 的提交幂等前置保护 |
 | gRPC max-inflight | `grpcclient.Manager` | 对 collection -> apiserver 的 RPC 并发做上限 |
 | HTTP concurrency | transport stage | 对整个 HTTP server 做并发限制 |
 | Governance endpoint | HealthHandler | `/governance/redis`、`/governance/resilience` |

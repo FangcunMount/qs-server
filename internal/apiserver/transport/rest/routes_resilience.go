@@ -11,14 +11,7 @@ import (
 
 func (r *Router) registerResilienceInternalRoutes(internalV1 *gin.RouterGroup) {
 	resilience := internalV1.Group("/resilience", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-	resilience.GET("/status", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		r.resilienceStatus,
-	)...)
+	resilience.GET("/status", r.rateLimitedHandlers(rateLimitBudgetQuery, r.resilienceStatus)...)
 }
 
 // resilienceStatus returns the internal runtime resilience snapshot.

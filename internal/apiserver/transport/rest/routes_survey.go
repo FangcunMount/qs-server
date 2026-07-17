@@ -46,30 +46,9 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 		admin := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		read := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAnswersheets))
 
-		admin.POST("/admin-submit", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.AdminSubmitGlobalQPS,
-			r.rateCfg.AdminSubmitGlobalBurst,
-			r.rateCfg.AdminSubmitUserQPS,
-			r.rateCfg.AdminSubmitUserBurst,
-			answersheetHandler.AdminSubmit,
-		)...)
-		read.GET("/:id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			answersheetHandler.GetByID,
-		)...)
-		read.GET("", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			answersheetHandler.List,
-		)...)
+		admin.POST("/admin-submit", r.rateLimitedHandlers(rateLimitBudgetAdminSubmit, answersheetHandler.AdminSubmit)...)
+		read.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.GetByID)...)
+		read.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.List)...)
 	}
 }
 

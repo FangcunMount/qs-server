@@ -37,7 +37,7 @@ sequenceDiagram
 
 ## 5. 核心数据结构
 
-`submitJob` 包含 context、request_id、writer_id 和提交请求；`SubmitStatusResponse` 保存 queued、processing、completed、failed 等状态；队列内部有有界 channel、worker pool、状态 TTL 和 observer。
+`submitJob` 包含 context、request_id、writer_id 和提交请求；公开 `SubmitStatusResponse` 保持 queued、processing、done、failed 四种状态和原 JSON 结构。状态库内部使用 `submitQueueStatusEntry`，将 response 和 `RetryableLeaseFailure` 放在同一个 TTL entry 中，不再使用独立 retry map。
 
 ## 6. 正常流程
 
@@ -45,7 +45,7 @@ sequenceDiagram
 
 ## 7. 异常流程
 
-队列满返回 `submit queue full`；相同 request_id 的重复入队复用 in-flight 状态；失败请求需要新的 request_id；状态超过 TTL 后清理；当前 SubmitQueue 不暴露 drain / shutdown 控制面。
+队列满返回 `submit queue full`；相同 request_id 的 queued/processing/done 重复入队保持 no-op；普通 failed 仍需新 request_id。仅当 collection submit 因 `ErrLeaseLost` 或 `ErrLeaseRenewFailed` 失败时，原 request_id 允许再入队一次。Admission 在状态库同一把锁内先写 queued 再非阻塞发送 channel，避免 worker 的 processing/done 被倒写；channel full 时恢复原 entry。状态 TTL 清理会删除完整 entry，不遗留 retry 元数据。当前 SubmitQueue 不暴露 drain / shutdown 控制面。
 
 ## 8. 幂等 / 降级 / 背压
 

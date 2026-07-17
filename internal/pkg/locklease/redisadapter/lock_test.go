@@ -2,12 +2,14 @@ package redisadapter
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -246,6 +248,47 @@ func TestManagerUsesInjectedObserver(t *testing.T) {
 		if !observer.has(outcome) {
 			t.Fatalf("observer missing outcome %s in %#v", outcome, observer.decisions)
 		}
+	}
+}
+
+func TestManagerCancellationDoesNotDegradeRedisFamily(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+
+	registry := redisobserve.NewFamilyStatusRegistry("worker")
+	registry.Update(redisobserve.FamilyStatus{
+		Component:  "worker",
+		Family:     string(redisruntime.FamilyLock),
+		Configured: true,
+		Available:  true,
+		Mode:       redisobserve.FamilyModeNamedProfile,
+	})
+	decisions := &lockleaseRecordingObserver{}
+	manager := NewManagerWithObservers("worker", "lock_lease", &redisruntime.Handle{
+		Family:  redisruntime.FamilyLock,
+		Client:  client,
+		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
+	}, decisions, redisobserve.NewComponentObserver("worker", registry))
+	spec, _ := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+
+	lease, acquired, err := manager.AcquireSpec(context.Background(), spec.Spec, "answersheet:processing:cancel")
+	if err != nil || !acquired {
+		t.Fatalf("AcquireSpec() acquired=%v err=%v", acquired, err)
+	}
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if owned, renewErr := manager.RenewSpec(canceled, spec.Spec, "answersheet:processing:cancel", lease); !errors.Is(renewErr, context.Canceled) || owned {
+		t.Fatalf("RenewSpec() owned=%v err=%v, want canceled", owned, renewErr)
+	}
+
+	statuses := registry.Snapshot()
+	if len(statuses) != 1 || !statuses[0].Available || statuses[0].Degraded || statuses[0].ConsecutiveFailures != 0 {
+		t.Fatalf("family status after canceled renew = %+v", statuses)
+	}
+	if decisions.has(resilienceplane.OutcomeLockRenewError) {
+		t.Fatalf("canceled renew emitted lock_renew_error: %#v", decisions.decisions)
 	}
 }
 

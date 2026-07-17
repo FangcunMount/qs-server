@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,11 @@ type ReportEventsHandler struct {
 	limiter  ratelimit.RateLimiter
 }
 
+type subscribeLimiter struct {
+	global ratelimit.RateLimiter
+	user   ratelimit.RateLimiter
+}
+
 func NewReportEventsHandler(deps Dependencies) *ReportEventsHandler {
 	opts := deps.Options
 	if opts == nil {
@@ -54,19 +60,53 @@ func newSubscribeLimiter(backend ratelimit.Backend, cfg *options.RateLimitOption
 	if cfg == nil {
 		cfg = options.NewRateLimitOptions()
 	}
-	policy := ratelimit.RateLimitPolicy{
+	if !cfg.Enabled {
+		return nil
+	}
+
+	globalPolicy := ratelimit.RateLimitPolicy{
 		Component:     "collection-server",
 		Scope:         "report_events",
-		Resource:      "subscribe",
+		Resource:      "global",
 		Strategy:      "local",
 		RatePerSecond: cfg.ReportEventsGlobalQPS,
 		Burst:         cfg.ReportEventsGlobalBurst,
 	}
-	if backend != nil {
-		policy.Strategy = "redis"
-		return ratelimit.NewDistributedLimiter(backend, policy)
+	userPolicy := ratelimit.RateLimitPolicy{
+		Component:     "collection-server",
+		Scope:         "report_events",
+		Resource:      "user",
+		Strategy:      "local_key",
+		RatePerSecond: cfg.ReportEventsUserQPS,
+		Burst:         cfg.ReportEventsUserBurst,
 	}
-	return ratelimit.NewLocalLimiter(policy)
+	if backend != nil {
+		globalPolicy.Strategy = "redis"
+		userPolicy.Strategy = "redis"
+		return &subscribeLimiter{
+			global: ratelimit.NewDistributedLimiter(backend, globalPolicy),
+			user:   ratelimit.NewDistributedLimiter(backend, userPolicy),
+		}
+	}
+	return &subscribeLimiter{
+		global: ratelimit.NewLocalLimiter(globalPolicy),
+		user:   ratelimit.NewKeyedLocalLimiter(userPolicy),
+	}
+}
+
+func (l *subscribeLimiter) Decide(ctx context.Context, key string) ratelimit.RateLimitDecision {
+	globalDecision := l.global.Decide(ctx, "limit:report_events:global")
+	if !globalDecision.Allowed || l.user == nil {
+		return globalDecision
+	}
+	return l.user.Decide(ctx, "limit:report_events:user:"+key)
+}
+
+func subscribeLimitKey(c *gin.Context) string {
+	if userID := pkgmiddleware.GetUserID(c); userID != "" {
+		return "user:" + userID
+	}
+	return "ip:" + c.ClientIP()
 }
 
 func (h *ReportEventsHandler) Enabled() bool {
@@ -95,6 +135,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "closed") }()
 
 	ctx := c.Request.Context()
+	limitKey := subscribeLimitKey(c)
 	idleTimeout := time.Duration(h.opts.IdleTimeoutSeconds) * time.Second
 	heartbeat := time.Duration(h.opts.HeartbeatIntervalSeconds) * time.Second
 
@@ -168,7 +209,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 				continue
 			}
 			if h.limiter != nil {
-				decision := h.limiter.Decide(ctx, frame.TesteeID)
+				decision := h.limiter.Decide(ctx, limitKey)
 				if !decision.Allowed {
 					incSubscribeDenied("rate_limited")
 					_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "rate_limited", Message: "subscribe rate limited"})

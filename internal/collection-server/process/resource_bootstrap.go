@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -38,6 +39,7 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		Handle:         redisRuntime.Handle(redisruntime.FamilyLock),
 		StatusRegistry: redisRuntime.StatusRegistry,
 		RenewalEnabled: renewalEnabled,
+		Warn:           func(message string) { log.Warn(message) },
 	})
 	return resourceOutput{
 		handles: resourceHandles{

@@ -346,6 +346,31 @@ func TestAnswerSheetRunnerAcquireFailureRemainsDegradedOpen(t *testing.T) {
 	}
 }
 
+func TestAnswerSheetRunnerParentCancellationDoesNotDegradeOpen(t *testing.T) {
+	bodyCalls := 0
+	observer := &workerGateRecordingObserver{}
+	deps := &Dependencies{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		LockRunner: runnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+			return locklease.RunResult{}, context.Canceled
+		}},
+	}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{observer: observer})
+	err := gate.Run(context.Background(), deps, "event-canceled", 43, func(context.Context) error {
+		bodyCalls++
+		return nil
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+	if bodyCalls != 0 {
+		t.Fatalf("body calls = %d, want 0", bodyCalls)
+	}
+	if observer.has(resilienceplane.OutcomeDegradedOpen) {
+		t.Fatal("parent cancellation must not trigger degraded-open execution")
+	}
+}
+
 func TestAnswerSheetRunnerLeaseLossFailsForMessageRetry(t *testing.T) {
 	deps := &Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),

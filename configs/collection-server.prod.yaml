@@ -89,7 +89,7 @@ redis_profiles:                        # Redis 配置文件
     database: 6                        # Redis 数据库 6
 
 lock_lease:
-  renewal_enabled: true
+  renewal_enabled: false
 
 redis_runtime:                         # Redis 运行时配置
   namespace: ""                        # 命名空间

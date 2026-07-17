@@ -170,3 +170,90 @@ func TestLeaderLockDisplayKeyUsesDefaultBuilderWhenBuilderIsNil(t *testing.T) {
 		t.Fatalf("DisplayKey() = %q, want raw key with default builder", got)
 	}
 }
+
+func TestLeaderLockRunUsesRunnerContextAndReportsReleaseError(t *testing.T) {
+	type contextKey struct{}
+	releaseErr := errors.New("release failed")
+	var gotReleaseErr error
+	runner := leaderLockRunnerStub{run: func(
+		ctx context.Context,
+		workload locklease.WorkloadID,
+		key string,
+		ttl time.Duration,
+		body func(context.Context) error,
+	) (locklease.RunResult, error) {
+		if workload != locklease.WorkloadPlanSchedulerLeader || key != "qs:plan-scheduler:runner" || ttl != time.Minute {
+			t.Fatalf("runner input = %s, %q, %s", workload, key, ttl)
+		}
+		child := context.WithValue(ctx, contextKey{}, "runner-child")
+		if err := body(child); err != nil {
+			return locklease.RunResult{Acquired: true}, err
+		}
+		return locklease.RunResult{Acquired: true, ReleaseErr: releaseErr}, nil
+	}}
+	lock := newLeaderLock(
+		workloadSpec(locklease.WorkloadPlanSchedulerLeader),
+		"qs:plan-scheduler:runner",
+		time.Minute,
+		nil,
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			t.Fatal("legacy acquire must not be called when runner is available")
+			return nil, false, nil
+		},
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
+			t.Fatal("legacy release must not be called when runner is available")
+			return nil
+		},
+		runner,
+	)
+
+	err := lock.Run(context.Background(), leaderLockRunOptions{
+		OnReleaseError: func(_ string, err error) { gotReleaseErr = err },
+	}, func(ctx context.Context) error {
+		if got := ctx.Value(contextKey{}); got != "runner-child" {
+			t.Fatalf("body context value = %v, want runner child context", got)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !errors.Is(gotReleaseErr, releaseErr) {
+		t.Fatalf("release error = %v, want %v", gotReleaseErr, releaseErr)
+	}
+}
+
+func TestLeaderLockRunnerContentionSkipsBody(t *testing.T) {
+	runner := leaderLockRunnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+		return locklease.RunResult{}, nil
+	}}
+	lock := newLeaderLock(
+		workloadSpec(locklease.WorkloadStatisticsSyncLeader),
+		"qs:statistics-sync:runner",
+		time.Minute,
+		nil,
+		nil,
+		nil,
+		runner,
+	)
+	skipped := false
+	if err := lock.Run(context.Background(), leaderLockRunOptions{
+		OnNotAcquired: func(string) { skipped = true },
+	}, func(context.Context) error {
+		t.Fatal("body must not run on contention")
+		return nil
+	}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !skipped {
+		t.Fatal("contention callback was not called")
+	}
+}
+
+type leaderLockRunnerStub struct {
+	run func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error)
+}
+
+func (r leaderLockRunnerStub) Run(ctx context.Context, workload locklease.WorkloadID, key string, ttl time.Duration, body func(context.Context) error) (locklease.RunResult, error) {
+	return r.run(ctx, workload, key, ttl, body)
+}

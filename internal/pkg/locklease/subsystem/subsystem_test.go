@@ -3,6 +3,7 @@ package subsystem
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type manualTicker struct{ ch chan time.Time }
@@ -25,6 +28,8 @@ type managerStub struct {
 	acquireErr   error
 	renewOwned   bool
 	renewErr     error
+	renewFunc    func(context.Context) (bool, error)
+	releaseErr   error
 	renewCalls   int
 	releaseCalls int
 }
@@ -33,14 +38,17 @@ func (m *managerStub) AcquireSpec(context.Context, locklease.Spec, string, ...ti
 	return m.lease, m.acquired, m.acquireErr
 }
 
-func (m *managerStub) RenewSpec(context.Context, locklease.Spec, string, *locklease.Lease, ...time.Duration) (bool, error) {
+func (m *managerStub) RenewSpec(ctx context.Context, _ locklease.Spec, _ string, _ *locklease.Lease, _ ...time.Duration) (bool, error) {
 	m.renewCalls++
+	if m.renewFunc != nil {
+		return m.renewFunc(ctx)
+	}
 	return m.renewOwned, m.renewErr
 }
 
 func (m *managerStub) ReleaseSpec(context.Context, locklease.Spec, string, *locklease.Lease) error {
 	m.releaseCalls++
-	return nil
+	return m.releaseErr
 }
 
 func TestRunContentionDoesNotStartBody(t *testing.T) {
@@ -62,6 +70,21 @@ func TestRunClassifiesAcquireError(t *testing.T) {
 	_, err := s.Run(context.Background(), locklease.WorkloadAnswersheetProcessing, "answer:1", time.Minute, nil)
 	if !errors.Is(err, locklease.ErrLeaseAcquireFailed) {
 		t.Fatalf("Run() error = %v, want ErrLeaseAcquireFailed", err)
+	}
+}
+
+func TestRunParentCancellationDuringAcquireIsNotAcquireFailure(t *testing.T) {
+	manager := &managerStub{acquireErr: errors.New("manager should not be called")}
+	s := New(Options{Component: "worker", Manager: manager})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := s.Run(ctx, locklease.WorkloadAnswersheetProcessing, "answer:cancel", time.Minute, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+	if errors.Is(err, locklease.ErrLeaseAcquireFailed) {
+		t.Fatalf("Run() error = %v, must not be ErrLeaseAcquireFailed", err)
 	}
 }
 
@@ -136,6 +159,245 @@ func TestRunRenewErrorTakesPrecedenceOverBodyCancellation(t *testing.T) {
 	err := <-finished
 	if !errors.Is(err, locklease.ErrLeaseRenewFailed) {
 		t.Fatalf("Run() error = %v, want ErrLeaseRenewFailed", err)
+	}
+}
+
+func TestRunRenewErrorTakesPrecedenceOverGRPCCancellation(t *testing.T) {
+	manual := &manualTicker{ch: make(chan time.Time, 1)}
+	manager := &managerStub{
+		lease:    &locklease.Lease{Key: "lock", Token: "token"},
+		acquired: true,
+		renewErr: errors.New("redis unavailable"),
+	}
+	s := New(Options{
+		Component:      "collection-server",
+		Manager:        manager,
+		RenewalEnabled: true,
+		tickerFactory:  func(time.Duration) ticker { return manual },
+	})
+
+	started := make(chan struct{})
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(context.Background(), locklease.WorkloadCollectionSubmit, "request:grpc", time.Minute, func(ctx context.Context) error {
+			close(started)
+			<-ctx.Done()
+			return status.Error(codes.Canceled, "context canceled")
+		})
+		finished <- err
+	}()
+	<-started
+	manual.ch <- time.Now()
+	err := <-finished
+	if !errors.Is(err, locklease.ErrLeaseRenewFailed) {
+		t.Fatalf("Run() error = %v, want ErrLeaseRenewFailed", err)
+	}
+}
+
+func TestRunParentCancellationDuringRenewIsNotLeaseFailure(t *testing.T) {
+	manual := &manualTicker{ch: make(chan time.Time, 1)}
+	renewStarted := make(chan struct{})
+	manager := &managerStub{
+		lease:    &locklease.Lease{Key: "lock", Token: "token"},
+		acquired: true,
+		renewFunc: func(ctx context.Context) (bool, error) {
+			close(renewStarted)
+			<-ctx.Done()
+			return false, ctx.Err()
+		},
+	}
+	s := New(Options{
+		Component:      "worker",
+		Manager:        manager,
+		RenewalEnabled: true,
+		tickerFactory:  func(time.Duration) ticker { return manual },
+	})
+
+	parent, cancel := context.WithCancel(context.Background())
+	bodyStarted := make(chan struct{})
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(parent, locklease.WorkloadAnswersheetProcessing, "answer:cancel", time.Minute, func(ctx context.Context) error {
+			close(bodyStarted)
+			<-ctx.Done()
+			return ctx.Err()
+		})
+		finished <- err
+	}()
+	<-bodyStarted
+	manual.ch <- time.Now()
+	<-renewStarted
+	cancel()
+	err := <-finished
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+	if errors.Is(err, locklease.ErrLeaseRenewFailed) {
+		t.Fatalf("Run() error = %v, must not be ErrLeaseRenewFailed", err)
+	}
+}
+
+func TestRunBodyCompletionCancelsInFlightRenew(t *testing.T) {
+	manual := &manualTicker{ch: make(chan time.Time, 1)}
+	bodyStarted := make(chan struct{})
+	allowBodyReturn := make(chan struct{})
+	renewStarted := make(chan struct{})
+	unblockRenew := make(chan struct{})
+	manager := &managerStub{
+		lease:    &locklease.Lease{Key: "lock", Token: "token"},
+		acquired: true,
+		renewFunc: func(ctx context.Context) (bool, error) {
+			close(renewStarted)
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			case <-unblockRenew:
+				return true, nil
+			}
+		},
+	}
+	s := New(Options{
+		Component:      "worker",
+		Manager:        manager,
+		RenewalEnabled: true,
+		tickerFactory:  func(time.Duration) ticker { return manual },
+	})
+
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(context.Background(), locklease.WorkloadAnswersheetProcessing, "answer:done", time.Minute, func(context.Context) error {
+			close(bodyStarted)
+			<-allowBodyReturn
+			return nil
+		})
+		finished <- err
+	}()
+	<-bodyStarted
+	manual.ch <- time.Now()
+	<-renewStarted
+	close(allowBodyReturn)
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		close(unblockRenew)
+		<-finished
+		t.Fatal("Run() did not cancel the in-flight renewal after body completion")
+	}
+}
+
+func TestRunPreservesBusinessErrorAndReportsReleaseError(t *testing.T) {
+	bodyErr := errors.New("body failed")
+	releaseErr := errors.New("release failed")
+	manager := &managerStub{
+		lease:      &locklease.Lease{Key: "lock", Token: "token"},
+		acquired:   true,
+		releaseErr: releaseErr,
+	}
+	s := New(Options{Component: "worker", Manager: manager})
+
+	result, err := s.Run(context.Background(), locklease.WorkloadAnswersheetProcessing, "answer:error", time.Minute, func(context.Context) error {
+		return bodyErr
+	})
+	if !errors.Is(err, bodyErr) {
+		t.Fatalf("Run() error = %v, want body error", err)
+	}
+	if !errors.Is(result.ReleaseErr, releaseErr) {
+		t.Fatalf("Run() release error = %v, want %v", result.ReleaseErr, releaseErr)
+	}
+}
+
+func TestRunWarnsUntilBodyStopsAfterParentCancellation(t *testing.T) {
+	manual := &manualTicker{ch: make(chan time.Time, 2)}
+	manager := &managerStub{
+		lease:      &locklease.Lease{Key: "lock", Token: "token"},
+		acquired:   true,
+		renewOwned: true,
+	}
+	warnings := make(chan string, 1)
+	s := New(Options{
+		Component:      "worker",
+		Manager:        manager,
+		RenewalEnabled: true,
+		Warn:           func(message string) { warnings <- message },
+		tickerFactory:  func(time.Duration) ticker { return manual },
+	})
+
+	parent, cancel := context.WithCancel(context.Background())
+	bodyStarted := make(chan struct{})
+	allowBodyReturn := make(chan struct{})
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(parent, locklease.WorkloadAnswersheetProcessing, "answer:warn", time.Minute, func(context.Context) error {
+			close(bodyStarted)
+			<-allowBodyReturn
+			return context.Canceled
+		})
+		finished <- err
+	}()
+	<-bodyStarted
+	cancel()
+	manual.ch <- time.Now()
+	manual.ch <- time.Now()
+
+	select {
+	case warning := <-warnings:
+		if !strings.Contains(warning, "component worker") || !strings.Contains(warning, "answersheet_processing") {
+			t.Fatalf("warning = %q", warning)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected non-responsive body warning")
+	}
+	close(allowBodyReturn)
+	if err := <-finished; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestRunWarnsUntilBodyStopsAfterLeaseLoss(t *testing.T) {
+	manual := &manualTicker{ch: make(chan time.Time, 2)}
+	manager := &managerStub{
+		lease:      &locklease.Lease{Key: "lock", Token: "token"},
+		acquired:   true,
+		renewOwned: false,
+	}
+	warnings := make(chan string, 1)
+	s := New(Options{
+		Component:      "collection-server",
+		Manager:        manager,
+		RenewalEnabled: true,
+		Warn:           func(message string) { warnings <- message },
+		tickerFactory:  func(time.Duration) ticker { return manual },
+	})
+
+	bodyStarted := make(chan struct{})
+	allowBodyReturn := make(chan struct{})
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(context.Background(), locklease.WorkloadCollectionSubmit, "request:warn", time.Minute, func(context.Context) error {
+			close(bodyStarted)
+			<-allowBodyReturn
+			return status.Error(codes.Canceled, "context canceled")
+		})
+		finished <- err
+	}()
+	<-bodyStarted
+	manual.ch <- time.Now()
+	manual.ch <- time.Now()
+
+	select {
+	case warning := <-warnings:
+		if !strings.Contains(warning, "component collection-server") || !strings.Contains(warning, "collection_submit") {
+			t.Fatalf("warning = %q", warning)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected lease-loss body warning")
+	}
+	close(allowBodyReturn)
+	if err := <-finished; !errors.Is(err, locklease.ErrLeaseLost) {
+		t.Fatalf("Run() error = %v, want ErrLeaseLost", err)
 	}
 }
 

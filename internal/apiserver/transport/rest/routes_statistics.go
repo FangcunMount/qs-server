@@ -37,91 +37,21 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 	statistics := apiV1.Group("/statistics")
 	{
 		adminStatistics := statistics.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-		adminStatistics.GET("/overview", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetOverview,
-		)...)
-		adminStatistics.GET("/clinicians", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.ListClinicianStatistics,
-		)...)
-		adminStatistics.GET("/clinicians/:id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetClinicianStatistics,
-		)...)
-		adminStatistics.GET("/entries", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.ListAssessmentEntryStatistics,
-		)...)
-		adminStatistics.GET("/entries/:id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetAssessmentEntryStatistics,
-		)...)
-		statistics.GET("/testees/:testee_id/periodic", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetTesteePeriodicStatistics,
-		)...)
+		adminStatistics.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetOverview)...)
+		adminStatistics.GET("/clinicians", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.ListClinicianStatistics)...)
+		adminStatistics.GET("/clinicians/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetClinicianStatistics)...)
+		adminStatistics.GET("/entries", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.ListAssessmentEntryStatistics)...)
+		adminStatistics.GET("/entries/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetAssessmentEntryStatistics)...)
+		statistics.GET("/testees/:testee_id/periodic", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetTesteePeriodicStatistics)...)
 		clinicianStatistics := statistics.Group("/clinicians/me")
-		clinicianStatistics.GET("/overview", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetCurrentClinicianOverview,
-		)...)
-		clinicianStatistics.GET("/entries", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.ListCurrentClinicianEntryStatistics,
-		)...)
-		clinicianStatistics.GET("/testees-summary", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetCurrentClinicianTesteeSummary,
-		)...)
+		clinicianStatistics.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetCurrentClinicianOverview)...)
+		clinicianStatistics.GET("/entries", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.ListCurrentClinicianEntryStatistics)...)
+		clinicianStatistics.GET("/testees-summary", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.GetCurrentClinicianTesteeSummary)...)
 		contentStatistics := statistics.Group("", restmiddleware.RequireAnyCapabilityMiddleware(
 			restmiddleware.CapabilityManageQuestionnaires,
 			restmiddleware.CapabilityManageAssessmentModels,
 		))
-		contentStatistics.POST("/contents/batch", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			statisticsHandler.BatchContentStatistics,
-		)...)
+		contentStatistics.POST("/contents/batch", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.BatchContentStatistics)...)
 	}
 }
 
@@ -133,30 +63,9 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 
 	statistics := internalV1.Group("/statistics", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	sync := statistics.Group("/sync")
-	sync.POST("/daily", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.SyncDailyStatistics,
-	)...)
-	sync.POST("/org-snapshot", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.SyncOrgSnapshotStatistics,
-	)...)
-	sync.POST("/plan", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.SyncPlanStatistics,
-	)...)
+	sync.POST("/daily", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.SyncDailyStatistics)...)
+	sync.POST("/org-snapshot", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.SyncOrgSnapshotStatistics)...)
+	sync.POST("/plan", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.SyncPlanStatistics)...)
 }
 
 func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGroup) {
@@ -166,36 +75,8 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 	}
 
 	governance := internalV1.Group("/cache/governance", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-	governance.POST("/repair-complete", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.RepairComplete,
-	)...)
-	governance.POST("/warmup-targets", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.WarmupTargets,
-	)...)
-	governance.GET("/status", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		statisticsHandler.CacheGovernanceStatus,
-	)...)
-	governance.GET("/hotset", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		statisticsHandler.CacheGovernanceHotset,
-	)...)
+	governance.POST("/repair-complete", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.RepairComplete)...)
+	governance.POST("/warmup-targets", r.rateLimitedHandlers(rateLimitBudgetSubmit, statisticsHandler.WarmupTargets)...)
+	governance.GET("/status", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.CacheGovernanceStatus)...)
+	governance.GET("/hotset", r.rateLimitedHandlers(rateLimitBudgetQuery, statisticsHandler.CacheGovernanceHotset)...)
 }

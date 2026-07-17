@@ -27,153 +27,34 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	plans := apiV1.Group("/plans")
 	{
 		planWrites := plans.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-		planWrites.POST("", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.CreatePlan,
-		)...)
-		planWrites.POST("/:id/pause", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.PausePlan,
-		)...)
-		planWrites.POST("/:id/resume", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.ResumePlan,
-		)...)
-		planWrites.POST("/:id/finish", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.FinishPlan,
-		)...)
-		planWrites.POST("/:id/cancel", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.CancelPlan,
-		)...)
+		planWrites.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CreatePlan)...)
+		planWrites.POST("/:id/pause", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.PausePlan)...)
+		planWrites.POST("/:id/resume", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ResumePlan)...)
+		planWrites.POST("/:id/finish", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.FinishPlan)...)
+		planWrites.POST("/:id/cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelPlan)...)
 
-		plans.GET("", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListPlans,
-		)...)
-		plans.GET("/:id/tasks", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListTasksByPlan,
-		)...)
-		plans.GET("/:id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.GetPlan,
-		)...)
+		plans.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListPlans)...)
+		plans.GET("/:id/tasks", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasksByPlan)...)
+		plans.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetPlan)...)
 
-		planWrites.POST("/enroll", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.EnrollTestee,
-		)...)
-		planWrites.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.TerminateEnrollment,
-		)...)
+		planWrites.POST("/enroll", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.EnrollTestee)...)
+		planWrites.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.TerminateEnrollment)...)
 	}
 
 	tasks := apiV1.Group("/plans/tasks")
 	{
 		taskWrites := tasks.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-		tasks.GET("", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListTasks,
-		)...)
-		tasks.GET("/:id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.GetTask,
-		)...)
-		taskWrites.POST("/:id/open", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.OpenTask,
-		)...)
-		taskWrites.POST("/:id/cancel", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.CancelTask,
-		)...)
+		tasks.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasks)...)
+		tasks.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetTask)...)
+		taskWrites.POST("/:id/open", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.OpenTask)...)
+		taskWrites.POST("/:id/cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelTask)...)
 	}
 
 	testees := apiV1.Group("/testees")
 	{
-		testees.GET("/:id/plans/:plan_id/tasks", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListTasksByTesteeAndPlan,
-		)...)
-		testees.GET("/:id/plans", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListPlansByTestee,
-		)...)
-		testees.GET("/:id/tasks", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			planHandler.ListTasksByTestee,
-		)...)
+		testees.GET("/:id/plans/:plan_id/tasks", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasksByTesteeAndPlan)...)
+		testees.GET("/:id/plans", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListPlansByTestee)...)
+		testees.GET("/:id/tasks", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasksByTestee)...)
 	}
 }
 
@@ -184,36 +65,8 @@ func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
 	}
 
 	tasks := internalV1.Group("/plans/tasks", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-	tasks.POST("/schedule", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		planHandler.SchedulePendingTasks,
-	)...)
-	tasks.POST("/window", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		planHandler.ListTaskWindow,
-	)...)
-	tasks.POST("/:id/complete", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		planHandler.CompleteTask,
-	)...)
-	tasks.POST("/:id/expire", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		planHandler.ExpireTask,
-	)...)
+	tasks.POST("/schedule", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.SchedulePendingTasks)...)
+	tasks.POST("/window", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTaskWindow)...)
+	tasks.POST("/:id/complete", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CompleteTask)...)
+	tasks.POST("/:id/expire", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ExpireTask)...)
 }

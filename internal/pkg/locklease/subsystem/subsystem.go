@@ -3,11 +3,11 @@ package subsystem
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -27,6 +27,20 @@ func (t realTicker) Chan() <-chan time.Time { return t.ticker.C }
 func (t realTicker) Stop()                  { t.ticker.Stop() }
 
 type tickerFactory func(time.Duration) ticker
+
+type renewalStopReason uint8
+
+const (
+	renewalStoppedByBody renewalStopReason = iota
+	renewalStoppedByParent
+	renewalStoppedByLeaseLoss
+	renewalStoppedByRenewFailure
+)
+
+type renewalOutcome struct {
+	reason renewalStopReason
+	err    error
+}
 
 // Options configures one process-local lock lease subsystem.
 type Options struct {
@@ -239,9 +253,15 @@ func (s *Subsystem) Run(
 	if ttl <= 0 {
 		ttl = capability.Spec.DefaultTTL
 	}
+	if cause := context.Cause(ctx); cause != nil {
+		return result, cause
+	}
 
 	lease, acquired, err := s.manager.AcquireSpec(ctx, capability.Spec, key, ttl)
 	if err != nil {
+		if cause := context.Cause(ctx); cause != nil {
+			return result, cause
+		}
 		return result, fmt.Errorf("%w: workload %s: %w", locklease.ErrLeaseAcquireFailed, workload, err)
 	}
 	if !acquired {
@@ -263,28 +283,39 @@ func (s *Subsystem) Run(
 	if interval <= 0 {
 		interval = time.Nanosecond
 	}
-	runCtx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
+	bodyCtx, cancelBody := context.WithCancelCause(ctx)
+	defer cancelBody(nil)
+	renewCtx, cancelRenew := context.WithCancel(bodyCtx)
+	defer cancelRenew()
 	done := make(chan struct{})
-	renewResult := make(chan error, 1)
+	renewResult := make(chan renewalOutcome, 1)
 	var stopOnce sync.Once
 	stop := func() { stopOnce.Do(func() { close(done) }) }
 
-	go s.renewLoop(runCtx, cancel, done, renewResult, capability, key, lease, ttl, interval)
-	bodyErr := body(runCtx)
+	go s.renewLoop(ctx, renewCtx, cancelBody, done, renewResult, capability, key, lease, ttl, interval)
+	bodyErr := body(bodyCtx)
 	stop()
-	renewErr := <-renewResult
-	if renewErr != nil && (bodyErr == nil || errors.Is(bodyErr, context.Canceled)) {
-		return result, renewErr
+	cancelRenew()
+	outcome := <-renewResult
+	switch outcome.reason {
+	case renewalStoppedByLeaseLoss, renewalStoppedByRenewFailure:
+		if bodyErr == nil || cancelerr.Is(bodyErr) {
+			return result, outcome.err
+		}
+	case renewalStoppedByParent:
+		if bodyErr == nil || cancelerr.Is(bodyErr) {
+			return result, outcome.err
+		}
 	}
 	return result, bodyErr
 }
 
 func (s *Subsystem) renewLoop(
-	ctx context.Context,
-	cancel context.CancelCauseFunc,
+	parentCtx context.Context,
+	renewCtx context.Context,
+	cancelBody context.CancelCauseFunc,
 	done <-chan struct{},
-	result chan<- error,
+	result chan<- renewalOutcome,
 	capability locklease.Capability,
 	key string,
 	lease *locklease.Lease,
@@ -297,13 +328,32 @@ func (s *Subsystem) renewLoop(
 	for {
 		select {
 		case <-done:
-			result <- nil
+			result <- renewalOutcome{reason: renewalStoppedByBody}
 			return
-		case <-ctx.Done():
-			result <- nil
+		case <-parentCtx.Done():
+			cause := context.Cause(parentCtx)
+			result <- renewalOutcome{reason: renewalStoppedByParent, err: cause}
+			s.warnUntilDone(done, ticker.Chan(), capability.ID, cause)
+			return
+		case <-renewCtx.Done():
+			if outcome, stopped := renewalStoppedOutcome(parentCtx, done); stopped {
+				result <- outcome
+				if outcome.reason == renewalStoppedByParent {
+					s.warnUntilDone(done, ticker.Chan(), capability.ID, outcome.err)
+				}
+				return
+			}
+			result <- renewalOutcome{reason: renewalStoppedByBody}
 			return
 		case <-ticker.Chan():
-			owned, err := s.manager.RenewSpec(ctx, capability.Spec, key, lease, ttl)
+			owned, err := s.manager.RenewSpec(renewCtx, capability.Spec, key, lease, ttl)
+			if outcome, stopped := renewalStoppedOutcome(parentCtx, done); stopped {
+				result <- outcome
+				if outcome.reason == renewalStoppedByParent {
+					s.warnUntilDone(done, ticker.Chan(), capability.ID, outcome.err)
+				}
+				return
+			}
 			if err == nil && owned {
 				continue
 			}
@@ -313,12 +363,28 @@ func (s *Subsystem) renewLoop(
 			} else {
 				renewErr = fmt.Errorf("%w: workload %s", locklease.ErrLeaseLost, capability.ID)
 			}
-			cancel(renewErr)
-			result <- renewErr
+			reason := renewalStoppedByLeaseLoss
+			if err != nil {
+				reason = renewalStoppedByRenewFailure
+			}
+			cancelBody(renewErr)
+			result <- renewalOutcome{reason: reason, err: renewErr}
 			s.warnUntilDone(done, ticker.Chan(), capability.ID, renewErr)
 			return
 		}
 	}
+}
+
+func renewalStoppedOutcome(parentCtx context.Context, done <-chan struct{}) (renewalOutcome, bool) {
+	select {
+	case <-done:
+		return renewalOutcome{reason: renewalStoppedByBody}, true
+	default:
+	}
+	if cause := context.Cause(parentCtx); cause != nil {
+		return renewalOutcome{reason: renewalStoppedByParent, err: cause}, true
+	}
+	return renewalOutcome{}, false
 }
 
 func (s *Subsystem) warnUntilDone(done <-chan struct{}, ticks <-chan time.Time, workload locklease.WorkloadID, cause error) {
@@ -328,7 +394,7 @@ func (s *Subsystem) warnUntilDone(done <-chan struct{}, ticks <-chan time.Time, 
 			return
 		case <-ticks:
 			if s.warn != nil {
-				s.warn(fmt.Sprintf("lock lease workload %s has not stopped after cancellation: %v", workload, cause))
+				s.warn(fmt.Sprintf("lock lease component %s workload %s has not stopped after cancellation: %v", s.component, workload, cause))
 			}
 		}
 	}

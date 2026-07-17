@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -97,6 +98,48 @@ func TestSubmitQueueDuplicateRequestReusesInFlightStatus(t *testing.T) {
 	}
 }
 
+func TestSubmitQueueConcurrentDuplicateRequestCreatesOneJob(t *testing.T) {
+	const concurrentRequests = 128
+
+	release := make(chan struct{})
+	var calls atomic.Int32
+	q := NewSubmitQueue(1, concurrentRequests, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		calls.Add(1)
+		<-release
+		return &SubmitAnswerSheetResponse{ID: "42"}, nil
+	})
+	t.Cleanup(func() { close(release) })
+
+	start := make(chan struct{})
+	errs := make(chan error, concurrentRequests)
+	var wg sync.WaitGroup
+	for i := 0; i < concurrentRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- q.Enqueue(context.Background(), "req-concurrent-duplicate", 1, &SubmitAnswerSheetRequest{})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent duplicate enqueue error = %v, want status reuse", err)
+		}
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for calls.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("submit calls = %d, want exactly one queued job", got)
+	}
+}
+
 func TestSubmitQueueFailedRequestRequiresNewRequestID(t *testing.T) {
 	q := NewSubmitQueue(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 		return nil, errors.New("boom")
@@ -144,6 +187,114 @@ func TestSubmitQueueAllowsSameRequestIDAfterRetryableLeaseFailure(t *testing.T) 
 	waitForSubmitStatus(t, q, "req-retry", SubmitStatusDone)
 }
 
+func TestSubmitQueueConcurrentRetryableRequeueCreatesOneJob(t *testing.T) {
+	const concurrentRetries = 64
+
+	var calls atomic.Int32
+	secondStarted := make(chan struct{})
+	releaseSecond := make(chan struct{})
+	q := NewSubmitQueue(8, concurrentRetries, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		switch calls.Add(1) {
+		case 1:
+			return nil, locklease.ErrLeaseRenewFailed
+		case 2:
+			close(secondStarted)
+			<-releaseSecond
+			return &SubmitAnswerSheetResponse{ID: "42"}, nil
+		default:
+			return nil, errors.New("duplicate retry job")
+		}
+	})
+
+	if err := q.Enqueue(context.Background(), "req-concurrent-retry", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("first enqueue: %v", err)
+	}
+	waitForSubmitStatus(t, q, "req-concurrent-retry", SubmitStatusFailed)
+
+	start := make(chan struct{})
+	errs := make(chan error, concurrentRetries)
+	var wg sync.WaitGroup
+	for range concurrentRetries {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- q.Enqueue(context.Background(), "req-concurrent-retry", 1, &SubmitAnswerSheetRequest{})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent retry enqueue error = %v", err)
+		}
+	}
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("retry job did not start")
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("submit calls = %d, want original plus exactly one retry", got)
+	}
+	close(releaseSecond)
+	waitForSubmitStatus(t, q, "req-concurrent-retry", SubmitStatusDone)
+}
+
+func TestSubmitQueueFullRestoresRetryableFailedEntry(t *testing.T) {
+	q := &SubmitQueue{
+		jobs:     make(chan submitJob, 1),
+		statuses: newSubmitQueueStatusStore(10 * time.Minute),
+		observer: defaultSubmitQueueObserver(nil),
+		subject: resilienceplane.Subject{
+			Component: "collection-server",
+			Scope:     "answersheet_submit",
+			Resource:  "submit_queue",
+			Strategy:  "memory_channel",
+		},
+	}
+	q.jobs <- submitJob{requestID: "buffer-full"}
+	q.setFailed("req-retry-full", locklease.ErrLeaseLost)
+
+	if err := q.Enqueue(context.Background(), "req-retry-full", 1, &SubmitAnswerSheetRequest{}); !errors.Is(err, ErrQueueFull) {
+		t.Fatalf("Enqueue() error = %v, want ErrQueueFull", err)
+	}
+	q.statuses.mu.Lock()
+	entry := q.statuses.statuses["req-retry-full"]
+	q.statuses.mu.Unlock()
+	if entry.Response.Status != SubmitStatusFailed || !entry.RetryableLeaseFailure {
+		t.Fatalf("entry after queue full = %+v", entry)
+	}
+
+	<-q.jobs
+	if err := q.Enqueue(context.Background(), "req-retry-full", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("retry after capacity recovery: %v", err)
+	}
+}
+
+func TestSubmitQueueCleanupRemovesRetryMetadata(t *testing.T) {
+	store := newSubmitQueueStatusStore(time.Millisecond)
+	store.SetStatus("expired-retry", SubmitStatusFailed, "", true)
+	store.mu.Lock()
+	entry := store.statuses["expired-retry"]
+	entry.Response.UpdatedAt = time.Now().Add(-time.Second).Unix()
+	store.statuses["expired-retry"] = entry
+	store.lastCleanup = time.Now().Add(-time.Hour)
+	store.mu.Unlock()
+
+	if _, cleaned := store.Snapshot(time.Now()); cleaned != 1 {
+		t.Fatalf("cleaned = %d, want 1", cleaned)
+	}
+	store.mu.Lock()
+	_, exists := store.statuses["expired-retry"]
+	store.mu.Unlock()
+	if exists {
+		t.Fatal("expired retry metadata was not removed")
+	}
+}
+
 func waitForSubmitStatus(t *testing.T, q *SubmitQueue, requestID, want string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -164,10 +315,10 @@ func TestSubmitQueueStatusExpiresAfterTTL(t *testing.T) {
 	q.statuses.statusTTL = time.Millisecond
 
 	q.statuses.mu.Lock()
-	q.statuses.statuses["expired"] = SubmitStatusResponse{
+	q.statuses.statuses["expired"] = submitQueueStatusEntry{Response: SubmitStatusResponse{
 		Status:    SubmitStatusDone,
 		UpdatedAt: time.Now().Add(-time.Second).Unix(),
-	}
+	}}
 	q.statuses.mu.Unlock()
 
 	if _, ok := q.GetStatus("expired"); ok {
@@ -209,10 +360,10 @@ func TestSubmitQueueStatusSnapshotReportsCleanupOutcome(t *testing.T) {
 	}, SubmitQueueRuntimeOptions{Observer: observer})
 	q.statuses.statusTTL = time.Millisecond
 	q.statuses.mu.Lock()
-	q.statuses.statuses["expired"] = SubmitStatusResponse{
+	q.statuses.statuses["expired"] = submitQueueStatusEntry{Response: SubmitStatusResponse{
 		Status:    SubmitStatusDone,
 		UpdatedAt: time.Now().Add(-time.Second).Unix(),
-	}
+	}}
 	q.statuses.lastCleanup = time.Now().Add(-time.Hour)
 	q.statuses.mu.Unlock()
 

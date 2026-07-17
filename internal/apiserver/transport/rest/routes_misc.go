@@ -28,29 +28,8 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 	admin := apiV1.Group("/admin")
 	// admin.Use(r.requireAdminRole()) // 需要实现管理员权限检查中间件
 	{
-		admin.GET("/users", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			r.unsupportedFeature,
-		)...)
-		admin.GET("/statistics", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			r.unsupportedFeature,
-		)...)
-		admin.GET("/logs", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			r.unsupportedFeature,
-		)...)
+		admin.GET("/users", r.rateLimitedHandlers(rateLimitBudgetQuery, r.unsupportedFeature)...)
+		admin.GET("/statistics", r.rateLimitedHandlers(rateLimitBudgetQuery, r.unsupportedFeature)...)
+		admin.GET("/logs", r.rateLimitedHandlers(rateLimitBudgetQuery, r.unsupportedFeature)...)
 	}
 }

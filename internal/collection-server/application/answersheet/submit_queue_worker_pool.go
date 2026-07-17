@@ -3,35 +3,35 @@ package answersheet
 import "github.com/FangcunMount/component-base/pkg/logger"
 
 type submitQueueStatusWriter func(requestID, status, answerSheetID string)
-type submitQueueFailureRecorder func(requestID string, err error)
+type submitQueueFailureWriter func(requestID string, err error)
 
 // submitQueueWorkerPool owns the goroutines that drain submit jobs.
 // SubmitQueue remains responsible for admission, status lookup, and observation.
 type submitQueueWorkerPool struct {
-	workerCount   int
-	jobs          <-chan submitJob
-	submit        submitFunc
-	writeStatus   submitQueueStatusWriter
-	recordFailure submitQueueFailureRecorder
+	workerCount  int
+	jobs         <-chan submitJob
+	submit       submitFunc
+	writeStatus  submitQueueStatusWriter
+	writeFailure submitQueueFailureWriter
 }
 
-func newSubmitQueueWorkerPool(workerCount int, jobs <-chan submitJob, submit submitFunc, writeStatus submitQueueStatusWriter, failureRecorders ...submitQueueFailureRecorder) *submitQueueWorkerPool {
+func newSubmitQueueWorkerPool(workerCount int, jobs <-chan submitJob, submit submitFunc, writeStatus submitQueueStatusWriter, failureWriters ...submitQueueFailureWriter) *submitQueueWorkerPool {
 	if workerCount <= 0 || jobs == nil || submit == nil || writeStatus == nil {
 		return nil
 	}
-	var recordFailure submitQueueFailureRecorder
-	for _, recorder := range failureRecorders {
-		if recorder != nil {
-			recordFailure = recorder
+	var writeFailure submitQueueFailureWriter
+	for _, writer := range failureWriters {
+		if writer != nil {
+			writeFailure = writer
 			break
 		}
 	}
 	return &submitQueueWorkerPool{
-		workerCount:   workerCount,
-		jobs:          jobs,
-		submit:        submit,
-		writeStatus:   writeStatus,
-		recordFailure: recordFailure,
+		workerCount:  workerCount,
+		jobs:         jobs,
+		submit:       submit,
+		writeStatus:  writeStatus,
+		writeFailure: writeFailure,
 	}
 }
 
@@ -61,10 +61,11 @@ func (p *submitQueueWorkerPool) worker() {
 		logger.L(job.ctx).Infow("答卷提交队列开始处理", startFields...)
 		resp, err := p.submit(job.ctx, job.requestID, job.writerID, job.req)
 		if err != nil {
-			if p.recordFailure != nil {
-				p.recordFailure(job.requestID, err)
+			if p.writeFailure != nil {
+				p.writeFailure(job.requestID, err)
+			} else {
+				p.writeStatus(job.requestID, SubmitStatusFailed, "")
 			}
-			p.writeStatus(job.requestID, SubmitStatusFailed, "")
 			failureFields := []interface{}{
 				"action", "process_answersheet_submit",
 				"request_id", job.requestID,

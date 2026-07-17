@@ -12,12 +12,5 @@ func (r *Router) registerEvaluationRunInternalRoutes(internalV1 *gin.RouterGroup
 	}
 	runHandler := handler.NewEvaluationRunInternalHandler(r.deps.Evaluation.ProtectedQueryService)
 	runs := internalV1.Group("/evaluation-runs", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-	runs.GET("/failed", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.QueryGlobalQPS,
-		r.rateCfg.QueryGlobalBurst,
-		r.rateCfg.QueryUserQPS,
-		r.rateCfg.QueryUserBurst,
-		runHandler.ListRetryableFailed,
-	)...)
+	runs.GET("/failed", r.rateLimitedHandlers(rateLimitBudgetQuery, runHandler.ListRetryableFailed)...)
 }

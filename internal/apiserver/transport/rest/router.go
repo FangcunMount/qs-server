@@ -31,14 +31,30 @@ import (
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
 
 // Router 集中的路由管理器。
 type Router struct {
-	deps    Deps
-	rateCfg *options.RateLimitOptions
+	deps             Deps
+	rateCfg          *options.RateLimitOptions
+	rateLimitBudgets map[rateLimitBudget]routeLimiters
+}
+
+type rateLimitBudget string
+
+const (
+	rateLimitBudgetQuery       rateLimitBudget = "query"
+	rateLimitBudgetSubmit      rateLimitBudget = "submit"
+	rateLimitBudgetAdminSubmit rateLimitBudget = "admin_submit"
+	rateLimitBudgetWaitReport  rateLimitBudget = "wait_report"
+)
+
+type routeLimiters struct {
+	global ratelimit.RateLimiter
+	user   ratelimit.RateLimiter
 }
 
 type routeSpec struct {
@@ -158,8 +174,59 @@ func NewRouter(deps Deps) *Router {
 	}
 
 	return &Router{
-		deps:    deps,
-		rateCfg: rateCfg,
+		deps:             deps,
+		rateCfg:          rateCfg,
+		rateLimitBudgets: newRateLimitBudgets(rateCfg),
+	}
+}
+
+func newRateLimitBudgets(cfg *options.RateLimitOptions) map[rateLimitBudget]routeLimiters {
+	return map[rateLimitBudget]routeLimiters{
+		rateLimitBudgetQuery: newRouteLimiters(
+			cfg.QueryGlobalQPS,
+			cfg.QueryGlobalBurst,
+			cfg.QueryUserQPS,
+			cfg.QueryUserBurst,
+		),
+		rateLimitBudgetSubmit: newRouteLimiters(
+			cfg.SubmitGlobalQPS,
+			cfg.SubmitGlobalBurst,
+			cfg.SubmitUserQPS,
+			cfg.SubmitUserBurst,
+		),
+		rateLimitBudgetAdminSubmit: newRouteLimiters(
+			cfg.AdminSubmitGlobalQPS,
+			cfg.AdminSubmitGlobalBurst,
+			cfg.AdminSubmitUserQPS,
+			cfg.AdminSubmitUserBurst,
+		),
+		rateLimitBudgetWaitReport: newRouteLimiters(
+			cfg.WaitReportGlobalQPS,
+			cfg.WaitReportGlobalBurst,
+			cfg.WaitReportUserQPS,
+			cfg.WaitReportUserBurst,
+		),
+	}
+}
+
+func newRouteLimiters(globalQPS float64, globalBurst int, userQPS float64, userBurst int) routeLimiters {
+	return routeLimiters{
+		global: ratelimit.NewLocalLimiter(ratelimit.RateLimitPolicy{
+			Component:     "apiserver",
+			Scope:         "rest",
+			Resource:      "global",
+			Strategy:      "local",
+			RatePerSecond: globalQPS,
+			Burst:         globalBurst,
+		}),
+		user: ratelimit.NewKeyedLocalLimiter(ratelimit.RateLimitPolicy{
+			Component:     "apiserver",
+			Scope:         "rest",
+			Resource:      "user",
+			Strategy:      "local_key",
+			RatePerSecond: userQPS,
+			Burst:         userBurst,
+		}),
 	}
 }
 
@@ -194,25 +261,25 @@ func registerRouteSpecs(group *gin.RouterGroup, routes []routeSpec) {
 }
 
 func (r *Router) rateLimitedHandlers(
-	rateCfg *options.RateLimitOptions,
-	globalQPS float64,
-	globalBurst int,
-	userQPS float64,
-	userBurst int,
+	budget rateLimitBudget,
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
-	if !rateCfg.Enabled {
+	if !r.rateCfg.Enabled {
 		return []gin.HandlerFunc{handler}
+	}
+	limiters, ok := r.rateLimitBudgets[budget]
+	if !ok {
+		panic("unknown REST rate-limit budget: " + string(budget))
 	}
 
 	return []gin.HandlerFunc{
-		middleware.LimitWithOptions(globalQPS, globalBurst, middleware.LimitOptions{
+		middleware.LimitWithLimiter(limiters.global, nil, middleware.LimitOptions{
 			Component: "apiserver",
 			Scope:     "rest",
 			Resource:  "global",
 			Strategy:  "local",
 		}),
-		middleware.LimitByKeyWithOptions(userQPS, userBurst, requestLimitKey, middleware.LimitOptions{
+		middleware.LimitWithLimiter(limiters.user, requestLimitKey, middleware.LimitOptions{
 			Component: "apiserver",
 			Scope:     "rest",
 			Resource:  "user",
