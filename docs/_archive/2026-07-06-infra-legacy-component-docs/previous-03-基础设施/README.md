@@ -98,7 +98,7 @@ concurrency/README.md
 | 缓存与信令 | `internal/pkg/cacheplane`、`internal/apiserver/infra/cache`、`internal/pkg/cachesignal`、`internal/collection-server/application/catalogl1` |
 | Outbox | `internal/apiserver/outboxcore`、`internal/apiserver/infra/mongo/eventoutbox`、`internal/apiserver/infra/mysql/eventoutbox` |
 | Worker 消费 | `internal/worker/handlers`、`internal/pkg/eventcatalog` |
-| 高并发保护 | `internal/pkg/resilienceplane`、`internal/collection-server/application/answersheet/submit_queue.go`、`internal/collection-server/infra/redisops`、`internal/pkg/locklease` |
+| 高并发保护 | `internal/pkg/resilience`、`internal/collection-server/application/answersheet/submit_queue.go`、`internal/collection-server/infra/redisops`、`internal/pkg/resilience/locklease` |
 | report 查询 | `api/rest/collection.yaml`、`docs/04-接口与运维/12-小程序报告等待接入指南.md` |
 | 压测验收 | `docs/04-接口与运维/11-300QPS混合场景压测SOP.md`、`Makefile` |
 

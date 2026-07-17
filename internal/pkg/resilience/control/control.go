@@ -1,7 +1,7 @@
-// Package resiliencecontrol defines the transport-neutral control contract for
+// Package control defines the transport-neutral control contract for
 // process-owned resilience subsystems. It deliberately does not implement data
 // plane rate limiting, queues, backpressure, or leases.
-package resiliencecontrol
+package control
 
 import (
 	"context"

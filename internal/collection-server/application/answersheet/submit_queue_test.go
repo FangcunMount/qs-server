@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 func TestSubmitQueueEnqueueReturnsImmediately(t *testing.T) {
@@ -249,7 +249,7 @@ func TestSubmitQueueFullRestoresRetryableFailedEntry(t *testing.T) {
 		jobs:     make(chan submitJob, 1),
 		statuses: newSubmitQueueStatusStore(10 * time.Minute),
 		observer: defaultSubmitQueueObserver(nil),
-		subject: resilienceplane.Subject{
+		subject: resilience.Subject{
 			Component: "collection-server",
 			Scope:     "answersheet_submit",
 			Resource:  "submit_queue",
@@ -372,7 +372,7 @@ func TestSubmitQueueStatusSnapshotReportsCleanupOutcome(t *testing.T) {
 	if snapshot.StatusCounts[SubmitStatusDone] != 0 {
 		t.Fatalf("status counts = %+v, want expired done status removed", snapshot.StatusCounts)
 	}
-	if !observer.has(resilienceplane.OutcomeQueueStatusCleaned) {
+	if !observer.has(resilience.OutcomeQueueStatusCleaned) {
 		t.Fatal("expected queue_status_cleaned outcome")
 	}
 }
@@ -399,10 +399,10 @@ func TestSubmitQueueReportsOutcomes(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	for _, outcome := range []resilienceplane.Outcome{
-		resilienceplane.OutcomeQueueAccepted,
-		resilienceplane.OutcomeQueueProcessing,
-		resilienceplane.OutcomeQueueDone,
+	for _, outcome := range []resilience.Outcome{
+		resilience.OutcomeQueueAccepted,
+		resilience.OutcomeQueueProcessing,
+		resilience.OutcomeQueueDone,
 	} {
 		if !observer.has(outcome) {
 			t.Fatalf("expected outcome %s", outcome)
@@ -431,9 +431,9 @@ func TestSubmitQueueDrainClosesAdmissionAndWaitsForWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-started
-	drained := make(chan resiliencecontrol.DrainResult, 1)
+	drained := make(chan control.DrainResult, 1)
 	go func() {
-		result, _ := q.Drain(context.Background(), resiliencecontrol.DrainOptions{Timeout: time.Second})
+		result, _ := q.Drain(context.Background(), control.DrainOptions{Timeout: time.Second})
 		drained <- result
 	}()
 	deadline := time.Now().Add(time.Second)
@@ -448,13 +448,13 @@ func TestSubmitQueueDrainClosesAdmissionAndWaitsForWork(t *testing.T) {
 	}
 	close(release)
 	result := <-drained
-	if result.State != resiliencecontrol.QueueStatePaused || result.Depth != 0 || result.InFlight != 0 {
+	if result.State != control.QueueStatePaused || result.Depth != 0 || result.InFlight != 0 {
 		t.Fatalf("Drain() = %+v", result)
 	}
 	if err := q.Resume(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(resiliencecontrol.QueueStateActive) || snapshot.AdmissionClosed {
+	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(control.QueueStateActive) || snapshot.AdmissionClosed {
 		t.Fatalf("snapshot after Resume() = %+v", snapshot)
 	}
 }
@@ -471,14 +471,14 @@ func TestSubmitQueueDrainTimeoutKeepsAdmissionClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-started
-	_, err := q.Drain(context.Background(), resiliencecontrol.DrainOptions{Timeout: 20 * time.Millisecond})
+	_, err := q.Drain(context.Background(), control.DrainOptions{Timeout: 20 * time.Millisecond})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Drain() error = %v", err)
 	}
-	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(resiliencecontrol.QueueStateDraining) || !snapshot.AdmissionClosed {
+	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(control.QueueStateDraining) || !snapshot.AdmissionClosed {
 		t.Fatalf("snapshot after timeout = %+v", snapshot)
 	}
-	if err := q.Resume(context.Background()); !errors.Is(err, resiliencecontrol.ErrInvalidState) {
+	if err := q.Resume(context.Background()); !errors.Is(err, control.ErrInvalidState) {
 		t.Fatalf("Resume() error = %v", err)
 	}
 	close(release)
@@ -486,16 +486,16 @@ func TestSubmitQueueDrainTimeoutKeepsAdmissionClosed(t *testing.T) {
 
 type submitQueueRecordingObserver struct {
 	mu        sync.Mutex
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *submitQueueRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *submitQueueRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *submitQueueRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *submitQueueRecordingObserver) has(outcome resilience.Outcome) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, decision := range r.decisions {

@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -304,12 +304,12 @@ func TestSubmitGuardUsesInjectedObserver(t *testing.T) {
 		t.Fatal("expected closed Redis client error")
 	}
 
-	for _, outcome := range []resilienceplane.Outcome{
-		resilienceplane.OutcomeLockAcquired,
-		resilienceplane.OutcomeLockContention,
-		resilienceplane.OutcomeIdempotencyHit,
-		resilienceplane.OutcomeDegradedOpen,
-		resilienceplane.OutcomeLockError,
+	for _, outcome := range []resilience.Outcome{
+		resilience.OutcomeLockAcquired,
+		resilience.OutcomeLockContention,
+		resilience.OutcomeIdempotencyHit,
+		resilience.OutcomeDegradedOpen,
+		resilience.OutcomeLockError,
 	} {
 		if !observer.has(outcome) {
 			t.Fatalf("observer missing outcome %s in %#v", outcome, observer.decisions)
@@ -318,14 +318,14 @@ func TestSubmitGuardUsesInjectedObserver(t *testing.T) {
 }
 
 type submitGuardRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *submitGuardRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *submitGuardRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *submitGuardRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *submitGuardRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

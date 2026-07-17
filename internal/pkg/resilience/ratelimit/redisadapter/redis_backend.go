@@ -2,8 +2,8 @@ package redisadapter
 
 import (
 	baseredisadapter "github.com/FangcunMount/component-base/pkg/ratelimit/redisadapter"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	redis "github.com/redis/go-redis/v9"
 )
 

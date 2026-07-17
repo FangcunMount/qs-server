@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 )
 
 func (s *Subsystem) processCommands(ctx context.Context) bool {
-	store, ok := s.stateStore.(resiliencecontrol.CommandStore)
+	store, ok := s.stateStore.(control.CommandStore)
 	if !ok {
 		return false
 	}
@@ -32,7 +32,7 @@ func (s *Subsystem) processCommands(ctx context.Context) bool {
 			continue
 		}
 		found = true
-		claimed, err := store.Claim(ctx, resiliencecontrol.ScopedRequestID(command.Actor.OrgID, command.RequestID), s.identity.InstanceID, time.Until(command.ExpiresAt)+time.Minute)
+		claimed, err := store.Claim(ctx, control.ScopedRequestID(command.Actor.OrgID, command.RequestID), s.identity.InstanceID, time.Until(command.ExpiresAt)+time.Minute)
 		if err != nil || !claimed {
 			continue
 		}
@@ -41,10 +41,10 @@ func (s *Subsystem) processCommands(ctx context.Context) bool {
 	return found
 }
 
-func (s *Subsystem) executeQueueCommand(ctx context.Context, store resiliencecontrol.CommandStore, command resiliencecontrol.Command) {
-	result := resiliencecontrol.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
-		OrgID: command.Actor.OrgID, Component: "collection-server", InstanceID: s.identity.InstanceID, Status: resiliencecontrol.CommandStatusFailed}
-	var change resiliencecontrol.QueueChange
+func (s *Subsystem) executeQueueCommand(ctx context.Context, store control.CommandStore, command control.Command) {
+	result := control.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
+		OrgID: command.Actor.OrgID, Component: "collection-server", InstanceID: s.identity.InstanceID, Status: control.CommandStatusFailed}
+	var change control.QueueChange
 	if err := json.Unmarshal(command.Payload, &change); err != nil {
 		result.Message = err.Error()
 		s.finishQueueCommand(ctx, store, result)
@@ -60,27 +60,27 @@ func (s *Subsystem) executeQueueCommand(ctx context.Context, store resiliencecon
 	}
 	switch command.ActionID {
 	case "resilience.drain_queue":
-		drained, err := queue.controller.Drain(ctx, resiliencecontrol.DrainOptions{Timeout: time.Duration(change.TimeoutSeconds) * time.Second})
+		drained, err := queue.controller.Drain(ctx, control.DrainOptions{Timeout: time.Duration(change.TimeoutSeconds) * time.Second})
 		result.Payload, _ = json.Marshal(drained)
 		if err == nil {
-			result.Status = resiliencecontrol.CommandStatusOK
+			result.Status = control.CommandStatusOK
 		} else {
 			result.Message = err.Error()
 			if errors.Is(err, context.DeadlineExceeded) {
-				result.Status = resiliencecontrol.CommandStatusTimeout
+				result.Status = control.CommandStatusTimeout
 			}
 		}
 	case "resilience.resume_queue":
 		if err := queue.controller.Resume(ctx); err != nil {
 			result.Message = err.Error()
 		} else {
-			result.Status = resiliencecontrol.CommandStatusOK
+			result.Status = control.CommandStatusOK
 		}
 	}
 	s.finishQueueCommand(ctx, store, result)
 }
 
-func (s *Subsystem) finishQueueCommand(ctx context.Context, store resiliencecontrol.CommandStore, result resiliencecontrol.CommandResult) {
+func (s *Subsystem) finishQueueCommand(ctx context.Context, store control.CommandStore, result control.CommandResult) {
 	result.FinishedAt = time.Now()
 	_ = store.PutCommandResult(context.WithoutCancel(ctx), result, 10*time.Minute)
 }

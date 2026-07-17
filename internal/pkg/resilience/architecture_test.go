@@ -1,4 +1,4 @@
-package resilienceplane_test
+package resilience_test
 
 import (
 	"go/ast"
@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 func TestResiliencePathsDoNotImportPrometheusDirectly(t *testing.T) {
 	root := repoRoot(t)
 	paths := []string{
 		"internal/pkg/middleware",
-		"internal/pkg/backpressure",
-		"internal/pkg/locklease/redisadapter",
+		"internal/pkg/resilience/backpressure",
+		"internal/pkg/resilience/locklease/redisadapter",
 		"internal/pkg/redisruntime",
 		"internal/collection-server/application/answersheet",
 		"internal/collection-server/infra/redisops",
@@ -32,7 +32,7 @@ func TestResiliencePathsDoNotImportPrometheusDirectly(t *testing.T) {
 			for _, imported := range file.Imports {
 				importPath := strings.Trim(imported.Path.Value, `"`)
 				if strings.HasPrefix(importPath, "github.com/prometheus/") {
-					t.Fatalf("%s imports %s; resilience metrics must go through internal/pkg/resilienceplane", path, importPath)
+					t.Fatalf("%s imports %s; resilience metrics must go through internal/pkg/resilience", path, importPath)
 				}
 			}
 		})
@@ -46,12 +46,12 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.HasPrefix(rel, "internal/pkg/locklease/redisadapter/") {
+		if strings.HasPrefix(rel, "internal/pkg/resilience/locklease/redisadapter/") {
 			return
 		}
 		for _, imported := range file.Imports {
 			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/component-base/pkg/redis/lease" {
-				t.Fatalf("%s imports component-base redis lease directly; use internal/pkg/locklease port", rel)
+				t.Fatalf("%s imports component-base redis lease directly; use internal/pkg/resilience/locklease port", rel)
 			}
 		}
 	})
@@ -60,8 +60,8 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 func TestBusinessCodeDoesNotImportLockLeaseRedisAdapterDirectly(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/pkg/locklease/redisadapter": {},
-		"internal/pkg/locklease/subsystem":    {},
+		"internal/pkg/resilience/locklease/redisadapter": {},
+		"internal/pkg/resilience/locklease/subsystem":    {},
 	}
 	scanGoFiles(t, filepath.Join(root, "internal"), func(path string, file *ast.File) {
 		rel, err := filepath.Rel(root, path)
@@ -77,8 +77,8 @@ func TestBusinessCodeDoesNotImportLockLeaseRedisAdapterDirectly(t *testing.T) {
 			}
 		}
 		for _, imported := range file.Imports {
-			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter" {
-				t.Fatalf("%s imports locklease redis adapter directly; use internal/pkg/locklease port", rel)
+			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter" {
+				t.Fatalf("%s imports locklease redis adapter directly; use internal/pkg/resilience/locklease port", rel)
 			}
 		}
 	})
@@ -173,11 +173,11 @@ func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
 	}
 	for _, rel := range paths {
 		scanGoSourceFiles(t, filepath.Join(root, rel), func(path string, content string) {
-			if strings.Contains(content, "resilienceplane.Observe(") {
-				t.Fatalf("%s observes rate limit directly; use internal/pkg/ratelimit decision adapter", path)
+			if strings.Contains(content, "resilience.Observe(") {
+				t.Fatalf("%s observes rate limit directly; use internal/pkg/resilience/ratelimit decision adapter", path)
 			}
 			if strings.Contains(content, `Header("Retry-After"`) {
-				t.Fatalf("%s writes Retry-After directly; use internal/pkg/ratelimit decision adapter", path)
+				t.Fatalf("%s writes Retry-After directly; use internal/pkg/resilience/ratelimit decision adapter", path)
 			}
 		})
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -28,7 +28,7 @@ func NewMetricsServerWithGovernanceAndResilience(
 	bindPort int,
 	component string,
 	registry *observability.FamilyStatusRegistry,
-	resilience func() resilienceplane.RuntimeSnapshot,
+	snapshotProvider func() resilience.RuntimeSnapshot,
 ) *MetricsServer {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -57,11 +57,11 @@ func NewMetricsServerWithGovernanceAndResilience(
 		writeGovernanceJSON(w, http.StatusOK, observability.SnapshotForComponent(component, registry))
 	})
 	mux.HandleFunc("/governance/resilience", func(w http.ResponseWriter, _ *http.Request) {
-		if resilience == nil {
-			writeGovernanceJSON(w, http.StatusOK, resilienceplane.FinalizeRuntimeSnapshot(resilienceplane.NewRuntimeSnapshot(component, time.Now())))
+		if snapshotProvider == nil {
+			writeGovernanceJSON(w, http.StatusOK, resilience.FinalizeRuntimeSnapshot(resilience.NewRuntimeSnapshot(component, time.Now())))
 			return
 		}
-		writeGovernanceJSON(w, http.StatusOK, resilience())
+		writeGovernanceJSON(w, http.StatusOK, snapshotProvider())
 	})
 
 	return &MetricsServer{

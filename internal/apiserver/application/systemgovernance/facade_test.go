@@ -14,7 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestGetOverviewProbesMetricsOnce(t *testing.T) {
@@ -111,9 +111,9 @@ func TestGetResilienceIncludesSummaryRowsAndRemoteDegradation(t *testing.T) {
 	defer remote.Close()
 
 	view, err := NewFacade(FacadeDeps{
-		LocalResilienceSnapshot: func() resilienceplane.RuntimeSnapshot {
-			snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", now)
-			snapshot.Queues = []resilienceplane.QueueSnapshot{{
+		LocalResilienceSnapshot: func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("apiserver", now)
+			snapshot.Queues = []resilience.QueueSnapshot{{
 				Component: "apiserver",
 				Name:      "submit",
 				Strategy:  "memory_channel",

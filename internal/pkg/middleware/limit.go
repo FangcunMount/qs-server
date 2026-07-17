@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +17,7 @@ type LimitOptions struct {
 	Scope     string
 	Resource  string
 	Strategy  string
-	Observer  resilienceplane.Observer
+	Observer  resilience.Observer
 }
 
 // LimitDegradedOpen preserves the distributed limiter's observable fail-open
@@ -98,13 +98,13 @@ func rateLimitPolicy(opts LimitOptions, defaultStrategy string, maxEventsPerSec 
 	return policy
 }
 
-func observeDecision(c *gin.Context, observer resilienceplane.Observer, decision ratelimit.RateLimitDecision) {
-	resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, decision.Subject, decision.Outcome)
+func observeDecision(c *gin.Context, observer resilience.Observer, decision ratelimit.RateLimitDecision) {
+	resilience.Observe(c.Request.Context(), observer, resilience.ProtectionRateLimit, decision.Subject, decision.Outcome)
 }
 
-func defaultLimitObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+func defaultLimitObserver(observer resilience.Observer) resilience.Observer {
 	if observer != nil {
 		return observer
 	}
-	return resilienceplane.DefaultObserver()
+	return resilience.DefaultObserver()
 }

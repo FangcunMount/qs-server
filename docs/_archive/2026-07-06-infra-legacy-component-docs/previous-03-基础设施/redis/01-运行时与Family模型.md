@@ -797,7 +797,7 @@ handle -> client/builder/status
 - Runtime：[../../../internal/pkg/cacheplane/runtime.go](../../../internal/pkg/cacheplane/runtime.go)
 - Runtime bootstrap：[../../../internal/pkg/cacheplane/bootstrap/runtime.go](../../../internal/pkg/cacheplane/bootstrap/runtime.go)
 - Keyspace builder：[../../../internal/pkg/cacheplane/keyspace/builder.go](../../../internal/pkg/cacheplane/keyspace/builder.go)
-- Lock specs：[../../../internal/pkg/locklease/lease.go](../../../internal/pkg/locklease/lease.go)
+- Lock specs：[../../../internal/pkg/resilience/locklease/lease.go](../../../internal/pkg/resilience/locklease/lease.go)
 
 ---
 
@@ -808,7 +808,7 @@ go test ./internal/pkg/cacheplane
 go test ./internal/pkg/cacheplane/bootstrap
 go test ./internal/pkg/cacheplane/keyspace
 go test ./internal/pkg/options
-go test ./internal/pkg/locklease
+go test ./internal/pkg/resilience/locklease
 ```
 
 如果修改三进程装配：

@@ -56,9 +56,9 @@ flowchart LR
 
 | 能力 | 事实源 |
 | --- | --- |
-| RateLimit / Backpressure | [../../../internal/pkg/ratelimit](../../../internal/pkg/ratelimit)、[../../../internal/pkg/backpressure](../../../internal/pkg/backpressure) |
+| RateLimit / Backpressure | [../../../internal/pkg/resilience/ratelimit](../../../internal/pkg/resilience/ratelimit)、[../../../internal/pkg/resilience/backpressure](../../../internal/pkg/resilience/backpressure) |
 | 进程级组合 | [../../../internal/apiserver/resilience/subsystem](../../../internal/apiserver/resilience/subsystem)、[../../../internal/collection-server/resilience/subsystem](../../../internal/collection-server/resilience/subsystem)、[../../../internal/worker/resilience/subsystem](../../../internal/worker/resilience/subsystem) |
-| 跨进程控制协议 | [../../../internal/pkg/resiliencecontrol](../../../internal/pkg/resiliencecontrol) |
+| 跨进程控制协议 | [../../../internal/pkg/resilience/control](../../../internal/pkg/resilience/control) |
 | SubmitQueue | [../../../internal/collection-server/application/answersheet/submit_queue.go](../../../internal/collection-server/application/answersheet/submit_queue.go) |
-| SubmitGuard / LockLease | [../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)、[../../../internal/pkg/locklease](../../../internal/pkg/locklease) |
+| SubmitGuard / LockLease | [../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)、[../../../internal/pkg/resilience/locklease](../../../internal/pkg/resilience/locklease) |
 | Report 查询 | [../../../internal/collection-server/application/reportwait](../../../internal/collection-server/application/reportwait)、[../../04-接口与运维/12-小程序报告等待接入指南.md](../../04-接口与运维/12-小程序报告等待接入指南.md) |

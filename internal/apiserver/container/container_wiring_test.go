@@ -18,9 +18,9 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	redis "github.com/redis/go-redis/v9"
 )
 

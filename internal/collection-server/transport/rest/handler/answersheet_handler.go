@@ -8,7 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 	uuid "github.com/satori/go.uuid"

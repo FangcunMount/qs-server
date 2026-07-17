@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestLocalLimiterAllowsThenLimitsWithRetryAfter(t *testing.T) {
 	limiter := NewLocalLimiter(testPolicy("local"))
 
 	first := limiter.Decide(context.Background(), "")
-	if !first.Allowed || first.Outcome != resilienceplane.OutcomeAllowed {
+	if !first.Allowed || first.Outcome != resilience.OutcomeAllowed {
 		t.Fatalf("first decision = %#v, want allowed", first)
 	}
 
@@ -21,8 +21,8 @@ func TestLocalLimiterAllowsThenLimitsWithRetryAfter(t *testing.T) {
 	if second.Allowed {
 		t.Fatalf("second decision = %#v, want limited", second)
 	}
-	if second.Outcome != resilienceplane.OutcomeRateLimited {
-		t.Fatalf("outcome = %s, want %s", second.Outcome, resilienceplane.OutcomeRateLimited)
+	if second.Outcome != resilience.OutcomeRateLimited {
+		t.Fatalf("outcome = %s, want %s", second.Outcome, resilience.OutcomeRateLimited)
 	}
 	if second.RetryAfterSeconds < 1 {
 		t.Fatalf("retryAfterSeconds = %d, want positive", second.RetryAfterSeconds)
@@ -77,18 +77,18 @@ func TestDistributedLimiterAllowsLimitsAndDegradesOpen(t *testing.T) {
 
 	backend.allowed = true
 	decision = limiter.Decide(context.Background(), "limit:submit:global")
-	if !decision.Allowed || decision.Outcome != resilienceplane.OutcomeAllowed {
+	if !decision.Allowed || decision.Outcome != resilience.OutcomeAllowed {
 		t.Fatalf("decision = %#v, want allowed", decision)
 	}
 
 	backend.err = errors.New("redis down")
 	decision = limiter.Decide(context.Background(), "limit:submit:global")
-	if !decision.Allowed || decision.Outcome != resilienceplane.OutcomeDegradedOpen {
+	if !decision.Allowed || decision.Outcome != resilience.OutcomeDegradedOpen {
 		t.Fatalf("decision = %#v, want degraded open", decision)
 	}
 
 	decision = NewDistributedLimiter(nil, testPolicy("redis")).Decide(context.Background(), "limit:submit:global")
-	if !decision.Allowed || decision.Outcome != resilienceplane.OutcomeDegradedOpen {
+	if !decision.Allowed || decision.Outcome != resilience.OutcomeDegradedOpen {
 		t.Fatalf("nil backend decision = %#v, want degraded open", decision)
 	}
 }

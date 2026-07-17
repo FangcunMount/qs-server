@@ -5,17 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestResilienceProjectionBuildsSummaryRowsSignalsAndMetrics(t *testing.T) {
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 	metrics := &recordingMetricsReader{}
-	snapshot := resilienceplane.RuntimeSnapshot{
+	snapshot := resilience.RuntimeSnapshot{
 		GeneratedAt: now,
 		Component:   "collection-server",
-		Summary:     resilienceplane.RuntimeSummary{Ready: false, CapabilityCount: 4, DegradedCount: 1},
-		Queues: []resilienceplane.QueueSnapshot{{
+		Summary:     resilience.RuntimeSummary{Ready: false, CapabilityCount: 4, DegradedCount: 1},
+		Queues: []resilience.QueueSnapshot{{
 			Component:         "collection-server",
 			Name:              "answersheet_submit",
 			Strategy:          "memory_channel",
@@ -24,7 +24,7 @@ func TestResilienceProjectionBuildsSummaryRowsSignalsAndMetrics(t *testing.T) {
 			StatusCounts:      map[string]int{"pending": 95},
 			LifecycleBoundary: "process_memory_no_drain",
 		}},
-		Backpressure: []resilienceplane.BackpressureSnapshot{{
+		Backpressure: []resilience.BackpressureSnapshot{{
 			Component:   "collection-server",
 			Name:        "mysql",
 			Dependency:  "mysql",
@@ -33,7 +33,7 @@ func TestResilienceProjectionBuildsSummaryRowsSignalsAndMetrics(t *testing.T) {
 			InFlight:    8,
 			MaxInflight: 10,
 		}},
-		RateLimits: []resilienceplane.CapabilitySnapshot{{
+		RateLimits: []resilience.CapabilitySnapshot{{
 			Name:       "api_global",
 			Kind:       "rate_limit",
 			Strategy:   "token_bucket",
@@ -83,8 +83,8 @@ func TestResilienceProjectionBuildsSummaryRowsSignalsAndMetrics(t *testing.T) {
 
 func TestResilienceProjectionKeepsPrometheusFailureAsMetricEvidence(t *testing.T) {
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
-	snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", now)
-	snapshot.Queues = []resilienceplane.QueueSnapshot{{
+	snapshot := resilience.NewRuntimeSnapshot("apiserver", now)
+	snapshot.Queues = []resilience.QueueSnapshot{{
 		Component: "apiserver",
 		Name:      "submit",
 		Strategy:  "memory_channel",
@@ -110,8 +110,8 @@ func TestResilienceProjectionKeepsPrometheusFailureAsMetricEvidence(t *testing.T
 
 func TestResilienceProjectionFlagsQueueUtilizationWithoutMetrics(t *testing.T) {
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
-	snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", now)
-	snapshot.Queues = []resilienceplane.QueueSnapshot{
+	snapshot := resilience.NewRuntimeSnapshot("collection-server", now)
+	snapshot.Queues = []resilience.QueueSnapshot{
 		{Name: "submit", Depth: 90, Capacity: 100},
 	}
 

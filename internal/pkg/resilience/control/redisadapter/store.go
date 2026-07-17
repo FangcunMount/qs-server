@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -24,30 +24,30 @@ func NewStore(client redis.UniversalClient, builder *keyspace.Builder) *Store {
 	return &Store{client: client, builder: builder}
 }
 
-func (s *Store) Load(ctx context.Context, name string) (resiliencecontrol.VersionedState, bool, error) {
+func (s *Store) Load(ctx context.Context, name string) (control.VersionedState, bool, error) {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.VersionedState{}, false, resiliencecontrol.ErrUnavailable
+		return control.VersionedState{}, false, control.ErrUnavailable
 	}
 	raw, err := s.client.Get(ctx, s.builder.BuildResilienceStateKey(name)).Bytes()
 	if errors.Is(err, redis.Nil) {
-		return resiliencecontrol.VersionedState{}, false, nil
+		return control.VersionedState{}, false, nil
 	}
 	if err != nil {
-		return resiliencecontrol.VersionedState{}, false, err
+		return control.VersionedState{}, false, err
 	}
-	var state resiliencecontrol.VersionedState
+	var state control.VersionedState
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return resiliencecontrol.VersionedState{}, false, fmt.Errorf("decode resilience state %q: %w", name, err)
+		return control.VersionedState{}, false, fmt.Errorf("decode resilience state %q: %w", name, err)
 	}
 	return state, true, nil
 }
 
-func (s *Store) CompareAndSwap(ctx context.Context, name string, expected uint64, candidate resiliencecontrol.VersionedState, ttl time.Duration) (resiliencecontrol.VersionedState, error) {
+func (s *Store) CompareAndSwap(ctx context.Context, name string, expected uint64, candidate control.VersionedState, ttl time.Duration) (control.VersionedState, error) {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.VersionedState{}, resiliencecontrol.ErrUnavailable
+		return control.VersionedState{}, control.ErrUnavailable
 	}
 	key := s.builder.BuildResilienceStateKey(name)
-	var published resiliencecontrol.VersionedState
+	var published control.VersionedState
 	err := s.client.Watch(ctx, func(tx *redis.Tx) error {
 		current, exists, err := loadTx(ctx, tx, key)
 		if err != nil {
@@ -58,7 +58,7 @@ func (s *Store) CompareAndSwap(ctx context.Context, name string, expected uint64
 			currentVersion = current.Version
 		}
 		if currentVersion != expected {
-			return resiliencecontrol.ErrVersionConflict
+			return control.ErrVersionConflict
 		}
 		if candidate.Version <= expected {
 			candidate.Version = expected + 1
@@ -81,7 +81,7 @@ func (s *Store) CompareAndSwap(ctx context.Context, name string, expected uint64
 		return err
 	}, key)
 	if errors.Is(err, redis.TxFailedErr) {
-		err = resiliencecontrol.ErrVersionConflict
+		err = control.ErrVersionConflict
 	}
 	if err == nil {
 		_ = s.client.Publish(ctx, s.builder.BuildResilienceSignalChannel(), name).Err()
@@ -91,7 +91,7 @@ func (s *Store) CompareAndSwap(ctx context.Context, name string, expected uint64
 
 func (s *Store) Delete(ctx context.Context, name string, expected uint64) error {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.ErrUnavailable
+		return control.ErrUnavailable
 	}
 	key := s.builder.BuildResilienceStateKey(name)
 	err := s.client.Watch(ctx, func(tx *redis.Tx) error {
@@ -100,7 +100,7 @@ func (s *Store) Delete(ctx context.Context, name string, expected uint64) error 
 			return err
 		}
 		if !exists || current.Version != expected {
-			return resiliencecontrol.ErrVersionConflict
+			return control.ErrVersionConflict
 		}
 		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 			pipe.Del(ctx, key)
@@ -109,7 +109,7 @@ func (s *Store) Delete(ctx context.Context, name string, expected uint64) error 
 		return err
 	}, key)
 	if errors.Is(err, redis.TxFailedErr) {
-		return resiliencecontrol.ErrVersionConflict
+		return control.ErrVersionConflict
 	}
 	if err == nil {
 		_ = s.client.Publish(ctx, s.builder.BuildResilienceSignalChannel(), name).Err()
@@ -119,20 +119,20 @@ func (s *Store) Delete(ctx context.Context, name string, expected uint64) error 
 
 func (s *Store) Claim(ctx context.Context, requestID, instanceID string, ttl time.Duration) (bool, error) {
 	if s == nil || s.client == nil {
-		return false, resiliencecontrol.ErrUnavailable
+		return false, control.ErrUnavailable
 	}
 	return s.client.SetNX(ctx, s.builder.BuildResilienceClaimKey(requestID, instanceID), "1", ttl).Result()
 }
 
-func (s *Store) PublishCommand(ctx context.Context, command resiliencecontrol.Command, ttl time.Duration) error {
+func (s *Store) PublishCommand(ctx context.Context, command control.Command, ttl time.Duration) error {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.ErrUnavailable
+		return control.ErrUnavailable
 	}
 	raw, err := json.Marshal(command)
 	if err != nil {
 		return err
 	}
-	created, err := s.client.SetNX(ctx, s.builder.BuildResilienceCommandKey(command.Target.Component, resiliencecontrol.ScopedRequestID(command.Actor.OrgID, command.RequestID)), raw, ttl).Result()
+	created, err := s.client.SetNX(ctx, s.builder.BuildResilienceCommandKey(command.Target.Component, control.ScopedRequestID(command.Actor.OrgID, command.RequestID)), raw, ttl).Result()
 	if err != nil {
 		return err
 	}
@@ -143,12 +143,12 @@ func (s *Store) PublishCommand(ctx context.Context, command resiliencecontrol.Co
 	return nil
 }
 
-func (s *Store) ListCommands(ctx context.Context, component, instanceID string) ([]resiliencecontrol.Command, error) {
+func (s *Store) ListCommands(ctx context.Context, component, instanceID string) ([]control.Command, error) {
 	if s == nil || s.client == nil {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
 	pattern := s.builder.BuildResilienceCommandKey(component, "*")
-	commands := []resiliencecontrol.Command{}
+	commands := []control.Command{}
 	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
@@ -158,7 +158,7 @@ func (s *Store) ListCommands(ctx context.Context, component, instanceID string) 
 		if err != nil {
 			return nil, err
 		}
-		var command resiliencecontrol.Command
+		var command control.Command
 		if json.Unmarshal(raw, &command) != nil {
 			continue
 		}
@@ -169,23 +169,23 @@ func (s *Store) ListCommands(ctx context.Context, component, instanceID string) 
 	return commands, iter.Err()
 }
 
-func (s *Store) PutCommandResult(ctx context.Context, result resiliencecontrol.CommandResult, ttl time.Duration) error {
+func (s *Store) PutCommandResult(ctx context.Context, result control.CommandResult, ttl time.Duration) error {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.ErrUnavailable
+		return control.ErrUnavailable
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
-	return s.client.Set(ctx, s.builder.BuildResilienceCommandResultKey(resiliencecontrol.ScopedRequestID(result.OrgID, result.RequestID), result.InstanceID), raw, ttl).Err()
+	return s.client.Set(ctx, s.builder.BuildResilienceCommandResultKey(control.ScopedRequestID(result.OrgID, result.RequestID), result.InstanceID), raw, ttl).Err()
 }
 
-func (s *Store) ListCommandResults(ctx context.Context, orgID int64, requestID string) ([]resiliencecontrol.CommandResult, error) {
+func (s *Store) ListCommandResults(ctx context.Context, orgID int64, requestID string) ([]control.CommandResult, error) {
 	if s == nil || s.client == nil {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
-	pattern := s.builder.BuildResilienceCommandResultKey(resiliencecontrol.ScopedRequestID(orgID, requestID), "*")
-	results := []resiliencecontrol.CommandResult{}
+	pattern := s.builder.BuildResilienceCommandResultKey(control.ScopedRequestID(orgID, requestID), "*")
+	results := []control.CommandResult{}
 	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
@@ -195,7 +195,7 @@ func (s *Store) ListCommandResults(ctx context.Context, orgID int64, requestID s
 		if err != nil {
 			return nil, err
 		}
-		var result resiliencecontrol.CommandResult
+		var result control.CommandResult
 		if json.Unmarshal(raw, &result) == nil {
 			results = append(results, result)
 		}
@@ -203,12 +203,12 @@ func (s *Store) ListCommandResults(ctx context.Context, orgID int64, requestID s
 	return results, iter.Err()
 }
 
-func (s *Store) ListInstances(ctx context.Context, component string) ([]resiliencecontrol.InstanceIdentity, error) {
+func (s *Store) ListInstances(ctx context.Context, component string) ([]control.InstanceIdentity, error) {
 	if s == nil || s.client == nil {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
 	pattern := s.builder.BuildResilienceInstanceKey(component, "*")
-	instances := []resiliencecontrol.InstanceIdentity{}
+	instances := []control.InstanceIdentity{}
 	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
@@ -218,7 +218,7 @@ func (s *Store) ListInstances(ctx context.Context, component string) ([]resilien
 		if err != nil {
 			return nil, err
 		}
-		var identity resiliencecontrol.InstanceIdentity
+		var identity control.InstanceIdentity
 		if json.Unmarshal(raw, &identity) == nil {
 			instances = append(instances, identity)
 		}
@@ -226,9 +226,9 @@ func (s *Store) ListInstances(ctx context.Context, component string) ([]resilien
 	return instances, iter.Err()
 }
 
-func (s *Store) Heartbeat(ctx context.Context, identity resiliencecontrol.InstanceIdentity, ttl time.Duration) error {
+func (s *Store) Heartbeat(ctx context.Context, identity control.InstanceIdentity, ttl time.Duration) error {
 	if s == nil || s.client == nil {
-		return resiliencecontrol.ErrUnavailable
+		return control.ErrUnavailable
 	}
 	raw, err := json.Marshal(identity)
 	if err != nil {
@@ -239,7 +239,7 @@ func (s *Store) Heartbeat(ctx context.Context, identity resiliencecontrol.Instan
 
 func (s *Store) WatchStateSignals(ctx context.Context) (<-chan string, error) {
 	if s == nil || s.client == nil {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
 	subscription := s.client.Subscribe(ctx, s.builder.BuildResilienceSignalChannel())
 	if _, err := subscription.Receive(ctx); err != nil {
@@ -268,22 +268,22 @@ func (s *Store) WatchStateSignals(ctx context.Context) (<-chan string, error) {
 	return out, nil
 }
 
-func loadTx(ctx context.Context, tx *redis.Tx, key string) (resiliencecontrol.VersionedState, bool, error) {
+func loadTx(ctx context.Context, tx *redis.Tx, key string) (control.VersionedState, bool, error) {
 	raw, err := tx.Get(ctx, key).Bytes()
 	if errors.Is(err, redis.Nil) {
-		return resiliencecontrol.VersionedState{}, false, nil
+		return control.VersionedState{}, false, nil
 	}
 	if err != nil {
-		return resiliencecontrol.VersionedState{}, false, err
+		return control.VersionedState{}, false, err
 	}
-	var state resiliencecontrol.VersionedState
+	var state control.VersionedState
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return resiliencecontrol.VersionedState{}, false, err
+		return control.VersionedState{}, false, err
 	}
 	return state, true, nil
 }
 
-var _ resiliencecontrol.StateStore = (*Store)(nil)
-var _ resiliencecontrol.InstanceHeartbeater = (*Store)(nil)
-var _ resiliencecontrol.StateSignalWatcher = (*Store)(nil)
-var _ resiliencecontrol.CommandStore = (*Store)(nil)
+var _ control.StateStore = (*Store)(nil)
+var _ control.InstanceHeartbeater = (*Store)(nil)
+var _ control.StateSignalWatcher = (*Store)(nil)
+var _ control.CommandStore = (*Store)(nil)

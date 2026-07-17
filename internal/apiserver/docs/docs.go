@@ -11224,6 +11224,12 @@ const docTemplate = `{
         "resilienceplane.CapabilitySnapshot": {
             "type": "object",
             "properties": {
+                "active": {
+                    "type": "integer"
+                },
+                "burst": {
+                    "type": "integer"
+                },
                 "configured": {
                     "type": "boolean"
                 },
@@ -11235,6 +11241,18 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "override_expires_at": {
+                    "type": "string"
+                },
+                "policy_source": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "integer"
+                },
+                "rate_per_second": {
+                    "type": "number"
                 },
                 "reason": {
                     "type": "string"
@@ -11256,6 +11274,9 @@ const docTemplate = `{
         "resilienceplane.QueueSnapshot": {
             "type": "object",
             "properties": {
+                "admission_closed": {
+                    "type": "boolean"
+                },
                 "capacity": {
                     "type": "integer"
                 },
@@ -11268,11 +11289,20 @@ const docTemplate = `{
                 "generated_at": {
                     "type": "string"
                 },
+                "in_flight": {
+                    "type": "integer"
+                },
                 "lifecycle_boundary": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "state_version": {
+                    "type": "integer"
                 },
                 "status_counts": {
                     "type": "object",
@@ -11309,11 +11339,17 @@ const docTemplate = `{
                 "generated_at": {
                     "type": "string"
                 },
+                "generation": {
+                    "type": "string"
+                },
                 "idempotency": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/resilienceplane.CapabilitySnapshot"
                     }
+                },
+                "instance_id": {
+                    "type": "string"
                 },
                 "locks": {
                     "type": "array",
@@ -14795,12 +14831,12 @@ const docTemplate = `{
                 "message": {
                     "type": "string"
                 },
+                "request_id": {
+                    "type": "string"
+                },
                 "result": {
                     "type": "object",
                     "additionalProperties": true
-                },
-                "request_id": {
-                    "type": "string"
                 },
                 "started_at": {
                     "type": "string"

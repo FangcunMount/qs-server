@@ -11,16 +11,16 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 const defaultComponentTimeout = 3 * time.Second
 
 // ResilienceResult 保存一个组件 resilience 载荷 使用 fetch 元数据。
 type ResilienceResult struct {
-	Available bool                             `json:"available"`
-	Reason    string                           `json:"reason,omitempty"`
-	Snapshot  *resilienceplane.RuntimeSnapshot `json:"snapshot,omitempty"`
+	Available bool                        `json:"available"`
+	Reason    string                      `json:"reason,omitempty"`
+	Snapshot  *resilience.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
 // CacheResult 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。
@@ -111,17 +111,17 @@ func (a *Adapter) FetchCache(ctx context.Context) map[string]CacheResult {
 	return result
 }
 
-func (a *Adapter) fetchResilience(ctx context.Context, endpoint string, timeout time.Duration) (*resilienceplane.RuntimeSnapshot, error) {
+func (a *Adapter) fetchResilience(ctx context.Context, endpoint string, timeout time.Duration) (*resilience.RuntimeSnapshot, error) {
 	body, err := a.getJSON(ctx, endpoint, timeout)
 	if err != nil {
 		return nil, err
 	}
-	var direct resilienceplane.RuntimeSnapshot
+	var direct resilience.RuntimeSnapshot
 	if err := json.Unmarshal(body, &direct); err == nil && direct.Component != "" {
 		return &direct, nil
 	}
 	var wrapped struct {
-		Data resilienceplane.RuntimeSnapshot `json:"data"`
+		Data resilience.RuntimeSnapshot `json:"data"`
 	}
 	if err := json.Unmarshal(body, &wrapped); err != nil {
 		return nil, err

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	basebackpressure "github.com/FangcunMount/component-base/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // Limiter provides a simple in-flight limiter with optional timeout.
@@ -20,7 +20,7 @@ type Acquirer interface {
 type Options struct {
 	Component  string
 	Dependency string
-	Observer   resilienceplane.Observer
+	Observer   resilience.Observer
 }
 
 // NewLimiter creates a limiter with maxInflight and optional timeout.
@@ -49,9 +49,9 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 	return l.limiter.Acquire(ctx)
 }
 
-func (l *Limiter) Snapshot(name string) resilienceplane.BackpressureSnapshot {
+func (l *Limiter) Snapshot(name string) resilience.BackpressureSnapshot {
 	if l == nil || l.limiter == nil {
-		return resilienceplane.BackpressureSnapshot{
+		return resilience.BackpressureSnapshot{
 			Name:     name,
 			Enabled:  false,
 			Degraded: true,
@@ -59,7 +59,7 @@ func (l *Limiter) Snapshot(name string) resilienceplane.BackpressureSnapshot {
 		}
 	}
 	stats := l.limiter.Stats(name)
-	return resilienceplane.BackpressureSnapshot{
+	return resilience.BackpressureSnapshot{
 		Component:     stats.Component,
 		Name:          stats.Name,
 		Dependency:    stats.Dependency,
@@ -74,11 +74,11 @@ func (l *Limiter) Snapshot(name string) resilienceplane.BackpressureSnapshot {
 }
 
 type resilienceObserver struct {
-	observer resilienceplane.Observer
+	observer resilience.Observer
 }
 
 func (o resilienceObserver) OnBackpressure(ctx context.Context, event basebackpressure.Event) {
-	subject := resilienceplane.Subject{
+	subject := resilience.Subject{
 		Component: event.Component,
 		Scope:     event.Dependency,
 		Resource:  event.Resource,
@@ -86,30 +86,30 @@ func (o resilienceObserver) OnBackpressure(ctx context.Context, event basebackpr
 	}
 	outcome := adaptOutcome(event.Outcome)
 	if event.Outcome != basebackpressure.OutcomeReleased {
-		resilienceplane.ObserveBackpressureWaitDuration(subject, outcome, event.Wait)
+		resilience.ObserveBackpressureWaitDuration(subject, outcome, event.Wait)
 	}
-	resilienceplane.Observe(ctx, o.observer, resilienceplane.ProtectionBackpressure, subject, outcome)
+	resilience.Observe(ctx, o.observer, resilience.ProtectionBackpressure, subject, outcome)
 	if event.Outcome == basebackpressure.OutcomeAcquired || event.Outcome == basebackpressure.OutcomeReleased {
-		resilienceplane.ObserveBackpressureInFlight(subject, event.InFlight)
+		resilience.ObserveBackpressureInFlight(subject, event.InFlight)
 	}
 }
 
-func adaptOutcome(outcome basebackpressure.Outcome) resilienceplane.Outcome {
+func adaptOutcome(outcome basebackpressure.Outcome) resilience.Outcome {
 	switch outcome {
 	case basebackpressure.OutcomeAcquired:
-		return resilienceplane.OutcomeBackpressureAcquired
+		return resilience.OutcomeBackpressureAcquired
 	case basebackpressure.OutcomeReleased:
-		return resilienceplane.OutcomeBackpressureReleased
+		return resilience.OutcomeBackpressureReleased
 	case basebackpressure.OutcomeTimeout:
-		return resilienceplane.OutcomeBackpressureTimeout
+		return resilience.OutcomeBackpressureTimeout
 	default:
-		return resilienceplane.OutcomeBackpressureTimeout
+		return resilience.OutcomeBackpressureTimeout
 	}
 }
 
-func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+func defaultObserver(observer resilience.Observer) resilience.Observer {
 	if observer != nil {
 		return observer
 	}
-	return resilienceplane.DefaultObserver()
+	return resilience.DefaultObserver()
 }

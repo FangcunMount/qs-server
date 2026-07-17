@@ -10,8 +10,8 @@ import (
 	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	"gorm.io/gorm"
 )
 
@@ -22,9 +22,9 @@ type RESTSystemGovernanceInput struct {
 	EventOutboxes           []appEventing.NamedOutboxStatusReader
 	CacheGovernance         statisticsApp.GovernanceFacade
 	CachePolicyReloader     systemgov.CachePolicyReloader
-	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
+	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
 	MySQLDB                 *gorm.DB
-	ResilienceGovernor      resiliencecontrol.Governor
+	ResilienceGovernor      control.Governor
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.

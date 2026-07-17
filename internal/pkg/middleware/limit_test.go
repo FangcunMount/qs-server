@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,10 +36,10 @@ func TestLimitRejectsWithRetryAfterAndOutcome(t *testing.T) {
 	if got := recorder.Header().Get("Retry-After"); got == "" {
 		t.Fatal("Retry-After header is empty")
 	}
-	if !observer.has(resilienceplane.OutcomeAllowed) {
+	if !observer.has(resilience.OutcomeAllowed) {
 		t.Fatal("expected allowed outcome")
 	}
-	if !observer.has(resilienceplane.OutcomeRateLimited) {
+	if !observer.has(resilience.OutcomeRateLimited) {
 		t.Fatal("expected rate_limited outcome")
 	}
 }
@@ -96,14 +96,14 @@ func TestLimitByKeyUsesAnonymousFallbackForEmptyKey(t *testing.T) {
 }
 
 type limitRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *limitRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *limitRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *limitRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *limitRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

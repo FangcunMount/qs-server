@@ -559,8 +559,8 @@ raw error
 
 ### Lock
 
-- Lock specs：[../../../internal/pkg/locklease/lease.go](../../../internal/pkg/locklease/lease.go)
-- Redis lock adapter：[../../../internal/pkg/locklease/redisadapter/](../../../internal/pkg/locklease/redisadapter/)
+- Lock specs：[../../../internal/pkg/resilience/locklease/lease.go](../../../internal/pkg/resilience/locklease/lease.go)
+- Redis lock adapter：[../../../internal/pkg/resilience/locklease/redisadapter/](../../../internal/pkg/resilience/locklease/redisadapter/)
 - SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
 - Worker answersheet gate：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
 
@@ -599,8 +599,8 @@ go test ./internal/pkg/cachegovernance/observability
 Lock：
 
 ```bash
-go test ./internal/pkg/locklease
-go test ./internal/pkg/locklease/redisadapter
+go test ./internal/pkg/resilience/locklease
+go test ./internal/pkg/resilience/locklease/redisadapter
 go test ./internal/apiserver/runtime/scheduler
 go test ./internal/collection-server/infra/redisops
 go test ./internal/worker/handlers

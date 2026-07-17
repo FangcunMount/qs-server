@@ -774,8 +774,8 @@ go test ./internal/apiserver/application/cachegovernance
 Lock：
 
 ```bash
-go test ./internal/pkg/locklease
-go test ./internal/pkg/locklease/redisadapter
+go test ./internal/pkg/resilience/locklease
+go test ./internal/pkg/resilience/locklease/redisadapter
 go test ./internal/apiserver/runtime/scheduler
 go test ./internal/collection-server/infra/redisops
 go test ./internal/worker/handlers
@@ -801,8 +801,8 @@ git diff --check
 - ScaleListCache：[../../../internal/apiserver/infra/cachequery/scale_list_cache.go](../../../internal/apiserver/infra/cachequery/scale_list_cache.go)
 - Warmup target：[../../../internal/apiserver/cachetarget/target.go](../../../internal/apiserver/cachetarget/target.go)
 - Hotset store：[../../../internal/apiserver/infra/cachehotset/store.go](../../../internal/apiserver/infra/cachehotset/store.go)
-- Lock specs：[../../../internal/pkg/locklease/lease.go](../../../internal/pkg/locklease/lease.go)
-- Lock manager：[../../../internal/pkg/locklease/redisadapter/lock.go](../../../internal/pkg/locklease/redisadapter/lock.go)
+- Lock specs：[../../../internal/pkg/resilience/locklease/lease.go](../../../internal/pkg/resilience/locklease/lease.go)
+- Lock manager：[../../../internal/pkg/resilience/locklease/redisadapter/lock.go](../../../internal/pkg/resilience/locklease/redisadapter/lock.go)
 - Cache governance：[../../../internal/apiserver/application/cachegovernance/](../../../internal/apiserver/application/cachegovernance/)
 
 ---

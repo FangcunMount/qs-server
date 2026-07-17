@@ -33,7 +33,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
@@ -41,6 +40,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // Module assembles evaluation application services.

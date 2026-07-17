@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 type leaderLockAcquireFunc func(context.Context, locklease.Spec, string, time.Duration) (*locklease.Lease, bool, error)

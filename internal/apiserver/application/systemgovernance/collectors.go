@@ -8,7 +8,7 @@ import (
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 type eventGovernanceCollector struct {
@@ -146,13 +146,13 @@ func projectRedisRuntimeSnapshot(in cachemodel.RuntimeSnapshot) observability.Ru
 }
 
 type resilienceGovernanceCollector struct {
-	localSnapshot func() resilienceplane.RuntimeSnapshot
+	localSnapshot func() resilience.RuntimeSnapshot
 	components    *govcomponent.Adapter
 	metrics       MetricsReader
 }
 
 func (c resilienceGovernanceCollector) Collect(ctx context.Context, evalCtx evaluationContext) (*ResilienceView, error) {
-	local := resilienceplane.NewRuntimeSnapshot("apiserver", evalCtx.evalAt)
+	local := resilience.NewRuntimeSnapshot("apiserver", evalCtx.evalAt)
 	if c.localSnapshot != nil {
 		local = c.localSnapshot()
 	}

@@ -7,20 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/gin-gonic/gin"
 )
 
 func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := newRouterWithBudgets(Deps{
-		ResilienceSnapshot: func() resilienceplane.RuntimeSnapshot {
-			snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", time.Now())
-			snapshot.Locks = []resilienceplane.CapabilitySnapshot{
+		ResilienceSnapshot: func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("apiserver", time.Now())
+			snapshot.Locks = []resilience.CapabilitySnapshot{
 				{Name: "plan_scheduler_leader", Kind: "leader", Strategy: "redis_lease", Configured: true, TTLSeconds: 50, RenewalMode: "auto", RenewEverySeconds: 16},
 				{Name: "statistics_sync", Kind: "task_lock", Strategy: "redis_lease", Configured: true, TTLSeconds: 1800, RenewalMode: "auto", RenewEverySeconds: 600},
 			}
-			snapshot.Backpressure = []resilienceplane.BackpressureSnapshot{{
+			snapshot.Backpressure = []resilience.BackpressureSnapshot{{
 				Component:     "apiserver",
 				Name:          "mysql",
 				Dependency:    "mysql",
@@ -29,7 +29,7 @@ func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 				MaxInflight:   16,
 				TimeoutMillis: 200,
 			}}
-			return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+			return resilience.FinalizeRuntimeSnapshot(snapshot)
 		},
 	})
 	engine := gin.New()

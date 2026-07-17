@@ -7,7 +7,7 @@ import (
 	"time"
 
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestMetricEvidenceReaderBuildsSortedEscapedCounterQuery(t *testing.T) {
@@ -37,12 +37,12 @@ func TestMetricEvidenceReaderScopesResilienceDecisionLabels(t *testing.T) {
 	reader := NewMetricEvidenceReader(metrics)
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 
-	reader.ResilienceQueueFull(context.Background(), "collection-server", resilienceplane.QueueSnapshot{
+	reader.ResilienceQueueFull(context.Background(), "collection-server", resilience.QueueSnapshot{
 		Component: "collection-server",
 		Name:      "answersheet_submit",
 		Strategy:  "memory_channel",
 	}, "5m", now)
-	reader.ResilienceBackpressureTimeout(context.Background(), "apiserver", resilienceplane.BackpressureSnapshot{
+	reader.ResilienceBackpressureTimeout(context.Background(), "apiserver", resilience.BackpressureSnapshot{
 		Component:  "apiserver",
 		Name:       "mysql",
 		Dependency: "mysql",

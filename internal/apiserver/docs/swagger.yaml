@@ -1330,6 +1330,10 @@ definitions:
     type: object
   resilienceplane.CapabilitySnapshot:
     properties:
+      active:
+        type: integer
+      burst:
+        type: integer
       configured:
         type: boolean
       degraded:
@@ -1338,6 +1342,14 @@ definitions:
         type: string
       name:
         type: string
+      override_expires_at:
+        type: string
+      policy_source:
+        type: string
+      policy_version:
+        type: integer
+      rate_per_second:
+        type: number
       reason:
         type: string
       renew_every_seconds:
@@ -1351,6 +1363,8 @@ definitions:
     type: object
   resilienceplane.QueueSnapshot:
     properties:
+      admission_closed:
+        type: boolean
       capacity:
         type: integer
       component:
@@ -1359,10 +1373,16 @@ definitions:
         type: integer
       generated_at:
         type: string
+      in_flight:
+        type: integer
       lifecycle_boundary:
         type: string
       name:
         type: string
+      state:
+        type: string
+      state_version:
+        type: integer
       status_counts:
         additionalProperties:
           type: integer
@@ -1386,10 +1406,14 @@ definitions:
         type: array
       generated_at:
         type: string
+      generation:
+        type: string
       idempotency:
         items:
           $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
         type: array
+      instance_id:
+        type: string
       locks:
         items:
           $ref: '#/definitions/resilienceplane.CapabilitySnapshot'
@@ -3731,11 +3755,11 @@ definitions:
         type: string
       message:
         type: string
+      request_id:
+        type: string
       result:
         additionalProperties: true
         type: object
-      request_id:
-        type: string
       started_at:
         type: string
       status:
@@ -9569,8 +9593,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id
-        安全重试；仅 qs:admin 可访问
+      description: 执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id 安全重试；仅
+        qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header

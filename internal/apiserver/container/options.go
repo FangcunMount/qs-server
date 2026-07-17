@@ -5,9 +5,9 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
 // ContainerOptions 容器配置选项。

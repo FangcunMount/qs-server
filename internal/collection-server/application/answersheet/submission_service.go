@@ -11,8 +11,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	collectionquestionnaire "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -371,9 +371,9 @@ func (s *SubmissionService) GetSubmitStatus(ctx context.Context, requestID strin
 	return &status, true
 }
 
-func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {
+func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilience.QueueSnapshot {
 	if s == nil || s.queue == nil {
-		return resilienceplane.QueueSnapshot{
+		return resilience.QueueSnapshot{
 			GeneratedAt:       now,
 			Component:         "collection-server",
 			Name:              "answersheet_submit",

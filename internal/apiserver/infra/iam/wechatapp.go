@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
 	"github.com/FangcunMount/iam/v2/pkg/sdk/idp"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // WeChatAppService 微信应用服务封装

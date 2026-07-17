@@ -9,11 +9,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionresilience "github.com/FangcunMount/qs-server/internal/collection-server/resilience/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/control/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -45,62 +45,62 @@ func TestQueueCommandWaitsForTargetInstanceResult(t *testing.T) {
 		Concurrency: collectionOpts.Concurrency, WaitReport: collectionOpts.WaitReport,
 		OpsAvailable: true, StateStore: store,
 	})
-	queue := &fakeQueueController{state: resiliencecontrol.QueueStateActive}
+	queue := &fakeQueueController{state: control.QueueStateActive}
 	collection.RegisterQueue("answersheet_submit", queue, queue.snapshot)
 	cancel := collection.Start(context.Background())
 	t.Cleanup(cancel)
 	waitForInstance(t, store, "collection-server")
 
 	governor := New(Options{InstanceID: "api-0", RateLimit: options.NewRateLimitOptions(), StateStore: store})
-	drained, err := governor.SetQueueState(context.Background(), resiliencecontrol.ActionActor{OrgID: 9}, resiliencecontrol.QueueChange{
+	drained, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
 		RequestID: "drain-1", Component: "collection-server", Queue: "answersheet_submit", Target: "all",
-		DesiredState: resiliencecontrol.QueueStatePaused, TimeoutSeconds: 2,
+		DesiredState: control.QueueStatePaused, TimeoutSeconds: 2,
 	})
-	if err != nil || drained.Status != resiliencecontrol.CommandStatusOK || len(drained.Instances) != 1 || queue.current() != resiliencecontrol.QueueStatePaused {
+	if err != nil || drained.Status != control.CommandStatusOK || len(drained.Instances) != 1 || queue.current() != control.QueueStatePaused {
 		t.Fatalf("drain result=%+v state=%s err=%v", drained, queue.current(), err)
 	}
-	resumed, err := governor.SetQueueState(context.Background(), resiliencecontrol.ActionActor{OrgID: 9}, resiliencecontrol.QueueChange{
+	resumed, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
 		RequestID: "resume-1", Component: "collection-server", Queue: "answersheet_submit", Target: "all",
-		DesiredState: resiliencecontrol.QueueStateActive, TimeoutSeconds: 2,
+		DesiredState: control.QueueStateActive, TimeoutSeconds: 2,
 	})
-	if err != nil || resumed.Status != resiliencecontrol.CommandStatusOK || queue.current() != resiliencecontrol.QueueStateActive {
+	if err != nil || resumed.Status != control.CommandStatusOK || queue.current() != control.QueueStateActive {
 		t.Fatalf("resume result=%+v state=%s err=%v", resumed, queue.current(), err)
 	}
 }
 
 type fakeQueueController struct {
 	mu    sync.Mutex
-	state resiliencecontrol.QueueState
+	state control.QueueState
 }
 
-func (q *fakeQueueController) Drain(context.Context, resiliencecontrol.DrainOptions) (resiliencecontrol.DrainResult, error) {
+func (q *fakeQueueController) Drain(context.Context, control.DrainOptions) (control.DrainResult, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.state = resiliencecontrol.QueueStatePaused
-	return resiliencecontrol.DrainResult{State: q.state, Version: 2}, nil
+	q.state = control.QueueStatePaused
+	return control.DrainResult{State: q.state, Version: 2}, nil
 }
 
 func (q *fakeQueueController) Resume(context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.state != resiliencecontrol.QueueStatePaused {
-		return resiliencecontrol.ErrInvalidState
+	if q.state != control.QueueStatePaused {
+		return control.ErrInvalidState
 	}
-	q.state = resiliencecontrol.QueueStateActive
+	q.state = control.QueueStateActive
 	return nil
 }
 
-func (q *fakeQueueController) current() resiliencecontrol.QueueState {
+func (q *fakeQueueController) current() control.QueueState {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.state
 }
 
-func (q *fakeQueueController) snapshot(time.Time) resilienceplane.QueueSnapshot {
-	return resilienceplane.QueueSnapshot{Name: "answersheet_submit", State: string(q.current())}
+func (q *fakeQueueController) snapshot(time.Time) resilience.QueueSnapshot {
+	return resilience.QueueSnapshot{Name: "answersheet_submit", State: string(q.current())}
 }
 
-func waitForInstance(t *testing.T, store resiliencecontrol.CommandStore, component string) {
+func waitForInstance(t *testing.T, store control.CommandStore, component string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -124,12 +124,12 @@ func TestRateOverrideReconcilesAcrossInstancesAndResetRestoresConfig(t *testing.
 	cancel := right.Start(context.Background())
 	t.Cleanup(cancel)
 
-	change := resiliencecontrol.RateLimitChange{
+	change := control.RateLimitChange{
 		Mode: "override", Component: "apiserver", Budget: "query", ExpectedVersion: 1,
-		Global: resiliencecontrol.RatePolicy{RatePerSecond: 12, Burst: 18},
-		User:   resiliencecontrol.RatePolicy{RatePerSecond: 3, Burst: 5}, TTLSeconds: 60,
+		Global: control.RatePolicy{RatePerSecond: 12, Burst: 18},
+		User:   control.RatePolicy{RatePerSecond: 3, Burst: 5}, TTLSeconds: 60,
 	}
-	result, err := left.TuneRateLimit(context.Background(), resiliencecontrol.ActionActor{OrgID: 9, UserID: 42}, change)
+	result, err := left.TuneRateLimit(context.Background(), control.ActionActor{OrgID: 9, UserID: 42}, change)
 	if err != nil || result.Version != 2 {
 		t.Fatalf("TuneRateLimit() = %+v, %v", result, err)
 	}
@@ -137,16 +137,16 @@ func TestRateOverrideReconcilesAcrossInstancesAndResetRestoresConfig(t *testing.
 
 	change.Mode = "reset"
 	change.ExpectedVersion = 2
-	if _, err := left.TuneRateLimit(context.Background(), resiliencecontrol.ActionActor{OrgID: 9, UserID: 42}, change); err != nil {
+	if _, err := left.TuneRateLimit(context.Background(), control.ActionActor{OrgID: 9, UserID: 42}, change); err != nil {
 		t.Fatalf("reset TuneRateLimit() error = %v", err)
 	}
 	waitForBudget(t, right, 3, "config")
 
 	change.Mode = "override"
 	change.ExpectedVersion = 3
-	change.Global = resiliencecontrol.RatePolicy{RatePerSecond: 20, Burst: 30}
-	change.User = resiliencecontrol.RatePolicy{RatePerSecond: 4, Burst: 6}
-	result, err = left.TuneRateLimit(context.Background(), resiliencecontrol.ActionActor{OrgID: 9, UserID: 42}, change)
+	change.Global = control.RatePolicy{RatePerSecond: 20, Burst: 30}
+	change.User = control.RatePolicy{RatePerSecond: 4, Burst: 6}
+	result, err = left.TuneRateLimit(context.Background(), control.ActionActor{OrgID: 9, UserID: 42}, change)
 	if err != nil || result.Version != 4 {
 		t.Fatalf("TuneRateLimit() after reset = %+v, %v", result, err)
 	}

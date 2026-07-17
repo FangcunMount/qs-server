@@ -3,7 +3,7 @@ package eventoutbox
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 func WithLimiter(limiter backpressure.Acquirer) StoreOption {

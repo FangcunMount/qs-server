@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -18,11 +18,11 @@ func TestStoreCompareAndSwapAndDelete(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	store := NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 
-	published, err := store.CompareAndSwap(context.Background(), "rate:apiserver:query", 0, resiliencecontrol.VersionedState{Payload: []byte(`{"qps":10}`)}, time.Minute)
+	published, err := store.CompareAndSwap(context.Background(), "rate:apiserver:query", 0, control.VersionedState{Payload: []byte(`{"qps":10}`)}, time.Minute)
 	if err != nil || published.Version != 1 {
 		t.Fatalf("CompareAndSwap() = %+v, %v", published, err)
 	}
-	if _, err := store.CompareAndSwap(context.Background(), "rate:apiserver:query", 0, resiliencecontrol.VersionedState{}, time.Minute); !errors.Is(err, resiliencecontrol.ErrVersionConflict) {
+	if _, err := store.CompareAndSwap(context.Background(), "rate:apiserver:query", 0, control.VersionedState{}, time.Minute); !errors.Is(err, control.ErrVersionConflict) {
 		t.Fatalf("stale CompareAndSwap() error = %v", err)
 	}
 	loaded, ok, err := store.Load(context.Background(), "rate:apiserver:query")
@@ -39,7 +39,7 @@ func TestStoreCompareAndSwapAndDelete(t *testing.T) {
 
 func TestStoreUnavailableDoesNotFallback(t *testing.T) {
 	store := NewStore(nil, nil)
-	if _, _, err := store.Load(context.Background(), "state"); !errors.Is(err, resiliencecontrol.ErrUnavailable) {
+	if _, _, err := store.Load(context.Background(), "state"); !errors.Is(err, control.ErrUnavailable) {
 		t.Fatalf("Load() error = %v", err)
 	}
 }
@@ -50,12 +50,12 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	store := NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	ctx := context.Background()
-	identity := resiliencecontrol.ResolveInstanceIdentity("collection-server", "collection-0")
+	identity := control.ResolveInstanceIdentity("collection-server", "collection-0")
 	if err := store.Heartbeat(ctx, identity, time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	command := resiliencecontrol.Command{RequestID: "request-1", ActionID: "resilience.drain_queue",
-		Target: resiliencecontrol.Target{Component: "collection-server", InstanceID: "all"}, Actor: resiliencecontrol.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Minute)}
+	command := control.Command{RequestID: "request-1", ActionID: "resilience.drain_queue",
+		Target: control.Target{Component: "collection-server", InstanceID: "all"}, Actor: control.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Minute)}
 	if err := store.PublishCommand(ctx, command, time.Minute); err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	if err != nil || len(commands) != 1 {
 		t.Fatalf("ListCommands() = %+v, %v", commands, err)
 	}
-	claimID := resiliencecontrol.ScopedRequestID(command.Actor.OrgID, command.RequestID)
+	claimID := control.ScopedRequestID(command.Actor.OrgID, command.RequestID)
 	claimed, err := store.Claim(ctx, claimID, identity.InstanceID, time.Minute)
 	if err != nil || !claimed {
 		t.Fatalf("first Claim() = %v, %v", claimed, err)
@@ -72,8 +72,8 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	if claimed {
 		t.Fatal("second Claim() = true, want idempotent rejection")
 	}
-	result := resiliencecontrol.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
-		OrgID: command.Actor.OrgID, Component: identity.Component, InstanceID: identity.InstanceID, Status: resiliencecontrol.CommandStatusOK}
+	result := control.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
+		OrgID: command.Actor.OrgID, Component: identity.Component, InstanceID: identity.InstanceID, Status: control.CommandStatusOK}
 	if err := store.PutCommandResult(ctx, result, time.Minute); err != nil {
 		t.Fatal(err)
 	}

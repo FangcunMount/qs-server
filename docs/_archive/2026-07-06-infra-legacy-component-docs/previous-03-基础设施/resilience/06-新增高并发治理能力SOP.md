@@ -28,8 +28,8 @@
 | 分布式锁 | `locklease.Specs` + 调用方语义 | contention 是 skip、busy、duplicate 还是 error？ |
 | 幂等保护 | done marker + in-flight lock + 业务持久化幂等 | 完成结果在哪里存？失败如何恢复？ |
 | 重复抑制 | package-local gate | 重复事件能否安全跳过？Redis 失败是否 degraded-open？ |
-| 状态观测 | `resilienceplane.RuntimeSnapshot` | 是否只读？是否暴露高基数字段？ |
-| 新 outcome | `resilienceplane.Outcome` | 是否 bounded？是否会污染指标？ |
+| 状态观测 | `resilience.RuntimeSnapshot` | 是否只读？是否暴露高基数字段？ |
+| 新 outcome | `resilience.Outcome` | 是否 bounded？是否会污染指标？ |
 
 一句话原则：
 
@@ -461,7 +461,7 @@ SubmitQueue 只适合：
 
 ### 12.2 新增步骤
 
-1. 在 `resilienceplane.Outcome` 增加枚举。
+1. 在 `resilience.Outcome` 增加枚举。
 2. 更新 tests。
 3. 更新 05-观测降级与排障。
 4. 更新 07-能力矩阵。
@@ -477,7 +477,7 @@ SubmitQueue 只适合：
 每个保护点都应上报：
 
 ```text
-resilienceplane.Observe(ctx, observer, kind, subject, outcome)
+resilience.Observe(ctx, observer, kind, subject, outcome)
 ```
 
 subject 必须是低基数：
@@ -594,10 +594,10 @@ strategy
 基础：
 
 ```bash
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 go test ./internal/pkg/middleware
-go test ./internal/pkg/backpressure
-go test ./internal/pkg/locklease
+go test ./internal/pkg/resilience/backpressure
+go test ./internal/pkg/resilience/locklease
 ```
 
 Collection：
@@ -633,13 +633,13 @@ git diff --check
 
 ## 19. 代码锚点
 
-- Resilience model：[../../../internal/pkg/resilienceplane/model.go](../../../internal/pkg/resilienceplane/model.go)
-- Resilience status：[../../../internal/pkg/resilienceplane/status.go](../../../internal/pkg/resilienceplane/status.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
+- Resilience model：[../../../internal/pkg/resilience/model.go](../../../internal/pkg/resilience/model.go)
+- Resilience status：[../../../internal/pkg/resilience/status.go](../../../internal/pkg/resilience/status.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
 - RateLimit middleware：[../../../internal/pkg/middleware/limit.go](../../../internal/pkg/middleware/limit.go)
 - SubmitQueue：[../../../internal/collection-server/application/answersheet/submit_queue.go](../../../internal/collection-server/application/answersheet/submit_queue.go)
-- Backpressure limiter：[../../../internal/pkg/backpressure/limiter.go](../../../internal/pkg/backpressure/limiter.go)
-- LockLease：[../../../internal/pkg/locklease/](../../../internal/pkg/locklease/)
+- Backpressure limiter：[../../../internal/pkg/resilience/backpressure/limiter.go](../../../internal/pkg/resilience/backpressure/limiter.go)
+- LockLease：[../../../internal/pkg/resilience/locklease/](../../../internal/pkg/resilience/locklease/)
 - SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
 - Worker duplicate gate：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
 

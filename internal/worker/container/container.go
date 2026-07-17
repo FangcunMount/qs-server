@@ -9,14 +9,14 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/control/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
@@ -248,11 +248,11 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 }
 
 // ResilienceSnapshot returns the worker's current resilience capability summary.
-func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
+func (c *Container) ResilienceSnapshot() resilience.RuntimeSnapshot {
 	if c != nil && c.resilience != nil {
 		return c.resilience.Snapshot(time.Now())
 	}
-	return resilienceplane.RuntimeSnapshot{Component: "worker"}
+	return resilience.RuntimeSnapshot{Component: "worker"}
 }
 
 func lockManager(locks *locksubsystem.Subsystem) locklease.Manager {

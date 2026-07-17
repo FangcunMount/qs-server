@@ -140,10 +140,10 @@ POST answersheets
 
 | 主题 | 路径 |
 | ---- | ---- |
-| resilience model / metrics | `internal/pkg/resilienceplane` |
-| RateLimit | `internal/pkg/ratelimit`、collection/apiserver middleware |
+| resilience model / metrics | `internal/pkg/resilience` |
+| RateLimit | `internal/pkg/resilience/ratelimit`、collection/apiserver middleware |
 | SubmitQueue | `internal/collection-server/application/answersheet/submit_queue.go` |
-| SubmitGuard | `internal/collection-server/infra/redisops`、`internal/pkg/locklease` |
-| Backpressure | `internal/pkg/backpressure`、`internal/pkg/resilienceplane` |
-| Worker duplicate suppression | `internal/worker/handlers`、`internal/pkg/locklease` |
+| SubmitGuard | `internal/collection-server/infra/redisops`、`internal/pkg/resilience/locklease` |
+| Backpressure | `internal/pkg/resilience/backpressure`、`internal/pkg/resilience` |
+| Worker duplicate suppression | `internal/worker/handlers`、`internal/pkg/resilience/locklease` |
 | report status / wait-report | `api/rest/collection.yaml`、`internal/collection-server/application/reportwait` |

@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit/redisadapter"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	redis "github.com/redis/go-redis/v9"
@@ -30,7 +30,7 @@ func TestDistributedLimitFailOpenWhenDistributedLimiterUnavailable(t *testing.T)
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
-	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
+	if !observer.has(resilience.OutcomeDegradedOpen) {
 		t.Fatal("expected degraded_open outcome")
 	}
 }
@@ -65,23 +65,23 @@ func TestDistributedLimitRejectsWithRetryAfterAndOutcome(t *testing.T) {
 	if got := recorder.Header().Get("Retry-After"); got == "" {
 		t.Fatal("Retry-After header is empty")
 	}
-	if !observer.has(resilienceplane.OutcomeAllowed) {
+	if !observer.has(resilience.OutcomeAllowed) {
 		t.Fatal("expected allowed outcome")
 	}
-	if !observer.has(resilienceplane.OutcomeRateLimited) {
+	if !observer.has(resilience.OutcomeRateLimited) {
 		t.Fatal("expected rate_limited outcome")
 	}
 }
 
 type rateLimitRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *rateLimitRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *rateLimitRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *rateLimitRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *rateLimitRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

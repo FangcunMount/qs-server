@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 )
 
 const (
@@ -27,16 +27,16 @@ type Options struct {
 	RateLimit    *options.RateLimitOptions
 	Backpressure map[string]backpressure.Acquirer
 	Locks        *locksubsystem.Subsystem
-	StateStore   resiliencecontrol.StateStore
+	StateStore   control.StateStore
 }
 
 type Subsystem struct {
-	identity     resiliencecontrol.InstanceIdentity
+	identity     control.InstanceIdentity
 	rateEnabled  bool
 	budgets      map[ratelimit.BudgetID]*ratelimit.Budget
 	backpressure map[string]backpressure.Acquirer
 	locks        *locksubsystem.Subsystem
-	stateStore   resiliencecontrol.StateStore
+	stateStore   control.StateStore
 }
 
 func New(opts Options) *Subsystem {
@@ -45,7 +45,7 @@ func New(opts Options) *Subsystem {
 		cfg = options.NewRateLimitOptions()
 	}
 	s := &Subsystem{
-		identity:     resiliencecontrol.ResolveInstanceIdentity("apiserver", opts.InstanceID),
+		identity:     control.ResolveInstanceIdentity("apiserver", opts.InstanceID),
 		rateEnabled:  cfg.Enabled,
 		budgets:      make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		backpressure: cloneBackpressure(opts.Backpressure),
@@ -70,7 +70,7 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		var signals <-chan string
-		if watcher, ok := s.stateStore.(resiliencecontrol.StateSignalWatcher); ok {
+		if watcher, ok := s.stateStore.(control.StateSignalWatcher); ok {
 			signals, _ = watcher.WatchStateSignals(ctx)
 		}
 		for {
@@ -90,7 +90,7 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 }
 
 func (s *Subsystem) reconcile(ctx context.Context) {
-	if heartbeater, ok := s.stateStore.(resiliencecontrol.InstanceHeartbeater); ok {
+	if heartbeater, ok := s.stateStore.(control.InstanceHeartbeater); ok {
 		_ = heartbeater.Heartbeat(ctx, s.identity, 5*time.Second)
 	}
 	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetAdminSubmit, BudgetWaitReport} {
@@ -109,7 +109,7 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 		if state.Version <= current.Version {
 			continue
 		}
-		var change resiliencecontrol.RateLimitChange
+		var change control.RateLimitChange
 		if json.Unmarshal(state.Payload, &change) != nil {
 			continue
 		}
@@ -193,13 +193,13 @@ func (s *Subsystem) Backpressure(name string) backpressure.Acquirer {
 	return s.backpressure[name]
 }
 
-func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
+func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", now)
+	snapshot := resilience.NewRuntimeSnapshot("apiserver", now)
 	if s == nil {
-		return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+		return resilience.FinalizeRuntimeSnapshot(snapshot)
 	}
 	snapshot.InstanceID = s.identity.InstanceID
 	snapshot.Generation = s.identity.Generation
@@ -220,26 +220,26 @@ func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
 	if s.locks != nil {
 		snapshot.Locks = s.locks.Snapshots()
 	}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+	return resilience.FinalizeRuntimeSnapshot(snapshot)
 }
 
-func rateSnapshot(id ratelimit.BudgetID, dimension string, configured bool, version uint64, source string, expiresAt time.Time, policy ratelimit.RateLimitPolicy) resilienceplane.CapabilitySnapshot {
-	return resilienceplane.CapabilitySnapshot{
-		Name: string(id) + "_" + dimension, Kind: resilienceplane.ProtectionRateLimit.String(),
+func rateSnapshot(id ratelimit.BudgetID, dimension string, configured bool, version uint64, source string, expiresAt time.Time, policy ratelimit.RateLimitPolicy) resilience.CapabilitySnapshot {
+	return resilience.CapabilitySnapshot{
+		Name: string(id) + "_" + dimension, Kind: resilience.ProtectionRateLimit.String(),
 		Strategy: policy.Strategy, Configured: configured, RatePerSecond: policy.RatePerSecond,
 		Burst: policy.Burst, PolicyVersion: version, PolicySource: source, OverrideExpiresAt: expiresAt,
 	}
 }
 
 type backpressureSnapshotter interface {
-	Snapshot(name string) resilienceplane.BackpressureSnapshot
+	Snapshot(name string) resilience.BackpressureSnapshot
 }
 
-func backpressureSnapshot(name string, limiter backpressure.Acquirer) resilienceplane.BackpressureSnapshot {
+func backpressureSnapshot(name string, limiter backpressure.Acquirer) resilience.BackpressureSnapshot {
 	if snapshotter, ok := limiter.(backpressureSnapshotter); ok {
 		return snapshotter.Snapshot(name)
 	}
-	return resilienceplane.BackpressureSnapshot{Component: "apiserver", Name: name, Dependency: name, Strategy: "semaphore", Enabled: limiter != nil}
+	return resilience.BackpressureSnapshot{Component: "apiserver", Name: name, Dependency: name, Strategy: "semaphore", Enabled: limiter != nil}
 }
 
 var _ ratelimit.RateBudgetProvider = (*Subsystem)(nil)

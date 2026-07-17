@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/admission"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

@@ -14,7 +14,7 @@ import (
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
 )
 

@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 )
 
 const maxRateOverrideTTL = 24 * time.Hour
 
-func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.ActionActor, change resiliencecontrol.RateLimitChange) (resiliencecontrol.RateLimitChangeResult, error) {
-	result := resiliencecontrol.RateLimitChangeResult{Status: resiliencecontrol.CommandStatusOK, Component: change.Component, Budget: change.Budget}
+func (s *Subsystem) TuneRateLimit(ctx context.Context, actor control.ActionActor, change control.RateLimitChange) (control.RateLimitChangeResult, error) {
+	result := control.RateLimitChangeResult{Status: control.CommandStatusOK, Component: change.Component, Budget: change.Budget}
 	if s == nil || s.stateStore == nil {
-		return result, resiliencecontrol.ErrUnavailable
+		return result, control.ErrUnavailable
 	}
 	if change.Component != "apiserver" && change.Component != "collection-server" {
 		return result, invalidArgument("unsupported rate limit component %q", change.Component)
@@ -35,7 +35,7 @@ func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.A
 			return result, invalidArgument("unknown apiserver rate limit budget %q", change.Budget)
 		}
 		if current := local.Snapshot().Version; current != change.ExpectedVersion {
-			return result, resiliencecontrol.ErrVersionConflict
+			return result, control.ErrVersionConflict
 		}
 	}
 	name := rateStateName(change.Component, change.Budget)
@@ -46,10 +46,10 @@ func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.A
 		}
 		if exists {
 			if state.Version != change.ExpectedVersion {
-				return result, resiliencecontrol.ErrVersionConflict
+				return result, control.ErrVersionConflict
 			}
-			payload, _ := json.Marshal(resiliencecontrol.RateLimitChange{Mode: "reset", Component: change.Component, Budget: change.Budget})
-			published, err := s.stateStore.CompareAndSwap(ctx, name, change.ExpectedVersion, resiliencecontrol.VersionedState{Payload: payload, Actor: actor}, 0)
+			payload, _ := json.Marshal(control.RateLimitChange{Mode: "reset", Component: change.Component, Budget: change.Budget})
+			published, err := s.stateStore.CompareAndSwap(ctx, name, change.ExpectedVersion, control.VersionedState{Payload: payload, Actor: actor}, 0)
 			if err != nil {
 				return result, err
 			}
@@ -57,7 +57,7 @@ func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.A
 		}
 		if !exists {
 			if local == nil || local.Snapshot().Source == "config" {
-				result.Status, result.Version, result.Source = resiliencecontrol.CommandStatusNoop, change.ExpectedVersion, "config"
+				result.Status, result.Version, result.Source = control.CommandStatusNoop, change.ExpectedVersion, "config"
 				return result, nil
 			}
 		}
@@ -89,7 +89,7 @@ func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.A
 	if err != nil {
 		return result, err
 	}
-	published, err := s.stateStore.CompareAndSwap(ctx, name, change.ExpectedVersion, resiliencecontrol.VersionedState{Payload: payload, Actor: actor}, ttl)
+	published, err := s.stateStore.CompareAndSwap(ctx, name, change.ExpectedVersion, control.VersionedState{Payload: payload, Actor: actor}, ttl)
 	if err != nil {
 		return result, err
 	}
@@ -108,18 +108,18 @@ func (s *Subsystem) TuneRateLimit(ctx context.Context, actor resiliencecontrol.A
 	return result, nil
 }
 
-func (s *Subsystem) ensureRateBaseline(ctx context.Context, name string, version uint64, actor resiliencecontrol.ActionActor) error {
+func (s *Subsystem) ensureRateBaseline(ctx context.Context, name string, version uint64, actor control.ActionActor) error {
 	state, exists, err := s.stateStore.Load(ctx, name)
 	if err != nil {
 		return err
 	}
 	if exists {
 		if state.Version != version {
-			return resiliencecontrol.ErrVersionConflict
+			return control.ErrVersionConflict
 		}
 		return nil
 	}
-	_, err = s.stateStore.CompareAndSwap(ctx, name, 0, resiliencecontrol.VersionedState{Version: version, Payload: []byte(`{"mode":"config"}`), Actor: actor}, 0)
+	_, err = s.stateStore.CompareAndSwap(ctx, name, 0, control.VersionedState{Version: version, Payload: []byte(`{"mode":"config"}`), Actor: actor}, 0)
 	return err
 }
 
@@ -133,10 +133,10 @@ func validCollectionBudget(budget string) bool {
 }
 
 func invalidArgument(format string, args ...interface{}) error {
-	return fmt.Errorf("%w: %s", resiliencecontrol.ErrInvalidArgument, fmt.Sprintf(format, args...))
+	return fmt.Errorf("%w: %s", control.ErrInvalidArgument, fmt.Sprintf(format, args...))
 }
 
-func overridePolicy(current ratelimit.RateLimitPolicy, change resiliencecontrol.RatePolicy) ratelimit.RateLimitPolicy {
+func overridePolicy(current ratelimit.RateLimitPolicy, change control.RatePolicy) ratelimit.RateLimitPolicy {
 	current.RatePerSecond = change.RatePerSecond
 	current.Burst = change.Burst
 	return current
@@ -150,14 +150,14 @@ func leaderStateName(component, instanceID, workload string) string {
 	return "leader:" + component + ":" + instanceID + ":" + workload
 }
 
-func (s *Subsystem) SetQueueState(ctx context.Context, actor resiliencecontrol.ActionActor, change resiliencecontrol.QueueChange) (resiliencecontrol.QueueChangeResult, error) {
-	result := resiliencecontrol.QueueChangeResult{Status: resiliencecontrol.CommandStatusOK, Component: change.Component, Queue: change.Queue, State: change.DesiredState}
+func (s *Subsystem) SetQueueState(ctx context.Context, actor control.ActionActor, change control.QueueChange) (control.QueueChangeResult, error) {
+	result := control.QueueChangeResult{Status: control.CommandStatusOK, Component: change.Component, Queue: change.Queue, State: change.DesiredState}
 	if s == nil || s.stateStore == nil {
-		return result, resiliencecontrol.ErrUnavailable
+		return result, control.ErrUnavailable
 	}
-	commands, ok := s.stateStore.(resiliencecontrol.CommandStore)
+	commands, ok := s.stateStore.(control.CommandStore)
 	if !ok || change.RequestID == "" {
-		return result, resiliencecontrol.ErrUnavailable
+		return result, control.ErrUnavailable
 	}
 	if change.Component != "collection-server" || change.Queue != "answersheet_submit" {
 		return result, invalidArgument("unsupported queue target %s/%s", change.Component, change.Queue)
@@ -165,7 +165,7 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor resiliencecontrol.A
 	if change.Target == "" {
 		change.Target = "all"
 	}
-	if change.DesiredState != resiliencecontrol.QueueStatePaused && change.DesiredState != resiliencecontrol.QueueStateActive {
+	if change.DesiredState != control.QueueStatePaused && change.DesiredState != control.QueueStateActive {
 		return result, invalidArgument("queue desired state must be paused or active")
 	}
 	name := queueStateName(change.Component, change.Queue)
@@ -181,14 +181,14 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor resiliencecontrol.A
 	if err != nil {
 		return result, err
 	}
-	published, err := s.stateStore.CompareAndSwap(ctx, name, expected, resiliencecontrol.VersionedState{Payload: payload, Actor: actor}, 0)
+	published, err := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
 	if err != nil {
 		return result, err
 	}
 	result.Version = published.Version
-	command := resiliencecontrol.Command{
+	command := control.Command{
 		RequestID: change.RequestID, ActionID: queueActionID(change.DesiredState),
-		Target:  resiliencecontrol.Target{Component: change.Component, InstanceID: change.Target},
+		Target:  control.Target{Component: change.Component, InstanceID: change.Target},
 		Payload: payload, Actor: actor, IssuedAt: time.Now(),
 	}
 	timeout := time.Duration(change.TimeoutSeconds) * time.Second
@@ -201,7 +201,7 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor resiliencecontrol.A
 		return result, err
 	}
 	if len(expectedInstances) == 0 {
-		result.Status = resiliencecontrol.CommandStatusNoop
+		result.Status = control.CommandStatusNoop
 		return result, nil
 	}
 	if err := commands.PublishCommand(ctx, command, timeout+time.Minute); err != nil {
@@ -209,31 +209,31 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor resiliencecontrol.A
 	}
 	results, status, err := waitCommandResults(ctx, commands, actor.OrgID, change.RequestID, expectedInstances, timeout)
 	result.Instances, result.Status = results, status
-	if change.DesiredState == resiliencecontrol.QueueStateActive && status != resiliencecontrol.CommandStatusOK && status != resiliencecontrol.CommandStatusNoop {
+	if change.DesiredState == control.QueueStateActive && status != control.CommandStatusOK && status != control.CommandStatusNoop {
 		rollback := change
-		rollback.DesiredState = resiliencecontrol.QueueStatePaused
+		rollback.DesiredState = control.QueueStatePaused
 		rollbackPayload, _ := json.Marshal(rollback)
-		if restored, restoreErr := s.stateStore.CompareAndSwap(ctx, name, published.Version, resiliencecontrol.VersionedState{Payload: rollbackPayload, Actor: actor}, 0); restoreErr == nil {
+		if restored, restoreErr := s.stateStore.CompareAndSwap(ctx, name, published.Version, control.VersionedState{Payload: rollbackPayload, Actor: actor}, 0); restoreErr == nil {
 			result.Version = restored.Version
 		}
 	}
 	return result, err
 }
 
-func queueActionID(state resiliencecontrol.QueueState) string {
-	if state == resiliencecontrol.QueueStateActive {
+func queueActionID(state control.QueueState) string {
+	if state == control.QueueStateActive {
 		return "resilience.resume_queue"
 	}
 	return "resilience.drain_queue"
 }
 
-func (s *Subsystem) RelinquishLeader(ctx context.Context, actor resiliencecontrol.ActionActor, change resiliencecontrol.LeaderChange) (any, error) {
+func (s *Subsystem) RelinquishLeader(ctx context.Context, actor control.ActionActor, change control.LeaderChange) (any, error) {
 	if s == nil || s.stateStore == nil || change.RequestID == "" {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
-	commands, ok := s.stateStore.(resiliencecontrol.CommandStore)
+	commands, ok := s.stateStore.(control.CommandStore)
 	if !ok {
-		return nil, resiliencecontrol.ErrUnavailable
+		return nil, control.ErrUnavailable
 	}
 	if change.Component != "apiserver" || change.InstanceID == "" {
 		return nil, invalidArgument("release_lock requires component=apiserver and a target instance_id")
@@ -260,10 +260,10 @@ func (s *Subsystem) RelinquishLeader(ctx context.Context, actor resiliencecontro
 		return nil, err
 	}
 	if len(instances) == 0 {
-		return map[string]interface{}{"status": resiliencecontrol.CommandStatusNoop, "instances": []resiliencecontrol.CommandResult{}}, nil
+		return map[string]interface{}{"status": control.CommandStatusNoop, "instances": []control.CommandResult{}}, nil
 	}
-	command := resiliencecontrol.Command{RequestID: change.RequestID, ActionID: "resilience.release_lock",
-		Target: resiliencecontrol.Target{Component: change.Component, InstanceID: change.InstanceID}, Payload: payload,
+	command := control.Command{RequestID: change.RequestID, ActionID: "resilience.release_lock",
+		Target: control.Target{Component: change.Component, InstanceID: change.InstanceID}, Payload: payload,
 		Actor: actor, IssuedAt: time.Now(), ExpiresAt: time.Now().Add(timeout + time.Minute)}
 	if err := commands.PublishCommand(ctx, command, timeout+time.Minute); err != nil {
 		return nil, err
@@ -272,7 +272,7 @@ func (s *Subsystem) RelinquishLeader(ctx context.Context, actor resiliencecontro
 	return map[string]interface{}{"status": status, "instances": results, "cooldown_seconds": int(cooldown.Seconds())}, waitErr
 }
 
-func commandTargetInstances(ctx context.Context, store resiliencecontrol.CommandStore, component, target string) ([]string, error) {
+func commandTargetInstances(ctx context.Context, store control.CommandStore, component, target string) ([]string, error) {
 	instances, err := store.ListInstances(ctx, component)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func commandTargetInstances(ctx context.Context, store resiliencecontrol.Command
 	return result, nil
 }
 
-func waitCommandResults(ctx context.Context, store resiliencecontrol.CommandStore, orgID int64, requestID string, expected []string, timeout time.Duration) ([]resiliencecontrol.CommandResult, resiliencecontrol.CommandStatus, error) {
+func waitCommandResults(ctx context.Context, store control.CommandStore, orgID int64, requestID string, expected []string, timeout time.Duration) ([]control.CommandResult, control.CommandStatus, error) {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -294,39 +294,39 @@ func waitCommandResults(ctx context.Context, store resiliencecontrol.CommandStor
 	for {
 		results, err := store.ListCommandResults(waitCtx, orgID, requestID)
 		if err != nil {
-			return nil, resiliencecontrol.CommandStatusFailed, err
+			return nil, control.CommandStatusFailed, err
 		}
 		if len(results) >= len(expected) {
-			status := resiliencecontrol.CommandStatusOK
+			status := control.CommandStatusOK
 			allNoop, allTimeout := len(results) > 0, len(results) > 0
 			failed, succeeded := false, false
 			for _, result := range results {
-				allNoop = allNoop && result.Status == resiliencecontrol.CommandStatusNoop
-				allTimeout = allTimeout && result.Status == resiliencecontrol.CommandStatusTimeout
-				failed = failed || result.Status == resiliencecontrol.CommandStatusFailed || result.Status == resiliencecontrol.CommandStatusTimeout
-				succeeded = succeeded || result.Status == resiliencecontrol.CommandStatusOK || result.Status == resiliencecontrol.CommandStatusNoop
+				allNoop = allNoop && result.Status == control.CommandStatusNoop
+				allTimeout = allTimeout && result.Status == control.CommandStatusTimeout
+				failed = failed || result.Status == control.CommandStatusFailed || result.Status == control.CommandStatusTimeout
+				succeeded = succeeded || result.Status == control.CommandStatusOK || result.Status == control.CommandStatusNoop
 			}
 			switch {
 			case allNoop:
-				status = resiliencecontrol.CommandStatusNoop
+				status = control.CommandStatusNoop
 			case allTimeout:
-				status = resiliencecontrol.CommandStatusTimeout
+				status = control.CommandStatusTimeout
 			case failed && succeeded:
-				status = resiliencecontrol.CommandStatusPartial
+				status = control.CommandStatusPartial
 			case failed:
-				status = resiliencecontrol.CommandStatusFailed
+				status = control.CommandStatusFailed
 			}
 			return results, status, nil
 		}
 		select {
 		case <-waitCtx.Done():
 			if len(results) > 0 {
-				return results, resiliencecontrol.CommandStatusPartial, nil
+				return results, control.CommandStatusPartial, nil
 			}
-			return results, resiliencecontrol.CommandStatusTimeout, nil
+			return results, control.CommandStatusTimeout, nil
 		case <-ticker.C:
 		}
 	}
 }
 
-var _ resiliencecontrol.Governor = (*Subsystem)(nil)
+var _ control.Governor = (*Subsystem)(nil)

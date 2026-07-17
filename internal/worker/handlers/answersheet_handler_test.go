@@ -13,11 +13,11 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -289,7 +289,7 @@ func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) 
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
-	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
+	if !observer.has(resilience.OutcomeDegradedOpen) {
 		t.Fatal("expected degraded_open outcome")
 	}
 }
@@ -321,7 +321,7 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 	if releaseCalled {
 		t.Fatalf("release should not be called when acquire fails")
 	}
-	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
+	if !observer.has(resilience.OutcomeDegradedOpen) {
 		t.Fatal("expected degraded_open outcome")
 	}
 }
@@ -366,7 +366,7 @@ func TestAnswerSheetRunnerParentCancellationDoesNotDegradeOpen(t *testing.T) {
 	if bodyCalls != 0 {
 		t.Fatalf("body calls = %d, want 0", bodyCalls)
 	}
-	if observer.has(resilienceplane.OutcomeDegradedOpen) {
+	if observer.has(resilience.OutcomeDegradedOpen) {
 		t.Fatal("parent cancellation must not trigger degraded-open execution")
 	}
 }
@@ -418,7 +418,7 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing
 	if client.createCalls != 0 {
 		t.Fatalf("expected no create calls, got %d", client.createCalls)
 	}
-	if !observer.has(resilienceplane.OutcomeDuplicateSkipped) {
+	if !observer.has(resilience.OutcomeDuplicateSkipped) {
 		t.Fatal("expected duplicate_skipped outcome")
 	}
 }
@@ -567,14 +567,14 @@ func mustBuildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []
 }
 
 type workerGateRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *workerGateRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *workerGateRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *workerGateRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *workerGateRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

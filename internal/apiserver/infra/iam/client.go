@@ -10,7 +10,7 @@ import (
 	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
 	sdk "github.com/FangcunMount/iam/v2/pkg/sdk"
 	sdkconfig "github.com/FangcunMount/iam/v2/pkg/sdk/config"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）

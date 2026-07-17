@@ -751,27 +751,27 @@ degraded-open 是可用性优先策略，只适合某些场景。
 
 ## 20. 代码锚点
 
-- LockLease specs：[../../../internal/pkg/locklease/lease.go](../../../internal/pkg/locklease/lease.go)
-- Redis lock adapter：[../../../internal/pkg/locklease/redisadapter/](../../../internal/pkg/locklease/redisadapter/)
+- LockLease specs：[../../../internal/pkg/resilience/locklease/lease.go](../../../internal/pkg/resilience/locklease/lease.go)
+- Redis lock adapter：[../../../internal/pkg/resilience/locklease/redisadapter/](../../../internal/pkg/resilience/locklease/redisadapter/)
 - Scheduler leader lock：[../../../internal/apiserver/runtime/scheduler/leader_lock.go](../../../internal/apiserver/runtime/scheduler/leader_lock.go)
 - SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
 - SubmissionService：[../../../internal/collection-server/application/answersheet/submission_service.go](../../../internal/collection-server/application/answersheet/submission_service.go)
 - Worker answersheet gate：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
-- Resilience model：[../../../internal/pkg/resilienceplane/model.go](../../../internal/pkg/resilienceplane/model.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
+- Resilience model：[../../../internal/pkg/resilience/model.go](../../../internal/pkg/resilience/model.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
 
 ---
 
 ## 21. Verify
 
 ```bash
-go test ./internal/pkg/locklease
-go test ./internal/pkg/locklease/redisadapter
+go test ./internal/pkg/resilience/locklease
+go test ./internal/pkg/resilience/locklease/redisadapter
 go test ./internal/collection-server/infra/redisops
 go test ./internal/collection-server/application/answersheet
 go test ./internal/worker/handlers
 go test ./internal/apiserver/runtime/scheduler
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 ```
 
 如果修改 Redis family/keyspace：

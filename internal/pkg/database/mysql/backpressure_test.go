@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 func TestBaseRepositoryUsesInjectedLimiter(t *testing.T) {

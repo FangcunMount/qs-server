@@ -4,7 +4,7 @@ LockLease 是独立于 cache 的进程级基础设施子系统。它统一管理
 
 ## 1. 能力目录
 
-[`internal/pkg/locklease/catalog.go`](../../../internal/pkg/locklease/catalog.go) 是唯一事实源：
+[`internal/pkg/resilience/locklease/catalog.go`](../../../internal/pkg/resilience/locklease/catalog.go) 是唯一事实源：
 
 | workload | 进程 | 语义 | 默认 TTL |
 | --- | --- | --- | --- |
@@ -99,7 +99,7 @@ qs_locklease_operation_total{component,name,operation="acquire|renew|release",re
 ## 7. 验证
 
 ```bash
-go test -race ./internal/pkg/locklease/... \
+go test -race ./internal/pkg/resilience/locklease/... \
   ./internal/apiserver/runtime/scheduler \
   ./internal/collection-server/application/answersheet \
   ./internal/worker/handlers

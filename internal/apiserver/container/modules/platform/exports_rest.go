@@ -8,7 +8,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // RESTIntegrationDeps are platform/integration surfaces wired into REST transport.
@@ -18,7 +18,7 @@ type RESTIntegrationDeps struct {
 	QRCodeObjectKeyPrefix   string
 	GovernanceStatusService statisticsApp.GovernanceStatusReader
 	EventStatusService      appEventing.StatusService
-	Backpressure            []resilienceplane.BackpressureSnapshot
+	Backpressure            []resilience.BackpressureSnapshot
 	IAM                     RESTIAMDeps
 }
 

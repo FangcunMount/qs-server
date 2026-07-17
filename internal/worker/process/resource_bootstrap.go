@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	gormuow "github.com/FangcunMount/component-base/pkg/uow/gorm"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/gorm"
 )
 

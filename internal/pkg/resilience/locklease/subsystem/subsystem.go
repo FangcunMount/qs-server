@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
 )
 
 type ticker interface {
@@ -181,13 +181,13 @@ func (s *Subsystem) Capabilities() []locklease.Capability {
 }
 
 // Snapshots projects the catalog and current lock Redis family health without exposing keys.
-func (s *Subsystem) Snapshots() []resilienceplane.CapabilitySnapshot {
+func (s *Subsystem) Snapshots() []resilience.CapabilitySnapshot {
 	if s == nil {
 		return nil
 	}
 	configured, degraded, reason := s.familyHealth()
 	capabilities := s.Capabilities()
-	result := make([]resilienceplane.CapabilitySnapshot, 0, len(capabilities))
+	result := make([]resilience.CapabilitySnapshot, 0, len(capabilities))
 	for _, capability := range capabilities {
 		enabled := true
 		if s.enabled != nil {
@@ -204,7 +204,7 @@ func (s *Subsystem) Snapshots() []resilienceplane.CapabilitySnapshot {
 		if s.renewalEnabled {
 			renewEvery = int64((capability.Spec.DefaultTTL / 3).Seconds())
 		}
-		result = append(result, resilienceplane.CapabilitySnapshot{
+		result = append(result, resilience.CapabilitySnapshot{
 			Name:              capability.Spec.Name,
 			Kind:              string(capability.Kind),
 			Strategy:          "redis_lease",

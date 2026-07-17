@@ -31,8 +31,8 @@ import (
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
 )
 
@@ -84,9 +84,9 @@ type Deps struct {
 	GovernanceStatusService  statisticsApp.GovernanceStatusReader
 	EventStatusService       appEventing.StatusService
 	SystemGovernanceFacade   systemgovApp.Facade
-	Backpressure             []resilienceplane.BackpressureSnapshot
-	Locks                    []resilienceplane.CapabilitySnapshot
-	ResilienceSnapshot       func() resilienceplane.RuntimeSnapshot
+	Backpressure             []resilience.BackpressureSnapshot
+	Locks                    []resilience.CapabilitySnapshot
+	ResilienceSnapshot       func() resilience.RuntimeSnapshot
 	IAM                      IAMDeps
 }
 

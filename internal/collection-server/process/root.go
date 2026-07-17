@@ -9,9 +9,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientinfra "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestMetricsServerReadyzReturnsServiceUnavailableWhenFamilyDegraded(t *testing.T) {
@@ -90,12 +90,12 @@ func TestMetricsServerResilienceEndpointReturnsSnapshot(t *testing.T) {
 		19091,
 		"worker",
 		registry,
-		func() resilienceplane.RuntimeSnapshot {
-			snapshot := resilienceplane.NewRuntimeSnapshot("worker", time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC))
-			snapshot.DuplicateSuppression = []resilienceplane.CapabilitySnapshot{
-				{Name: "answersheet_submitted", Kind: resilienceplane.ProtectionDuplicateSuppression.String(), Strategy: "redis_lock", Configured: true},
+		func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("worker", time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC))
+			snapshot.DuplicateSuppression = []resilience.CapabilitySnapshot{
+				{Name: "answersheet_submitted", Kind: resilience.ProtectionDuplicateSuppression.String(), Strategy: "redis_lock", Configured: true},
 			}
-			return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+			return resilience.FinalizeRuntimeSnapshot(snapshot)
 		},
 	)
 	req := httptest.NewRequest(http.MethodGet, "/governance/resilience", nil)

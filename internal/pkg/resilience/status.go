@@ -1,4 +1,4 @@
-package resilienceplane
+package resilience
 
 import (
 	"context"
@@ -15,6 +15,7 @@ func (f StatusServiceFunc) GetStatus(ctx context.Context) (*RuntimeSnapshot, err
 	return f(ctx)
 }
 
+// RuntimeSnapshot is the component-level resilience status document.
 type RuntimeSnapshot struct {
 	GeneratedAt          time.Time              `json:"generated_at"`
 	Component            string                 `json:"component"`
@@ -27,14 +28,16 @@ type RuntimeSnapshot struct {
 	Locks                []CapabilitySnapshot   `json:"locks,omitempty"`
 	Idempotency          []CapabilitySnapshot   `json:"idempotency,omitempty"`
 	DuplicateSuppression []CapabilitySnapshot   `json:"duplicate_suppression,omitempty"`
-}
+} // @name resilienceplane.RuntimeSnapshot
 
+// RuntimeSummary summarizes component readiness and degraded capabilities.
 type RuntimeSummary struct {
 	Ready           bool `json:"ready"`
 	CapabilityCount int  `json:"capability_count"`
 	DegradedCount   int  `json:"degraded_count"`
-}
+} // @name resilienceplane.RuntimeSummary
 
+// CapabilitySnapshot describes one bounded resilience capability.
 type CapabilitySnapshot struct {
 	Name              string    `json:"name"`
 	Kind              string    `json:"kind"`
@@ -51,8 +54,9 @@ type CapabilitySnapshot struct {
 	PolicySource      string    `json:"policy_source,omitempty"`
 	OverrideExpiresAt time.Time `json:"override_expires_at,omitempty"`
 	Active            int       `json:"active,omitempty"`
-}
+} // @name resilienceplane.CapabilitySnapshot
 
+// QueueSnapshot describes queue capacity, lifecycle, and admission state.
 type QueueSnapshot struct {
 	GeneratedAt       time.Time      `json:"generated_at"`
 	Component         string         `json:"component"`
@@ -67,8 +71,9 @@ type QueueSnapshot struct {
 	StateVersion      uint64         `json:"state_version,omitempty"`
 	InFlight          int            `json:"in_flight,omitempty"`
 	AdmissionClosed   bool           `json:"admission_closed,omitempty"`
-}
+} // @name resilienceplane.QueueSnapshot
 
+// BackpressureSnapshot describes one downstream concurrency boundary.
 type BackpressureSnapshot struct {
 	Component     string `json:"component"`
 	Name          string `json:"name"`
@@ -80,7 +85,7 @@ type BackpressureSnapshot struct {
 	TimeoutMillis int64  `json:"timeout_millis"`
 	Degraded      bool   `json:"degraded"`
 	Reason        string `json:"reason,omitempty"`
-}
+} // @name resilienceplane.BackpressureSnapshot
 
 func NewRuntimeSnapshot(component string, now time.Time) RuntimeSnapshot {
 	if component == "" {

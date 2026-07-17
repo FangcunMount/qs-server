@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // ResilienceProjection 是diagnostic pressure-protection 视图。
@@ -67,7 +67,7 @@ func (p *ResilienceProjector) projectComponent(
 	ctx context.Context,
 	projection *ResilienceProjection,
 	component string,
-	snapshot resilienceplane.RuntimeSnapshot,
+	snapshot resilience.RuntimeSnapshot,
 	window string,
 	evalAt time.Time,
 ) {
@@ -116,7 +116,7 @@ func (p *ResilienceProjector) projectComponent(
 func (p *ResilienceProjector) projectQueueRow(
 	ctx context.Context,
 	component string,
-	queue resilienceplane.QueueSnapshot,
+	queue resilience.QueueSnapshot,
 	window string,
 	evalAt time.Time,
 ) ResilienceQueueRow {
@@ -190,7 +190,7 @@ func resilienceQueueSignals(row ResilienceQueueRow) []Signal {
 func (p *ResilienceProjector) projectBackpressureRow(
 	ctx context.Context,
 	component string,
-	backpressure resilienceplane.BackpressureSnapshot,
+	backpressure resilience.BackpressureSnapshot,
 	window string,
 	evalAt time.Time,
 ) ResilienceBackpressureRow {
@@ -251,9 +251,9 @@ func resilienceBackpressureSignals(row ResilienceBackpressureRow) []Signal {
 	}}
 }
 
-func resilienceCapabilityRows(component string, snapshot resilienceplane.RuntimeSnapshot) []ResilienceCapabilityRow {
+func resilienceCapabilityRows(component string, snapshot resilience.RuntimeSnapshot) []ResilienceCapabilityRow {
 	rows := []ResilienceCapabilityRow{}
-	appendRows := func(kind resilienceplane.ProtectionKind, items []resilienceplane.CapabilitySnapshot) {
+	appendRows := func(kind resilience.ProtectionKind, items []resilience.CapabilitySnapshot) {
 		for _, item := range items {
 			rowKind := nonEmpty(item.Kind, kind.String())
 			severity := SeverityHealthy
@@ -272,14 +272,14 @@ func resilienceCapabilityRows(component string, snapshot resilienceplane.Runtime
 			})
 		}
 	}
-	appendRows(resilienceplane.ProtectionRateLimit, snapshot.RateLimits)
-	appendRows(resilienceplane.ProtectionLock, snapshot.Locks)
-	appendRows(resilienceplane.ProtectionIdempotency, snapshot.Idempotency)
-	appendRows(resilienceplane.ProtectionDuplicateSuppression, snapshot.DuplicateSuppression)
+	appendRows(resilience.ProtectionRateLimit, snapshot.RateLimits)
+	appendRows(resilience.ProtectionLock, snapshot.Locks)
+	appendRows(resilience.ProtectionIdempotency, snapshot.Idempotency)
+	appendRows(resilience.ProtectionDuplicateSuppression, snapshot.DuplicateSuppression)
 	return rows
 }
 
-func resilienceRuntimeNotReadySignal(component string, snapshot resilienceplane.RuntimeSnapshot) Signal {
+func resilienceRuntimeNotReadySignal(component string, snapshot resilience.RuntimeSnapshot) Signal {
 	return Signal{
 		ID:       "resilience.runtime.not_ready." + component,
 		Domain:   DomainResilience,
@@ -308,24 +308,24 @@ func resilienceComponentUnavailableSignal(component, reason string) Signal {
 	}
 }
 
-func queueUtilization(queue resilienceplane.QueueSnapshot) float64 {
+func queueUtilization(queue resilience.QueueSnapshot) float64 {
 	if queue.Capacity <= 0 {
 		return 0
 	}
 	return float64(queue.Depth) / float64(queue.Capacity)
 }
 
-func backpressureUtilization(bp resilienceplane.BackpressureSnapshot) float64 {
+func backpressureUtilization(bp resilience.BackpressureSnapshot) float64 {
 	if bp.MaxInflight <= 0 {
 		return 0
 	}
 	return float64(bp.InFlight) / float64(bp.MaxInflight)
 }
 
-func queueDecisionLabels(component string, queue resilienceplane.QueueSnapshot, outcome resilienceplane.Outcome) map[string]string {
+func queueDecisionLabels(component string, queue resilience.QueueSnapshot, outcome resilience.Outcome) map[string]string {
 	return map[string]string{
 		"component": nonEmpty(queue.Component, component, "unknown"),
-		"kind":      resilienceplane.ProtectionQueue.String(),
+		"kind":      resilience.ProtectionQueue.String(),
 		"scope":     nonEmpty(queue.Name, "default"),
 		"resource":  queueResource(queue),
 		"strategy":  nonEmpty(queue.Strategy, "default"),
@@ -333,7 +333,7 @@ func queueDecisionLabels(component string, queue resilienceplane.QueueSnapshot, 
 	}
 }
 
-func queueResource(queue resilienceplane.QueueSnapshot) string {
+func queueResource(queue resilience.QueueSnapshot) string {
 	switch queue.Name {
 	case "answersheet_submit", "submit":
 		return "submit_queue"
@@ -342,10 +342,10 @@ func queueResource(queue resilienceplane.QueueSnapshot) string {
 	}
 }
 
-func backpressureDecisionLabels(component string, bp resilienceplane.BackpressureSnapshot, outcome resilienceplane.Outcome) map[string]string {
+func backpressureDecisionLabels(component string, bp resilience.BackpressureSnapshot, outcome resilience.Outcome) map[string]string {
 	return map[string]string{
 		"component": nonEmpty(bp.Component, component, "unknown"),
-		"kind":      resilienceplane.ProtectionBackpressure.String(),
+		"kind":      resilience.ProtectionBackpressure.String(),
 		"scope":     nonEmpty(bp.Dependency, bp.Name, "default"),
 		"resource":  "downstream",
 		"strategy":  nonEmpty(bp.Strategy, "default"),

@@ -822,9 +822,9 @@ Lock 层记录两类观测：
 
 ## 23. 代码锚点
 
-- Lock specs：[../../../internal/pkg/locklease/lease.go](../../../internal/pkg/locklease/lease.go)
-- Redis adapter doc：[../../../internal/pkg/locklease/redisadapter/doc.go](../../../internal/pkg/locklease/redisadapter/doc.go)
-- Redis adapter manager：[../../../internal/pkg/locklease/redisadapter/lock.go](../../../internal/pkg/locklease/redisadapter/lock.go)
+- Lock specs：[../../../internal/pkg/resilience/locklease/lease.go](../../../internal/pkg/resilience/locklease/lease.go)
+- Redis adapter doc：[../../../internal/pkg/resilience/locklease/redisadapter/doc.go](../../../internal/pkg/resilience/locklease/redisadapter/doc.go)
+- Redis adapter manager：[../../../internal/pkg/resilience/locklease/redisadapter/lock.go](../../../internal/pkg/resilience/locklease/redisadapter/lock.go)
 - Scheduler leader lock：[../../../internal/apiserver/runtime/scheduler/leader_lock.go](../../../internal/apiserver/runtime/scheduler/leader_lock.go)
 - Collection SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
 - Worker answersheet gate：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
@@ -835,8 +835,8 @@ Lock 层记录两类观测：
 ## 24. Verify
 
 ```bash
-go test ./internal/pkg/locklease
-go test ./internal/pkg/locklease/redisadapter
+go test ./internal/pkg/resilience/locklease
+go test ./internal/pkg/resilience/locklease/redisadapter
 go test ./internal/apiserver/runtime/scheduler
 go test ./internal/collection-server/infra/redisops
 go test ./internal/worker/handlers
@@ -845,7 +845,7 @@ go test ./internal/worker/handlers
 如果修改 resilience outcome：
 
 ```bash
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 go test ./internal/pkg/cachegovernance/observability
 ```
 

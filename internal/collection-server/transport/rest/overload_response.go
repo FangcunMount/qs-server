@@ -3,7 +3,7 @@ package rest
 import (
 	"net/http"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )

@@ -14,8 +14,8 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )

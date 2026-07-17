@@ -7,9 +7,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 type statisticsSyncService interface {

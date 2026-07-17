@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/gin-gonic/gin"
 )
 
@@ -123,9 +123,9 @@ func TestHealthHandlerResilienceReturnsSnapshot(t *testing.T) {
 		"collection-server",
 		"2.0.0",
 		nil,
-		func() resilienceplane.RuntimeSnapshot {
-			snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC))
-			snapshot.Queues = []resilienceplane.QueueSnapshot{{
+		func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("collection-server", time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC))
+			snapshot.Queues = []resilience.QueueSnapshot{{
 				Component:         "collection-server",
 				Name:              "answersheet_submit",
 				Strategy:          "memory_channel",
@@ -134,7 +134,7 @@ func TestHealthHandlerResilienceReturnsSnapshot(t *testing.T) {
 				StatusCounts:      map[string]int{"queued": 1},
 				LifecycleBoundary: "process_memory_no_drain",
 			}}
-			return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+			return resilience.FinalizeRuntimeSnapshot(snapshot)
 		},
 	)
 

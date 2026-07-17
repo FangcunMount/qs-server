@@ -3,7 +3,7 @@ package systemgovernance
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // ResilienceView 聚合 resilience 快照 across 组件。
@@ -21,9 +21,9 @@ type ResilienceView struct {
 
 // ComponentResilience 保存一个组件 resilience 载荷 使用 fetch 元数据。
 type ComponentResilience struct {
-	Available bool                             `json:"available"`
-	Reason    string                           `json:"reason,omitempty"`
-	Snapshot  *resilienceplane.RuntimeSnapshot `json:"snapshot,omitempty"`
+	Available bool                        `json:"available"`
+	Reason    string                      `json:"reason,omitempty"`
+	Snapshot  *resilience.RuntimeSnapshot `json:"snapshot,omitempty"`
 }
 
 // ResilienceSummary 汇总压力保护健康度 across 组件。

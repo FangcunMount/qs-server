@@ -132,7 +132,7 @@ observability/
 ```bash
 go test ./internal/pkg/server
 go test ./internal/pkg/cachegovernance/observability
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 ```
 
 如果修改文档：

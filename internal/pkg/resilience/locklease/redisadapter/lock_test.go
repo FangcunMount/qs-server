@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -239,11 +239,11 @@ func TestManagerUsesInjectedObserver(t *testing.T) {
 		t.Fatal("expected invalid identity acquire error")
 	}
 
-	for _, outcome := range []resilienceplane.Outcome{
-		resilienceplane.OutcomeLockAcquired,
-		resilienceplane.OutcomeLockContention,
-		resilienceplane.OutcomeLockReleased,
-		resilienceplane.OutcomeLockError,
+	for _, outcome := range []resilience.Outcome{
+		resilience.OutcomeLockAcquired,
+		resilience.OutcomeLockContention,
+		resilience.OutcomeLockReleased,
+		resilience.OutcomeLockError,
 	} {
 		if !observer.has(outcome) {
 			t.Fatalf("observer missing outcome %s in %#v", outcome, observer.decisions)
@@ -287,20 +287,20 @@ func TestManagerCancellationDoesNotDegradeRedisFamily(t *testing.T) {
 	if len(statuses) != 1 || !statuses[0].Available || statuses[0].Degraded || statuses[0].ConsecutiveFailures != 0 {
 		t.Fatalf("family status after canceled renew = %+v", statuses)
 	}
-	if decisions.has(resilienceplane.OutcomeLockRenewError) {
+	if decisions.has(resilience.OutcomeLockRenewError) {
 		t.Fatalf("canceled renew emitted lock_renew_error: %#v", decisions.decisions)
 	}
 }
 
 type lockleaseRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *lockleaseRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *lockleaseRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *lockleaseRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *lockleaseRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

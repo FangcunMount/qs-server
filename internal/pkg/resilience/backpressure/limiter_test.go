@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestAcquireDoesNotWrapOperationContextWithLimiterTimeout(t *testing.T) {
@@ -56,10 +56,10 @@ func TestAcquireReportsOutcomes(t *testing.T) {
 	}
 	release()
 
-	if !observer.has(resilienceplane.OutcomeBackpressureAcquired) {
+	if !observer.has(resilience.OutcomeBackpressureAcquired) {
 		t.Fatal("expected acquired outcome")
 	}
-	if !observer.has(resilienceplane.OutcomeBackpressureReleased) {
+	if !observer.has(resilience.OutcomeBackpressureReleased) {
 		t.Fatal("expected released outcome")
 	}
 }
@@ -77,7 +77,7 @@ func TestAcquireTimeoutReportsOutcome(t *testing.T) {
 	if _, _, err := limiter.Acquire(context.Background()); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("second Acquire() error = %v, want deadline exceeded", err)
 	}
-	if !observer.has(resilienceplane.OutcomeBackpressureTimeout) {
+	if !observer.has(resilience.OutcomeBackpressureTimeout) {
 		t.Fatal("expected timeout outcome")
 	}
 }
@@ -117,14 +117,14 @@ func TestNilLimiterSnapshotIsDegraded(t *testing.T) {
 }
 
 type backpressureRecordingObserver struct {
-	decisions []resilienceplane.Decision
+	decisions []resilience.Decision
 }
 
-func (r *backpressureRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *backpressureRecordingObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *backpressureRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *backpressureRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

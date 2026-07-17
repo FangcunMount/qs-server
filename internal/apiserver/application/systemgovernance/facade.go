@@ -8,7 +8,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // Facade 是unified system governance entry point。
@@ -33,7 +33,7 @@ type FacadeDeps struct {
 	EventStatusService      appEventing.StatusService
 	EventTypeSources        []EventTypeStatusSource
 	CacheGovernance         statisticsApp.GovernanceFacade
-	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
+	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
 	CheckpointReader        CheckpointStatusReader
 	Metrics                 MetricsClient
 	Components              *govcomponent.Adapter

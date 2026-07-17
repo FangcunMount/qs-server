@@ -23,9 +23,9 @@ import (
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttransport.Deps {
@@ -53,7 +53,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.Backpressure = platformDeps.Backpressure
 	deps.RateBudgets = c.resilience
 	if c.resilience != nil {
-		deps.ResilienceSnapshot = func() resilienceplane.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
+		deps.ResilienceSnapshot = func() resilience.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
 	}
 	deps.IAM = platformDeps.IAM
 
@@ -135,11 +135,11 @@ func (c *Container) buildRESTSystemGovernanceFacade(statisticsDeps resttransport
 	})
 }
 
-func (c *Container) localResilienceSnapshot() func() resilienceplane.RuntimeSnapshot {
+func (c *Container) localResilienceSnapshot() func() resilience.RuntimeSnapshot {
 	if c != nil && c.resilience != nil {
-		return func() resilienceplane.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
+		return func() resilience.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
 	}
-	return func() resilienceplane.RuntimeSnapshot { return resilienceplane.RuntimeSnapshot{Component: "apiserver"} }
+	return func() resilience.RuntimeSnapshot { return resilience.RuntimeSnapshot{Component: "apiserver"} }
 }
 
 func (c *Container) buildRESTEventStatusService() appEventing.StatusService {
@@ -164,25 +164,25 @@ func (c *Container) exportRESTIAMDeps() platformmod.RESTIAMDeps {
 }
 
 type backpressureSnapshotter interface {
-	Snapshot(name string) resilienceplane.BackpressureSnapshot
+	Snapshot(name string) resilience.BackpressureSnapshot
 }
 
-func (c *Container) buildBackpressureSnapshots() []resilienceplane.BackpressureSnapshot {
+func (c *Container) buildBackpressureSnapshots() []resilience.BackpressureSnapshot {
 	if c == nil {
 		return nil
 	}
-	return []resilienceplane.BackpressureSnapshot{
+	return []resilience.BackpressureSnapshot{
 		backpressureSnapshot("mysql", c.backpressure.MySQL),
 		backpressureSnapshot("mongo", c.backpressure.Mongo),
 		backpressureSnapshot("iam", c.backpressure.IAM),
 	}
 }
 
-func backpressureSnapshot(name string, limiter interface{}) resilienceplane.BackpressureSnapshot {
+func backpressureSnapshot(name string, limiter interface{}) resilience.BackpressureSnapshot {
 	if snapshotter, ok := limiter.(backpressureSnapshotter); ok {
 		return snapshotter.Snapshot(name)
 	}
-	return resilienceplane.BackpressureSnapshot{
+	return resilience.BackpressureSnapshot{
 		Component:  "apiserver",
 		Name:       name,
 		Dependency: name,

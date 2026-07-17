@@ -13,8 +13,8 @@ import (
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
 func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {

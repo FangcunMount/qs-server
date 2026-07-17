@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 // ErrQueueFull indicates the submit queue is full.
@@ -33,10 +33,10 @@ type SubmitQueue struct {
 	jobs         chan submitJob
 	statuses     *submitQueueStatusStore
 	workerPool   *submitQueueWorkerPool
-	observer     resilienceplane.Observer
-	subject      resilienceplane.Subject
+	observer     resilience.Observer
+	subject      resilience.Subject
 	lifecycleMu  sync.Mutex
-	state        resiliencecontrol.QueueState
+	state        control.QueueState
 	stateVersion uint64
 	inFlight     atomic.Int64
 	outstanding  atomic.Int64
@@ -45,7 +45,7 @@ type SubmitQueue struct {
 type SubmitQueueRuntimeOptions struct {
 	Component string
 	Name      string
-	Observer  resilienceplane.Observer
+	Observer  resilience.Observer
 }
 
 // NewSubmitQueue creates a submit queue with worker goroutines.
@@ -65,13 +65,13 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 		jobs:     make(chan submitJob, queueSize),
 		statuses: newSubmitQueueStatusStore(10 * time.Minute),
 		observer: defaultSubmitQueueObserver(opts.Observer),
-		subject: resilienceplane.Subject{
+		subject: resilience.Subject{
 			Component: opts.Component,
 			Scope:     opts.Name,
 			Resource:  "submit_queue",
 			Strategy:  "memory_channel",
 		},
-		state:        resiliencecontrol.QueueStateActive,
+		state:        control.QueueStateActive,
 		stateVersion: 1,
 	}
 	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus, q.setFailed)
@@ -106,12 +106,12 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 	}
 
 	q.lifecycleMu.Lock()
-	admission, cleaned := q.admit(job, q.state != "" && q.state != resiliencecontrol.QueueStateActive)
+	admission, cleaned := q.admit(job, q.state != "" && q.state != control.QueueStateActive)
 	q.lifecycleMu.Unlock()
 	q.observeCleaned(ctx, cleaned)
 	switch admission {
 	case submitQueueAdmissionAccepted:
-		q.observe(ctx, resilienceplane.OutcomeQueueAccepted)
+		q.observe(ctx, resilience.OutcomeQueueAccepted)
 		q.observeQueueDepth()
 		logger.L(ctx).Infow("答卷提交请求已进入处理队列",
 			"action", "enqueue_answersheet_submit",
@@ -123,17 +123,17 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 			"queue_capacity", cap(q.jobs),
 		)
 	case submitQueueAdmissionDuplicate:
-		q.observe(ctx, resilienceplane.OutcomeQueueDuplicate)
+		q.observe(ctx, resilience.OutcomeQueueDuplicate)
 		return nil
 	case submitQueueAdmissionRejected:
-		q.observe(ctx, resilienceplane.OutcomeQueueFailed)
+		q.observe(ctx, resilience.OutcomeQueueFailed)
 		return errors.New("previous request failed, please retry with a new request_id")
 	case submitQueueAdmissionFull:
-		q.observe(ctx, resilienceplane.OutcomeQueueFull)
+		q.observe(ctx, resilience.OutcomeQueueFull)
 		q.observeQueueDepth()
 		return ErrQueueFull
 	case submitQueueAdmissionClosed:
-		q.observe(ctx, resilienceplane.OutcomeQueueAdmissionClosed)
+		q.observe(ctx, resilience.OutcomeQueueAdmissionClosed)
 		return ErrQueueDraining
 	}
 
@@ -206,30 +206,30 @@ func (q *SubmitQueue) GetStatus(requestID string) (SubmitStatusResponse, bool) {
 	return status, ok
 }
 
-func (q *SubmitQueue) StatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {
+func (q *SubmitQueue) StatusSnapshot(now time.Time) resilience.QueueSnapshot {
 	if now.IsZero() {
 		now = time.Now()
 	}
 	if q == nil {
-		return resilienceplane.QueueSnapshot{
+		return resilience.QueueSnapshot{
 			GeneratedAt:       now,
 			Component:         "collection-server",
 			Name:              "answersheet_submit",
 			Strategy:          "memory_channel",
 			LifecycleBoundary: "process_memory_drainable",
-			State:             string(resiliencecontrol.QueueStateActive),
+			State:             string(control.QueueStateActive),
 		}
 	}
 	q.lifecycleMu.Lock()
 	state := q.state
 	stateVersion := q.stateVersion
 	if state == "" {
-		state = resiliencecontrol.QueueStateActive
+		state = control.QueueStateActive
 	}
 	q.lifecycleMu.Unlock()
 	counts, cleaned := q.statuses.Snapshot(now)
 	q.observeCleaned(context.Background(), cleaned)
-	snapshot := resilienceplane.QueueSnapshot{
+	snapshot := resilience.QueueSnapshot{
 		GeneratedAt:       now,
 		Component:         q.subject.Component,
 		Name:              q.subject.Scope,
@@ -242,7 +242,7 @@ func (q *SubmitQueue) StatusSnapshot(now time.Time) resilienceplane.QueueSnapsho
 		State:             string(state),
 		StateVersion:      stateVersion,
 		InFlight:          int(q.inFlight.Load()),
-		AdmissionClosed:   state != resiliencecontrol.QueueStateActive,
+		AdmissionClosed:   state != control.QueueStateActive,
 	}
 	q.observeQueueSnapshot(snapshot)
 	return snapshot
@@ -263,13 +263,13 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	switch status {
 	case SubmitStatusProcessing:
 		q.inFlight.Add(1)
-		q.observe(context.Background(), resilienceplane.OutcomeQueueProcessing)
+		q.observe(context.Background(), resilience.OutcomeQueueProcessing)
 	case SubmitStatusDone:
 		q.inFlight.Add(-1)
 		q.outstanding.Add(-1)
-		q.observe(context.Background(), resilienceplane.OutcomeQueueDone)
+		q.observe(context.Background(), resilience.OutcomeQueueDone)
 	case SubmitStatusFailed:
-		q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
+		q.observe(context.Background(), resilience.OutcomeQueueFailed)
 	}
 	q.observeCleaned(context.Background(), cleaned)
 	q.observeQueueDepth()
@@ -287,21 +287,21 @@ func (q *SubmitQueue) setFailed(requestID string, err error) {
 	q.observeCleaned(context.Background(), cleaned)
 	q.observeQueueDepth()
 	q.observeQueueStatusCounts()
-	q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
+	q.observe(context.Background(), resilience.OutcomeQueueFailed)
 }
 
 // Drain closes admission and waits until queued and processing work reaches zero.
 // A timeout intentionally leaves the queue in draining state.
-func (q *SubmitQueue) Drain(ctx context.Context, opts resiliencecontrol.DrainOptions) (resiliencecontrol.DrainResult, error) {
+func (q *SubmitQueue) Drain(ctx context.Context, opts control.DrainOptions) (control.DrainResult, error) {
 	if q == nil {
-		return resiliencecontrol.DrainResult{}, errors.New("submit queue disabled")
+		return control.DrainResult{}, errors.New("submit queue disabled")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	q.lifecycleMu.Lock()
-	if q.state == "" || q.state == resiliencecontrol.QueueStateActive {
-		q.state = resiliencecontrol.QueueStateDraining
+	if q.state == "" || q.state == control.QueueStateActive {
+		q.state = control.QueueStateDraining
 		q.stateVersion++
 	}
 	q.lifecycleMu.Unlock()
@@ -333,36 +333,36 @@ func (q *SubmitQueue) Resume(_ context.Context) error {
 	}
 	q.lifecycleMu.Lock()
 	defer q.lifecycleMu.Unlock()
-	if q.state != resiliencecontrol.QueueStatePaused || q.outstanding.Load() != 0 {
-		return resiliencecontrol.ErrInvalidState
+	if q.state != control.QueueStatePaused || q.outstanding.Load() != 0 {
+		return control.ErrInvalidState
 	}
-	q.state = resiliencecontrol.QueueStateActive
+	q.state = control.QueueStateActive
 	q.stateVersion++
 	return nil
 }
 
-func (q *SubmitQueue) finishDrainIfEmpty() (resiliencecontrol.DrainResult, bool) {
+func (q *SubmitQueue) finishDrainIfEmpty() (control.DrainResult, bool) {
 	q.lifecycleMu.Lock()
 	defer q.lifecycleMu.Unlock()
-	if q.state == resiliencecontrol.QueueStatePaused {
+	if q.state == control.QueueStatePaused {
 		return q.drainResultLocked(), true
 	}
 	if q.outstanding.Load() != 0 {
 		return q.drainResultLocked(), false
 	}
-	q.state = resiliencecontrol.QueueStatePaused
+	q.state = control.QueueStatePaused
 	q.stateVersion++
 	return q.drainResultLocked(), true
 }
 
-func (q *SubmitQueue) drainResult() resiliencecontrol.DrainResult {
+func (q *SubmitQueue) drainResult() control.DrainResult {
 	q.lifecycleMu.Lock()
 	defer q.lifecycleMu.Unlock()
 	return q.drainResultLocked()
 }
 
-func (q *SubmitQueue) drainResultLocked() resiliencecontrol.DrainResult {
-	return resiliencecontrol.DrainResult{
+func (q *SubmitQueue) drainResultLocked() control.DrainResult {
+	return control.DrainResult{
 		State:      q.state,
 		Version:    q.stateVersion,
 		Depth:      len(q.jobs),
@@ -371,7 +371,7 @@ func (q *SubmitQueue) drainResultLocked() resiliencecontrol.DrainResult {
 	}
 }
 
-var _ resiliencecontrol.QueueController = (*SubmitQueue)(nil)
+var _ control.QueueController = (*SubmitQueue)(nil)
 
 func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {
 	if q == nil || requestID == "" || assessmentID == "" {
@@ -380,25 +380,25 @@ func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {
 	q.statuses.SetAssessmentID(requestID, assessmentID)
 }
 
-func (q *SubmitQueue) observe(ctx context.Context, outcome resilienceplane.Outcome) {
+func (q *SubmitQueue) observe(ctx context.Context, outcome resilience.Outcome) {
 	if q == nil {
 		return
 	}
-	resilienceplane.Observe(ctx, q.observer, resilienceplane.ProtectionQueue, q.subject, outcome)
+	resilience.Observe(ctx, q.observer, resilience.ProtectionQueue, q.subject, outcome)
 }
 
 func (q *SubmitQueue) observeCleaned(ctx context.Context, count int) {
 	if q == nil || count <= 0 {
 		return
 	}
-	resilienceplane.Observe(ctx, q.observer, resilienceplane.ProtectionQueue, q.subject, resilienceplane.OutcomeQueueStatusCleaned)
+	resilience.Observe(ctx, q.observer, resilience.ProtectionQueue, q.subject, resilience.OutcomeQueueStatusCleaned)
 }
 
 func (q *SubmitQueue) observeQueueDepth() {
 	if q == nil {
 		return
 	}
-	resilienceplane.ObserveQueueDepth(q.subject, len(q.jobs))
+	resilience.ObserveQueueDepth(q.subject, len(q.jobs))
 }
 
 func (q *SubmitQueue) observeQueueStatusCounts() {
@@ -406,25 +406,25 @@ func (q *SubmitQueue) observeQueueStatusCounts() {
 		return
 	}
 	for status, count := range q.statuses.Counts() {
-		resilienceplane.ObserveQueueStatus(q.subject, status, count)
+		resilience.ObserveQueueStatus(q.subject, status, count)
 	}
 }
 
-func (q *SubmitQueue) observeQueueSnapshot(snapshot resilienceplane.QueueSnapshot) {
+func (q *SubmitQueue) observeQueueSnapshot(snapshot resilience.QueueSnapshot) {
 	if q == nil {
 		return
 	}
-	resilienceplane.ObserveQueueDepth(q.subject, snapshot.Depth)
+	resilience.ObserveQueueDepth(q.subject, snapshot.Depth)
 	for status, count := range snapshot.StatusCounts {
-		resilienceplane.ObserveQueueStatus(q.subject, status, count)
+		resilience.ObserveQueueStatus(q.subject, status, count)
 	}
 }
 
-func defaultSubmitQueueObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+func defaultSubmitQueueObserver(observer resilience.Observer) resilience.Observer {
 	if observer != nil {
 		return observer
 	}
-	return resilienceplane.DefaultObserver()
+	return resilience.DefaultObserver()
 }
 
 type submitQueueStatusStore struct {

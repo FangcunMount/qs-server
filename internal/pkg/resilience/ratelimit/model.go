@@ -5,7 +5,7 @@ import (
 	"time"
 
 	baseratelimit "github.com/FangcunMount/component-base/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // RateLimitPolicy describes one bounded rate limit control point.
@@ -19,8 +19,8 @@ type RateLimitPolicy struct {
 }
 
 // Subject returns the bounded resilience subject for this policy.
-func (p RateLimitPolicy) Subject() resilienceplane.Subject {
-	return resilienceplane.Subject{
+func (p RateLimitPolicy) Subject() resilience.Subject {
+	return resilience.Subject{
 		Component: p.Component,
 		Scope:     p.Scope,
 		Resource:  p.Resource,
@@ -48,8 +48,8 @@ type RateLimitDecision struct {
 	Allowed           bool
 	RetryAfter        time.Duration
 	RetryAfterSeconds int
-	Subject           resilienceplane.Subject
-	Outcome           resilienceplane.Outcome
+	Subject           resilience.Subject
+	Outcome           resilience.Outcome
 }
 
 // RateLimiter decides whether one request key may pass.
@@ -59,7 +59,7 @@ type RateLimiter interface {
 
 type Backend = baseratelimit.Backend
 
-func allowedDecision(policy RateLimitPolicy, outcome resilienceplane.Outcome) RateLimitDecision {
+func allowedDecision(policy RateLimitPolicy, outcome resilience.Outcome) RateLimitDecision {
 	return RateLimitDecision{
 		Allowed: true,
 		Subject: policy.Subject(),
@@ -76,7 +76,7 @@ func limitedDecision(policy RateLimitPolicy, retryAfter time.Duration, retryAfte
 		RetryAfter:        retryAfter,
 		RetryAfterSeconds: retryAfterSeconds,
 		Subject:           policy.Subject(),
-		Outcome:           resilienceplane.OutcomeRateLimited,
+		Outcome:           resilience.OutcomeRateLimited,
 	}
 }
 
@@ -101,15 +101,15 @@ func adaptDecision(decision baseratelimit.Decision) RateLimitDecision {
 	}
 }
 
-func adaptOutcome(outcome baseratelimit.Outcome) resilienceplane.Outcome {
+func adaptOutcome(outcome baseratelimit.Outcome) resilience.Outcome {
 	switch outcome {
 	case baseratelimit.OutcomeAllowed:
-		return resilienceplane.OutcomeAllowed
+		return resilience.OutcomeAllowed
 	case baseratelimit.OutcomeDegradedOpen:
-		return resilienceplane.OutcomeDegradedOpen
+		return resilience.OutcomeDegradedOpen
 	case baseratelimit.OutcomeRateLimited:
-		return resilienceplane.OutcomeRateLimited
+		return resilience.OutcomeRateLimited
 	default:
-		return resilienceplane.OutcomeDegradedOpen
+		return resilience.OutcomeDegradedOpen
 	}
 }

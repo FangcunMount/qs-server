@@ -47,6 +47,6 @@ guard acquire success、guard conflict、duplicate submit count、status reused 
 ## 12. 代码事实源
 
 - [../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
-- [../../../internal/pkg/locklease](../../../internal/pkg/locklease)
-- [../../../internal/pkg/locklease/redisadapter](../../../internal/pkg/locklease/redisadapter)
+- [../../../internal/pkg/resilience/locklease](../../../internal/pkg/resilience/locklease)
+- [../../../internal/pkg/resilience/locklease/redisadapter](../../../internal/pkg/resilience/locklease/redisadapter)
 - [../../../internal/collection-server/application/answersheet/submission_service.go](../../../internal/collection-server/application/answersheet/submission_service.go)

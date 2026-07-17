@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 const defaultStatisticsRepairWindowDays = 7

@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
 )
 

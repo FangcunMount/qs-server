@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )

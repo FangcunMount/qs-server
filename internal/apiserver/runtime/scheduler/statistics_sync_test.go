@@ -12,9 +12,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
 )
 
 type fakeStatisticsSyncService struct {

@@ -648,8 +648,8 @@ collection 的价值是：
 
 ### Resilience / Redis governance
 
-- `internal/pkg/ratelimit`
-- `internal/pkg/resilienceplane`
+- `internal/pkg/resilience/ratelimit`
+- `internal/pkg/resilience`
 - `internal/pkg/cacheplane`
 
 ---

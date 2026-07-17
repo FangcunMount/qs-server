@@ -7,7 +7,7 @@ import (
 	"time"
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 func TestNormalizeDailyWindowDefaultsToRepairWindow(t *testing.T) {

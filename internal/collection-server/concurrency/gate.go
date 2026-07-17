@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/admission"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"github.com/gin-gonic/gin"
 )
 

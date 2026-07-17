@@ -5,25 +5,25 @@ import (
 	"context"
 	"time"
 
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
 type Options struct {
 	InstanceID string
 	Locks      *locksubsystem.Subsystem
-	StateStore resiliencecontrol.StateStore
+	StateStore control.StateStore
 }
 
 type Subsystem struct {
-	identity resiliencecontrol.InstanceIdentity
+	identity control.InstanceIdentity
 	locks    *locksubsystem.Subsystem
-	store    resiliencecontrol.StateStore
+	store    control.StateStore
 }
 
 func New(opts Options) *Subsystem {
-	return &Subsystem{identity: resiliencecontrol.ResolveInstanceIdentity("worker", opts.InstanceID), locks: opts.Locks, store: opts.StateStore}
+	return &Subsystem{identity: control.ResolveInstanceIdentity("worker", opts.InstanceID), locks: opts.Locks, store: opts.StateStore}
 }
 
 func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
@@ -31,7 +31,7 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 	if s == nil {
 		return cancel
 	}
-	heartbeater, ok := s.store.(resiliencecontrol.InstanceHeartbeater)
+	heartbeater, ok := s.store.(control.InstanceHeartbeater)
 	if !ok {
 		return cancel
 	}
@@ -50,13 +50,13 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 	return cancel
 }
 
-func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
+func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	snapshot := resilienceplane.NewRuntimeSnapshot("worker", now)
+	snapshot := resilience.NewRuntimeSnapshot("worker", now)
 	if s == nil {
-		return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+		return resilience.FinalizeRuntimeSnapshot(snapshot)
 	}
 	snapshot.InstanceID, snapshot.Generation = s.identity.InstanceID, s.identity.Generation
 	if s.locks != nil {
@@ -67,9 +67,9 @@ func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
 	if !configured {
 		reason = "worker duplicate suppression lock manager unavailable"
 	}
-	snapshot.DuplicateSuppression = []resilienceplane.CapabilitySnapshot{{
-		Name: "answersheet_submitted", Kind: resilienceplane.ProtectionDuplicateSuppression.String(), Strategy: "redis_lock",
+	snapshot.DuplicateSuppression = []resilience.CapabilitySnapshot{{
+		Name: "answersheet_submitted", Kind: resilience.ProtectionDuplicateSuppression.String(), Strategy: "redis_lock",
 		Configured: configured, Degraded: !configured, Reason: reason,
 	}}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+	return resilience.FinalizeRuntimeSnapshot(snapshot)
 }

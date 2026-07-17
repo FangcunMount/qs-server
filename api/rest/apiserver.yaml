@@ -9298,7 +9298,7 @@ paths:
       tags:
       - System-Governance
       summary: 执行治理动作
-      description: 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅
+      description: 执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id 安全重试；仅
         qs:admin 可访问
       operationId: 执行治理动作
       parameters:
@@ -10969,6 +10969,10 @@ components:
     resilienceplane.CapabilitySnapshot:
       type: object
       properties:
+        active:
+          type: integer
+        burst:
+          type: integer
         configured:
           type: boolean
         degraded:
@@ -10977,6 +10981,14 @@ components:
           type: string
         name:
           type: string
+        override_expires_at:
+          type: string
+        policy_source:
+          type: string
+        policy_version:
+          type: integer
+        rate_per_second:
+          type: number
         reason:
           type: string
         renew_every_seconds:
@@ -10990,6 +11002,8 @@ components:
     resilienceplane.QueueSnapshot:
       type: object
       properties:
+        admission_closed:
+          type: boolean
         capacity:
           type: integer
         component:
@@ -10998,10 +11012,16 @@ components:
           type: integer
         generated_at:
           type: string
+        in_flight:
+          type: integer
         lifecycle_boundary:
           type: string
         name:
           type: string
+        state:
+          type: string
+        state_version:
+          type: integer
         status_counts:
           type: object
           additionalProperties:
@@ -11025,10 +11045,14 @@ components:
             $ref: '#/components/schemas/resilienceplane.CapabilitySnapshot'
         generated_at:
           type: string
+        generation:
+          type: string
         idempotency:
           type: array
           items:
             $ref: '#/components/schemas/resilienceplane.CapabilitySnapshot'
+        instance_id:
+          type: string
         locks:
           type: array
           items:
@@ -13359,6 +13383,8 @@ components:
         input:
           type: object
           additionalProperties: true
+        request_id:
+          type: string
     systemgovernance.ActionRunResult:
       type: object
       properties:
@@ -13367,6 +13393,8 @@ components:
         finished_at:
           type: string
         message:
+          type: string
+        request_id:
           type: string
         result:
           type: object

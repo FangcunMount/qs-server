@@ -6,10 +6,10 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // BootstrapInput carries container integration inputs for actor module bootstrap.

@@ -10,10 +10,10 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 )
 
 const (
@@ -38,22 +38,22 @@ type Options struct {
 	Backend      ratelimit.Backend
 	Locks        *locksubsystem.Subsystem
 	OpsAvailable bool
-	StateStore   resiliencecontrol.StateStore
+	StateStore   control.StateStore
 }
 
 type queueRegistration struct {
-	controller resiliencecontrol.QueueController
-	snapshot   func(time.Time) resilienceplane.QueueSnapshot
+	controller control.QueueController
+	snapshot   func(time.Time) resilience.QueueSnapshot
 }
 
 type Subsystem struct {
-	identity     resiliencecontrol.InstanceIdentity
+	identity     control.InstanceIdentity
 	rateEnabled  bool
 	budgets      map[ratelimit.BudgetID]*ratelimit.Budget
 	gates        map[string]*concurrency.Gate
 	locks        *locksubsystem.Subsystem
 	opsAvailable bool
-	stateStore   resiliencecontrol.StateStore
+	stateStore   control.StateStore
 	appliedRate  map[ratelimit.BudgetID]uint64
 	queueMu      sync.RWMutex
 	queues       map[string]queueRegistration
@@ -66,7 +66,7 @@ func New(opts Options) *Subsystem {
 		rateCfg = options.NewRateLimitOptions()
 	}
 	s := &Subsystem{
-		identity:    resiliencecontrol.ResolveInstanceIdentity("collection-server", opts.InstanceID),
+		identity:    control.ResolveInstanceIdentity("collection-server", opts.InstanceID),
 		rateEnabled: rateCfg.Enabled, budgets: make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		gates: make(map[string]*concurrency.Gate), locks: opts.Locks, opsAvailable: opts.OpsAvailable, stateStore: opts.StateStore,
 		appliedRate: make(map[ratelimit.BudgetID]uint64),
@@ -113,7 +113,7 @@ func (s *Subsystem) Start(ctx context.Context) context.CancelFunc {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		var signals <-chan string
-		if watcher, ok := s.stateStore.(resiliencecontrol.StateSignalWatcher); ok {
+		if watcher, ok := s.stateStore.(control.StateSignalWatcher); ok {
 			signals, _ = watcher.WatchStateSignals(ctx)
 		}
 		for {
@@ -133,7 +133,7 @@ func (s *Subsystem) Start(ctx context.Context) context.CancelFunc {
 }
 
 func (s *Subsystem) reconcile(ctx context.Context) {
-	if heartbeater, ok := s.stateStore.(resiliencecontrol.InstanceHeartbeater); ok {
+	if heartbeater, ok := s.stateStore.(control.InstanceHeartbeater); ok {
 		_ = heartbeater.Heartbeat(ctx, s.identity, 5*time.Second)
 	}
 	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetWaitReport, BudgetReportEvents} {
@@ -152,7 +152,7 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 		if state.Version <= s.appliedRate[id] {
 			continue
 		}
-		var change resiliencecontrol.RateLimitChange
+		var change control.RateLimitChange
 		if json.Unmarshal(state.Payload, &change) != nil {
 			continue
 		}
@@ -182,7 +182,7 @@ func (s *Subsystem) reconcileQueues(ctx context.Context) {
 	if err != nil || !exists {
 		return
 	}
-	var change resiliencecontrol.QueueChange
+	var change control.QueueChange
 	if json.Unmarshal(state.Payload, &change) != nil || (change.Target != "" && change.Target != "all" && change.Target != s.identity.InstanceID) {
 		return
 	}
@@ -194,14 +194,14 @@ func (s *Subsystem) reconcileQueues(ctx context.Context) {
 	}
 	snapshot := queue.snapshot(time.Now())
 	switch change.DesiredState {
-	case resiliencecontrol.QueueStatePaused:
-		if snapshot.State == string(resiliencecontrol.QueueStatePaused) {
+	case control.QueueStatePaused:
+		if snapshot.State == string(control.QueueStatePaused) {
 			return
 		}
 		timeout := time.Duration(change.TimeoutSeconds) * time.Second
-		_, _ = queue.controller.Drain(ctx, resiliencecontrol.DrainOptions{Timeout: timeout})
-	case resiliencecontrol.QueueStateActive:
-		if snapshot.State == string(resiliencecontrol.QueueStatePaused) {
+		_, _ = queue.controller.Drain(ctx, control.DrainOptions{Timeout: timeout})
+	case control.QueueStateActive:
+		if snapshot.State == string(control.QueueStatePaused) {
 			_ = queue.controller.Resume(ctx)
 		}
 	}
@@ -275,7 +275,7 @@ func (s *Subsystem) Gate(name string) *concurrency.Gate {
 	return s.gates[name]
 }
 
-func (s *Subsystem) RegisterQueue(name string, controller resiliencecontrol.QueueController, snapshot func(time.Time) resilienceplane.QueueSnapshot) {
+func (s *Subsystem) RegisterQueue(name string, controller control.QueueController, snapshot func(time.Time) resilience.QueueSnapshot) {
 	if s == nil || name == "" || controller == nil || snapshot == nil {
 		return
 	}
@@ -284,7 +284,7 @@ func (s *Subsystem) RegisterQueue(name string, controller resiliencecontrol.Queu
 	s.queueMu.Unlock()
 }
 
-func (s *Subsystem) Queue(name string) (resiliencecontrol.QueueController, bool) {
+func (s *Subsystem) Queue(name string) (control.QueueController, bool) {
 	if s == nil {
 		return nil, false
 	}
@@ -294,13 +294,13 @@ func (s *Subsystem) Queue(name string) (resiliencecontrol.QueueController, bool)
 	return registration.controller, ok
 }
 
-func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
+func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", now)
+	snapshot := resilience.NewRuntimeSnapshot("collection-server", now)
 	if s == nil {
-		return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+		return resilience.FinalizeRuntimeSnapshot(snapshot)
 	}
 	snapshot.InstanceID, snapshot.Generation = s.identity.InstanceID, s.identity.Generation
 	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetWaitReport, BudgetReportEvents} {
@@ -319,15 +319,15 @@ func (s *Subsystem) Snapshot(now time.Time) resilienceplane.RuntimeSnapshot {
 		snapshot.Locks = s.locks.Snapshots()
 	}
 	configured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded && s.opsAvailable
-	snapshot.Idempotency = []resilienceplane.CapabilitySnapshot{{
-		Name: "answersheet_submit", Kind: resilienceplane.ProtectionIdempotency.String(), Strategy: "redis_lock",
+	snapshot.Idempotency = []resilience.CapabilitySnapshot{{
+		Name: "answersheet_submit", Kind: resilience.ProtectionIdempotency.String(), Strategy: "redis_lock",
 		Configured: configured, Degraded: !configured, Reason: reasonIf(!configured, "submit guard redis runtime unavailable"),
 	}}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+	return resilience.FinalizeRuntimeSnapshot(snapshot)
 }
 
-func rateSnapshot(id ratelimit.BudgetID, dimension string, configured bool, snapshot ratelimit.BudgetSnapshot, policy ratelimit.RateLimitPolicy) resilienceplane.CapabilitySnapshot {
-	return resilienceplane.CapabilitySnapshot{Name: string(id) + "_" + dimension, Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: policy.Strategy,
+func rateSnapshot(id ratelimit.BudgetID, dimension string, configured bool, snapshot ratelimit.BudgetSnapshot, policy ratelimit.RateLimitPolicy) resilience.CapabilitySnapshot {
+	return resilience.CapabilitySnapshot{Name: string(id) + "_" + dimension, Kind: resilience.ProtectionRateLimit.String(), Strategy: policy.Strategy,
 		Configured: configured, RatePerSecond: policy.RatePerSecond, Burst: policy.Burst, PolicyVersion: snapshot.Version,
 		PolicySource: snapshot.Source, OverrideExpiresAt: snapshot.ExpiresAt}
 }

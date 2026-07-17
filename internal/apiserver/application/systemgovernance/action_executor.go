@@ -13,7 +13,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -22,11 +22,11 @@ type ActionExecutor struct {
 	registry   *ActionRegistry
 	governance statisticsApp.GovernanceFacade
 	reloader   CachePolicyReloader
-	resilience resiliencecontrol.Governor
+	resilience control.Governor
 	audit      ActionAuditStore
 }
 
-func NewActionExecutorWithResilience(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloader CachePolicyReloader, resilience resiliencecontrol.Governor, audits ...ActionAuditStore) *ActionExecutor {
+func NewActionExecutorWithResilience(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloader CachePolicyReloader, resilience control.Governor, audits ...ActionAuditStore) *ActionExecutor {
 	executor := &ActionExecutor{registry: registry, governance: governance, reloader: reloader, resilience: resilience}
 	if len(audits) > 0 {
 		executor.audit = audits[0]
@@ -115,10 +115,10 @@ func (e *ActionExecutor) Run(
 		result, err := e.runTuneRateLimit(ctx, orgID, req.Input)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
 	case "resilience.drain_queue":
-		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, resiliencecontrol.QueueStatePaused)
+		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, control.QueueStatePaused)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
 	case "resilience.resume_queue":
-		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, resiliencecontrol.QueueStateActive)
+		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, control.QueueStateActive)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
 	case "resilience.release_lock":
 		result, err := e.runReleaseLock(ctx, orgID, requestID, req.Input)
@@ -177,18 +177,18 @@ func actionAuditStatus(result *ActionRunResult, err error) string {
 	}
 	if err != nil {
 		if stderrors.Is(err, context.DeadlineExceeded) {
-			return string(resiliencecontrol.CommandStatusTimeout)
+			return string(control.CommandStatusTimeout)
 		}
-		return string(resiliencecontrol.CommandStatusFailed)
+		return string(control.CommandStatusFailed)
 	}
-	return string(resiliencecontrol.CommandStatusOK)
+	return string(control.CommandStatusOK)
 }
 
 func (e *ActionExecutor) runTuneRateLimit(ctx context.Context, orgID int64, input map[string]interface{}) (map[string]interface{}, error) {
 	if e == nil || e.resilience == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "resilience governance unavailable")
 	}
-	var change resiliencecontrol.RateLimitChange
+	var change control.RateLimitChange
 	if err := decodeActionInput(input, &change); err != nil {
 		return nil, err
 	}
@@ -196,11 +196,11 @@ func (e *ActionExecutor) runTuneRateLimit(ctx context.Context, orgID int64, inpu
 	return actionResultMap(result), normalizeResilienceError(err)
 }
 
-func (e *ActionExecutor) runQueueState(ctx context.Context, orgID int64, requestID string, input map[string]interface{}, desired resiliencecontrol.QueueState) (map[string]interface{}, error) {
+func (e *ActionExecutor) runQueueState(ctx context.Context, orgID int64, requestID string, input map[string]interface{}, desired control.QueueState) (map[string]interface{}, error) {
 	if e == nil || e.resilience == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "resilience governance unavailable")
 	}
-	var change resiliencecontrol.QueueChange
+	var change control.QueueChange
 	if err := decodeActionInput(input, &change); err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (e *ActionExecutor) runReleaseLock(ctx context.Context, orgID int64, reques
 	if e == nil || e.resilience == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "resilience governance unavailable")
 	}
-	var change resiliencecontrol.LeaderChange
+	var change control.LeaderChange
 	if err := decodeActionInput(input, &change); err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (e *ActionExecutor) runReleaseLock(ctx context.Context, orgID int64, reques
 	view := actionResultMap(result)
 	if err == nil {
 		if _, exists := view["status"]; !exists {
-			view["status"] = string(resiliencecontrol.CommandStatusOK)
+			view["status"] = string(control.CommandStatusOK)
 		}
 	}
 	return view, normalizeResilienceError(err)
@@ -240,8 +240,8 @@ func decodeActionInput(input map[string]interface{}, target interface{}) error {
 	return nil
 }
 
-func actionActor(ctx context.Context, orgID int64) resiliencecontrol.ActionActor {
-	return resiliencecontrol.ActionActor{OrgID: orgID, UserID: actorctx.GrantingUserID(ctx)}
+func actionActor(ctx context.Context, orgID int64) control.ActionActor {
+	return control.ActionActor{OrgID: orgID, UserID: actorctx.GrantingUserID(ctx)}
 }
 
 func actionResultMap(value interface{}) map[string]interface{} {
@@ -255,13 +255,13 @@ func normalizeResilienceError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if stderrors.Is(err, resiliencecontrol.ErrVersionConflict) {
+	if stderrors.Is(err, control.ErrVersionConflict) {
 		return errors.WithCode(code.ErrConflict, "%s", err.Error())
 	}
-	if stderrors.Is(err, resiliencecontrol.ErrInvalidArgument) {
+	if stderrors.Is(err, control.ErrInvalidArgument) {
 		return errors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
 	}
-	if stderrors.Is(err, resiliencecontrol.ErrUnavailable) {
+	if stderrors.Is(err, control.ErrUnavailable) {
 		return errors.WithCode(code.ErrInternalServerError, "%s", err.Error())
 	}
 	return err
@@ -331,11 +331,11 @@ func finalizeActionRun(requestID, actionID string, startedAt time.Time, result m
 	if err != nil {
 		return nil, err
 	}
-	status := string(resiliencecontrol.CommandStatusOK)
+	status := string(control.CommandStatusOK)
 	if projected, ok := result["status"].(string); ok {
-		switch resiliencecontrol.CommandStatus(projected) {
-		case resiliencecontrol.CommandStatusOK, resiliencecontrol.CommandStatusNoop, resiliencecontrol.CommandStatusPartial,
-			resiliencecontrol.CommandStatusTimeout, resiliencecontrol.CommandStatusFailed:
+		switch control.CommandStatus(projected) {
+		case control.CommandStatusOK, control.CommandStatusNoop, control.CommandStatusPartial,
+			control.CommandStatusTimeout, control.CommandStatusFailed:
 			status = projected
 		}
 	}

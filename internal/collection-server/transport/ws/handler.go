@@ -14,7 +14,7 @@ import (
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 )

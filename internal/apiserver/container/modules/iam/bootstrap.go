@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // Module IAM 集成模块

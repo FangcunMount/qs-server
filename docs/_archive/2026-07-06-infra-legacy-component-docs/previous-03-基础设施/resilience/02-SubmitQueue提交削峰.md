@@ -107,8 +107,8 @@ sequenceDiagram
 | `jobs chan submitJob` | 有界内存队列 |
 | `statuses *submitQueueStatusStore` | requestID -> 状态 |
 | `workerPool *submitQueueWorkerPool` | 消费 jobs 的 worker pool |
-| `observer resilienceplane.Observer` | 观测出口 |
-| `subject resilienceplane.Subject` | 低基数保护点标识 |
+| `observer resilience.Observer` | 观测出口 |
+| `subject resilience.Subject` | 低基数保护点标识 |
 
 `submitJob` 包含：
 
@@ -824,8 +824,8 @@ queueSize 过大可能把故障延迟暴露给用户。
 - SubmissionService：[../../../internal/collection-server/application/answersheet/submission_service.go](../../../internal/collection-server/application/answersheet/submission_service.go)
 - AnswerSheetHandler：[../../../internal/collection-server/transport/rest/handler/answersheet_handler.go](../../../internal/collection-server/transport/rest/handler/answersheet_handler.go)
 - SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
-- Resilience model：[../../../internal/pkg/resilienceplane/model.go](../../../internal/pkg/resilienceplane/model.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
+- Resilience model：[../../../internal/pkg/resilience/model.go](../../../internal/pkg/resilience/model.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
 
 ---
 
@@ -835,13 +835,13 @@ queueSize 过大可能把故障延迟暴露给用户。
 go test ./internal/collection-server/application/answersheet
 go test ./internal/collection-server/transport/rest/handler
 go test ./internal/collection-server/infra/redisops
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 ```
 
 如果修改队列状态或 metrics：
 
 ```bash
-go test ./internal/pkg/resilienceplane ./internal/collection-server/application/answersheet
+go test ./internal/pkg/resilience ./internal/collection-server/application/answersheet
 ```
 
 如果修改文档：

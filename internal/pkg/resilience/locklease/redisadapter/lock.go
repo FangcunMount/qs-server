@@ -8,11 +8,11 @@ import (
 
 	baseredisadapter "github.com/FangcunMount/component-base/pkg/locklease/redisadapter"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
-	lockkeyspace "github.com/FangcunMount/qs-server/internal/pkg/locklease/keyspace"
-	lockobserve "github.com/FangcunMount/qs-server/internal/pkg/locklease/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	lockkeyspace "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/keyspace"
+	lockobserve "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/observability"
 )
 
 // Manager 是构建在 cache runtime 之上的 Redis 锁租约 adapter。
@@ -20,7 +20,7 @@ type Manager struct {
 	component string
 	name      string
 	handle    *redisruntime.Handle
-	observer  resilienceplane.Observer
+	observer  resilience.Observer
 	family    cacheobserve.FamilyObserver
 }
 
@@ -30,13 +30,13 @@ func NewManager(component, name string, handle *redisruntime.Handle) *Manager {
 }
 
 // NewManagerWithObserver 创建带显式 resilience observer 的锁管理器。
-func NewManagerWithObserver(component, name string, handle *redisruntime.Handle, observer resilienceplane.Observer) *Manager {
+func NewManagerWithObserver(component, name string, handle *redisruntime.Handle, observer resilience.Observer) *Manager {
 	return NewManagerWithObservers(component, name, handle, observer, nil)
 }
 
 // NewManagerWithObservers creates a lock manager with explicit resilience and
 // Redis-family health observers.
-func NewManagerWithObservers(component, name string, handle *redisruntime.Handle, observer resilienceplane.Observer, family cacheobserve.FamilyObserver) *Manager {
+func NewManagerWithObservers(component, name string, handle *redisruntime.Handle, observer resilience.Observer, family cacheobserve.FamilyObserver) *Manager {
 	return &Manager{
 		component: component,
 		name:      name,
@@ -53,7 +53,7 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	if err != nil {
 		observability.ObserveLockAcquire(lockName, "error")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "error")
-		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
+		m.observe(ctx, identity, resilience.OutcomeLockError)
 		return nil, false, err
 	}
 	if cause := cancellationCause(ctx); cause != nil {
@@ -63,7 +63,7 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		observability.ObserveLockDegraded(lockName, "redis_unavailable")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "unavailable")
-		m.observe(ctx, identity, resilienceplane.OutcomeLockDegraded)
+		m.observe(ctx, identity, resilience.OutcomeLockDegraded)
 		err := fmt.Errorf("lock redis handle is unavailable")
 		m.observeFamilyFailure(err)
 		return nil, false, err
@@ -79,20 +79,20 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 		}
 		observability.ObserveLockAcquire(lockName, "error")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "error")
-		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
+		m.observe(ctx, identity, resilience.OutcomeLockError)
 		m.observeFamilyFailure(err)
 		return nil, false, err
 	}
 	if !acquired {
 		observability.ObserveLockAcquire(lockName, "contention")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "contention")
-		m.observe(ctx, identity, resilienceplane.OutcomeLockContention)
+		m.observe(ctx, identity, resilience.OutcomeLockContention)
 		m.observeFamilySuccess()
 		return nil, false, nil
 	}
 	observability.ObserveLockAcquire(lockName, "ok")
 	lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "ok")
-	m.observe(ctx, identity, resilienceplane.OutcomeLockAcquired)
+	m.observe(ctx, identity, resilience.OutcomeLockAcquired)
 	m.observeFamilySuccess()
 	return lease, true, nil
 }
@@ -133,7 +133,7 @@ func (m *Manager) RenewSpec(ctx context.Context, spec Spec, key string, lease *L
 	}
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "unavailable")
-		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
+		m.observe(ctx, spec.Identity(key), resilience.OutcomeLockRenewError)
 		err := fmt.Errorf("lock redis handle is unavailable")
 		m.observeFamilyFailure(err)
 		return false, err
@@ -146,18 +146,18 @@ func (m *Manager) RenewSpec(ctx context.Context, spec Spec, key string, lease *L
 			return false, cause
 		}
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
-		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
+		m.observe(ctx, spec.Identity(key), resilience.OutcomeLockRenewError)
 		m.observeFamilyFailure(err)
 		return false, err
 	}
 	if !owned {
 		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "lost")
-		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockLost)
+		m.observe(ctx, spec.Identity(key), resilience.OutcomeLockLost)
 		m.observeFamilySuccess()
 		return false, nil
 	}
 	lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "ok")
-	m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewed)
+	m.observe(ctx, spec.Identity(key), resilience.OutcomeLockRenewed)
 	m.observeFamilySuccess()
 	return true, nil
 }
@@ -179,13 +179,13 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 		}
 		observability.ObserveLockRelease(lockName, "error")
 		lockobserve.ObserveOperation(m.componentName(), lockName, "release", "error")
-		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
+		m.observe(ctx, identity, resilience.OutcomeLockError)
 		m.observeFamilyFailure(err)
 		return err
 	}
 	observability.ObserveLockRelease(lockName, "ok")
 	lockobserve.ObserveOperation(m.componentName(), lockName, "release", "ok")
-	m.observe(ctx, identity, resilienceplane.OutcomeLockReleased)
+	m.observe(ctx, identity, resilience.OutcomeLockReleased)
 	m.observeFamilySuccess()
 	return nil
 }
@@ -259,16 +259,16 @@ func (m *Manager) componentName() string {
 	return m.component
 }
 
-func (m *Manager) observe(ctx context.Context, identity Identity, outcome resilienceplane.Outcome) {
+func (m *Manager) observe(ctx context.Context, identity Identity, outcome resilience.Outcome) {
 	component := ""
-	observer := resilienceplane.DefaultObserver()
+	observer := resilience.DefaultObserver()
 	if m != nil {
 		component = m.component
 		if m.observer != nil {
 			observer = m.observer
 		}
 	}
-	resilienceplane.Observe(ctx, observer, resilienceplane.ProtectionLock, resilienceplane.Subject{
+	resilience.Observe(ctx, observer, resilience.ProtectionLock, resilience.Subject{
 		Component: component,
 		Scope:     m.metricName(identity),
 		Resource:  "redis_lock",
@@ -276,9 +276,9 @@ func (m *Manager) observe(ctx context.Context, identity Identity, outcome resili
 	}, outcome)
 }
 
-func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+func defaultObserver(observer resilience.Observer) resilience.Observer {
 	if observer != nil {
 		return observer
 	}
-	return resilienceplane.DefaultObserver()
+	return resilience.DefaultObserver()
 }

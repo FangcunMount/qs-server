@@ -5,9 +5,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
 func (s *server) prepareResources() (resourceOutput, error) {

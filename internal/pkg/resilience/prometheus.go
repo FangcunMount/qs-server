@@ -1,4 +1,4 @@
-package resilienceplane
+package resilience
 
 import (
 	"context"

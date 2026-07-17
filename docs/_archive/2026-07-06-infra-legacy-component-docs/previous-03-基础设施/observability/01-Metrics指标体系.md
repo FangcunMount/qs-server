@@ -618,7 +618,7 @@ last_failure_at
 
 ```bash
 go test ./internal/pkg/cachegovernance/observability
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 go test ./internal/apiserver/application/evaluation/...
 go test ./internal/apiserver/application/cachegovernance
 ```

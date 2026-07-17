@@ -120,7 +120,7 @@ Backpressure 不替代这些能力。
 
 ```go
 Acquire(ctx) (context.Context, func(), error)
-Snapshot(name) resilienceplane.BackpressureSnapshot
+Snapshot(name) resilience.BackpressureSnapshot
 ```
 
 ### 4.1 NewLimiter
@@ -746,23 +746,23 @@ Reason=backpressure limiter disabled
 
 ## 21. 代码锚点
 
-- Backpressure limiter：[../../../internal/pkg/backpressure/limiter.go](../../../internal/pkg/backpressure/limiter.go)
+- Backpressure limiter：[../../../internal/pkg/resilience/backpressure/limiter.go](../../../internal/pkg/resilience/backpressure/limiter.go)
 - MySQL BaseRepository：[../../../internal/pkg/database/mysql/base.go](../../../internal/pkg/database/mysql/base.go)
 - Mongo BaseRepository：[../../../internal/apiserver/infra/mongo/base.go](../../../internal/apiserver/infra/mongo/base.go)
 - IAM Client：[../../../internal/apiserver/infra/iam/client.go](../../../internal/apiserver/infra/iam/client.go)
 - IAM ProfileLinkService：[../../../internal/apiserver/infra/iam/profile_link.go](../../../internal/apiserver/infra/iam/profile_link.go)
 - Container BackpressureOptions：[../../../internal/apiserver/container/options.go](../../../internal/apiserver/container/options.go)
 - Resource bootstrap：[../../../internal/apiserver/process/resource_bootstrap.go](../../../internal/apiserver/process/resource_bootstrap.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
-- Resilience status：[../../../internal/pkg/resilienceplane/status.go](../../../internal/pkg/resilienceplane/status.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
+- Resilience status：[../../../internal/pkg/resilience/status.go](../../../internal/pkg/resilience/status.go)
 
 ---
 
 ## 22. Verify
 
 ```bash
-go test ./internal/pkg/backpressure
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience/backpressure
+go test ./internal/pkg/resilience
 go test ./internal/pkg/database/mysql
 go test ./internal/apiserver/infra/mongo
 go test ./internal/apiserver/infra/iam

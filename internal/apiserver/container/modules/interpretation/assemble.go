@@ -24,11 +24,11 @@ import (
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.

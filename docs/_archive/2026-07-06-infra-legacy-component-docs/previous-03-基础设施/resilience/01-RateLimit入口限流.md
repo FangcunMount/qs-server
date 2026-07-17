@@ -81,7 +81,7 @@ flowchart TB
     end
 
     subgraph Obs["Observability"]
-        resilience["resilienceplane.Observe"]
+        resilience["resilience.Observe"]
         metrics["qs_resilience_decision_total"]
     end
 
@@ -121,7 +121,7 @@ flowchart TB
 `RateLimitPolicy.Subject()` 会生成：
 
 ```text
-resilienceplane.Subject{
+resilience.Subject{
   Component,
   Scope,
   Resource,
@@ -748,30 +748,30 @@ sum by (scope, resource) (
 
 ## 19. 代码锚点
 
-- RateLimit model：[../../../internal/pkg/ratelimit/model.go](../../../internal/pkg/ratelimit/model.go)
-- Local limiter：[../../../internal/pkg/ratelimit/local.go](../../../internal/pkg/ratelimit/local.go)
-- Distributed limiter：[../../../internal/pkg/ratelimit/distributed.go](../../../internal/pkg/ratelimit/distributed.go)
-- Redis backend：[../../../internal/pkg/ratelimit/redisadapter/redis_backend.go](../../../internal/pkg/ratelimit/redisadapter/redis_backend.go)
+- RateLimit model：[../../../internal/pkg/resilience/ratelimit/model.go](../../../internal/pkg/resilience/ratelimit/model.go)
+- Local limiter：[../../../internal/pkg/resilience/ratelimit/local.go](../../../internal/pkg/resilience/ratelimit/local.go)
+- Distributed limiter：[../../../internal/pkg/resilience/ratelimit/distributed.go](../../../internal/pkg/resilience/ratelimit/distributed.go)
+- Redis backend：[../../../internal/pkg/resilience/ratelimit/redisadapter/redis_backend.go](../../../internal/pkg/resilience/ratelimit/redisadapter/redis_backend.go)
 - HTTP middleware：[../../../internal/pkg/middleware/limit.go](../../../internal/pkg/middleware/limit.go)
 - Collection router：[../../../internal/collection-server/transport/rest/router.go](../../../internal/collection-server/transport/rest/router.go)
-- Resilience model：[../../../internal/pkg/resilienceplane/model.go](../../../internal/pkg/resilienceplane/model.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
+- Resilience model：[../../../internal/pkg/resilience/model.go](../../../internal/pkg/resilience/model.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
 
 ---
 
 ## 20. Verify
 
 ```bash
-go test ./internal/pkg/ratelimit/...
+go test ./internal/pkg/resilience/ratelimit/...
 go test ./internal/pkg/middleware
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 go test ./internal/collection-server/transport/rest
 ```
 
 如果修改 Redis backend：
 
 ```bash
-go test ./internal/pkg/ratelimit/redisadapter
+go test ./internal/pkg/resilience/ratelimit/redisadapter
 go test ./internal/pkg/cacheplane/keyspace
 ```
 

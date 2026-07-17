@@ -6,12 +6,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 func (s *Subsystem) processCommands(ctx context.Context) {
-	store, ok := s.stateStore.(resiliencecontrol.CommandStore)
+	store, ok := s.stateStore.(control.CommandStore)
 	if !ok {
 		return
 	}
@@ -23,7 +23,7 @@ func (s *Subsystem) processCommands(ctx context.Context) {
 		if command.ActionID != "resilience.release_lock" {
 			continue
 		}
-		claimed, err := store.Claim(ctx, resiliencecontrol.ScopedRequestID(command.Actor.OrgID, command.RequestID), s.identity.InstanceID, time.Until(command.ExpiresAt)+time.Minute)
+		claimed, err := store.Claim(ctx, control.ScopedRequestID(command.Actor.OrgID, command.RequestID), s.identity.InstanceID, time.Until(command.ExpiresAt)+time.Minute)
 		if err != nil || !claimed {
 			continue
 		}
@@ -31,10 +31,10 @@ func (s *Subsystem) processCommands(ctx context.Context) {
 	}
 }
 
-func (s *Subsystem) executeLeaderCommand(ctx context.Context, store resiliencecontrol.CommandStore, command resiliencecontrol.Command) {
-	result := resiliencecontrol.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
-		OrgID: command.Actor.OrgID, Component: "apiserver", InstanceID: s.identity.InstanceID, Status: resiliencecontrol.CommandStatusFailed}
-	var change resiliencecontrol.LeaderChange
+func (s *Subsystem) executeLeaderCommand(ctx context.Context, store control.CommandStore, command control.Command) {
+	result := control.CommandResult{RequestID: command.RequestID, ActionID: command.ActionID,
+		OrgID: command.Actor.OrgID, Component: "apiserver", InstanceID: s.identity.InstanceID, Status: control.CommandStatusFailed}
+	var change control.LeaderChange
 	if err := json.Unmarshal(command.Payload, &change); err != nil {
 		result.Message = err.Error()
 		result.FinishedAt = time.Now()
@@ -59,7 +59,7 @@ func (s *Subsystem) executeLeaderCommand(ctx context.Context, store resilienceco
 		if exists {
 			expected = current.Version
 		}
-		_, err = s.stateStore.CompareAndSwap(ctx, name, expected, resiliencecontrol.VersionedState{Payload: command.Payload, Actor: command.Actor}, cooldown)
+		_, err = s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: command.Payload, Actor: command.Actor}, cooldown)
 	}
 	if err == nil {
 		leaseResult, relinquishErr := s.locks.RelinquishLeader(ctx, capability.ID, locklease.RelinquishOptions{
@@ -67,14 +67,14 @@ func (s *Subsystem) executeLeaderCommand(ctx context.Context, store resilienceco
 		})
 		result.Payload, _ = json.Marshal(leaseResult)
 		if relinquishErr == nil {
-			result.Status = resiliencecontrol.CommandStatusOK
+			result.Status = control.CommandStatusOK
 			if leaseResult.ActiveCount == 0 {
-				result.Status = resiliencecontrol.CommandStatusNoop
+				result.Status = control.CommandStatusNoop
 			}
 		} else {
 			result.Message = relinquishErr.Error()
 			if errors.Is(relinquishErr, context.DeadlineExceeded) {
-				result.Status = resiliencecontrol.CommandStatusTimeout
+				result.Status = control.CommandStatusTimeout
 			}
 		}
 	} else {

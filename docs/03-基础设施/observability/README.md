@@ -33,6 +33,6 @@ observability 横跨 HTTP、gRPC、cache、Outbox、MQ、worker、DB 和 report 
 
 - [../../../internal/pkg/redisruntime/observability](../../../internal/pkg/redisruntime/observability)
 - [../../../internal/pkg/eventing/observe](../../../internal/pkg/eventing/observe)
-- [../../../internal/pkg/resilienceplane](../../../internal/pkg/resilienceplane)
+- [../../../internal/pkg/resilience](../../../internal/pkg/resilience)
 - [../../../internal/apiserver/application/systemgovernance](../../../internal/apiserver/application/systemgovernance)
 - [../../../internal/worker/observability](../../../internal/worker/observability)

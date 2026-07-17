@@ -1,4 +1,4 @@
-package resiliencecontrol
+package control
 
 import (
 	"crypto/rand"

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -19,7 +19,7 @@ type SubmitGuard struct {
 	opsHandle *redisruntime.Handle
 	lockMgr   locklease.Manager
 	runner    locklease.Runner
-	observer  resilienceplane.Observer
+	observer  resilience.Observer
 }
 
 // NewSubmitGuardWithRunner creates the closure-based guard used by production composition.
@@ -35,7 +35,7 @@ func NewSubmitGuard(opsHandle *redisruntime.Handle, lockMgr locklease.Manager) *
 	return NewSubmitGuardWithObserver(opsHandle, lockMgr, nil)
 }
 
-func NewSubmitGuardWithObserver(opsHandle *redisruntime.Handle, lockMgr locklease.Manager, observer resilienceplane.Observer) *SubmitGuard {
+func NewSubmitGuardWithObserver(opsHandle *redisruntime.Handle, lockMgr locklease.Manager, observer resilience.Observer) *SubmitGuard {
 	return &SubmitGuard{
 		opsHandle: opsHandle,
 		lockMgr:   lockMgr,
@@ -48,26 +48,26 @@ func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *locklease
 		return "", nil, true, nil
 	}
 	if doneID, ok, err := g.lookupDone(ctx, key); err != nil {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockError)
 		return "", nil, false, err
 	} else if ok {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeIdempotencyHit)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeIdempotencyHit)
 		return doneID, nil, false, nil
 	}
 	if g.lockMgr == nil {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeDegradedOpen)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeDegradedOpen)
 		return "", nil, true, nil
 	}
 	capability, _ := locklease.Lookup(locklease.WorkloadCollectionSubmit)
 	lease, acquired, err := g.lockMgr.AcquireSpec(ctx, capability.Spec, submitInflightKey(key), defaultSubmitInflightTTL)
 	if err != nil {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockError)
 		return "", nil, false, err
 	}
 	if acquired {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockAcquired)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockAcquired)
 	} else {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockContention)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockContention)
 	}
 	return "", lease, acquired, nil
 }
@@ -78,7 +78,7 @@ func (g *SubmitGuard) Complete(ctx context.Context, key string, lease *locklease
 	}
 	if answerSheetID != "" && g.opsHandle != nil && g.opsHandle.Client != nil {
 		if err := g.opsHandle.Client.Set(ctx, g.opsKeyspace().IdempotencyDone(key), answerSheetID, defaultSubmitResultTTL).Err(); err != nil {
-			g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+			g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockError)
 			return err
 		}
 	}
@@ -108,14 +108,14 @@ func (g *SubmitGuard) Run(ctx context.Context, key string, body func(context.Con
 		return value, true, err
 	}
 	if doneID, ok, err := g.lookupDone(ctx, key); err != nil {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockError)
 		return "", false, err
 	} else if ok {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeIdempotencyHit)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeIdempotencyHit)
 		return doneID, false, nil
 	}
 	if g.runner == nil {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeDegradedOpen)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeDegradedOpen)
 		if body == nil {
 			return "", true, nil
 		}
@@ -135,7 +135,7 @@ func (g *SubmitGuard) Run(ctx context.Context, key string, body func(context.Con
 		answerSheetID = value
 		if value != "" && g.opsHandle != nil && g.opsHandle.Client != nil {
 			if setErr := g.opsHandle.Client.Set(runCtx, g.opsKeyspace().IdempotencyDone(key), value, defaultSubmitResultTTL).Err(); setErr != nil {
-				g.observe(runCtx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+				g.observe(runCtx, resilience.ProtectionIdempotency, resilience.OutcomeLockError)
 				return setErr
 			}
 		}
@@ -145,10 +145,10 @@ func (g *SubmitGuard) Run(ctx context.Context, key string, body func(context.Con
 		return "", result.Acquired, err
 	}
 	if !result.Acquired {
-		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockContention)
+		g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockContention)
 		return "", false, nil
 	}
-	g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockAcquired)
+	g.observe(ctx, resilience.ProtectionIdempotency, resilience.OutcomeLockAcquired)
 	return answerSheetID, true, nil
 }
 
@@ -181,12 +181,12 @@ func submitDoneKey(key string) string {
 	return "submit:idempotency:" + key + ":done"
 }
 
-func (g *SubmitGuard) observe(ctx context.Context, kind resilienceplane.ProtectionKind, outcome resilienceplane.Outcome) {
-	observer := resilienceplane.DefaultObserver()
+func (g *SubmitGuard) observe(ctx context.Context, kind resilience.ProtectionKind, outcome resilience.Outcome) {
+	observer := resilience.DefaultObserver()
 	if g != nil && g.observer != nil {
 		observer = g.observer
 	}
-	resilienceplane.Observe(ctx, observer, kind, resilienceplane.Subject{
+	resilience.Observe(ctx, observer, kind, resilience.Subject{
 		Component: "collection-server",
 		Scope:     "answersheet_submit",
 		Resource:  "submit_guard",
@@ -194,9 +194,9 @@ func (g *SubmitGuard) observe(ctx context.Context, kind resilienceplane.Protecti
 	}, outcome)
 }
 
-func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+func defaultObserver(observer resilience.Observer) resilience.Observer {
 	if observer != nil {
 		return observer
 	}
-	return resilienceplane.DefaultObserver()
+	return resilience.DefaultObserver()
 }

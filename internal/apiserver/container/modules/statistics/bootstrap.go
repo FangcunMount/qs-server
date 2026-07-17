@@ -8,12 +8,12 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 // BootstrapInput carries container integration inputs for statistics module bootstrap.

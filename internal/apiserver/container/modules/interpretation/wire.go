@@ -2,9 +2,9 @@ package interpretation
 
 import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

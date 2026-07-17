@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
@@ -15,7 +15,7 @@ type HealthHandler struct {
 	serviceName  string
 	version      string
 	status       *observability.FamilyStatusRegistry
-	resilience   func() resilienceplane.RuntimeSnapshot
+	resilience   func() resilience.RuntimeSnapshot
 	controlReady func() bool
 }
 
@@ -24,7 +24,7 @@ func NewHealthHandler(serviceName, version string, status *observability.FamilyS
 	return NewHealthHandlerWithResilience(serviceName, version, status, nil)
 }
 
-func NewHealthHandlerWithResilience(serviceName, version string, status *observability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot, readiness ...func() bool) *HealthHandler {
+func NewHealthHandlerWithResilience(serviceName, version string, status *observability.FamilyStatusRegistry, resilience func() resilience.RuntimeSnapshot, readiness ...func() bool) *HealthHandler {
 	handler := &HealthHandler{
 		serviceName: serviceName,
 		version:     version,
@@ -114,7 +114,7 @@ func (h *HealthHandler) Resilience(c *gin.Context) {
 	if h != nil && h.serviceName != "" {
 		component = h.serviceName
 	}
-	core.WriteResponse(c, nil, resilienceplane.FinalizeRuntimeSnapshot(resilienceplane.NewRuntimeSnapshot(component, time.Now())))
+	core.WriteResponse(c, nil, resilience.FinalizeRuntimeSnapshot(resilience.NewRuntimeSnapshot(component, time.Now())))
 }
 
 // Ping 简单连通性测试

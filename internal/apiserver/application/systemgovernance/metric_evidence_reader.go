@@ -5,7 +5,7 @@ import (
 	"time"
 
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 // MetricEvidenceReader 保留PromQL 查询 construction out of 领域投影器。
@@ -156,7 +156,7 @@ func cloneMetricLabels(base map[string]string, key, value string) map[string]str
 func (r MetricEvidenceReader) ResilienceQueueFull(
 	ctx context.Context,
 	component string,
-	queue resilienceplane.QueueSnapshot,
+	queue resilience.QueueSnapshot,
 	window string,
 	evalAt time.Time,
 ) (MetricEvidence, bool) {
@@ -165,7 +165,7 @@ func (r MetricEvidenceReader) ResilienceQueueFull(
 		"queue_full_"+component+"_"+queue.Name,
 		"qs_resilience_decision_total",
 		window,
-		queueDecisionLabels(component, queue, resilienceplane.OutcomeQueueFull),
+		queueDecisionLabels(component, queue, resilience.OutcomeQueueFull),
 		evalAt,
 	)
 }
@@ -173,7 +173,7 @@ func (r MetricEvidenceReader) ResilienceQueueFull(
 func (r MetricEvidenceReader) ResilienceBackpressureTimeout(
 	ctx context.Context,
 	component string,
-	backpressure resilienceplane.BackpressureSnapshot,
+	backpressure resilience.BackpressureSnapshot,
 	window string,
 	evalAt time.Time,
 ) (MetricEvidence, bool) {
@@ -182,7 +182,7 @@ func (r MetricEvidenceReader) ResilienceBackpressureTimeout(
 		"backpressure_timeout_"+component+"_"+backpressure.Name,
 		"qs_resilience_decision_total",
 		window,
-		backpressureDecisionLabels(component, backpressure, resilienceplane.OutcomeBackpressureTimeout),
+		backpressureDecisionLabels(component, backpressure, resilience.OutcomeBackpressureTimeout),
 		evalAt,
 	)
 }

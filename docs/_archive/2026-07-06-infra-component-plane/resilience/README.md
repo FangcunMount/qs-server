@@ -9,7 +9,7 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 模块定位 | `resilience/` 是 qs-server 的**高并发保护与降级文档组**，解释入口限流、提交削峰、下游背压、锁租约、幂等、重复抑制、观测和排障 |
-| 核心模型 | `internal/pkg/resilienceplane` 只定义 ProtectionKind、Outcome、Subject、Observer、RuntimeSnapshot，不实现具体限流/队列/锁/背压 |
+| 核心模型 | `internal/pkg/resilience` 只定义 ProtectionKind、Outcome、Subject、Observer、RuntimeSnapshot，不实现具体限流/队列/锁/背压 |
 | 入口保护 | RateLimit 负责 HTTP 入口 QPS，超限返回 429 + Retry-After |
 | 提交削峰 | SubmitQueue 负责 collection-server 进程内答卷提交削峰，返回 202 + request_id |
 | 下游保护 | Backpressure 负责 MySQL/Mongo/IAM in-flight protection |
@@ -201,7 +201,7 @@ flowchart TB
     end
 
     subgraph Obs["Observability"]
-        outcome["resilienceplane.Decision"]
+        outcome["resilience.Decision"]
         metrics["qs_resilience_* metrics"]
         status["RuntimeSnapshot"]
     end
@@ -481,22 +481,22 @@ Redis lock 只能降低并发冲突，最终正确性依赖：
 
 ### Vocabulary / Status / Metrics
 
-- Resilience model：[../../../internal/pkg/resilienceplane/model.go](../../../internal/pkg/resilienceplane/model.go)
-- Resilience status：[../../../internal/pkg/resilienceplane/status.go](../../../internal/pkg/resilienceplane/status.go)
-- Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)
+- Resilience model：[../../../internal/pkg/resilience/model.go](../../../internal/pkg/resilience/model.go)
+- Resilience status：[../../../internal/pkg/resilience/status.go](../../../internal/pkg/resilience/status.go)
+- Resilience metrics：[../../../internal/pkg/resilience/prometheus.go](../../../internal/pkg/resilience/prometheus.go)
 
 ### RateLimit
 
-- RateLimit model：[../../../internal/pkg/ratelimit/model.go](../../../internal/pkg/ratelimit/model.go)
+- RateLimit model：[../../../internal/pkg/resilience/ratelimit/model.go](../../../internal/pkg/resilience/ratelimit/model.go)
 - HTTP middleware：[../../../internal/pkg/middleware/limit.go](../../../internal/pkg/middleware/limit.go)
-- Redis limiter adapter：[../../../internal/pkg/ratelimit/redisadapter/](../../../internal/pkg/ratelimit/redisadapter/)
+- Redis limiter adapter：[../../../internal/pkg/resilience/ratelimit/redisadapter/](../../../internal/pkg/resilience/ratelimit/redisadapter/)
 
 ### Queue / Backpressure / Lock
 
 - SubmitQueue：[../../../internal/collection-server/application/answersheet/submit_queue.go](../../../internal/collection-server/application/answersheet/submit_queue.go)
 - SubmitQueue worker pool：[../../../internal/collection-server/application/answersheet/submit_queue_worker_pool.go](../../../internal/collection-server/application/answersheet/submit_queue_worker_pool.go)
-- Backpressure limiter：[../../../internal/pkg/backpressure/limiter.go](../../../internal/pkg/backpressure/limiter.go)
-- LockLease：[../../../internal/pkg/locklease/](../../../internal/pkg/locklease/)
+- Backpressure limiter：[../../../internal/pkg/resilience/backpressure/limiter.go](../../../internal/pkg/resilience/backpressure/limiter.go)
+- LockLease：[../../../internal/pkg/resilience/locklease/](../../../internal/pkg/resilience/locklease/)
 - SubmitGuard：[../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)
 - Worker duplicate gate：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
 - Scheduler leader lock：[../../../internal/apiserver/runtime/scheduler/leader_lock.go](../../../internal/apiserver/runtime/scheduler/leader_lock.go)
@@ -508,10 +508,10 @@ Redis lock 只能降低并发冲突，最终正确性依赖：
 Foundation：
 
 ```bash
-go test ./internal/pkg/resilienceplane
+go test ./internal/pkg/resilience
 go test ./internal/pkg/middleware
-go test ./internal/pkg/backpressure
-go test ./internal/pkg/locklease
+go test ./internal/pkg/resilience/backpressure
+go test ./internal/pkg/resilience/locklease
 ```
 
 Collection：

@@ -28,14 +28,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
-	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
-	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
-	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/control/redisadapter"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
+	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit/redisadapter"
 )
 
 // Container 主容器，负责管理所有组件
@@ -502,11 +502,11 @@ func (c *Container) ReportEventsOptions() *options.ReportEventsOptions {
 	return c.opts.ReportEvents
 }
 
-func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
+func (c *Container) ResilienceSnapshot() resilience.RuntimeSnapshot {
 	if c != nil && c.resilience != nil {
 		return c.resilience.Snapshot(time.Now())
 	}
-	return resilienceplane.RuntimeSnapshot{Component: "collection-server"}
+	return resilience.RuntimeSnapshot{Component: "collection-server"}
 }
 
 // InitializeRuntimeClients installs the runtime client bundle built by the
