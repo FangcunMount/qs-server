@@ -161,7 +161,7 @@ func (r *Router) rateLimitedCatalogHandlers(
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
 	return r.catalogHandlers(rateLimitedHandlers(
-		backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
+		r.container.RateBudgetProvider(), backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
 	)...)
 }
 
@@ -176,7 +176,7 @@ func (r *Router) rateLimitedReportStatusHandlers(
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
 	return r.reportStatusHandlers(rateLimitedHandlers(
-		backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
+		r.container.RateBudgetProvider(), backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
 	)...)
 }
 
@@ -191,7 +191,7 @@ func (r *Router) rateLimitedQueryHandlers(
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
 	return r.queryHandlers(rateLimitedHandlers(
-		backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
+		r.container.RateBudgetProvider(), backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
 	)...)
 }
 
@@ -206,6 +206,6 @@ func (r *Router) rateLimitedSubmitHandlers(
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
 	return r.submitHandlers(rateLimitedHandlers(
-		backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
+		r.container.RateBudgetProvider(), backend, scope, rateCfg, globalQPS, globalBurst, userQPS, userBurst, handler,
 	)...)
 }

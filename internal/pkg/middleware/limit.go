@@ -2,10 +2,11 @@ package middleware
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 // ErrLimitExceeded 定义了限制超出错误
@@ -17,6 +18,13 @@ type LimitOptions struct {
 	Resource  string
 	Strategy  string
 	Observer  resilienceplane.Observer
+}
+
+// LimitDegradedOpen preserves the distributed limiter's observable fail-open
+// contract when its configured backend is unavailable.
+func LimitDegradedOpen(opts LimitOptions) gin.HandlerFunc {
+	policy := rateLimitPolicy(opts, "redis", 1, 1)
+	return LimitWithLimiter(ratelimit.NewDistributedLimiter(nil, policy), nil, opts)
 }
 
 // Limit 如果达到限制，则丢弃（HTTP 状态 429）请求

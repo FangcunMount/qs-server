@@ -46,6 +46,7 @@ flowchart LR
 | 容量压测 | [09-容量边界与压测验证.md](09-容量边界与压测验证.md) |
 | 方案取舍 | [10-方案取舍.md](10-方案取舍.md) |
 | LockLease 租约锁与续租治理 | [11-LockLease租约锁与续租治理.md](11-LockLease租约锁与续租治理.md) |
+| 韧性子系统与控制面 | [12-韧性子系统与控制面.md](12-韧性子系统与控制面.md) |
 
 ## 5. 为什么选择当前方案
 
@@ -56,6 +57,8 @@ flowchart LR
 | 能力 | 事实源 |
 | --- | --- |
 | RateLimit / Backpressure | [../../../internal/pkg/ratelimit](../../../internal/pkg/ratelimit)、[../../../internal/pkg/backpressure](../../../internal/pkg/backpressure) |
+| 进程级组合 | [../../../internal/apiserver/resilience/subsystem](../../../internal/apiserver/resilience/subsystem)、[../../../internal/collection-server/resilience/subsystem](../../../internal/collection-server/resilience/subsystem)、[../../../internal/worker/resilience/subsystem](../../../internal/worker/resilience/subsystem) |
+| 跨进程控制协议 | [../../../internal/pkg/resiliencecontrol](../../../internal/pkg/resiliencecontrol) |
 | SubmitQueue | [../../../internal/collection-server/application/answersheet/submit_queue.go](../../../internal/collection-server/application/answersheet/submit_queue.go) |
 | SubmitGuard / LockLease | [../../../internal/collection-server/infra/redisops/submit_guard.go](../../../internal/collection-server/infra/redisops/submit_guard.go)、[../../../internal/pkg/locklease](../../../internal/pkg/locklease) |
 | Report 查询 | [../../../internal/collection-server/application/reportwait](../../../internal/collection-server/application/reportwait)、[../../04-接口与运维/12-小程序报告等待接入指南.md](../../04-接口与运维/12-小程序报告等待接入指南.md) |

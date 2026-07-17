@@ -30,6 +30,7 @@ const (
 	OutcomeQueueDone            Outcome = "queue_done"
 	OutcomeQueueFailed          Outcome = "queue_failed"
 	OutcomeQueueStatusCleaned   Outcome = "queue_status_cleaned"
+	OutcomeQueueAdmissionClosed Outcome = "queue_admission_closed"
 	OutcomeBackpressureAcquired Outcome = "backpressure_acquired"
 	OutcomeBackpressureTimeout  Outcome = "backpressure_timeout"
 	OutcomeBackpressureReleased Outcome = "backpressure_released"

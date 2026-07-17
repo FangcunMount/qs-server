@@ -2,7 +2,6 @@ package rest
 
 import (
 	"net/http"
-	"time"
 
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -26,17 +25,8 @@ func (r *Router) resilienceStatus(c *gin.Context) {
 }
 
 func (r *Router) resilienceSnapshot() resilienceplane.RuntimeSnapshot {
-	snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", time.Now())
-	rateEnabled := r != nil && r.rateCfg != nil && r.rateCfg.Enabled
-	snapshot.RateLimits = []resilienceplane.CapabilitySnapshot{
-		{Name: "rest_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: "local", Configured: rateEnabled},
-		{Name: "rest_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: "local_key", Configured: rateEnabled},
+	if r != nil && r.deps.ResilienceSnapshot != nil {
+		return r.deps.ResilienceSnapshot()
 	}
-	if r != nil {
-		snapshot.Backpressure = append(snapshot.Backpressure, r.deps.Backpressure...)
-	}
-	if r != nil {
-		snapshot.Locks = append(snapshot.Locks, r.deps.Locks...)
-	}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+	return resilienceplane.RuntimeSnapshot{Component: "apiserver"}
 }

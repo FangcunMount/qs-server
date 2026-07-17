@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
@@ -22,18 +23,21 @@ import (
 	workereventing "github.com/FangcunMount/qs-server/internal/worker/integration/eventing"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/worker/resilience/subsystem"
 )
 
 // Container 主容器，负责管理所有组件
 type Container struct {
-	initialized  bool
-	opts         *options.Options
-	logger       *slog.Logger
-	locks        *locksubsystem.Subsystem
-	opsHandle    *redisruntime.Handle
-	lockBuilder  *keyspace.Builder
-	eventCatalog *eventcatalog.Catalog
-	reportStatus *reportstatus.Reporter
+	initialized      bool
+	opts             *options.Options
+	logger           *slog.Logger
+	locks            *locksubsystem.Subsystem
+	resilience       *resiliencesubsystem.Subsystem
+	resilienceCancel context.CancelFunc
+	opsHandle        *redisruntime.Handle
+	lockBuilder      *keyspace.Builder
+	eventCatalog     *eventcatalog.Catalog
+	reportStatus     *reportstatus.Reporter
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient              *grpcclient.AnswerSheetClient
@@ -62,6 +66,10 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 	if locks != nil && locks.Builder() != nil {
 		lockBuilder = locks.Builder()
 	}
+	var stateStore *controlredis.Store
+	if opsHandle != nil {
+		stateStore = controlredis.NewStore(opsHandle.Client, opsHandle.Builder)
+	}
 	c := &Container{
 		opts:         opts,
 		logger:       logger,
@@ -70,6 +78,7 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 		lockBuilder:  lockBuilder,
 		eventCatalog: eventCatalog,
 		initialized:  false,
+		resilience:   resiliencesubsystem.New(resiliencesubsystem.Options{Locks: locks, StateStore: stateStore}),
 	}
 	c.reportStatus = c.buildReportStatusReporter()
 	return c
@@ -113,6 +122,9 @@ func (c *Container) Initialize() error {
 	// 初始化事件分发器
 	if err := c.initEventDispatcher(); err != nil {
 		return err
+	}
+	if c.resilience != nil {
+		c.resilienceCancel = c.resilience.Start(context.Background())
 	}
 
 	c.initialized = true
@@ -190,6 +202,10 @@ func (c *Container) buildNotifier() port.TaskNotifier {
 // Cleanup 清理资源
 func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
+	if c.resilienceCancel != nil {
+		c.resilienceCancel()
+		c.resilienceCancel = nil
+	}
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
 }
@@ -233,24 +249,10 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 
 // ResilienceSnapshot returns the worker's current resilience capability summary.
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
-	snapshot := resilienceplane.NewRuntimeSnapshot("worker", time.Now())
-	if c != nil && c.locks != nil {
-		snapshot.Locks = c.locks.Snapshots()
+	if c != nil && c.resilience != nil {
+		return c.resilience.Snapshot(time.Now())
 	}
-	lockConfigured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded
-	lockReason := ""
-	if !lockConfigured {
-		lockReason = "worker duplicate suppression lock manager unavailable"
-	}
-	snapshot.DuplicateSuppression = []resilienceplane.CapabilitySnapshot{{
-		Name:       "answersheet_submitted",
-		Kind:       resilienceplane.ProtectionDuplicateSuppression.String(),
-		Strategy:   "redis_lock",
-		Configured: lockConfigured,
-		Degraded:   !lockConfigured,
-		Reason:     lockReason,
-	}}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+	return resilienceplane.RuntimeSnapshot{Component: "worker"}
 }
 
 func lockManager(locks *locksubsystem.Subsystem) locklease.Manager {

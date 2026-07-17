@@ -6,6 +6,14 @@ import "time"
 type SystemGovernanceOptions struct {
 	Prometheus *SystemGovernancePrometheusOptions     `json:"prometheus" mapstructure:"prometheus"`
 	Components map[string]*GovernanceComponentOptions `json:"components" mapstructure:"components"`
+	Resilience *ResilienceGovernanceOptions           `json:"resilience" mapstructure:"resilience"`
+}
+
+type ResilienceGovernanceOptions struct {
+	TuneRateLimit bool `json:"tune_rate_limit" mapstructure:"tune_rate_limit"`
+	DrainQueue    bool `json:"drain_queue" mapstructure:"drain_queue"`
+	ResumeQueue   bool `json:"resume_queue" mapstructure:"resume_queue"`
+	ReleaseLock   bool `json:"release_lock" mapstructure:"release_lock"`
 }
 
 // SystemGovernancePrometheusOptions configures Prometheus query access.
@@ -31,5 +39,6 @@ func NewSystemGovernanceOptions() *SystemGovernanceOptions {
 			Timeout: 3 * time.Second,
 		},
 		Components: map[string]*GovernanceComponentOptions{},
+		Resilience: &ResilienceGovernanceOptions{},
 	}
 }

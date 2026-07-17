@@ -61,7 +61,7 @@ func (s stubSystemGovernanceFacade) RunAction(context.Context, int64, string, sy
 
 func TestSystemGovernanceOverviewRouteReturnsSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		SystemGovernanceFacade: stubSystemGovernanceFacade{overview: &systemgov.OverviewResponse{
 			Window:          "5m",
 			OverallSeverity: systemgov.SeverityHealthy,
@@ -105,7 +105,7 @@ func TestSystemGovernanceOverviewRouteReturnsSnapshot(t *testing.T) {
 
 func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		SystemGovernanceFacade: stubSystemGovernanceFacade{events: &systemgov.EventsView{
 			Window: "5m",
 			Summary: systemgov.EventDrainSummary{
@@ -171,7 +171,7 @@ func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
 
 func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		SystemGovernanceFacade: stubSystemGovernanceFacade{cache: &systemgov.CacheView{
 			Window: "5m",
 			Components: map[string]systemgov.ComponentCache{
@@ -253,7 +253,7 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 
 func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		SystemGovernanceFacade: stubSystemGovernanceFacade{resilience: &systemgov.ResilienceView{
 			Window: "5m",
 			Summary: systemgov.ResilienceSummary{

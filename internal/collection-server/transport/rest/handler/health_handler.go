@@ -12,10 +12,11 @@ import (
 
 // HealthHandler 健康检查处理器
 type HealthHandler struct {
-	serviceName string
-	version     string
-	status      *observability.FamilyStatusRegistry
-	resilience  func() resilienceplane.RuntimeSnapshot
+	serviceName  string
+	version      string
+	status       *observability.FamilyStatusRegistry
+	resilience   func() resilienceplane.RuntimeSnapshot
+	controlReady func() bool
 }
 
 // NewHealthHandler 创建健康检查处理器
@@ -23,13 +24,17 @@ func NewHealthHandler(serviceName, version string, status *observability.FamilyS
 	return NewHealthHandlerWithResilience(serviceName, version, status, nil)
 }
 
-func NewHealthHandlerWithResilience(serviceName, version string, status *observability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot) *HealthHandler {
-	return &HealthHandler{
+func NewHealthHandlerWithResilience(serviceName, version string, status *observability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot, readiness ...func() bool) *HealthHandler {
+	handler := &HealthHandler{
 		serviceName: serviceName,
 		version:     version,
 		status:      status,
 		resilience:  resilience,
 	}
+	if len(readiness) > 0 {
+		handler.controlReady = readiness[0]
+	}
+	return handler
 }
 
 // Health 健康检查
@@ -64,14 +69,20 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 		statusCode = http.StatusServiceUnavailable
 		statusText = "degraded"
 	}
+	controlSynchronized := h.controlReady == nil || h.controlReady()
+	if !controlSynchronized {
+		statusCode = http.StatusServiceUnavailable
+		statusText = "synchronizing"
+	}
 	c.JSON(statusCode, core.Response{
 		Code:    0,
 		Message: "success",
 		Data: gin.H{
-			"status":  statusText,
-			"service": h.serviceName,
-			"version": h.version,
-			"redis":   snapshot,
+			"status":                          statusText,
+			"service":                         h.serviceName,
+			"version":                         h.version,
+			"redis":                           snapshot,
+			"resilience_control_synchronized": controlSynchronized,
 		},
 	})
 }

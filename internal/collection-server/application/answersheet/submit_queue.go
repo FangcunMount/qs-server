@@ -4,15 +4,20 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 // ErrQueueFull indicates the submit queue is full.
 var ErrQueueFull = errors.New("submit queue full")
+
+// ErrQueueDraining indicates governance has closed queue admission.
+var ErrQueueDraining = errors.New("submit queue draining")
 
 type submitJob struct {
 	ctx       context.Context
@@ -25,11 +30,16 @@ type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest)
 
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
-	jobs       chan submitJob
-	statuses   *submitQueueStatusStore
-	workerPool *submitQueueWorkerPool
-	observer   resilienceplane.Observer
-	subject    resilienceplane.Subject
+	jobs         chan submitJob
+	statuses     *submitQueueStatusStore
+	workerPool   *submitQueueWorkerPool
+	observer     resilienceplane.Observer
+	subject      resilienceplane.Subject
+	lifecycleMu  sync.Mutex
+	state        resiliencecontrol.QueueState
+	stateVersion uint64
+	inFlight     atomic.Int64
+	outstanding  atomic.Int64
 }
 
 type SubmitQueueRuntimeOptions struct {
@@ -61,6 +71,8 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 			Resource:  "submit_queue",
 			Strategy:  "memory_channel",
 		},
+		state:        resiliencecontrol.QueueStateActive,
+		stateVersion: 1,
 	}
 	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus, q.setFailed)
 	q.workerPool.Start()
@@ -93,7 +105,9 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 	default:
 	}
 
-	admission, cleaned := q.admit(job)
+	q.lifecycleMu.Lock()
+	admission, cleaned := q.admit(job, q.state != "" && q.state != resiliencecontrol.QueueStateActive)
+	q.lifecycleMu.Unlock()
 	q.observeCleaned(ctx, cleaned)
 	switch admission {
 	case submitQueueAdmissionAccepted:
@@ -118,6 +132,9 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 		q.observe(ctx, resilienceplane.OutcomeQueueFull)
 		q.observeQueueDepth()
 		return ErrQueueFull
+	case submitQueueAdmissionClosed:
+		q.observe(ctx, resilienceplane.OutcomeQueueAdmissionClosed)
+		return ErrQueueDraining
 	}
 
 	return nil
@@ -130,9 +147,10 @@ const (
 	submitQueueAdmissionDuplicate
 	submitQueueAdmissionRejected
 	submitQueueAdmissionFull
+	submitQueueAdmissionClosed
 )
 
-func (q *SubmitQueue) admit(job submitJob) (submitQueueAdmission, int) {
+func (q *SubmitQueue) admit(job submitJob, admissionClosed bool) (submitQueueAdmission, int) {
 	if q == nil || q.statuses == nil {
 		return submitQueueAdmissionRejected, 0
 	}
@@ -152,16 +170,21 @@ func (q *SubmitQueue) admit(job submitJob) (submitQueueAdmission, int) {
 			}
 		}
 	}
+	if admissionClosed {
+		return submitQueueAdmissionClosed, cleaned
+	}
 
 	queued := SubmitStatusResponse{Status: SubmitStatusQueued, UpdatedAt: time.Now().Unix()}
 	if exists {
 		queued.AssessmentID = previous.Response.AssessmentID
 	}
 	store.statuses[job.requestID] = submitQueueStatusEntry{Response: queued}
+	q.outstanding.Add(1)
 	select {
 	case q.jobs <- job:
 		return submitQueueAdmissionAccepted, cleaned
 	default:
+		q.outstanding.Add(-1)
 		if exists {
 			store.statuses[job.requestID] = previous
 		} else {
@@ -193,9 +216,17 @@ func (q *SubmitQueue) StatusSnapshot(now time.Time) resilienceplane.QueueSnapsho
 			Component:         "collection-server",
 			Name:              "answersheet_submit",
 			Strategy:          "memory_channel",
-			LifecycleBoundary: "process_memory_no_drain",
+			LifecycleBoundary: "process_memory_drainable",
+			State:             string(resiliencecontrol.QueueStateActive),
 		}
 	}
+	q.lifecycleMu.Lock()
+	state := q.state
+	stateVersion := q.stateVersion
+	if state == "" {
+		state = resiliencecontrol.QueueStateActive
+	}
+	q.lifecycleMu.Unlock()
 	counts, cleaned := q.statuses.Snapshot(now)
 	q.observeCleaned(context.Background(), cleaned)
 	snapshot := resilienceplane.QueueSnapshot{
@@ -207,7 +238,11 @@ func (q *SubmitQueue) StatusSnapshot(now time.Time) resilienceplane.QueueSnapsho
 		Capacity:          cap(q.jobs),
 		StatusTTLSeconds:  int64(q.statuses.statusTTL.Seconds()),
 		StatusCounts:      counts,
-		LifecycleBoundary: "process_memory_no_drain",
+		LifecycleBoundary: "process_memory_drainable",
+		State:             string(state),
+		StateVersion:      stateVersion,
+		InFlight:          int(q.inFlight.Load()),
+		AdmissionClosed:   state != resiliencecontrol.QueueStateActive,
 	}
 	q.observeQueueSnapshot(snapshot)
 	return snapshot
@@ -225,6 +260,12 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 		return
 	}
 	cleaned := q.statuses.SetStatus(requestID, status, answerSheetID, false)
+	if status == SubmitStatusProcessing {
+		q.inFlight.Add(1)
+	} else if status == SubmitStatusDone {
+		q.inFlight.Add(-1)
+		q.outstanding.Add(-1)
+	}
 	q.observeCleaned(context.Background(), cleaned)
 	q.observeQueueDepth()
 	q.observeQueueStatusCounts()
@@ -245,11 +286,96 @@ func (q *SubmitQueue) setFailed(requestID string, err error) {
 	}
 	retryable := errors.Is(err, locklease.ErrLeaseLost) || errors.Is(err, locklease.ErrLeaseRenewFailed)
 	cleaned := q.statuses.SetStatus(requestID, SubmitStatusFailed, "", retryable)
+	q.inFlight.Add(-1)
+	q.outstanding.Add(-1)
 	q.observeCleaned(context.Background(), cleaned)
 	q.observeQueueDepth()
 	q.observeQueueStatusCounts()
 	q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
 }
+
+// Drain closes admission and waits until queued and processing work reaches zero.
+// A timeout intentionally leaves the queue in draining state.
+func (q *SubmitQueue) Drain(ctx context.Context, opts resiliencecontrol.DrainOptions) (resiliencecontrol.DrainResult, error) {
+	if q == nil {
+		return resiliencecontrol.DrainResult{}, errors.New("submit queue disabled")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	q.lifecycleMu.Lock()
+	if q.state == "" || q.state == resiliencecontrol.QueueStateActive {
+		q.state = resiliencecontrol.QueueStateDraining
+		q.stateVersion++
+	}
+	q.lifecycleMu.Unlock()
+
+	waitCtx := ctx
+	var cancel context.CancelFunc
+	if opts.Timeout > 0 {
+		waitCtx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+	}
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if result, done := q.finishDrainIfEmpty(); done {
+			return result, nil
+		}
+		select {
+		case <-waitCtx.Done():
+			return q.drainResult(), waitCtx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+// Resume reopens admission only after a completed drain.
+func (q *SubmitQueue) Resume(_ context.Context) error {
+	if q == nil {
+		return errors.New("submit queue disabled")
+	}
+	q.lifecycleMu.Lock()
+	defer q.lifecycleMu.Unlock()
+	if q.state != resiliencecontrol.QueueStatePaused || q.outstanding.Load() != 0 {
+		return resiliencecontrol.ErrInvalidState
+	}
+	q.state = resiliencecontrol.QueueStateActive
+	q.stateVersion++
+	return nil
+}
+
+func (q *SubmitQueue) finishDrainIfEmpty() (resiliencecontrol.DrainResult, bool) {
+	q.lifecycleMu.Lock()
+	defer q.lifecycleMu.Unlock()
+	if q.state == resiliencecontrol.QueueStatePaused {
+		return q.drainResultLocked(), true
+	}
+	if q.outstanding.Load() != 0 {
+		return q.drainResultLocked(), false
+	}
+	q.state = resiliencecontrol.QueueStatePaused
+	q.stateVersion++
+	return q.drainResultLocked(), true
+}
+
+func (q *SubmitQueue) drainResult() resiliencecontrol.DrainResult {
+	q.lifecycleMu.Lock()
+	defer q.lifecycleMu.Unlock()
+	return q.drainResultLocked()
+}
+
+func (q *SubmitQueue) drainResultLocked() resiliencecontrol.DrainResult {
+	return resiliencecontrol.DrainResult{
+		State:      q.state,
+		Version:    q.stateVersion,
+		Depth:      len(q.jobs),
+		InFlight:   int(q.inFlight.Load()),
+		FinishedAt: time.Now(),
+	}
+}
+
+var _ resiliencecontrol.QueueController = (*SubmitQueue)(nil)
 
 func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {
 	if q == nil || requestID == "" || assessmentID == "" {

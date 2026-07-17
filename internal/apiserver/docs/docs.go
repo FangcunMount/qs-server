@@ -8925,7 +8925,7 @@ const docTemplate = `{
         },
         "/internal/v1/system-governance/actions/{action_id}/runs": {
             "post": {
-                "description": "执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅 qs:admin 可访问",
+                "description": "执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id 安全重试；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -14777,6 +14777,9 @@ const docTemplate = `{
                 "input": {
                     "type": "object",
                     "additionalProperties": true
+                },
+                "request_id": {
+                    "type": "string"
                 }
             }
         },
@@ -14795,6 +14798,9 @@ const docTemplate = `{
                 "result": {
                     "type": "object",
                     "additionalProperties": true
+                },
+                "request_id": {
+                    "type": "string"
                 },
                 "started_at": {
                     "type": "string"

@@ -420,6 +420,12 @@ backpressure:
 # -------------------------------------------------------
 # Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
 system_governance:
+  # 高风险韧性动作默认关闭，开发环境按动作显式启用。
+  resilience:
+    tune_rate_limit: false
+    drain_queue: false
+    resume_queue: false
+    release_lock: false
   prometheus:
     # infra/components/prometheus 在 infra-network 内提供 Prometheus Query API。
     # 本机直跑 apiserver 时，如无法解析 prometheus，请在本地配置中覆盖为可达地址。

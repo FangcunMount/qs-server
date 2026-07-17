@@ -89,6 +89,8 @@ func (p *submitQueueWorkerPool) worker() {
 				"assessment_id", resp.AssessmentID,
 				"result", "success",
 			)
+			continue
 		}
+		p.writeStatus(job.requestID, SubmitStatusDone, "")
 	}
 }

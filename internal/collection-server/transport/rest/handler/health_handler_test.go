@@ -58,6 +58,17 @@ func TestHealthHandlerReadyReturnsServiceUnavailableWhenRedisDegraded(t *testing
 	}
 }
 
+func TestHealthHandlerReadyWaitsForInitialResilienceControlSync(t *testing.T) {
+	handler := NewHealthHandlerWithResilience("collection-server", "2.0.0", nil, nil, func() bool { return false })
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	handler.Ready(c)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 before initial control sync", recorder.Code)
+	}
+}
+
 func TestHealthHandlerRedisFamiliesReturnsSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	registry := observability.NewFamilyStatusRegistry("collection-server")

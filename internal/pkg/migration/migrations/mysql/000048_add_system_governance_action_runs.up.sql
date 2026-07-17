@@ -1,0 +1,20 @@
+CREATE TABLE `system_governance_action_runs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `request_id` VARCHAR(64) NOT NULL,
+  `action_id` VARCHAR(128) NOT NULL,
+  `org_id` BIGINT NOT NULL,
+  `actor_user_id` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `component` VARCHAR(64) NOT NULL DEFAULT '',
+  `target_instance` VARCHAR(255) NOT NULL DEFAULT '',
+  `input_json` JSON NOT NULL,
+  `status` VARCHAR(32) NOT NULL,
+  `result_json` JSON NULL,
+  `started_at` DATETIME(3) NOT NULL,
+  `finished_at` DATETIME(3) NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_system_governance_action_runs_org_request` (`org_id`, `request_id`),
+  KEY `idx_system_governance_action_runs_action_started` (`action_id`, `started_at`),
+  KEY `idx_system_governance_action_runs_component_started` (`component`, `started_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

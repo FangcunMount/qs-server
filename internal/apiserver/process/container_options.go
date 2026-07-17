@@ -11,6 +11,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
@@ -18,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	cacheplanebootstrap "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
 )
 
 type containerOptionsInput struct {
@@ -50,12 +53,29 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 			locklease.WorkloadBehaviorJourneyScanLeader:      s.config.BehaviorJourneyScan != nil && s.config.BehaviorJourneyScan.Enable,
 		},
 	})
+	var stateStore *controlredis.Store
+	if input.redisRuntime != nil {
+		if ops := input.redisRuntime.Handle(redisruntime.FamilyOps); ops != nil {
+			stateStore = controlredis.NewStore(ops.Client, ops.Builder)
+		}
+	}
+	resilience := resiliencesubsystem.New(resiliencesubsystem.Options{
+		RateLimit: s.config.RateLimit,
+		Backpressure: map[string]backpressure.Acquirer{
+			"mysql": input.backpressure.MySQL,
+			"mongo": input.backpressure.Mongo,
+			"iam":   input.backpressure.IAM,
+		},
+		Locks:      locks,
+		StateStore: stateStore,
+	})
 	return container.ContainerOptions{
 		EventSubsystem:             input.eventSubsystem,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		LockSubsystem:              locks,
 		Backpressure:               input.backpressure,
+		Resilience:                 resilience,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,

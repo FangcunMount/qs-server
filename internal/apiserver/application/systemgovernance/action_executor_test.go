@@ -2,6 +2,7 @@ package systemgovernance
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,6 +48,58 @@ func TestActionExecutorRejectsPlannedAction(t *testing.T) {
 	if err == nil {
 		t.Fatal("Run() error = nil, want disabled action error")
 	}
+}
+
+func TestActionExecutorRequestIDIsClaimedAndReplayedFromAudit(t *testing.T) {
+	governance := &fakeStatisticsGovernance{}
+	audit := &memoryActionAudit{results: map[string]*ActionRunResult{}}
+	executor := NewActionExecutorWithResilience(NewActionRegistry(), governance, nil, nil, audit)
+	req := ActionRunRequest{
+		RequestID: "governance-request-1", Confirm: true,
+		Input: map[string]interface{}{"targets": []interface{}{map[string]interface{}{"kind": "static.scale", "scope": "scale:S-001"}}},
+	}
+	first, err := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+	if err != nil {
+		t.Fatalf("first Run() error = %v", err)
+	}
+	second, err := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+	if err != nil {
+		t.Fatalf("second Run() error = %v", err)
+	}
+	if audit.claims != 2 || audit.completes != 1 || first.RequestID != req.RequestID || second.RequestID != req.RequestID {
+		t.Fatalf("claims=%d completes=%d first=%+v second=%+v", audit.claims, audit.completes, first, second)
+	}
+}
+
+type memoryActionAudit struct {
+	mu        sync.Mutex
+	claims    int
+	completes int
+	running   bool
+	results   map[string]*ActionRunResult
+}
+
+func (a *memoryActionAudit) Claim(_ context.Context, record ActionAuditRecord) (*ActionRunResult, bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.claims++
+	if result := a.results[record.RequestID]; result != nil {
+		return result, false, nil
+	}
+	if a.running {
+		return nil, false, nil
+	}
+	a.running = true
+	return nil, true, nil
+}
+
+func (a *memoryActionAudit) Complete(_ context.Context, record ActionAuditRecord) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.completes++
+	a.running = false
+	a.results[record.RequestID] = record.Result
+	return nil
 }
 
 type fakeStatisticsGovernance struct {

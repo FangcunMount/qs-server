@@ -184,3 +184,27 @@ func (k OpsKeyspace) IdempotencyInflight(key string) string {
 func (k OpsKeyspace) IdempotencyDone(key string) string {
 	return k.keyspace.Prefix("submit:idempotency:" + key + ":done")
 }
+
+func (k OpsKeyspace) ResilienceState(name string) string {
+	return k.keyspace.Prefix("resilience:state:" + name)
+}
+
+func (k OpsKeyspace) ResilienceSignal() string {
+	return k.keyspace.Prefix("resilience:signal")
+}
+
+func (k OpsKeyspace) ResilienceInstance(component, instanceID string) string {
+	return k.keyspace.Prefix("resilience:instance:" + component + ":" + instanceID)
+}
+
+func (k OpsKeyspace) ResilienceClaim(requestID, instanceID string) string {
+	return k.keyspace.Prefix("resilience:claim:" + requestID + ":" + instanceID)
+}
+
+func (k OpsKeyspace) ResilienceCommand(component, requestID string) string {
+	return k.keyspace.Prefix("resilience:command:" + component + ":" + requestID)
+}
+
+func (k OpsKeyspace) ResilienceCommandResult(requestID, instanceID string) string {
+	return k.keyspace.Prefix("resilience:result:" + requestID + ":" + instanceID)
+}

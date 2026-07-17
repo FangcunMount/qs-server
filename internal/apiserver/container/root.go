@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"fmt"
 
 	redis "github.com/redis/go-redis/v9"
@@ -14,6 +15,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 
@@ -35,6 +37,8 @@ type Container struct {
 	cache                      *cachebootstrap.Subsystem
 	locks                      *locksubsystem.Subsystem
 	backpressure               BackpressureOptions
+	resilience                 *resiliencesubsystem.Subsystem
+	resilienceCancel           context.CancelFunc
 	planEntryURL               string
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
@@ -87,6 +91,7 @@ func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.Un
 		mongoDB:      mongoDB,
 		redisCache:   redisCache,
 		cacheOptions: ContainerCacheOptions{},
+		resilience:   resiliencesubsystem.New(resiliencesubsystem.Options{}),
 		initialized:  false,
 		modules:      make(map[string]Module),
 	}
@@ -126,6 +131,9 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.cache = opts.CacheSubsystem
 	c.locks = opts.LockSubsystem
 	c.backpressure = opts.Backpressure
+	if opts.Resilience != nil {
+		c.resilience = opts.Resilience
+	}
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
@@ -193,6 +201,9 @@ func (c *Container) Initialize() error {
 
 	// 初始化 CodesService 与小程序码基础设施
 	c.initPlatformModule()
+	if c.resilience != nil {
+		c.resilienceCancel = c.resilience.Start(context.Background())
+	}
 
 	c.initialized = true
 	c.printf("🏗️  Container initialized successfully\n")

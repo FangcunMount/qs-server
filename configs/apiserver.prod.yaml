@@ -427,6 +427,12 @@ backpressure:
 # ----------------------------------------------------------------------------
 # Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
 system_governance:
+  # 生产默认关闭；上线时按动态限流、队列、Leader 让权顺序逐项启用。
+  resilience:
+    tune_rate_limit: false
+    drain_queue: false
+    resume_queue: false
+    release_lock: false
   prometheus:
     # infra/components/prometheus 与 qs-apiserver 同在 infra-network，Query API 使用服务名访问。
     enabled: true

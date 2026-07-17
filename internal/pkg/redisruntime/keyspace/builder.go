@@ -148,6 +148,30 @@ func (b *Builder) BuildWeChatCacheKey(key string) string {
 	return NewCacheKeyspace(b.namespace()).WeChatSDK(key)
 }
 
+func (b *Builder) BuildResilienceStateKey(name string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceState(name)
+}
+
+func (b *Builder) BuildResilienceSignalChannel() string {
+	return NewOpsKeyspace(b.namespace()).ResilienceSignal()
+}
+
+func (b *Builder) BuildResilienceInstanceKey(component, instanceID string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceInstance(component, instanceID)
+}
+
+func (b *Builder) BuildResilienceClaimKey(requestID, instanceID string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceClaim(requestID, instanceID)
+}
+
+func (b *Builder) BuildResilienceCommandKey(component, requestID string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceCommand(component, requestID)
+}
+
+func (b *Builder) BuildResilienceCommandResultKey(requestID, instanceID string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceCommandResult(requestID, instanceID)
+}
+
 // func (b *Builder) prefix(key string) string {
 // 	if b == nil {
 // 		return AddNamespace(key)

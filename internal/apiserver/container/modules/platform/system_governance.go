@@ -1,16 +1,16 @@
 package platform
 
 import (
-	"time"
-
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
+	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"gorm.io/gorm"
 )
@@ -24,6 +24,7 @@ type RESTSystemGovernanceInput struct {
 	CachePolicyReloader     systemgov.CachePolicyReloader
 	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
 	MySQLDB                 *gorm.DB
+	ResilienceGovernor      resiliencecontrol.Governor
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -34,7 +35,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		metrics = govprom.NewAdapter(in.Options.Prometheus)
 		components = govcomponent.NewAdapter(in.Options.Components)
 	}
-	registry := systemgov.NewActionRegistry()
+	registry := systemgov.NewActionRegistry(resilienceActionFlags(in.Options))
 	return systemgov.NewFacade(systemgov.FacadeDeps{
 		EventStatusService:      in.EventStatusService,
 		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
@@ -44,8 +45,21 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		CheckpointReader:        NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
 		Metrics:                 metrics,
 		Components:              components,
-		Actions:                 systemgov.NewActionExecutor(registry, in.CacheGovernance, in.CachePolicyReloader),
+		Registry:                registry,
+		Actions:                 systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, governanceinfra.NewActionAuditStore(in.MySQLDB)),
 	})
+}
+
+func resilienceActionFlags(opts *options.SystemGovernanceOptions) map[string]bool {
+	flags := map[string]bool{}
+	if opts == nil || opts.Resilience == nil {
+		return flags
+	}
+	flags["resilience.tune_rate_limit"] = opts.Resilience.TuneRateLimit
+	flags["resilience.drain_queue"] = opts.Resilience.DrainQueue
+	flags["resilience.resume_queue"] = opts.Resilience.ResumeQueue
+	flags["resilience.release_lock"] = opts.Resilience.ReleaseLock
+	return flags
 }
 
 func buildEventTypeSources(outboxes []appEventing.NamedOutboxStatusReader) []systemgov.EventTypeStatusSource {
@@ -68,18 +82,4 @@ func buildEventTypeSources(outboxes []appEventing.NamedOutboxStatusReader) []sys
 		})
 	}
 	return sources
-}
-
-// BuildLocalResilienceSnapshot mirrors the apiserver /resilience/status assembly.
-func BuildLocalResilienceSnapshot(component string, rateEnabled bool, backpressure []resilienceplane.BackpressureSnapshot, locks []resilienceplane.CapabilitySnapshot) func() resilienceplane.RuntimeSnapshot {
-	return func() resilienceplane.RuntimeSnapshot {
-		snapshot := resilienceplane.NewRuntimeSnapshot(component, time.Now())
-		snapshot.RateLimits = []resilienceplane.CapabilitySnapshot{
-			{Name: "rest_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: "local", Configured: rateEnabled},
-			{Name: "rest_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: "local_key", Configured: rateEnabled},
-		}
-		snapshot.Backpressure = append(snapshot.Backpressure, backpressure...)
-		snapshot.Locks = append(snapshot.Locks, locks...)
-		return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
-	}
 }

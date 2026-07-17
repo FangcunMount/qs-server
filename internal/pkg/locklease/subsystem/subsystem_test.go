@@ -416,6 +416,91 @@ func TestRunRenewalDisabledKeepsFixedTTLBehavior(t *testing.T) {
 	}
 }
 
+func TestRelinquishLeaderCancelsBodyBeforeTokenSafeRelease(t *testing.T) {
+	manager := &managerStub{
+		lease:    &locklease.Lease{Key: "lock", Token: "token"},
+		acquired: true,
+	}
+	s := New(Options{Component: "apiserver", Manager: manager, RenewalEnabled: false})
+	bodyStarted := make(chan struct{})
+	runFinished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(context.Background(), locklease.WorkloadPlanSchedulerLeader, "leader", time.Minute, func(ctx context.Context) error {
+			close(bodyStarted)
+			<-ctx.Done()
+			return context.Cause(ctx)
+		})
+		runFinished <- err
+	}()
+	<-bodyStarted
+
+	result, err := s.RelinquishLeader(context.Background(), locklease.WorkloadPlanSchedulerLeader, locklease.RelinquishOptions{
+		Cooldown: time.Minute,
+		Timeout:  time.Second,
+	})
+	if err != nil || result.ActiveCount != 1 || result.Relinquished != 1 {
+		t.Fatalf("RelinquishLeader() = %+v, %v", result, err)
+	}
+	if err := <-runFinished; !errors.Is(err, locklease.ErrLeaseRelinquished) {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if manager.releaseCalls != 1 {
+		t.Fatalf("release calls = %d, want 1", manager.releaseCalls)
+	}
+	second, err := s.Run(context.Background(), locklease.WorkloadPlanSchedulerLeader, "leader", time.Minute, func(context.Context) error {
+		t.Fatal("body must not run during cooldown")
+		return nil
+	})
+	if err != nil || second.Acquired {
+		t.Fatalf("Run() during cooldown = %+v, %v", second, err)
+	}
+}
+
+func TestRelinquishLeaderTimeoutDoesNotReleaseUnstoppedBody(t *testing.T) {
+	manager := &managerStub{
+		lease:    &locklease.Lease{Key: "lock", Token: "token"},
+		acquired: true,
+	}
+	s := New(Options{Component: "apiserver", Manager: manager})
+	bodyStarted := make(chan struct{})
+	allowReturn := make(chan struct{})
+	runFinished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(context.Background(), locklease.WorkloadPlanSchedulerLeader, "leader", time.Minute, func(context.Context) error {
+			close(bodyStarted)
+			<-allowReturn
+			return nil
+		})
+		runFinished <- err
+	}()
+	<-bodyStarted
+	result, err := s.RelinquishLeader(context.Background(), locklease.WorkloadPlanSchedulerLeader, locklease.RelinquishOptions{Timeout: 20 * time.Millisecond})
+	if !errors.Is(err, context.DeadlineExceeded) || result.Relinquished != 0 {
+		t.Fatalf("RelinquishLeader() = %+v, %v", result, err)
+	}
+	if manager.releaseCalls != 0 {
+		t.Fatalf("release calls before body exit = %d", manager.releaseCalls)
+	}
+	close(allowReturn)
+	if err := <-runFinished; err != nil {
+		t.Fatal(err)
+	}
+	if manager.releaseCalls != 1 {
+		t.Fatalf("release calls after body exit = %d", manager.releaseCalls)
+	}
+}
+
+func TestRelinquishLeaderRejectsNonLeaderKinds(t *testing.T) {
+	s := New(Options{Component: "apiserver", Manager: &managerStub{}})
+	if _, err := s.RelinquishLeader(context.Background(), locklease.WorkloadStatisticsSync, locklease.RelinquishOptions{}); err == nil {
+		t.Fatal("expected task lock relinquish rejection")
+	}
+	worker := New(Options{Component: "worker", Manager: &managerStub{}})
+	if _, err := worker.RelinquishLeader(context.Background(), locklease.WorkloadAnswersheetProcessing, locklease.RelinquishOptions{}); err == nil {
+		t.Fatal("expected duplicate suppression relinquish rejection")
+	}
+}
+
 func TestSnapshotsDeriveCatalogBindingsAndFamilyHealth(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})

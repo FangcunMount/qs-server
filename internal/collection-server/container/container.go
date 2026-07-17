@@ -23,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/collection-server/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
@@ -33,6 +34,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -42,6 +44,7 @@ type Container struct {
 	opts         *options.Options
 	opsHandle    *redisruntime.Handle
 	locks        *locksubsystem.Subsystem
+	resilience   *resiliencesubsystem.Subsystem
 	familyStatus *observability.FamilyStatusRegistry
 
 	// IAM 模块
@@ -70,6 +73,7 @@ type Container struct {
 	reportStatusReporter               *reportstatus.Reporter
 	reportNotifier                     reportnotify.Notifier
 	waitWatcherCancel                  context.CancelFunc
+	resilienceCancel                   context.CancelFunc
 	reportEventsHandler                *ws.ReportEventsHandler
 	cacheSubsystem                     *collectioncache.Subsystem
 	l1PeekRegistry                     *catalogpeek.Registry
@@ -113,6 +117,20 @@ func (c *Container) TesteeService() *testee.Service {
 
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, familyStatus *observability.FamilyStatusRegistry) *Container {
+	var backend ratelimit.Backend
+	if opsHandle != nil && opsHandle.Client != nil {
+		backend = ratelimitredis.NewBackend(opsHandle.Client, opsHandle.Builder)
+	}
+	var stateStore *controlredis.Store
+	if opsHandle != nil {
+		stateStore = controlredis.NewStore(opsHandle.Client, opsHandle.Builder)
+	}
+	var rateCfg *options.RateLimitOptions
+	var concurrencyCfg *options.ConcurrencyOptions
+	var waitCfg *options.WaitReportOptions
+	if opts != nil {
+		rateCfg, concurrencyCfg, waitCfg = opts.RateLimit, opts.Concurrency, opts.WaitReport
+	}
 	c := &Container{
 		opts:           opts,
 		opsHandle:      opsHandle,
@@ -120,6 +138,10 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *
 		familyStatus:   familyStatus,
 		initialized:    false,
 		cacheSubsystem: collectioncache.NewSubsystem(collectionCacheConfig(opts), opsHandle),
+		resilience: resiliencesubsystem.New(resiliencesubsystem.Options{
+			RateLimit: rateCfg, Concurrency: concurrencyCfg, WaitReport: waitCfg,
+			Backend: backend, Locks: locks, OpsAvailable: opsHandle != nil && opsHandle.Client != nil, StateStore: stateStore,
+		}),
 	}
 	c.initConcurrencyGates()
 	return c
@@ -181,35 +203,13 @@ func catalogBinding(id, source string, cfg *options.CatalogL1CacheOptions) colle
 }
 
 func (c *Container) initConcurrencyGates() {
-	var concurrencyOpts *options.ConcurrencyOptions
-	if c.opts != nil {
-		concurrencyOpts = c.opts.Concurrency
+	if c == nil || c.resilience == nil {
+		return
 	}
-	maxQuery := 0
-	maxCatalog := 0
-	maxSubmit := 0
-	if concurrencyOpts != nil {
-		maxQuery = concurrencyOpts.ResolvedQueryConcurrency()
-		maxCatalog = concurrencyOpts.ResolvedCatalogConcurrency()
-		maxSubmit = concurrencyOpts.ResolvedSubmitConcurrency()
-	}
-	maxWaitReport := 0
-	degradeEnabled := true
-	if c.opts != nil && c.opts.WaitReport != nil {
-		maxWaitReport = c.opts.WaitReport.MaxHTTPConcurrency
-		degradeEnabled = c.opts.WaitReport.DegradeImmediateEnabled
-	}
-	if maxWaitReport <= 0 {
-		maxWaitReport = 400
-	}
-	c.queryConcurrencyGate = concurrency.NewGate(maxQuery)
-	c.catalogConcurrencyGate = concurrency.NewGate(maxCatalog)
-	c.submitConcurrencyGate = concurrency.NewGate(maxSubmit)
-	if degradeEnabled {
-		c.waitReportConcurrencyGate = concurrency.NewGate(maxWaitReport)
-	} else {
-		c.waitReportConcurrencyGate = c.queryConcurrencyGate
-	}
+	c.queryConcurrencyGate = c.resilience.Gate(resiliencesubsystem.GateQuery)
+	c.catalogConcurrencyGate = c.resilience.Gate(resiliencesubsystem.GateCatalog)
+	c.submitConcurrencyGate = c.resilience.Gate(resiliencesubsystem.GateSubmit)
+	c.waitReportConcurrencyGate = c.resilience.Gate(resiliencesubsystem.GateWaitReport)
 }
 
 // Initialize 初始化容器中的所有组件
@@ -222,9 +222,17 @@ func (c *Container) Initialize() error {
 
 	// 1. 初始化应用层
 	c.initApplicationServices()
+	if c.resilience != nil {
+		if err := c.resilience.Sync(context.Background()); err != nil {
+			log.Warnf("collection resilience initial control sync pending: %v", err)
+		}
+	}
 
 	// 2. 初始化接口层
 	c.initHandlers()
+	if c.resilience != nil {
+		c.resilienceCancel = c.resilience.Start(context.Background())
+	}
 
 	if c.cacheSubsystem != nil {
 		c.cacheSubsystem.BindWarmup(c.typologyModelQueryService)
@@ -249,6 +257,9 @@ func (c *Container) initApplicationServices() {
 
 	submitRuntime := c.buildSubmitRuntime(profileLinkService, c.questionnaireQueryService)
 	c.submissionService = submitRuntime.submission
+	if c.resilience != nil && c.submissionService != nil {
+		c.resilience.RegisterQueue("answersheet_submit", c.submissionService.SubmitQueueController(), c.submissionService.SubmitQueueStatusSnapshot)
+	}
 
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
@@ -294,7 +305,7 @@ func (c *Container) initHandlers() {
 	c.behaviorAssessmentHandler = handler.NewBehaviorAssessmentHandler(c.behaviorAssessmentQueryService, c.waitReportService)
 	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.typologySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
-	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
+	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot, c.resilience.ControlSynchronized)
 
 	log.Info("✅ REST handlers initialized")
 }
@@ -305,6 +316,10 @@ func (c *Container) Cleanup() {
 	if c.waitWatcherCancel != nil {
 		c.waitWatcherCancel()
 		c.waitWatcherCancel = nil
+	}
+	if c.resilienceCancel != nil {
+		c.resilienceCancel()
+		c.resilienceCancel = nil
 	}
 	if c.cacheSubsystem != nil {
 		_ = c.cacheSubsystem.Close()
@@ -396,6 +411,13 @@ func (c *Container) RateLimitBackend() ratelimit.Backend {
 	return ratelimitredis.NewBackend(c.opsHandle.Client, c.opsHandle.Builder)
 }
 
+func (c *Container) RateBudgetProvider() ratelimit.RateBudgetProvider {
+	if c == nil {
+		return nil
+	}
+	return c.resilience
+}
+
 func (c *Container) ConcurrencyOptions() *options.ConcurrencyOptions {
 	if c == nil || c.opts == nil || c.opts.Concurrency == nil {
 		return options.NewOptions().Concurrency
@@ -481,47 +503,10 @@ func (c *Container) ReportEventsOptions() *options.ReportEventsOptions {
 }
 
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
-	now := time.Now()
-	snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", now)
-	var rateCfg *options.RateLimitOptions
-	if c != nil && c.opts != nil {
-		rateCfg = c.opts.RateLimit
+	if c != nil && c.resilience != nil {
+		return c.resilience.Snapshot(time.Now())
 	}
-	strategy := "local"
-	if c != nil && c.opsHandle != nil && c.opsHandle.Client != nil {
-		strategy = "redis"
-	}
-	if rateCfg != nil {
-		snapshot.RateLimits = []resilienceplane.CapabilitySnapshot{
-			{Name: "submit_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
-			{Name: "submit_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
-			{Name: "query_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
-			{Name: "query_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
-		}
-	}
-	if c != nil && c.submissionService != nil {
-		snapshot.Queues = []resilienceplane.QueueSnapshot{c.submissionService.SubmitQueueStatusSnapshot(now)}
-	}
-	if c != nil && c.locks != nil {
-		snapshot.Locks = c.locks.Snapshots()
-	}
-	idempotencyConfigured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded && c.opsHandle != nil && c.opsHandle.Client != nil
-	snapshot.Idempotency = []resilienceplane.CapabilitySnapshot{{
-		Name:       "answersheet_submit",
-		Kind:       resilienceplane.ProtectionIdempotency.String(),
-		Strategy:   "redis_lock",
-		Configured: idempotencyConfigured,
-		Degraded:   !idempotencyConfigured,
-		Reason:     resilienceReason(idempotencyConfigured, "submit guard redis runtime unavailable"),
-	}}
-	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
-}
-
-func resilienceReason(ok bool, reason string) string {
-	if ok {
-		return ""
-	}
-	return reason
+	return resilienceplane.RuntimeSnapshot{Component: "collection-server"}
 }
 
 // InitializeRuntimeClients installs the runtime client bundle built by the

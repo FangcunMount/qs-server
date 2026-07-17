@@ -3720,6 +3720,8 @@ definitions:
       input:
         additionalProperties: true
         type: object
+      request_id:
+        type: string
     type: object
   systemgovernance.ActionRunResult:
     properties:
@@ -3732,6 +3734,8 @@ definitions:
       result:
         additionalProperties: true
         type: object
+      request_id:
+        type: string
       started_at:
         type: string
       status:
@@ -9565,8 +9569,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 执行治理动作（如 cache.manual_warmup、cache.repair_complete、cache.reload_policy）；仅
-        qs:admin 可访问
+      description: 执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id
+        安全重试；仅 qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header

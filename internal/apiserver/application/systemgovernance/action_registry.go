@@ -8,14 +8,18 @@ type ActionRegistry struct {
 }
 
 // NewActionRegistry 返回v1 action 目录。
-func NewActionRegistry() *ActionRegistry {
-	return &ActionRegistry{actions: defaultActions()}
+func NewActionRegistry(enabled ...map[string]bool) *ActionRegistry {
+	flags := map[string]bool{}
+	if len(enabled) > 0 && enabled[0] != nil {
+		flags = enabled[0]
+	}
+	return &ActionRegistry{actions: defaultActions(flags)}
 }
 
 // List 返回全部action 描述符。
 func (r *ActionRegistry) List() []ActionDescriptor {
 	if r == nil {
-		return defaultActions()
+		return defaultActions(nil)
 	}
 	out := make([]ActionDescriptor, len(r.actions))
 	copy(out, r.actions)
@@ -32,7 +36,7 @@ func (r *ActionRegistry) Get(actionID string) (ActionDescriptor, bool) {
 	return ActionDescriptor{}, false
 }
 
-func defaultActions() []ActionDescriptor {
+func defaultActions(enabled map[string]bool) []ActionDescriptor {
 	return []ActionDescriptor{
 		{
 			ID:                   "cache.reload_policy",
@@ -103,30 +107,34 @@ func defaultActions() []ActionDescriptor {
 			Planned:   true,
 		},
 		{
-			ID:        "resilience.drain_queue",
-			Domain:    DomainResilience,
-			Label:     "Drain in-memory queue",
-			RiskLevel: "high",
-			Enabled:   false,
-			Planned:   true,
+			ID: "resilience.drain_queue", Domain: DomainResilience, Label: "Drain in-memory queue", RiskLevel: "high",
+			Enabled: enabled["resilience.drain_queue"], Planned: !enabled["resilience.drain_queue"], RequiresConfirmation: true,
+			InputSchema: queueActionSchema(),
 		},
 		{
-			ID:        "resilience.release_lock",
-			Domain:    DomainResilience,
-			Label:     "Release distributed lock",
-			RiskLevel: "high",
-			Enabled:   false,
-			Planned:   true,
+			ID: "resilience.resume_queue", Domain: DomainResilience, Label: "Resume drained queue", RiskLevel: "high",
+			Enabled: enabled["resilience.resume_queue"], Planned: !enabled["resilience.resume_queue"], RequiresConfirmation: true,
+			InputSchema: queueActionSchema(),
 		},
 		{
-			ID:        "resilience.tune_rate_limit",
-			Domain:    DomainResilience,
-			Label:     "Tune rate limit parameters",
-			RiskLevel: "medium",
-			Enabled:   false,
-			Planned:   true,
+			ID: "resilience.release_lock", Domain: DomainResilience, Label: "Relinquish leader lease", RiskLevel: "high",
+			Enabled: enabled["resilience.release_lock"], Planned: !enabled["resilience.release_lock"], RequiresConfirmation: true,
+			InputSchema: map[string]interface{}{"type": "object", "required": []string{"component", "instance_id", "workload"}},
+		},
+		{
+			ID: "resilience.tune_rate_limit", Domain: DomainResilience, Label: "Tune rate limit parameters", RiskLevel: "medium",
+			Enabled: enabled["resilience.tune_rate_limit"], Planned: !enabled["resilience.tune_rate_limit"], RequiresConfirmation: true,
+			InputSchema: map[string]interface{}{"type": "object", "required": []string{"mode", "component", "budget", "expected_version"}},
 		},
 	}
+}
+
+func queueActionSchema() map[string]interface{} {
+	return map[string]interface{}{"type": "object", "required": []string{"component", "queue"}, "properties": map[string]interface{}{
+		"component": map[string]interface{}{"type": "string", "enum": []string{"collection-server"}},
+		"queue":     map[string]interface{}{"type": "string", "enum": []string{"answersheet_submit"}},
+		"target":    map[string]interface{}{"type": "string"}, "timeout_seconds": map[string]interface{}{"type": "integer", "minimum": 1},
+	}}
 }
 
 func warmupKindEnum() []string {

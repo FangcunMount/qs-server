@@ -75,6 +75,14 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	}
 
 	if err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req); err != nil {
+		if errors.Is(err, answersheet.ErrQueueDraining) {
+			ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
+			c.JSON(http.StatusServiceUnavailable, core.ErrResponse{
+				Code:    http.StatusServiceUnavailable,
+				Message: "submit queue draining",
+			})
+			return
+		}
 		if errors.Is(err, answersheet.ErrQueueFull) {
 			ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
 			c.JSON(http.StatusTooManyRequests, core.ErrResponse{

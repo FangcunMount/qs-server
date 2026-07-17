@@ -1,6 +1,8 @@
 package container
 
 import (
+	"time"
+
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
@@ -49,8 +51,9 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.GovernanceStatusService = platformDeps.GovernanceStatusService
 	deps.EventStatusService = platformDeps.EventStatusService
 	deps.Backpressure = platformDeps.Backpressure
-	if c.locks != nil {
-		deps.Locks = c.locks.Snapshots()
+	deps.RateBudgets = c.resilience
+	if c.resilience != nil {
+		deps.ResilienceSnapshot = func() resilienceplane.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
 	}
 	deps.IAM = platformDeps.IAM
 
@@ -101,12 +104,12 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Statistics = c.StatisticsModule.ExportRESTDeps(testeeAccess)
 	}
 
-	deps.SystemGovernanceFacade = c.buildRESTSystemGovernanceFacade(rateCfg, deps.Statistics)
+	deps.SystemGovernanceFacade = c.buildRESTSystemGovernanceFacade(deps.Statistics)
 
 	return deps
 }
 
-func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOptions, statisticsDeps resttransport.StatisticsDeps) systemgovApp.Facade {
+func (c *Container) buildRESTSystemGovernanceFacade(statisticsDeps resttransport.StatisticsDeps) systemgovApp.Facade {
 	if c == nil {
 		return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{})
 	}
@@ -121,19 +124,22 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 		statisticsDeps.CacheGovernanceStatusService,
 	)
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
-		Options:             c.systemGovernanceOptions,
-		EventStatusService:  eventStatus,
-		EventOutboxes:       outboxes,
-		CacheGovernance:     cacheGovernance,
-		CachePolicyReloader: c.CachePolicyReloader(),
-		MySQLDB:             c.mysqlDB,
-		LocalResilienceSnapshot: platformmod.BuildLocalResilienceSnapshot(
-			"apiserver",
-			rateCfg != nil && rateCfg.Enabled,
-			c.buildBackpressureSnapshots(),
-			c.locks.Snapshots(),
-		),
+		Options:                 c.systemGovernanceOptions,
+		EventStatusService:      eventStatus,
+		EventOutboxes:           outboxes,
+		CacheGovernance:         cacheGovernance,
+		CachePolicyReloader:     c.CachePolicyReloader(),
+		MySQLDB:                 c.mysqlDB,
+		ResilienceGovernor:      c.resilience,
+		LocalResilienceSnapshot: c.localResilienceSnapshot(),
 	})
+}
+
+func (c *Container) localResilienceSnapshot() func() resilienceplane.RuntimeSnapshot {
+	if c != nil && c.resilience != nil {
+		return func() resilienceplane.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
+	}
+	return func() resilienceplane.RuntimeSnapshot { return resilienceplane.RuntimeSnapshot{Component: "apiserver"} }
 }
 
 func (c *Container) buildRESTEventStatusService() appEventing.StatusService {

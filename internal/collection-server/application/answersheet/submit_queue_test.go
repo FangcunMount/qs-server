@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resiliencecontrol"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -409,13 +410,78 @@ func TestSubmitQueueReportsOutcomes(t *testing.T) {
 	}
 }
 
-func TestSubmitQueueHasNoLifecycleControlSurface(t *testing.T) {
+func TestSubmitQueueHasNoShutdownControlSurface(t *testing.T) {
 	queueType := reflect.TypeOf(&SubmitQueue{})
-	for _, method := range []string{"Stop", "Drain", "Close"} {
+	for _, method := range []string{"Stop", "Close"} {
 		if _, ok := queueType.MethodByName(method); ok {
-			t.Fatalf("SubmitQueue exposes %s; lifecycle drain/shutdown is intentionally not supported", method)
+			t.Fatalf("SubmitQueue exposes %s; process shutdown remains externally owned", method)
 		}
 	}
+}
+
+func TestSubmitQueueDrainClosesAdmissionAndWaitsForWork(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	q := NewSubmitQueue(1, 2, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		close(started)
+		<-release
+		return &SubmitAnswerSheetResponse{ID: "answer-1"}, nil
+	})
+	if err := q.Enqueue(context.Background(), "existing", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	drained := make(chan resiliencecontrol.DrainResult, 1)
+	go func() {
+		result, _ := q.Drain(context.Background(), resiliencecontrol.DrainOptions{Timeout: time.Second})
+		drained <- result
+	}()
+	deadline := time.Now().Add(time.Second)
+	for !q.StatusSnapshot(time.Now()).AdmissionClosed && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if err := q.Enqueue(context.Background(), "new", 1, &SubmitAnswerSheetRequest{}); !errors.Is(err, ErrQueueDraining) {
+		t.Fatalf("new Enqueue() error = %v", err)
+	}
+	if err := q.Enqueue(context.Background(), "existing", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("duplicate Enqueue() error = %v", err)
+	}
+	close(release)
+	result := <-drained
+	if result.State != resiliencecontrol.QueueStatePaused || result.Depth != 0 || result.InFlight != 0 {
+		t.Fatalf("Drain() = %+v", result)
+	}
+	if err := q.Resume(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(resiliencecontrol.QueueStateActive) || snapshot.AdmissionClosed {
+		t.Fatalf("snapshot after Resume() = %+v", snapshot)
+	}
+}
+
+func TestSubmitQueueDrainTimeoutKeepsAdmissionClosed(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	q := NewSubmitQueue(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		close(started)
+		<-release
+		return &SubmitAnswerSheetResponse{ID: "answer-1"}, nil
+	})
+	if err := q.Enqueue(context.Background(), "existing", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	_, err := q.Drain(context.Background(), resiliencecontrol.DrainOptions{Timeout: 20 * time.Millisecond})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Drain() error = %v", err)
+	}
+	if snapshot := q.StatusSnapshot(time.Now()); snapshot.State != string(resiliencecontrol.QueueStateDraining) || !snapshot.AdmissionClosed {
+		t.Fatalf("snapshot after timeout = %+v", snapshot)
+	}
+	if err := q.Resume(context.Background()); !errors.Is(err, resiliencecontrol.ErrInvalidState) {
+		t.Fatalf("Resume() error = %v", err)
+	}
+	close(release)
 }
 
 type submitQueueRecordingObserver struct {

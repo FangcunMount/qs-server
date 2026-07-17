@@ -108,7 +108,7 @@ func TestRouterGovernanceEndpointsRemainPublicWhenGovernanceServiceUnavailable(t
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := resttransport.NewRouter((&container.Container{}).BuildRESTDeps(nil))
+	router := resttransport.NewRouter(container.NewContainer(nil, nil, nil).BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
 	for _, path := range []string{"/readyz", "/governance/redis"} {

@@ -18,6 +18,8 @@ func (f StatusServiceFunc) GetStatus(ctx context.Context) (*RuntimeSnapshot, err
 type RuntimeSnapshot struct {
 	GeneratedAt          time.Time              `json:"generated_at"`
 	Component            string                 `json:"component"`
+	InstanceID           string                 `json:"instance_id,omitempty"`
+	Generation           string                 `json:"generation,omitempty"`
 	Summary              RuntimeSummary         `json:"summary"`
 	RateLimits           []CapabilitySnapshot   `json:"rate_limits,omitempty"`
 	Queues               []QueueSnapshot        `json:"queues,omitempty"`
@@ -34,15 +36,21 @@ type RuntimeSummary struct {
 }
 
 type CapabilitySnapshot struct {
-	Name              string `json:"name"`
-	Kind              string `json:"kind"`
-	Strategy          string `json:"strategy"`
-	Configured        bool   `json:"configured"`
-	Degraded          bool   `json:"degraded"`
-	Reason            string `json:"reason,omitempty"`
-	TTLSeconds        int64  `json:"ttl_seconds,omitempty"`
-	RenewalMode       string `json:"renewal_mode,omitempty"`
-	RenewEverySeconds int64  `json:"renew_every_seconds,omitempty"`
+	Name              string    `json:"name"`
+	Kind              string    `json:"kind"`
+	Strategy          string    `json:"strategy"`
+	Configured        bool      `json:"configured"`
+	Degraded          bool      `json:"degraded"`
+	Reason            string    `json:"reason,omitempty"`
+	TTLSeconds        int64     `json:"ttl_seconds,omitempty"`
+	RenewalMode       string    `json:"renewal_mode,omitempty"`
+	RenewEverySeconds int64     `json:"renew_every_seconds,omitempty"`
+	RatePerSecond     float64   `json:"rate_per_second,omitempty"`
+	Burst             int       `json:"burst,omitempty"`
+	PolicyVersion     uint64    `json:"policy_version,omitempty"`
+	PolicySource      string    `json:"policy_source,omitempty"`
+	OverrideExpiresAt time.Time `json:"override_expires_at,omitempty"`
+	Active            int       `json:"active,omitempty"`
 }
 
 type QueueSnapshot struct {
@@ -55,6 +63,10 @@ type QueueSnapshot struct {
 	StatusTTLSeconds  int64          `json:"status_ttl_seconds"`
 	StatusCounts      map[string]int `json:"status_counts"`
 	LifecycleBoundary string         `json:"lifecycle_boundary"`
+	State             string         `json:"state,omitempty"`
+	StateVersion      uint64         `json:"state_version,omitempty"`
+	InFlight          int            `json:"in_flight,omitempty"`
+	AdmissionClosed   bool           `json:"admission_closed,omitempty"`
 }
 
 type BackpressureSnapshot struct {

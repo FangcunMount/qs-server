@@ -38,6 +38,7 @@ type FacadeDeps struct {
 	Metrics                 MetricsClient
 	Components              *govcomponent.Adapter
 	Actions                 *ActionExecutor
+	Registry                *ActionRegistry
 	CachePolicyReloader     CachePolicyReloader
 }
 
@@ -55,7 +56,13 @@ type evaluationContext struct {
 
 // NewFacade 创建governance 门面。
 func NewFacade(deps FacadeDeps) Facade {
-	registry := NewActionRegistry()
+	registry := deps.Registry
+	if registry == nil && deps.Actions != nil {
+		registry = deps.Actions.registry
+	}
+	if registry == nil {
+		registry = NewActionRegistry()
+	}
 	if deps.Actions == nil {
 		deps.Actions = NewActionExecutor(registry, deps.CacheGovernance, deps.CachePolicyReloader)
 	}

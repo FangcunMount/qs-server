@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
@@ -12,13 +13,14 @@ import (
 
 func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
-		Locks: []resilienceplane.CapabilitySnapshot{
-			{Name: "plan_scheduler_leader", Kind: "leader", Strategy: "redis_lease", Configured: true, TTLSeconds: 50, RenewalMode: "auto", RenewEverySeconds: 16},
-			{Name: "statistics_sync", Kind: "task_lock", Strategy: "redis_lease", Configured: true, TTLSeconds: 1800, RenewalMode: "auto", RenewEverySeconds: 600},
-		},
-		Backpressure: []resilienceplane.BackpressureSnapshot{
-			{
+	router := newRouterWithBudgets(Deps{
+		ResilienceSnapshot: func() resilienceplane.RuntimeSnapshot {
+			snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", time.Now())
+			snapshot.Locks = []resilienceplane.CapabilitySnapshot{
+				{Name: "plan_scheduler_leader", Kind: "leader", Strategy: "redis_lease", Configured: true, TTLSeconds: 50, RenewalMode: "auto", RenewEverySeconds: 16},
+				{Name: "statistics_sync", Kind: "task_lock", Strategy: "redis_lease", Configured: true, TTLSeconds: 1800, RenewalMode: "auto", RenewEverySeconds: 600},
+			}
+			snapshot.Backpressure = []resilienceplane.BackpressureSnapshot{{
 				Component:     "apiserver",
 				Name:          "mysql",
 				Dependency:    "mysql",
@@ -26,7 +28,8 @@ func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 				Enabled:       true,
 				MaxInflight:   16,
 				TimeoutMillis: 200,
-			},
+			}}
+			return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
 		},
 	})
 	engine := gin.New()
@@ -67,7 +70,7 @@ func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 
 func TestResilienceStatusHasNoMutationRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{})
+	router := newRouterWithBudgets(Deps{})
 	engine := gin.New()
 	group := engine.Group("/internal/v1")
 	router.registerResilienceInternalRoutes(group)

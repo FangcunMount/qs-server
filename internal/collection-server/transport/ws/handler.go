@@ -26,6 +26,7 @@ type Dependencies struct {
 	Options      *options.ReportEventsOptions
 	RateLimit    ratelimit.Backend
 	RateLimitCfg *options.RateLimitOptions
+	RateBudgets  ratelimit.RateBudgetProvider
 }
 
 // ReportEventsHandler serves WSS /api/v1/report-events.
@@ -52,46 +53,33 @@ func NewReportEventsHandler(deps Dependencies) *ReportEventsHandler {
 		events:   deps.Events,
 		opts:     opts,
 		connMgr:  newConnectionManager(opts.MaxConnections, opts.MaxPerTestee),
-		limiter:  newSubscribeLimiter(deps.RateLimit, deps.RateLimitCfg),
+		limiter:  newSubscribeLimiter(deps.RateLimit, deps.RateLimitCfg, deps.RateBudgets),
 	}
 }
 
-func newSubscribeLimiter(backend ratelimit.Backend, cfg *options.RateLimitOptions) ratelimit.RateLimiter {
+func newSubscribeLimiter(_ ratelimit.Backend, cfg *options.RateLimitOptions, providers ...ratelimit.RateBudgetProvider) ratelimit.RateLimiter {
 	if cfg == nil {
 		cfg = options.NewRateLimitOptions()
 	}
 	if !cfg.Enabled {
 		return nil
 	}
-
-	globalPolicy := ratelimit.RateLimitPolicy{
-		Component:     "collection-server",
-		Scope:         "report_events",
-		Resource:      "global",
-		Strategy:      "local",
-		RatePerSecond: cfg.ReportEventsGlobalQPS,
-		Burst:         cfg.ReportEventsGlobalBurst,
-	}
-	userPolicy := ratelimit.RateLimitPolicy{
-		Component:     "collection-server",
-		Scope:         "report_events",
-		Resource:      "user",
-		Strategy:      "local_key",
-		RatePerSecond: cfg.ReportEventsUserQPS,
-		Burst:         cfg.ReportEventsUserBurst,
-	}
-	if backend != nil {
-		globalPolicy.Strategy = "redis"
-		userPolicy.Strategy = "redis"
-		return &subscribeLimiter{
-			global: ratelimit.NewDistributedLimiter(backend, globalPolicy),
-			user:   ratelimit.NewDistributedLimiter(backend, userPolicy),
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		if budget, ok := provider.Budget(ratelimit.BudgetID("report_events")); ok {
+			return &subscribeLimiter{global: budget.Global, user: budget.User}
 		}
 	}
-	return &subscribeLimiter{
-		global: ratelimit.NewLocalLimiter(globalPolicy),
-		user:   ratelimit.NewKeyedLocalLimiter(userPolicy),
-	}
+
+	return unavailableSubscribeLimiter{}
+}
+
+type unavailableSubscribeLimiter struct{}
+
+func (unavailableSubscribeLimiter) Decide(context.Context, string) ratelimit.RateLimitDecision {
+	return ratelimit.RateLimitDecision{Allowed: false, RetryAfter: time.Second, RetryAfterSeconds: 1}
 }
 
 func (l *subscribeLimiter) Decide(ctx context.Context, key string) ratelimit.RateLimitDecision {

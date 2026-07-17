@@ -19,6 +19,7 @@ var (
 	ErrLeaseAcquireFailed = errors.New("lock lease acquire failed")
 	ErrLeaseRenewFailed   = errors.New("lock lease renew failed")
 	ErrLeaseLost          = errors.New("lock lease ownership lost")
+	ErrLeaseRelinquished  = errors.New("leader lease relinquished")
 )
 
 // RunResult describes an executed lease-protected workload. ReleaseErr is
@@ -38,4 +39,21 @@ type Runner interface {
 		ttl time.Duration,
 		body func(context.Context) error,
 	) (RunResult, error)
+}
+
+type RelinquishOptions struct {
+	Cooldown time.Duration
+	Timeout  time.Duration
+}
+
+type RelinquishResult struct {
+	Workload      WorkloadID `json:"workload"`
+	ActiveCount   int        `json:"active_count"`
+	Relinquished  int        `json:"relinquished"`
+	CooldownUntil time.Time  `json:"cooldown_until,omitempty"`
+	ReleaseErrors int        `json:"release_errors"`
+}
+
+type LeaderRelinquisher interface {
+	RelinquishLeader(context.Context, WorkloadID, RelinquishOptions) (RelinquishResult, error)
 }

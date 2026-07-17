@@ -27,7 +27,7 @@ func (s fakeEventStatusService) GetStatus(context.Context) (*appEventing.StatusS
 func TestEventStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		EventStatusService: fakeEventStatusService{snapshot: &appEventing.StatusSnapshot{
 			GeneratedAt: now,
 			Catalog: appEventing.CatalogSummary{
@@ -126,7 +126,7 @@ func orgAdminSnapshotMiddleware() gin.HandlerFunc {
 
 func TestEventStatusHasNoRepairRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(Deps{
+	router := newRouterWithBudgets(Deps{
 		EventStatusService: fakeEventStatusService{snapshot: &appEventing.StatusSnapshot{}},
 	})
 	engine := gin.New()

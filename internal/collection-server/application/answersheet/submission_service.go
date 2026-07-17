@@ -384,6 +384,13 @@ func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resiliencep
 	return s.queue.StatusSnapshot(now)
 }
 
+func (s *SubmissionService) SubmitQueueController() *SubmitQueue {
+	if s == nil {
+		return nil
+	}
+	return s.queue
+}
+
 func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()

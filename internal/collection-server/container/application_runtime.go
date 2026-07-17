@@ -160,5 +160,6 @@ func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 		Options:      c.opts.ReportEvents,
 		RateLimit:    c.RateLimitBackend(),
 		RateLimitCfg: c.opts.RateLimit,
+		RateBudgets:  c.RateBudgetProvider(),
 	})
 }

@@ -43,7 +43,7 @@ type Router struct {
 	rateLimitBudgets map[rateLimitBudget]routeLimiters
 }
 
-type rateLimitBudget string
+type rateLimitBudget = ratelimit.BudgetID
 
 const (
 	rateLimitBudgetQuery       rateLimitBudget = "query"
@@ -64,7 +64,8 @@ type routeSpec struct {
 }
 
 type Deps struct {
-	RateLimit *options.RateLimitOptions
+	RateLimit   *options.RateLimitOptions
+	RateBudgets ratelimit.RateBudgetProvider
 
 	Survey          SurveyDeps
 	AssessmentModel AssessmentModelDeps
@@ -85,6 +86,7 @@ type Deps struct {
 	SystemGovernanceFacade   systemgovApp.Facade
 	Backpressure             []resilienceplane.BackpressureSnapshot
 	Locks                    []resilienceplane.CapabilitySnapshot
+	ResilienceSnapshot       func() resilienceplane.RuntimeSnapshot
 	IAM                      IAMDeps
 }
 
@@ -173,60 +175,18 @@ func NewRouter(deps Deps) *Router {
 		rateCfg = options.NewRateLimitOptions()
 	}
 
+	budgets := make(map[rateLimitBudget]routeLimiters, 4)
+	if deps.RateBudgets != nil {
+		for _, id := range []rateLimitBudget{rateLimitBudgetQuery, rateLimitBudgetSubmit, rateLimitBudgetAdminSubmit, rateLimitBudgetWaitReport} {
+			if budget, ok := deps.RateBudgets.Budget(id); ok {
+				budgets[id] = routeLimiters{global: budget.Global, user: budget.User}
+			}
+		}
+	}
 	return &Router{
 		deps:             deps,
 		rateCfg:          rateCfg,
-		rateLimitBudgets: newRateLimitBudgets(rateCfg),
-	}
-}
-
-func newRateLimitBudgets(cfg *options.RateLimitOptions) map[rateLimitBudget]routeLimiters {
-	return map[rateLimitBudget]routeLimiters{
-		rateLimitBudgetQuery: newRouteLimiters(
-			cfg.QueryGlobalQPS,
-			cfg.QueryGlobalBurst,
-			cfg.QueryUserQPS,
-			cfg.QueryUserBurst,
-		),
-		rateLimitBudgetSubmit: newRouteLimiters(
-			cfg.SubmitGlobalQPS,
-			cfg.SubmitGlobalBurst,
-			cfg.SubmitUserQPS,
-			cfg.SubmitUserBurst,
-		),
-		rateLimitBudgetAdminSubmit: newRouteLimiters(
-			cfg.AdminSubmitGlobalQPS,
-			cfg.AdminSubmitGlobalBurst,
-			cfg.AdminSubmitUserQPS,
-			cfg.AdminSubmitUserBurst,
-		),
-		rateLimitBudgetWaitReport: newRouteLimiters(
-			cfg.WaitReportGlobalQPS,
-			cfg.WaitReportGlobalBurst,
-			cfg.WaitReportUserQPS,
-			cfg.WaitReportUserBurst,
-		),
-	}
-}
-
-func newRouteLimiters(globalQPS float64, globalBurst int, userQPS float64, userBurst int) routeLimiters {
-	return routeLimiters{
-		global: ratelimit.NewLocalLimiter(ratelimit.RateLimitPolicy{
-			Component:     "apiserver",
-			Scope:         "rest",
-			Resource:      "global",
-			Strategy:      "local",
-			RatePerSecond: globalQPS,
-			Burst:         globalBurst,
-		}),
-		user: ratelimit.NewKeyedLocalLimiter(ratelimit.RateLimitPolicy{
-			Component:     "apiserver",
-			Scope:         "rest",
-			Resource:      "user",
-			Strategy:      "local_key",
-			RatePerSecond: userQPS,
-			Burst:         userBurst,
-		}),
+		rateLimitBudgets: budgets,
 	}
 }
 

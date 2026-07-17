@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +21,7 @@ func TestRateLimitedHandlersShareGlobalBudgetAcrossRoutes(t *testing.T) {
 	cfg.QueryUserQPS = 1000
 	cfg.QueryUserBurst = 1000
 
-	router := NewRouter(Deps{RateLimit: cfg})
+	router := newRateContractRouter(cfg)
 	engine := gin.New()
 	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
 	engine.GET("/route-a", router.rateLimitedHandlers(
@@ -78,7 +79,7 @@ func TestRateLimitedHandlersSharePerUserBudgetAcrossRoutes(t *testing.T) {
 	cfg.QueryUserQPS = 0.000001
 	cfg.QueryUserBurst = 5
 
-	router := NewRouter(Deps{RateLimit: cfg})
+	router := newRateContractRouter(cfg)
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "42"})
@@ -143,7 +144,7 @@ func TestRateLimitedHandlersKeepDifferentBudgetsIndependent(t *testing.T) {
 	cfg.SubmitUserQPS = cfg.QueryUserQPS
 	cfg.SubmitUserBurst = cfg.QueryUserBurst
 
-	router := NewRouter(Deps{RateLimit: cfg})
+	router := newRateContractRouter(cfg)
 	engine := gin.New()
 	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
 	engine.GET("/query", router.rateLimitedHandlers(
@@ -178,7 +179,7 @@ func TestWaitReportBudgetUsesDedicatedConfig(t *testing.T) {
 	cfg.WaitReportUserQPS = 100
 	cfg.WaitReportUserBurst = 100
 
-	router := NewRouter(Deps{RateLimit: cfg})
+	router := newRateContractRouter(cfg)
 	engine := gin.New()
 	engine.GET("/wait-report", router.rateLimitedHandlers(rateLimitBudgetWaitReport, func(c *gin.Context) {
 		c.Status(http.StatusOK)
@@ -191,4 +192,9 @@ func TestWaitReportBudgetUsesDedicatedConfig(t *testing.T) {
 			t.Fatalf("request %d status = %d, want %d", index+1, recorder.Code, want)
 		}
 	}
+}
+
+func newRateContractRouter(cfg *options.RateLimitOptions) *Router {
+	provider := resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg})
+	return NewRouter(Deps{RateLimit: cfg, RateBudgets: provider})
 }

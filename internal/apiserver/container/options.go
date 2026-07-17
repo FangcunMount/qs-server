@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -21,6 +22,8 @@ type ContainerOptions struct {
 	LockSubsystem *locksubsystem.Subsystem
 	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
 	Backpressure BackpressureOptions
+	// Resilience owns process-local resilience composition and governance projection.
+	Resilience *resiliencesubsystem.Subsystem
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口

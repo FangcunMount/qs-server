@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/collection-server/resilience/subsystem"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -70,13 +71,14 @@ func TestSubscribeLimiterDisabledMeansNoAdmissionCheck(t *testing.T) {
 
 func TestSubscribeLimiterUsesSharedGlobalAndPerUserBudgets(t *testing.T) {
 	backend := &recordingRateLimitBackend{}
-	limiter := newSubscribeLimiter(backend, &options.RateLimitOptions{
+	cfg := &options.RateLimitOptions{
 		Enabled:                 true,
 		ReportEventsGlobalQPS:   10,
 		ReportEventsGlobalBurst: 20,
 		ReportEventsUserQPS:     2,
 		ReportEventsUserBurst:   4,
-	})
+	}
+	limiter := newSubscribeLimiter(backend, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg, Backend: backend}))
 	if limiter == nil {
 		t.Fatal("enabled report-events rate limit should install a limiter")
 	}
@@ -98,13 +100,14 @@ func TestSubscribeLimiterUsesSharedGlobalAndPerUserBudgets(t *testing.T) {
 }
 
 func TestLocalSubscribeLimiterSharesGlobalBudgetAcrossUsers(t *testing.T) {
-	limiter := newSubscribeLimiter(nil, &options.RateLimitOptions{
+	cfg := &options.RateLimitOptions{
 		Enabled:                 true,
 		ReportEventsGlobalQPS:   1,
 		ReportEventsGlobalBurst: 1,
 		ReportEventsUserQPS:     100,
 		ReportEventsUserBurst:   100,
-	})
+	}
+	limiter := newSubscribeLimiter(nil, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg}))
 
 	if decision := limiter.Decide(context.Background(), "user:1"); !decision.Allowed {
 		t.Fatalf("first user decision = %+v, want allowed", decision)
@@ -115,13 +118,14 @@ func TestLocalSubscribeLimiterSharesGlobalBudgetAcrossUsers(t *testing.T) {
 }
 
 func TestLocalSubscribeLimiterKeepsIndependentPerUserBudgets(t *testing.T) {
-	limiter := newSubscribeLimiter(nil, &options.RateLimitOptions{
+	cfg := &options.RateLimitOptions{
 		Enabled:                 true,
 		ReportEventsGlobalQPS:   100,
 		ReportEventsGlobalBurst: 100,
 		ReportEventsUserQPS:     1,
 		ReportEventsUserBurst:   1,
-	})
+	}
+	limiter := newSubscribeLimiter(nil, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg}))
 
 	if decision := limiter.Decide(context.Background(), "user:1"); !decision.Allowed {
 		t.Fatalf("first user decision = %+v, want allowed", decision)

@@ -217,57 +217,32 @@ func requestLimitKey(c *gin.Context) string {
 }
 
 func rateLimitedHandlers(
-	backend ratelimit.Backend,
+	provider ratelimit.RateBudgetProvider,
+	_ ratelimit.Backend,
 	scope string,
 	rateCfg *options.RateLimitOptions,
-	globalQPS float64,
-	globalBurst int,
-	userQPS float64,
-	userBurst int,
+	_ float64,
+	_ int,
+	_ float64,
+	_ int,
 	handler gin.HandlerFunc,
 ) []gin.HandlerFunc {
 	if rateCfg == nil || !rateCfg.Enabled {
 		return []gin.HandlerFunc{handler}
 	}
-	if backend != nil {
-		globalLimiter := ratelimit.NewDistributedLimiter(backend, ratelimit.RateLimitPolicy{
-			Component:     "collection-server",
-			Scope:         scope,
-			Resource:      "global",
-			Strategy:      "redis",
-			RatePerSecond: globalQPS,
-			Burst:         globalBurst,
-		})
-		userLimiter := ratelimit.NewDistributedLimiter(backend, ratelimit.RateLimitPolicy{
-			Component:     "collection-server",
-			Scope:         scope,
-			Resource:      "user",
-			Strategy:      "redis",
-			RatePerSecond: userQPS,
-			Burst:         userBurst,
-		})
-		return []gin.HandlerFunc{
-			distributedLimit(globalLimiter, "limit:"+scope+":global", nil),
-			distributedLimit(userLimiter, "limit:"+scope+":user", requestLimitKey),
-			handler,
+	budgetID := ratelimit.BudgetID(strings.ReplaceAll(scope, "-", "_"))
+	if provider != nil {
+		if budget, ok := provider.Budget(budgetID); ok {
+			return []gin.HandlerFunc{
+				distributedLimit(budget.Global, "limit:"+scope+":global", nil),
+				distributedLimit(budget.User, "limit:"+scope+":user", requestLimitKey),
+				handler,
+			}
 		}
 	}
-
-	return []gin.HandlerFunc{
-		pkgmiddleware.LimitWithOptions(globalQPS, globalBurst, pkgmiddleware.LimitOptions{
-			Component: "collection-server",
-			Scope:     scope,
-			Resource:  "global",
-			Strategy:  "local",
-		}),
-		pkgmiddleware.LimitByKeyWithOptions(userQPS, userBurst, requestLimitKey, pkgmiddleware.LimitOptions{
-			Component: "collection-server",
-			Scope:     scope,
-			Resource:  "user",
-			Strategy:  "local_key",
-		}),
-		handler,
-	}
+	return []gin.HandlerFunc{func(c *gin.Context) {
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"message": "rate limit budget unavailable"})
+	}}
 }
 
 func waitConcurrencyHandlers(
@@ -306,14 +281,7 @@ func distributedLimitWithOptions(
 	opts pkgmiddleware.LimitOptions,
 ) gin.HandlerFunc {
 	if limiter == nil {
-		limiter = ratelimit.NewDistributedLimiter(nil, ratelimit.RateLimitPolicy{
-			Component:     "collection-server",
-			Scope:         scope,
-			Resource:      "redis",
-			Strategy:      "redis",
-			RatePerSecond: 1,
-			Burst:         1,
-		})
+		return pkgmiddleware.LimitDegradedOpen(opts)
 	}
 	return pkgmiddleware.LimitWithLimiter(limiter, func(c *gin.Context) string {
 		key := scope
@@ -476,6 +444,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)...)
 		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(
 			rateLimitedHandlers(
+				r.container.RateBudgetProvider(),
 				r.container.RateLimitBackend(),
 				"wait-report",
 				rateCfg,
@@ -563,6 +532,7 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 		)...)...)
 		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(
 			rateLimitedHandlers(
+				r.container.RateBudgetProvider(),
 				r.container.RateLimitBackend(),
 				"wait-report",
 				rateCfg,
@@ -610,7 +580,7 @@ func (r *Router) registerBehaviorAssessmentRoutes(api *gin.RouterGroup) {
 	{
 		assessments.GET("", r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.List)...)
 		assessments.GET("/:id/report-status", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedReportStatusHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.GetReportStatus)...)...)
-		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(rateLimitedHandlers(r.container.RateLimitBackend(), "wait-report", rateCfg, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst, handler.WaitReport)...)...)...)
+		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(rateLimitedHandlers(r.container.RateBudgetProvider(), r.container.RateLimitBackend(), "wait-report", rateCfg, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst, handler.WaitReport)...)...)...)
 		assessments.GET("/:id/report", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.GetReport)...)...)
 		assessments.GET("/:id", r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.Get)...)
 	}

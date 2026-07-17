@@ -52,6 +52,7 @@ type Options struct {
 	EnabledWorkloads map[locklease.WorkloadID]bool
 	Warn             func(message string)
 	tickerFactory    tickerFactory
+	now              func() time.Time
 }
 
 // Subsystem owns the catalog binding, Redis adapter, key builder and lease runner.
@@ -64,6 +65,19 @@ type Subsystem struct {
 	statusRegistry *redisobserve.FamilyStatusRegistry
 	warn           func(string)
 	tickerFactory  tickerFactory
+	now            func() time.Time
+	activeMu       sync.Mutex
+	active         map[locklease.WorkloadID]map[uint64]*activeRun
+	cooldownUntil  map[locklease.WorkloadID]time.Time
+	nextRunID      uint64
+}
+
+type activeRun struct {
+	id         uint64
+	workload   locklease.WorkloadID
+	cancel     context.CancelCauseFunc
+	done       chan struct{}
+	releaseErr error
 }
 
 func New(opts Options) *Subsystem {
@@ -83,6 +97,10 @@ func New(opts Options) *Subsystem {
 			redisobserve.NewComponentObserver(opts.Component, opts.StatusRegistry),
 		)
 	}
+	now := opts.now
+	if now == nil {
+		now = time.Now
+	}
 	return &Subsystem{
 		component:      opts.Component,
 		handle:         opts.Handle,
@@ -92,6 +110,9 @@ func New(opts Options) *Subsystem {
 		statusRegistry: opts.StatusRegistry,
 		warn:           opts.Warn,
 		tickerFactory:  factory,
+		now:            now,
+		active:         make(map[locklease.WorkloadID]map[uint64]*activeRun),
+		cooldownUntil:  make(map[locklease.WorkloadID]time.Time),
 	}
 }
 
@@ -193,6 +214,7 @@ func (s *Subsystem) Snapshots() []resilienceplane.CapabilitySnapshot {
 			TTLSeconds:        int64(capability.Spec.DefaultTTL.Seconds()),
 			RenewalMode:       renewalMode(s.renewalEnabled),
 			RenewEverySeconds: renewEvery,
+			Active:            s.activeCount(capability.ID),
 		})
 	}
 	return result
@@ -256,6 +278,9 @@ func (s *Subsystem) Run(
 	if cause := context.Cause(ctx); cause != nil {
 		return result, cause
 	}
+	if s.inCooldown(workload) {
+		return result, nil
+	}
 
 	lease, acquired, err := s.manager.AcquireSpec(ctx, capability.Spec, key, ttl)
 	if err != nil {
@@ -268,23 +293,26 @@ func (s *Subsystem) Run(
 		return result, nil
 	}
 	result.Acquired = true
-	defer func() {
-		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
-	}()
 
 	if body == nil {
+		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
 		return result, nil
 	}
+	bodyCtx, cancelBody := context.WithCancelCause(ctx)
+	run := s.registerActive(workload, cancelBody)
+	defer cancelBody(nil)
+	defer func() {
+		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
+		s.finishActive(run, result.ReleaseErr)
+	}()
 	if !s.renewalEnabled {
-		return result, body(ctx)
+		return result, body(bodyCtx)
 	}
 
 	interval := ttl / 3
 	if interval <= 0 {
 		interval = time.Nanosecond
 	}
-	bodyCtx, cancelBody := context.WithCancelCause(ctx)
-	defer cancelBody(nil)
 	renewCtx, cancelRenew := context.WithCancel(bodyCtx)
 	defer cancelRenew()
 	done := make(chan struct{})
@@ -309,6 +337,122 @@ func (s *Subsystem) Run(
 	}
 	return result, bodyErr
 }
+
+func (s *Subsystem) RelinquishLeader(ctx context.Context, workload locklease.WorkloadID, opts locklease.RelinquishOptions) (locklease.RelinquishResult, error) {
+	result := locklease.RelinquishResult{Workload: workload}
+	capability, ok := locklease.Lookup(workload)
+	if !ok {
+		return result, fmt.Errorf("unknown lock lease workload %q", workload)
+	}
+	if s == nil || capability.Component != s.component || capability.Kind != locklease.KindLeader {
+		return result, fmt.Errorf("workload %q is not a releasable leader lease for component %q", workload, s.component)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if opts.Cooldown <= 0 {
+		opts.Cooldown = capability.Spec.DefaultTTL
+	}
+	if opts.Timeout <= 0 {
+		opts.Timeout = 30 * time.Second
+	}
+
+	s.activeMu.Lock()
+	result.CooldownUntil = s.now().Add(opts.Cooldown)
+	s.cooldownUntil[workload] = result.CooldownUntil
+	runs := make([]*activeRun, 0, len(s.active[workload]))
+	for _, run := range s.active[workload] {
+		runs = append(runs, run)
+	}
+	s.activeMu.Unlock()
+	result.ActiveCount = len(runs)
+	if len(runs) == 0 {
+		return result, nil
+	}
+	for _, run := range runs {
+		run.cancel(locklease.ErrLeaseRelinquished)
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	for _, run := range runs {
+		select {
+		case <-run.done:
+			result.Relinquished++
+			if run.releaseErr != nil {
+				result.ReleaseErrors++
+			}
+		case <-waitCtx.Done():
+			return result, waitCtx.Err()
+		}
+	}
+	return result, nil
+}
+
+// ApplyLeaderCooldown restores a control-plane cooldown after process restart.
+// It never acquires or releases a lease.
+func (s *Subsystem) ApplyLeaderCooldown(workload locklease.WorkloadID, until time.Time) error {
+	capability, ok := locklease.Lookup(workload)
+	if !ok || s == nil || capability.Component != s.component || capability.Kind != locklease.KindLeader {
+		return fmt.Errorf("workload %q is not a leader lease for component %q", workload, s.component)
+	}
+	if until.IsZero() || !until.After(s.now()) {
+		return nil
+	}
+	s.activeMu.Lock()
+	if current := s.cooldownUntil[workload]; until.After(current) {
+		s.cooldownUntil[workload] = until
+	}
+	s.activeMu.Unlock()
+	return nil
+}
+
+func (s *Subsystem) registerActive(workload locklease.WorkloadID, cancel context.CancelCauseFunc) *activeRun {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	s.nextRunID++
+	run := &activeRun{id: s.nextRunID, workload: workload, cancel: cancel, done: make(chan struct{})}
+	if s.active[workload] == nil {
+		s.active[workload] = make(map[uint64]*activeRun)
+	}
+	s.active[workload][run.id] = run
+	return run
+}
+
+func (s *Subsystem) finishActive(run *activeRun, releaseErr error) {
+	if s == nil || run == nil {
+		return
+	}
+	s.activeMu.Lock()
+	run.releaseErr = releaseErr
+	delete(s.active[run.workload], run.id)
+	close(run.done)
+	s.activeMu.Unlock()
+}
+
+func (s *Subsystem) activeCount(workload locklease.WorkloadID) int {
+	if s == nil {
+		return 0
+	}
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	return len(s.active[workload])
+}
+
+func (s *Subsystem) inCooldown(workload locklease.WorkloadID) bool {
+	if s == nil {
+		return false
+	}
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	until := s.cooldownUntil[workload]
+	if until.IsZero() || !s.now().Before(until) {
+		delete(s.cooldownUntil, workload)
+		return false
+	}
+	return true
+}
+
+var _ locklease.LeaderRelinquisher = (*Subsystem)(nil)
 
 func (s *Subsystem) renewLoop(
 	parentCtx context.Context,

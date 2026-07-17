@@ -60,6 +60,10 @@ func (c *Container) checkModulesHealth(_ context.Context) error {
 // Cleanup 清理资源
 func (c *Container) Cleanup() error {
 	c.printf("🧹 Cleaning up container resources...\n")
+	if c.resilienceCancel != nil {
+		c.resilienceCancel()
+		c.resilienceCancel = nil
+	}
 	if c.eventSubsystem != nil {
 		if err := c.eventSubsystem.Close(); err != nil {
 			return fmt.Errorf("failed to close event subsystem: %w", err)
