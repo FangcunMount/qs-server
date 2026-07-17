@@ -57,7 +57,6 @@ func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) err
 		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "today"),
 		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "7d"),
 		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "30d"),
-		cachetarget.NewQueryStatsSystemWarmupTarget(orgID),
 	}
 	_, err := c.executeTargets(ctx, "statistics_sync", append(targets, c.mergeQueryTargets(ctx, []int64{orgID}, nil)...))
 	return err

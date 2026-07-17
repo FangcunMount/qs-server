@@ -1171,34 +1171,17 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 		statisticsCache.NewVersionTokenStore(metaClient, nil),
 		nil,
 	)
-	repo := statisticsInfra.NewStatisticsRepository(db)
 	readService := statisticsApp.NewReadService(
 		statisticsReadModelInfra.NewReadModel(db),
-		nil,
 		statisticsApp.WithReadServiceCache(cache),
 	)
-	systemService := statisticsApp.NewSystemStatisticsService(repo, repo, cache, nil)
-	questionnaireService := statisticsApp.NewQuestionnaireStatisticsService(repo, repo, cache, nil)
-	planService := statisticsApp.NewPlanStatisticsService(repo, repo, cache, nil)
 
 	for _, scope := range scopes {
-		log.Printf("warm statistics cache org_id=%d overview/system", scope.OrgID)
+		log.Printf("warm statistics cache org_id=%d overview questionnaires=%d plans=%d",
+			scope.OrgID, len(scope.QuestionnaireCodes), len(scope.PlanIDs))
 		for _, preset := range []string{"today", "7d", "30d"} {
 			if _, err := readService.GetOverview(ctx, scope.OrgID, statisticsApp.QueryFilter{Preset: preset}); err != nil {
 				return fmt.Errorf("warm overview org=%d preset=%s: %w", scope.OrgID, preset, err)
-			}
-		}
-		if _, err := systemService.GetSystemStatistics(ctx, scope.OrgID); err != nil {
-			return fmt.Errorf("warm system org=%d: %w", scope.OrgID, err)
-		}
-		for _, code := range scope.QuestionnaireCodes {
-			if _, err := questionnaireService.GetQuestionnaireStatistics(ctx, scope.OrgID, code); err != nil {
-				return fmt.Errorf("warm questionnaire org=%d code=%s: %w", scope.OrgID, code, err)
-			}
-		}
-		for _, planID := range scope.PlanIDs {
-			if _, err := planService.GetPlanStatistics(ctx, scope.OrgID, planID); err != nil {
-				return fmt.Errorf("warm plan org=%d plan=%d: %w", scope.OrgID, planID, err)
 			}
 		}
 	}

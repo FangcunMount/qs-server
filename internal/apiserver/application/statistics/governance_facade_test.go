@@ -109,7 +109,7 @@ func TestGovernanceFacadeHandleManualWarmupRejectsCrossOrgTarget(t *testing.T) {
 
 	_, err := facade.HandleManualWarmup(context.Background(), 1, ManualWarmupRequest{
 		Targets: []cachetarget.ManualWarmupTarget{
-			{Kind: cachetarget.WarmupKindQueryStatsSystem, Scope: "org:2"},
+			{Kind: cachetarget.WarmupKindQueryStatsOverview, Scope: "org:2:preset:30d"},
 		},
 	})
 	if err == nil {
@@ -120,7 +120,7 @@ func TestGovernanceFacadeHandleManualWarmupRejectsCrossOrgTarget(t *testing.T) {
 func TestGovernanceFacadeGetHotsetReturnsFallbackWhenServiceUnavailable(t *testing.T) {
 	facade := NewGovernanceFacade("apiserver", nil, nil)
 
-	result, err := facade.GetHotset(context.Background(), "query.stats_system", "20")
+	result, err := facade.GetHotset(context.Background(), "query.stats_overview", "20")
 	if err != nil {
 		t.Fatalf("GetHotset() error = %v", err)
 	}

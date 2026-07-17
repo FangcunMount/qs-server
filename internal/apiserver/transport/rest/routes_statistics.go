@@ -11,10 +11,6 @@ func (r *Router) newStatisticsHandler() *handler.StatisticsHandler {
 		return nil
 	}
 	statisticsHandler := handler.NewStatisticsHandler(
-		r.deps.Statistics.SystemStatisticsService,
-		r.deps.Statistics.QuestionnaireStatisticsService,
-		r.deps.Statistics.TesteeStatisticsService,
-		r.deps.Statistics.PlanStatisticsService,
 		r.deps.Statistics.ReadService,
 		r.deps.Statistics.PeriodicStatsService,
 		r.deps.Statistics.SyncService,
@@ -81,30 +77,6 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			statisticsHandler.GetAssessmentEntryStatistics,
 		)...)
-		adminStatistics.GET("/system", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetSystemStatistics,
-		)...)
-		adminStatistics.GET("/questionnaires/:code", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetQuestionnaireStatistics,
-		)...)
-		statistics.GET("/testees/:testee_id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetTesteeStatistics,
-		)...)
 		statistics.GET("/testees/:testee_id/periodic", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
@@ -112,14 +84,6 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
 			statisticsHandler.GetTesteePeriodicStatistics,
-		)...)
-		adminStatistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.QueryGlobalQPS,
-			r.rateCfg.QueryGlobalBurst,
-			r.rateCfg.QueryUserQPS,
-			r.rateCfg.QueryUserBurst,
-			statisticsHandler.GetPlanStatistics,
 		)...)
 		clinicianStatistics := statistics.Group("/clinicians/me")
 		clinicianStatistics.GET("/overview", r.rateLimitedHandlers(
@@ -150,13 +114,13 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			restmiddleware.CapabilityManageQuestionnaires,
 			restmiddleware.CapabilityManageAssessmentModels,
 		))
-		contentStatistics.POST("/questionnaires/batch", r.rateLimitedHandlers(
+		contentStatistics.POST("/contents/batch", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
 			r.rateCfg.SubmitUserQPS,
 			r.rateCfg.SubmitUserBurst,
-			statisticsHandler.BatchQuestionnaireStatistics,
+			statisticsHandler.BatchContentStatistics,
 		)...)
 	}
 }

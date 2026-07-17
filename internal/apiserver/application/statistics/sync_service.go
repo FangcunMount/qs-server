@@ -22,15 +22,6 @@ type syncService struct {
 	lockManager      locklease.Manager
 }
 
-func NewSyncService(
-	runner apptransaction.Runner,
-	writer StatisticsRebuildWriter,
-	repairWindowDays int,
-	lockManager locklease.Manager,
-) StatisticsSyncService {
-	return NewSyncServiceWithTransactionRunner(runner, writer, repairWindowDays, lockManager)
-}
-
 func NewSyncServiceWithTransactionRunner(
 	runner apptransaction.Runner,
 	writer StatisticsRebuildWriter,

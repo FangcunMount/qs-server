@@ -49,14 +49,17 @@ type BehaviorJourneyScanSourceResult struct {
 	Error       string
 }
 
-// BehaviorJourneyScanRepository 加载scan 事实 和 persists watermarks/投影。
-type BehaviorJourneyScanRepository interface {
-	BehaviorJourneyRepository
+// BehaviorJourneyScanStateRepository owns scan facts and watermarks.
+type BehaviorJourneyScanStateRepository interface {
 	LoadScanWatermark(ctx context.Context, orgID int64, sourceName string) (*domainStatistics.ScanWatermark, error)
 	SaveScanWatermark(ctx context.Context, watermark *domainStatistics.ScanWatermark) error
 	ListEntryResolveFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryResolveFact, error)
 	ListEntryIntakeFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryIntakeFact, error)
 	ListAssessmentCreatedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.AssessmentCreatedFact, error)
+}
+
+// JourneyProjectionRebuilder rebuilds a bounded journey projection window.
+type JourneyProjectionRebuilder interface {
 	RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error
 }
 

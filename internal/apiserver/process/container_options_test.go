@@ -29,11 +29,9 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.Defaults.TTLJitterRatio = 0.25
 	opts.Cache.Defaults.CompressPayload = true
 	opts.Cache.Governance.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
-		Enable:             true,
-		OrgIDs:             []int64{101, 202},
-		OverviewPresets:    []string{"today", "30d"},
-		QuestionnaireCodes: []string{"phq9", "gad7"},
-		PlanIDs:            []uint64{11, 22},
+		Enable:          true,
+		OrgIDs:          []int64{101, 202},
+		OverviewPresets: []string{"today", "30d"},
 	}
 	opts.Cache.Governance.Warmup = &apiserveroptions.WarmupOptions{
 		Enable: true,
@@ -194,33 +192,6 @@ func TestBuildStatisticsOverviewOptionsMapsServiceSingleflight(t *testing.T) {
 
 func TestBuildStatisticsOverviewOptionsDefaultsServiceSingleflightTrue(t *testing.T) {
 	got := buildStatisticsOverviewOptions(apiserveroptions.NewOptions().Cache)
-	if !got.ServiceSingleflight {
-		t.Fatal("ServiceSingleflight = false, want true")
-	}
-}
-
-func TestBuildStatisticsQuestionnaireOptionsMapsGuardFields(t *testing.T) {
-	opts := apiserveroptions.NewOptions()
-	opts.Cache.Governance.StatisticsQuestionnaire = &apiserveroptions.StatisticsQuestionnaireOptions{
-		ServiceSingleflight: false,
-		StaleOnTimeout:      false,
-		LoadTimeout:         9 * time.Second,
-	}
-
-	got := buildStatisticsQuestionnaireOptions(opts.Cache)
-	if got.ServiceSingleflight {
-		t.Fatal("ServiceSingleflight = true, want false")
-	}
-	if got.StaleOnTimeout {
-		t.Fatal("StaleOnTimeout = true, want false")
-	}
-	if got.LoadTimeout != 9*time.Second {
-		t.Fatalf("LoadTimeout = %v, want 9s", got.LoadTimeout)
-	}
-}
-
-func TestBuildStatisticsQuestionnaireOptionsDefaultsServiceSingleflightTrue(t *testing.T) {
-	got := buildStatisticsQuestionnaireOptions(apiserveroptions.NewOptions().Cache)
 	if !got.ServiceSingleflight {
 		t.Fatal("ServiceSingleflight = false, want true")
 	}

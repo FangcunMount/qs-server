@@ -10,6 +10,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
@@ -18,37 +19,25 @@ import (
 // StatisticsHandler 统计处理器
 type StatisticsHandler struct {
 	BaseHandler
-	systemStatisticsService        statisticsApp.SystemStatisticsService
-	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
-	testeeStatisticsService        statisticsApp.TesteeStatisticsService
-	planStatisticsService          statisticsApp.PlanStatisticsService
-	readService                    statisticsApp.ReadService
-	periodicStatsService           statisticsApp.PeriodicStatsService
-	syncService                    statisticsApp.StatisticsSyncService
-	testeeAccessService            statisticsApp.TesteeAccessValidator
-	warmupCoordinator              statisticsApp.WarmupCoordinator
-	cacheGovernanceStatusService   statisticsApp.GovernanceStatusReader
-	governanceFacade               statisticsApp.GovernanceFacade
+	readService                  statisticsApp.ReadService
+	periodicStatsService         statisticsApp.PeriodicStatsService
+	syncService                  statisticsApp.StatisticsSyncService
+	testeeAccessService          statisticsApp.TesteeAccessValidator
+	warmupCoordinator            statisticsApp.WarmupCoordinator
+	cacheGovernanceStatusService statisticsApp.GovernanceStatusReader
+	governanceFacade             statisticsApp.GovernanceFacade
 }
 
 // NewStatisticsHandler 创建统计处理器
 func NewStatisticsHandler(
-	systemStatisticsService statisticsApp.SystemStatisticsService,
-	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService,
-	testeeStatisticsService statisticsApp.TesteeStatisticsService,
-	planStatisticsService statisticsApp.PlanStatisticsService,
 	readService statisticsApp.ReadService,
 	periodicStatsService statisticsApp.PeriodicStatsService,
 	syncService statisticsApp.StatisticsSyncService,
 ) *StatisticsHandler {
 	return &StatisticsHandler{
-		systemStatisticsService:        systemStatisticsService,
-		questionnaireStatisticsService: questionnaireStatisticsService,
-		testeeStatisticsService:        testeeStatisticsService,
-		planStatisticsService:          planStatisticsService,
-		readService:                    readService,
-		periodicStatsService:           periodicStatsService,
-		syncService:                    syncService,
+		readService:          readService,
+		periodicStatsService: periodicStatsService,
+		syncService:          syncService,
 	}
 }
 
@@ -136,8 +125,8 @@ func parseStatisticsSyncDateRange(c *gin.Context) (statisticsApp.SyncDailyOption
 	}, nil
 }
 
-type questionnaireBatchRequest struct {
-	Codes []string `json:"codes"`
+type contentBatchRequest struct {
+	Items []domainStatistics.ContentReference `json:"items"`
 }
 
 // GetOverview 查询机构统计总览。
@@ -448,20 +437,20 @@ func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 	h.Success(c, response.NewPeriodicStatsResponse(stats))
 }
 
-// BatchQuestionnaireStatistics 批量查询问卷统计。
-// @Summary 批量查询问卷统计
-// @Description 按问卷 code 批量查询提交数、完成数和完成率；需要问卷或量表管理权限
+// BatchContentStatistics 批量查询统一内容统计。
+// @Summary 批量查询统一内容统计
+// @Description 按内容 type + code 批量查询测评形成数、完成数和完成率；需要问卷或量表管理权限
 // @Tags Statistics
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body questionnaireBatchRequest true "问卷编码列表"
-// @Success 200 {object} core.Response{data=statistics.QuestionnaireBatchStatisticsResponse}
+// @Param request body contentBatchRequest true "内容标识列表"
+// @Success 200 {object} core.Response{data=statistics.ContentBatchStatisticsResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/questionnaires/batch [post]
-func (h *StatisticsHandler) BatchQuestionnaireStatistics(c *gin.Context) {
-	var req questionnaireBatchRequest
+// @Router /api/v1/statistics/contents/batch [post]
+func (h *StatisticsHandler) BatchContentStatistics(c *gin.Context) {
+	var req contentBatchRequest
 	if !h.bindJSON(c, &req) {
 		return
 	}
@@ -470,188 +459,11 @@ func (h *StatisticsHandler) BatchQuestionnaireStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.GetQuestionnaireBatchStatistics(c.Request.Context(), orgID, req.Codes)
+	stats, err := h.readService.GetContentBatchStatistics(c.Request.Context(), orgID, req.Items)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
-}
-
-// ============= 统计查询 API =============
-
-// GetSystemStatistics 获取系统整体统计
-// @Summary 获取系统整体统计
-// @Description 获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等；仅 qs:admin 可访问
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Success 200 {object} core.Response{data=statistics.SystemStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/system [get]
-func (h *StatisticsHandler) GetSystemStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	logger.L(ctx).Infow("获取系统整体统计", "action", "get_system_statistics")
-
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	stats, err := h.systemStatisticsService.GetSystemStatistics(ctx, orgID)
-	if err != nil {
-		logger.L(ctx).Errorw("获取系统整体统计失败",
-			"action", "get_system_statistics",
-			"org_id", orgID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, stats)
-}
-
-// GetQuestionnaireStatistics 获取问卷/量表统计
-// @Summary 获取问卷/量表统计
-// @Description 获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等；仅 qs:admin 可访问
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code path string true "问卷编码"
-// @Success 200 {object} core.Response{data=statistics.QuestionnaireStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/questionnaires/{code} [get]
-func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	questionnaireCode := c.Param("code")
-	logger.L(ctx).Infow("获取问卷统计",
-		"action", "get_questionnaire_statistics",
-		"questionnaire_code", questionnaireCode,
-	)
-
-	if questionnaireCode == "" {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "问卷编码不能为空"))
-		return
-	}
-
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	stats, err := h.questionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, questionnaireCode)
-	if err != nil {
-		logger.L(ctx).Errorw("获取问卷统计失败",
-			"action", "get_questionnaire_statistics",
-			"org_id", orgID,
-			"questionnaire_code", questionnaireCode,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, stats)
-}
-
-// GetTesteeStatistics 获取受试者统计
-// @Summary 获取受试者统计
-// @Description 获取指定受试者的统计数据，包括测评数、完成数、风险分布等；后台访问范围按 ClinicianTesteeRelation 收口
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param testee_id path uint64 true "受试者ID"
-// @Success 200 {object} core.Response{data=response.TesteeStatisticsResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/testees/{testee_id} [get]
-func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	testeeIDStr := c.Param("testee_id")
-	logger.L(ctx).Infow("获取受试者统计",
-		"action", "get_testee_statistics",
-		"testee_id", testeeIDStr,
-	)
-
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "无效的受试者ID: %s", testeeIDStr))
-		return
-	}
-
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	stats, err := h.testeeStatisticsService.GetTesteeStatistics(ctx, orgID, testeeID)
-	if err != nil {
-		logger.L(ctx).Errorw("获取受试者统计失败",
-			"action", "get_testee_statistics",
-			"org_id", orgID,
-			"testee_id", testeeID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, response.NewTesteeStatisticsResponse(stats))
-}
-
-// GetPlanStatistics 获取计划统计
-// @Summary 获取计划统计
-// @Description 获取指定测评计划的统计数据，包括任务数、完成率等；仅 qs:admin 可访问
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param plan_id path uint64 true "计划ID"
-// @Success 200 {object} core.Response{data=statistics.PlanStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/plans/{plan_id} [get]
-func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	planIDStr := c.Param("plan_id")
-	planID, err := strconv.ParseUint(planIDStr, 10, 64)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "无效的计划ID: %s", planIDStr))
-		return
-	}
-
-	logger.L(ctx).Infow("获取计划统计",
-		"action", "get_plan_statistics",
-		"plan_id", planID,
-	)
-
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	stats, err := h.planStatisticsService.GetPlanStatistics(ctx, orgID, planID)
-	if err != nil {
-		logger.L(ctx).Errorw("获取计划统计失败",
-			"action", "get_plan_statistics",
-			"org_id", orgID,
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
 	h.Success(c, stats)
 }
 

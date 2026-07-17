@@ -196,7 +196,7 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 	if bindings.ListPublishedScaleCodes == nil || bindings.ListPublishedQuestionnaireCodes == nil || bindings.LookupScaleQuestionnaireCode == nil {
 		t.Fatalf("list/lookup callbacks should always be wired: %#v", bindings)
 	}
-	if bindings.WarmScale != nil || bindings.WarmQuestionnaire != nil || bindings.WarmStatsSystem != nil {
+	if bindings.WarmScale != nil || bindings.WarmQuestionnaire != nil || bindings.WarmStatsOverview != nil {
 		t.Fatalf("warm callbacks = %#v, want nil without available cache clients", bindings)
 	}
 
@@ -214,7 +214,7 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 	if bindings.WarmScale == nil || bindings.WarmQuestionnaire == nil {
 		t.Fatalf("model and questionnaire warm callbacks should be wired: %#v", bindings)
 	}
-	if bindings.WarmStatsSystem == nil || bindings.WarmStatsQuestionnaire == nil || bindings.WarmStatsPlan == nil {
+	if bindings.WarmStatsOverview == nil {
 		t.Fatalf("statistics warm callbacks should be wired when query family is available: %#v", bindings)
 	}
 
@@ -224,7 +224,7 @@ func TestCacheGovernanceAdapterSelectsWarmupCallbacksByAvailableFamilies(t *test
 		},
 	}, map[string]redis.UniversalClient{"static": staticClient, "query": queryClient})
 	bindings = newCacheGovernanceAdapter(c).bindings()
-	if bindings.WarmStatsSystem != nil || bindings.WarmStatsQuestionnaire != nil || bindings.WarmStatsPlan != nil {
+	if bindings.WarmStatsOverview != nil {
 		t.Fatalf("statistics warm callbacks = %#v, want nil when statistics cache is disabled", bindings)
 	}
 }

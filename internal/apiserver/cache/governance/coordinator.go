@@ -77,9 +77,6 @@ type Dependencies struct {
 	WarmQuestionnaire               func(context.Context, string) error
 	WarmPublishedTypologyModel      func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
-	WarmStatsSystem                 func(context.Context, int64) error
-	WarmStatsQuestionnaire          func(context.Context, int64, string) error
-	WarmStatsPlan                   func(context.Context, int64, uint64) error
 }
 
 type coordinator struct {

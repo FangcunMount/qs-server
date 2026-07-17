@@ -108,13 +108,13 @@ func TestMetricEvidenceReaderBuildsCacheQueries(t *testing.T) {
 	reader.CacheFamilyAvailable(context.Background(), "apiserver", "query_result", "query_cache", "5m", now)
 	reader.CacheFamilyDegraded(context.Background(), "apiserver", "query_result", "query_cache", "5m", now)
 	reader.CacheWarmupRunsError(context.Background(), "5m", now)
-	reader.CacheHotsetSize(context.Background(), "query_result", "query.stats_system", "5m", now)
+	reader.CacheHotsetSize(context.Background(), "query_result", "query.stats_overview", "5m", now)
 
 	want := []string{
 		`sum(qs_cache_family_available{component="apiserver",family="query_result",profile="query_cache"})`,
 		`sum(increase(qs_cache_family_degraded_total{component="apiserver",family="query_result",profile="query_cache"}[5m]))`,
 		`sum(increase(qs_cache_warmup_runs_total{result="error"}[5m]))`,
-		`sum(qs_cache_hotset_size{family="query_result",kind="query.stats_system"})`,
+		`sum(qs_cache_hotset_size{family="query_result",kind="query.stats_overview"})`,
 	}
 	if len(metrics.specs) != len(want) {
 		t.Fatalf("metric specs = %#v, want %d specs", metrics.specs, len(want))
@@ -127,7 +127,7 @@ func TestMetricEvidenceReaderBuildsCacheQueries(t *testing.T) {
 	if metrics.specs[0].Name != "cache_family_available_apiserver_query_result" || metrics.specs[0].Unit != "bool" {
 		t.Fatalf("cache available spec = %#v, want legacy name and bool unit", metrics.specs[0])
 	}
-	if metrics.specs[3].Name != "cache_hotset_size_query_stats_system" || metrics.specs[3].Unit != "count" {
+	if metrics.specs[3].Name != "cache_hotset_size_query_stats_overview" || metrics.specs[3].Unit != "count" {
 		t.Fatalf("hotset size spec = %#v, want sanitized legacy name and count unit", metrics.specs[3])
 	}
 }

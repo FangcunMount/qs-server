@@ -9,23 +9,21 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type readService struct {
 	readModel         StatisticsReadModel
-	answerSheetRead   surveyreadmodel.AnswerSheetReader
 	cache             statisticscache.Cache
 	hotset            cachetarget.HotsetRecorder
 	overviewGuardOpts StatisticsReadGuardOptions
 
-	overview           *overviewQuery
-	clinicianStats     *clinicianStatsQuery
-	entryStats         *entryStatsQuery
-	questionnaireBatch *questionnaireBatchQuery
-	cacheHelper        *statisticsCacheHelper
+	overview       *overviewQuery
+	clinicianStats *clinicianStatsQuery
+	entryStats     *entryStatsQuery
+	contentBatch   *contentBatchQuery
+	cacheHelper    *statisticsCacheHelper
 }
 
 type ReadServiceOption func(*readService)
@@ -49,8 +47,8 @@ func WithReadServiceHotset(hotset cachetarget.HotsetRecorder) ReadServiceOption 
 }
 
 // NewReadService 创建统一统计读服务。
-func NewReadService(readModel StatisticsReadModel, answerSheetRead surveyreadmodel.AnswerSheetReader, opts ...ReadServiceOption) ReadService {
-	service := &readService{readModel: readModel, answerSheetRead: answerSheetRead}
+func NewReadService(readModel StatisticsReadModel, opts ...ReadServiceOption) ReadService {
+	service := &readService{readModel: readModel}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(service)
@@ -64,7 +62,7 @@ func NewReadService(readModel StatisticsReadModel, answerSheetRead surveyreadmod
 	service.overview = newOverviewQuery(readModel, service.cacheHelper, overviewOpts)
 	service.clinicianStats = &clinicianStatsQuery{readModel: readModel}
 	service.entryStats = &entryStatsQuery{readModel: readModel}
-	service.questionnaireBatch = &questionnaireBatchQuery{readModel: readModel, answerSheetRead: answerSheetRead}
+	service.contentBatch = &contentBatchQuery{readModel: readModel}
 	return service
 }
 
@@ -100,8 +98,8 @@ func (s *readService) GetCurrentClinicianTesteeSummary(ctx context.Context, orgI
 	return s.clinicianStats.GetCurrentClinicianTesteeSummary(ctx, orgID, operatorUserID, filter)
 }
 
-func (s *readService) GetQuestionnaireBatchStatistics(ctx context.Context, orgID int64, codes []string) (*domainStatistics.QuestionnaireBatchStatisticsResponse, error) {
-	return s.questionnaireBatch.GetQuestionnaireBatchStatistics(ctx, orgID, codes)
+func (s *readService) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
+	return s.contentBatch.GetContentBatchStatistics(ctx, orgID, refs)
 }
 
 func normalizeQueryFilter(filter QueryFilter) (domainStatistics.StatisticsTimeRange, error) {

@@ -5,7 +5,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -18,10 +17,8 @@ type InstallHost interface {
 
 // InstallFrom wires and registers the statistics module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
-	var answerSheetReader surveyreadmodel.AnswerSheetReader
 	var answerSheetScanSource statisticsApp.AnswerSheetScanSource
 	if infra := host.SurveyRuntimeInfra(); infra != nil {
-		answerSheetReader = infra.AnswerSheetReader
 		answerSheetScanSource = infra.AnswerSheetRepo
 	}
 	provider := host.CachePolicyProvider()
@@ -31,24 +28,21 @@ func InstallFrom(host InstallHost) error {
 		queryRedis = nil
 	}
 	module, err := Wire(WireInput{
-		MySQLDB:                host.MySQLDB(),
-		FallbackRedisClient:    queryRedis,
-		CacheBuilder:           host.CacheBuilder(redisruntime.FamilyQuery),
-		AnswerSheetReader:      answerSheetReader,
-		AnswerSheetScanSource:  answerSheetScanSource,
-		MongoDB:                host.MongoDB(),
-		RepairWindowDays:       host.StatisticsRepairWindowDays(),
-		CachePolicies:          provider,
-		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
-		OverviewGuardOpts:      host.StatisticsOverviewGuardOptions(),
-		QuestionnaireGuardOpts: host.StatisticsQuestionnaireGuardOptions(),
-		HotsetRecorder:         host.HotsetRecorder(),
-		LockManager:            host.LockManager(),
-		Observer:               host.CacheObserver(),
-		MySQLLimiter:           host.MySQLLimiter(),
-		WarmupCoordinator:      host.WarmupCoordinator(),
-		StatusService:          host.CacheGovernanceStatusService(),
-		MetaRedisClient:        host.CacheClient(redisruntime.FamilyMeta),
+		MySQLDB:               host.MySQLDB(),
+		FallbackRedisClient:   queryRedis,
+		CacheBuilder:          host.CacheBuilder(redisruntime.FamilyQuery),
+		AnswerSheetScanSource: answerSheetScanSource,
+		MongoDB:               host.MongoDB(),
+		RepairWindowDays:      host.StatisticsRepairWindowDays(),
+		CachePolicies:         provider,
+		OverviewGuardOpts:     host.StatisticsOverviewGuardOptions(),
+		HotsetRecorder:        host.HotsetRecorder(),
+		LockManager:           host.LockManager(),
+		Observer:              host.CacheObserver(),
+		MySQLLimiter:          host.MySQLLimiter(),
+		WarmupCoordinator:     host.WarmupCoordinator(),
+		StatusService:         host.CacheGovernanceStatusService(),
+		MetaRedisClient:       host.CacheClient(redisruntime.FamilyMeta),
 	})
 	if err != nil {
 		return err

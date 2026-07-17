@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	statisticsreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticsreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	mysqlDriver "gorm.io/driver/mysql"
@@ -21,57 +21,6 @@ func TestAssessmentServiceAnswerSheetScanAliasMatchesGORMNaming(t *testing.T) {
 	want := schema.NamingStrategy{}.ColumnName("", "AnswerSheetSubmittedCount")
 	if assessmentServiceAnswerSheetSubmittedScanAlias != want {
 		t.Fatalf("answersheet submitted scan alias = %q, want %q", assessmentServiceAnswerSheetSubmittedScanAlias, want)
-	}
-}
-
-func TestStatisticsTrendMetricMappingsDocumentColumnContract(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		got  string
-		ok   bool
-		want string
-	}{
-		{
-			name: "overview assessment created",
-			got:  mustOverviewTrendField(statisticsreadmodel.OrgOverviewMetricAssessmentCreated),
-			ok:   true,
-			want: "assessment_created_count",
-		},
-		{
-			name: "access entry opened",
-			got:  mustAccessFunnelTrendField(statisticsreadmodel.AccessFunnelMetricEntryOpened),
-			ok:   true,
-			want: "access_entry_opened_count",
-		},
-		{
-			name: "assessment report generated",
-			got:  mustAssessmentServiceTrendField(statisticsreadmodel.AssessmentServiceMetricReportGenerated),
-			ok:   true,
-			want: "service_report_generated_count",
-		},
-		{
-			name: "plan task completed",
-			got:  mustPlanTaskTrendField(statisticsreadmodel.PlanTaskMetricCompleted),
-			ok:   true,
-			want: "task_completed_count",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if !tc.ok || tc.got != tc.want {
-				t.Fatalf("field = %q ok=%v, want %q", tc.got, tc.ok, tc.want)
-			}
-		})
-	}
-	if field, ok := overviewTrendField(statisticsreadmodel.OrgOverviewMetric("unknown")); ok || field != "" {
-		t.Fatalf("unknown overview metric field=%q ok=%v, want empty false", field, ok)
-	}
-	if field, ok := planTaskTrendField(statisticsreadmodel.PlanTaskMetric("unknown")); ok || field != "" {
-		t.Fatalf("unknown plan metric field=%q ok=%v, want empty false", field, ok)
 	}
 }
 
@@ -188,17 +137,19 @@ func TestBuildAssessmentEntryMetaQueryDocumentsClinicianAndActiveFilters(t *test
 	}
 }
 
-func TestBuildQuestionnaireBatchTotalsQueryDocumentsDedupedTotalsContract(t *testing.T) {
+func TestBuildContentBatchTotalsQueriesPreserveTypedIdentityAndOrgScope(t *testing.T) {
 	t.Parallel()
 
 	db := newDryRunStatisticsReadModelDB(t)
-	var rows []statisticsreadmodel.QuestionnaireBatchTotal
+	var rows []statisticsApp.ContentBatchTotal
+	refs := []statisticsApp.ContentReference{{Type: "questionnaire", Code: "COMMON"}, {Type: "scale", Code: "COMMON"}}
 
-	stmt := buildQuestionnaireBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, []string{"Q-A", "Q-B"}).
+	stmt := buildProjectedContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, refs).
 		Find(&rows).Statement
 
 	sql := stmt.SQL.String()
 	for _, token := range []string{
+		"content_type AS type",
 		"content_code AS code",
 		"SUM(submission_count)",
 		"SUM(completion_count)",
@@ -206,15 +157,29 @@ func TestBuildQuestionnaireBatchTotalsQueryDocumentsDedupedTotalsContract(t *tes
 		"content_type IN",
 		"deleted_at IS NULL",
 		"content_code IN",
-		"GROUP BY",
+		"GROUP BY content_type, content_code",
 	} {
 		if !strings.Contains(sql, token) {
 			t.Fatalf("query sql %q does not contain %q", sql, token)
 		}
 	}
-	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "Q-A", "Q-B"} {
+	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "COMMON"} {
 		if !containsStatisticsReadModelVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+
+	realtimeStmt := buildRealtimeContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, refs).
+		Find(&rows).Statement
+	realtimeSQL := realtimeStmt.SQL.String()
+	for _, token := range []string{"FROM `assessment`", "org_id = ?", "status = 'evaluated'", "evaluation_model_kind = 'scale'", "questionnaire_code", "GROUP BY"} {
+		if !strings.Contains(realtimeSQL, token) {
+			t.Fatalf("realtime query sql %q does not contain %q", realtimeSQL, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "COMMON"} {
+		if !containsStatisticsReadModelVar(realtimeStmt.Vars, want) {
+			t.Fatalf("realtime query vars = %#v, want %v", realtimeStmt.Vars, want)
 		}
 	}
 }
@@ -402,26 +367,6 @@ func TestPlanTaskFulfillmentWindowFromRowCalculatesRatesOnDueCohort(t *testing.T
 	if got.CompletionRate != 70 || got.OnTimeCompletionRate != 60 {
 		t.Fatalf("rates = %.2f/%.2f, want 70/60", got.CompletionRate, got.OnTimeCompletionRate)
 	}
-}
-
-func mustOverviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) string {
-	field, _ := overviewTrendField(metric)
-	return field
-}
-
-func mustAccessFunnelTrendField(metric statisticsreadmodel.AccessFunnelMetric) string {
-	field, _ := accessFunnelTrendField(metric)
-	return field
-}
-
-func mustAssessmentServiceTrendField(metric statisticsreadmodel.AssessmentServiceMetric) string {
-	field, _ := assessmentServiceTrendField(metric)
-	return field
-}
-
-func mustPlanTaskTrendField(metric statisticsreadmodel.PlanTaskMetric) string {
-	field, _ := planTaskTrendField(metric)
-	return field
 }
 
 func newDryRunStatisticsReadModelDB(t *testing.T) *gorm.DB {

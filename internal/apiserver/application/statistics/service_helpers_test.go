@@ -21,20 +21,6 @@ func TestCurrentDayBounds(t *testing.T) {
 	}
 }
 
-func TestDaysAgoReturnsApproximateOffset(t *testing.T) {
-	t.Parallel()
-
-	got := daysAgo(7)
-	if got == nil {
-		t.Fatal("daysAgo returned nil")
-		return
-	}
-	diff := time.Since(*got)
-	if diff < 7*24*time.Hour || diff > 8*24*time.Hour {
-		t.Fatalf("daysAgo(7) diff = %v, want within [7d, 8d]", diff)
-	}
-}
-
 func TestNormalizeQueryFilterWithExplicitRange(t *testing.T) {
 	t.Parallel()
 

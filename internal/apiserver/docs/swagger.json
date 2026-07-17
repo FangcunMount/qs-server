@@ -6899,6 +6899,71 @@
                 }
             }
         },
+        "/api/v1/statistics/contents/batch": {
+            "post": {
+                "description": "按内容 type + code 批量查询测评形成数、完成数和完成率；需要问卷或量表管理权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "批量查询统一内容统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "内容标识列表",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.contentBatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.ContentBatchStatisticsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/statistics/entries": {
             "get": {
                 "description": "查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问",
@@ -7119,292 +7184,6 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/statistics.StatisticsOverview"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/plans/{plan_id}": {
-            "get": {
-                "description": "获取指定测评计划的统计数据，包括任务数、完成率等；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "获取计划统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "计划ID",
-                        "name": "plan_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.PlanStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/questionnaires/batch": {
-            "post": {
-                "description": "按问卷 code 批量查询提交数、完成数和完成率；需要问卷或量表管理权限",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "批量查询问卷统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "问卷编码列表",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.questionnaireBatchRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.QuestionnaireBatchStatisticsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/questionnaires/{code}": {
-            "get": {
-                "description": "获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "获取问卷/量表统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "问卷编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.QuestionnaireStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/system": {
-            "get": {
-                "description": "获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "获取系统整体统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.SystemStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/testees/{testee_id}": {
-            "get": {
-                "description": "获取指定受试者的统计数据，包括测评数、完成数、风险分布等；后台访问范围按 ClinicianTesteeRelation 收口",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "获取受试者统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TesteeStatisticsResponse"
                                         }
                                     }
                                 }
@@ -9658,19 +9437,13 @@
                 "static.scale",
                 "static.questionnaire",
                 "static.typology_model",
-                "query.stats_overview",
-                "query.stats_system",
-                "query.stats_questionnaire",
-                "query.stats_plan"
+                "query.stats_overview"
             ],
             "x-enum-varnames": [
                 "WarmupKindStaticScale",
                 "WarmupKindStaticQuestionnaire",
                 "WarmupKindStaticTypologyModel",
-                "WarmupKindQueryStatsOverview",
-                "WarmupKindQueryStatsSystem",
-                "WarmupKindQueryStatsQuestionnaire",
-                "WarmupKindQueryStatsPlan"
+                "WarmupKindQueryStatsOverview"
             ]
         },
         "conclusion.Outcome": {
@@ -10146,13 +9919,24 @@
                 }
             }
         },
-        "handler.questionnaireBatchRequest": {
+        "github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference": {
             "type": "object",
             "properties": {
-                "codes": {
+                "code": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/statistics.ContentType"
+                }
+            }
+        },
+        "handler.contentBatchRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference"
                     }
                 }
             }
@@ -11452,8 +11236,17 @@
                 "reason": {
                     "type": "string"
                 },
+                "renew_every_seconds": {
+                    "type": "integer"
+                },
+                "renewal_mode": {
+                    "type": "string"
+                },
                 "strategy": {
                     "type": "string"
+                },
+                "ttl_seconds": {
+                    "type": "integer"
                 }
             }
         },
@@ -14254,38 +14047,6 @@
                 }
             }
         },
-        "response.TesteeStatisticsResponse": {
-            "type": "object",
-            "properties": {
-                "completed_assessments": {
-                    "type": "integer"
-                },
-                "first_assessment_date": {
-                    "type": "string"
-                },
-                "last_assessment_date": {
-                    "type": "string"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "pending_assessments": {
-                    "type": "integer"
-                },
-                "risk_distribution": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "testee_id": {
-                    "type": "integer"
-                },
-                "total_assessments": {
-                    "type": "integer"
-                }
-            }
-        },
         "response.TrendDataPoint": {
             "type": "object",
             "properties": {
@@ -14671,6 +14432,48 @@
                 }
             }
         },
+        "statistics.ContentBatchStatisticsItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "completion_rate": {
+                    "type": "number"
+                },
+                "total_completions": {
+                    "type": "integer"
+                },
+                "total_submissions": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/statistics.ContentType"
+                }
+            }
+        },
+        "statistics.ContentBatchStatisticsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.ContentBatchStatisticsItem"
+                    }
+                }
+            }
+        },
+        "statistics.ContentType": {
+            "type": "string",
+            "enum": [
+                "questionnaire",
+                "scale"
+            ],
+            "x-enum-varnames": [
+                "ContentTypeQuestionnaire",
+                "ContentTypeScale"
+            ]
+        },
         "statistics.DailyCount": {
             "type": "object",
             "properties": {
@@ -14702,16 +14505,25 @@
                 "active_entry_count": {
                     "type": "integer"
                 },
+                "answer_sheet_submission_count": {
+                    "type": "integer"
+                },
                 "assessment_count": {
                     "type": "integer"
                 },
                 "clinician_count": {
                     "type": "integer"
                 },
+                "content_count": {
+                    "type": "integer"
+                },
                 "report_count": {
                     "type": "integer"
                 },
                 "testee_count": {
+                    "type": "integer"
+                },
+                "today_answer_sheet_submission_count": {
                     "type": "integer"
                 }
             }
@@ -14724,88 +14536,6 @@
                 },
                 "fulfillment": {
                     "$ref": "#/definitions/statistics.PlanTaskFulfillmentStatistics"
-                },
-                "trend": {
-                    "description": "Deprecated: 使用 activity.trend。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/statistics.PlanTaskTrend"
-                        }
-                    ]
-                },
-                "window": {
-                    "description": "Deprecated: 使用 activity.窗口。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/statistics.PlanTaskWindow"
-                        }
-                    ]
-                }
-            }
-        },
-        "statistics.PlanStatistics": {
-            "type": "object",
-            "properties": {
-                "active_testees": {
-                    "description": "活跃受试者数（有完成任务的）",
-                    "type": "integer"
-                },
-                "activity": {
-                    "description": "近窗口任务趋势，默认由计划日投影提供",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/statistics.PlanTaskActivityStatistics"
-                        }
-                    ]
-                },
-                "completed_tasks": {
-                    "description": "已完成任务数",
-                    "type": "integer"
-                },
-                "completion_rate": {
-                    "description": "完成率",
-                    "type": "number"
-                },
-                "enrolled_testees": {
-                    "description": "受试者统计",
-                    "type": "integer"
-                },
-                "expired_tasks": {
-                    "description": "已过期任务数",
-                    "type": "integer"
-                },
-                "fulfillment": {
-                    "$ref": "#/definitions/statistics.PlanTaskFulfillmentStatistics"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "pending_tasks": {
-                    "description": "待完成任务数",
-                    "type": "integer"
-                },
-                "plan_id": {
-                    "type": "integer"
-                },
-                "total_tasks": {
-                    "description": "任务统计",
-                    "type": "integer"
-                },
-                "trend": {
-                    "description": "Deprecated: 使用 activity.trend。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/statistics.PlanTaskTrend"
-                        }
-                    ]
-                },
-                "window": {
-                    "description": "Deprecated: 使用 activity.窗口。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/statistics.PlanTaskWindow"
-                        }
-                    ]
                 }
             }
         },
@@ -14938,135 +14668,6 @@
                 }
             }
         },
-        "statistics.PlanTaskTrend": {
-            "type": "object",
-            "properties": {
-                "task_completed": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                },
-                "task_created": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                },
-                "task_expired": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                },
-                "task_opened": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                }
-            }
-        },
-        "statistics.PlanTaskWindow": {
-            "type": "object",
-            "properties": {
-                "active_testees": {
-                    "type": "integer"
-                },
-                "enrolled_testees": {
-                    "type": "integer"
-                },
-                "task_completed_count": {
-                    "type": "integer"
-                },
-                "task_created_count": {
-                    "type": "integer"
-                },
-                "task_expired_count": {
-                    "type": "integer"
-                },
-                "task_opened_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.QuestionnaireBatchStatisticsItem": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "completion_rate": {
-                    "type": "number"
-                },
-                "total_completions": {
-                    "type": "integer"
-                },
-                "total_submissions": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.QuestionnaireBatchStatisticsResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.QuestionnaireBatchStatisticsItem"
-                    }
-                }
-            }
-        },
-        "statistics.QuestionnaireStatistics": {
-            "type": "object",
-            "properties": {
-                "completion_rate": {
-                    "description": "完成率 = TotalCompletions / TotalSubmissions",
-                    "type": "number"
-                },
-                "daily_trend": {
-                    "description": "趋势数据（近30天）",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                },
-                "last_15_days_count": {
-                    "description": "近15天提交数",
-                    "type": "integer"
-                },
-                "last_30_days_count": {
-                    "description": "近30天提交数",
-                    "type": "integer"
-                },
-                "last_7_days_count": {
-                    "description": "时间维度统计",
-                    "type": "integer"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "origin_distribution": {
-                    "description": "来源分布",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "total_completions": {
-                    "description": "总完成数（已解读）",
-                    "type": "integer"
-                },
-                "total_submissions": {
-                    "description": "基础统计",
-                    "type": "integer"
-                }
-            }
-        },
         "statistics.RepairCompleteRequest": {
             "type": "object",
             "properties": {
@@ -15074,18 +14675,6 @@
                     "type": "array",
                     "items": {
                         "type": "integer"
-                    }
-                },
-                "plan_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "questionnaire_codes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
                     }
                 },
                 "repair_kind": {
@@ -15130,56 +14719,6 @@
                 },
                 "to": {
                     "type": "string"
-                }
-            }
-        },
-        "statistics.SystemStatistics": {
-            "type": "object",
-            "properties": {
-                "answer_sheet_count": {
-                    "description": "答卷总数",
-                    "type": "integer"
-                },
-                "assessment_count": {
-                    "description": "测评总数",
-                    "type": "integer"
-                },
-                "assessment_status_distribution": {
-                    "description": "状态分布",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "assessment_trend": {
-                    "description": "趋势数据（近30天）",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.DailyCount"
-                    }
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "questionnaire_count": {
-                    "description": "基础数量统计",
-                    "type": "integer"
-                },
-                "testee_count": {
-                    "description": "受试者总数",
-                    "type": "integer"
-                },
-                "today_new_answer_sheets": {
-                    "description": "今日新增答卷",
-                    "type": "integer"
-                },
-                "today_new_assessments": {
-                    "description": "今日新增（每日凌晨清零）",
-                    "type": "integer"
-                },
-                "today_new_testees": {
-                    "description": "今日新增受试者",
-                    "type": "integer"
                 }
             }
         },

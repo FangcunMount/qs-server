@@ -11,30 +11,6 @@ import (
 
 // ==================== 应用服务接口 ====================
 
-// SystemStatisticsService 系统整体统计服务
-type SystemStatisticsService interface {
-	// GetSystemStatistics 获取系统整体统计
-	GetSystemStatistics(ctx context.Context, orgID int64) (*statistics.SystemStatistics, error)
-}
-
-// QuestionnaireStatisticsService 问卷/量表统计服务
-type QuestionnaireStatisticsService interface {
-	// GetQuestionnaireStatistics 获取问卷/量表统计
-	GetQuestionnaireStatistics(ctx context.Context, orgID int64, questionnaireCode string) (*statistics.QuestionnaireStatistics, error)
-}
-
-// TesteeStatisticsService 受试者统计服务
-type TesteeStatisticsService interface {
-	// GetTesteeStatistics 获取受试者统计
-	GetTesteeStatistics(ctx context.Context, orgID int64, testeeID uint64) (*statistics.TesteeStatistics, error)
-}
-
-// PlanStatisticsService 测评计划统计服务
-type PlanStatisticsService interface {
-	// GetPlanStatistics 获取计划统计
-	GetPlanStatistics(ctx context.Context, orgID int64, planID uint64) (*statistics.PlanStatistics, error)
-}
-
 // ReadService v1 统一统计读服务。
 type ReadService interface {
 	GetOverview(ctx context.Context, orgID int64, filter QueryFilter) (*statistics.StatisticsOverview, error)
@@ -45,7 +21,7 @@ type ReadService interface {
 	GetCurrentClinicianStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianStatistics, error)
 	ListCurrentClinicianEntryStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter, page, pageSize int) (*statistics.AssessmentEntryStatisticsList, error)
 	GetCurrentClinicianTesteeSummary(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianTesteeSummaryStatistics, error)
-	GetQuestionnaireBatchStatistics(ctx context.Context, orgID int64, codes []string) (*statistics.QuestionnaireBatchStatisticsResponse, error)
+	GetContentBatchStatistics(ctx context.Context, orgID int64, refs []statistics.ContentReference) (*statistics.ContentBatchStatisticsResponse, error)
 }
 
 // PeriodicStatsService 受试者周期性统计服务。
@@ -82,10 +58,8 @@ type GovernanceStatusReader interface {
 
 // RepairCompleteRequest 描述 repair complete 治理请求。
 type RepairCompleteRequest struct {
-	RepairKind         string   `json:"repair_kind"`
-	OrgIDs             []int64  `json:"org_ids"`
-	QuestionnaireCodes []string `json:"questionnaire_codes"`
-	PlanIDs            []uint64 `json:"plan_ids"`
+	RepairKind string  `json:"repair_kind"`
+	OrgIDs     []int64 `json:"org_ids"`
 }
 
 // ManualWarmupRequest 描述手工治理预热请求。

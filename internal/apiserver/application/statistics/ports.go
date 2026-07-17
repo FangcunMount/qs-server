@@ -12,21 +12,6 @@ type TesteeAccessValidator interface {
 	ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error
 }
 
-// StatisticsQueryReader 定义读取统计数据的接口，提供了加载系统统计、问卷统计和计划统计的方法。实现该接口的组件负责从数据源中获取统计数据，并返回给调用者。
-type StatisticsQueryReader interface {
-	LoadSystemStatistics(ctx context.Context, orgID int64) (*domainStatistics.SystemStatistics, bool, error)
-	LoadQuestionnaireStatistics(ctx context.Context, orgID int64, questionnaireCode string) (*domainStatistics.QuestionnaireStatistics, bool, error)
-	LoadPlanStatistics(ctx context.Context, orgID int64, planID uint64) (*domainStatistics.PlanStatistics, bool, error)
-}
-
-// StatisticsRealtimeReader 定义实时构建统计数据的接口，提供了构建系统统计、问卷统计、测试对象统计和计划统计的方法。实现该接口的组件负责根据最新的数据动态计算统计结果，以确保提供给用户的是最新的统计信息。
-type StatisticsRealtimeReader interface {
-	BuildRealtimeSystemStatistics(ctx context.Context, orgID int64) (*domainStatistics.SystemStatistics, error)
-	BuildRealtimeQuestionnaireStatistics(ctx context.Context, orgID int64, questionnaireCode string) (*domainStatistics.QuestionnaireStatistics, error)
-	BuildRealtimeTesteeStatistics(ctx context.Context, orgID int64, testeeID uint64) (*domainStatistics.TesteeStatistics, error)
-	BuildRealtimePlanStatistics(ctx context.Context, orgID int64, planID uint64) (*domainStatistics.PlanStatistics, error)
-}
-
 // StatisticsRebuildWriter 定义重建统计数据的接口，提供了重建日常统计、组织快照统计和计划统计的方法。实现该接口的组件负责根据历史数据重新计算统计结果，以修正可能存在的数据错误或更新统计算法后的结果。
 type StatisticsRebuildWriter interface {
 	RebuildDailyStatistics(ctx context.Context, orgID int64, startDate, endDate time.Time) error

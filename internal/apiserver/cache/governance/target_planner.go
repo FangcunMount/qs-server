@@ -50,13 +50,6 @@ func (p *TargetPlanner) querySeedTargets(orgFilter []int64) []cachetarget.Warmup
 		for _, preset := range overviewSeedPresets(p.deps.StatisticsSeeds.OverviewPresets) {
 			targets = append(targets, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
 		}
-		targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
-		for _, code := range p.deps.StatisticsSeeds.QuestionnaireCodes {
-			targets = append(targets, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
-		}
-		for _, planID := range p.deps.StatisticsSeeds.PlanIDs {
-			targets = append(targets, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
-		}
 	}
 	return targets
 }
@@ -97,9 +90,6 @@ func (p *TargetPlanner) queryHotTargets(ctx context.Context, orgFilter []int64, 
 	targets := make([]cachetarget.WarmupTarget, 0)
 	for _, kind := range []cachetarget.WarmupKind{
 		cachetarget.WarmupKindQueryStatsOverview,
-		cachetarget.WarmupKindQueryStatsSystem,
-		cachetarget.WarmupKindQueryStatsQuestionnaire,
-		cachetarget.WarmupKindQueryStatsPlan,
 	} {
 		items, err := p.deps.Hotset.Top(ctx, cachemodel.FamilyQuery, kind, p.cfg.HotsetTopN)
 		if err != nil {
@@ -124,21 +114,6 @@ func allowQueryTarget(target cachetarget.WarmupTarget, orgFilter map[int64]struc
 	case cachetarget.WarmupKindQueryStatsOverview:
 		orgID, _, ok := cachetarget.ParseQueryStatsOverviewScope(target.Scope)
 		return ok && allowOrg(orgFilter, orgID)
-	case cachetarget.WarmupKindQueryStatsSystem:
-		orgID, ok := cachetarget.ParseQueryStatsSystemScope(target.Scope)
-		return ok && allowOrg(orgFilter, orgID)
-	case cachetarget.WarmupKindQueryStatsQuestionnaire:
-		orgID, code, ok := cachetarget.ParseQueryStatsQuestionnaireScope(target.Scope)
-		if !ok || !allowOrg(orgFilter, orgID) {
-			return false
-		}
-		return repair == nil || len(repair.QuestionnaireCodes) == 0 || containsFold(repair.QuestionnaireCodes, code)
-	case cachetarget.WarmupKindQueryStatsPlan:
-		orgID, planID, ok := cachetarget.ParseQueryStatsPlanScope(target.Scope)
-		if !ok || !allowOrg(orgFilter, orgID) {
-			return false
-		}
-		return repair == nil || len(repair.PlanIDs) == 0 || containsUint64(repair.PlanIDs, planID)
 	default:
 		return true
 	}
@@ -173,22 +148,4 @@ func dedupeTargets(targets []cachetarget.WarmupTarget) []cachetarget.WarmupTarge
 		result = append(result, seen[key])
 	}
 	return result
-}
-
-func containsFold(items []string, want string) bool {
-	for _, item := range items {
-		if strings.EqualFold(strings.TrimSpace(item), strings.TrimSpace(want)) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsUint64(items []uint64, want uint64) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
 }

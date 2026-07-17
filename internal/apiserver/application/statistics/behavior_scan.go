@@ -4,12 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
 type behaviorJourneyScanner struct {
 	uow          transactionRunner
-	repo         BehaviorJourneyScanRepository
+	journeyRepo  BehaviorJourneyRepository
+	scanRepo     BehaviorJourneyScanStateRepository
+	rebuilder    JourneyProjectionRebuilder
 	answerSheets AnswerSheetScanSource
 	reports      ReportScanSource
 	lifecycler   episodeLifecycler
@@ -29,24 +32,30 @@ type scanBatchResult struct {
 // NewBehaviorJourneyScanService 创建background scan 投影器。
 func NewBehaviorJourneyScanService(
 	runner transactionRunner,
-	repo BehaviorJourneyScanRepository,
+	journeyRepo BehaviorJourneyRepository,
+	scanRepo BehaviorJourneyScanStateRepository,
+	rebuilder JourneyProjectionRebuilder,
 	answerSheets AnswerSheetScanSource,
 	reports ReportScanSource,
 ) BehaviorJourneyScanService {
-	if runner == nil || repo == nil {
+	if runner == nil || journeyRepo == nil || scanRepo == nil || rebuilder == nil {
 		return nil
 	}
-	journey := journeyWriter{repo: repo}
+	journey := journeyWriter{repo: journeyRepo}
 	return &behaviorJourneyScanner{
 		uow:          runner,
-		repo:         repo,
+		journeyRepo:  journeyRepo,
+		scanRepo:     scanRepo,
+		rebuilder:    rebuilder,
 		answerSheets: answerSheets,
 		reports:      reports,
-		lifecycler:   episodeLifecycler{repo: repo, journey: journey},
+		lifecycler:   episodeLifecycler{repo: journeyRepo, journey: journey},
 	}
 }
 
 func (s *behaviorJourneyScanner) ScanDue(ctx context.Context, input BehaviorJourneyScanInput) (BehaviorJourneyScanResult, error) {
+	startedAt := time.Now()
+	defer observeBehaviorScanDuration(startedAt)
 	result := BehaviorJourneyScanResult{}
 	if s == nil {
 		return result, nil
@@ -78,6 +87,18 @@ func (s *behaviorJourneyScanner) ScanDue(ctx context.Context, input BehaviorJour
 		for _, source := range sources {
 			sourceResult := s.scanSource(ctx, orgID, source, batchSize, lookback, now, input.DryRun, input.WindowRecalc)
 			result.SourceResults = append(result.SourceResults, sourceResult)
+			observeBehaviorScanSource(sourceResult)
+			if sourceResult.Error != "" {
+				logger.L(ctx).Warnw("behavior journey scan source partially failed",
+					"org_id", orgID,
+					"source", source,
+					"scanned", sourceResult.Scanned,
+					"projected", sourceResult.Projected,
+					"skipped", sourceResult.Skipped,
+					"failed", sourceResult.Failed,
+					"error", sourceResult.Error,
+				)
+			}
 		}
 		if input.WindowRecalc && !input.DryRun {
 			recalcResult := s.recalcJourneyDailyWindow(ctx, orgID, lookback, now)
@@ -94,6 +115,7 @@ func (s *behaviorJourneyScanner) lifecyclerForScan(skipStatisticsMutations bool)
 }
 
 func (s *behaviorJourneyScanner) recalcJourneyDailyWindow(ctx context.Context, orgID int64, lookback time.Duration, now time.Time) BehaviorJourneyScanRecalcResult {
+	startedAt := time.Now()
 	startDate, endDate := journeyRecalcWindow(now, lookback)
 	result := BehaviorJourneyScanRecalcResult{
 		OrgID:     orgID,
@@ -103,9 +125,11 @@ func (s *behaviorJourneyScanner) recalcJourneyDailyWindow(ctx context.Context, o
 	if !startDate.Before(endDate) {
 		return result
 	}
-	if err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		return s.repo.RebuildJourneyDailyWindow(txCtx, orgID, startDate, endDate)
-	}); err != nil {
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		return s.rebuilder.RebuildJourneyDailyWindow(txCtx, orgID, startDate, endDate)
+	})
+	observeBehaviorProjectionRebuild(startedAt, err)
+	if err != nil {
 		result.Error = err.Error()
 	}
 	return result
@@ -130,7 +154,7 @@ func (s *behaviorJourneyScanner) scanSource(
 	windowRecalc bool,
 ) BehaviorJourneyScanSourceResult {
 	result := BehaviorJourneyScanSourceResult{SourceName: source, OrgID: orgID}
-	watermark, err := s.repo.LoadScanWatermark(ctx, orgID, source)
+	watermark, err := s.scanRepo.LoadScanWatermark(ctx, orgID, source)
 	if err != nil {
 		result.Error = err.Error()
 		result.Failed = 1
@@ -156,7 +180,7 @@ func (s *behaviorJourneyScanner) scanSource(
 	watermark.ScanWindowEnd = &windowEnd
 	watermark.LastError = ""
 	if !dryRun {
-		if err := s.repo.SaveScanWatermark(ctx, watermark); err != nil {
+		if err := s.scanRepo.SaveScanWatermark(ctx, watermark); err != nil {
 			result.Error = err.Error()
 			result.Failed = 1
 			return result
@@ -186,7 +210,7 @@ func (s *behaviorJourneyScanner) scanSource(
 		result.Error = err.Error()
 		result.Failed = batch.scanned - batch.projected
 		if !dryRun {
-			_ = s.repo.SaveScanWatermark(ctx, watermark)
+			_ = s.scanRepo.SaveScanWatermark(ctx, watermark)
 		}
 		return result
 	}
@@ -196,7 +220,7 @@ func (s *behaviorJourneyScanner) scanSource(
 	}
 	watermark.Status = domainStatistics.ScanWatermarkStatusIdle
 	if !dryRun {
-		if err := s.repo.SaveScanWatermark(ctx, watermark); err != nil {
+		if err := s.scanRepo.SaveScanWatermark(ctx, watermark); err != nil {
 			result.Error = err.Error()
 			result.Failed = 1
 			return result
@@ -242,7 +266,7 @@ func (s *behaviorJourneyScanner) scanEntryResolve(
 	dryRun bool,
 	windowRecalc bool,
 ) (scanBatchResult, error) {
-	facts, err := s.repo.ListEntryResolveFacts(ctx, orgID, sinceID, sinceTime, limit)
+	facts, err := s.scanRepo.ListEntryResolveFacts(ctx, orgID, sinceID, sinceTime, limit)
 	if err != nil {
 		return scanBatchResult{}, err
 	}
@@ -267,7 +291,7 @@ func (s *behaviorJourneyScanner) scanEntryIntake(
 	dryRun bool,
 	windowRecalc bool,
 ) (scanBatchResult, error) {
-	facts, err := s.repo.ListEntryIntakeFacts(ctx, orgID, sinceID, sinceTime, limit)
+	facts, err := s.scanRepo.ListEntryIntakeFacts(ctx, orgID, sinceID, sinceTime, limit)
 	if err != nil {
 		return scanBatchResult{}, err
 	}
@@ -320,7 +344,7 @@ func (s *behaviorJourneyScanner) scanAssessments(
 	dryRun bool,
 	windowRecalc bool,
 ) (scanBatchResult, error) {
-	facts, err := s.repo.ListAssessmentCreatedFacts(ctx, orgID, sinceID, sinceTime, limit)
+	facts, err := s.scanRepo.ListAssessmentCreatedFacts(ctx, orgID, sinceID, sinceTime, limit)
 	if err != nil {
 		return scanBatchResult{}, err
 	}
@@ -452,7 +476,7 @@ func (s *behaviorJourneyScanner) projectReportGeneratedFromScan(ctx context.Cont
 	if err := lc.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
 		return err
 	}
-	episode, err := s.repo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
+	episode, err := s.journeyRepo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
 	if err != nil {
 		return err
 	}
@@ -465,13 +489,13 @@ func (s *behaviorJourneyScanner) projectReportGeneratedFromScan(ctx context.Cont
 	episode.ReportID = uint64Ptr(input.ReportID)
 	episode.ReportGeneratedAt = timePtr(input.OccurredAt)
 	episode.Status = domainStatistics.EpisodeStatusCompleted
-	if err := s.repo.SaveEpisode(ctx, episode); err != nil {
+	if err := s.journeyRepo.SaveEpisode(ctx, episode); err != nil {
 		return err
 	}
 	if lc.skipStatisticsMutations {
 		return nil
 	}
-	return s.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
+	return s.journeyRepo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                 input.OrgID,
 		ClinicianID:           valueOrZero(episode.ClinicianID),
 		EntryID:               valueOrZero(episode.EntryID),

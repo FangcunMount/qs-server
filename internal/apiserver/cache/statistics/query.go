@@ -9,7 +9,6 @@ import (
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
-	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
@@ -29,7 +28,6 @@ type StatisticsCache struct {
 	policies     sharedcache.PolicyProvider
 	observer     *observability.ComponentObserver
 	keys         *keyspace.Builder
-	coalescer    loadguard.Coalescer
 }
 
 // NewStatisticsCacheWithBuilderAndPolicy 创建绑定显式 key builder/policy 的统计缓存。
@@ -62,7 +60,6 @@ func NewStatisticsCacheWithBuilderProviderVersionStoreAndObserver(
 		policies:     policies,
 		observer:     observer,
 		keys:         builder,
-		coalescer:    loadguard.NewCoalescer(true),
 	}
 }
 

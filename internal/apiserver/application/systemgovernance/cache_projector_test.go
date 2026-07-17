@@ -34,13 +34,13 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 			},
 		},
 	}
-	hotset := CacheHotsetViewFromResponse(cachetarget.WarmupKindQueryStatsSystem, &statisticsApp.GovernanceHotsetResponse{
+	hotset := CacheHotsetViewFromResponse(cachetarget.WarmupKindQueryStatsOverview, &statisticsApp.GovernanceHotsetResponse{
 		Family:    "query_result",
-		Kind:      cachetarget.WarmupKindQueryStatsSystem,
+		Kind:      cachetarget.WarmupKindQueryStatsOverview,
 		Limit:     5,
 		Available: true,
 		Items: []cachetarget.HotsetItem{
-			{Target: cachetarget.NewQueryStatsSystemWarmupTarget(7), Score: 3},
+			{Target: cachetarget.NewQueryStatsOverviewWarmupTarget(7, "30d"), Score: 3},
 		},
 	}, nil)
 
@@ -52,8 +52,8 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 	if len(projection.FamilyRows) != 1 || projection.FamilyRows[0].Severity != SeverityWarning {
 		t.Fatalf("family rows = %#v, want one warning row", projection.FamilyRows)
 	}
-	if len(projection.WarmupKinds) != 7 {
-		t.Fatalf("warmup kinds len = %d, want 7", len(projection.WarmupKinds))
+	if len(projection.WarmupKinds) != 4 {
+		t.Fatalf("warmup kinds len = %d, want 4", len(projection.WarmupKinds))
 	}
 	for _, descriptor := range projection.WarmupKinds {
 		if _, ok := cachetarget.ParseWarmupKind(string(descriptor.Kind)); !ok {

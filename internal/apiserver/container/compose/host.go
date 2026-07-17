@@ -39,9 +39,7 @@ type Host interface {
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config
-	StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions
 	StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions
-	StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions
 
 	CacheClient(family redisruntime.Family) redis.UniversalClient
 	CacheBuilder(family redisruntime.Family) *keyspace.Builder

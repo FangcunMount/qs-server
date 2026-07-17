@@ -298,11 +298,8 @@ cache:
       warm_on_startup: true
       org_ids: [1]
       overview_presets: ["today", "7d", "30d"]
-      questionnaire_codes: []
-      plan_ids: []
-    statistics_system:
+    statistics_overview:
       service_singleflight: true
-      disable_realtime_fallback: true
       stale_on_timeout: true
       load_timeout: 25s
     warmup:

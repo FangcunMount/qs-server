@@ -10,7 +10,6 @@ import (
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsQueryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -26,37 +25,30 @@ import (
 
 // Module assembles statistics application services.
 type Module struct {
-	SystemStatisticsService        statisticsApp.SystemStatisticsService
-	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
-	TesteeStatisticsService        statisticsApp.TesteeStatisticsService
-	PlanStatisticsService          statisticsApp.PlanStatisticsService
-	ReadService                    statisticsApp.ReadService
-	PeriodicStatsService           statisticsApp.PeriodicStatsService
-	SyncService                    statisticsApp.StatisticsSyncService
-	BehaviorProjectorService       statisticsApp.BehaviorProjectorService
-	BehaviorJourneyScanService     statisticsApp.BehaviorJourneyScanService
+	ReadService                statisticsApp.ReadService
+	PeriodicStatsService       statisticsApp.PeriodicStatsService
+	SyncService                statisticsApp.StatisticsSyncService
+	BehaviorProjectorService   statisticsApp.BehaviorProjectorService
+	BehaviorJourneyScanService statisticsApp.BehaviorJourneyScanService
 }
 
 // Deps defines explicit constructor dependencies for the statistics module.
 type Deps struct {
-	MySQLDB                *gorm.DB
-	RedisClient            redis.UniversalClient
-	CacheBuilder           *keyspace.Builder
-	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
-	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
-	MongoDB                *mongo.Database
-	RepairWindowDays       int
-	CachePolicies          sharedcache.PolicyProvider
-	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
-	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
-	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
-	HotsetRecorder         cachetarget.HotsetRecorder
-	LockManager            locklease.Manager
-	VersionStore           querycache.VersionTokenStore
-	Observer               *observability.ComponentObserver
-	MySQLLimiter           backpressure.Acquirer
-	WarmupCoordinator      statisticsApp.WarmupCoordinator
-	StatusService          statisticsApp.GovernanceStatusReader
+	MySQLDB               *gorm.DB
+	RedisClient           redis.UniversalClient
+	CacheBuilder          *keyspace.Builder
+	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
+	MongoDB               *mongo.Database
+	RepairWindowDays      int
+	CachePolicies         sharedcache.PolicyProvider
+	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
+	HotsetRecorder        cachetarget.HotsetRecorder
+	LockManager           locklease.Manager
+	VersionStore          querycache.VersionTokenStore
+	Observer              *observability.ComponentObserver
+	MySQLLimiter          backpressure.Acquirer
+	WarmupCoordinator     statisticsApp.WarmupCoordinator
+	StatusService         statisticsApp.GovernanceStatusReader
 }
 
 // New assembles the statistics module.
@@ -83,22 +75,8 @@ func New(deps Deps) (*Module, error) {
 	}
 	txRunner := modtx.NewMySQLRunner(normalized.MySQLDB)
 
-	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(
-		repo,
-		repo,
-		cache,
-		normalized.HotsetRecorder,
-		statisticsApp.WithSystemStatisticsOptions(normalized.SystemStatisticsOpts),
-	)
-	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(
-		repo, repo, cache, normalized.HotsetRecorder,
-		statisticsApp.WithQuestionnaireStatisticsGuard(normalized.QuestionnaireGuardOpts),
-	)
-	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(repo, cache)
-	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(
 		statisticsReadModelInfra.NewReadModel(normalized.MySQLDB),
-		normalized.AnswerSheetReader,
 		statisticsApp.WithReadServiceCache(cache),
 		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
 		statisticsApp.WithReadServiceOverviewGuard(normalized.OverviewGuardOpts),
@@ -107,6 +85,8 @@ func New(deps Deps) (*Module, error) {
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, repo)
 	module.BehaviorJourneyScanService = statisticsApp.NewBehaviorJourneyScanService(
 		txRunner,
+		repo,
+		repo,
 		repo,
 		normalized.AnswerSheetScanSource,
 		statisticsQueryInfra.NewReportScanSource(normalized.MySQLDB, normalized.MongoDB),

@@ -69,22 +69,8 @@ func (c *Container) StatisticsRepairWindowDays() int { return c.statisticsRepair
 
 func (c *Container) ReportStatusConfig() reportstatus.Config { return c.reportStatusConfig }
 
-func (c *Container) StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions {
-	opts := c.cacheOptions.StatisticsSystem
-	return statisticsApp.SystemStatisticsOptions{
-		ServiceSingleflight:     opts.ServiceSingleflight,
-		DisableRealtimeFallback: opts.DisableRealtimeFallback,
-		StaleOnTimeout:          opts.StaleOnTimeout,
-		LoadTimeout:             opts.LoadTimeout,
-	}
-}
-
 func (c *Container) StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions {
 	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsOverview)
-}
-
-func (c *Container) StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions {
-	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsQuestionnaire)
 }
 
 func toStatisticsReadGuardOptions(opts cachebootstrap.StatisticsReadGuardOptions) statisticsApp.StatisticsReadGuardOptions {

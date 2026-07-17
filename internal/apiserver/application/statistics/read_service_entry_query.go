@@ -7,7 +7,7 @@ import (
 )
 
 type entryStatsQuery struct {
-	readModel StatisticsReadModel
+	readModel EntryStatisticsReader
 }
 
 func (q *entryStatsQuery) ListAssessmentEntryStatistics(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool, filter QueryFilter, page, pageSize int) (*domainStatistics.AssessmentEntryStatisticsList, error) {
@@ -25,14 +25,18 @@ func (q *entryStatsQuery) ListAssessmentEntryStatistics(ctx context.Context, org
 	if err != nil {
 		return nil, err
 	}
+	entryIDs := make([]uint64, 0, len(metas))
+	for i := range metas {
+		entryIDs = append(entryIDs, metas[i].ID.Uint64())
+	}
+	details, err := q.readModel.GetAssessmentEntryStatisticsDetails(ctx, orgID, entryIDs, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]*domainStatistics.AssessmentEntryStatistics, 0, len(metas))
 	for i := range metas {
-		item, err := q.buildEntryStatistics(ctx, orgID, metas[i], timeRange)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+		items = append(items, buildEntryStatistics(metas[i], timeRange, details[metas[i].ID.Uint64()]))
 	}
 
 	return &domainStatistics.AssessmentEntryStatisticsList{
@@ -54,7 +58,11 @@ func (q *entryStatsQuery) GetAssessmentEntryStatistics(ctx context.Context, orgI
 	if err != nil {
 		return nil, err
 	}
-	return q.buildEntryStatistics(ctx, orgID, *metaItem, timeRange)
+	details, err := q.readModel.GetAssessmentEntryStatisticsDetails(ctx, orgID, []uint64{entryID}, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	return buildEntryStatistics(*metaItem, timeRange, details[entryID]), nil
 }
 
 func (q *entryStatsQuery) ListCurrentClinicianEntryStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter, page, pageSize int) (*domainStatistics.AssessmentEntryStatisticsList, error) {
@@ -66,30 +74,13 @@ func (q *entryStatsQuery) ListCurrentClinicianEntryStatistics(ctx context.Contex
 	return q.ListAssessmentEntryStatistics(ctx, orgID, &clinicianID, nil, filter, page, pageSize)
 }
 
-func (q *entryStatsQuery) buildEntryStatistics(ctx context.Context, orgID int64, entry domainStatistics.AssessmentEntryStatisticsMeta, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.AssessmentEntryStatistics, error) {
-	snapshot, err := q.readModel.GetAssessmentEntryCounts(ctx, orgID, entry.ID.Uint64(), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	window, err := q.readModel.GetAssessmentEntryCounts(ctx, orgID, entry.ID.Uint64(), &timeRange.From, &timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	lastResolvedAt, err := q.readModel.GetAssessmentEntryLastEventTime(ctx, orgID, entry.ID.Uint64(), domainStatistics.BehaviorEventEntryOpened)
-	if err != nil {
-		return nil, err
-	}
-	lastIntakeAt, err := q.readModel.GetAssessmentEntryLastEventTime(ctx, orgID, entry.ID.Uint64(), domainStatistics.BehaviorEventIntakeConfirmed)
-	if err != nil {
-		return nil, err
-	}
-
+func buildEntryStatistics(entry domainStatistics.AssessmentEntryStatisticsMeta, timeRange domainStatistics.StatisticsTimeRange, detail AssessmentEntryStatisticsDetail) *domainStatistics.AssessmentEntryStatistics {
 	return &domainStatistics.AssessmentEntryStatistics{
 		TimeRange:      timeRange,
 		Entry:          entry,
-		Snapshot:       snapshot,
-		Window:         window,
-		LastResolvedAt: lastResolvedAt,
-		LastIntakeAt:   lastIntakeAt,
-	}, nil
+		Snapshot:       detail.Snapshot,
+		Window:         detail.Window,
+		LastResolvedAt: detail.LastResolvedAt,
+		LastIntakeAt:   detail.LastIntakeAt,
+	}
 }

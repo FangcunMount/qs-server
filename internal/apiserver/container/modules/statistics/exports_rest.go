@@ -20,10 +20,6 @@ func (m *Module) ExportRESTDeps(opts RESTExportOptions) resttransport.Statistics
 		return deps
 	}
 	deps.Enabled = true
-	deps.SystemStatisticsService = m.SystemStatisticsService
-	deps.QuestionnaireStatisticsService = m.QuestionnaireStatisticsService
-	deps.TesteeStatisticsService = m.TesteeStatisticsService
-	deps.PlanStatisticsService = m.PlanStatisticsService
 	deps.ReadService = m.ReadService
 	deps.PeriodicStatsService = m.PeriodicStatsService
 	deps.SyncService = m.SyncService

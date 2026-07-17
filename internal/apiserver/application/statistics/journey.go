@@ -97,14 +97,18 @@ func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, i
 }
 
 func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.Context, limit int) (int, error) {
+	startedAt := time.Now()
+	processed := 0
+	var resultErr error
+	defer func() { observePendingReconcile(startedAt, processed, resultErr) }()
 	if limit <= 0 {
 		limit = 100
 	}
 	rows, err := p.pending.listDue(ctx, limit, time.Now())
 	if err != nil {
+		resultErr = err
 		return 0, err
 	}
-	processed := 0
 	for _, item := range rows {
 		if item == nil {
 			continue
@@ -114,6 +118,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 				return p.pending.reschedule(txCtx, item.EventID, err.Error(), item.AttemptCount+1)
 			}); txErr != nil {
+				resultErr = txErr
 				return processed, txErr
 			}
 			continue
@@ -133,6 +138,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusCompleted)
 		})
 		if err != nil {
+			resultErr = err
 			return processed, err
 		}
 		processed++

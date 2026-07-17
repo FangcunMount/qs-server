@@ -29,9 +29,6 @@ type GovernanceBindings struct {
 	WarmQuestionnaire               func(context.Context, string) error
 	WarmPublishedTypologyModel      func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
-	WarmStatsSystem                 func(context.Context, int64) error
-	WarmStatsQuestionnaire          func(context.Context, int64, string) error
-	WarmStatsPlan                   func(context.Context, int64, uint64) error
 }
 
 // Subsystem 收口 apiserver cache 子系统运行时与治理装配。
@@ -138,9 +135,6 @@ func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
 		WarmQuestionnaire:               bindings.WarmQuestionnaire,
 		WarmPublishedTypologyModel:      bindings.WarmPublishedTypologyModel,
 		WarmStatsOverview:               bindings.WarmStatsOverview,
-		WarmStatsSystem:                 bindings.WarmStatsSystem,
-		WarmStatsQuestionnaire:          bindings.WarmStatsQuestionnaire,
-		WarmStatsPlan:                   bindings.WarmStatsPlan,
 	})
 	s.statusService = cachegov.NewStatusService(s.component, s.statusRegistry, s.hotsetInspector, s.warmupCoordinator, s.effective, s.policyReloader)
 }

@@ -132,7 +132,7 @@ func TestCacheGovernanceStatusReturnsNormalizedEmptySnapshotWhenServiceUnavailab
 func TestWarmupTargetsReturnsManualWarmupResult(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	body := []byte(`{"targets":[{"kind":"static.scale","scope":"scale:S-001"},{"kind":"query.stats_system","scope":"org:1"}]}`)
+	body := []byte(`{"targets":[{"kind":"static.scale","scope":"scale:S-001"},{"kind":"query.stats_overview","scope":"org:1:preset:30d"}]}`)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/internal/v1/cache/governance/warmup-targets", bytes.NewReader(body))
@@ -152,7 +152,7 @@ func TestWarmupTargetsReturnsManualWarmupResult(t *testing.T) {
 			},
 			Items: []cachemodel.ManualWarmupItemResult{
 				{Family: "static_meta", Kind: "static.scale", Scope: "scale:s-001", Status: cachemodel.ManualWarmupItemStatusOK},
-				{Family: "query_result", Kind: "query.stats_system", Scope: "org:1", Status: cachemodel.ManualWarmupItemStatusSkipped, Message: "该缓存族未开启预热"},
+				{Family: "query_result", Kind: "query.stats_overview", Scope: "org:1:preset:30d", Status: cachemodel.ManualWarmupItemStatusSkipped, Message: "该缓存族未开启预热"},
 			},
 		},
 	}
@@ -187,7 +187,7 @@ func TestWarmupTargetsReturnsManualWarmupResult(t *testing.T) {
 func TestWarmupTargetsRejectsCrossOrgQueryTarget(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	body := []byte(`{"targets":[{"kind":"query.stats_system","scope":"org:2"}]}`)
+	body := []byte(`{"targets":[{"kind":"query.stats_overview","scope":"org:2:preset:30d"}]}`)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/internal/v1/cache/governance/warmup-targets", bytes.NewReader(body))

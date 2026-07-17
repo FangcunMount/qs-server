@@ -39,13 +39,6 @@ func (c *coordinator) repairQueryTargets(req cachetarget.RepairCompleteRequest) 
 			for _, preset := range overviewSeedPresets(nil) {
 				targets = append(targets, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
 			}
-			targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
-		}
-		for _, code := range req.QuestionnaireCodes {
-			targets = append(targets, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
-		}
-		for _, planID := range req.PlanIDs {
-			targets = append(targets, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 		}
 	}
 	return dedupeTargets(targets)

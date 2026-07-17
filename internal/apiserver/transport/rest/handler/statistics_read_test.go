@@ -36,8 +36,8 @@ type stubStatisticsReadService struct {
 	currentClinicianErr          error
 
 	lastBatchOrgID int64
-	lastBatchCodes []string
-	batchResult    *domainStatistics.QuestionnaireBatchStatisticsResponse
+	lastBatchRefs  []domainStatistics.ContentReference
+	batchResult    *domainStatistics.ContentBatchStatisticsResponse
 	batchErr       error
 }
 
@@ -93,17 +93,17 @@ func (*stubStatisticsReadService) GetCurrentClinicianTesteeSummary(context.Conte
 	return nil, nil
 }
 
-func (s *stubStatisticsReadService) GetQuestionnaireBatchStatistics(_ context.Context, orgID int64, codes []string) (*domainStatistics.QuestionnaireBatchStatisticsResponse, error) {
+func (s *stubStatisticsReadService) GetContentBatchStatistics(_ context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
 	s.lastBatchOrgID = orgID
-	s.lastBatchCodes = append([]string(nil), codes...)
+	s.lastBatchRefs = append([]domainStatistics.ContentReference(nil), refs...)
 	if s.batchResult != nil {
 		return s.batchResult, s.batchErr
 	}
-	return &domainStatistics.QuestionnaireBatchStatisticsResponse{}, s.batchErr
+	return &domainStatistics.ContentBatchStatisticsResponse{}, s.batchErr
 }
 
 func newStatisticsHandlerForTest(readService statisticsApp.ReadService) *StatisticsHandler {
-	handler := NewStatisticsHandler(nil, nil, nil, nil, readService, nil, nil)
+	handler := NewStatisticsHandler(readService, nil, nil)
 	handler.BaseHandler = *NewBaseHandler()
 	return handler
 }
@@ -225,17 +225,38 @@ func TestStatisticsHandlerGetCurrentClinicianOverviewUsesProtectedScope(t *testi
 	}
 }
 
-func TestStatisticsHandlerBatchQuestionnaireStatisticsRejectsInvalidJSON(t *testing.T) {
+func TestStatisticsHandlerBatchContentStatisticsRejectsInvalidJSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := newStatisticsHandlerForTest(&stubStatisticsReadService{})
-	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/questionnaires/batch", []byte(`{"codes":`))
+	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/contents/batch", []byte(`{"items":`))
 	c.Set(restmiddleware.OrgIDKey, uint64(91))
 
-	handler.BatchQuestionnaireStatistics(c)
+	handler.BatchContentStatistics(c)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestStatisticsHandlerBatchContentStatisticsUsesProtectedOrgAndTypedItems(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	readService := &stubStatisticsReadService{batchResult: &domainStatistics.ContentBatchStatisticsResponse{}}
+	handler := newStatisticsHandlerForTest(readService)
+	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/contents/batch", []byte(`{"items":[{"type":"questionnaire","code":"Q-1"},{"type":"scale","code":"S-1"}]}`))
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+
+	handler.BatchContentStatistics(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if readService.lastBatchOrgID != 91 || len(readService.lastBatchRefs) != 2 {
+		t.Fatalf("unexpected batch scope: org=%d refs=%+v", readService.lastBatchOrgID, readService.lastBatchRefs)
+	}
+	if readService.lastBatchRefs[0].Type != domainStatistics.ContentTypeQuestionnaire || readService.lastBatchRefs[1].Type != domainStatistics.ContentTypeScale {
+		t.Fatalf("unexpected typed refs: %+v", readService.lastBatchRefs)
 	}
 }
 

@@ -227,13 +227,13 @@ func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
 	service := NewStatusService("apiserver", registry, stubHotsetInspector{
 		items: []cachetarget.HotsetItem{
 			{
-				Target: cachetarget.NewQueryStatsSystemWarmupTarget(1),
+				Target: cachetarget.NewQueryStatsOverviewWarmupTarget(1, "30d"),
 				Score:  12,
 			},
 		},
 	}, nil)
 
-	got, err := service.GetHotset(context.Background(), cachetarget.WarmupKindQueryStatsSystem, 0)
+	got, err := service.GetHotset(context.Background(), cachetarget.WarmupKindQueryStatsOverview, 0)
 	if err != nil {
 		t.Fatalf("GetHotset() error = %v", err)
 	}
@@ -252,8 +252,8 @@ func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
 	if len(got.Items) != 1 {
 		t.Fatalf("GetHotset().Items len = %d, want 1", len(got.Items))
 	}
-	if got.Items[0].Target.Scope != "org:1" {
-		t.Fatalf("GetHotset().Items[0].Target.Scope = %q, want org:1", got.Items[0].Target.Scope)
+	if got.Items[0].Target.Scope != "org:1:preset:30d" {
+		t.Fatalf("GetHotset().Items[0].Target.Scope = %q, want org:1:preset:30d", got.Items[0].Target.Scope)
 	}
 }
 

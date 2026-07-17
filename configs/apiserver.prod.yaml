@@ -277,26 +277,14 @@ cache:
   governance:
     statistics_warmup:          # 统计查询结果缓存预热配置
       enable: true              # 启用统计缓存预热，生产环境建议开启以提升关键统计查询的性能
-      warm_on_startup: true     # 线 B3：进程启动即预热 overview+system（不依赖 warmup.startup.query）
+      warm_on_startup: true     # 进程启动预热 overview（不依赖 warmup.startup.query）
       org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
       overview_presets: ["today", "7d", "30d"] # 首页概览常用窗口
-      questionnaire_codes: []    # 问卷编码列表（从配置读取，默认预热所有问卷）
-      plan_ids: []              # 计划ID列表（从配置读取，默认预热所有计划）
 
-    statistics_system:          # 线 B2/B4：系统统计查询保护与降级
-      service_singleflight: true
-      disable_realtime_fallback: true   # 快照未就绪时禁止全表实时聚合
-      stale_on_timeout: true            # 回源失败/超时返回进程内最近成功结果
-      load_timeout: 25s
-
-    statistics_overview:        # 机构总览读保护与降级（对齐 system）
+    statistics_overview:        # 机构总览读保护与降级
       service_singleflight: true
       stale_on_timeout: true
       load_timeout: 25s
-
-    statistics_questionnaire:   # 问卷统计读保护与降级
-      stale_on_timeout: true
-      load_timeout: 15s
 
     warmup:
       enable: true              # 启用缓存预热，生产环境建议开启以提升关键数据的访问性能

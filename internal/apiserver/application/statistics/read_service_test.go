@@ -8,7 +8,7 @@ import (
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type statisticsReadModelStub struct {
@@ -17,51 +17,34 @@ type statisticsReadModelStub struct {
 	lastOverviewTo    time.Time
 	overviewReadCalls int
 
-	lastTrendMetrics []OrgOverviewMetric
-	lastTrendFrom    []time.Time
-	lastTrendTo      []time.Time
+	lastTrendFrom []time.Time
+	lastTrendTo   []time.Time
 
 	lastListEntryPage     int
 	lastListEntryPageSize int
+	clinicianDetailCalls  int
+	clinicianDetailIDs    []uint64
+	entryDetailCalls      int
+	entryDetailIDs        []uint64
 
-	lastBatchCodes []string
+	lastBatchRefs []ContentReference
 
-	orgOverviewSnapshot      domainStatistics.OrgOverviewSnapshot
-	orgOverviewWindow        domainStatistics.OrgOverviewWindow
-	trendByMetric            map[OrgOverviewMetric][]domainStatistics.DailyCount
 	organizationOverview     domainStatistics.OrganizationOverview
 	accessFunnelWindow       domainStatistics.AccessFunnelWindow
-	accessTrendByMetric      map[AccessFunnelMetric][]domainStatistics.DailyCount
+	accessTrend              domainStatistics.AccessFunnelTrend
 	assessmentServiceWindow  domainStatistics.AssessmentServiceWindow
-	assessmentTrendByMetric  map[AssessmentServiceMetric][]domainStatistics.DailyCount
+	assessmentTrend          domainStatistics.AssessmentServiceTrend
 	dimensionAnalysisSummary domainStatistics.DimensionAnalysisSummary
-	planTaskWindow           domainStatistics.PlanTaskWindow
-	planTrendByMetric        map[PlanTaskMetric][]domainStatistics.DailyCount
+	planTaskWindow           domainStatistics.PlanTaskActivityWindow
+	planTrend                domainStatistics.PlanTaskActivityTrend
 	planFulfillmentWindow    domainStatistics.PlanTaskFulfillmentWindow
 	planFulfillmentTrend     domainStatistics.PlanTaskFulfillmentTrend
 
 	countAssessmentEntriesResult int64
 	listAssessmentEntryMetas     []domainStatistics.AssessmentEntryStatisticsMeta
+	clinicianSubjects            []domainStatistics.ClinicianStatisticsSubject
 
-	questionnaireBatchTotals []QuestionnaireBatchTotal
-}
-
-func (s *statisticsReadModelStub) GetOrgOverviewSnapshot(context.Context, int64) (domainStatistics.OrgOverviewSnapshot, error) {
-	return s.orgOverviewSnapshot, nil
-}
-
-func (s *statisticsReadModelStub) GetOrgOverviewWindow(_ context.Context, orgID int64, from, to time.Time) (domainStatistics.OrgOverviewWindow, error) {
-	s.lastOverviewOrgID = orgID
-	s.lastOverviewFrom = from
-	s.lastOverviewTo = to
-	return s.orgOverviewWindow, nil
-}
-
-func (s *statisticsReadModelStub) ListOrgOverviewTrend(_ context.Context, _ int64, metric OrgOverviewMetric, from, to time.Time) []domainStatistics.DailyCount {
-	s.lastTrendMetrics = append(s.lastTrendMetrics, metric)
-	s.lastTrendFrom = append(s.lastTrendFrom, from)
-	s.lastTrendTo = append(s.lastTrendTo, to)
-	return append([]domainStatistics.DailyCount(nil), s.trendByMetric[metric]...)
+	contentBatchTotals []ContentBatchTotal
 }
 
 func (s *statisticsReadModelStub) GetOrganizationOverview(context.Context, int64) (domainStatistics.OrganizationOverview, error) {
@@ -76,71 +59,34 @@ func (s *statisticsReadModelStub) GetAccessFunnel(_ context.Context, orgID int64
 	return s.accessFunnelWindow, nil
 }
 
-func (s *statisticsReadModelStub) ListAccessFunnelTrend(_ context.Context, _ int64, metric AccessFunnelMetric, from, to time.Time) []domainStatistics.DailyCount {
-	s.lastTrendFrom = append(s.lastTrendFrom, from)
-	s.lastTrendTo = append(s.lastTrendTo, to)
-	return append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[metric]...)
-}
-
 func (s *statisticsReadModelStub) GetAccessFunnelTrend(_ context.Context, _ int64, from, to time.Time) (domainStatistics.AccessFunnelTrend, error) {
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
-	return domainStatistics.AccessFunnelTrend{
-		EntryOpened:                 append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricEntryOpened]...),
-		IntakeConfirmed:             append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricIntakeConfirmed]...),
-		TesteeCreated:               append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricTesteeCreated]...),
-		CareRelationshipEstablished: append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricCareRelationshipEstablished]...),
-	}, nil
+	return s.accessTrend, nil
 }
 
 func (s *statisticsReadModelStub) GetAssessmentService(context.Context, int64, time.Time, time.Time) (domainStatistics.AssessmentServiceWindow, error) {
 	return s.assessmentServiceWindow, nil
 }
 
-func (s *statisticsReadModelStub) ListAssessmentServiceTrend(_ context.Context, _ int64, metric AssessmentServiceMetric, from, to time.Time) []domainStatistics.DailyCount {
-	s.lastTrendFrom = append(s.lastTrendFrom, from)
-	s.lastTrendTo = append(s.lastTrendTo, to)
-	return append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[metric]...)
-}
-
 func (s *statisticsReadModelStub) GetAssessmentServiceTrend(_ context.Context, _ int64, from, to time.Time) (domainStatistics.AssessmentServiceTrend, error) {
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
-	return domainStatistics.AssessmentServiceTrend{
-		AnswerSheetSubmitted: append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAnswerSheetSubmitted]...),
-		AssessmentCreated:    append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAssessmentCreated]...),
-		ReportGenerated:      append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricReportGenerated]...),
-		AssessmentFailed:     append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAssessmentFailed]...),
-	}, nil
+	return s.assessmentTrend, nil
 }
 
 func (s *statisticsReadModelStub) GetDimensionAnalysisSummary(context.Context, int64) (domainStatistics.DimensionAnalysisSummary, error) {
 	return s.dimensionAnalysisSummary, nil
 }
 
-func (s *statisticsReadModelStub) GetPlanTaskOverview(context.Context, int64, time.Time, time.Time) (domainStatistics.PlanTaskWindow, error) {
+func (s *statisticsReadModelStub) GetPlanTaskOverview(context.Context, int64, time.Time, time.Time) (domainStatistics.PlanTaskActivityWindow, error) {
 	return s.planTaskWindow, nil
 }
 
-func (s *statisticsReadModelStub) GetPlanTaskOverviewByPlan(context.Context, int64, uint64, time.Time, time.Time) (domainStatistics.PlanTaskWindow, error) {
-	return s.planTaskWindow, nil
-}
-
-func (s *statisticsReadModelStub) ListPlanTaskTrend(_ context.Context, _ int64, _ *uint64, metric PlanTaskMetric, from, to time.Time) []domainStatistics.DailyCount {
+func (s *statisticsReadModelStub) GetPlanTaskTrend(_ context.Context, _ int64, _ *uint64, from, to time.Time) (domainStatistics.PlanTaskActivityTrend, error) {
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
-	return append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[metric]...)
-}
-
-func (s *statisticsReadModelStub) GetPlanTaskTrend(_ context.Context, _ int64, _ *uint64, from, to time.Time) (domainStatistics.PlanTaskTrend, error) {
-	s.lastTrendFrom = append(s.lastTrendFrom, from)
-	s.lastTrendTo = append(s.lastTrendTo, to)
-	return domainStatistics.PlanTaskTrend{
-		TaskCreated:   append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricCreated]...),
-		TaskOpened:    append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricOpened]...),
-		TaskCompleted: append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricCompleted]...),
-		TaskExpired:   append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricExpired]...),
-	}, nil
+	return s.planTrend, nil
 }
 
 func (s *statisticsReadModelStub) GetPlanTaskFulfillment(context.Context, int64, *uint64, time.Time, time.Time) (domainStatistics.PlanTaskFulfillmentWindow, error) {
@@ -157,8 +103,8 @@ func (*statisticsReadModelStub) CountClinicianSubjects(context.Context, int64) (
 	return 0, nil
 }
 
-func (*statisticsReadModelStub) ListClinicianSubjects(context.Context, int64, int, int) ([]domainStatistics.ClinicianStatisticsSubject, error) {
-	return nil, nil
+func (s *statisticsReadModelStub) ListClinicianSubjects(context.Context, int64, int, int) ([]domainStatistics.ClinicianStatisticsSubject, error) {
+	return append([]domainStatistics.ClinicianStatisticsSubject(nil), s.clinicianSubjects...), nil
 }
 
 func (*statisticsReadModelStub) GetClinicianSubject(context.Context, int64, uint64) (*domainStatistics.ClinicianStatisticsSubject, error) {
@@ -169,12 +115,14 @@ func (*statisticsReadModelStub) GetCurrentClinicianSubject(context.Context, int6
 	return nil, nil
 }
 
-func (*statisticsReadModelStub) GetClinicianSnapshot(context.Context, int64, uint64) (domainStatistics.ClinicianStatisticsSnapshot, error) {
-	return domainStatistics.ClinicianStatisticsSnapshot{}, nil
+func (s *statisticsReadModelStub) GetClinicianStatisticsDetails(_ context.Context, _ int64, ids []uint64, _, _ time.Time) (map[uint64]ClinicianStatisticsDetail, error) {
+	s.clinicianDetailCalls++
+	s.clinicianDetailIDs = append([]uint64(nil), ids...)
+	return map[uint64]ClinicianStatisticsDetail{}, nil
 }
 
-func (*statisticsReadModelStub) GetClinicianJourneyStats(context.Context, int64, uint64, time.Time, time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
-	return domainStatistics.ClinicianStatisticsWindow{}, domainStatistics.ClinicianStatisticsFunnel{}, nil
+func (*statisticsReadModelStub) GetClinicianSnapshot(context.Context, int64, uint64) (domainStatistics.ClinicianStatisticsSnapshot, error) {
+	return domainStatistics.ClinicianStatisticsSnapshot{}, nil
 }
 
 func (*statisticsReadModelStub) GetClinicianTesteeSummaryCounts(context.Context, int64, uint64, time.Time, time.Time) (int64, int64, error) {
@@ -195,29 +143,15 @@ func (*statisticsReadModelStub) GetAssessmentEntryMeta(context.Context, int64, u
 	return nil, nil
 }
 
-func (*statisticsReadModelStub) GetAssessmentEntryCounts(context.Context, int64, uint64, *time.Time, *time.Time) (domainStatistics.AssessmentEntryStatisticsCounts, error) {
-	return domainStatistics.AssessmentEntryStatisticsCounts{}, nil
+func (s *statisticsReadModelStub) GetAssessmentEntryStatisticsDetails(_ context.Context, _ int64, ids []uint64, _, _ time.Time) (map[uint64]AssessmentEntryStatisticsDetail, error) {
+	s.entryDetailCalls++
+	s.entryDetailIDs = append([]uint64(nil), ids...)
+	return map[uint64]AssessmentEntryStatisticsDetail{}, nil
 }
 
-func (*statisticsReadModelStub) GetAssessmentEntryLastEventTime(context.Context, int64, uint64, domainStatistics.BehaviorEventName) (*time.Time, error) {
-	return nil, nil
-}
-
-func (s *statisticsReadModelStub) GetQuestionnaireBatchTotals(_ context.Context, _ int64, codes []string) ([]QuestionnaireBatchTotal, error) {
-	s.lastBatchCodes = append([]string(nil), codes...)
-	return append([]QuestionnaireBatchTotal(nil), s.questionnaireBatchTotals...), nil
-}
-
-type answerSheetRepoStub struct {
-	countsByQuestionnaire map[string]int64
-}
-
-func (*answerSheetRepoStub) ListAnswerSheets(context.Context, surveyreadmodel.AnswerSheetFilter, surveyreadmodel.PageRequest) ([]surveyreadmodel.AnswerSheetSummaryRow, error) {
-	return nil, nil
-}
-
-func (s *answerSheetRepoStub) CountAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter) (int64, error) {
-	return s.countsByQuestionnaire[filter.QuestionnaireCode], nil
+func (s *statisticsReadModelStub) GetContentBatchTotals(_ context.Context, _ int64, refs []ContentReference) ([]ContentBatchTotal, error) {
+	s.lastBatchRefs = append([]ContentReference(nil), refs...)
+	return append([]ContentBatchTotal(nil), s.contentBatchTotals...), nil
 }
 
 func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *testing.T) {
@@ -226,15 +160,13 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	stub := &statisticsReadModelStub{
 		organizationOverview: domainStatistics.OrganizationOverview{TesteeCount: 7},
 		accessFunnelWindow:   domainStatistics.AccessFunnelWindow{EntryOpenedCount: 3},
-		accessTrendByMetric: map[AccessFunnelMetric][]domainStatistics.DailyCount{
-			AccessFunnelMetricEntryOpened: {
+		accessTrend: domainStatistics.AccessFunnelTrend{
+			EntryOpened: []domainStatistics.DailyCount{
 				{Date: time.Date(2026, 4, 1, 0, 0, 0, 0, time.Local), Count: 2},
 			},
 		},
-		assessmentTrendByMetric: map[AssessmentServiceMetric][]domainStatistics.DailyCount{},
-		planTrendByMetric:       map[PlanTaskMetric][]domainStatistics.DailyCount{},
 	}
-	service := NewReadService(stub, nil)
+	service := NewReadService(stub)
 
 	got, err := service.GetOverview(context.Background(), 9, QueryFilter{
 		From: "2026-04-01",
@@ -280,14 +212,14 @@ func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
 			EntryCount:     1,
 			ContentCount:   4,
 		},
-		planTaskWindow: domainStatistics.PlanTaskWindow{TaskCompletedCount: 6},
+		planTaskWindow: domainStatistics.PlanTaskActivityWindow{TaskCompletedCount: 6},
 		planFulfillmentWindow: domainStatistics.PlanTaskFulfillmentWindow{
 			DueTaskCount:       10,
 			CompletedTaskCount: 7,
 			CompletionRate:     70,
 		},
 	}
-	service := NewReadService(stub, nil, WithReadServiceCache(cache))
+	service := NewReadService(stub, WithReadServiceCache(cache))
 	filter := QueryFilter{
 		From: "2026-04-01",
 		To:   "2026-04-02",
@@ -315,7 +247,7 @@ func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
 	if second.AccessFunnel.Window.EntryOpenedCount != first.AccessFunnel.Window.EntryOpenedCount {
 		t.Fatalf("cached access funnel changed: got %d want %d", second.AccessFunnel.Window.EntryOpenedCount, first.AccessFunnel.Window.EntryOpenedCount)
 	}
-	if second.Plan.Activity.Window.TaskCompletedCount != 6 || second.Plan.Window.TaskCompletedCount != 6 {
+	if second.Plan.Activity.Window.TaskCompletedCount != 6 {
 		t.Fatalf("plan activity window not populated: %+v", second.Plan)
 	}
 	if second.Plan.Fulfillment.Window.DueTaskCount != 10 || second.Plan.Fulfillment.Window.CompletionRate != 70 {
@@ -330,7 +262,7 @@ func TestReadServiceListAssessmentEntryStatisticsNormalizesPaginationBeforeReadM
 		countAssessmentEntriesResult: 3,
 		listAssessmentEntryMetas:     []domainStatistics.AssessmentEntryStatisticsMeta{},
 	}
-	service := NewReadService(stub, nil)
+	service := NewReadService(stub)
 
 	got, err := service.ListAssessmentEntryStatistics(context.Background(), 12, nil, nil, QueryFilter{}, 0, 500)
 	if err != nil {
@@ -345,46 +277,80 @@ func TestReadServiceListAssessmentEntryStatisticsNormalizesPaginationBeforeReadM
 	}
 }
 
-func TestReadServiceGetQuestionnaireBatchStatisticsDeduplicatesKeepsOrderAndFallsBackToAnswerSheetRepo(t *testing.T) {
+func TestReadServiceListsClinicianStatisticsWithOneBatchDetailRead(t *testing.T) {
+	t.Parallel()
+	stub := &statisticsReadModelStub{clinicianSubjects: []domainStatistics.ClinicianStatisticsSubject{
+		{ID: meta.FromUint64(10)}, {ID: meta.FromUint64(20)}, {ID: meta.FromUint64(30)},
+	}}
+	service := NewReadService(stub)
+	if _, err := service.ListClinicianStatistics(context.Background(), 12, QueryFilter{}, 1, 20); err != nil {
+		t.Fatal(err)
+	}
+	if stub.clinicianDetailCalls != 1 || fmt.Sprint(stub.clinicianDetailIDs) != "[10 20 30]" {
+		t.Fatalf("batch detail calls=%d ids=%v", stub.clinicianDetailCalls, stub.clinicianDetailIDs)
+	}
+}
+
+func TestReadServiceListsEntryStatisticsWithOneBatchDetailRead(t *testing.T) {
+	t.Parallel()
+	stub := &statisticsReadModelStub{listAssessmentEntryMetas: []domainStatistics.AssessmentEntryStatisticsMeta{
+		{ID: meta.FromUint64(101)}, {ID: meta.FromUint64(202)},
+	}}
+	service := NewReadService(stub)
+	if _, err := service.ListAssessmentEntryStatistics(context.Background(), 12, nil, nil, QueryFilter{}, 1, 20); err != nil {
+		t.Fatal(err)
+	}
+	if stub.entryDetailCalls != 1 || fmt.Sprint(stub.entryDetailIDs) != "[101 202]" {
+		t.Fatalf("batch detail calls=%d ids=%v", stub.entryDetailCalls, stub.entryDetailIDs)
+	}
+}
+
+func TestReadServiceGetContentBatchStatisticsKeepsTypedIdentityAndOrder(t *testing.T) {
 	t.Parallel()
 
 	stub := &statisticsReadModelStub{
-		questionnaireBatchTotals: []QuestionnaireBatchTotal{
-			{Code: "PHQ9", TotalSubmissions: 10, TotalCompletions: 8},
+		contentBatchTotals: []ContentBatchTotal{
+			{Type: "questionnaire", Code: "COMMON", TotalSubmissions: 10, TotalCompletions: 8},
+			{Type: "scale", Code: "COMMON", TotalSubmissions: 4, TotalCompletions: 1},
 		},
 	}
-	answerSheetRepo := &answerSheetRepoStub{
-		countsByQuestionnaire: map[string]int64{
-			"GAD7": 4,
-		},
-	}
-	service := NewReadService(stub, answerSheetRepo)
+	service := NewReadService(stub)
 
-	got, err := service.GetQuestionnaireBatchStatistics(context.Background(), 21, []string{" PHQ9 ", "GAD7", "", "PHQ9", "SCL90"})
+	got, err := service.GetContentBatchStatistics(context.Background(), 21, []domainStatistics.ContentReference{
+		{Type: "QUESTIONNAIRE", Code: " COMMON "},
+		{Type: "scale", Code: "COMMON"},
+		{Type: "questionnaire", Code: "COMMON"},
+	})
 	if err != nil {
-		t.Fatalf("GetQuestionnaireBatchStatistics returned error: %v", err)
+		t.Fatalf("GetContentBatchStatistics returned error: %v", err)
 	}
 
-	wantCodes := []string{"PHQ9", "GAD7", "SCL90"}
-	if len(stub.lastBatchCodes) != len(wantCodes) {
-		t.Fatalf("batch codes len = %d, want %d", len(stub.lastBatchCodes), len(wantCodes))
+	wantRefs := []ContentReference{{Type: "questionnaire", Code: "COMMON"}, {Type: "scale", Code: "COMMON"}}
+	if len(stub.lastBatchRefs) != len(wantRefs) {
+		t.Fatalf("batch refs len = %d, want %d", len(stub.lastBatchRefs), len(wantRefs))
 	}
-	for i, want := range wantCodes {
-		if stub.lastBatchCodes[i] != want {
-			t.Fatalf("batch codes[%d] = %q, want %q", i, stub.lastBatchCodes[i], want)
+	for i, want := range wantRefs {
+		if stub.lastBatchRefs[i] != want {
+			t.Fatalf("batch refs[%d] = %+v, want %+v", i, stub.lastBatchRefs[i], want)
 		}
 	}
-	if len(got.Items) != 3 {
-		t.Fatalf("items len = %d, want 3", len(got.Items))
+	if len(got.Items) != 2 {
+		t.Fatalf("items len = %d, want 2", len(got.Items))
 	}
-	if got.Items[0].Code != "PHQ9" || got.Items[0].TotalSubmissions != 10 || got.Items[0].TotalCompletions != 8 {
-		t.Fatalf("unexpected PHQ9 stats: %+v", got.Items[0])
+	if got.Items[0].Type != domainStatistics.ContentTypeQuestionnaire || got.Items[0].TotalSubmissions != 10 || got.Items[0].TotalCompletions != 8 || got.Items[0].CompletionRate != 80 {
+		t.Fatalf("unexpected questionnaire stats: %+v", got.Items[0])
 	}
-	if got.Items[1].Code != "GAD7" || got.Items[1].TotalSubmissions != 4 || got.Items[1].TotalCompletions != 4 || got.Items[1].CompletionRate != 100 {
-		t.Fatalf("unexpected GAD7 fallback stats: %+v", got.Items[1])
+	if got.Items[1].Type != domainStatistics.ContentTypeScale || got.Items[1].TotalSubmissions != 4 || got.Items[1].TotalCompletions != 1 || got.Items[1].CompletionRate != 25 {
+		t.Fatalf("unexpected scale stats: %+v", got.Items[1])
 	}
-	if got.Items[2].Code != "SCL90" || got.Items[2].TotalSubmissions != 0 || got.Items[2].TotalCompletions != 0 {
-		t.Fatalf("unexpected SCL90 stats: %+v", got.Items[2])
+}
+
+func TestReadServiceGetContentBatchStatisticsRejectsInvalidReference(t *testing.T) {
+	t.Parallel()
+
+	service := NewReadService(&statisticsReadModelStub{})
+	if _, err := service.GetContentBatchStatistics(context.Background(), 21, []domainStatistics.ContentReference{{Type: "unknown", Code: "X"}}); err == nil {
+		t.Fatal("GetContentBatchStatistics() error = nil, want invalid argument")
 	}
 }
 
@@ -395,34 +361,6 @@ type memoryStatisticsCache struct {
 func newStatisticsQueryCache(t *testing.T) *memoryStatisticsCache {
 	t.Helper()
 	return &memoryStatisticsCache{overview: make(map[string]*domainStatistics.StatisticsOverview)}
-}
-
-func (*memoryStatisticsCache) LoadSystemStatistics(context.Context, int64) (*domainStatistics.SystemStatistics, bool) {
-	return nil, false
-}
-
-func (*memoryStatisticsCache) StoreSystemStatistics(context.Context, int64, *domainStatistics.SystemStatistics) {
-}
-
-func (*memoryStatisticsCache) LoadQuestionnaireStatistics(context.Context, int64, string) (*domainStatistics.QuestionnaireStatistics, bool) {
-	return nil, false
-}
-
-func (*memoryStatisticsCache) StoreQuestionnaireStatistics(context.Context, int64, string, *domainStatistics.QuestionnaireStatistics) {
-}
-
-func (*memoryStatisticsCache) LoadTesteeStatistics(context.Context, int64, uint64) (*domainStatistics.TesteeStatistics, bool) {
-	return nil, false
-}
-
-func (*memoryStatisticsCache) StoreTesteeStatistics(context.Context, int64, uint64, *domainStatistics.TesteeStatistics) {
-}
-
-func (*memoryStatisticsCache) LoadPlanStatistics(context.Context, int64, uint64) (*domainStatistics.PlanStatistics, bool) {
-	return nil, false
-}
-
-func (*memoryStatisticsCache) StorePlanStatistics(context.Context, int64, uint64, *domainStatistics.PlanStatistics) {
 }
 
 func (c *memoryStatisticsCache) LoadOverview(_ context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, bool) {
@@ -450,5 +388,4 @@ func statisticsCacheOverviewKey(orgID int64, timeRange domainStatistics.Statisti
 }
 
 var _ StatisticsReadModel = (*statisticsReadModelStub)(nil)
-var _ surveyreadmodel.AnswerSheetReader = (*answerSheetRepoStub)(nil)
 var _ statisticscache.Cache = (*memoryStatisticsCache)(nil)

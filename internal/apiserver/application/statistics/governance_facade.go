@@ -143,10 +143,8 @@ func normalizeRepairCompleteRequest(protectedOrgID int64, req RepairCompleteRequ
 		}
 	}
 	return cachetarget.RepairCompleteRequest{
-		RepairKind:         req.RepairKind,
-		OrgIDs:             orgIDs,
-		QuestionnaireCodes: req.QuestionnaireCodes,
-		PlanIDs:            req.PlanIDs,
+		RepairKind: req.RepairKind,
+		OrgIDs:     orgIDs,
 	}, nil
 }
 

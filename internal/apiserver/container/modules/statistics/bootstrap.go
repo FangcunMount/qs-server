@@ -8,7 +8,6 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -19,24 +18,21 @@ import (
 
 // BootstrapInput carries container integration inputs for statistics module bootstrap.
 type BootstrapInput struct {
-	MySQLDB                *gorm.DB
-	RedisClient            redis.UniversalClient
-	CacheBuilder           *keyspace.Builder
-	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
-	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
-	MongoDB                *mongo.Database
-	RepairWindowDays       int
-	CachePolicies          sharedcache.PolicyProvider
-	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
-	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
-	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
-	HotsetRecorder         cachetarget.HotsetRecorder
-	LockManager            locklease.Manager
-	VersionStore           querycache.VersionTokenStore
-	Observer               *observability.ComponentObserver
-	MySQLLimiter           backpressure.Acquirer
-	WarmupCoordinator      statisticsApp.WarmupCoordinator
-	StatusService          statisticsApp.GovernanceStatusReader
+	MySQLDB               *gorm.DB
+	RedisClient           redis.UniversalClient
+	CacheBuilder          *keyspace.Builder
+	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
+	MongoDB               *mongo.Database
+	RepairWindowDays      int
+	CachePolicies         sharedcache.PolicyProvider
+	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
+	HotsetRecorder        cachetarget.HotsetRecorder
+	LockManager           locklease.Manager
+	VersionStore          querycache.VersionTokenStore
+	Observer              *observability.ComponentObserver
+	MySQLLimiter          backpressure.Acquirer
+	WarmupCoordinator     statisticsApp.WarmupCoordinator
+	StatusService         statisticsApp.GovernanceStatusReader
 }
 
 // Bootstrap assembles the statistics module from container integration inputs.

@@ -1,69 +1,41 @@
 # Statistics
 
-**本文回答**：Statistics 如何作为读侧统计与行为投影模块，消费业务事件并形成运营、计划、测评和行为指标。
+**结论**：Statistics 是机构隔离的查询与可重建投影模块。查询主线是 Overview、Clinician、Entry、Periodic、Typed Content；投影主线是行为同步、补偿扫描、pending 重建与 Overview 缓存治理。
 
----
+## 模块职责
 
-## 1. 这个模块负责什么
+- 查询机构总览、从业者、入口和受试者周期统计。
+- 按 `(content_type, content_code)` 批量查询内容形成量、完成量和完成率。
+- 将入口、接入、答卷、测评、报告和计划事实投影为 journey/content/plan daily 与 organization snapshot。
+- 维护扫描 watermark、pending reconcile、定时重建和 Overview 缓存。
 
-Statistics 负责“如何看业务运行结果”：
+Statistics 不维护问卷、答卷、Assessment、报告或计划的主事实，也不反向驱动这些业务状态。
 
-- 机构概览。
-- 测评服务漏斗。
-- 行为足迹投影。
-- 计划统计。
-- 受试者、从业者、组织维度读模型。
-- 查询缓存和最终一致性读侧。
+## 现役模型
 
----
+| 模型族 | 说明 |
+| ------ | ---- |
+| Behavior footprint | 幂等行为事实与补偿入口 |
+| Journey daily | 机构、从业者、入口旅程聚合 |
+| Content daily | questionnaire/scale typed content 聚合 |
+| Plan daily | activity 与 fulfillment 聚合 |
+| Organization snapshot | 机构累计快照 |
 
-## 2. 这个模块不负责什么
+## 文档导航
 
-- 不维护问卷、答卷、测评、报告、计划的主事实。
-- 不反向驱动核心业务状态。
-- 不负责测评执行。
-- 不负责报告生成。
-
-一句话：**Statistics 不是事实源；Statistics 是读侧投影。**
-
----
-
-## 3. 核心领域模型
-
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `StatisticProjection` | 统计投影 | [02-领域模型.md](./02-领域模型.md) |
-| `AssessmentMetric` | 测评服务指标 | [03-统计指标模型.md](./03-统计指标模型.md) |
-| `PlanMetric` | 计划任务指标 | [03-统计指标模型.md](./03-统计指标模型.md) |
-| `SurveyMetric` | 答卷提交指标 | [03-统计指标模型.md](./03-统计指标模型.md) |
-| `ReportMetric` | 报告生成和查看指标 | [03-统计指标模型.md](./03-统计指标模型.md) |
-
----
-
-## 4. 关键业务链路
-
-| 链路 | 文档 |
+| 主题 | 文档 |
 | ---- | ---- |
-| 统计指标模型 | [03-统计指标模型.md](./03-统计指标模型.md) |
-| 消费事件并更新投影 | [04-事件投影链路.md](./04-事件投影链路.md) |
-| 查询视图和读模型 | [05-查询视图与读模型.md](./05-查询视图与读模型.md) |
-| 最终一致和延迟容忍 | [06-一致性与延迟容忍.md](./06-一致性与延迟容忍.md) |
-| 接口、事件和存储 | [07-接口事件与存储.md](./07-接口事件与存储.md) |
-
----
-
-## 5. 上下游依赖
-
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | `survey` | 答卷提交行为 |
-| 上游 | `evaluation` | 测评创建、完成、失败 |
-| 上游 | `interpretation` | 报告生成 |
-| 上游 | `plan` | 任务开放、完成、过期、取消 |
-| 上游 | `actor` | 人员、组织、关系维度 |
-| 下游 | 运营后台 / 数据看板 | 查询统计读模型 |
+| 模块边界 | [01-模块定位与边界.md](./01-模块定位与边界.md) |
+| 真实模型 | [02-领域模型.md](./02-领域模型.md) |
+| 指标口径 | [03-统计指标模型.md](./03-统计指标模型.md) |
+| 投影与扫描 | [04-事件投影链路.md](./04-事件投影链路.md) |
+| 查询与缓存 | [05-查询视图与读模型.md](./05-查询视图与读模型.md) |
+| 一致性 | [06-一致性与延迟容忍.md](./06-一致性与延迟容忍.md) |
+| 接口与存储 | [07-接口事件与存储.md](./07-接口事件与存储.md) |
 
 代码事实入口：
 
+- [`internal/apiserver/application/statistics`](../../../internal/apiserver/application/statistics/)
 - [`internal/apiserver/domain/statistics`](../../../internal/apiserver/domain/statistics/)
+- [`internal/apiserver/infra/mysql/statistics`](../../../internal/apiserver/infra/mysql/statistics/)
 - [`internal/apiserver/container/modules/statistics`](../../../internal/apiserver/container/modules/statistics/)

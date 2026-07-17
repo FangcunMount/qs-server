@@ -135,16 +135,12 @@ type WorkbenchDeps struct {
 type StatisticsDeps struct {
 	Enabled bool
 
-	SystemStatisticsService        statisticsApp.SystemStatisticsService
-	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
-	TesteeStatisticsService        statisticsApp.TesteeStatisticsService
-	PlanStatisticsService          statisticsApp.PlanStatisticsService
-	ReadService                    statisticsApp.ReadService
-	PeriodicStatsService           statisticsApp.PeriodicStatsService
-	SyncService                    statisticsApp.StatisticsSyncService
-	TesteeAccessService            statisticsApp.TesteeAccessValidator
-	WarmupCoordinator              statisticsApp.WarmupCoordinator
-	CacheGovernanceStatusService   statisticsApp.GovernanceStatusReader
+	ReadService                  statisticsApp.ReadService
+	PeriodicStatsService         statisticsApp.PeriodicStatsService
+	SyncService                  statisticsApp.StatisticsSyncService
+	TesteeAccessService          statisticsApp.TesteeAccessValidator
+	WarmupCoordinator            statisticsApp.WarmupCoordinator
+	CacheGovernanceStatusService statisticsApp.GovernanceStatusReader
 }
 
 type IAMDeps struct {

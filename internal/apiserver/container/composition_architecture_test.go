@@ -500,6 +500,38 @@ func TestTransportDepsDelegatesToModuleExports(t *testing.T) {
 	}
 }
 
+func TestStatisticsActiveCodeDoesNotQueryInterpretedAssessmentStatus(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/application/statistics",
+		"internal/apiserver/domain/statistics",
+		"internal/apiserver/infra/mysql/statistics",
+	} {
+		dir := filepath.Join(root, rel)
+		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || filepath.Ext(path) != ".go" {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(strings.ToLower(string(data)), "interpreted") {
+				t.Fatalf("%s contains interpreted; evaluated is the only completed assessment status used by active Statistics code", filepath.ToSlash(path))
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestEvaluationAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	t.Parallel()
 

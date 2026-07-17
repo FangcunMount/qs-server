@@ -15,11 +15,9 @@ func (o *Options) ValidateRawSettings(settings map[string]any) error {
 			"report_status": {"ttl_seconds": leaf},
 		},
 		"governance": {
-			"statistics_warmup":        {"enable": leaf, "warm_on_startup": leaf, "org_ids": leaf, "overview_presets": leaf, "questionnaire_codes": leaf, "plan_ids": leaf},
-			"statistics_system":        {"service_singleflight": leaf, "disable_realtime_fallback": leaf, "stale_on_timeout": leaf, "load_timeout": leaf},
-			"statistics_overview":      {"service_singleflight": leaf, "stale_on_timeout": leaf, "load_timeout": leaf},
-			"statistics_questionnaire": {"service_singleflight": leaf, "stale_on_timeout": leaf, "load_timeout": leaf},
-			"warmup":                   {"enable": leaf, "startup": {"static": leaf, "query": leaf}, "hotset": {"enable": leaf, "top_n": leaf, "max_items_per_kind": leaf}},
+			"statistics_warmup":   {"enable": leaf, "warm_on_startup": leaf, "org_ids": leaf, "overview_presets": leaf},
+			"statistics_overview": {"service_singleflight": leaf, "stale_on_timeout": leaf, "load_timeout": leaf},
+			"warmup":              {"enable": leaf, "startup": {"static": leaf, "query": leaf}, "hotset": {"enable": leaf, "top_n": leaf, "max_items_per_kind": leaf}},
 		},
 	})
 }

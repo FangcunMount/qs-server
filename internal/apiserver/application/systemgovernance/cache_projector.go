@@ -390,9 +390,6 @@ func DefaultCacheWarmupKinds() []CacheWarmupKind {
 		cachetarget.WarmupKindStaticQuestionnaire,
 		cachetarget.WarmupKindStaticTypologyModel,
 		cachetarget.WarmupKindQueryStatsOverview,
-		cachetarget.WarmupKindQueryStatsSystem,
-		cachetarget.WarmupKindQueryStatsQuestionnaire,
-		cachetarget.WarmupKindQueryStatsPlan,
 	}
 	result := make([]CacheWarmupKind, 0, len(kinds))
 	for _, kind := range kinds {
@@ -416,12 +413,6 @@ func cacheWarmupScopeExample(kind cachetarget.WarmupKind) string {
 		return "typology_model:M-001"
 	case cachetarget.WarmupKindQueryStatsOverview:
 		return "org:1:preset:30d"
-	case cachetarget.WarmupKindQueryStatsSystem:
-		return "org:1"
-	case cachetarget.WarmupKindQueryStatsQuestionnaire:
-		return "org:1:questionnaire:Q-001"
-	case cachetarget.WarmupKindQueryStatsPlan:
-		return "org:1:plan:99"
 	default:
 		return ""
 	}

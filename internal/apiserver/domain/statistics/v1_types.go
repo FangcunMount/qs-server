@@ -22,43 +22,16 @@ type StatisticsTimeRange struct {
 	To     time.Time       `json:"to"`
 }
 
-// OrgOverviewSnapshot 机构概览快照。
-type OrgOverviewSnapshot struct {
-	TesteeCount                int64 `json:"testee_count"`
-	ClinicianCount             int64 `json:"clinician_count"`
-	ActiveEntryCount           int64 `json:"active_entry_count"`
-	AssessmentCount            int64 `json:"assessment_count"`
-	InterpretedAssessmentCount int64 `json:"interpreted_assessment_count"`
-}
-
-// OrgOverviewWindow 机构概览窗口指标。
-// 注意：
-// - EntryCreatedCount 属于供给侧资源指标，表示这段时间新发布了多少入口，不属于 C 端旅程节点。
-// - 其余 entry/intake/assigned/assessment 字段属于接入行为和测评服务过程指标。
-type OrgOverviewWindow struct {
-	NewTestees               int64 `json:"new_testees"`                // 入口旅程里新建的受试者人数
-	EntryCreatedCount        int64 `json:"entry_created_count"`        // 供给侧：新建入口数
-	EntryResolvedCount       int64 `json:"entry_resolved_count"`       // 旅程侧：被用户成功打开的入口次数
-	EntryIntakeCount         int64 `json:"entry_intake_count"`         // 旅程侧：完成 intake 的次数
-	RelationAssignedCount    int64 `json:"relation_assigned_count"`    // 旅程侧：建立照护关系的唯一受试者数
-	AssessmentCreatedCount   int64 `json:"assessment_created_count"`   // 旅程侧：结果就绪后形成测评的次数
-	AssessmentCompletedCount int64 `json:"assessment_completed_count"` // 旅程侧：结果就绪的次数
-}
-
-// OrgOverviewTrend 机构概览趋势。
-type OrgOverviewTrend struct {
-	Assessments []DailyCount `json:"assessments"`
-	Intakes     []DailyCount `json:"intakes"`
-	Assignments []DailyCount `json:"assignments"`
-}
-
 // OrganizationOverview 机构资源总览。
 type OrganizationOverview struct {
-	TesteeCount      int64 `json:"testee_count"`
-	ClinicianCount   int64 `json:"clinician_count"`
-	ActiveEntryCount int64 `json:"active_entry_count"`
-	AssessmentCount  int64 `json:"assessment_count"`
-	ReportCount      int64 `json:"report_count"`
+	TesteeCount                     int64 `json:"testee_count"`
+	ClinicianCount                  int64 `json:"clinician_count"`
+	ActiveEntryCount                int64 `json:"active_entry_count"`
+	AssessmentCount                 int64 `json:"assessment_count"`
+	ReportCount                     int64 `json:"report_count"`
+	ContentCount                    int64 `json:"content_count"`
+	AnswerSheetSubmissionCount      int64 `json:"answer_sheet_submission_count"`
+	TodayAnswerSheetSubmissionCount int64 `json:"today_answer_sheet_submission_count"`
 }
 
 // AccessFunnelWindow 接入漏斗窗口指标。
@@ -131,12 +104,6 @@ type PlanTaskActivityTrend struct {
 	TaskExpired   []DailyCount `json:"task_expired"`
 }
 
-// PlanTaskWindow 保留旧字段类型名称，语义等同 PlanTaskActivityWindow。
-type PlanTaskWindow = PlanTaskActivityWindow
-
-// PlanTaskTrend 保留旧字段类型名称，语义等同 PlanTaskActivityTrend。
-type PlanTaskTrend = PlanTaskActivityTrend
-
 // PlanTaskActivityStatistics 计划任务事件活动统计域。
 type PlanTaskActivityStatistics struct {
 	Window PlanTaskActivityWindow `json:"window"`
@@ -173,8 +140,6 @@ type PlanTaskFulfillmentStatistics struct {
 type PlanDomainStatistics struct {
 	Activity    PlanTaskActivityStatistics    `json:"activity"`
 	Fulfillment PlanTaskFulfillmentStatistics `json:"fulfillment"`
-	Window      PlanTaskWindow                `json:"window"` // Deprecated: 使用 activity.窗口。
-	Trend       PlanTaskTrend                 `json:"trend"`  // Deprecated: 使用 activity.trend。
 }
 
 // StatisticsOverview 机构统计概览。
@@ -298,17 +263,32 @@ type ClinicianTesteeSummaryStatistics struct {
 	AssessedInWindowCount   int64               `json:"assessed_in_window_count"`
 }
 
-// QuestionnaireBatchStatisticsItem 内容最小统计项。
-type QuestionnaireBatchStatisticsItem struct {
-	Code             string  `json:"code"`
-	TotalSubmissions int64   `json:"total_submissions"`
-	TotalCompletions int64   `json:"total_completions"`
-	CompletionRate   float64 `json:"completion_rate"`
+// ContentType identifies a supported assessment content family.
+type ContentType string
+
+const (
+	ContentTypeQuestionnaire ContentType = "questionnaire"
+	ContentTypeScale         ContentType = "scale"
+)
+
+// ContentReference uniquely identifies assessment content.
+type ContentReference struct {
+	Type ContentType `json:"type"`
+	Code string      `json:"code"`
 }
 
-// QuestionnaireBatchStatisticsResponse 内容最小统计批量响应。
-type QuestionnaireBatchStatisticsResponse struct {
-	Items []*QuestionnaireBatchStatisticsItem `json:"items"`
+// ContentBatchStatisticsItem 内容最小统计项。
+type ContentBatchStatisticsItem struct {
+	Type             ContentType `json:"type"`
+	Code             string      `json:"code"`
+	TotalSubmissions int64       `json:"total_submissions"`
+	TotalCompletions int64       `json:"total_completions"`
+	CompletionRate   float64     `json:"completion_rate"`
+}
+
+// ContentBatchStatisticsResponse 内容最小统计批量响应。
+type ContentBatchStatisticsResponse struct {
+	Items []*ContentBatchStatisticsItem `json:"items"`
 }
 
 // TesteePeriodicTaskStatistics 周期任务统计项。

@@ -7,7 +7,7 @@ import (
 )
 
 type clinicianStatsQuery struct {
-	readModel StatisticsReadModel
+	readModel ClinicianStatisticsReader
 }
 
 func (q *clinicianStatsQuery) ListClinicianStatistics(ctx context.Context, orgID int64, filter QueryFilter, page, pageSize int) (*domainStatistics.ClinicianStatisticsList, error) {
@@ -25,14 +25,18 @@ func (q *clinicianStatsQuery) ListClinicianStatistics(ctx context.Context, orgID
 	if err != nil {
 		return nil, err
 	}
+	clinicianIDs := make([]uint64, 0, len(subjects))
+	for i := range subjects {
+		clinicianIDs = append(clinicianIDs, subjects[i].ID.Uint64())
+	}
+	details, err := q.readModel.GetClinicianStatisticsDetails(ctx, orgID, clinicianIDs, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]*domainStatistics.ClinicianStatistics, 0, len(subjects))
 	for i := range subjects {
-		item, err := q.buildClinicianStatistics(ctx, orgID, subjects[i], timeRange)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+		items = append(items, buildClinicianStatistics(subjects[i], timeRange, details[subjects[i].ID.Uint64()]))
 	}
 
 	return &domainStatistics.ClinicianStatisticsList{
@@ -54,7 +58,11 @@ func (q *clinicianStatsQuery) GetClinicianStatistics(ctx context.Context, orgID 
 	if err != nil {
 		return nil, err
 	}
-	return q.buildClinicianStatistics(ctx, orgID, *subject, timeRange)
+	details, err := q.readModel.GetClinicianStatisticsDetails(ctx, orgID, []uint64{clinicianID}, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	return buildClinicianStatistics(*subject, timeRange, details[clinicianID]), nil
 }
 
 func (q *clinicianStatsQuery) GetCurrentClinicianStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*domainStatistics.ClinicianStatistics, error) {
@@ -67,7 +75,12 @@ func (q *clinicianStatsQuery) GetCurrentClinicianStatistics(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	return q.buildClinicianStatistics(ctx, orgID, *subject, timeRange)
+	clinicianID := subject.ID.Uint64()
+	details, err := q.readModel.GetClinicianStatisticsDetails(ctx, orgID, []uint64{clinicianID}, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	return buildClinicianStatistics(*subject, timeRange, details[clinicianID]), nil
 }
 
 func (q *clinicianStatsQuery) GetCurrentClinicianTesteeSummary(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*domainStatistics.ClinicianTesteeSummaryStatistics, error) {
@@ -101,21 +114,12 @@ func (q *clinicianStatsQuery) GetCurrentClinicianTesteeSummary(ctx context.Conte
 	}, nil
 }
 
-func (q *clinicianStatsQuery) buildClinicianStatistics(ctx context.Context, orgID int64, subject domainStatistics.ClinicianStatisticsSubject, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.ClinicianStatistics, error) {
-	snapshot, err := q.readModel.GetClinicianSnapshot(ctx, orgID, subject.ID.Uint64())
-	if err != nil {
-		return nil, err
-	}
-	window, funnel, err := q.readModel.GetClinicianJourneyStats(ctx, orgID, subject.ID.Uint64(), timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-
+func buildClinicianStatistics(subject domainStatistics.ClinicianStatisticsSubject, timeRange domainStatistics.StatisticsTimeRange, detail ClinicianStatisticsDetail) *domainStatistics.ClinicianStatistics {
 	return &domainStatistics.ClinicianStatistics{
 		TimeRange: timeRange,
 		Clinician: subject,
-		Snapshot:  snapshot,
-		Window:    window,
-		Funnel:    funnel,
-	}, nil
+		Snapshot:  detail.Snapshot,
+		Window:    detail.Window,
+		Funnel:    detail.Funnel,
+	}
 }

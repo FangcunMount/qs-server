@@ -27,13 +27,10 @@ const suppressHotsetRecordingKey contextKey = "suppress-hotset-recording"
 type WarmupKind string
 
 const (
-	WarmupKindStaticScale             WarmupKind = "static.scale"
-	WarmupKindStaticQuestionnaire     WarmupKind = "static.questionnaire"
-	WarmupKindStaticTypologyModel     WarmupKind = "static.typology_model"
-	WarmupKindQueryStatsOverview      WarmupKind = "query.stats_overview"
-	WarmupKindQueryStatsSystem        WarmupKind = "query.stats_system"
-	WarmupKindQueryStatsQuestionnaire WarmupKind = "query.stats_questionnaire"
-	WarmupKindQueryStatsPlan          WarmupKind = "query.stats_plan"
+	WarmupKindStaticScale         WarmupKind = "static.scale"
+	WarmupKindStaticQuestionnaire WarmupKind = "static.questionnaire"
+	WarmupKindStaticTypologyModel WarmupKind = "static.typology_model"
+	WarmupKindQueryStatsOverview  WarmupKind = "query.stats_overview"
 )
 
 // WarmupTarget 描述一个稳定的预热目标。
@@ -69,14 +66,6 @@ func (t WarmupTarget) OrgID() (int64, bool) {
 	case WarmupKindQueryStatsOverview:
 		orgID, _, ok := ParseQueryStatsOverviewScope(t.Scope)
 		return orgID, ok
-	case WarmupKindQueryStatsSystem:
-		return ParseQueryStatsSystemScope(t.Scope)
-	case WarmupKindQueryStatsQuestionnaire:
-		orgID, _, ok := ParseQueryStatsQuestionnaireScope(t.Scope)
-		return orgID, ok
-	case WarmupKindQueryStatsPlan:
-		orgID, _, ok := ParseQueryStatsPlanScope(t.Scope)
-		return orgID, ok
 	default:
 		return 0, false
 	}
@@ -87,7 +76,7 @@ func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	switch kind {
 	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticTypologyModel:
 		return cachemodel.FamilyStatic
-	case WarmupKindQueryStatsOverview, WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
+	case WarmupKindQueryStatsOverview:
 		return cachemodel.FamilyQuery
 	default:
 		return cachemodel.FamilyDefault
@@ -134,42 +123,12 @@ func NewQueryStatsOverviewWarmupTarget(orgID int64, preset string) WarmupTarget 
 	}
 }
 
-// NewQueryStatsSystemWarmupTarget 创建系统统计查询预热目标。
-func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
-	return WarmupTarget{
-		Family: cachemodel.FamilyQuery,
-		Kind:   WarmupKindQueryStatsSystem,
-		Scope:  fmt.Sprintf("org:%d", orgID),
-	}
-}
-
-// NewQueryStatsQuestionnaireWarmupTarget 创建问卷统计查询预热目标。
-func NewQueryStatsQuestionnaireWarmupTarget(orgID int64, code string) WarmupTarget {
-	return WarmupTarget{
-		Family: cachemodel.FamilyQuery,
-		Kind:   WarmupKindQueryStatsQuestionnaire,
-		Scope:  fmt.Sprintf("org:%d:questionnaire:%s", orgID, strings.ToLower(strings.TrimSpace(code))),
-	}
-}
-
-// NewQueryStatsPlanWarmupTarget 创建计划统计查询预热目标。
-func NewQueryStatsPlanWarmupTarget(orgID int64, planID uint64) WarmupTarget {
-	return WarmupTarget{
-		Family: cachemodel.FamilyQuery,
-		Kind:   WarmupKindQueryStatsPlan,
-		Scope:  fmt.Sprintf("org:%d:plan:%d", orgID, planID),
-	}
-}
-
 func ParseWarmupKind(raw string) (WarmupKind, bool) {
 	switch WarmupKind(strings.TrimSpace(raw)) {
 	case WarmupKindStaticScale,
 		WarmupKindStaticQuestionnaire,
 		WarmupKindStaticTypologyModel,
-		WarmupKindQueryStatsOverview,
-		WarmupKindQueryStatsSystem,
-		WarmupKindQueryStatsQuestionnaire,
-		WarmupKindQueryStatsPlan:
+		WarmupKindQueryStatsOverview:
 		return WarmupKind(strings.TrimSpace(raw)), true
 	default:
 		return "", false
@@ -204,24 +163,6 @@ func ParseWarmupTarget(kind WarmupKind, scope string) (WarmupTarget, error) {
 			return WarmupTarget{}, fmt.Errorf("invalid stats overview warmup scope: %s", scope)
 		}
 		return NewQueryStatsOverviewWarmupTarget(orgID, preset), nil
-	case WarmupKindQueryStatsSystem:
-		orgID, ok := ParseQueryStatsSystemScope(scope)
-		if !ok {
-			return WarmupTarget{}, fmt.Errorf("invalid stats system warmup scope: %s", scope)
-		}
-		return NewQueryStatsSystemWarmupTarget(orgID), nil
-	case WarmupKindQueryStatsQuestionnaire:
-		orgID, code, ok := ParseQueryStatsQuestionnaireScope(scope)
-		if !ok {
-			return WarmupTarget{}, fmt.Errorf("invalid stats questionnaire warmup scope: %s", scope)
-		}
-		return NewQueryStatsQuestionnaireWarmupTarget(orgID, code), nil
-	case WarmupKindQueryStatsPlan:
-		orgID, planID, ok := ParseQueryStatsPlanScope(scope)
-		if !ok {
-			return WarmupTarget{}, fmt.Errorf("invalid stats plan warmup scope: %s", scope)
-		}
-		return NewQueryStatsPlanWarmupTarget(orgID, planID), nil
 	default:
 		return WarmupTarget{}, fmt.Errorf("unsupported warmup kind: %s", kind)
 	}
@@ -251,14 +192,6 @@ func ParseStaticTypologyModelScope(scope string) (string, bool) {
 	return code, code != ""
 }
 
-func ParseQueryStatsSystemScope(scope string) (int64, bool) {
-	var orgID int64
-	if _, err := fmt.Sscanf(scope, "org:%d", &orgID); err != nil || orgID == 0 {
-		return 0, false
-	}
-	return orgID, true
-}
-
 func ParseQueryStatsOverviewScope(scope string) (int64, string, bool) {
 	parts := strings.Split(scope, ":")
 	if len(parts) != 4 || parts[0] != "org" || parts[2] != "preset" {
@@ -286,31 +219,6 @@ func isSupportedOverviewPreset(preset string) bool {
 	default:
 		return false
 	}
-}
-
-func ParseQueryStatsQuestionnaireScope(scope string) (int64, string, bool) {
-	var orgID int64
-	var code string
-	if _, err := fmt.Sscanf(scope, "org:%d:questionnaire:%s", &orgID, &code); err != nil || orgID == 0 || code == "" {
-		return 0, "", false
-	}
-	return orgID, code, true
-}
-
-func ParseQueryStatsPlanScope(scope string) (int64, uint64, bool) {
-	parts := strings.Split(scope, ":")
-	if len(parts) != 4 || parts[0] != "org" || parts[2] != "plan" {
-		return 0, 0, false
-	}
-	orgID, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil || orgID == 0 {
-		return 0, 0, false
-	}
-	planID, err := strconv.ParseUint(parts[3], 10, 64)
-	if err != nil || planID == 0 {
-		return 0, 0, false
-	}
-	return orgID, planID, true
 }
 
 // SuppressHotsetRecording returns a context that prevents best-effort hotset writes.

@@ -612,11 +612,9 @@ type CacheDefaultsOptions struct {
 }
 
 type CacheGovernanceOptions struct {
-	StatisticsWarmup        *StatisticsWarmupOptions        `json:"statistics_warmup" mapstructure:"statistics_warmup"`
-	StatisticsSystem        *StatisticsSystemOptions        `json:"statistics_system" mapstructure:"statistics_system"`
-	StatisticsOverview      *StatisticsOverviewOptions      `json:"statistics_overview" mapstructure:"statistics_overview"`
-	StatisticsQuestionnaire *StatisticsQuestionnaireOptions `json:"statistics_questionnaire" mapstructure:"statistics_questionnaire"`
-	Warmup                  *WarmupOptions                  `json:"warmup" mapstructure:"warmup"`
+	StatisticsWarmup   *StatisticsWarmupOptions   `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	StatisticsOverview *StatisticsOverviewOptions `json:"statistics_overview" mapstructure:"statistics_overview"`
+	Warmup             *WarmupOptions             `json:"warmup" mapstructure:"warmup"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -642,28 +640,15 @@ func NewCacheOptions() *CacheOptions {
 		},
 		Governance: &CacheGovernanceOptions{
 			StatisticsWarmup: &StatisticsWarmupOptions{
-				Enable:             false,
-				WarmOnStartup:      true,
-				OrgIDs:             []int64{1},
-				OverviewPresets:    []string{"today", "7d", "30d"},
-				QuestionnaireCodes: []string{},
-				PlanIDs:            []uint64{},
-			},
-			StatisticsSystem: &StatisticsSystemOptions{
-				ServiceSingleflight:     true,
-				DisableRealtimeFallback: true,
-				StaleOnTimeout:          true,
-				LoadTimeout:             25 * time.Second,
+				Enable:          false,
+				WarmOnStartup:   true,
+				OrgIDs:          []int64{1},
+				OverviewPresets: []string{"today", "7d", "30d"},
 			},
 			StatisticsOverview: &StatisticsOverviewOptions{
 				ServiceSingleflight: true,
 				StaleOnTimeout:      true,
 				LoadTimeout:         25 * time.Second,
-			},
-			StatisticsQuestionnaire: &StatisticsQuestionnaireOptions{
-				ServiceSingleflight: true,
-				StaleOnTimeout:      true,
-				LoadTimeout:         15 * time.Second,
 			},
 			Warmup: &WarmupOptions{
 				Enable: true,
@@ -722,20 +707,10 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&c.Defaults.Query.TTLJitterRatio, "cache.defaults.query.ttl_jitter_ratio", c.Defaults.Query.TTLJitterRatio, "TTL jitter ratio override for query-result caches (0 uses the global cache.defaults.ttl_jitter_ratio).")
 	if c.Governance.StatisticsWarmup == nil {
 		c.Governance.StatisticsWarmup = &StatisticsWarmupOptions{
-			Enable:             false,
-			WarmOnStartup:      true,
-			OrgIDs:             []int64{1},
-			OverviewPresets:    []string{"today", "7d", "30d"},
-			QuestionnaireCodes: []string{},
-			PlanIDs:            []uint64{},
-		}
-	}
-	if c.Governance.StatisticsSystem == nil {
-		c.Governance.StatisticsSystem = &StatisticsSystemOptions{
-			ServiceSingleflight:     true,
-			DisableRealtimeFallback: true,
-			StaleOnTimeout:          true,
-			LoadTimeout:             25 * time.Second,
+			Enable:          false,
+			WarmOnStartup:   true,
+			OrgIDs:          []int64{1},
+			OverviewPresets: []string{"today", "7d", "30d"},
 		}
 	}
 	if c.Governance.StatisticsOverview == nil {
@@ -743,13 +718,6 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			ServiceSingleflight: true,
 			StaleOnTimeout:      true,
 			LoadTimeout:         25 * time.Second,
-		}
-	}
-	if c.Governance.StatisticsQuestionnaire == nil {
-		c.Governance.StatisticsQuestionnaire = &StatisticsQuestionnaireOptions{
-			ServiceSingleflight: true,
-			StaleOnTimeout:      true,
-			LoadTimeout:         15 * time.Second,
 		}
 	}
 	if c.Governance.Warmup == nil {
@@ -873,31 +841,14 @@ type CacheFamilyOptions struct {
 
 // StatisticsWarmupOptions 统计查询结果缓存预热配置
 type StatisticsWarmupOptions struct {
-	Enable             bool     `json:"enable" mapstructure:"enable"`
-	WarmOnStartup      bool     `json:"warm_on_startup" mapstructure:"warm_on_startup"`
-	OrgIDs             []int64  `json:"org_ids" mapstructure:"org_ids"`
-	OverviewPresets    []string `json:"overview_presets" mapstructure:"overview_presets"`
-	QuestionnaireCodes []string `json:"questionnaire_codes" mapstructure:"questionnaire_codes"`
-	PlanIDs            []uint64 `json:"plan_ids" mapstructure:"plan_ids"`
-}
-
-// StatisticsSystemOptions 系统统计查询保护与降级配置。
-type StatisticsSystemOptions struct {
-	ServiceSingleflight     bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
-	DisableRealtimeFallback bool          `json:"disable_realtime_fallback" mapstructure:"disable_realtime_fallback"`
-	StaleOnTimeout          bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
-	LoadTimeout             time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
+	Enable          bool     `json:"enable" mapstructure:"enable"`
+	WarmOnStartup   bool     `json:"warm_on_startup" mapstructure:"warm_on_startup"`
+	OrgIDs          []int64  `json:"org_ids" mapstructure:"org_ids"`
+	OverviewPresets []string `json:"overview_presets" mapstructure:"overview_presets"`
 }
 
 // StatisticsOverviewOptions 机构统计总览读保护与降级配置。
 type StatisticsOverviewOptions struct {
-	ServiceSingleflight bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
-	StaleOnTimeout      bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
-	LoadTimeout         time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
-}
-
-// StatisticsQuestionnaireOptions 问卷统计读保护与降级配置。
-type StatisticsQuestionnaireOptions struct {
 	ServiceSingleflight bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
 	StaleOnTimeout      bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
 	LoadTimeout         time.Duration `json:"load_timeout" mapstructure:"load_timeout"`

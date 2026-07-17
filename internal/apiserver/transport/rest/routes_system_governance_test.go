@@ -183,18 +183,18 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 				Severity:  systemgov.SeverityWarning,
 			}},
 			WarmupKinds: []systemgov.CacheWarmupKind{{
-				Kind:                 "query.stats_system",
+				Kind:                 "query.stats_overview",
 				Family:               "query_result",
-				ScopeExample:         "org:7",
+				ScopeExample:         "org:7:preset:30d",
 				SupportsManualWarmup: true,
 			}},
 			Hotsets: []systemgov.CacheHotsetView{{
-				Kind:      "query.stats_system",
+				Kind:      "query.stats_overview",
 				Family:    "query_result",
 				Available: true,
 				Items: []systemgov.CacheHotsetItem{{
-					Kind:  "query.stats_system",
-					Scope: "org:7",
+					Kind:  "query.stats_overview",
+					Scope: "org:7:preset:30d",
 					Score: 3,
 				}},
 			}},
@@ -240,14 +240,14 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 	if len(payload.Data.FamilyRows) != 1 || payload.Data.FamilyRows[0].Family != "query_result" {
 		t.Fatalf("family_rows = %+v, want query_result row", payload.Data.FamilyRows)
 	}
-	if len(payload.Data.WarmupKinds) != 1 || payload.Data.WarmupKinds[0].Kind != "query.stats_system" {
-		t.Fatalf("warmup_kinds = %+v, want query.stats_system", payload.Data.WarmupKinds)
+	if len(payload.Data.WarmupKinds) != 1 || payload.Data.WarmupKinds[0].Kind != "query.stats_overview" {
+		t.Fatalf("warmup_kinds = %+v, want query.stats_overview", payload.Data.WarmupKinds)
 	}
 	if len(payload.Data.Hotsets) != 1 || len(payload.Data.Hotsets[0].Items) != 1 {
 		t.Fatalf("hotsets = %+v, want one recommendation item", payload.Data.Hotsets)
 	}
-	if payload.Data.Hotsets[0].Items[0].Scope != "org:7" {
-		t.Fatalf("hotset scope = %q, want org:7", payload.Data.Hotsets[0].Items[0].Scope)
+	if payload.Data.Hotsets[0].Items[0].Scope != "org:7:preset:30d" {
+		t.Fatalf("hotset scope = %q, want org:7:preset:30d", payload.Data.Hotsets[0].Items[0].Scope)
 	}
 }
 

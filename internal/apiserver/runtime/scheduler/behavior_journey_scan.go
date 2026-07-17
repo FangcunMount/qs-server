@@ -149,7 +149,7 @@ func (r *BehaviorJourneyScanRunner) runOnce(ctx context.Context) error {
 			log.Warnf("failed to release behavior journey scan lock (lock_key=%s): %v", lockKey, err)
 		},
 	}, func(ctx context.Context) error {
-		_, err := r.scanner.ScanDue(ctx, statisticsApp.BehaviorJourneyScanInput{
+		result, err := r.scanner.ScanDue(ctx, statisticsApp.BehaviorJourneyScanInput{
 			OrgIDs:       r.opts.OrgIDs,
 			Sources:      r.opts.Sources,
 			BatchSize:    r.opts.BatchSize,
@@ -158,6 +158,9 @@ func (r *BehaviorJourneyScanRunner) runOnce(ctx context.Context) error {
 			DryRun:       r.opts.DryRun,
 			WindowRecalc: r.opts.WindowRecalc,
 		})
+		if err == nil {
+			log.Infof("behavior journey scan completed (sources=%d, recalculations=%d)", len(result.SourceResults), len(result.RecalcResults))
+		}
 		return err
 	})
 }

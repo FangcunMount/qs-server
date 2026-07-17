@@ -7,7 +7,7 @@ import (
 )
 
 // StatisticsReadGuardOptions 控制统计读路径的并发合并与过载降级。
-// system/overview/questionnaire 三套读路径均映射到 load守卫；默认均开启 singleflight 与 stale fallback。
+// overview 读路径映射到 load 守卫；默认开启 singleflight 与 stale fallback。
 type StatisticsReadGuardOptions struct {
 	ServiceSingleflight bool
 	StaleOnTimeout      bool
@@ -28,13 +28,5 @@ func DefaultStatisticsReadGuardOptions() StatisticsReadGuardOptions {
 		ServiceSingleflight: true,
 		StaleOnTimeout:      true,
 		LoadTimeout:         25 * time.Second,
-	}
-}
-
-func DefaultQuestionnaireStatisticsGuardOptions() StatisticsReadGuardOptions {
-	return StatisticsReadGuardOptions{
-		ServiceSingleflight: true,
-		StaleOnTimeout:      true,
-		LoadTimeout:         15 * time.Second,
 	}
 }

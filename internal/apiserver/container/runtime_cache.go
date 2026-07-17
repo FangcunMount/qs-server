@@ -149,15 +149,9 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		warmQuestionnaire = a.warmQuestionnaireCacheTarget
 	}
 
-	var warmStatsSystem func(context.Context, int64) error
 	var warmStatsOverview func(context.Context, int64, string) error
-	var warmStatsQuestionnaire func(context.Context, int64, string) error
-	var warmStatsPlan func(context.Context, int64, uint64) error
 	if c != nil && c.CacheClient(redisruntime.FamilyQuery) != nil && capabilityEnabled(c.CachePolicyProvider(), cachepolicy.CapabilityStatisticsQuery) {
 		warmStatsOverview = a.warmOverviewStatsTarget
-		warmStatsSystem = a.warmSystemStatsTarget
-		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget
-		warmStatsPlan = a.warmPlanStatsTarget
 	}
 
 	return cachebootstrap.GovernanceBindings{
@@ -168,9 +162,6 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		WarmQuestionnaire:               warmQuestionnaire,
 		WarmPublishedTypologyModel:      a.warmPublishedTypologyModel,
 		WarmStatsOverview:               warmStatsOverview,
-		WarmStatsSystem:                 warmStatsSystem,
-		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
-		WarmStatsPlan:                   warmStatsPlan,
 	}
 }
 
@@ -296,38 +287,11 @@ func (a cacheGovernanceAdapter) containerSurveyRuntimeInfra() *surveymod.SurveyR
 	return a.container.surveyRuntimeInfra
 }
 
-func (a cacheGovernanceAdapter) warmSystemStatsTarget(ctx context.Context, orgID int64) error {
-	c := a.container
-	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.SystemStatisticsService == nil {
-		return nil
-	}
-	_, err := c.StatisticsModule.SystemStatisticsService.GetSystemStatistics(ctx, orgID)
-	return err
-}
-
 func (a cacheGovernanceAdapter) warmOverviewStatsTarget(ctx context.Context, orgID int64, preset string) error {
 	c := a.container
 	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.ReadService == nil {
 		return nil
 	}
 	_, err := c.StatisticsModule.ReadService.GetOverview(ctx, orgID, statisticsApp.QueryFilter{Preset: preset})
-	return err
-}
-
-func (a cacheGovernanceAdapter) warmQuestionnaireStatsTarget(ctx context.Context, orgID int64, code string) error {
-	c := a.container
-	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.QuestionnaireStatisticsService == nil {
-		return nil
-	}
-	_, err := c.StatisticsModule.QuestionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, code)
-	return err
-}
-
-func (a cacheGovernanceAdapter) warmPlanStatsTarget(ctx context.Context, orgID int64, planID uint64) error {
-	c := a.container
-	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.PlanStatisticsService == nil {
-		return nil
-	}
-	_, err := c.StatisticsModule.PlanStatisticsService.GetPlanStatistics(ctx, orgID, planID)
 	return err
 }

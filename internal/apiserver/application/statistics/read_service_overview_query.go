@@ -10,13 +10,13 @@ import (
 )
 
 type overviewQuery struct {
-	readModel StatisticsReadModel
+	readModel OverviewReader
 	cache     *statisticsCacheHelper
 	guard     *loadguard.Guard[string, *domainStatistics.StatisticsOverview]
 }
 
 func newOverviewQuery(
-	readModel StatisticsReadModel,
+	readModel OverviewReader,
 	cache *statisticsCacheHelper,
 	opts StatisticsReadGuardOptions,
 ) *overviewQuery {
@@ -161,8 +161,6 @@ func (q *overviewQuery) buildOverview(ctx context.Context, orgID int64, timeRang
 				Window: planFulfillmentWindow,
 				Trend:  planFulfillmentFilledTrend,
 			},
-			Window: planWindow,
-			Trend:  planActivityTrend,
 		},
 	}, nil
 }

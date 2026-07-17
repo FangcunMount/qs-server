@@ -4,36 +4,43 @@ import (
 	"context"
 	"strings"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-type questionnaireBatchQuery struct {
-	readModel       StatisticsReadModel
-	answerSheetRead surveyreadmodel.AnswerSheetReader
+type contentBatchQuery struct {
+	readModel ContentStatisticsReader
 }
 
-func (q *questionnaireBatchQuery) GetQuestionnaireBatchStatistics(ctx context.Context, orgID int64, codes []string) (*domainStatistics.QuestionnaireBatchStatisticsResponse, error) {
-	cleanCodes := normalizeQuestionnaireCodes(codes)
-	items := make([]*domainStatistics.QuestionnaireBatchStatisticsItem, 0, len(cleanCodes))
-	if len(cleanCodes) == 0 {
-		return &domainStatistics.QuestionnaireBatchStatisticsResponse{Items: items}, nil
+func (q *contentBatchQuery) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
+	cleanRefs, err := normalizeContentReferences(refs)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*domainStatistics.ContentBatchStatisticsItem, 0, len(cleanRefs))
+	if len(cleanRefs) == 0 {
+		return &domainStatistics.ContentBatchStatisticsResponse{Items: items}, nil
 	}
 
-	totals, err := q.readModel.GetQuestionnaireBatchTotals(ctx, orgID, cleanCodes)
+	readRefs := make([]ContentReference, 0, len(cleanRefs))
+	for _, ref := range cleanRefs {
+		readRefs = append(readRefs, ContentReference{Type: string(ref.Type), Code: ref.Code})
+	}
+	totals, err := q.readModel.GetContentBatchTotals(ctx, orgID, readRefs)
 	if err != nil {
 		return nil, err
 	}
 
-	resultByCode := make(map[string]*domainStatistics.QuestionnaireBatchStatisticsItem, len(cleanCodes))
-	for _, codeValue := range cleanCodes {
-		resultByCode[codeValue] = &domainStatistics.QuestionnaireBatchStatisticsItem{Code: codeValue}
+	resultByRef := make(map[domainStatistics.ContentReference]*domainStatistics.ContentBatchStatisticsItem, len(cleanRefs))
+	for _, ref := range cleanRefs {
+		resultByRef[ref] = &domainStatistics.ContentBatchStatisticsItem{Type: ref.Type, Code: ref.Code}
 	}
 	for _, total := range totals {
-		item := resultByCode[total.Code]
+		ref := domainStatistics.ContentReference{Type: domainStatistics.ContentType(total.Type), Code: total.Code}
+		item := resultByRef[ref]
 		if item == nil {
-			item = &domainStatistics.QuestionnaireBatchStatisticsItem{Code: total.Code}
-			resultByCode[total.Code] = item
+			continue
 		}
 		item.TotalSubmissions = total.TotalSubmissions
 		item.TotalCompletions = total.TotalCompletions
@@ -42,44 +49,32 @@ func (q *questionnaireBatchQuery) GetQuestionnaireBatchStatistics(ctx context.Co
 		}
 	}
 
-	for _, codeValue := range cleanCodes {
-		items = append(items, resultByCode[codeValue])
+	for _, ref := range cleanRefs {
+		items = append(items, resultByRef[ref])
 	}
 
-	if q.answerSheetRead != nil {
-		for _, item := range items {
-			if item.TotalSubmissions > 0 {
-				continue
-			}
-			count, err := q.answerSheetRead.CountAnswerSheets(ctx, surveyreadmodel.AnswerSheetFilter{QuestionnaireCode: item.Code})
-			if err != nil {
-				return nil, err
-			}
-			if count <= 0 {
-				continue
-			}
-			item.TotalSubmissions = count
-			item.TotalCompletions = count
-			item.CompletionRate = 100
-		}
-	}
-
-	return &domainStatistics.QuestionnaireBatchStatisticsResponse{Items: items}, nil
+	return &domainStatistics.ContentBatchStatisticsResponse{Items: items}, nil
 }
 
-func normalizeQuestionnaireCodes(codes []string) []string {
-	cleanCodes := make([]string, 0, len(codes))
-	seen := make(map[string]struct{}, len(codes))
-	for _, codeValue := range codes {
-		codeValue = strings.TrimSpace(codeValue)
-		if codeValue == "" {
+func normalizeContentReferences(refs []domainStatistics.ContentReference) ([]domainStatistics.ContentReference, error) {
+	cleanRefs := make([]domainStatistics.ContentReference, 0, len(refs))
+	seen := make(map[domainStatistics.ContentReference]struct{}, len(refs))
+	for _, ref := range refs {
+		ref.Type = domainStatistics.ContentType(strings.ToLower(strings.TrimSpace(string(ref.Type))))
+		ref.Code = strings.TrimSpace(ref.Code)
+		if ref.Code == "" {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "content code is required")
+		}
+		switch ref.Type {
+		case domainStatistics.ContentTypeQuestionnaire, domainStatistics.ContentTypeScale:
+		default:
+			return nil, errors.WithCode(code.ErrInvalidArgument, "unsupported content type: %s", ref.Type)
+		}
+		if _, exists := seen[ref]; exists {
 			continue
 		}
-		if _, exists := seen[codeValue]; exists {
-			continue
-		}
-		seen[codeValue] = struct{}{}
-		cleanCodes = append(cleanCodes, codeValue)
+		seen[ref] = struct{}{}
+		cleanRefs = append(cleanRefs, ref)
 	}
-	return cleanCodes
+	return cleanRefs, nil
 }

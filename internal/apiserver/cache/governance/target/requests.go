@@ -18,10 +18,8 @@ type ManualWarmupTarget struct {
 }
 
 type RepairCompleteRequest struct {
-	RepairKind         string
-	OrgIDs             []int64
-	QuestionnaireCodes []string
-	PlanIDs            []uint64
+	RepairKind string
+	OrgIDs     []int64
 }
 
 type HotsetSnapshot struct {

@@ -48,11 +48,11 @@ func TestGetCacheIncludesRemoteComponentDegradationAndHotsets(t *testing.T) {
 		status: healthyCacheStatus("apiserver"),
 		hotset: &statisticsApp.GovernanceHotsetResponse{
 			Family:    "query_result",
-			Kind:      cachetarget.WarmupKindQueryStatsSystem,
+			Kind:      cachetarget.WarmupKindQueryStatsOverview,
 			Limit:     5,
 			Available: true,
 			Items: []cachetarget.HotsetItem{
-				{Target: cachetarget.NewQueryStatsSystemWarmupTarget(9), Score: 2},
+				{Target: cachetarget.NewQueryStatsOverviewWarmupTarget(9, "30d"), Score: 2},
 			},
 		},
 	}
