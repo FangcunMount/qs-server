@@ -46,6 +46,9 @@ type config struct {
 type report struct {
 	Heads, Snapshots, RetiredSnapshots, OrphanSnapshots                               int
 	QuestionnaireHeads, QuestionnaireSnapshots, ActiveSnapshots, ActiveQuestionnaires int
+	DroppedModelSnapshots, ArchivedModelActives, NormalizedModelHeads                 int
+	DroppedQuestionnaireHeads, DroppedQuestionnaireSnapshots                          int
+	ArchivedQuestionnaireActives, NormalizedQuestionnaireHeads                        int
 	Issues                                                                            []string
 	LegacyCollection                                                                  string
 }
@@ -170,10 +173,10 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 	if err != nil {
 		return report{}, fmt.Errorf("load assessment models: %w", err)
 	}
-	heads := filterRows(allModels, func(row bson.M) bool {
+	rawHeads := filterRows(allModels, func(row bson.M) bool {
 		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
 	})
-	snapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
+	rawSnapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
 	if exists, existsErr := collectionExists(ctx, db, snapshotsName); existsErr != nil {
 		return report{}, existsErr
 	} else if exists {
@@ -181,10 +184,16 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 		if loadErr != nil {
 			return report{}, fmt.Errorf("load snapshots: %w", loadErr)
 		}
-		snapshots = append(snapshots, legacy...)
+		rawSnapshots = append(rawSnapshots, legacy...)
 	}
-	snapshots, duplicateIssues := deduplicateSnapshots(snapshots)
-	rep := report{Heads: len(heads), Snapshots: len(snapshots), Issues: duplicateIssues}
+	models := prepareRunnableModelRecords(rawHeads, rawSnapshots)
+	heads, snapshots := models.heads, models.snapshots
+	rep := report{
+		Heads: len(heads), Snapshots: len(snapshots), Issues: models.issues,
+		DroppedModelSnapshots: models.droppedSnapshots,
+		ArchivedModelActives:  models.archivedActives,
+		NormalizedModelHeads:  models.normalizedHeads,
+	}
 	seenHeads := map[string]struct{}{}
 	for _, head := range heads {
 		code := stringField(head, "code")
@@ -219,14 +228,15 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 	if err != nil {
 		return report{}, fmt.Errorf("load questionnaires: %w", err)
 	}
-	questionnaireHeads := filterRows(questionnaires, func(row bson.M) bool {
-		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
-	})
-	questionnaireSnapshots := questionnaireSnapshotSources(questionnaires)
-	questionnaireSnapshots, questionnaireDuplicateIssues := deduplicateQuestionnaireSnapshots(questionnaireSnapshots)
-	rep.Issues = append(rep.Issues, questionnaireDuplicateIssues...)
+	preparedQuestionnaires := prepareRunnableQuestionnaireRecords(questionnaires)
+	questionnaireHeads, questionnaireSnapshots := preparedQuestionnaires.heads, preparedQuestionnaires.snapshots
+	rep.Issues = append(rep.Issues, preparedQuestionnaires.issues...)
 	rep.QuestionnaireHeads = len(questionnaireHeads)
 	rep.QuestionnaireSnapshots = len(questionnaireSnapshots)
+	rep.DroppedQuestionnaireHeads = preparedQuestionnaires.droppedHeads
+	rep.DroppedQuestionnaireSnapshots = preparedQuestionnaires.droppedSnapshots
+	rep.ArchivedQuestionnaireActives = preparedQuestionnaires.archivedActives
+	rep.NormalizedQuestionnaireHeads = preparedQuestionnaires.normalizedHeads
 	questionnaireInspection := inspectQuestionnaireSnapshots(questionnaireSnapshots)
 	rep.Issues = append(rep.Issues, questionnaireInspection.issues...)
 	rep.ActiveQuestionnaires = len(questionnaireInspection.activeCodes)
@@ -246,6 +256,252 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 	rep.Issues = append(rep.Issues, inspectQuestionnaireHeads(questionnaireHeads, questionnaireInspection.activeCodes)...)
 	sort.Strings(rep.Issues)
 	return rep, nil
+}
+
+type modelRecordPreparation struct {
+	heads, snapshots                  []bson.M
+	droppedSnapshots, archivedActives int
+	normalizedHeads                   int
+	issues                            []string
+}
+
+func prepareRunnableModelRecords(heads, snapshots []bson.M) modelRecordPreparation {
+	compatible := make([]bson.M, 0, len(snapshots))
+	result := modelRecordPreparation{}
+	result.heads = cloneRows(heads)
+	for _, row := range snapshots {
+		if !modelSnapshotCompatible(row) {
+			result.droppedSnapshots++
+			continue
+		}
+		compatible = append(compatible, row)
+	}
+	deduplicated, issues := deduplicateSnapshots(compatible)
+	result.issues = append(result.issues, issues...)
+	for _, row := range deduplicated {
+		result.snapshots = append(result.snapshots, cloneBSON(row))
+	}
+
+	headByCode := make(map[string]bson.M, len(result.heads))
+	for _, head := range result.heads {
+		code := stringField(head, "code")
+		if code != "" {
+			headByCode[code] = head
+		}
+	}
+	activeByCode := make(map[string][]bson.M)
+	for _, row := range result.snapshots {
+		if snapshotActive(row) {
+			activeByCode[snapshotField(row, "code")] = append(activeByCode[snapshotField(row, "code")], row)
+		}
+	}
+	for code, active := range activeByCode {
+		head := headByCode[code]
+		if head == nil || stringField(head, "status") == "archived" {
+			for _, row := range active {
+				archiveSnapshotForMigration(row, "active_without_runnable_head")
+				result.archivedActives++
+			}
+			continue
+		}
+		if len(active) <= 1 {
+			continue
+		}
+		matching := matchingModelActive(head, active)
+		if len(matching) != 1 {
+			result.issues = append(result.issues, "cannot determine current active snapshot for "+code)
+			continue
+		}
+		for _, row := range active {
+			if modelSnapshotIdentityKey(row) == modelSnapshotIdentityKey(matching[0]) {
+				continue
+			}
+			archiveSnapshotForMigration(row, "superseded_active_snapshot")
+			result.archivedActives++
+		}
+	}
+	normalizePublishedModelHeads(result.heads, result.snapshots, &result.normalizedHeads)
+	return result
+}
+
+func modelSnapshotIdentityKey(row bson.M) string {
+	return strings.Join([]string{
+		snapshotField(row, "kind"), snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"),
+		snapshotField(row, "code"), snapshotField(row, "version"),
+	}, "|")
+}
+
+func modelSnapshotCompatible(row bson.M) bool {
+	kind := domain.Kind(snapshotField(row, "kind"))
+	switch kind {
+	case domain.KindScale, domain.KindTypology, domain.KindCognitive, domain.KindBehavioralRating:
+	default:
+		return false
+	}
+	return snapshotField(row, "code") != "" &&
+		snapshotField(row, "version") != "" &&
+		len(bytesField(row, "payload")) != 0 &&
+		stringField(row, "payload_format") != "" &&
+		stringField(row, "decision_kind") != "" &&
+		row["definition_v2"] != nil &&
+		stringField(row, "questionnaire_code") != "" &&
+		stringField(row, "questionnaire_version") != ""
+}
+
+func matchingModelActive(head bson.M, candidates []bson.M) []bson.M {
+	result := make([]bson.M, 0, 1)
+	for _, row := range candidates {
+		if snapshotField(row, "kind") != stringField(head, "kind") ||
+			snapshotField(row, "sub_kind") != stringField(head, "sub_kind") ||
+			snapshotField(row, "algorithm") != stringField(head, "algorithm") ||
+			stringField(row, "questionnaire_code") != stringField(head, "questionnaire_code") ||
+			stringField(row, "questionnaire_version") != stringField(head, "questionnaire_version") {
+			continue
+		}
+		result = append(result, row)
+	}
+	if len(result) != 0 {
+		return result
+	}
+	// Some legacy heads predate the canonical identity fields. The exact
+	// questionnaire binding still identifies the online release pair.
+	for _, row := range candidates {
+		if stringField(row, "questionnaire_code") == stringField(head, "questionnaire_code") &&
+			stringField(row, "questionnaire_version") == stringField(head, "questionnaire_version") {
+			result = append(result, row)
+		}
+	}
+	return result
+}
+
+func normalizePublishedModelHeads(heads, snapshots []bson.M, normalized *int) {
+	activeCodes := make(map[string]struct{})
+	for _, row := range snapshots {
+		if snapshotActive(row) {
+			activeCodes[snapshotField(row, "code")] = struct{}{}
+		}
+	}
+	for _, head := range heads {
+		if stringField(head, "status") != "published" {
+			continue
+		}
+		if _, ok := activeCodes[stringField(head, "code")]; ok {
+			continue
+		}
+		head["status"] = "draft"
+		head["migration_status_normalization"] = "published_without_runnable_snapshot"
+		(*normalized)++
+	}
+}
+
+type questionnaireRecordPreparation struct {
+	heads, snapshots                 []bson.M
+	droppedHeads, droppedSnapshots   int
+	archivedActives, normalizedHeads int
+	issues                           []string
+}
+
+func prepareRunnableQuestionnaireRecords(rows []bson.M) questionnaireRecordPreparation {
+	result := questionnaireRecordPreparation{}
+	for _, row := range rows {
+		if stringField(row, "record_role") == roleSnapshot || row["deleted_at"] != nil {
+			continue
+		}
+		if stringField(row, "code") == "" || stringField(row, "version") == "" {
+			result.droppedHeads++
+			continue
+		}
+		result.heads = append(result.heads, cloneBSON(row))
+	}
+	deduplicated, issues := deduplicateQuestionnaireSnapshots(questionnaireSnapshotSources(rows))
+	result.issues = append(result.issues, issues...)
+	for _, row := range deduplicated {
+		if stringField(row, "code") == "" || stringField(row, "version") == "" {
+			result.droppedSnapshots++
+			continue
+		}
+		result.snapshots = append(result.snapshots, cloneBSON(row))
+	}
+
+	headByCode := make(map[string]bson.M, len(result.heads))
+	for _, head := range result.heads {
+		headByCode[stringField(head, "code")] = head
+	}
+	activeByCode := make(map[string][]bson.M)
+	for _, row := range result.snapshots {
+		if snapshotActive(row) {
+			activeByCode[stringField(row, "code")] = append(activeByCode[stringField(row, "code")], row)
+		}
+	}
+	for code, active := range activeByCode {
+		head := headByCode[code]
+		if head == nil || stringField(head, "status") == "archived" {
+			for _, row := range active {
+				archiveSnapshotForMigration(row, "active_without_runnable_head")
+				result.archivedActives++
+			}
+			continue
+		}
+		if len(active) <= 1 {
+			continue
+		}
+		matching := make([]bson.M, 0, 1)
+		for _, row := range active {
+			if stringField(row, "version") == stringField(head, "version") {
+				matching = append(matching, row)
+			}
+		}
+		if len(matching) != 1 {
+			result.issues = append(result.issues, "cannot determine current active questionnaire snapshot for "+code)
+			continue
+		}
+		for _, row := range active {
+			if stringField(row, "version") == stringField(matching[0], "version") {
+				continue
+			}
+			archiveSnapshotForMigration(row, "superseded_active_snapshot")
+			result.archivedActives++
+		}
+	}
+	normalizePublishedQuestionnaireHeads(result.heads, result.snapshots, &result.normalizedHeads)
+	return result
+}
+
+func normalizePublishedQuestionnaireHeads(heads, snapshots []bson.M, normalized *int) {
+	activeCodes := make(map[string]struct{})
+	for _, row := range snapshots {
+		if snapshotActive(row) {
+			activeCodes[stringField(row, "code")] = struct{}{}
+		}
+	}
+	for _, head := range heads {
+		if stringField(head, "status") != "published" {
+			continue
+		}
+		if _, ok := activeCodes[stringField(head, "code")]; ok {
+			continue
+		}
+		head["status"] = "draft"
+		head["migration_status_normalization"] = "published_without_runnable_snapshot"
+		(*normalized)++
+	}
+}
+
+func archiveSnapshotForMigration(row bson.M, reason string) {
+	row["release_status"] = "archived"
+	row["is_active_published"] = false
+	if row["release_archived_at"] == nil {
+		row["release_archived_at"] = time.Now().UTC()
+	}
+	row["migration_release_normalization"] = reason
+}
+
+func cloneRows(rows []bson.M) []bson.M {
+	result := make([]bson.M, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, cloneBSON(row))
+	}
+	return result
 }
 
 type modelSnapshotInspection struct {
@@ -393,10 +649,24 @@ func buildTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp 
 	if err != nil {
 		return err
 	}
-	heads := filterRows(allModels, func(row bson.M) bool {
+	rawHeads := filterRows(allModels, func(row bson.M) bool {
 		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
 	})
-	for _, row := range heads {
+	rawSnapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
+	if exists, existsErr := collectionExists(ctx, db, publishedCollection); existsErr != nil {
+		return existsErr
+	} else if exists {
+		legacy, loadErr := loadAll(ctx, db.Collection(publishedCollection), bson.M{})
+		if loadErr != nil {
+			return loadErr
+		}
+		rawSnapshots = append(rawSnapshots, legacy...)
+	}
+	models := prepareRunnableModelRecords(rawHeads, rawSnapshots)
+	if len(models.issues) != 0 {
+		return fmt.Errorf("model source conflict: %s", strings.Join(models.issues, "; "))
+	}
+	for _, row := range models.heads {
 		row["record_role"] = roleHead
 		row["is_active_published"] = false
 		delete(row, "release_status")
@@ -409,22 +679,7 @@ func buildTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp 
 			return fmt.Errorf("insert head %s: %w", stringField(row, "code"), err)
 		}
 	}
-	snapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
-	if exists, existsErr := collectionExists(ctx, db, publishedCollection); existsErr != nil {
-		return existsErr
-	} else if exists {
-		legacy, loadErr := loadAll(ctx, db.Collection(publishedCollection), bson.M{})
-		if loadErr != nil {
-			return loadErr
-		}
-		snapshots = append(snapshots, legacy...)
-	}
-	var duplicateIssues []string
-	snapshots, duplicateIssues = deduplicateSnapshots(snapshots)
-	if len(duplicateIssues) != 0 {
-		return fmt.Errorf("snapshot source conflict: %s", strings.Join(duplicateIssues, "; "))
-	}
-	for _, row := range snapshots {
+	for _, row := range models.snapshots {
 		converted := convertSnapshot(row)
 		if _, err := target.InsertOne(ctx, converted); err != nil {
 			return fmt.Errorf("insert snapshot %s@%s: %w", stringField(converted, "code"), stringField(converted, "release_version"), err)
@@ -438,20 +693,17 @@ func buildTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp 
 	if err != nil {
 		return err
 	}
-	questionnaireHeads := filterRows(questionnaires, func(row bson.M) bool {
-		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
-	})
-	for _, row := range questionnaireHeads {
+	preparedQuestionnaires := prepareRunnableQuestionnaireRecords(questionnaires)
+	if len(preparedQuestionnaires.issues) != 0 {
+		return fmt.Errorf("questionnaire source conflict: %s", strings.Join(preparedQuestionnaires.issues, "; "))
+	}
+	for _, row := range preparedQuestionnaires.heads {
 		converted := convertQuestionnaireRecord(row)
 		if _, err := questionnaireTarget.InsertOne(ctx, converted); err != nil {
 			return fmt.Errorf("insert questionnaire %s@%s: %w", stringField(converted, "code"), stringField(converted, "version"), err)
 		}
 	}
-	questionnaireSnapshots, duplicateIssues := deduplicateQuestionnaireSnapshots(questionnaireSnapshotSources(questionnaires))
-	if len(duplicateIssues) != 0 {
-		return fmt.Errorf("questionnaire snapshot source conflict: %s", strings.Join(duplicateIssues, "; "))
-	}
-	for _, row := range questionnaireSnapshots {
+	for _, row := range preparedQuestionnaires.snapshots {
 		source := cloneBSON(row)
 		source["record_role"] = roleSnapshot
 		converted := convertQuestionnaireRecord(source)
@@ -979,6 +1231,7 @@ func envOr(key, fallback string) string {
 }
 func printReport(out *os.File, rep report) {
 	_, _ = fmt.Fprintf(out, "model_heads=%d model_snapshots=%d active_models=%d retired_snapshots=%d orphan_snapshots=%d questionnaire_heads=%d questionnaire_snapshots=%d active_questionnaires=%d issues=%d\n", rep.Heads, rep.Snapshots, rep.ActiveSnapshots, rep.RetiredSnapshots, rep.OrphanSnapshots, rep.QuestionnaireHeads, rep.QuestionnaireSnapshots, rep.ActiveQuestionnaires, len(rep.Issues))
+	_, _ = fmt.Fprintf(out, "skipped_model_snapshots=%d archived_model_actives=%d normalized_model_heads=%d skipped_questionnaire_heads=%d skipped_questionnaire_snapshots=%d archived_questionnaire_actives=%d normalized_questionnaire_heads=%d\n", rep.DroppedModelSnapshots, rep.ArchivedModelActives, rep.NormalizedModelHeads, rep.DroppedQuestionnaireHeads, rep.DroppedQuestionnaireSnapshots, rep.ArchivedQuestionnaireActives, rep.NormalizedQuestionnaireHeads)
 	for _, issue := range rep.Issues {
 		_, _ = fmt.Fprintln(out, "-", issue)
 	}

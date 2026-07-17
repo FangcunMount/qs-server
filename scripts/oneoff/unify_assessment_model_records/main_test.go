@@ -176,6 +176,88 @@ func TestInspectModelSnapshotsReportsIncompleteFields(t *testing.T) {
 	}
 }
 
+func TestPrepareRunnableModelRecordsDropsIncompatibleHistory(t *testing.T) {
+	incomplete := completeSnapshot("OLD", "v1", "OLD_Q", "1.0.0", time.Now().UTC())
+	delete(incomplete, "definition_v2")
+	got := prepareRunnableModelRecords(nil, []bson.M{incomplete})
+	if len(got.issues) != 0 || got.droppedSnapshots != 1 || len(got.snapshots) != 0 {
+		t.Fatalf("preparation = %#v", got)
+	}
+}
+
+func TestPrepareRunnableModelRecordsDropsLegacyKind(t *testing.T) {
+	legacy := completeSnapshot("OLD", "v1", "OLD_Q", "1.0.0", time.Now().UTC())
+	legacy["model_kind"] = "personality"
+	got := prepareRunnableModelRecords(nil, []bson.M{legacy})
+	if len(got.issues) != 0 || got.droppedSnapshots != 1 || len(got.snapshots) != 0 {
+		t.Fatalf("preparation = %#v", got)
+	}
+}
+
+func TestPrepareRunnableModelRecordsIgnoresConflictsBetweenIncompatibleHistory(t *testing.T) {
+	before := completeSnapshot("OLD", "v1", "OLD_Q", "1.0.0", time.Now().UTC())
+	after := completeSnapshot("OLD", "v1", "OLD_Q", "1.0.0", time.Now().UTC())
+	delete(before, "definition_v2")
+	delete(after, "definition_v2")
+	after["payload"] = []byte("different")
+	got := prepareRunnableModelRecords(nil, []bson.M{before, after})
+	if len(got.issues) != 0 || got.droppedSnapshots != 2 || len(got.snapshots) != 0 {
+		t.Fatalf("preparation = %#v", got)
+	}
+}
+
+func TestPrepareRunnableModelRecordsKeepsHeadMatchingActive(t *testing.T) {
+	head := bson.M{
+		"code": "ENNEAGRAM_45", "kind": "typology", "sub_kind": "typology", "algorithm": "personality_typology",
+		"status": "published", "deleted_at": nil,
+		"questionnaire_code": "ENNEAGRAM_45", "questionnaire_version": "3.0.1",
+	}
+	current := completeSnapshot("ENNEAGRAM_45", "v16", "ENNEAGRAM_45", "3.0.1", nil)
+	stale := completeSnapshot("ENNEAGRAM_45", "v3", "ENNEAGRAM_45", "1.0.0", nil)
+	got := prepareRunnableModelRecords([]bson.M{head}, []bson.M{current, stale})
+	if len(got.issues) != 0 || got.archivedActives != 1 {
+		t.Fatalf("preparation = %#v", got)
+	}
+	for _, row := range got.snapshots {
+		active := snapshotActive(row)
+		if version := snapshotField(row, "version"); (version == "v16") != active {
+			t.Fatalf("snapshot %s active=%v, want only v16 active", version, active)
+		}
+	}
+	if !snapshotActive(stale) {
+		t.Fatal("preparation mutated the source snapshot")
+	}
+}
+
+func TestPrepareRunnableModelRecordsArchivesActiveOrphan(t *testing.T) {
+	snapshot := completeSnapshot("ORPHAN", "v1", "ORPHAN_Q", "1.0.0", nil)
+	got := prepareRunnableModelRecords(nil, []bson.M{snapshot})
+	if len(got.issues) != 0 || got.archivedActives != 1 || snapshotActive(got.snapshots[0]) {
+		t.Fatalf("preparation = %#v", got)
+	}
+}
+
+func TestPrepareRunnableModelRecordsDowngradesPublishedHeadWithoutRunnableSnapshot(t *testing.T) {
+	head := bson.M{"code": "BROKEN", "status": "published", "deleted_at": nil}
+	got := prepareRunnableModelRecords([]bson.M{head}, nil)
+	if got.normalizedHeads != 1 || stringField(got.heads[0], "status") != "draft" {
+		t.Fatalf("preparation = %#v", got)
+	}
+	if stringField(head, "status") != "published" {
+		t.Fatal("preparation mutated the source head")
+	}
+}
+
+func completeSnapshot(code, version, questionnaireCode, questionnaireVersion string, deletedAt any) bson.M {
+	return bson.M{
+		"model_kind": "typology", "model_sub_kind": "typology", "model_algorithm": "personality_typology",
+		"model_code": code, "model_version": version, "status": "published", "deleted_at": deletedAt,
+		"questionnaire_code": questionnaireCode, "questionnaire_version": questionnaireVersion,
+		"payload": []byte("payload"), "payload_format": "assessmentmodel.personality.typology.v1",
+		"decision_kind": "trait_profile", "definition_v2": bson.M{"measure": bson.M{}},
+	}
+}
+
 func TestQuestionnaireSnapshotSourcesDuplicatesLegacyPublishedHeadAsRelease(t *testing.T) {
 	legacy := bson.M{"_id": primitive.NewObjectID(), "code": "Q-1", "version": "1", "status": "published", "questions": bson.A{bson.M{"code": "Q1"}}}
 	draft := bson.M{"_id": primitive.NewObjectID(), "code": "Q-2", "version": "1", "status": "draft"}
@@ -223,5 +305,20 @@ func TestInspectQuestionnaireHeadsRejectsActiveOrphan(t *testing.T) {
 	issues := inspectQuestionnaireHeads(nil, map[string]struct{}{"Q-ORPHAN": {}})
 	if len(issues) != 1 || issues[0] != "active questionnaire snapshot without head Q-ORPHAN" {
 		t.Fatalf("issues = %#v, want active questionnaire orphan", issues)
+	}
+}
+
+func TestPrepareRunnableQuestionnaireRecordsDropsInvalidLegacyRows(t *testing.T) {
+	rows := []bson.M{
+		{"record_role": roleHead, "code": "ARCHIVED", "version": "", "status": "archived", "deleted_at": nil},
+		{"record_role": roleHead, "code": "DRAFT", "version": ".0.1", "status": "draft", "deleted_at": nil},
+		{"record_role": roleSnapshot, "code": "DRAFT", "version": "", "status": "published", "is_active_published": true, "deleted_at": nil},
+	}
+	got := prepareRunnableQuestionnaireRecords(rows)
+	if len(got.issues) != 0 || got.droppedHeads != 1 || got.droppedSnapshots != 1 {
+		t.Fatalf("preparation = %#v", got)
+	}
+	if len(got.heads) != 1 || stringField(got.heads[0], "code") != "DRAFT" || len(got.snapshots) != 0 {
+		t.Fatalf("prepared records = %#v", got)
 	}
 }
