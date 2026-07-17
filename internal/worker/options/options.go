@@ -33,6 +33,7 @@ type Options struct {
 	RedisProfiles map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	// 共享 Redis family runtime 路由
 	RedisRuntime *genericoptions.RedisRuntimeOptions `json:"redis_runtime" mapstructure:"redis_runtime"`
+	LockLease    *genericoptions.LockLeaseOptions    `json:"lock_lease" mapstructure:"lock_lease"`
 	Cache        *CacheOptions                       `json:"cache" mapstructure:"cache"`
 	// report_status 与 signaling
 	Signaling *genericoptions.SignalingOptions `json:"signaling" mapstructure:"signaling"`
@@ -130,6 +131,7 @@ func NewOptions() *Options {
 		Redis:         genericoptions.NewRedisOptions(),
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
+		LockLease:     genericoptions.NewLockLeaseOptions(),
 		Cache: &CacheOptions{Capabilities: &CacheCapabilities{
 			ReportStatus: genericoptions.NewReportStatusOptions(),
 		}},

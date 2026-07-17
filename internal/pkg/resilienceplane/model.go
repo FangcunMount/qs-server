@@ -38,6 +38,9 @@ const (
 	OutcomeLockReleased         Outcome = "lock_released"
 	OutcomeLockError            Outcome = "lock_error"
 	OutcomeLockDegraded         Outcome = "lock_degraded"
+	OutcomeLockRenewed          Outcome = "lock_renewed"
+	OutcomeLockLost             Outcome = "lock_lost"
+	OutcomeLockRenewError       Outcome = "lock_renew_error"
 	OutcomeIdempotencyHit       Outcome = "idempotency_hit"
 	OutcomeDuplicateSkipped     Outcome = "duplicate_skipped"
 )

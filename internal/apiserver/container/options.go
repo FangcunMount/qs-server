@@ -5,6 +5,7 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
@@ -16,6 +17,8 @@ type ContainerOptions struct {
 	Cache ContainerCacheOptions
 	// CacheSubsystem cache 子系统组合根。
 	CacheSubsystem *cachebootstrap.Subsystem
+	// LockSubsystem owns distributed lease lifecycle independently from cache.
+	LockSubsystem *locksubsystem.Subsystem
 	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
 	Backpressure BackpressureOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址

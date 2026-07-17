@@ -18,7 +18,17 @@ const (
 type SubmitGuard struct {
 	opsHandle *redisruntime.Handle
 	lockMgr   locklease.Manager
+	runner    locklease.Runner
 	observer  resilienceplane.Observer
+}
+
+// NewSubmitGuardWithRunner creates the closure-based guard used by production composition.
+func NewSubmitGuardWithRunner(opsHandle *redisruntime.Handle, runner locklease.Runner) *SubmitGuard {
+	return &SubmitGuard{
+		opsHandle: opsHandle,
+		runner:    runner,
+		observer:  defaultObserver(nil),
+	}
 }
 
 func NewSubmitGuard(opsHandle *redisruntime.Handle, lockMgr locklease.Manager) *SubmitGuard {
@@ -48,7 +58,8 @@ func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *locklease
 		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeDegradedOpen)
 		return "", nil, true, nil
 	}
-	lease, acquired, err := g.lockMgr.AcquireSpec(ctx, locklease.Specs.CollectionSubmit, submitInflightKey(key), defaultSubmitInflightTTL)
+	capability, _ := locklease.Lookup(locklease.WorkloadCollectionSubmit)
+	lease, acquired, err := g.lockMgr.AcquireSpec(ctx, capability.Spec, submitInflightKey(key), defaultSubmitInflightTTL)
 	if err != nil {
 		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
 		return "", nil, false, err
@@ -72,7 +83,8 @@ func (g *SubmitGuard) Complete(ctx context.Context, key string, lease *locklease
 		}
 	}
 	if g.lockMgr != nil {
-		return g.lockMgr.ReleaseSpec(context.Background(), locklease.Specs.CollectionSubmit, submitInflightKey(key), lease)
+		capability, _ := locklease.Lookup(locklease.WorkloadCollectionSubmit)
+		return g.lockMgr.ReleaseSpec(context.Background(), capability.Spec, submitInflightKey(key), lease)
 	}
 	return nil
 }
@@ -81,7 +93,63 @@ func (g *SubmitGuard) Abort(ctx context.Context, key string, lease *locklease.Le
 	if g == nil || g.lockMgr == nil {
 		return nil
 	}
-	return g.lockMgr.ReleaseSpec(ctx, locklease.Specs.CollectionSubmit, submitInflightKey(key), lease)
+	capability, _ := locklease.Lookup(locklease.WorkloadCollectionSubmit)
+	return g.lockMgr.ReleaseSpec(ctx, capability.Spec, submitInflightKey(key), lease)
+}
+
+// Run executes a submit closure while owning the lease. The done marker is
+// persisted inside the closure and therefore before Runner releases the lock.
+func (g *SubmitGuard) Run(ctx context.Context, key string, body func(context.Context) (string, error)) (string, bool, error) {
+	if g == nil || key == "" {
+		if body == nil {
+			return "", true, nil
+		}
+		value, err := body(ctx)
+		return value, true, err
+	}
+	if doneID, ok, err := g.lookupDone(ctx, key); err != nil {
+		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+		return "", false, err
+	} else if ok {
+		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeIdempotencyHit)
+		return doneID, false, nil
+	}
+	if g.runner == nil {
+		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeDegradedOpen)
+		if body == nil {
+			return "", true, nil
+		}
+		value, err := body(ctx)
+		return value, true, err
+	}
+
+	var answerSheetID string
+	result, err := g.runner.Run(ctx, locklease.WorkloadCollectionSubmit, submitInflightKey(key), defaultSubmitInflightTTL, func(runCtx context.Context) error {
+		if body == nil {
+			return nil
+		}
+		value, bodyErr := body(runCtx)
+		if bodyErr != nil {
+			return bodyErr
+		}
+		answerSheetID = value
+		if value != "" && g.opsHandle != nil && g.opsHandle.Client != nil {
+			if setErr := g.opsHandle.Client.Set(runCtx, g.opsKeyspace().IdempotencyDone(key), value, defaultSubmitResultTTL).Err(); setErr != nil {
+				g.observe(runCtx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
+				return setErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", result.Acquired, err
+	}
+	if !result.Acquired {
+		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockContention)
+		return "", false, nil
+	}
+	g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockAcquired)
+	return answerSheetID, true, nil
 }
 
 func (g *SubmitGuard) lookupDone(ctx context.Context, key string) (string, bool, error) {

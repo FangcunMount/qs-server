@@ -71,7 +71,7 @@ func buildEventTypeSources(outboxes []appEventing.NamedOutboxStatusReader) []sys
 }
 
 // BuildLocalResilienceSnapshot mirrors the apiserver /resilience/status assembly.
-func BuildLocalResilienceSnapshot(component string, rateEnabled bool, backpressure []resilienceplane.BackpressureSnapshot) func() resilienceplane.RuntimeSnapshot {
+func BuildLocalResilienceSnapshot(component string, rateEnabled bool, backpressure []resilienceplane.BackpressureSnapshot, locks []resilienceplane.CapabilitySnapshot) func() resilienceplane.RuntimeSnapshot {
 	return func() resilienceplane.RuntimeSnapshot {
 		snapshot := resilienceplane.NewRuntimeSnapshot(component, time.Now())
 		snapshot.RateLimits = []resilienceplane.CapabilitySnapshot{
@@ -79,11 +79,7 @@ func BuildLocalResilienceSnapshot(component string, rateEnabled bool, backpressu
 			{Name: "rest_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: "local_key", Configured: rateEnabled},
 		}
 		snapshot.Backpressure = append(snapshot.Backpressure, backpressure...)
-		snapshot.Locks = []resilienceplane.CapabilitySnapshot{
-			{Name: "plan_scheduler_leader", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
-			{Name: "statistics_sync_leader", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
-			{Name: "behavior_pending_reconcile", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
-		}
+		snapshot.Locks = append(snapshot.Locks, locks...)
 		return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
 	}
 }

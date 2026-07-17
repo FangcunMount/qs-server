@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -75,18 +76,19 @@ func TestManagerAcquireSpecUsesSpecNameAndDefaultTTL(t *testing.T) {
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
 
-	lease, acquired, err := manager.AcquireSpec(context.Background(), Specs.PlanSchedulerLeader, "qs:plan-scheduler:test")
+	spec, _ := locklease.Lookup(locklease.WorkloadPlanSchedulerLeader)
+	lease, acquired, err := manager.AcquireSpec(context.Background(), spec.Spec, "qs:plan-scheduler:test")
 	if err != nil {
 		t.Fatalf("AcquireSpec() error = %v", err)
 	}
 	if !acquired || lease == nil {
 		t.Fatalf("AcquireSpec() got acquired=%v lease=%+v, want acquired lock", acquired, lease)
 	}
-	if ttl := mr.TTL(lease.Key); ttl != Specs.PlanSchedulerLeader.DefaultTTL {
-		t.Fatalf("ttl = %s, want %s", ttl, Specs.PlanSchedulerLeader.DefaultTTL)
+	if ttl := mr.TTL(lease.Key); ttl != spec.Spec.DefaultTTL {
+		t.Fatalf("ttl = %s, want %s", ttl, spec.Spec.DefaultTTL)
 	}
 
-	if err := manager.ReleaseSpec(context.Background(), Specs.PlanSchedulerLeader, "qs:plan-scheduler:test", lease); err != nil {
+	if err := manager.ReleaseSpec(context.Background(), spec.Spec, "qs:plan-scheduler:test", lease); err != nil {
 		t.Fatalf("ReleaseSpec() error = %v", err)
 	}
 }
@@ -122,7 +124,8 @@ func TestManagerReleaseNoOpsWhenUnavailable(t *testing.T) {
 	if err := nilManager.Release(ctx, Identity{}, lease); err != nil {
 		t.Fatalf("nil manager Release() error = %v", err)
 	}
-	if err := nilManager.ReleaseSpec(ctx, Specs.AnswersheetProcessing, "answersheet:processing:1", lease); err != nil {
+	spec, _ := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	if err := nilManager.ReleaseSpec(ctx, spec.Spec, "answersheet:processing:1", lease); err != nil {
 		t.Fatalf("nil manager ReleaseSpec() error = %v", err)
 	}
 
@@ -177,7 +180,8 @@ func TestManagerReleaseSpecWithWrongTokenDoesNotUnlock(t *testing.T) {
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
 	})
 
-	lease, acquired, err := manager.AcquireSpec(context.Background(), Specs.CollectionSubmit, "submit:idempotency:req-1:lock")
+	spec, _ := locklease.Lookup(locklease.WorkloadCollectionSubmit)
+	lease, acquired, err := manager.AcquireSpec(context.Background(), spec.Spec, "submit:idempotency:req-1:lock")
 	if err != nil {
 		t.Fatalf("AcquireSpec() error = %v", err)
 	}
@@ -185,14 +189,14 @@ func TestManagerReleaseSpecWithWrongTokenDoesNotUnlock(t *testing.T) {
 		t.Fatalf("AcquireSpec() got acquired=%v lease=%+v, want acquired lock", acquired, lease)
 	}
 
-	if err := manager.ReleaseSpec(context.Background(), Specs.CollectionSubmit, "submit:idempotency:req-1:lock", &Lease{
+	if err := manager.ReleaseSpec(context.Background(), spec.Spec, "submit:idempotency:req-1:lock", &Lease{
 		Key:   lease.Key,
 		Token: "wrong-token",
 	}); err != nil {
 		t.Fatalf("ReleaseSpec() with wrong token error = %v", err)
 	}
 
-	if _, acquired, err := manager.AcquireSpec(context.Background(), Specs.CollectionSubmit, "submit:idempotency:req-1:lock"); err != nil {
+	if _, acquired, err := manager.AcquireSpec(context.Background(), spec.Spec, "submit:idempotency:req-1:lock"); err != nil {
 		t.Fatalf("AcquireSpec() after wrong release error = %v", err)
 	} else if acquired {
 		t.Fatal("expected lock to remain held after wrong-token release")

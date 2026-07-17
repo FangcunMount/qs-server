@@ -24,6 +24,7 @@ type Options struct {
 	RedisOptions                   *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
 	RedisProfiles                  map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	RedisRuntime                   *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	LockLease                      *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
 	MongoDBOptions                 *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
 	MessagingOptions               *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
 	IAMOptions                     *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
@@ -72,6 +73,7 @@ func NewOptions() *Options {
 		RedisOptions:                   genericoptions.NewRedisOptions(),
 		RedisProfiles:                  map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:                   defaultRedisRuntimeOptions(),
+		LockLease:                      genericoptions.NewLockLeaseOptions(),
 		MongoDBOptions:                 genericoptions.NewMongoDBOptions(),
 		MessagingOptions:               genericoptions.NewMessagingOptions(),
 		IAMOptions:                     genericoptions.NewIAMOptions(),

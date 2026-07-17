@@ -75,6 +75,7 @@ type Dependencies struct {
 	EvaluationWorkerClient         EvaluationWorkerClient
 	InterpretationAutomationClient InterpretationAutomationClient
 	LockManager                    locklease.Manager
+	LockRunner                     locklease.Runner
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           ReportStatusWriter

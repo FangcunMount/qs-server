@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
@@ -15,7 +16,7 @@ func TestLeaderLockRunExecutesBodyAndReleasesWhenAcquired(t *testing.T) {
 	bodyCalls := 0
 	releaseCalls := 0
 	lock := newLeaderLock(
-		redisadapter.Specs.PlanSchedulerLeader,
+		workloadSpec(locklease.WorkloadPlanSchedulerLeader),
 		"qs:plan-scheduler:test",
 		30*time.Second,
 		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
@@ -47,7 +48,7 @@ func TestLeaderLockRunSkipsBodyWhenNotAcquired(t *testing.T) {
 	releaseCalls := 0
 	var skippedKey string
 	lock := newLeaderLock(
-		redisadapter.Specs.StatisticsSyncLeader,
+		workloadSpec(locklease.WorkloadStatisticsSyncLeader),
 		"qs:statistics-sync:test",
 		time.Minute,
 		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
@@ -84,7 +85,7 @@ func TestLeaderLockRunSkipsBodyWhenNotAcquired(t *testing.T) {
 func TestLeaderLockRunWrapsAcquireError(t *testing.T) {
 	acquireErr := errors.New("redis unavailable")
 	lock := newLeaderLock(
-		redisadapter.Specs.BehaviorPendingReconcile,
+		workloadSpec(locklease.WorkloadBehaviorPendingReconcile),
 		"qs:behavior-pending-reconcile:test",
 		time.Minute,
 		nil,
@@ -120,7 +121,7 @@ func TestLeaderLockRunPreservesBodyErrorAndReportsReleaseError(t *testing.T) {
 	var gotReleaseKey string
 	var gotReleaseErr error
 	lock := newLeaderLock(
-		redisadapter.Specs.PlanSchedulerLeader,
+		workloadSpec(locklease.WorkloadPlanSchedulerLeader),
 		"qs:plan-scheduler:test",
 		time.Minute,
 		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
@@ -153,7 +154,7 @@ func TestLeaderLockRunPreservesBodyErrorAndReportsReleaseError(t *testing.T) {
 
 func TestLeaderLockDisplayKeyUsesDefaultBuilderWhenBuilderIsNil(t *testing.T) {
 	lock := newLeaderLock(
-		redisadapter.Specs.PlanSchedulerLeader,
+		workloadSpec(locklease.WorkloadPlanSchedulerLeader),
 		"qs:plan-scheduler:test",
 		time.Minute,
 		nil,

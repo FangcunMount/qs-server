@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -28,7 +29,7 @@ type Container struct {
 	initialized  bool
 	opts         *options.Options
 	logger       *slog.Logger
-	lockManager  locklease.Manager
+	locks        *locksubsystem.Subsystem
 	opsHandle    *redisruntime.Handle
 	lockBuilder  *keyspace.Builder
 	eventCatalog *eventcatalog.Catalog
@@ -56,16 +57,16 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle, opsHandle *redisruntime.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, eventCatalog *eventcatalog.Catalog) *Container {
 	lockBuilder := keyspace.NewBuilder()
-	if lockHandle != nil {
-		lockBuilder = lockHandle.Builder
+	if locks != nil && locks.Builder() != nil {
+		lockBuilder = locks.Builder()
 	}
 	c := &Container{
 		opts:         opts,
 		logger:       logger,
 		opsHandle:    opsHandle,
-		lockManager:  lockManager,
+		locks:        locks,
 		lockBuilder:  lockBuilder,
 		eventCatalog: eventCatalog,
 		initialized:  false,
@@ -139,7 +140,8 @@ func (c *Container) initEventDispatcher() error {
 		AssessmentIntakeClient:         c.assessmentIntakeClient,
 		EvaluationWorkerClient:         c.evaluationWorkerClient,
 		InterpretationAutomationClient: c.interpretationAutomationClient,
-		LockManager:                    c.lockManager,
+		LockManager:                    lockManager(c.locks),
+		LockRunner:                     c.locks,
 		LockKeyBuilder:                 c.lockBuilder,
 		Notifier:                       c.buildNotifier(),
 		ReportStatusReporter:           c.reportStatus,
@@ -232,7 +234,10 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 // ResilienceSnapshot returns the worker's current resilience capability summary.
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
 	snapshot := resilienceplane.NewRuntimeSnapshot("worker", time.Now())
-	lockConfigured := c != nil && c.lockManager != nil
+	if c != nil && c.locks != nil {
+		snapshot.Locks = c.locks.Snapshots()
+	}
+	lockConfigured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded
 	lockReason := ""
 	if !lockConfigured {
 		lockReason = "worker duplicate suppression lock manager unavailable"
@@ -245,15 +250,14 @@ func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
 		Degraded:   !lockConfigured,
 		Reason:     lockReason,
 	}}
-	snapshot.Locks = []resilienceplane.CapabilitySnapshot{{
-		Name:       "answersheet_processing",
-		Kind:       resilienceplane.ProtectionLock.String(),
-		Strategy:   "redis_lock",
-		Configured: lockConfigured,
-		Degraded:   !lockConfigured,
-		Reason:     lockReason,
-	}}
 	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+}
+
+func lockManager(locks *locksubsystem.Subsystem) locklease.Manager {
+	if locks == nil {
+		return nil
+	}
+	return locks
 }
 
 // Logger 获取日志器

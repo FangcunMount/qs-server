@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
@@ -35,7 +36,18 @@ func (s *server) prepareResources() (resourceOutput, error) {
 				AllowFallbackDefault: true,
 			},
 		},
-		LockName: "lock_lease",
+	})
+	renewalEnabled := s.config.LockLease != nil && s.config.LockLease.RenewalEnabled
+	locks := locksubsystem.New(locksubsystem.Options{
+		Component:      "worker",
+		Handle:         redisRuntime.Handle(redisruntime.FamilyLock),
+		StatusRegistry: redisRuntime.StatusRegistry,
+		RenewalEnabled: renewalEnabled,
+		Warn: func(message string) {
+			if s.logger != nil {
+				s.logger.Warn(message)
+			}
+		},
 	})
 	eventCatalog, err := loadWorkerEventCatalog(s.eventConfigPath())
 	if err != nil {
@@ -48,9 +60,8 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		redisRuntime: redisRuntimeOutput{
 			familyStatus: redisRuntime.StatusRegistry,
 			redisRuntime: redisRuntime.Runtime,
-			lockHandle:   redisRuntime.Handle(redisruntime.FamilyLock),
 			opsHandle:    redisRuntime.Handle(redisruntime.FamilyOps),
-			lockManager:  redisRuntime.LockManager,
+			locks:        locks,
 		},
 		eventCatalog: eventCatalog,
 	}, nil

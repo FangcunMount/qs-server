@@ -9,6 +9,7 @@ import (
 	baseredisadapter "github.com/FangcunMount/component-base/pkg/locklease/redisadapter"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	lockkeyspace "github.com/FangcunMount/qs-server/internal/pkg/locklease/keyspace"
+	lockobserve "github.com/FangcunMount/qs-server/internal/pkg/locklease/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -51,11 +52,13 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	key, err := m.lockKey(identity)
 	if err != nil {
 		observability.ObserveLockAcquire(lockName, "error")
+		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		return nil, false, err
 	}
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		observability.ObserveLockDegraded(lockName, "redis_unavailable")
+		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "unavailable")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockDegraded)
 		err := fmt.Errorf("lock redis handle is unavailable")
 		m.observeFamilyFailure(err)
@@ -67,17 +70,20 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	}, ttl)
 	if err != nil {
 		observability.ObserveLockAcquire(lockName, "error")
+		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		m.observeFamilyFailure(err)
 		return nil, false, err
 	}
 	if !acquired {
 		observability.ObserveLockAcquire(lockName, "contention")
+		lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "contention")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockContention)
 		m.observeFamilySuccess()
 		return nil, false, nil
 	}
 	observability.ObserveLockAcquire(lockName, "ok")
+	lockobserve.ObserveOperation(m.componentName(), lockName, "acquire", "ok")
 	m.observe(ctx, identity, resilienceplane.OutcomeLockAcquired)
 	m.observeFamilySuccess()
 	return lease, true, nil
@@ -98,6 +104,48 @@ func (m *Manager) AcquireSpec(ctx context.Context, spec Spec, key string, ttlOve
 	return m.Acquire(ctx, spec.Identity(key), ttl)
 }
 
+// RenewSpec 按锁规格以 compare-and-expire 语义续租当前租约。
+func (m *Manager) RenewSpec(ctx context.Context, spec Spec, key string, lease *Lease, ttlOverride ...time.Duration) (bool, error) {
+	lockName := m.metricName(spec.Identity(key))
+	ttl := spec.DefaultTTL
+	if len(ttlOverride) > 0 && ttlOverride[0] > 0 {
+		ttl = ttlOverride[0]
+	}
+	if spec.Name == "" {
+		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
+		return false, fmt.Errorf("lock spec name is empty")
+	}
+	if ttl <= 0 {
+		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
+		return false, fmt.Errorf("lock spec ttl must be greater than 0")
+	}
+	if m == nil || m.handle == nil || m.handle.Client == nil {
+		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "unavailable")
+		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
+		err := fmt.Errorf("lock redis handle is unavailable")
+		m.observeFamilyFailure(err)
+		return false, err
+	}
+
+	owned, err := baseredisadapter.NewManager(m.handle.Client, nil).RenewSpec(ctx, spec, key, lease, ttl)
+	if err != nil {
+		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "error")
+		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewError)
+		m.observeFamilyFailure(err)
+		return false, err
+	}
+	if !owned {
+		lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "lost")
+		m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockLost)
+		m.observeFamilySuccess()
+		return false, nil
+	}
+	lockobserve.ObserveOperation(m.componentName(), lockName, "renew", "ok")
+	m.observe(ctx, spec.Identity(key), resilienceplane.OutcomeLockRenewed)
+	m.observeFamilySuccess()
+	return true, nil
+}
+
 // Release 释放一个已经获取到的锁租约。
 func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) error {
 	lockName := m.metricName(identity)
@@ -106,11 +154,13 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	}
 	if err := baseredisadapter.NewManager(m.handle.Client, nil).Release(ctx, identity, lease); err != nil {
 		observability.ObserveLockRelease(lockName, "error")
+		lockobserve.ObserveOperation(m.componentName(), lockName, "release", "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		m.observeFamilyFailure(err)
 		return err
 	}
 	observability.ObserveLockRelease(lockName, "ok")
+	lockobserve.ObserveOperation(m.componentName(), lockName, "release", "ok")
 	m.observe(ctx, identity, resilienceplane.OutcomeLockReleased)
 	m.observeFamilySuccess()
 	return nil
@@ -159,6 +209,13 @@ func (m *Manager) metricName(identity Identity) string {
 		base = "lock"
 	}
 	return base
+}
+
+func (m *Manager) componentName() string {
+	if m == nil || strings.TrimSpace(m.component) == "" {
+		return "unknown"
+	}
+	return m.component
 }
 
 func (m *Manager) observe(ctx context.Context, identity Identity, outcome resilienceplane.Outcome) {

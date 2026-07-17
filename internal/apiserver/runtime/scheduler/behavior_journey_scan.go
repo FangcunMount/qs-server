@@ -88,12 +88,13 @@ func newBehaviorJourneyScanRunnerWithHooks(
 		opts:    opts,
 		scanner: scanner,
 		leader: newLeaderLock(
-			locklease.Specs.BehaviorJourneyScanLeader,
+			workloadSpec(locklease.WorkloadBehaviorJourneyScanLeader),
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,
 			acquireLock,
 			releaseLock,
+			leaseRunner(lockManager),
 		),
 	}
 }

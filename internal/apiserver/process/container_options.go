@@ -11,20 +11,48 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	cacheplanebootstrap "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
+	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
 type containerOptionsInput struct {
 	cacheSubsystem *cachebootstrap.Subsystem
+	redisRuntime   *cacheplanebootstrap.RuntimeBundle
 	backpressure   container.BackpressureOptions
 	eventSubsystem *eventsubsystem.Subsystem
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
+	renewalEnabled := s.config.LockLease != nil && s.config.LockLease.RenewalEnabled
+	var lockHandle *redisruntime.Handle
+	var lockStatus *redisobserve.FamilyStatusRegistry
+	if input.redisRuntime != nil {
+		lockHandle = input.redisRuntime.Handle(redisruntime.FamilyLock)
+		lockStatus = input.redisRuntime.StatusRegistry
+	}
+	locks := locksubsystem.New(locksubsystem.Options{
+		Component:      "apiserver",
+		Handle:         lockHandle,
+		StatusRegistry: lockStatus,
+		RenewalEnabled: renewalEnabled,
+		EnabledWorkloads: map[locklease.WorkloadID]bool{
+			locklease.WorkloadPlanSchedulerLeader:            s.config.PlanScheduler != nil && s.config.PlanScheduler.Enable,
+			locklease.WorkloadStatisticsSyncLeader:           s.config.StatisticsSync != nil && s.config.StatisticsSync.Enable,
+			locklease.WorkloadStatisticsSync:                 true,
+			locklease.WorkloadBehaviorPendingReconcile:       s.config.BehaviorPendingReconcile != nil && s.config.BehaviorPendingReconcile.Enable,
+			locklease.WorkloadEvaluationConsistencyReconcile: s.config.EvaluationConsistencyReconcile != nil && s.config.EvaluationConsistencyReconcile.Enable,
+			locklease.WorkloadBehaviorJourneyScanLeader:      s.config.BehaviorJourneyScan != nil && s.config.BehaviorJourneyScan.Enable,
+		},
+	})
 	return container.ContainerOptions{
 		EventSubsystem:             input.eventSubsystem,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
+		LockSubsystem:              locks,
 		Backpressure:               input.backpressure,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),

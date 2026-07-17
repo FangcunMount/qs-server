@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -38,6 +39,10 @@ type IdempotencyGuard interface {
 	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *locklease.Lease, acquired bool, err error)
 	Complete(ctx context.Context, key string, lease *locklease.Lease, answerSheetID string) error
 	Abort(ctx context.Context, key string, lease *locklease.Lease) error
+}
+
+type LeaseIdempotencyGuard interface {
+	Run(ctx context.Context, key string, body func(context.Context) (answerSheetID string, err error)) (doneAnswerSheetID string, acquired bool, err error)
 }
 
 type profileLinkChecker interface {
@@ -197,6 +202,10 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 	if key == "" || s.submitGuard == nil {
 		return s.submitSync(ctx, writerID, req)
 	}
+	req = withEffectiveIdempotencyKey(req, key)
+	if leaseGuard, ok := s.submitGuard.(LeaseIdempotencyGuard); ok {
+		return s.submitWithLeaseGuard(ctx, requestID, key, writerID, req, leaseGuard)
+	}
 
 	doneID, lease, acquired, err := s.submitGuard.Begin(ctx, key)
 	if err != nil {
@@ -256,6 +265,97 @@ func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID strin
 		)
 	}
 	return resp, nil
+}
+
+func (s *SubmissionService) submitWithLeaseGuard(
+	ctx context.Context,
+	requestID string,
+	key string,
+	writerID uint64,
+	req *SubmitAnswerSheetRequest,
+	guard LeaseIdempotencyGuard,
+) (*SubmitAnswerSheetResponse, error) {
+	var response *SubmitAnswerSheetResponse
+	doneID, acquired, err := guard.Run(ctx, key, func(runCtx context.Context) (string, error) {
+		var submitErr error
+		response, submitErr = s.submitSync(runCtx, writerID, req)
+		if submitErr != nil || response == nil {
+			return "", submitErr
+		}
+		return response.ID, nil
+	})
+	if errors.Is(err, locklease.ErrLeaseLost) || errors.Is(err, locklease.ErrLeaseRenewFailed) {
+		return nil, retryableLeaseFailure{cause: err}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		if doneID == "" {
+			return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
+		}
+		return s.completedSubmitResponse(ctx, requestID, key, doneID)
+	}
+	if response != nil {
+		if s.queue != nil && response.AssessmentID != "" {
+			s.queue.setAssessmentID(requestID, response.AssessmentID)
+		}
+		logger.L(ctx).Infow("答卷提交链路已完成受理",
+			"action", "submit_answersheet",
+			"request_id", requestID,
+			"idempotency_key", key,
+			"answersheet_id", response.ID,
+			"assessment_id", response.AssessmentID,
+			"result", "success",
+		)
+	}
+	return response, nil
+}
+
+type retryableLeaseFailure struct{ cause error }
+
+func (e retryableLeaseFailure) Error() string {
+	return "submit lease was lost; retry with the same idempotency key: " + e.cause.Error()
+}
+
+func (e retryableLeaseFailure) Unwrap() error { return e.cause }
+
+func (e retryableLeaseFailure) GRPCStatus() *status.Status {
+	return status.New(codes.Unavailable, "submit lease was lost; retry with the same idempotency key")
+}
+
+func (s *SubmissionService) completedSubmitResponse(ctx context.Context, requestID, key, doneID string) (*SubmitAnswerSheetResponse, error) {
+	assessmentID := ""
+	if answerSheetID, parseErr := strconv.ParseUint(doneID, 10, 64); parseErr == nil && s.assessmentIntake != nil {
+		_, id, resolveErr := s.assessmentIntake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		if id != 0 {
+			assessmentID = strconv.FormatUint(id, 10)
+		}
+	}
+	if assessmentID == "" {
+		return nil, fmt.Errorf("completed answer sheet is missing assessment id")
+	}
+	logger.L(ctx).Infow("答卷提交命中幂等结果",
+		"action", "submit_answersheet",
+		"request_id", requestID,
+		"idempotency_key", key,
+		"answersheet_id", doneID,
+		"assessment_id", assessmentID,
+		"result", "idempotent_hit",
+	)
+	return &SubmitAnswerSheetResponse{ID: doneID, AssessmentID: assessmentID, Message: "already submitted"}, nil
+}
+
+func withEffectiveIdempotencyKey(req *SubmitAnswerSheetRequest, key string) *SubmitAnswerSheetRequest {
+	if req == nil || key == "" || req.IdempotencyKey == key {
+		return req
+	}
+	cloned := *req
+	cloned.IdempotencyKey = key
+	return &cloned
 }
 
 // GetSubmitStatus 获取提交状态。done 必须已经同时持久化两个 ID。

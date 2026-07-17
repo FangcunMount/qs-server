@@ -45,6 +45,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				redisruntime.FamilySDK,
 				redisruntime.FamilyLock,
 			})
+			assertRenewalEnabled(t, opts.LockLease)
 			if opts.MessagingOptions == nil {
 				t.Fatal("messaging options must be traceable")
 			}
@@ -81,6 +82,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 				redisruntime.FamilyOps,
 				redisruntime.FamilyLock,
 			})
+			assertRenewalEnabled(t, opts.LockLease)
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
 			}
@@ -113,6 +115,7 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			assertRedisFamilies(t, opts.RedisRuntime, []redisruntime.Family{
 				redisruntime.FamilyLock,
 			})
+			assertRenewalEnabled(t, opts.LockLease)
 			if cfg.Messaging == nil || cfg.Messaging.Provider == "" {
 				t.Fatal("worker messaging config must be traceable")
 			}
@@ -279,6 +282,13 @@ func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeO
 		if route == nil || strings.TrimSpace(route.NamespaceSuffix) == "" {
 			t.Fatalf("redis runtime family %q has empty namespace suffix", family)
 		}
+	}
+}
+
+func assertRenewalEnabled(t *testing.T, opts *genericoptions.LockLeaseOptions) {
+	t.Helper()
+	if opts == nil || !opts.RenewalEnabled {
+		t.Fatal("lock_lease.renewal_enabled must be explicitly enabled in dev/prod config")
 	}
 }
 

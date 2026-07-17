@@ -14,6 +14,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -32,6 +33,7 @@ type Container struct {
 	redisCache                 redis.UniversalClient
 	cacheOptions               ContainerCacheOptions
 	cache                      *cachebootstrap.Subsystem
+	locks                      *locksubsystem.Subsystem
 	backpressure               BackpressureOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
@@ -122,6 +124,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.eventSubsystem = opts.EventSubsystem
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
+	c.locks = opts.LockSubsystem
 	c.backpressure = opts.Backpressure
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays

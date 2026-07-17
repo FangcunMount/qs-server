@@ -34,12 +34,15 @@ type RuntimeSummary struct {
 }
 
 type CapabilitySnapshot struct {
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Strategy   string `json:"strategy"`
-	Configured bool   `json:"configured"`
-	Degraded   bool   `json:"degraded"`
-	Reason     string `json:"reason,omitempty"`
+	Name              string `json:"name"`
+	Kind              string `json:"kind"`
+	Strategy          string `json:"strategy"`
+	Configured        bool   `json:"configured"`
+	Degraded          bool   `json:"degraded"`
+	Reason            string `json:"reason,omitempty"`
+	TTLSeconds        int64  `json:"ttl_seconds,omitempty"`
+	RenewalMode       string `json:"renewal_mode,omitempty"`
+	RenewEverySeconds int64  `json:"renew_every_seconds,omitempty"`
 }
 
 type QueueSnapshot struct {

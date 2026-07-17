@@ -25,6 +25,7 @@ type HandlerDependencies struct {
 	EvaluationWorkerClient         handlers.EvaluationWorkerClient
 	InterpretationAutomationClient handlers.InterpretationAutomationClient
 	LockManager                    locklease.Manager
+	LockRunner                     locklease.Runner
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           *reportstatus.Reporter
@@ -130,6 +131,7 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 		EvaluationWorkerClient:         d.deps.EvaluationWorkerClient,
 		InterpretationAutomationClient: d.deps.InterpretationAutomationClient,
 		LockManager:                    d.deps.LockManager,
+		LockRunner:                     d.deps.LockRunner,
 		LockKeyBuilder:                 d.deps.LockKeyBuilder,
 		Notifier:                       d.deps.Notifier,
 		ReportStatusReporter:           d.deps.ReportStatusReporter,

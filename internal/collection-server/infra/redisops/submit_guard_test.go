@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -62,6 +63,41 @@ func TestSubmitGuardSuppressesDuplicateAcrossInstances(t *testing.T) {
 	}
 	if doneID != "answersheet-1" || acquired || leaseB != nil {
 		t.Fatalf("expected duplicate suppression, got doneID=%q acquired=%v lease=%+v", doneID, acquired, leaseB)
+	}
+}
+
+func TestSubmitGuardRunWritesDoneBeforeRunnerReleasesLease(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	opsHandle := &redisruntime.Handle{Family: redisruntime.FamilyOps, Client: client, Builder: keyspace.NewBuilderWithNamespace("ops:runtime")}
+	lockHandle := &redisruntime.Handle{Family: redisruntime.FamilyLock, Client: client, Builder: keyspace.NewBuilderWithNamespace("cache:lock"), Configured: true, Available: true}
+	locks := locksubsystem.New(locksubsystem.Options{Component: "collection-server", Handle: lockHandle})
+	guard := NewSubmitGuardWithRunner(opsHandle, locks)
+	lockKey := lockHandle.Builder.BuildLockKey(submitInflightKey("req-run"))
+
+	doneID, acquired, err := guard.Run(context.Background(), "req-run", func(context.Context) (string, error) {
+		if !mr.Exists(lockKey) {
+			t.Fatal("lease must remain held while submit closure runs")
+		}
+		return "answersheet-1", nil
+	})
+	if err != nil || !acquired || doneID != "answersheet-1" {
+		t.Fatalf("Run() = doneID=%q acquired=%v err=%v", doneID, acquired, err)
+	}
+	if mr.Exists(lockKey) {
+		t.Fatal("lease was not released after done marker write")
+	}
+	if value, err := client.Get(context.Background(), guard.opsKeyspace().IdempotencyDone("req-run")).Result(); err != nil || value != "answersheet-1" {
+		t.Fatalf("done marker = %q, %v", value, err)
+	}
+
+	doneID, acquired, err = guard.Run(context.Background(), "req-run", func(context.Context) (string, error) {
+		t.Fatal("duplicate hit must not execute body")
+		return "", nil
+	})
+	if err != nil || acquired || doneID != "answersheet-1" {
+		t.Fatalf("duplicate Run() = doneID=%q acquired=%v err=%v", doneID, acquired, err)
 	}
 }
 

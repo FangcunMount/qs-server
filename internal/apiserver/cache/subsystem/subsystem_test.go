@@ -49,9 +49,6 @@ func TestSubsystemOwnsRuntimeAndGovernanceLifecycle(t *testing.T) {
 	if subsystem.StatusRegistry() == nil {
 		t.Fatal("status registry = nil, want initialized registry")
 	}
-	if subsystem.LockManager() == nil {
-		t.Fatal("lock manager = nil, want initialized lock manager")
-	}
 	if subsystem.StatusService() != nil {
 		t.Fatal("status service initialized before BindGovernance, want nil")
 	}
@@ -111,7 +108,6 @@ func TestSubsystemUsesSharedRedisRuntimeBundle(t *testing.T) {
 			},
 		},
 		Resolver: fakeResolver{},
-		LockName: "lock_lease",
 	})
 
 	subsystem := NewSubsystemFromRuntime(runtimeBundle, CacheOptions{})
@@ -123,9 +119,6 @@ func TestSubsystemUsesSharedRedisRuntimeBundle(t *testing.T) {
 	}
 	if subsystem.StatusRegistry() != runtimeBundle.StatusRegistry {
 		t.Fatal("subsystem status registry did not use shared runtime bundle")
-	}
-	if subsystem.LockManager() != runtimeBundle.LockManager {
-		t.Fatal("subsystem lock manager did not use shared runtime bundle")
 	}
 	if got := subsystem.Builder(redisruntime.FamilyMeta).BuildQueryVersionKey("stats", "system"); got != "prod:cache:meta:query:version:stats:system" {
 		t.Fatalf("meta builder key = %q, want prod:cache:meta:query:version:stats:system", got)

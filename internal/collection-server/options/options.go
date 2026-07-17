@@ -22,6 +22,7 @@ type Options struct {
 	RedisOptions            *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
 	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	RedisRuntime            *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	LockLease               *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
 	Concurrency             *ConcurrencyOptions                     `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
@@ -223,6 +224,7 @@ func NewOptions() *Options {
 		RedisOptions:  genericoptions.NewRedisOptions(),
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
+		LockLease:     genericoptions.NewLockLeaseOptions(),
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},

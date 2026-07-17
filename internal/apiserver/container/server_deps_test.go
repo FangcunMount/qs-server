@@ -13,6 +13,7 @@ import (
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -48,6 +49,7 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 
 	c := NewContainer(nil, nil, nil)
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
+	c.locks = locksubsystem.New(locksubsystem.Options{Component: "apiserver", Handle: c.CacheHandle(redisruntime.FamilyLock)})
 	c.cache.BindGovernance(cachebootstrap.GovernanceBindings{})
 
 	planCommand := &planCommandServiceStub{}
@@ -65,11 +67,11 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	}
 
 	deps := c.BuildServerRuntimeDeps()
-	if deps.LockBuilder != c.CacheBuilder(redisruntime.FamilyLock) {
-		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.CacheBuilder(redisruntime.FamilyLock))
+	if deps.LockBuilder != c.locks.Builder() {
+		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.locks.Builder())
 	}
-	if deps.LockManager != c.CacheLockManager() {
-		t.Fatalf("LockManager = %#v, want %#v", deps.LockManager, c.CacheLockManager())
+	if deps.LockManager != c.LockManager() {
+		t.Fatalf("LockManager = %#v, want %#v", deps.LockManager, c.LockManager())
 	}
 	if deps.WarmupCoordinator != c.WarmupCoordinator() {
 		t.Fatalf("WarmupCoordinator = %#v, want %#v", deps.WarmupCoordinator, c.WarmupCoordinator())

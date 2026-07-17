@@ -124,7 +124,7 @@ flowchart LR
     dbm[worker bootstrap.DatabaseManager]
     redis[Redis profiles]
     runtime[cacheplane Runtime]
-    lock[lock_lease Manager]
+    lock[LockLease subsystem / Runner]
     events[configs/events.yaml]
     catalog[EventCatalog]
 

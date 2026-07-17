@@ -9,6 +9,7 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
@@ -162,8 +163,8 @@ func TestBehaviorPendingReconcileRunOnceUsesConfiguredLockOverride(t *testing.T)
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redisadapter.Specs.BehaviorPendingReconcile.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.BehaviorPendingReconcile.Name)
+	if gotSpec.Name != workloadSpec(locklease.WorkloadBehaviorPendingReconcile).Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, workloadSpec(locklease.WorkloadBehaviorPendingReconcile).Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)

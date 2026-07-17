@@ -92,9 +92,9 @@ func newEvaluationConsistencyReconcileRunnerWithHooks(
 
 	// 创建评估一致性协调器
 	return &EvaluationConsistencyReconcileRunner{
-		opts:    opts,                                                                                                                             // 配置选项
-		service: service,                                                                                                                          // 评估一致性协调器服务
-		leader:  newLeaderLock(locklease.Specs.EvaluationConsistencyReconcile, opts.LockKey, opts.LockTTL, lockBuilder, acquireLock, releaseLock), // 领导者锁
+		opts:    opts,                                                                                                                                                                       // 配置选项
+		service: service,                                                                                                                                                                    // 评估一致性协调器服务
+		leader:  newLeaderLock(workloadSpec(locklease.WorkloadEvaluationConsistencyReconcile), opts.LockKey, opts.LockTTL, lockBuilder, acquireLock, releaseLock, leaseRunner(lockManager)), // 领导者锁
 	}
 }
 

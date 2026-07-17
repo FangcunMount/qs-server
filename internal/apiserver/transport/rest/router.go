@@ -68,6 +68,7 @@ type Deps struct {
 	EventStatusService       appEventing.StatusService
 	SystemGovernanceFacade   systemgovApp.Facade
 	Backpressure             []resilienceplane.BackpressureSnapshot
+	Locks                    []resilienceplane.CapabilitySnapshot
 	IAM                      IAMDeps
 }
 

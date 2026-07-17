@@ -39,7 +39,7 @@ func (s resolverStub) GetRedisProfileStatus(profile string) cbdatabase.RedisProf
 	return cbdatabase.RedisProfileStatus{Name: profile, State: cbdatabase.RedisProfileStateMissing}
 }
 
-func TestBuildRuntimeCreatesFamilyHandlesAndLockManager(t *testing.T) {
+func TestBuildRuntimeCreatesFamilyHandlesWithoutConstructingLockManager(t *testing.T) {
 	mr := miniredis.RunT(t)
 	defaultClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	lockClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -69,14 +69,13 @@ func TestBuildRuntimeCreatesFamilyHandlesAndLockManager(t *testing.T) {
 				"lock_cache": {Name: "lock_cache", State: cbdatabase.RedisProfileStateAvailable},
 			},
 		},
-		LockName: "lock_lease",
 	})
 
 	if bundle == nil {
 		t.Fatal("bundle = nil, want runtime bundle")
 		return
 	}
-	if bundle.StatusRegistry == nil || bundle.Runtime == nil || bundle.LockManager == nil {
+	if bundle.StatusRegistry == nil || bundle.Runtime == nil {
 		t.Fatalf("runtime outputs missing: %#v", bundle)
 	}
 	if got := bundle.Builder(redisruntime.FamilyLock).BuildLockKey("answersheet:1"); got != "qs:cache:lock:answersheet:1" {

@@ -13,6 +13,10 @@ import (
 func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := NewRouter(Deps{
+		Locks: []resilienceplane.CapabilitySnapshot{
+			{Name: "plan_scheduler_leader", Kind: "leader", Strategy: "redis_lease", Configured: true, TTLSeconds: 50, RenewalMode: "auto", RenewEverySeconds: 16},
+			{Name: "statistics_sync", Kind: "task_lock", Strategy: "redis_lease", Configured: true, TTLSeconds: 1800, RenewalMode: "auto", RenewEverySeconds: 600},
+		},
 		Backpressure: []resilienceplane.BackpressureSnapshot{
 			{
 				Component:     "apiserver",
@@ -56,8 +60,8 @@ func TestResilienceStatusRouteReturnsReadOnlySnapshot(t *testing.T) {
 	if len(payload.Backpressure) != 1 || payload.Backpressure[0].Name != "mysql" || payload.Backpressure[0].MaxInflight != 16 {
 		t.Fatalf("backpressure = %+v, want mysql max 16", payload.Backpressure)
 	}
-	if len(payload.Locks) != 3 {
-		t.Fatalf("locks = %+v, want three scheduler locks", payload.Locks)
+	if len(payload.Locks) != 2 {
+		t.Fatalf("locks = %+v, want projected lock catalog", payload.Locks)
 	}
 }
 

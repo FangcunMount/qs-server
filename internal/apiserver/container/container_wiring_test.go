@@ -18,6 +18,7 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"
@@ -149,12 +150,13 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, map[string]redis.UniversalClient{
 		"query": queryClient,
 	})
+	c.locks = locksubsystem.New(locksubsystem.Options{Component: "apiserver"})
 
 	wire := statmod.WireInput{
 		FallbackRedisClient: c.CacheClient(redisruntime.FamilyQuery),
 		CacheBuilder:        c.CacheBuilder(redisruntime.FamilyQuery),
 		CachePolicies:       c.CachePolicyProvider(),
-		LockManager:         c.CacheLockManager(),
+		LockManager:         c.LockManager(),
 		Observer:            c.cacheObserver(),
 		MetaRedisClient:     c.CacheClient(redisruntime.FamilyMeta),
 	}

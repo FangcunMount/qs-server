@@ -85,12 +85,13 @@ func newBehaviorPendingReconcileRunnerWithHooks(
 		opts:      opts,
 		projector: projector,
 		leader: newLeaderLock(
-			locklease.Specs.BehaviorPendingReconcile,
+			workloadSpec(locklease.WorkloadBehaviorPendingReconcile),
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,
 			acquireLock,
 			releaseLock,
+			leaseRunner(lockManager),
 		),
 	}
 }

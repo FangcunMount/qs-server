@@ -74,12 +74,13 @@ func newPlanRunnerWithHooks(
 		opts:    opts,
 		command: command,
 		leader: newLeaderLock(
-			locklease.Specs.PlanSchedulerLeader,
+			workloadSpec(locklease.WorkloadPlanSchedulerLeader),
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,
 			acquireLock,
 			releaseLock,
+			leaseRunner(lockManager),
 		),
 	}
 }

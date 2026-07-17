@@ -50,7 +50,7 @@ func (c *Container) profileServices() (*iam.ProfileLinkService, *iam.ProfileServ
 
 func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkService, questionnaireReader *questionnaire.QueryService) submitRuntime {
 	// answersheet / testee 经 acl 适配（REST↔gRPC 字段差异）；catalog / evaluation 经 grpcbridge 直出 application DTO。
-	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
+	submitGuard := redisops.NewSubmitGuardWithRunner(c.opsHandle, c.locks)
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
 			acl.NewAnswerSheetBFFWriter(c.answerSheetClient),

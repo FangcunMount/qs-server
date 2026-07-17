@@ -22,7 +22,6 @@ import (
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
@@ -50,6 +49,9 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.GovernanceStatusService = platformDeps.GovernanceStatusService
 	deps.EventStatusService = platformDeps.EventStatusService
 	deps.Backpressure = platformDeps.Backpressure
+	if c.locks != nil {
+		deps.Locks = c.locks.Snapshots()
+	}
 	deps.IAM = platformDeps.IAM
 
 	if c.SurveyModule != nil {
@@ -129,6 +131,7 @@ func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOp
 			"apiserver",
 			rateCfg != nil && rateCfg.Enabled,
 			c.buildBackpressureSnapshots(),
+			c.locks.Snapshots(),
 		),
 	})
 }
@@ -308,8 +311,10 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		return deps
 	}
 
-	deps.LockBuilder = c.CacheBuilder(redisruntime.FamilyLock)
-	deps.LockManager = c.CacheLockManager()
+	if c.locks != nil {
+		deps.LockBuilder = c.locks.Builder()
+	}
+	deps.LockManager = c.LockManager()
 	deps.WarmupCoordinator = c.WarmupCoordinator()
 
 	if c.PlanModule != nil {

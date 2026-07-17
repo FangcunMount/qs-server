@@ -45,6 +45,7 @@ flowchart LR
 | Report WebSocket | [08-Report-WebSocket推送链路.md](08-Report-WebSocket推送链路.md) |
 | 容量压测 | [09-容量边界与压测验证.md](09-容量边界与压测验证.md) |
 | 方案取舍 | [10-方案取舍.md](10-方案取舍.md) |
+| LockLease 租约锁与续租治理 | [11-LockLease租约锁与续租治理.md](11-LockLease租约锁与续租治理.md) |
 
 ## 5. 为什么选择当前方案
 

@@ -13,6 +13,7 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -323,6 +324,48 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
 		t.Fatal("expected degraded_open outcome")
 	}
+}
+
+func TestAnswerSheetRunnerAcquireFailureRemainsDegradedOpen(t *testing.T) {
+	bodyCalls := 0
+	deps := &Dependencies{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		LockRunner: runnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+			return locklease.RunResult{}, locklease.ErrLeaseAcquireFailed
+		}},
+	}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
+	if err := gate.Run(context.Background(), deps, "event-1", 42, func(context.Context) error {
+		bodyCalls++
+		return nil
+	}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if bodyCalls != 1 {
+		t.Fatalf("body calls = %d, want degraded-open execution", bodyCalls)
+	}
+}
+
+func TestAnswerSheetRunnerLeaseLossFailsForMessageRetry(t *testing.T) {
+	deps := &Dependencies{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		LockRunner: runnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+			return locklease.RunResult{Acquired: true}, locklease.ErrLeaseLost
+		}},
+	}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
+	err := gate.Run(context.Background(), deps, "event-1", 42, func(context.Context) error { return nil })
+	if !errors.Is(err, locklease.ErrLeaseLost) {
+		t.Fatalf("Run() error = %v, want ErrLeaseLost", err)
+	}
+}
+
+type runnerStub struct {
+	run func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error)
+}
+
+func (r runnerStub) Run(ctx context.Context, workload locklease.WorkloadID, key string, ttl time.Duration, body func(context.Context) error) (locklease.RunResult, error) {
+	return r.run(ctx, workload, key, ttl, body)
 }
 
 func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -24,11 +25,12 @@ type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest)
 
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
-	jobs       chan submitJob
-	statuses   *submitQueueStatusStore
-	workerPool *submitQueueWorkerPool
-	observer   resilienceplane.Observer
-	subject    resilienceplane.Subject
+	jobs              chan submitJob
+	statuses          *submitQueueStatusStore
+	workerPool        *submitQueueWorkerPool
+	retryableFailures sync.Map
+	observer          resilienceplane.Observer
+	subject           resilienceplane.Subject
 }
 
 type SubmitQueueRuntimeOptions struct {
@@ -61,7 +63,7 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 			Strategy:  "memory_channel",
 		},
 	}
-	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus)
+	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus, q.recordFailure)
 	q.workerPool.Start()
 
 	return q
@@ -89,6 +91,9 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 			q.observe(ctx, resilienceplane.OutcomeQueueDuplicate)
 			return nil
 		case SubmitStatusFailed:
+			if retryable, _ := q.retryableFailures.Load(requestID); retryable == true {
+				break
+			}
 			q.observe(ctx, resilienceplane.OutcomeQueueFailed)
 			return errors.New("previous request failed, please retry with a new request_id")
 		}
@@ -183,6 +188,9 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	if requestID == "" {
 		return
 	}
+	if status != SubmitStatusFailed {
+		q.retryableFailures.Delete(requestID)
+	}
 
 	existing, _ := q.getStatus(requestID)
 	cleaned := q.statuses.Set(requestID, SubmitStatusResponse{
@@ -203,6 +211,14 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 	case SubmitStatusFailed:
 		q.observe(context.Background(), resilienceplane.OutcomeQueueFailed)
 	}
+}
+
+func (q *SubmitQueue) recordFailure(requestID string, err error) {
+	if q == nil || requestID == "" || err == nil {
+		return
+	}
+	retryable := errors.Is(err, locklease.ErrLeaseLost) || errors.Is(err, locklease.ErrLeaseRenewFailed)
+	q.retryableFailures.Store(requestID, retryable)
 }
 
 func (q *SubmitQueue) setAssessmentID(requestID, assessmentID string) {

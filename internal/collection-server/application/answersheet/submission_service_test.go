@@ -297,3 +297,17 @@ func TestSubmitWithGuardReturnsIdempotentHit(t *testing.T) {
 		t.Fatalf("Submit() = %#v, want idempotent hit with assessment 9001", resp)
 	}
 }
+
+func TestEffectiveIdempotencyKeyPrefersExplicitAndFallsBackToRequestID(t *testing.T) {
+	original := &SubmitAnswerSheetRequest{}
+	effective := withEffectiveIdempotencyKey(original, requestKey("request-42", original))
+	if effective == original || effective.IdempotencyKey != "request-42" || original.IdempotencyKey != "" {
+		t.Fatalf("fallback effective request = %+v original = %+v", effective, original)
+	}
+
+	explicit := &SubmitAnswerSheetRequest{IdempotencyKey: "idem-42"}
+	key := requestKey("request-42", explicit)
+	if key != "idem-42" || withEffectiveIdempotencyKey(explicit, key) != explicit {
+		t.Fatalf("explicit idempotency key was not preferred: key=%q", key)
+	}
+}

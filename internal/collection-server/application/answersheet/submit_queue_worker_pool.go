@@ -3,25 +3,35 @@ package answersheet
 import "github.com/FangcunMount/component-base/pkg/logger"
 
 type submitQueueStatusWriter func(requestID, status, answerSheetID string)
+type submitQueueFailureRecorder func(requestID string, err error)
 
 // submitQueueWorkerPool owns the goroutines that drain submit jobs.
 // SubmitQueue remains responsible for admission, status lookup, and observation.
 type submitQueueWorkerPool struct {
-	workerCount int
-	jobs        <-chan submitJob
-	submit      submitFunc
-	writeStatus submitQueueStatusWriter
+	workerCount   int
+	jobs          <-chan submitJob
+	submit        submitFunc
+	writeStatus   submitQueueStatusWriter
+	recordFailure submitQueueFailureRecorder
 }
 
-func newSubmitQueueWorkerPool(workerCount int, jobs <-chan submitJob, submit submitFunc, writeStatus submitQueueStatusWriter) *submitQueueWorkerPool {
+func newSubmitQueueWorkerPool(workerCount int, jobs <-chan submitJob, submit submitFunc, writeStatus submitQueueStatusWriter, failureRecorders ...submitQueueFailureRecorder) *submitQueueWorkerPool {
 	if workerCount <= 0 || jobs == nil || submit == nil || writeStatus == nil {
 		return nil
 	}
+	var recordFailure submitQueueFailureRecorder
+	for _, recorder := range failureRecorders {
+		if recorder != nil {
+			recordFailure = recorder
+			break
+		}
+	}
 	return &submitQueueWorkerPool{
-		workerCount: workerCount,
-		jobs:        jobs,
-		submit:      submit,
-		writeStatus: writeStatus,
+		workerCount:   workerCount,
+		jobs:          jobs,
+		submit:        submit,
+		writeStatus:   writeStatus,
+		recordFailure: recordFailure,
 	}
 }
 
@@ -51,6 +61,9 @@ func (p *submitQueueWorkerPool) worker() {
 		logger.L(job.ctx).Infow("答卷提交队列开始处理", startFields...)
 		resp, err := p.submit(job.ctx, job.requestID, job.writerID, job.req)
 		if err != nil {
+			if p.recordFailure != nil {
+				p.recordFailure(job.requestID, err)
+			}
 			p.writeStatus(job.requestID, SubmitStatusFailed, "")
 			failureFields := []interface{}{
 				"action", "process_answersheet_submit",

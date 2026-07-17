@@ -8,7 +8,7 @@ import (
 
 func (s *server) initializeContainer(resources resourceOutput) (containerOutput, error) {
 	output := containerOutput{
-		container: container.NewContainer(s.config.Options, resources.redisRuntime.opsHandle, resources.redisRuntime.lockManager, resources.redisRuntime.familyStatus),
+		container: container.NewContainer(s.config.Options, resources.redisRuntime.opsHandle, resources.redisRuntime.locks, resources.redisRuntime.familyStatus),
 	}
 	if output.container == nil {
 		return output, nil

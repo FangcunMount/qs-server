@@ -12,7 +12,7 @@
 | 主状态边界 | collection 不持有 `survey / modelcatalog / evaluation / interpretation` 的权威写模型；答卷、测评、报告等主业务状态仍由 `qs-apiserver` 落库 |
 | 启动主线 | `main -> collection.NewApp -> config.CreateConfigFromOptions -> process.Run -> PrepareRun -> Run` |
 | PrepareRun 阶段 | `prepare resources -> initialize container -> initialize integrations -> initialize transports -> register shutdown callback` |
-| 资源层 | collection 的 `DatabaseManager` 只管理 Redis connectivity；Redis runtime 产出 `ops_runtime`、`lock_lease` 和 lock manager |
+| 资源层 | collection 的 `DatabaseManager` 只管理 Redis connectivity；Redis runtime 产出 `ops_runtime`、`lock_lease` handles，独立 LockLease subsystem 构造 manager 与 Runner |
 | 容器层 | container 装配 BFF 应用服务、REST handler、IAM module、SubmitGuard、SubmitQueue 和 gRPC client bundle |
 | 集成层 | integration stage 创建 apiserver gRPC client manager，注入 AnswerSheet / Questionnaire / Evaluation / Actor / Scale client |
 | HTTP 层 | 只启动 HTTP REST server；全局中间件包括 recovery、request-id、logger、API logger、NoCache、Options |

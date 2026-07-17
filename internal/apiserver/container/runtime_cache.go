@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -72,11 +73,25 @@ func (c *Container) HotsetInspector() cachetarget.HotsetInspector {
 	return c.cache.HotsetInspector()
 }
 
-func (c *Container) CacheLockManager() locklease.Manager {
-	if c == nil || c.cache == nil {
+func (c *Container) LockSubsystem() *locksubsystem.Subsystem {
+	if c == nil {
 		return nil
 	}
-	return c.cache.LockManager()
+	return c.locks
+}
+
+func (c *Container) LockManager() locklease.Manager {
+	if c == nil || c.locks == nil {
+		return nil
+	}
+	return c.locks
+}
+
+func (c *Container) LockRunner() locklease.Runner {
+	if c == nil || c.locks == nil {
+		return nil
+	}
+	return c.locks
 }
 
 func (c *Container) WarmupCoordinator() statisticsApp.WarmupCoordinator {

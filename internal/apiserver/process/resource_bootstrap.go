@@ -127,7 +127,6 @@ func (s *server) buildRedisRuntimeDeps(dbManager *bootstrap.DatabaseManager) red
 				Component:      "apiserver",
 				RuntimeOptions: s.config.RedisRuntime,
 				Resolver:       dbManager,
-				LockName:       "lock_lease",
 			})
 		},
 		buildSubsystem: func(runtimeBundle *cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
@@ -207,6 +206,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if deps.buildContainerOptions != nil {
 		containerOptions := deps.buildContainerOptions(containerOptionsInput{
 			cacheSubsystem: cacheSubsystem,
+			redisRuntime:   redisRuntime,
 			backpressure:   backpressureOptions,
 			eventSubsystem: events,
 		})

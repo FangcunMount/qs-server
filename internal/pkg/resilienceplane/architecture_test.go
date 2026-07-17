@@ -60,13 +60,8 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 func TestBusinessCodeDoesNotImportLockLeaseRedisAdapterDirectly(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/pkg/redisruntime/bootstrap": {},
 		"internal/pkg/locklease/redisadapter": {},
-		"internal/apiserver/cache/subsystem":  {},
-		"internal/pkg/resilienceplane":        {},
-		"internal/pkg/configcontract":         {},
-		"internal/collection-server/process":  {},
-		"internal/worker/process":             {},
+		"internal/pkg/locklease/subsystem":    {},
 	}
 	scanGoFiles(t, filepath.Join(root, "internal"), func(path string, file *ast.File) {
 		rel, err := filepath.Rel(root, path)
@@ -189,16 +184,8 @@ func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
 }
 
 func TestLockLeaseSpecsHaveResilienceSemantics(t *testing.T) {
-	specs := []locklease.Spec{
-		locklease.Specs.AnswersheetProcessing,
-		locklease.Specs.PlanSchedulerLeader,
-		locklease.Specs.StatisticsSyncLeader,
-		locklease.Specs.StatisticsSync,
-		locklease.Specs.BehaviorPendingReconcile,
-		locklease.Specs.EvaluationConsistencyReconcile,
-		locklease.Specs.CollectionSubmit,
-	}
-	for _, spec := range specs {
+	for _, capability := range locklease.All() {
+		spec := capability.Spec
 		if spec.Name == "" {
 			t.Fatal("lock spec name must not be empty")
 		}

@@ -88,6 +88,9 @@ redis_profiles:                        # Redis 配置文件
   lock_cache:                          # lock_lease 家族
     database: 6                        # Redis 数据库 6
 
+lock_lease:
+  renewal_enabled: true
+
 redis_runtime:                         # Redis 运行时配置
   namespace: ""                        # 命名空间
   families:                            # 家族配置

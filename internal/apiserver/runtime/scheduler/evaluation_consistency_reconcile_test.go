@@ -9,6 +9,7 @@ import (
 
 	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
@@ -158,8 +159,8 @@ func TestEvaluationConsistencyReconcileRunOnceUsesConfiguredLockOverride(t *test
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redisadapter.Specs.EvaluationConsistencyReconcile.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.EvaluationConsistencyReconcile.Name)
+	if gotSpec.Name != workloadSpec(locklease.WorkloadEvaluationConsistencyReconcile).Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, workloadSpec(locklease.WorkloadEvaluationConsistencyReconcile).Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)

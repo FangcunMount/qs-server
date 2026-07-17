@@ -27,7 +27,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -41,7 +41,7 @@ type Container struct {
 	initialized  bool
 	opts         *options.Options
 	opsHandle    *redisruntime.Handle
-	lockManager  locklease.Manager
+	locks        *locksubsystem.Subsystem
 	familyStatus *observability.FamilyStatusRegistry
 
 	// IAM 模块
@@ -112,11 +112,11 @@ func (c *Container) TesteeService() *testee.Service {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
+func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, familyStatus *observability.FamilyStatusRegistry) *Container {
 	c := &Container{
 		opts:           opts,
 		opsHandle:      opsHandle,
-		lockManager:    lockManager,
+		locks:          locks,
 		familyStatus:   familyStatus,
 		initialized:    false,
 		cacheSubsystem: collectioncache.NewSubsystem(collectionCacheConfig(opts), opsHandle),
@@ -502,7 +502,10 @@ func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
 	if c != nil && c.submissionService != nil {
 		snapshot.Queues = []resilienceplane.QueueSnapshot{c.submissionService.SubmitQueueStatusSnapshot(now)}
 	}
-	idempotencyConfigured := c != nil && c.lockManager != nil && c.opsHandle != nil && c.opsHandle.Client != nil
+	if c != nil && c.locks != nil {
+		snapshot.Locks = c.locks.Snapshots()
+	}
+	idempotencyConfigured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded && c.opsHandle != nil && c.opsHandle.Client != nil
 	snapshot.Idempotency = []resilienceplane.CapabilitySnapshot{{
 		Name:       "answersheet_submit",
 		Kind:       resilienceplane.ProtectionIdempotency.String(),

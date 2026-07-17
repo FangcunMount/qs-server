@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 )
@@ -226,8 +227,8 @@ func TestStatisticsSyncRunnerRunOnceUsesConfiguredLockOverride(t *testing.T) {
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redisadapter.Specs.StatisticsSyncLeader.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.StatisticsSyncLeader.Name)
+	if gotSpec.Name != workloadSpec(locklease.WorkloadStatisticsSyncLeader).Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, workloadSpec(locklease.WorkloadStatisticsSyncLeader).Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)

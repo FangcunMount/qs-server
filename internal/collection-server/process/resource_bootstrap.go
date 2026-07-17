@@ -4,6 +4,7 @@ import (
 	"context"
 
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 )
@@ -30,7 +31,13 @@ func (s *server) prepareResources() (resourceOutput, error) {
 				AllowFallbackDefault: true,
 			},
 		},
-		LockName: "lock_lease",
+	})
+	renewalEnabled := s.config.LockLease != nil && s.config.LockLease.RenewalEnabled
+	locks := locksubsystem.New(locksubsystem.Options{
+		Component:      "collection-server",
+		Handle:         redisRuntime.Handle(redisruntime.FamilyLock),
+		StatusRegistry: redisRuntime.StatusRegistry,
+		RenewalEnabled: renewalEnabled,
 	})
 	return resourceOutput{
 		handles: resourceHandles{
@@ -40,8 +47,7 @@ func (s *server) prepareResources() (resourceOutput, error) {
 			familyStatus: redisRuntime.StatusRegistry,
 			redisRuntime: redisRuntime.Runtime,
 			opsHandle:    redisRuntime.Handle(redisruntime.FamilyOps),
-			lockHandle:   redisRuntime.Handle(redisruntime.FamilyLock),
-			lockManager:  redisRuntime.LockManager,
+			locks:        locks,
 		},
 	}, nil
 }

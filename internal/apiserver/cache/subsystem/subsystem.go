@@ -12,8 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
@@ -49,7 +47,6 @@ type Subsystem struct {
 
 	hotsetRecorder  cachetarget.HotsetRecorder
 	hotsetInspector cachetarget.HotsetInspector
-	lockManager     locklease.Manager
 
 	warmupCoordinator cachegov.Coordinator
 	statusService     cachegov.StatusService
@@ -70,7 +67,6 @@ func NewSubsystem(component string, resolver redisruntime.Resolver, runtimeOptio
 		Component:      component,
 		RuntimeOptions: runtimeOptions,
 		Resolver:       resolver,
-		LockName:       "lock_lease",
 	}), cacheConfig)
 }
 
@@ -80,7 +76,6 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 	var statusRegistry *observability.FamilyStatusRegistry
 	var runtime *redisruntime.Runtime
 	var handles map[redisruntime.Family]*redisruntime.Handle
-	var lockManager locklease.Manager
 	if runtimeBundle != nil {
 		if runtimeBundle.Component != "" {
 			component = runtimeBundle.Component
@@ -88,7 +83,6 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 		statusRegistry = runtimeBundle.StatusRegistry
 		runtime = runtimeBundle.Runtime
 		handles = runtimeBundle.Handles
-		lockManager = runtimeBundle.LockManager
 	}
 	if statusRegistry == nil {
 		statusRegistry = observability.NewFamilyStatusRegistry(component)
@@ -115,10 +109,6 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 	)
 	if inspector, ok := s.hotsetRecorder.(cachetarget.HotsetInspector); ok {
 		s.hotsetInspector = inspector
-	}
-	s.lockManager = lockManager
-	if s.lockManager == nil {
-		s.lockManager = redisadapter.NewManagerWithObservers(component, "lock_lease", s.Handle(redisruntime.FamilyLock), nil, s.observer)
 	}
 	s.signals = newSignalRuntime(s.Client(redisruntime.FamilyOps), cacheConfig.Signal, component)
 	s.warnMetaCacheAvailability()
@@ -313,13 +303,6 @@ func (s *Subsystem) HotsetInspector() cachetarget.HotsetInspector {
 		return nil
 	}
 	return s.hotsetInspector
-}
-
-func (s *Subsystem) LockManager() locklease.Manager {
-	if s == nil {
-		return nil
-	}
-	return s.lockManager
 }
 
 func (s *Subsystem) WarmupCoordinator() statisticsApp.WarmupCoordinator {

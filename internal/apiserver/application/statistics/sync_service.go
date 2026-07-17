@@ -158,8 +158,19 @@ func (s *syncService) withLockLease(ctx context.Context, lockName string, fn fun
 	if s.writer == nil {
 		return fmt.Errorf("statistics sync writer is unavailable")
 	}
+	if runner, ok := s.lockManager.(locklease.Runner); ok {
+		result, err := runner.Run(ctx, locklease.WorkloadStatisticsSync, lockName, statisticsSyncLockTTL, fn)
+		if err != nil {
+			return err
+		}
+		if !result.Acquired {
+			return fmt.Errorf("statistics sync lock busy: %s", lockName)
+		}
+		return nil
+	}
 
-	lease, acquired, err := s.lockManager.AcquireSpec(ctx, locklease.Specs.StatisticsSync, lockName, statisticsSyncLockTTL)
+	capability, _ := locklease.Lookup(locklease.WorkloadStatisticsSync)
+	lease, acquired, err := s.lockManager.AcquireSpec(ctx, capability.Spec, lockName, statisticsSyncLockTTL)
 	if err != nil {
 		return err
 	}
@@ -167,7 +178,7 @@ func (s *syncService) withLockLease(ctx context.Context, lockName string, fn fun
 		return fmt.Errorf("statistics sync lock busy: %s", lockName)
 	}
 	defer func() {
-		_ = s.lockManager.ReleaseSpec(context.Background(), locklease.Specs.StatisticsSync, lockName, lease)
+		_ = s.lockManager.ReleaseSpec(context.Background(), capability.Spec, lockName, lease)
 	}()
 
 	return fn(ctx)

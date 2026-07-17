@@ -42,10 +42,8 @@ func (r *Router) resilienceSnapshot() resilienceplane.RuntimeSnapshot {
 	if r != nil {
 		snapshot.Backpressure = append(snapshot.Backpressure, r.deps.Backpressure...)
 	}
-	snapshot.Locks = []resilienceplane.CapabilitySnapshot{
-		{Name: "plan_scheduler_leader", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
-		{Name: "statistics_sync_leader", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
-		{Name: "behavior_pending_reconcile", Kind: resilienceplane.ProtectionLock.String(), Strategy: "redis_lock", Configured: true},
+	if r != nil {
+		snapshot.Locks = append(snapshot.Locks, r.deps.Locks...)
 	}
 	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
 }

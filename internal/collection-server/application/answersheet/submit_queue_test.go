@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -118,6 +119,42 @@ func TestSubmitQueueFailedRequestRequiresNewRequestID(t *testing.T) {
 	if err := q.Enqueue(context.Background(), "req-failed", 1, &SubmitAnswerSheetRequest{}); err == nil {
 		t.Fatal("expected failed request id reuse to be rejected")
 	}
+}
+
+func TestSubmitQueueAllowsSameRequestIDAfterRetryableLeaseFailure(t *testing.T) {
+	var mu sync.Mutex
+	attempts := 0
+	q := NewSubmitQueue(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		attempts++
+		if attempts == 1 {
+			return nil, locklease.ErrLeaseLost
+		}
+		return &SubmitAnswerSheetResponse{ID: "42"}, nil
+	})
+
+	if err := q.Enqueue(context.Background(), "req-retry", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("first enqueue: %v", err)
+	}
+	waitForSubmitStatus(t, q, "req-retry", SubmitStatusFailed)
+	if err := q.Enqueue(context.Background(), "req-retry", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("retry enqueue with same request id: %v", err)
+	}
+	waitForSubmitStatus(t, q, "req-retry", SubmitStatusDone)
+}
+
+func waitForSubmitStatus(t *testing.T, q *SubmitQueue, requestID, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		status, ok := q.GetStatus(requestID)
+		if ok && status.Status == want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("request %q did not reach status %q", requestID, want)
 }
 
 func TestSubmitQueueStatusExpiresAfterTTL(t *testing.T) {

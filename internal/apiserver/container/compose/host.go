@@ -49,7 +49,8 @@ type Host interface {
 	CachePolicyProvider() sharedcache.PolicyProvider
 	CacheObserver() *observability.ComponentObserver
 	HotsetRecorder() cachetarget.HotsetRecorder
-	CacheLockManager() locklease.Manager
+	LockManager() locklease.Manager
+	LockRunner() locklease.Runner
 	WarmupCoordinator() statisticsApp.WarmupCoordinator
 	CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader
 	CacheSignalNotifier() cachebootstrap.SignalNotifier

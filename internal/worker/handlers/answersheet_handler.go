@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -33,18 +34,15 @@ type DuplicateSuppressionGate interface {
 }
 
 type answerSheetDuplicateSuppressionGate struct {
-	hooks    answerSheetProcessingGateHooks
-	observer resilienceplane.Observer
+	hooks       answerSheetProcessingGateHooks
+	manualHooks bool
+	observer    resilienceplane.Observer
 }
 
 var _ DuplicateSuppressionGate = answerSheetDuplicateSuppressionGate{}
 
-var defaultAnswerSheetProcessingGateHooks = answerSheetProcessingGateHooks{
-	acquire: acquireProcessingLock,
-	release: releaseProcessingLock,
-}
-
 func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks) DuplicateSuppressionGate {
+	manualHooks := hooks.acquire != nil || hooks.release != nil
 	if hooks.acquire == nil {
 		hooks.acquire = acquireProcessingLock
 	}
@@ -52,8 +50,9 @@ func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks
 		hooks.release = releaseProcessingLock
 	}
 	return answerSheetDuplicateSuppressionGate{
-		hooks:    hooks,
-		observer: defaultAnswerSheetGateObserver(hooks.observer),
+		hooks:       hooks,
+		manualHooks: manualHooks,
+		observer:    defaultAnswerSheetGateObserver(hooks.observer),
 	}
 }
 
@@ -64,7 +63,7 @@ func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks
 //  3. 对关联量表，内部服务创建后自动提交；若已存在但仍为 pending，
 //     则本次 worker 重放负责幂等补提交并触发评估
 func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
-	return handleAnswerSheetSubmittedWithHooks(deps, defaultAnswerSheetProcessingGateHooks)
+	return handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{})
 }
 
 func handleAnswerSheetSubmittedWithHooks(
@@ -125,6 +124,50 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 ) error {
 	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
 	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
+	if deps.LockRunner != nil && !g.manualHooks {
+		result, err := deps.LockRunner.Run(
+			ctx,
+			locklease.WorkloadAnswersheetProcessing,
+			answerSheetProcessingLockKeyBase(answerSheetID),
+			0,
+			fn,
+		)
+		if errors.Is(err, locklease.ErrLeaseAcquireFailed) {
+			observability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
+			g.observe(ctx, resilienceplane.OutcomeDegradedOpen)
+			deps.Logger.Warn("answersheet processing gate degraded",
+				slog.String("event_id", eventID),
+				slog.String("answersheet_id", answerSheetIDStr),
+				slog.String("lock_key", lockKey),
+				slog.String("lock_mode", string(answerSheetProcessingGateModeDegraded)),
+				slog.String("reason", "acquire_failed"),
+				slog.String("error", err.Error()),
+			)
+			return fn(ctx)
+		}
+		if err != nil {
+			return err
+		}
+		if !result.Acquired {
+			g.observe(ctx, resilienceplane.OutcomeDuplicateSkipped)
+			deps.Logger.Info("answersheet processing skipped as duplicate",
+				slog.String("event_id", eventID),
+				slog.String("answersheet_id", answerSheetIDStr),
+				slog.String("lock_key", lockKey),
+				slog.String("lock_mode", string(answerSheetProcessingGateModeDuplicateSkip)),
+			)
+			return nil
+		}
+		if result.ReleaseErr != nil {
+			deps.Logger.Warn("failed to release answersheet processing gate",
+				slog.String("event_id", eventID),
+				slog.String("answersheet_id", answerSheetIDStr),
+				slog.String("lock_key", lockKey),
+				slog.String("error", result.ReleaseErr.Error()),
+			)
+		}
+		return nil
+	}
 
 	if !lockManagerAvailable(deps.LockManager) {
 		observability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
@@ -207,7 +250,8 @@ func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetI
 	if !lockManagerAvailable(deps.LockManager) {
 		return nil, false, fmt.Errorf("lock manager is unavailable")
 	}
-	lease, acquired, err := deps.LockManager.AcquireSpec(ctx, locklease.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID))
+	capability, _ := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	lease, acquired, err := deps.LockManager.AcquireSpec(ctx, capability.Spec, answerSheetProcessingLockKeyBase(answerSheetID))
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to acquire processing lock: %w", err)
 	}
@@ -219,7 +263,8 @@ func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetI
 	if !lockManagerAvailable(deps.LockManager) {
 		return nil
 	}
-	if err := deps.LockManager.ReleaseSpec(ctx, locklease.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID), lease); err != nil {
+	capability, _ := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	if err := deps.LockManager.ReleaseSpec(ctx, capability.Spec, answerSheetProcessingLockKeyBase(answerSheetID), lease); err != nil {
 		return fmt.Errorf("failed to release processing lock: %w", err)
 	}
 	return nil

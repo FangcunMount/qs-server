@@ -132,6 +132,9 @@ redis_profiles:
     password: "dev_app_123"
     database: 0
 
+lock_lease:
+  renewal_enabled: true
+
 redis_runtime:
   namespace: ""
   families:

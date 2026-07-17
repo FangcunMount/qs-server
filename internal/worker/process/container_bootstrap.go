@@ -7,9 +7,8 @@ func (s *server) initializeContainer(resources resourceOutput) (containerOutput,
 		container: container.NewContainer(
 			s.config.Options,
 			s.logger,
-			resources.redisRuntime.lockHandle,
 			resources.redisRuntime.opsHandle,
-			resources.redisRuntime.lockManager,
+			resources.redisRuntime.locks,
 			resources.eventCatalog,
 		),
 	}, nil

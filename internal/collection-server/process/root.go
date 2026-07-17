@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientinfra "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
@@ -34,8 +34,7 @@ type redisRuntimeOutput struct {
 	familyStatus *observability.FamilyStatusRegistry
 	redisRuntime *redisruntime.Runtime
 	opsHandle    *redisruntime.Handle
-	lockHandle   *redisruntime.Handle
-	lockManager  locklease.Manager
+	locks        *locksubsystem.Subsystem
 }
 
 type resourceOutput struct {
