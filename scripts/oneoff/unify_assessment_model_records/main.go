@@ -261,7 +261,8 @@ func inspectModelSnapshots(snapshots []bson.M, headCodes map[string]struct{}) mo
 	seenActiveQuestionnaire := map[string]struct{}{}
 	for _, row := range snapshots {
 		code, kind, version := snapshotField(row, "code"), snapshotField(row, "kind"), snapshotField(row, "version")
-		if snapshotActive(row) {
+		active := snapshotActive(row)
+		if active {
 			if code != "" {
 				if _, ok := result.activeCodes[code]; ok {
 					result.issues = append(result.issues, "multiple active snapshots for "+code)
@@ -285,6 +286,9 @@ func inspectModelSnapshots(snapshots []bson.M, headCodes map[string]struct{}) mo
 		if code != "" {
 			if _, ok := headCodes[code]; !ok {
 				result.orphaned++
+				if active {
+					result.issues = append(result.issues, fmt.Sprintf("active orphan snapshot %s@%s", code, version))
+				}
 			}
 		}
 
@@ -293,8 +297,18 @@ func inspectModelSnapshots(snapshots []bson.M, headCodes map[string]struct{}) mo
 			result.issues = append(result.issues, fmt.Sprintf("invalid published snapshot code=%q kind=%q version=%q payload_type=%T", code, kind, version, row["payload"]))
 			continue
 		}
-		if stringField(row, "payload_format") == "" || stringField(row, "decision_kind") == "" || row["definition_v2"] == nil {
-			result.issues = append(result.issues, fmt.Sprintf("incomplete published snapshot %s@%s", code, version))
+		missing := make([]string, 0, 3)
+		if stringField(row, "payload_format") == "" {
+			missing = append(missing, "payload_format")
+		}
+		if stringField(row, "decision_kind") == "" {
+			missing = append(missing, "decision_kind")
+		}
+		if row["definition_v2"] == nil {
+			missing = append(missing, "definition_v2")
+		}
+		if len(missing) != 0 {
+			result.issues = append(result.issues, fmt.Sprintf("incomplete published snapshot %s@%s missing=%s", code, version, strings.Join(missing, ",")))
 		}
 		key := strings.Join([]string{kind, snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), code, version}, "|")
 		if _, ok := seenRelease[key]; ok {
@@ -337,6 +351,7 @@ func inspectQuestionnaireSnapshots(snapshots []bson.M) questionnaireSnapshotInsp
 
 func inspectQuestionnaireHeads(heads []bson.M, activeCodes map[string]struct{}) []string {
 	issues := make([]string, 0)
+	headCodes := make(map[string]struct{}, len(heads))
 	for _, head := range heads {
 		code, version, status := stringField(head, "code"), stringField(head, "version"), stringField(head, "status")
 		if code == "" || version == "" {
@@ -345,12 +360,18 @@ func inspectQuestionnaireHeads(heads []bson.M, activeCodes map[string]struct{}) 
 		if code == "" {
 			continue
 		}
+		headCodes[code] = struct{}{}
 		_, active := activeCodes[code]
 		if status == "published" && !active {
 			issues = append(issues, "published questionnaire head without active snapshot "+code)
 		}
 		if status == "archived" && active {
 			issues = append(issues, "archived questionnaire head with active snapshot "+code)
+		}
+	}
+	for code := range activeCodes {
+		if _, ok := headCodes[code]; !ok {
+			issues = append(issues, "active questionnaire snapshot without head "+code)
 		}
 	}
 	return issues

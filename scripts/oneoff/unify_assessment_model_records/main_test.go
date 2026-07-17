@@ -142,6 +142,40 @@ func TestInspectModelSnapshotsCountsLifecycleWhenPayloadIsInvalid(t *testing.T) 
 	}
 }
 
+func TestInspectModelSnapshotsRejectsActiveOrphanButRetainsArchivedOrphan(t *testing.T) {
+	active := bson.M{
+		"model_kind": "scale", "model_code": "ACTIVE", "model_version": "v1",
+		"status": "published", "deleted_at": nil,
+		"questionnaire_code": "Q", "questionnaire_version": "1",
+		"payload": []byte("payload"), "payload_format": "assessmentmodel.scale.v1",
+		"decision_kind": "score_range", "definition_v2": bson.M{"measure": bson.M{}},
+	}
+	archived := bson.M{
+		"model_kind": "scale", "model_code": "ARCHIVED", "model_version": "v1",
+		"status": "published", "deleted_at": time.Now().UTC(),
+		"payload": []byte("payload"), "payload_format": "assessmentmodel.scale.v1",
+		"decision_kind": "score_range", "definition_v2": bson.M{"measure": bson.M{}},
+	}
+	got := inspectModelSnapshots([]bson.M{active, archived}, map[string]struct{}{})
+	if got.orphaned != 2 {
+		t.Fatalf("orphaned = %d, want 2", got.orphaned)
+	}
+	if len(got.issues) != 1 || !strings.Contains(got.issues[0], "active orphan snapshot ACTIVE@v1") {
+		t.Fatalf("issues = %#v, want active orphan only", got.issues)
+	}
+}
+
+func TestInspectModelSnapshotsReportsIncompleteFields(t *testing.T) {
+	row := bson.M{
+		"model_kind": "typology", "model_code": "T-1", "model_version": "v1",
+		"status": "published", "deleted_at": time.Now().UTC(), "payload": []byte("payload"),
+	}
+	got := inspectModelSnapshots([]bson.M{row}, map[string]struct{}{"T-1": {}})
+	if len(got.issues) != 1 || !strings.Contains(got.issues[0], "missing=payload_format,decision_kind,definition_v2") {
+		t.Fatalf("issues = %#v, want named incomplete fields", got.issues)
+	}
+}
+
 func TestQuestionnaireSnapshotSourcesDuplicatesLegacyPublishedHeadAsRelease(t *testing.T) {
 	legacy := bson.M{"_id": primitive.NewObjectID(), "code": "Q-1", "version": "1", "status": "published", "questions": bson.A{bson.M{"code": "Q1"}}}
 	draft := bson.M{"_id": primitive.NewObjectID(), "code": "Q-2", "version": "1", "status": "draft"}
@@ -182,5 +216,12 @@ func TestInspectQuestionnaireHeadsRejectsMissingWorkingVersion(t *testing.T) {
 	}}, map[string]struct{}{})
 	if len(issues) != 1 || !strings.Contains(issues[0], `code="Q-1" version=""`) {
 		t.Fatalf("issues = %#v, want head identity issue", issues)
+	}
+}
+
+func TestInspectQuestionnaireHeadsRejectsActiveOrphan(t *testing.T) {
+	issues := inspectQuestionnaireHeads(nil, map[string]struct{}{"Q-ORPHAN": {}})
+	if len(issues) != 1 || issues[0] != "active questionnaire snapshot without head Q-ORPHAN" {
+		t.Fatalf("issues = %#v, want active questionnaire orphan", issues)
 	}
 }
