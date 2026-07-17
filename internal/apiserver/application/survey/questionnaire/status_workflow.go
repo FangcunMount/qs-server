@@ -19,6 +19,9 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 		"action", "unpublish",
 		"code", code,
 	)
+	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
+		return nil, err
+	}
 
 	q, err := s.loadUnpublishTarget(ctx, l, code)
 	if err != nil {
@@ -57,6 +60,28 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 	return toQuestionnaireResult(q), nil
 }
 
+// UnpublishForRelease performs only the transactional questionnaire state
+// changes. The paired release service owns all post-commit effects.
+func (s *lifecycleService) UnpublishForRelease(ctx context.Context, code string) (*QuestionnaireResult, error) {
+	l := logger.L(ctx)
+	q, err := s.loadUnpublishTarget(ctx, l, code)
+	if err != nil {
+		return nil, err
+	}
+	if q.IsPublished() {
+		if err := s.lifecycle.Unpublish(ctx, q); err != nil {
+			return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "下架问卷失败")
+		}
+		if err := s.persistQuestionnaire(ctx, q, code, "release_unpublish", "状态"); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "归档发布快照失败")
+	}
+	return toQuestionnaireResult(q), nil
+}
+
 // Archive 归档问卷
 func (s *lifecycleService) Archive(ctx context.Context, code string) (*QuestionnaireResult, error) {
 	l := logger.L(ctx)
@@ -66,6 +91,9 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 		"action", "archive",
 		"code", code,
 	)
+	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
+		return nil, err
+	}
 
 	if err := s.validateCode(ctx, code, "archive"); err != nil {
 		return nil, err

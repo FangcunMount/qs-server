@@ -79,6 +79,9 @@ func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model
 	if model == nil {
 		return
 	}
+	if deps.Catalog.CacheInvalidator != nil {
+		deps.Catalog.CacheInvalidator.InvalidatePublishedModel(ctx, model.Kind, model.Code)
+	}
 	if deps.Lifecycle.EventPublisher != nil {
 		if changeAction, ok := assessmentModelChangeAction(action); ok {
 			evt := event.New(eventcatalog.AssessmentModelChanged, "AssessmentModel", model.Code, eventpayload.AssessmentModelChangedData{

@@ -11,7 +11,7 @@ product_channel=behavior_ability
 payload_format=assessmentmodel.behavioral_rating.default.v1
 ```
 
-脚本写入 `assessment_norms`、`assessment_models` 和 `published_assessment_models`。它只需要 MongoDB，不使用 MySQL。常模已经作为版本化、gzip+base64 编码的 JSON 资产内嵌在 `data/spm-sensory-cn-legacy-bJFKi3-v1.json.gz.b64`，服务器不需要 PHP，也不需要本地附件。Base64 不是加密，不应把未经授权的常模资产提交到公开仓库。
+脚本写入 `assessment_norms`，以及 `assessment_models` 中的 head/published_snapshot。它只需要 MongoDB，不使用 MySQL。常模已经作为版本化、gzip+base64 编码的 JSON 资产内嵌在 `data/spm-sensory-cn-legacy-bJFKi3-v1.json.gz.b64`，服务器不需要 PHP，也不需要本地附件。Base64 不是加密，不应把未经授权的常模资产提交到公开仓库。
 
 内嵌资产解压后 JSON 的 SHA-256 为 `280841d9893b72ece1170417eeb0f1ead05e0aad5c8d605928576d59c0db473b`，可用于部署前完整性核验。
 

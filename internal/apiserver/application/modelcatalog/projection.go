@@ -1,6 +1,7 @@
 package modelcatalog
 
 import (
+	"strconv"
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -29,6 +30,16 @@ func ModelSummaryFromAssessmentModel(model *domain.AssessmentModel) *ModelSummar
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		CreatedAt:            model.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:            model.UpdatedAt.Format(time.RFC3339),
+		ReleaseState: ReleaseState{
+			WorkingStatus:  string(model.Status),
+			WorkingVersion: "v" + strconv.FormatInt(model.Revision(), 10),
+			OnlineStatus: func() string {
+				if model.IsArchived() {
+					return "archived"
+				}
+				return "offline"
+			}(),
+		},
 	}
 	PopulateModelSummaryIdentity(result, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
 	return result

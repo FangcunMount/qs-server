@@ -72,6 +72,19 @@ type scaleBindingSyncerRecorder struct {
 	syncCalls   int
 	lastCode    string
 	lastVersion string
+	bound       bool
+}
+
+func (r *scaleBindingSyncerRecorder) IsQuestionnaireBound(context.Context, string) (bool, error) {
+	return r.bound, nil
+}
+
+func TestStandaloneLifecycleRejectsQuestionnaireBoundToAssessmentRelease(t *testing.T) {
+	svc := &lifecycleService{bindingSyncer: &scaleBindingSyncerRecorder{bound: true}}
+	err := svc.rejectBoundStandaloneLifecycle(context.Background(), "Q-BOUND")
+	if err == nil {
+		t.Fatal("rejectBoundStandaloneLifecycle() error = nil, want conflict")
+	}
 }
 
 func (r *scaleBindingSyncerRecorder) SyncQuestionnaireVersion(_ context.Context, questionnaireCode, version string) error {

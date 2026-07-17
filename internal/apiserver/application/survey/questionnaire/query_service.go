@@ -66,7 +66,13 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 	)
 	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 
-	return toQuestionnaireResult(q), nil
+	result := toQuestionnaireResult(q)
+	active, activeErr := s.repo.FindBasePublishedByCode(ctx, code)
+	if activeErr != nil {
+		return nil, activeErr
+	}
+	result.ReleaseState = questionnaireReleaseState(q, active)
+	return result, nil
 }
 
 // List 查询问卷摘要列表（轻量级，不包含问题详情）
@@ -114,7 +120,9 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	)
 	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 
-	return toQuestionnaireResult(q), nil
+	result := toQuestionnaireResult(q)
+	result.ReleaseState = questionnaireReleaseState(q, q)
+	return result, nil
 }
 
 // GetPublishedByCodeVersion 获取指定版本的已发布问卷
@@ -160,7 +168,41 @@ func (s *queryService) GetPublishedByCodeVersion(ctx context.Context, code, vers
 	)
 	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 
-	return toQuestionnaireResult(q), nil
+	result := toQuestionnaireResult(q)
+	if q.IsActivePublished() {
+		result.ReleaseState = questionnaireReleaseState(q, q)
+	}
+	return result, nil
+}
+
+func (s *queryService) ListReleaseVersions(ctx context.Context, code string) ([]QuestionnaireReleaseVersion, error) {
+	if err := s.validateCode(ctx, code, "list_release_versions"); err != nil {
+		return nil, err
+	}
+	reader, ok := s.repo.(questionnaire.ReleaseHistoryRepository)
+	if !ok {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "问卷版本历史存储未配置")
+	}
+	items, err := reader.ListPublishedReleaseHistory(ctx, code)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷版本历史失败")
+	}
+	result := make([]QuestionnaireReleaseVersion, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		status := item.GetReleaseStatus()
+		entry := QuestionnaireReleaseVersion{Version: item.GetVersion().String(), ReleaseStatus: string(status), Current: status.IsActive()}
+		if item.GetPublishedAt() != nil {
+			entry.PublishedAt = item.GetPublishedAt().UTC().Format(time.RFC3339)
+		}
+		if item.GetReleaseArchivedAt() != nil {
+			entry.ArchivedAt = item.GetReleaseArchivedAt().UTC().Format(time.RFC3339)
+		}
+		result = append(result, entry)
+	}
+	return result, nil
 }
 
 // GetQuestionCount 获取问卷题目数量（轻量，不加载 questions）
@@ -236,6 +278,19 @@ func (s *queryService) listQuestionnaireSummaries(ctx context.Context, action st
 	}
 
 	result := toQuestionnaireSummaryRowsResult(ctx, questionnaires, total, s.identitySvc)
+	if !publishedOnly {
+		for _, item := range result.Items {
+			head, headErr := s.repo.FindBaseByCode(ctx, item.Code)
+			if headErr != nil {
+				return nil, headErr
+			}
+			active, activeErr := s.repo.FindBasePublishedByCode(ctx, item.Code)
+			if activeErr != nil {
+				return nil, activeErr
+			}
+			item.ReleaseState = questionnaireReleaseState(head, active)
+		}
+	}
 	s.logSuccess(ctx, action, startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),

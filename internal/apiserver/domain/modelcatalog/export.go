@@ -51,6 +51,7 @@ type (
 	NewAssessmentModelInput = assessmentmodelpkg.NewInput
 	DefinitionPayload       = assessmentmodelpkg.DefinitionPayload
 	ModelStatus             = assessmentmodelpkg.Status
+	ReleaseStatus           = assessmentmodelpkg.ReleaseStatus
 	ValidationLevel         = assessmentmodelpkg.ValidationLevel
 	DomainValidationIssue   = assessmentmodelpkg.DomainValidationIssue
 	DomainValidationResult  = assessmentmodelpkg.DomainValidationResult
@@ -171,9 +172,11 @@ const (
 	SchemaVersionV1 = payloadformatpkg.SchemaVersionV1
 	SchemaVersionV2 = payloadformatpkg.SchemaVersionV2
 
-	ModelStatusDraft     = assessmentmodelpkg.StatusDraft
-	ModelStatusPublished = assessmentmodelpkg.StatusPublished
-	ModelStatusArchived  = assessmentmodelpkg.StatusArchived
+	ModelStatusDraft      = assessmentmodelpkg.StatusDraft
+	ModelStatusPublished  = assessmentmodelpkg.StatusPublished
+	ModelStatusArchived   = assessmentmodelpkg.StatusArchived
+	ReleaseStatusActive   = assessmentmodelpkg.ReleaseStatusActive
+	ReleaseStatusArchived = assessmentmodelpkg.ReleaseStatusArchived
 
 	ValidationLevelError   = assessmentmodelpkg.ValidationLevelError
 	ValidationLevelWarning = assessmentmodelpkg.ValidationLevelWarning
@@ -211,7 +214,8 @@ var (
 	FamilyCapabilityByKind = binding.FamilyCapabilityByKind
 	RuntimeExecutableKinds = binding.RuntimeExecutableKinds
 
-	NewAssessmentModel = assessmentmodelpkg.New
-	ParseModelStatus   = assessmentmodelpkg.ParseStatus
-	ValidateDefinition = definitionpkg.Validate
+	NewAssessmentModel     = assessmentmodelpkg.New
+	ParseModelStatus       = assessmentmodelpkg.ParseStatus
+	NormalizeReleaseStatus = assessmentmodelpkg.NormalizeReleaseStatus
+	ValidateDefinition     = definitionpkg.Validate
 )

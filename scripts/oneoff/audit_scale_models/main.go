@@ -150,7 +150,10 @@ func loadDrafts(ctx context.Context, db *mongo.Database, codes []string) ([]*dom
 }
 
 func loadPublished(ctx context.Context, db *mongo.Database, codes []string) ([]*modelcatalogport.AssessmentSnapshot, error) {
-	filter := bson.M{"deleted_at": nil, "record_role": "published_snapshot", "is_active_published": true, "status": "published", "kind": string(domain.KindScale)}
+	filter := bson.M{"deleted_at": nil, "record_role": "published_snapshot", "status": "published", "kind": string(domain.KindScale), "$or": bson.A{
+		bson.M{"release_status": "active"},
+		bson.M{"release_status": bson.M{"$exists": false}, "is_active_published": true},
+	}}
 	if len(codes) > 0 {
 		filter["code"] = bson.M{"$in": codes}
 	}

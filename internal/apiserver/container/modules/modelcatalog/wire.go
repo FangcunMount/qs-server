@@ -107,11 +107,14 @@ func buildCatalogDeps(
 		port.PublishedModelLister
 	} = dualStore
 	var publishedWarmer cachetarget.PublishedModelWarmer
+	var cacheInvalidator PublishedModelCacheInvalidator
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
 		cached := modelcatalogcache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policies, cacheCfg.Observer)
 		publishedStore = cached
 		publishedWarmer = cached
-		publishedRepo = modelcatalogcache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
+		// Writes remain transaction-local. Mutable visibility caches are
+		// invalidated by lifecycle effects only after the transaction commits.
+		cacheInvalidator = cached
 	}
 	runtimeCatalog := rulesetInfra.NewRuntimePublishedCatalogWithStore(publishedStore)
 	trustedCatalog := modelcatalogRuntime.NewTrustedRuntimeCatalog(runtimeCatalog, runtimeCatalog)
@@ -119,6 +122,7 @@ func buildCatalogDeps(
 		PublishedLister:     publishedStore,
 		PublishedCatalog:    trustedCatalog,
 		PublishedWarmer:     publishedWarmer,
+		CacheInvalidator:    cacheInvalidator,
 		ModelRepo:           draftRepo,
 		PublishedRepo:       publishedRepo,
 		NormRepo:            normRepo,

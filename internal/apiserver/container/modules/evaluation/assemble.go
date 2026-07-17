@@ -60,23 +60,24 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
-	MySQLDB                   *gorm.DB
-	InputResolver             evaluationinput.Resolver
-	ScaleCatalog              evaluationinput.ScaleCatalog
-	EventPublisher            event.EventPublisher
-	RedisClient               redis.UniversalClient
-	CacheBuilder              *keyspace.Builder
-	CachePolicies             sharedcache.PolicyProvider
-	QueryRedisClient          redis.UniversalClient
-	QueryCacheBuilder         *keyspace.Builder
-	VersionStore              querycache.VersionTokenStore
-	Observer                  *observability.ComponentObserver
-	MySQLLimiter              backpressure.Acquirer
-	TesteeAccessChecker       evaluationoperator.AccessChecker
-	ExecutionPaths            []modelcatalog.ExecutionPath
-	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
-	PublishedModelReader      rulesetport.PublishedModelReader
-	OutboxProfile             appEventing.ProfileBinding
+	MySQLDB                    *gorm.DB
+	InputResolver              evaluationinput.Resolver
+	ScaleCatalog               evaluationinput.ScaleCatalog
+	EventPublisher             event.EventPublisher
+	RedisClient                redis.UniversalClient
+	CacheBuilder               *keyspace.Builder
+	CachePolicies              sharedcache.PolicyProvider
+	QueryRedisClient           redis.UniversalClient
+	QueryCacheBuilder          *keyspace.Builder
+	VersionStore               querycache.VersionTokenStore
+	Observer                   *observability.ComponentObserver
+	MySQLLimiter               backpressure.Acquirer
+	TesteeAccessChecker        evaluationoperator.AccessChecker
+	ExecutionPaths             []modelcatalog.ExecutionPath
+	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
+	PublishedModelReader       rulesetport.PublishedModelReader
+	ActivePublishedModelReader rulesetport.ActivePublishedModelReader
+	OutboxProfile              appEventing.ProfileBinding
 }
 
 // New assembles the evaluation module.
@@ -182,9 +183,9 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 
 func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationInfra) {
 	var modelValidator evaluationintake.EvaluationModelValidator
-	if normalized.PublishedModelReader != nil {
+	if normalized.ActivePublishedModelReader != nil {
 		modelValidator = evaluationintake.NewCompositeEvaluationModelValidator(
-			evaluationintake.NewTypologyEvaluationModelValidator(normalized.PublishedModelReader),
+			evaluationintake.NewPublishedEvaluationModelValidator(normalized.ActivePublishedModelReader),
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {

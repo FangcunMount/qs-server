@@ -3,6 +3,7 @@ package query
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -44,7 +45,11 @@ func (s *catalogQueryService) Get(ctx context.Context, actor modelcatalog.ActorC
 	if err != nil {
 		return nil, err
 	}
-	return modelcatalog.ModelSummaryFromAssessmentModel(model), nil
+	summary := modelcatalog.ModelSummaryFromAssessmentModel(model)
+	if err := s.populateReleaseState(ctx, model, summary); err != nil {
+		return nil, err
+	}
+	return summary, nil
 }
 
 func (s *catalogQueryService) List(ctx context.Context, actor modelcatalog.ActorContext, input modelcatalog.ListModelsDTO) (*modelcatalog.ModelListResult, error) {
@@ -64,9 +69,70 @@ func (s *catalogQueryService) List(ctx context.Context, actor modelcatalog.Actor
 	}
 	result := &modelcatalog.ModelListResult{Items: make([]modelcatalog.ModelSummary, 0, len(models)), Total: total, Page: filter.Page, PageSize: filter.PageSize}
 	for _, model := range models {
-		result.Items = append(result.Items, *modelcatalog.ModelSummaryFromAssessmentModel(model))
+		summary := modelcatalog.ModelSummaryFromAssessmentModel(model)
+		if err := s.populateReleaseState(ctx, model, summary); err != nil {
+			return nil, err
+		}
+		result.Items = append(result.Items, *summary)
 	}
 	return result, nil
+}
+
+func (s *catalogQueryService) ListReleaseVersions(ctx context.Context, actor modelcatalog.ActorContext, codeValue string) ([]modelcatalog.AssessmentReleaseVersion, error) {
+	if err := s.authorize(ctx, actor, modelcatalog.Resource{Code: codeValue}); err != nil {
+		return nil, err
+	}
+	if codeValue == "" || s.deps.Published == nil {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "model code and published repository are required")
+	}
+	reader, ok := s.deps.Published.(modelcatalogport.PublishedReleaseHistoryReader)
+	if !ok {
+		return nil, errors.WithCode(code.ErrInternalServerError, "published release history reader is not configured")
+	}
+	items, err := reader.ListPublishedReleaseHistory(ctx, codeValue)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]modelcatalog.AssessmentReleaseVersion, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		status := domain.NormalizeReleaseStatus(item.ReleaseStatus, false)
+		entry := modelcatalog.AssessmentReleaseVersion{
+			ModelVersion: item.Version, QuestionnaireCode: item.QuestionnaireCode,
+			QuestionnaireVersion: item.QuestionnaireVersion, ReleaseStatus: string(status),
+			Current: status.IsActive(),
+		}
+		if item.PublishedAt != nil {
+			entry.PublishedAt = item.PublishedAt.UTC().Format(time.RFC3339)
+		}
+		if item.ReleaseArchivedAt != nil {
+			entry.ArchivedAt = item.ReleaseArchivedAt.UTC().Format(time.RFC3339)
+		}
+		result = append(result, entry)
+	}
+	return result, nil
+}
+
+func (s *catalogQueryService) populateReleaseState(ctx context.Context, model *domain.AssessmentModel, summary *modelcatalog.ModelSummary) error {
+	if model == nil || summary == nil || s.deps.Published == nil {
+		return nil
+	}
+	active, err := s.deps.Published.FindPublishedModelByCode(ctx, model.Kind, model.Code)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if active == nil {
+		return nil
+	}
+	summary.ReleaseState.OnlineStatus = "online"
+	summary.ReleaseState.ActiveVersion = active.Version
+	summary.ReleaseState.HasUnpublishedChanges = model.IsDraft() || summary.ReleaseState.WorkingVersion != active.Version
+	return nil
 }
 
 func (s *catalogQueryService) GetPublished(ctx context.Context, actor modelcatalog.ActorContext, codeValue, version string) (*modelcatalog.PublishedModelDetail, error) {
@@ -248,7 +314,14 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 	if model.DefinitionV2 == nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "published model definition_v2 is required: %s", model.Code)
 	}
-	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion}
+	releaseStatus := domain.NormalizeReleaseStatus(model.ReleaseStatus, false)
+	onlineStatus := "offline"
+	activeVersion := ""
+	if releaseStatus.IsActive() {
+		onlineStatus = "online"
+		activeVersion = model.Version
+	}
+	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, ReleaseState: modelcatalog.ReleaseState{WorkingStatus: model.Status, WorkingVersion: model.Version, OnlineStatus: onlineStatus, ActiveVersion: activeVersion}}
 	modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
 	return &modelcatalog.PublishedModelDetail{ModelSummary: summary, Version: model.Version, Definition: model.DefinitionV2}, nil
 }

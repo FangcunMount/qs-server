@@ -15,15 +15,32 @@ import (
 
 // QuestionnaireResult 问卷结果
 type QuestionnaireResult struct {
-	Code        string           // 问卷编码
-	Version     string           // 版本号
-	Title       string           // 问卷标题
-	Description string           // 问卷描述
-	ImgUrl      string           // 封面图URL
-	Status      string           // 状态
-	Type        string           // 问卷分类
-	Questions   []QuestionResult // 问题列表
-	QRCodeURL   string           // 小程序码URL（仅已发布状态时返回）
+	Code         string           // 问卷编码
+	Version      string           // 版本号
+	Title        string           // 问卷标题
+	Description  string           // 问卷描述
+	ImgUrl       string           // 封面图URL
+	Status       string           // 状态
+	Type         string           // 问卷分类
+	Questions    []QuestionResult // 问题列表
+	QRCodeURL    string           // 小程序码URL（仅已发布状态时返回）
+	ReleaseState QuestionnaireReleaseState
+}
+
+type QuestionnaireReleaseState struct {
+	WorkingStatus         string
+	WorkingVersion        string
+	OnlineStatus          string
+	ActiveVersion         string
+	HasUnpublishedChanges bool
+}
+
+type QuestionnaireReleaseVersion struct {
+	Version       string `json:"version"`
+	ReleaseStatus string `json:"release_status"`
+	PublishedAt   string `json:"published_at,omitempty"`
+	ArchivedAt    string `json:"archived_at,omitempty"`
+	Current       bool   `json:"current"`
 }
 
 // QuestionResult 问题结果
@@ -83,6 +100,7 @@ type QuestionnaireSummaryResult struct {
 	CreatedAt     time.Time // 创建时间
 	UpdatedBy     string    // 更新人
 	UpdatedAt     time.Time // 更新时间
+	ReleaseState  QuestionnaireReleaseState
 }
 
 // QuestionnaireSummaryListResult 问卷摘要列表结果
@@ -100,14 +118,15 @@ func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireR
 	}
 
 	result := &QuestionnaireResult{
-		Code:        q.GetCode().String(),
-		Version:     q.GetVersion().String(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Status:      q.GetStatus().String(),
-		Type:        q.GetType().String(),
-		Questions:   make([]QuestionResult, 0),
+		Code:         q.GetCode().String(),
+		Version:      q.GetVersion().String(),
+		Title:        q.GetTitle(),
+		Description:  q.GetDescription(),
+		ImgUrl:       q.GetImgUrl(),
+		Status:       q.GetStatus().String(),
+		Type:         q.GetType().String(),
+		Questions:    make([]QuestionResult, 0),
+		ReleaseState: questionnaireReleaseState(q, nil),
 	}
 
 	// 转换问题列表
@@ -116,6 +135,26 @@ func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireR
 	}
 
 	return result
+}
+
+func questionnaireReleaseState(head *domainQuestionnaire.Questionnaire, active *domainQuestionnaire.Questionnaire) QuestionnaireReleaseState {
+	state := QuestionnaireReleaseState{}
+	if head == nil {
+		return state
+	}
+	state.WorkingStatus = head.GetStatus().String()
+	state.WorkingVersion = head.GetVersion().String()
+	if head.IsArchived() {
+		state.OnlineStatus = "archived"
+	} else {
+		state.OnlineStatus = "offline"
+	}
+	if active != nil {
+		state.OnlineStatus = "online"
+		state.ActiveVersion = active.GetVersion().String()
+		state.HasUnpublishedChanges = head.IsDraft() || state.WorkingVersion != state.ActiveVersion
+	}
+	return state
 }
 
 // toQuestionResult 将问题领域模型转换为结果对象

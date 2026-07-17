@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	"time"
 
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -25,7 +26,8 @@ type PublishedAssessmentModelPO struct {
 	SchemaVersion           string        `bson:"schema_version,omitempty"`
 	PayloadFormat           string        `bson:"payload_format,omitempty"`
 	RecordRole              string        `bson:"record_role"`
-	IsActivePublished       bool          `bson:"is_active_published"`
+	IsActivePublished       bool          `bson:"is_active_published,omitempty"`
+	ReleaseStatus           string        `bson:"release_status,omitempty"`
 	ProductChannel          string        `bson:"product_channel,omitempty"`
 	Kind                    string        `bson:"kind"`
 	SubKind                 string        `bson:"sub_kind,omitempty"`
@@ -48,6 +50,7 @@ type PublishedAssessmentModelPO struct {
 	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
 	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
 	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
+	ReleaseArchivedAt       *time.Time    `bson:"release_archived_at,omitempty"`
 }
 
 func (PublishedAssessmentModelPO) CollectionName() string {
@@ -95,7 +98,13 @@ func publishedFilter(extra bson.M) bson.M {
 
 func activePublishedFilter(extra bson.M) bson.M {
 	filter := publishedFilter(extra)
-	filter["is_active_published"] = true
+	filter["$or"] = bson.A{
+		bson.M{"release_status": string(domain.ReleaseStatusActive)},
+		bson.M{
+			"release_status":      bson.M{"$exists": false},
+			"is_active_published": true,
+		},
+	}
 	return filter
 }
 

@@ -13,9 +13,10 @@ import (
 
 // Resolver 是已发布模型的应用服务，仅用于受信任的运行时消费者。它从不访问 ModelRepository 或负载解码器。
 type Resolver struct {
-	Reader     modelcatalogport.PublishedModelReader // 已发布模型读取器
-	Lister     modelcatalogport.PublishedModelLister // 已发布模型列表器
-	Authorizer modelcatalog.Authorizer               // 授权器
+	Reader       modelcatalogport.PublishedModelReader       // 已发布模型读取器
+	ActiveReader modelcatalogport.ActivePublishedModelReader // 当前线上模型读取器
+	Lister       modelcatalogport.PublishedModelLister       // 已发布模型列表器
+	Authorizer   modelcatalog.Authorizer                     // 授权器
 }
 
 // ResolveByRef 解析已发布模型引用
@@ -30,6 +31,25 @@ func (s Resolver) ResolveByRef(ctx context.Context, actor modelcatalog.ActorCont
 		return nil, err
 	}
 	model, err := s.Reader.GetPublishedModelByRef(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return requireRuntimeDefinition(model)
+}
+
+// ResolveActiveByRef resolves an exact identity for admission and rejects
+// archived releases. Execution and retries use ResolveByRef instead.
+func (s Resolver) ResolveActiveByRef(ctx context.Context, actor modelcatalog.ActorContext, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error) {
+	if ref.Code == "" || ref.Version == "" {
+		return nil, errors.WithCode(codepkg.ErrInvalidArgument, "published model code and version are required")
+	}
+	if s.ActiveReader == nil || s.Authorizer == nil {
+		return nil, errors.WithCode(codepkg.ErrInternalServerError, "active published model resolver is not configured")
+	}
+	if err := s.Authorizer.Authorize(ctx, actor, modelcatalog.ActionResolvePublished, modelcatalog.Resource{Code: ref.Code, Kind: ref.Kind}); err != nil {
+		return nil, err
+	}
+	model, err := s.ActiveReader.GetActivePublishedModelByRef(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +137,13 @@ func (r TrustedRuntimeResolver) GetPublishedModelByRef(ctx context.Context, ref 
 	return r.Resolver.ResolveByRef(ctx, r.Actor, ref)
 }
 
+func (r TrustedRuntimeResolver) GetActivePublishedModelByRef(ctx context.Context, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error) {
+	if r.Resolver == nil {
+		return nil, errors.WithCode(codepkg.ErrInternalServerError, "trusted published model resolver is not configured")
+	}
+	return r.Resolver.ResolveActiveByRef(ctx, r.Actor, ref)
+}
+
 // FindPublishedModelByQuestionnaire 查找已发布模型问卷
 func (r TrustedRuntimeResolver) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*modelcatalogport.PublishedModel, error) {
 	if r.Resolver == nil {
@@ -148,10 +175,12 @@ type TrustedRuntimeCatalog struct {
 
 // NewTrustedRuntimeCatalog 创建受信任运行时目录适配器
 func NewTrustedRuntimeCatalog(reader modelcatalogport.PublishedModelReader, lister modelcatalogport.PublishedModelLister) *TrustedRuntimeCatalog {
+	activeReader, _ := reader.(modelcatalogport.ActivePublishedModelReader)
 	resolver := Resolver{
-		Reader:     reader,
-		Lister:     lister,
-		Authorizer: trustedRuntimeAuthorizer{},
+		Reader:       reader,
+		ActiveReader: activeReader,
+		Lister:       lister,
+		Authorizer:   trustedRuntimeAuthorizer{},
 	}
 	return &TrustedRuntimeCatalog{
 		Resolver: TrustedRuntimeResolver{
@@ -170,6 +199,13 @@ func (c *TrustedRuntimeCatalog) GetPublishedModelByRef(ctx context.Context, ref 
 		return nil, domain.ErrNotFound
 	}
 	return c.Resolver.GetPublishedModelByRef(ctx, ref)
+}
+
+func (c *TrustedRuntimeCatalog) GetActivePublishedModelByRef(ctx context.Context, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error) {
+	if c == nil {
+		return nil, domain.ErrNotFound
+	}
+	return c.Resolver.GetActivePublishedModelByRef(ctx, ref)
 }
 
 // FindPublishedModelByQuestionnaire 查找已发布模型问卷
@@ -222,6 +258,8 @@ func (trustedRuntimeAuthorizer) Authorize(_ context.Context, actor modelcatalog.
 // 验证接口实现
 var _ modelcatalog.PublishedModelResolver = Resolver{}
 var _ modelcatalogport.PublishedModelReader = TrustedRuntimeResolver{}
+var _ modelcatalogport.ActivePublishedModelReader = TrustedRuntimeResolver{}
 var _ modelcatalogport.PublishedModelLister = TrustedRuntimeResolver{}
 var _ modelcatalogport.Catalog = (*TrustedRuntimeCatalog)(nil)
 var _ modelcatalogport.PublishedModelLister = (*TrustedRuntimeCatalog)(nil)
+var _ modelcatalogport.ActivePublishedModelReader = (*TrustedRuntimeCatalog)(nil)

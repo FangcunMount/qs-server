@@ -38,3 +38,19 @@ func (s *catalogBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, que
 		Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService, Source: securityplane.PrincipalSourceServiceAuth},
 	}, questionnaireCode, version)
 }
+
+func (s *catalogBindingSyncer) IsQuestionnaireBound(ctx context.Context, questionnaireCode string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	s.mu.RLock()
+	service := s.management
+	s.mu.RUnlock()
+	reader, ok := service.(interface {
+		IsQuestionnaireBound(context.Context, string) (bool, error)
+	})
+	if !ok {
+		return false, nil
+	}
+	return reader.IsQuestionnaireBound(ctx, questionnaireCode)
+}

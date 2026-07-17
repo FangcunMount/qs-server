@@ -12,7 +12,7 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 	if r.deps.AssessmentModel.Management == nil || r.deps.AssessmentModel.Definition == nil || r.deps.AssessmentModel.Query == nil || r.deps.AssessmentModel.Release == nil {
 		return
 	}
-	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Publication, r.deps.AssessmentModel.Query, r.deps.AssessmentModel.Assets)
+	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Query, r.deps.AssessmentModel.Assets)
 	models := apiV1.Group("/assessment-models")
 	{
 		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageAssessmentModels))
@@ -23,16 +23,17 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 		registerRouteSpecs(definition, assessmentModelDefinitionRoutes(handler))
 		registerRouteSpecs(publication, assessmentModelPublicationRoutes(handler))
 		registerRouteSpecs(read, assessmentModelReadRoutes(handler))
-		releases := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
-		releaseHandler := codesHandler.NewAssessmentReleaseHandler(r.deps.AssessmentModel.Release)
-		registerRouteSpecs(releases, assessmentReleaseRoutes(releaseHandler))
+		releaseHandler := codesHandler.NewAssessmentReleaseHandler(r.deps.AssessmentModel.Release, r.deps.AssessmentModel.Query)
+		releaseLifecycle := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
+		releaseHistory := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAssessmentModels))
+		registerRouteSpecs(releaseLifecycle, assessmentReleaseLifecycleRoutes(releaseHandler))
+		registerRouteSpecs(releaseHistory, assessmentReleaseHistoryRoutes(releaseHandler))
 	}
 }
 
 func assessmentModelManageRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
 	return []routeSpec{
 		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
-		{method: http.MethodPost, path: "/:code/restore-draft", handlers: []gin.HandlerFunc{handler.RestoreDraftFromPublished}},
 		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
 		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
 		{method: http.MethodPut, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.BindQuestionnaire}},
@@ -52,11 +53,16 @@ func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandle
 
 func assessmentModelPublicationRoutes(*codesHandler.AssessmentModelHandler) []routeSpec { return nil }
 
-func assessmentReleaseRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
+func assessmentReleaseLifecycleRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
 	return []routeSpec{
 		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
+		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
 		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
 	}
+}
+
+func assessmentReleaseHistoryRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
+	return []routeSpec{{method: http.MethodGet, path: "/:code/versions", handlers: []gin.HandlerFunc{handler.Versions}}}
 }
 
 func assessmentModelReadRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {

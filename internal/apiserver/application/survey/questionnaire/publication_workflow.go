@@ -77,7 +77,10 @@ func (s *lifecycleService) persistPublishedQuestionnaire(ctx context.Context, q 
 	if err := s.persistQuestionnaire(ctx, q, code, "publish", "状态"); err != nil {
 		return err
 	}
-	if err := s.repo.CreatePublishedSnapshot(ctx, q, true); err != nil {
+	// Insert the new version as archived first. SetActivePublishedVersion then
+	// archives the previous active row and activates this one inside the outer
+	// release transaction, satisfying the unique-active index throughout.
+	if err := s.repo.CreatePublishedSnapshot(ctx, q, false); err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存发布快照失败")
 	}
 	if err := s.repo.SetActivePublishedVersion(ctx, code, q.GetVersion().String()); err != nil {

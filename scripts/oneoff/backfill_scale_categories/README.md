@@ -38,7 +38,7 @@ bash scripts/oneoff/backfill_scale_categories/apply.sh --apply
 
 1. 先读取所有非归档模型，确认它们都能作为可编辑草稿读取；这些读取结果会在本次运行内复用。任一读取失败就以状态码 `2` 退出，不进行任何新的写入；
 2. `PUT /assessment-models/{code}/basic-info` 更新分类（已发布模型会 fork 为草稿）；
-3. `POST /assessment-releases/{code}/publish` 走正常发布事务，生成新的 `published_assessment_models` 快照；
+3. `POST /assessment-releases/{code}/publish` 走正常发布事务，在 `assessment_models` 生成新的 `published_snapshot`；
 4. 查询 8 个分类接口并校验预期数量。
 
-脚本不会直接更新 `published_assessment_models`，因此不会产生草稿与快照分类不一致的问题。
+脚本不会直接更新 `published_snapshot`，因此不会产生工作记录与发布快照分类不一致的问题。

@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -18,25 +19,35 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	inframodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
+	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
+	typologypayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 const (
-	headCollection      = "assessment_models"
-	publishedCollection = "published_assessment_models"
-	defaultTemp         = "assessment_models_unified_staging"
-	roleHead            = "head"
-	roleSnapshot        = "published_snapshot"
+	headCollection           = "assessment_models"
+	questionnaireCollection  = "questionnaires"
+	publishedCollection      = "published_assessment_models"
+	defaultTemp              = "assessment_models_unified_staging"
+	defaultQuestionnaireTemp = "questionnaires_unified_staging"
+	roleHead                 = "head"
+	roleSnapshot             = "published_snapshot"
 )
 
 type config struct {
-	mongoURI, mongoDB, mode, temp, legacy string
-	timeout                               time.Duration
+	mongoURI, mongoDB, mode, temp, questionnaireTemp, legacy, questionnaireLegacy string
+	timeout                                                                       time.Duration
 }
 
 type report struct {
-	Heads, Snapshots, RetiredSnapshots, OrphanSnapshots int
-	Issues                                              []string
-	LegacyCollection                                    string
+	Heads, Snapshots, RetiredSnapshots, OrphanSnapshots                               int
+	QuestionnaireHeads, QuestionnaireSnapshots, ActiveSnapshots, ActiveQuestionnaires int
+	Issues                                                                            []string
+	LegacyCollection                                                                  string
 }
 
 func main() {
@@ -65,7 +76,9 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database name")
 	flag.StringVar(&cfg.mode, "mode", "dry-run", "dry-run, apply, verify, cutover, or finalize")
 	flag.StringVar(&cfg.temp, "temp-collection", defaultTemp, "temporary unified collection")
+	flag.StringVar(&cfg.questionnaireTemp, "questionnaire-temp-collection", defaultQuestionnaireTemp, "temporary versioned questionnaire collection")
 	flag.StringVar(&cfg.legacy, "legacy-collection", "", "legacy assessment_models collection name for finalize")
+	flag.StringVar(&cfg.questionnaireLegacy, "legacy-questionnaire-collection", "", "legacy questionnaires collection name for finalize")
 	flag.DurationVar(&cfg.timeout, "timeout", 10*time.Minute, "overall timeout")
 	flag.Parse()
 	return cfg
@@ -92,10 +105,10 @@ func run(ctx context.Context, client *mongo.Client, db *mongo.Database, cfg conf
 			printReport(out, rep)
 			return fmt.Errorf("refusing apply with %d issue(s)", len(rep.Issues))
 		}
-		if err := buildTemp(ctx, db, cfg.temp); err != nil {
+		if err := buildTemp(ctx, db, cfg.temp, cfg.questionnaireTemp); err != nil {
 			return err
 		}
-		if err := verifyTemp(ctx, db, cfg.temp, rep); err != nil {
+		if err := verifyTemp(ctx, db, cfg.temp, cfg.questionnaireTemp, rep); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(out, "prepared and verified %s\n", cfg.temp)
@@ -105,26 +118,35 @@ func run(ctx context.Context, client *mongo.Client, db *mongo.Database, cfg conf
 		if err != nil {
 			return err
 		}
-		if err := verifyTemp(ctx, db, cfg.temp, rep); err != nil {
+		if err := verifyTemp(ctx, db, cfg.temp, cfg.questionnaireTemp, rep); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(out, "verified %s\n", cfg.temp)
 		return nil
 	case "cutover":
-		legacy, err := cutover(ctx, client, db, cfg.temp)
+		legacy, questionnaireLegacy, err := cutover(ctx, client, db, cfg.temp, cfg.questionnaireTemp)
 		if err != nil {
 			return err
 		}
-		_, _ = fmt.Fprintf(out, "cutover complete; legacy collection: %s\n", legacy)
+		_, _ = fmt.Fprintf(out, "cutover complete; legacy collections: %s, %s\n", legacy, questionnaireLegacy)
 		return nil
 	case "finalize":
 		if cfg.legacy == "" {
 			return fmt.Errorf("--legacy-collection is required for finalize")
 		}
-		if err := db.Collection(cfg.legacy).Drop(ctx); err != nil {
+		if cfg.questionnaireLegacy == "" {
+			return fmt.Errorf("--legacy-questionnaire-collection is required for finalize")
+		}
+		if err := finalizeCanonicalFields(ctx, db); err != nil {
+			return err
+		}
+		if err := dropIfExists(ctx, db, cfg.legacy); err != nil {
 			return fmt.Errorf("drop %s: %w", cfg.legacy, err)
 		}
-		if err := db.Collection(publishedCollection).Drop(ctx); err != nil {
+		if err := dropIfExists(ctx, db, cfg.questionnaireLegacy); err != nil {
+			return fmt.Errorf("drop %s: %w", cfg.questionnaireLegacy, err)
+		}
+		if err := dropIfExists(ctx, db, publishedCollection); err != nil {
 			return fmt.Errorf("drop %s: %w", publishedCollection, err)
 		}
 		_, _ = fmt.Fprintln(out, "finalize complete")
@@ -134,16 +156,35 @@ func run(ctx context.Context, client *mongo.Client, db *mongo.Database, cfg conf
 	}
 }
 
+func finalizeCanonicalFields(ctx context.Context, db *mongo.Database) error {
+	for _, collection := range []string{headCollection, questionnaireCollection} {
+		if _, err := db.Collection(collection).UpdateMany(ctx, bson.M{"record_role": roleSnapshot}, bson.M{"$unset": bson.M{"is_active_published": ""}}); err != nil {
+			return fmt.Errorf("remove legacy active boolean from %s: %w", collection, err)
+		}
+	}
+	return nil
+}
+
 func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName string) (report, error) {
-	heads, err := loadAll(ctx, db.Collection(headsName), bson.M{"deleted_at": nil})
+	allModels, err := loadAll(ctx, db.Collection(headsName), bson.M{})
 	if err != nil {
-		return report{}, fmt.Errorf("load heads: %w", err)
+		return report{}, fmt.Errorf("load assessment models: %w", err)
 	}
-	snapshots, err := loadAll(ctx, db.Collection(snapshotsName), bson.M{})
-	if err != nil {
-		return report{}, fmt.Errorf("load snapshots: %w", err)
+	heads := filterRows(allModels, func(row bson.M) bool {
+		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
+	})
+	snapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
+	if exists, existsErr := collectionExists(ctx, db, snapshotsName); existsErr != nil {
+		return report{}, existsErr
+	} else if exists {
+		legacy, loadErr := loadAll(ctx, db.Collection(snapshotsName), bson.M{})
+		if loadErr != nil {
+			return report{}, fmt.Errorf("load snapshots: %w", loadErr)
+		}
+		snapshots = append(snapshots, legacy...)
 	}
-	rep := report{Heads: len(heads), Snapshots: len(snapshots)}
+	snapshots, duplicateIssues := deduplicateSnapshots(snapshots)
+	rep := report{Heads: len(heads), Snapshots: len(snapshots), Issues: duplicateIssues}
 	seenHeads, seenActive, seenRelease, seenActiveQuestionnaire := map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}
 	for _, head := range heads {
 		code := stringField(head, "code")
@@ -157,7 +198,7 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 		seenHeads[code] = struct{}{}
 	}
 	for _, row := range snapshots {
-		code, kind, version := stringField(row, "model_code"), stringField(row, "model_kind"), stringField(row, "model_version")
+		code, kind, version := snapshotField(row, "code"), snapshotField(row, "kind"), snapshotField(row, "version")
 		if code == "" || kind == "" || version == "" || len(bytesField(row, "payload")) == 0 {
 			rep.Issues = append(rep.Issues, fmt.Sprintf("invalid published snapshot code=%q kind=%q version=%q", code, kind, version))
 			continue
@@ -165,12 +206,12 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 		if stringField(row, "payload_format") == "" || stringField(row, "decision_kind") == "" || row["definition_v2"] == nil {
 			rep.Issues = append(rep.Issues, fmt.Sprintf("incomplete published snapshot %s@%s", code, version))
 		}
-		key := strings.Join([]string{kind, stringField(row, "model_sub_kind"), stringField(row, "model_algorithm"), code, version}, "|")
+		key := strings.Join([]string{kind, snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), code, version}, "|")
 		if _, ok := seenRelease[key]; ok {
 			rep.Issues = append(rep.Issues, "duplicate published release "+key)
 		}
 		seenRelease[key] = struct{}{}
-		if row["deleted_at"] == nil && stringField(row, "status") == "published" {
+		if snapshotActive(row) {
 			if _, ok := seenActive[code]; ok {
 				rep.Issues = append(rep.Issues, "multiple active snapshots for "+code)
 			}
@@ -190,33 +231,115 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 			rep.OrphanSnapshots++
 		}
 	}
+	for _, head := range heads {
+		code, status := stringField(head, "code"), stringField(head, "status")
+		_, active := seenActive[code]
+		if status == "published" && !active {
+			rep.Issues = append(rep.Issues, "published model head without active snapshot "+code)
+		}
+		if status == "archived" && active {
+			rep.Issues = append(rep.Issues, "archived model head with active snapshot "+code)
+		}
+	}
+	questionnaires, err := loadAll(ctx, db.Collection(questionnaireCollection), bson.M{})
+	if err != nil {
+		return report{}, fmt.Errorf("load questionnaires: %w", err)
+	}
+	questionnaireHeads := filterRows(questionnaires, func(row bson.M) bool {
+		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
+	})
+	questionnaireSnapshots := questionnaireSnapshotSources(questionnaires)
+	questionnaireSnapshots, questionnaireDuplicateIssues := deduplicateQuestionnaireSnapshots(questionnaireSnapshots)
+	rep.Issues = append(rep.Issues, questionnaireDuplicateIssues...)
+	rep.QuestionnaireHeads = len(questionnaireHeads)
+	rep.QuestionnaireSnapshots = len(questionnaireSnapshots)
+	activeQuestionnaireVersions := map[string]struct{}{}
+	activeQuestionnaireCodes := map[string]struct{}{}
+	for _, row := range questionnaireSnapshots {
+		if !snapshotActive(row) {
+			continue
+		}
+		code, version := stringField(row, "code"), stringField(row, "version")
+		if code == "" || version == "" {
+			rep.Issues = append(rep.Issues, "active questionnaire snapshot without identity")
+			continue
+		}
+		if _, ok := activeQuestionnaireCodes[code]; ok {
+			rep.Issues = append(rep.Issues, "multiple active questionnaire snapshots for "+code)
+		}
+		activeQuestionnaireCodes[code] = struct{}{}
+		activeQuestionnaireVersions[code+"@"+version] = struct{}{}
+	}
+	rep.ActiveSnapshots = len(seenActive)
+	rep.ActiveQuestionnaires = len(activeQuestionnaireCodes)
+	for _, row := range snapshots {
+		if snapshotActive(row) {
+			binding := stringField(row, "questionnaire_code") + "@" + stringField(row, "questionnaire_version")
+			if _, ok := activeQuestionnaireVersions[binding]; !ok {
+				rep.Issues = append(rep.Issues, "active model references non-active questionnaire "+binding)
+			}
+		}
+	}
+	for _, head := range questionnaireHeads {
+		code, status := stringField(head, "code"), stringField(head, "status")
+		_, active := activeQuestionnaireCodes[code]
+		if status == "published" && !active {
+			rep.Issues = append(rep.Issues, "published questionnaire head without active snapshot "+code)
+		}
+		if status == "archived" && active {
+			rep.Issues = append(rep.Issues, "archived questionnaire head with active snapshot "+code)
+		}
+	}
 	sort.Strings(rep.Issues)
 	return rep, nil
 }
 
-func buildTemp(ctx context.Context, db *mongo.Database, temp string) error {
+func buildTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp string) error {
 	if exists, err := collectionExists(ctx, db, temp); err != nil {
 		return err
 	} else if exists {
 		return fmt.Errorf("temporary collection %s already exists", temp)
 	}
+	if exists, err := collectionExists(ctx, db, questionnaireTemp); err != nil {
+		return err
+	} else if exists {
+		return fmt.Errorf("temporary collection %s already exists", questionnaireTemp)
+	}
 	target := db.Collection(temp)
-	heads, err := loadAll(ctx, db.Collection(headCollection), bson.M{"deleted_at": nil})
+	allModels, err := loadAll(ctx, db.Collection(headCollection), bson.M{})
 	if err != nil {
 		return err
 	}
+	heads := filterRows(allModels, func(row bson.M) bool {
+		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
+	})
 	for _, row := range heads {
 		row["record_role"] = roleHead
 		row["is_active_published"] = false
-		row["revision"] = row["version"]
-		delete(row, "version")
+		delete(row, "release_status")
+		delete(row, "release_archived_at")
+		if _, ok := row["revision"]; !ok {
+			row["revision"] = row["version"]
+			delete(row, "version")
+		}
 		if _, err := target.InsertOne(ctx, row); err != nil {
 			return fmt.Errorf("insert head %s: %w", stringField(row, "code"), err)
 		}
 	}
-	snapshots, err := loadAll(ctx, db.Collection(publishedCollection), bson.M{})
-	if err != nil {
-		return err
+	snapshots := filterRows(allModels, func(row bson.M) bool { return stringField(row, "record_role") == roleSnapshot })
+	if exists, existsErr := collectionExists(ctx, db, publishedCollection); existsErr != nil {
+		return existsErr
+	} else if exists {
+		legacy, loadErr := loadAll(ctx, db.Collection(publishedCollection), bson.M{})
+		if loadErr != nil {
+			return loadErr
+		}
+		snapshots = append(snapshots, legacy...)
+	}
+	var duplicateIssues []string
+	snapshots, duplicateIssues = deduplicateSnapshots(snapshots)
+	if len(duplicateIssues) != 0 {
+		return fmt.Errorf("snapshot source conflict: %s", strings.Join(duplicateIssues, "; "))
 	}
 	for _, row := range snapshots {
 		converted := convertSnapshot(row)
@@ -224,7 +347,40 @@ func buildTemp(ctx context.Context, db *mongo.Database, temp string) error {
 			return fmt.Errorf("insert snapshot %s@%s: %w", stringField(converted, "code"), stringField(converted, "release_version"), err)
 		}
 	}
-	return createIndexes(ctx, target)
+	if err := createIndexes(ctx, target); err != nil {
+		return err
+	}
+	questionnaireTarget := db.Collection(questionnaireTemp)
+	questionnaires, err := loadAll(ctx, db.Collection(questionnaireCollection), bson.M{})
+	if err != nil {
+		return err
+	}
+	questionnaireHeads := filterRows(questionnaires, func(row bson.M) bool {
+		return stringField(row, "record_role") != roleSnapshot && row["deleted_at"] == nil
+	})
+	for _, row := range questionnaireHeads {
+		converted := convertQuestionnaireRecord(row)
+		if _, err := questionnaireTarget.InsertOne(ctx, converted); err != nil {
+			return fmt.Errorf("insert questionnaire %s@%s: %w", stringField(converted, "code"), stringField(converted, "version"), err)
+		}
+	}
+	questionnaireSnapshots, duplicateIssues := deduplicateQuestionnaireSnapshots(questionnaireSnapshotSources(questionnaires))
+	if len(duplicateIssues) != 0 {
+		return fmt.Errorf("questionnaire snapshot source conflict: %s", strings.Join(duplicateIssues, "; "))
+	}
+	for _, row := range questionnaireSnapshots {
+		source := cloneBSON(row)
+		source["record_role"] = roleSnapshot
+		converted := convertQuestionnaireRecord(source)
+		converted["legacy_source_id"] = legacySourceID(row["_id"])
+		if stringField(row, "record_role") != roleSnapshot {
+			converted["_id"] = primitive.NewObjectID()
+		}
+		if _, err := questionnaireTarget.InsertOne(ctx, converted); err != nil {
+			return fmt.Errorf("insert questionnaire snapshot %s@%s: %w", stringField(converted, "code"), stringField(converted, "version"), err)
+		}
+	}
+	return createQuestionnaireIndexes(ctx, questionnaireTarget)
 }
 
 func convertSnapshot(row bson.M) bson.M {
@@ -233,23 +389,37 @@ func convertSnapshot(row bson.M) bson.M {
 		converted[key] = value
 	}
 	converted["legacy_source_id"] = legacySourceID(row["_id"])
+	converted["legacy_source_collection"] = headCollection
+	if stringField(row, "model_code") != "" {
+		converted["legacy_source_collection"] = publishedCollection
+	}
 	converted["_id"] = primitive.NewObjectID()
 	converted["record_role"] = roleSnapshot
-	active := row["deleted_at"] == nil && stringField(row, "status") == "published"
+	converted["status"] = "published"
+	if converted["published_at"] == nil {
+		converted["published_at"] = firstTime(row["updated_at"], row["created_at"], time.Now().UTC())
+	}
+	active := snapshotActive(row)
 	converted["is_active_published"] = active
-	converted["product_channel"] = row["model_product_channel"]
-	converted["kind"] = row["model_kind"]
-	converted["sub_kind"] = row["model_sub_kind"]
-	converted["algorithm"] = row["model_algorithm"]
-	converted["code"] = row["model_code"]
-	converted["release_version"] = row["model_version"]
-	if !active {
+	converted["release_status"] = "archived"
+	if active {
+		converted["release_status"] = "active"
+		delete(converted, "release_archived_at")
+	} else if converted["release_archived_at"] == nil {
+		converted["release_archived_at"] = time.Now().UTC()
+	}
+	converted["product_channel"] = snapshotField(row, "product_channel")
+	converted["kind"] = snapshotField(row, "kind")
+	converted["sub_kind"] = snapshotField(row, "sub_kind")
+	converted["algorithm"] = snapshotField(row, "algorithm")
+	converted["code"] = snapshotField(row, "code")
+	converted["release_version"] = snapshotField(row, "version")
+	if row["deleted_at"] != nil {
 		// Historical soft-deleted rows remain queryable by their exact release
 		// after cutover, but cannot be selected by any active runtime query.
 		converted["legacy_deleted_at"] = row["deleted_at"]
 		converted["retention_state"] = "legacy_soft_deleted"
 		converted["deleted_at"] = nil
-		converted["status"] = "published"
 	}
 	for _, key := range []string{"model_product_channel", "model_kind", "model_sub_kind", "model_algorithm", "model_code", "model_version"} {
 		delete(converted, key)
@@ -257,7 +427,7 @@ func convertSnapshot(row bson.M) bson.M {
 	return converted
 }
 
-func verifyTemp(ctx context.Context, db *mongo.Database, temp string, source report) error {
+func verifyTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp string, source report) error {
 	rows, err := loadAll(ctx, db.Collection(temp), bson.M{})
 	if err != nil {
 		return err
@@ -273,10 +443,13 @@ func verifyTemp(ctx context.Context, db *mongo.Database, temp string, source rep
 			if len(bytesField(row, "payload")) == 0 || stringField(row, "release_version") == "" || row["definition_v2"] == nil {
 				return fmt.Errorf("invalid converted snapshot %s", stringField(row, "code"))
 			}
+			if err := verifyRuntimeDecodable(ctx, db, row); err != nil {
+				return fmt.Errorf("runtime decode %s@%s: %w", stringField(row, "code"), stringField(row, "release_version"), err)
+			}
 			if err := verifySnapshotSource(ctx, db, row); err != nil {
 				return err
 			}
-			if active, _ := row["is_active_published"].(bool); active {
+			if snapshotActive(row) {
 				code := stringField(row, "code")
 				if _, ok := seenActive[code]; ok {
 					return fmt.Errorf("multiple active converted snapshots for %s", code)
@@ -291,8 +464,8 @@ func verifyTemp(ctx context.Context, db *mongo.Database, temp string, source rep
 				retired++
 			}
 			if stringField(row, "legacy_source_id") != "" {
-				// Orphan count is informational: retained snapshots can later rebuild
-				// a missing head through RestoreDraftFromPublished.
+				// Orphan count is informational: retained snapshots remain runnable,
+				// while missing heads are repaired only by this one-off tool.
 				var head bson.M
 				err := db.Collection(temp).FindOne(ctx, bson.M{"record_role": roleHead, "code": stringField(row, "code")}).Decode(&head)
 				if err == mongo.ErrNoDocuments {
@@ -308,10 +481,104 @@ func verifyTemp(ctx context.Context, db *mongo.Database, temp string, source rep
 	if heads != source.Heads || snapshots != source.Snapshots {
 		return fmt.Errorf("temporary count mismatch heads=%d/%d snapshots=%d/%d", heads, source.Heads, snapshots, source.Snapshots)
 	}
+	if len(seenActive) != source.ActiveSnapshots {
+		return fmt.Errorf("temporary active model mismatch active=%d/%d", len(seenActive), source.ActiveSnapshots)
+	}
 	if retired != source.RetiredSnapshots || orphaned != source.OrphanSnapshots {
 		return fmt.Errorf("temporary retained/orphan mismatch retained=%d/%d orphaned=%d/%d", retired, source.RetiredSnapshots, orphaned, source.OrphanSnapshots)
 	}
+	questionnaires, err := loadAll(ctx, db.Collection(questionnaireTemp), bson.M{})
+	if err != nil {
+		return err
+	}
+	var questionnaireHeads, questionnaireSnapshots int
+	activeQuestionnaires := map[string]struct{}{}
+	for _, row := range questionnaires {
+		if stringField(row, "record_role") == roleSnapshot {
+			questionnaireSnapshots++
+			if snapshotActive(row) {
+				key := stringField(row, "code") + "@" + stringField(row, "version")
+				activeQuestionnaires[key] = struct{}{}
+			}
+		} else if stringField(row, "record_role") == roleHead {
+			questionnaireHeads++
+		} else {
+			return fmt.Errorf("unknown questionnaire record_role %q", stringField(row, "record_role"))
+		}
+	}
+	if questionnaireHeads != source.QuestionnaireHeads || questionnaireSnapshots != source.QuestionnaireSnapshots {
+		return fmt.Errorf("temporary questionnaire count mismatch heads=%d/%d snapshots=%d/%d", questionnaireHeads, source.QuestionnaireHeads, questionnaireSnapshots, source.QuestionnaireSnapshots)
+	}
+	if len(activeQuestionnaires) != source.ActiveQuestionnaires {
+		return fmt.Errorf("temporary active questionnaire mismatch active=%d/%d", len(activeQuestionnaires), source.ActiveQuestionnaires)
+	}
+	for _, row := range rows {
+		if stringField(row, "record_role") != roleSnapshot || !snapshotActive(row) {
+			continue
+		}
+		binding := stringField(row, "questionnaire_code") + "@" + stringField(row, "questionnaire_version")
+		if _, ok := activeQuestionnaires[binding]; !ok {
+			return fmt.Errorf("active model references non-active questionnaire %s", binding)
+		}
+	}
 	return nil
+}
+
+func verifyRuntimeDecodable(ctx context.Context, db *mongo.Database, row bson.M) error {
+	data, err := bson.Marshal(row)
+	if err != nil {
+		return err
+	}
+	var po mongomodelcatalog.PublishedAssessmentModelPO
+	if err := bson.Unmarshal(data, &po); err != nil {
+		return err
+	}
+	model := mongomodelcatalog.NewMapper().ToPublished(&po)
+	if model == nil || model.DefinitionV2 == nil {
+		return fmt.Errorf("definition_v2 is required")
+	}
+	switch model.Kind {
+	case domain.KindScale:
+		_, err = inframodelcatalog.DecodeScaleFromPublished(model)
+	case domain.KindTypology:
+		var payload *typologypayload.Payload
+		payload, err = typologypayload.PayloadFromDefinition(typologypayload.DefinitionEnvelope{
+			Code: model.Code, Version: model.Version, Title: model.Title, QuestionnaireCode: model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status, Algorithm: model.Algorithm,
+		}, model.DefinitionV2)
+		if err == nil && (payload == nil || !payload.IsPublished()) {
+			err = fmt.Errorf("typology definition did not produce a published payload")
+		}
+	case domain.KindCognitive:
+		var snapshot *cognitivepayload.Snapshot
+		snapshot, err = cognitivepayload.SnapshotFromDefinition(cognitivepayload.DefinitionEnvelope{
+			Code: model.Code, Version: model.Version, Title: model.Title, QuestionnaireCode: model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
+		}, model.DefinitionV2)
+		if err == nil && (snapshot == nil || !snapshot.IsPublished()) {
+			err = fmt.Errorf("cognitive definition did not produce a published snapshot")
+		}
+	case domain.KindBehavioralRating:
+		tables := make(map[string]*domain.Norm, len(model.DefinitionV2.Calibration.NormRefs))
+		norms := mongomodelcatalog.NewNormRepository(db)
+		for _, ref := range model.DefinitionV2.Calibration.NormRefs {
+			if ref.NormTableVersion == "" {
+				continue
+			}
+			table, loadErr := norms.FindNorm(ctx, ref.NormTableVersion)
+			if loadErr != nil {
+				return fmt.Errorf("load norm %s: %w", ref.NormTableVersion, loadErr)
+			}
+			tables[ref.NormTableVersion] = table
+		}
+		_, err = behavioralpayload.SnapshotFromDefinition(behavioralpayload.DefinitionEnvelope{
+			Code: model.Code, Version: model.Version, Title: model.Title, QuestionnaireCode: model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
+		}, model.DefinitionV2, tables)
+	default:
+		err = fmt.Errorf("unsupported model kind %q", model.Kind)
+	}
+	return err
 }
 
 func verifySnapshotSource(ctx context.Context, db *mongo.Database, row bson.M) error {
@@ -324,13 +591,17 @@ func verifySnapshotSource(ctx context.Context, db *mongo.Database, row bson.M) e
 		return fmt.Errorf("converted snapshot %s has invalid legacy_source_id: %w", stringField(row, "code"), err)
 	}
 	var source bson.M
-	if err := db.Collection(publishedCollection).FindOne(ctx, bson.M{"_id": objectID}).Decode(&source); err != nil {
+	sourceCollection := stringField(row, "legacy_source_collection")
+	if sourceCollection == "" {
+		sourceCollection = publishedCollection
+	}
+	if err := db.Collection(sourceCollection).FindOne(ctx, bson.M{"_id": objectID}).Decode(&source); err != nil {
 		return fmt.Errorf("load legacy source %s: %w", id, err)
 	}
 	if payloadHash(bytesField(source, "payload")) != payloadHash(bytesField(row, "payload")) {
 		return fmt.Errorf("payload hash mismatch for %s@%s", stringField(row, "code"), stringField(row, "release_version"))
 	}
-	if stringField(source, "model_code") != stringField(row, "code") || stringField(source, "model_version") != stringField(row, "release_version") || stringField(source, "questionnaire_code") != stringField(row, "questionnaire_code") || stringField(source, "questionnaire_version") != stringField(row, "questionnaire_version") {
+	if snapshotField(source, "code") != stringField(row, "code") || snapshotField(source, "version") != stringField(row, "release_version") || stringField(source, "questionnaire_code") != stringField(row, "questionnaire_code") || stringField(source, "questionnaire_version") != stringField(row, "questionnaire_version") {
 		return fmt.Errorf("identity or questionnaire binding mismatch for %s", id)
 	}
 	return nil
@@ -340,30 +611,61 @@ func createIndexes(ctx context.Context, c *mongo.Collection) error {
 	indexes := []mongo.IndexModel{
 		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_head_code").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleHead, "deleted_at": nil})},
 		{Keys: bson.D{{Key: "kind", Value: 1}, {Key: "sub_kind", Value: 1}, {Key: "algorithm", Value: 1}, {Key: "code", Value: 1}, {Key: "release_version", Value: 1}, {Key: "record_role", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_snapshot_identity_version").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "deleted_at": nil})},
-		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "is_active_published", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_code").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "is_active_published": true, "deleted_at": nil})},
-		{Keys: bson.D{{Key: "questionnaire_code", Value: 1}, {Key: "questionnaire_version", Value: 1}, {Key: "record_role", Value: 1}, {Key: "is_active_published", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_questionnaire").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "is_active_published": true, "deleted_at": nil})},
-		{Keys: bson.D{{Key: "record_role", Value: 1}, {Key: "is_active_published", Value: 1}, {Key: "status", Value: 1}, {Key: "kind", Value: 1}, {Key: "category", Value: 1}, {Key: "code", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_catalog")},
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_code").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "release_status": "active", "deleted_at": nil})},
+		{Keys: bson.D{{Key: "questionnaire_code", Value: 1}, {Key: "questionnaire_version", Value: 1}, {Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_questionnaire").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "release_status": "active", "deleted_at": nil})},
+		{Keys: bson.D{{Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}, {Key: "status", Value: 1}, {Key: "kind", Value: 1}, {Key: "category", Value: 1}, {Key: "algorithm", Value: 1}, {Key: "code", Value: 1}}, Options: options.Index().SetName("idx_assessment_models_active_catalog")},
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "published_at", Value: -1}}, Options: options.Index().SetName("idx_assessment_models_release_history")},
 	}
 	_, err := c.Indexes().CreateMany(ctx, indexes)
 	return err
 }
 
-func cutover(ctx context.Context, client *mongo.Client, db *mongo.Database, temp string) (string, error) {
+func createQuestionnaireIndexes(ctx context.Context, c *mongo.Collection) error {
+	indexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}}, Options: options.Index().SetName("idx_questionnaires_head_code").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleHead, "deleted_at": nil})},
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "version", Value: 1}, {Key: "record_role", Value: 1}}, Options: options.Index().SetName("idx_questionnaires_snapshot_version").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "deleted_at": nil})},
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}}, Options: options.Index().SetName("idx_questionnaires_active_code").SetUnique(true).SetPartialFilterExpression(bson.M{"record_role": roleSnapshot, "release_status": "active", "deleted_at": nil})},
+		{Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "published_at", Value: -1}}, Options: options.Index().SetName("idx_questionnaires_release_history")},
+	}
+	_, err := c.Indexes().CreateMany(ctx, indexes)
+	return err
+}
+
+func cutover(ctx context.Context, client *mongo.Client, db *mongo.Database, temp, questionnaireTemp string) (string, string, error) {
 	if ok, err := collectionExists(ctx, db, temp); err != nil || !ok {
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
-		return "", fmt.Errorf("temporary collection %s does not exist", temp)
+		return "", "", fmt.Errorf("temporary collection %s does not exist", temp)
 	}
-	legacy := headCollection + "_legacy_" + time.Now().UTC().Format("20060102_150405")
+	if ok, err := collectionExists(ctx, db, questionnaireTemp); err != nil || !ok {
+		if err != nil {
+			return "", "", err
+		}
+		return "", "", fmt.Errorf("temporary collection %s does not exist", questionnaireTemp)
+	}
+	suffix := time.Now().UTC().Format("20060102_150405")
+	legacy := headCollection + "_legacy_" + suffix
+	questionnaireLegacy := questionnaireCollection + "_legacy_" + suffix
 	if err := renameCollection(ctx, client, db.Name(), headCollection, legacy); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := renameCollection(ctx, client, db.Name(), temp, headCollection); err != nil {
 		_ = renameCollection(ctx, client, db.Name(), legacy, headCollection)
-		return "", err
+		return "", "", err
 	}
-	return legacy, nil
+	if err := renameCollection(ctx, client, db.Name(), questionnaireCollection, questionnaireLegacy); err != nil {
+		_ = renameCollection(ctx, client, db.Name(), headCollection, temp)
+		_ = renameCollection(ctx, client, db.Name(), legacy, headCollection)
+		return "", "", err
+	}
+	if err := renameCollection(ctx, client, db.Name(), questionnaireTemp, questionnaireCollection); err != nil {
+		_ = renameCollection(ctx, client, db.Name(), questionnaireLegacy, questionnaireCollection)
+		_ = renameCollection(ctx, client, db.Name(), headCollection, temp)
+		_ = renameCollection(ctx, client, db.Name(), legacy, headCollection)
+		return "", "", err
+	}
+	return legacy, questionnaireLegacy, nil
 }
 
 func renameCollection(ctx context.Context, client *mongo.Client, dbName, from, to string) error {
@@ -374,6 +676,168 @@ func renameCollection(ctx context.Context, client *mongo.Client, dbName, from, t
 func collectionExists(ctx context.Context, db *mongo.Database, name string) (bool, error) {
 	items, err := db.ListCollectionNames(ctx, bson.M{"name": name})
 	return len(items) != 0, err
+}
+
+func dropIfExists(ctx context.Context, db *mongo.Database, name string) error {
+	exists, err := collectionExists(ctx, db, name)
+	if err != nil || !exists {
+		return err
+	}
+	return db.Collection(name).Drop(ctx)
+}
+
+func convertQuestionnaireRecord(row bson.M) bson.M {
+	converted := bson.M{}
+	for key, value := range row {
+		converted[key] = value
+	}
+	role := stringField(row, "record_role")
+	if role != roleSnapshot {
+		converted["record_role"] = roleHead
+		converted["is_active_published"] = false
+		delete(converted, "release_status")
+		delete(converted, "release_archived_at")
+		delete(converted, "published_at")
+		return converted
+	}
+	active := snapshotActive(row)
+	converted["record_role"] = roleSnapshot
+	converted["status"] = "published"
+	if converted["published_at"] == nil {
+		converted["published_at"] = firstTime(row["updated_at"], row["created_at"], time.Now().UTC())
+	}
+	converted["is_active_published"] = active
+	converted["release_status"] = "archived"
+	if active {
+		converted["release_status"] = "active"
+		delete(converted, "release_archived_at")
+	} else if converted["release_archived_at"] == nil {
+		converted["release_archived_at"] = time.Now().UTC()
+	}
+	if row["deleted_at"] != nil {
+		converted["legacy_deleted_at"] = row["deleted_at"]
+		converted["deleted_at"] = nil
+	}
+	return converted
+}
+
+func snapshotActive(row bson.M) bool {
+	if status := stringField(row, "release_status"); status != "" {
+		return status == "active"
+	}
+	if active, ok := row["is_active_published"].(bool); ok {
+		return active
+	}
+	return row["deleted_at"] == nil && stringField(row, "status") == "published"
+}
+
+func snapshotField(row bson.M, field string) string {
+	legacyKey := map[string]string{
+		"code": "model_code", "kind": "model_kind", "sub_kind": "model_sub_kind",
+		"algorithm": "model_algorithm", "product_channel": "model_product_channel", "version": "model_version",
+	}[field]
+	if legacyKey != "" {
+		if value := stringField(row, legacyKey); value != "" {
+			return value
+		}
+	}
+	if field == "version" {
+		return stringField(row, "release_version")
+	}
+	return stringField(row, field)
+}
+
+func filterRows(rows []bson.M, keep func(bson.M) bool) []bson.M {
+	result := make([]bson.M, 0, len(rows))
+	for _, row := range rows {
+		if keep(row) {
+			result = append(result, row)
+		}
+	}
+	return result
+}
+
+func deduplicateSnapshots(rows []bson.M) ([]bson.M, []string) {
+	result := make([]bson.M, 0, len(rows))
+	indexes := map[string]int{}
+	issues := make([]string, 0)
+	for _, row := range rows {
+		key := strings.Join([]string{snapshotField(row, "kind"), snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), snapshotField(row, "code"), snapshotField(row, "version")}, "|")
+		if index, ok := indexes[key]; ok {
+			existing := result[index]
+			same := payloadHash(bytesField(existing, "payload")) == payloadHash(bytesField(row, "payload")) &&
+				stringField(existing, "questionnaire_code") == stringField(row, "questionnaire_code") &&
+				stringField(existing, "questionnaire_version") == stringField(row, "questionnaire_version") &&
+				fmt.Sprint(existing["definition_v2"]) == fmt.Sprint(row["definition_v2"])
+			if !same {
+				issues = append(issues, "conflicting duplicate published release "+key)
+				continue
+			}
+			if snapshotActive(row) && !snapshotActive(existing) {
+				result[index] = row
+			}
+			continue
+		}
+		indexes[key] = len(result)
+		result = append(result, row)
+	}
+	return result, issues
+}
+
+func questionnaireSnapshotSources(rows []bson.M) []bson.M {
+	return filterRows(rows, func(row bson.M) bool {
+		return stringField(row, "record_role") == roleSnapshot ||
+			(stringField(row, "record_role") != roleHead && stringField(row, "status") == "published")
+	})
+}
+
+func deduplicateQuestionnaireSnapshots(rows []bson.M) ([]bson.M, []string) {
+	result := make([]bson.M, 0, len(rows))
+	indexes := map[string]int{}
+	issues := make([]string, 0)
+	for _, row := range rows {
+		key := stringField(row, "code") + "@" + stringField(row, "version")
+		if index, ok := indexes[key]; ok {
+			existing := result[index]
+			if !sameQuestionnaireReleaseContent(existing, row) {
+				issues = append(issues, "conflicting duplicate questionnaire release "+key)
+				continue
+			}
+			if snapshotActive(row) && !snapshotActive(existing) {
+				result[index] = row
+			}
+			continue
+		}
+		indexes[key] = len(result)
+		result = append(result, row)
+	}
+	return result, issues
+}
+
+func sameQuestionnaireReleaseContent(a, b bson.M) bool {
+	for _, field := range []string{"code", "version", "title", "description", "img_url", "type", "questions"} {
+		if !reflect.DeepEqual(a[field], b[field]) {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneBSON(row bson.M) bson.M {
+	copy := make(bson.M, len(row))
+	for key, value := range row {
+		copy[key] = value
+	}
+	return copy
+}
+
+func firstTime(values ...any) time.Time {
+	for _, value := range values {
+		if at, ok := value.(time.Time); ok && !at.IsZero() {
+			return at.UTC()
+		}
+	}
+	return time.Now().UTC()
 }
 
 func loadAll(ctx context.Context, c *mongo.Collection, filter bson.M) ([]bson.M, error) {
@@ -412,7 +876,7 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 func printReport(out *os.File, rep report) {
-	_, _ = fmt.Fprintf(out, "heads=%d snapshots=%d retired_snapshots=%d orphan_snapshots=%d issues=%d\n", rep.Heads, rep.Snapshots, rep.RetiredSnapshots, rep.OrphanSnapshots, len(rep.Issues))
+	_, _ = fmt.Fprintf(out, "model_heads=%d model_snapshots=%d active_models=%d retired_snapshots=%d orphan_snapshots=%d questionnaire_heads=%d questionnaire_snapshots=%d active_questionnaires=%d issues=%d\n", rep.Heads, rep.Snapshots, rep.ActiveSnapshots, rep.RetiredSnapshots, rep.OrphanSnapshots, rep.QuestionnaireHeads, rep.QuestionnaireSnapshots, rep.ActiveQuestionnaires, len(rep.Issues))
 	for _, issue := range rep.Issues {
 		_, _ = fmt.Fprintln(out, "-", issue)
 	}

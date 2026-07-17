@@ -96,6 +96,7 @@ func questionnaireManageRoutes(handler *codesHandler.QuestionnaireHandler) []rou
 func questionnaireReadRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
 	return []routeSpec{
 		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{handler.List}},
+		{method: http.MethodGet, path: "/:code/versions", handlers: []gin.HandlerFunc{handler.ListVersions}},
 		{method: http.MethodGet, path: "/:code", handlers: []gin.HandlerFunc{handler.GetByCode}},
 		{method: http.MethodGet, path: "/published/:code", handlers: []gin.HandlerFunc{handler.GetPublishedByCode}},
 		{method: http.MethodGet, path: "/published", handlers: []gin.HandlerFunc{handler.ListPublished}},

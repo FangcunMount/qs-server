@@ -547,6 +547,28 @@ func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
+// ListVersions returns immutable questionnaire release metadata only.
+// @Summary 查询问卷发布版本历史
+// @Tags Questionnaire-Query
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "问卷编码"
+// @Success 200 {object} core.Response{data=[]questionnaire.QuestionnaireReleaseVersion}
+// @Router /api/v1/questionnaires/{code}/versions [get]
+func (h *QuestionnaireHandler) ListVersions(c *gin.Context) {
+	history, ok := h.queryService.(questionnaire.QuestionnaireReleaseHistoryService)
+	if !ok {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "问卷版本历史服务未配置"))
+		return
+	}
+	result, err := history.ListReleaseVersions(c.Request.Context(), c.Param("code"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
 // List 查询问卷列表
 // @Summary 查询问卷列表
 // @Description 分页查询问卷列表，支持条件筛选（管理端使用）

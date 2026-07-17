@@ -48,6 +48,10 @@ type QuestionnaireLifecycleService interface {
 	// release service performs those effects after the pair commits.
 	PublishForRelease(ctx context.Context, code string) (*QuestionnaireResult, error)
 
+	// UnpublishForRelease archives the active questionnaire snapshot as part
+	// of an AssessmentRelease transaction without emitting standalone effects.
+	UnpublishForRelease(ctx context.Context, code string) (*QuestionnaireResult, error)
+
 	// ArchiveForRelease archives the questionnaire as part of an
 	// AssessmentRelease transaction without independently emitting lifecycle
 	// effects.
@@ -56,6 +60,12 @@ type QuestionnaireLifecycleService interface {
 	// Delete 删除问卷
 	// 场景：管理员彻底删除问卷（只能删除草稿状态的问卷）
 	Delete(ctx context.Context, code string) error
+}
+
+// QuestionnaireReleaseCacheInvalidator is an optional post-commit boundary
+// implemented by the lifecycle service when a Redis-backed repository exists.
+type QuestionnaireReleaseCacheInvalidator interface {
+	InvalidateReleaseCache(context.Context, string)
 }
 
 // QuestionnaireContentService 问卷内容编辑服务
@@ -114,8 +124,18 @@ type QuestionnaireQueryService interface {
 	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)
 }
 
+type QuestionnaireReleaseHistoryService interface {
+	ListReleaseVersions(ctx context.Context, code string) ([]QuestionnaireReleaseVersion, error)
+}
+
 // QuestionnaireBindingVersionSyncer synchronizes draft assessment-model
 // bindings after a questionnaire version is published.
 type QuestionnaireBindingVersionSyncer interface {
 	SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error
+}
+
+// QuestionnaireAssessmentBindingReader protects questionnaire-bound resources
+// from bypassing the atomic Assessment Release lifecycle.
+type QuestionnaireAssessmentBindingReader interface {
+	IsQuestionnaireBound(ctx context.Context, questionnaireCode string) (bool, error)
 }

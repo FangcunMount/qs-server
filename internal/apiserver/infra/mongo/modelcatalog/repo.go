@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -23,11 +24,13 @@ type Repository struct {
 }
 
 var (
-	_ port.PublishedModelReader        = (*Repository)(nil)
-	_ port.PublishedModelLister        = (*Repository)(nil)
-	_ port.PublishedWriter             = (*Repository)(nil)
-	_ port.PublishedAlgorithmLister    = (*Repository)(nil)
-	_ port.PublishedSnapshotRepository = (*Repository)(nil)
+	_ port.PublishedModelReader          = (*Repository)(nil)
+	_ port.ActivePublishedModelReader    = (*Repository)(nil)
+	_ port.PublishedModelLister          = (*Repository)(nil)
+	_ port.PublishedReleaseHistoryReader = (*Repository)(nil)
+	_ port.PublishedWriter               = (*Repository)(nil)
+	_ port.PublishedAlgorithmLister      = (*Repository)(nil)
+	_ port.PublishedSnapshotRepository   = (*Repository)(nil)
 )
 
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
@@ -75,7 +78,8 @@ func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code
 		"kind": kindBSONFilter(kind),
 		"code": code,
 	}), bson.M{"$set": bson.M{
-		"is_active_published": false,
+		"release_status":      string(domain.ReleaseStatusArchived),
+		"release_archived_at": time.Now(),
 		"updated_at":          time.Now(),
 	}})
 	return err
@@ -111,50 +115,61 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.Publi
 	po := r.mapper.ToPO(model)
 	now := time.Now()
 	po.Status = statusPublished
+	po.ReleaseStatus = string(domain.ReleaseStatusActive)
+	po.IsActivePublished = false
 	po.PublishedAt = &now
+	po.ReleaseArchivedAt = nil
 
 	filter := publishedModelUpsertFilter(po)
-	// A release is immutable once persisted. Only the exact same release is
-	// upserted for idempotency; all earlier active releases are retained and
-	// merely made invisible to catalog queries.
+	var existing PublishedAssessmentModelPO
+	findErr := r.FindOne(ctx, filter, &existing)
+	if findErr == nil {
+		incoming := r.mapper.ToPublished(po)
+		persisted := r.mapper.ToPublished(&existing)
+		if !sameImmutablePublishedContent(persisted, incoming) {
+			return fmt.Errorf("%w: %s@%s", domain.ErrReleaseVersionConflict, model.Code, model.Version)
+		}
+		if domain.NormalizeReleaseStatus(domain.ReleaseStatus(existing.ReleaseStatus), existing.IsActivePublished) != domain.ReleaseStatusActive {
+			return fmt.Errorf("%w: archived release %s@%s cannot be reactivated", domain.ErrInvalidState, model.Code, model.Version)
+		}
+		return nil
+	}
+	if findErr != mongo.ErrNoDocuments {
+		return findErr
+	}
+
+	// Earlier active releases remain immutable and are archived in the same
+	// outer Mongo transaction before the new active row is inserted.
 	_, err := r.Collection().UpdateMany(ctx, activePublishedFilter(bson.M{
 		"kind": po.Kind,
 		"code": po.Code,
 	}), bson.M{"$set": bson.M{
-		"is_active_published": false,
+		"release_status":      string(domain.ReleaseStatusArchived),
+		"release_archived_at": now,
 		"updated_at":          now,
 	}})
 	if err != nil {
 		return err
 	}
-
-	var existing PublishedAssessmentModelPO
-	findErr := r.FindOne(ctx, filter, &existing)
-	if findErr == mongo.ErrNoDocuments {
-		mongoBase.ApplyAuditCreate(ctx, po)
-		po.BeforeInsert()
-		insertData, err := po.ToBsonM()
-		if err != nil {
-			return err
-		}
-		_, err = r.InsertOne(ctx, insertData)
-		return err
-	}
-	if findErr != nil {
-		return findErr
-	}
-
-	mongoBase.ApplyAuditUpdate(ctx, po)
-	po.BeforeUpdate()
-	updateData, err := po.ToBsonM()
+	mongoBase.ApplyAuditCreate(ctx, po)
+	po.BeforeInsert()
+	insertData, err := po.ToBsonM()
 	if err != nil {
 		return err
 	}
-	delete(updateData, "_id")
-	delete(updateData, "created_at")
-	delete(updateData, "created_by")
-	_, err = r.Collection().UpdateOne(ctx, filter, bson.M{"$set": updateData})
+	_, err = r.InsertOne(ctx, insertData)
 	return err
+}
+
+func sameImmutablePublishedContent(a, b *port.PublishedModel) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	aCopy, bCopy := *a, *b
+	aCopy.ReleaseStatus, bCopy.ReleaseStatus = "", ""
+	aCopy.PublishedAt, bCopy.PublishedAt = nil, nil
+	aCopy.ReleaseArchivedAt, bCopy.ReleaseArchivedAt = nil, nil
+	return reflect.DeepEqual(aCopy, bCopy)
 }
 
 func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
@@ -163,6 +178,16 @@ func (r *Repository) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (
 	}
 	filter := publishedFilter(r.refFilter(ref))
 	return r.findOnePublished(ctx, filter)
+}
+
+// GetActivePublishedModelByRef resolves an exact version only when it is the
+// currently active release. Assessment intake must use this method; workers
+// intentionally continue to use GetPublishedModelByRef for retained history.
+func (r *Repository) GetActivePublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
+	}
+	return r.findOnePublished(ctx, activePublishedFilter(r.refFilter(ref)))
 }
 
 func (r *Repository) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.PublishedModel, error) {
@@ -274,6 +299,32 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 		return nil, 0, err
 	}
 	return models, total, nil
+}
+
+func (r *Repository) ListPublishedReleaseHistory(ctx context.Context, codeValue string) ([]*port.PublishedModel, error) {
+	if strings.TrimSpace(codeValue) == "" {
+		return nil, domain.ErrNotFound
+	}
+	cursor, err := r.Find(ctx, publishedFilter(bson.M{"code": strings.TrimSpace(codeValue)}), options.Find().SetSort(bson.D{
+		{Key: "published_at", Value: -1},
+		{Key: "release_version", Value: -1},
+	}))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	items := make([]*port.PublishedModel, 0)
+	for cursor.Next(ctx) {
+		var po PublishedAssessmentModelPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		items = append(items, r.mapper.ToPublished(&po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {

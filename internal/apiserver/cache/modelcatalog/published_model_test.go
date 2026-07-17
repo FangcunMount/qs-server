@@ -113,6 +113,49 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 	}
 }
 
+func TestCachedPublishedModelStoreCachesImmutableExactVersionButActiveLookupBypassesIt(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	snapshot := &port.PublishedModel{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0", ReleaseStatus: domain.ReleaseStatusActive}
+	inner := &activePublishedModelStoreStub{publishedModelStoreStub: publishedModelStoreStub{getByRef: snapshot}, active: snapshot}
+	cached := NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("test-ns"), publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+	ref := port.Ref{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"}
+
+	if _, err := cached.GetPublishedModelByRef(context.Background(), ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cached.GetPublishedModelByRef(context.Background(), ref); err != nil {
+		t.Fatal(err)
+	}
+	if inner.getByRefCalls != 1 {
+		t.Fatalf("exact source calls = %d, want 1", inner.getByRefCalls)
+	}
+	if _, err := cached.GetActivePublishedModelByRef(context.Background(), ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cached.GetActivePublishedModelByRef(context.Background(), ref); err != nil {
+		t.Fatal(err)
+	}
+	if inner.activeCalls != 2 {
+		t.Fatalf("active source calls = %d, want 2", inner.activeCalls)
+	}
+}
+
+type activePublishedModelStoreStub struct {
+	publishedModelStoreStub
+	activeCalls int
+	active      *port.PublishedModel
+}
+
+func (s *activePublishedModelStoreStub) GetActivePublishedModelByRef(context.Context, port.Ref) (*port.PublishedModel, error) {
+	s.activeCalls++
+	if s.active == nil {
+		return nil, domain.ErrNotFound
+	}
+	return s.active, nil
+}
+
 func TestCachedPublishedModelStoreUpsertPublishedModelDelegatesToInner(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})

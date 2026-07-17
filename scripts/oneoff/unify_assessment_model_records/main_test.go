@@ -35,6 +35,9 @@ func TestConvertSnapshotMapsLegacyFieldsAndKeepsPayload(t *testing.T) {
 	if got["record_role"] != roleSnapshot || got["is_active_published"] != true {
 		t.Fatalf("snapshot role/activity = %#v", got)
 	}
+	if got["release_status"] != "active" {
+		t.Fatalf("release status = %#v, want active", got["release_status"])
+	}
 	if got["code"] != "PHQ9" || got["release_version"] != "2.0.0" || got["kind"] != "scale" {
 		t.Fatalf("mapped identity = %#v", got)
 	}
@@ -61,7 +64,51 @@ func TestConvertSnapshotRetainsLegacySoftDeleteAsInactiveHistory(t *testing.T) {
 	if got["is_active_published"] != false || got["retention_state"] != "legacy_soft_deleted" {
 		t.Fatalf("soft-deleted snapshot was not retained inactive: %#v", got)
 	}
+	if got["release_status"] != "archived" {
+		t.Fatalf("release status = %#v, want archived", got["release_status"])
+	}
 	if got["deleted_at"] != nil || got["legacy_deleted_at"] != deletedAt || got["status"] != "published" {
 		t.Fatalf("retained snapshot lifecycle = %#v", got)
+	}
+}
+
+func TestConvertQuestionnaireRecordNormalizesArchivedSnapshot(t *testing.T) {
+	deletedAt := time.Date(2026, time.July, 2, 0, 0, 0, 0, time.UTC)
+	got := convertQuestionnaireRecord(bson.M{
+		"_id": primitive.NewObjectID(), "code": "Q-1", "version": "1.0.0",
+		"record_role": roleSnapshot, "status": "published", "deleted_at": deletedAt,
+	})
+	if got["release_status"] != "archived" || got["is_active_published"] != false {
+		t.Fatalf("questionnaire release = %#v", got)
+	}
+	if got["deleted_at"] != nil || got["legacy_deleted_at"] != deletedAt {
+		t.Fatalf("questionnaire provenance = %#v", got)
+	}
+}
+
+func TestDeduplicateSnapshotsRejectsPayloadConflict(t *testing.T) {
+	base := bson.M{"model_kind": "scale", "model_code": "S-1", "model_version": "v1", "payload": []byte("one"), "questionnaire_code": "Q", "questionnaire_version": "1"}
+	conflict := bson.M{"kind": "scale", "code": "S-1", "release_version": "v1", "payload": []byte("two"), "questionnaire_code": "Q", "questionnaire_version": "1"}
+	_, issues := deduplicateSnapshots([]bson.M{base, conflict})
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one payload conflict", issues)
+	}
+}
+
+func TestQuestionnaireSnapshotSourcesDuplicatesLegacyPublishedHeadAsRelease(t *testing.T) {
+	legacy := bson.M{"_id": primitive.NewObjectID(), "code": "Q-1", "version": "1", "status": "published", "questions": bson.A{bson.M{"code": "Q1"}}}
+	draft := bson.M{"_id": primitive.NewObjectID(), "code": "Q-2", "version": "1", "status": "draft"}
+	sources := questionnaireSnapshotSources([]bson.M{legacy, draft})
+	if len(sources) != 1 || stringField(sources[0], "code") != "Q-1" {
+		t.Fatalf("snapshot sources = %#v", sources)
+	}
+}
+
+func TestDeduplicateQuestionnaireSnapshotsRejectsContentConflict(t *testing.T) {
+	legacy := bson.M{"code": "Q-1", "version": "1", "status": "published", "title": "Before"}
+	unified := bson.M{"code": "Q-1", "version": "1", "status": "published", "record_role": roleSnapshot, "title": "After"}
+	_, issues := deduplicateQuestionnaireSnapshots([]bson.M{legacy, unified})
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one conflict", issues)
 	}
 }

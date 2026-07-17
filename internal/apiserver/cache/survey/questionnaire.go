@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type CachedQuestionnaireRepository struct {
@@ -67,7 +68,7 @@ func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *dom
 	if err := r.repo.Create(ctx, qDomain); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.setCache(ctx, r.headKey(qDomain.GetCode().Value()), qDomain)
 	}
 	return nil
@@ -77,7 +78,7 @@ func (r *CachedQuestionnaireRepository) CreatePublishedSnapshot(ctx context.Cont
 	if err := r.repo.CreatePublishedSnapshot(ctx, qDomain, active); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.setCache(ctx, r.versionKey(qDomain.GetCode().Value(), qDomain.GetVersion().Value()), qDomain)
 		if active {
 			_ = r.setCache(ctx, r.publishedKey(qDomain.GetCode().Value()), qDomain)
@@ -132,7 +133,7 @@ func (r *CachedQuestionnaireRepository) Update(ctx context.Context, qDomain *dom
 	if err := r.repo.Update(ctx, qDomain); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, qDomain.GetCode().Value())
 	}
 	return nil
@@ -142,7 +143,7 @@ func (r *CachedQuestionnaireRepository) SetActivePublishedVersion(ctx context.Co
 	if err := r.repo.SetActivePublishedVersion(ctx, code, version); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, code)
 	}
 	return nil
@@ -152,7 +153,7 @@ func (r *CachedQuestionnaireRepository) ClearActivePublishedVersion(ctx context.
 	if err := r.repo.ClearActivePublishedVersion(ctx, code); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, code)
 	}
 	return nil
@@ -162,7 +163,7 @@ func (r *CachedQuestionnaireRepository) Remove(ctx context.Context, code string)
 	if err := r.repo.Remove(ctx, code); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, code)
 	}
 	return nil
@@ -172,7 +173,7 @@ func (r *CachedQuestionnaireRepository) HardDelete(ctx context.Context, code str
 	if err := r.repo.HardDelete(ctx, code); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, code)
 	}
 	return nil
@@ -182,7 +183,7 @@ func (r *CachedQuestionnaireRepository) HardDeleteFamily(ctx context.Context, co
 	if err := r.repo.HardDeleteFamily(ctx, code); err != nil {
 		return err
 	}
-	if r.client != nil {
+	if r.shouldMutateCache(ctx) {
 		_ = r.deleteCacheByCode(ctx, code)
 	}
 	return nil
@@ -253,6 +254,20 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 		_ = r.store.Delete(ctx, iter.Val())
 	}
 	return iter.Err()
+}
+
+func (r *CachedQuestionnaireRepository) shouldMutateCache(ctx context.Context) bool {
+	return r != nil && r.client != nil && mongo.SessionFromContext(ctx) == nil
+}
+
+// InvalidateQuestionnaireCache is called after a paired release transaction
+// commits. Exact-version entries are removed too because legacy cache entries
+// may contain mutable release metadata.
+func (r *CachedQuestionnaireRepository) InvalidateQuestionnaireCache(ctx context.Context, code string) {
+	if r == nil || r.client == nil || code == "" {
+		return
+	}
+	_ = r.deleteCacheByCode(ctx, code)
 }
 
 // WarmupCache 预热工作版本和当前已发布版本缓存

@@ -13,7 +13,9 @@ go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" 
 go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" --mongo-db qs --mode apply
 go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" --mongo-db qs --mode verify
 go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" --mongo-db qs --mode cutover
-go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" --mongo-db qs --mode finalize --legacy-collection assessment_models_legacy_YYYYMMDD_HHMMSS
+go run ./scripts/oneoff/unify_assessment_model_records --mongo-uri "$MONGO_URI" --mongo-db qs --mode finalize \
+  --legacy-collection assessment_models_legacy_YYYYMMDD_HHMMSS \
+  --legacy-questionnaire-collection questionnaires_legacy_YYYYMMDD_HHMMSS
 ```
 
 `finalize` 不可逆；只有在运行时、Redis 缓存和四类代表性模型冒烟均通过后执行。

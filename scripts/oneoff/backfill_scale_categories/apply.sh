@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Backfill category through the protected model-management and release APIs.
-# It never writes published_assessment_models directly: basic-info forks the
+# It never writes published_snapshot records directly: basic-info forks the
 # published draft, and assessment-releases/{code}/publish creates the new
 # immutable snapshot through the normal release transaction.
 

@@ -889,53 +889,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assessment-models/{code}/archive": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentModel"
-                ],
-                "summary": "归档测评模型",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "模型编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/assessment-models/{code}/basic-info": {
             "put": {
                 "consumes": [
@@ -1281,53 +1234,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assessment-models/{code}/publish": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentModel"
-                ],
-                "summary": "发布测评模型",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "模型编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/assessment-models/{code}/qrcode": {
             "get": {
                 "produces": [
@@ -1479,100 +1385,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assessment-models/{code}/restore-draft": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentModel"
-                ],
-                "summary": "从发布快照恢复测评草稿",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "模型编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/assessment-models/{code}/unpublish": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentModel"
-                ],
-                "summary": "下架测评模型",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "模型编码",
-                        "name": "code",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AssessmentModelResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/assessment-models/{code}/validate": {
             "post": {
                 "produces": [
@@ -1705,6 +1517,103 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/modelcatalog.AssessmentRelease"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-releases/{code}/unpublish": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentRelease"
+                ],
+                "summary": "下架测评版本",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/modelcatalog.AssessmentRelease"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessment-releases/{code}/versions": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AssessmentRelease"
+                ],
+                "summary": "查询测评发布版本历史",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/modelcatalog.AssessmentReleaseVersion"
+                                            }
                                         }
                                     }
                                 }
@@ -6393,6 +6302,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/questionnaires/{code}/versions": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questionnaire-Query"
+                ],
+                "summary": "查询问卷发布版本历史",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/questionnaire.QuestionnaireReleaseVersion"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/staff": {
             "get": {
                 "produces": [
@@ -10236,6 +10195,32 @@ const docTemplate = `{
                 }
             }
         },
+        "modelcatalog.AssessmentReleaseVersion": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "current": {
+                    "type": "boolean"
+                },
+                "model_version": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "release_status": {
+                    "type": "string"
+                }
+            }
+        },
         "modelcatalog.Definition": {
             "type": "object",
             "properties": {
@@ -10309,6 +10294,9 @@ const docTemplate = `{
                 },
                 "rank": {
                     "type": "integer"
+                },
+                "release_state": {
+                    "$ref": "#/definitions/modelcatalog.ReleaseState"
                 },
                 "reporters": {
                     "type": "array",
@@ -10386,6 +10374,9 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                },
+                "release_state": {
+                    "$ref": "#/definitions/modelcatalog.ReleaseState"
                 },
                 "reporters": {
                     "type": "array",
@@ -10498,6 +10489,9 @@ const docTemplate = `{
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "release_state": {
+                    "$ref": "#/definitions/modelcatalog.ReleaseState"
+                },
                 "reporters": {
                     "type": "array",
                     "items": {
@@ -10534,6 +10528,26 @@ const docTemplate = `{
                 }
             }
         },
+        "modelcatalog.ReleaseState": {
+            "type": "object",
+            "properties": {
+                "active_version": {
+                    "type": "string"
+                },
+                "has_unpublished_changes": {
+                    "type": "boolean"
+                },
+                "online_status": {
+                    "type": "string"
+                },
+                "working_status": {
+                    "type": "string"
+                },
+                "working_version": {
+                    "type": "string"
+                }
+            }
+        },
         "modelcatalog.ValidationIssue": {
             "type": "object",
             "properties": {
@@ -10558,6 +10572,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "normTableVersion": {
+                    "type": "string"
+                }
+            }
+        },
+        "questionnaire.QuestionnaireReleaseVersion": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "current": {
+                    "type": "boolean"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "release_status": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }
@@ -11815,6 +11849,9 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                },
+                "release_state": {
+                    "$ref": "#/definitions/modelcatalog.ReleaseState"
                 },
                 "reporters": {
                     "type": "array",
@@ -13594,6 +13631,9 @@ const docTemplate = `{
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "release_state": {
+                    "$ref": "#/definitions/modelcatalog.ReleaseState"
+                },
                 "reporters": {
                     "type": "array",
                     "items": {
@@ -13659,6 +13699,26 @@ const docTemplate = `{
                 }
             }
         },
+        "response.QuestionnaireReleaseStateResponse": {
+            "type": "object",
+            "properties": {
+                "active_version": {
+                    "type": "string"
+                },
+                "has_unpublished_changes": {
+                    "type": "boolean"
+                },
+                "online_status": {
+                    "type": "string"
+                },
+                "working_status": {
+                    "type": "string"
+                },
+                "working_version": {
+                    "type": "string"
+                }
+            }
+        },
         "response.QuestionnaireResponse": {
             "type": "object",
             "properties": {
@@ -13676,6 +13736,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/viewmodel.QuestionDTO"
                     }
+                },
+                "release_state": {
+                    "$ref": "#/definitions/response.QuestionnaireReleaseStateResponse"
                 },
                 "status": {
                     "type": "string"

@@ -67,7 +67,7 @@ func TestInspectActivePublishedMatchesUnifiedSnapshotByStableIdentity(t *testing
 		t.Fatalf("state = %#v", state)
 	}
 	matching := collection.countFilters[0].(bson.M)
-	if matching["record_role"] != "published_snapshot" || matching["is_active_published"] != true {
+	if matching["record_role"] != "published_snapshot" || matching["$or"] == nil {
 		t.Fatalf("matching filter must require active snapshot role: %#v", matching)
 	}
 	if matching["code"] != "gXkk9W" || matching["questionnaire_version"] != "4.0.1" {
@@ -113,7 +113,7 @@ func TestRetireMatchingPublishedUsesQuestionnaireIdentityAndNoKind(t *testing.T)
 		t.Fatalf("RetireMatchingPublished() error = %v", err)
 	}
 	filter := collection.updateFilter.(bson.M)
-	if filter["record_role"] != "published_snapshot" || filter["is_active_published"] != true {
+	if filter["record_role"] != "published_snapshot" || filter["$or"] == nil {
 		t.Fatalf("retire filter must select active snapshot: %#v", filter)
 	}
 	want := matchingPublishedFilter("gXkk9W", "gXkk9W", "4.0.1")

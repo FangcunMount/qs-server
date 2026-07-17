@@ -22,17 +22,15 @@ import (
 // snapshot DTO.
 type AssessmentModelHandler struct {
 	BaseHandler
-	management  modelcatalog.CatalogManagementService
-	definition  modelcatalog.DefinitionAuthoringService
-	publication modelcatalog.PublicationService
-	query       modelcatalog.CatalogQueryService
-	assets      modelcatalog.OutcomeImageService
+	management modelcatalog.CatalogManagementService
+	definition modelcatalog.DefinitionAuthoringService
+	query      modelcatalog.CatalogQueryService
+	assets     modelcatalog.OutcomeImageService
 }
 
 func NewAssessmentModelHandler(
 	management modelcatalog.CatalogManagementService,
 	definition modelcatalog.DefinitionAuthoringService,
-	publication modelcatalog.PublicationService,
 	query modelcatalog.CatalogQueryService,
 	assets ...modelcatalog.OutcomeImageService,
 ) *AssessmentModelHandler {
@@ -40,7 +38,7 @@ func NewAssessmentModelHandler(
 	if len(assets) > 0 {
 		imageService = assets[0]
 	}
-	return &AssessmentModelHandler{management: management, definition: definition, publication: publication, query: query, assets: imageService}
+	return &AssessmentModelHandler{management: management, definition: definition, query: query, assets: imageService}
 }
 
 // List lists draft catalogue records. Use the published endpoints for
@@ -166,30 +164,6 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
-// RestoreDraftFromPublished restores a mutable draft for a legacy orphaned
-// published snapshot. The operator must still make any edit and publish it via
-// the normal assessment release workflow.
-// @Summary 从发布快照恢复测评草稿
-// @Tags AssessmentModel
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code path string true "模型编码"
-// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
-// @Router /api/v1/assessment-models/{code}/restore-draft [post]
-func (h *AssessmentModelHandler) RestoreDraftFromPublished(c *gin.Context) {
-	actor, err := assessmentModelActorContext(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	result, err := h.management.RestoreDraftFromPublished(c.Request.Context(), actor, h.modelCode(c))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, (*response.AssessmentModelResponse)(result))
-}
-
 // @Summary 删除已归档测评模型
 // @Tags AssessmentModel
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -207,69 +181,6 @@ func (h *AssessmentModelHandler) Delete(c *gin.Context) {
 		return
 	}
 	h.SuccessResponseWithMessage(c, "删除成功", nil)
-}
-
-// @Summary 发布测评模型
-// @Tags AssessmentModel
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code path string true "模型编码"
-// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
-// @Router /api/v1/assessment-models/{code}/publish [post]
-func (h *AssessmentModelHandler) Publish(c *gin.Context) {
-	actor, err := assessmentModelActorContext(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	result, err := h.publication.Publish(c.Request.Context(), actor, h.modelCode(c))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, (*response.AssessmentModelResponse)(result))
-}
-
-// @Summary 下架测评模型
-// @Tags AssessmentModel
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code path string true "模型编码"
-// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
-// @Router /api/v1/assessment-models/{code}/unpublish [post]
-func (h *AssessmentModelHandler) Unpublish(c *gin.Context) {
-	actor, err := assessmentModelActorContext(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	result, err := h.publication.Unpublish(c.Request.Context(), actor, h.modelCode(c))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, (*response.AssessmentModelResponse)(result))
-}
-
-// @Summary 归档测评模型
-// @Tags AssessmentModel
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code path string true "模型编码"
-// @Success 200 {object} core.Response{data=response.AssessmentModelResponse}
-// @Router /api/v1/assessment-models/{code}/archive [post]
-func (h *AssessmentModelHandler) Archive(c *gin.Context) {
-	actor, err := assessmentModelActorContext(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	result, err := h.management.Archive(c.Request.Context(), actor, h.modelCode(c))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, (*response.AssessmentModelResponse)(result))
 }
 
 // BindQuestionnaire binds a draft model to a questionnaire version.

@@ -21,6 +21,9 @@ type QuestionnairePO struct {
 	Type              string       `bson:"type" json:"type"`
 	RecordRole        string       `bson:"record_role,omitempty" json:"record_role,omitempty"`
 	IsActivePublished bool         `bson:"is_active_published,omitempty" json:"is_active_published,omitempty"`
+	ReleaseStatus     string       `bson:"release_status,omitempty" json:"release_status,omitempty"`
+	PublishedAt       *time.Time   `bson:"published_at,omitempty" json:"published_at,omitempty"`
+	ReleaseArchivedAt *time.Time   `bson:"release_archived_at,omitempty" json:"release_archived_at,omitempty"`
 	Questions         []QuestionPO `bson:"questions,omitempty" json:"questions,omitempty"`
 	QuestionCount     int          `bson:"question_count,omitempty" json:"question_count,omitempty"`
 }

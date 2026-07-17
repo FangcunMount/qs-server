@@ -7,14 +7,23 @@ import (
 
 // QuestionnaireResponse 问卷响应
 type QuestionnaireResponse struct {
-	Code        string                  `json:"code"`
-	Title       string                  `json:"title"`
-	Description string                  `json:"description"`
-	ImgUrl      string                  `json:"img_url"`
-	Version     string                  `json:"version"`
-	Status      string                  `json:"status"`
-	Type        string                  `json:"type"`
-	Questions   []viewmodel.QuestionDTO `json:"questions,omitempty"`
+	Code         string                            `json:"code"`
+	Title        string                            `json:"title"`
+	Description  string                            `json:"description"`
+	ImgUrl       string                            `json:"img_url"`
+	Version      string                            `json:"version"`
+	Status       string                            `json:"status"`
+	Type         string                            `json:"type"`
+	Questions    []viewmodel.QuestionDTO           `json:"questions,omitempty"`
+	ReleaseState QuestionnaireReleaseStateResponse `json:"release_state"`
+}
+
+type QuestionnaireReleaseStateResponse struct {
+	WorkingStatus         string `json:"working_status"`
+	WorkingVersion        string `json:"working_version"`
+	OnlineStatus          string `json:"online_status"`
+	ActiveVersion         string `json:"active_version,omitempty"`
+	HasUnpublishedChanges bool   `json:"has_unpublished_changes"`
 }
 
 // QuestionnaireListResponse 问卷列表响应
@@ -27,17 +36,18 @@ type QuestionnaireListResponse struct {
 
 // QuestionnaireSummaryResponse 问卷摘要响应（不包含问题详情）
 type QuestionnaireSummaryResponse struct {
-	Code        string `json:"code"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	ImgUrl      string `json:"img_url"`
-	Version     string `json:"version"`
-	Status      string `json:"status"`
-	Type        string `json:"type"`
-	CreatedBy   string `json:"created_by"` // 创建人
-	CreatedAt   string `json:"created_at"`
-	UpdatedBy   string `json:"updated_by"` // 更新人
-	UpdatedAt   string `json:"updated_at"`
+	Code         string                            `json:"code"`
+	Title        string                            `json:"title"`
+	Description  string                            `json:"description"`
+	ImgUrl       string                            `json:"img_url"`
+	Version      string                            `json:"version"`
+	Status       string                            `json:"status"`
+	Type         string                            `json:"type"`
+	CreatedBy    string                            `json:"created_by"` // 创建人
+	CreatedAt    string                            `json:"created_at"`
+	UpdatedBy    string                            `json:"updated_by"` // 更新人
+	UpdatedAt    string                            `json:"updated_at"`
+	ReleaseState QuestionnaireReleaseStateResponse `json:"release_state"`
 }
 
 // QuestionnaireSummaryListResponse 问卷摘要列表响应
@@ -90,14 +100,15 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 	}
 
 	return &QuestionnaireResponse{
-		Code:        result.Code,
-		Title:       result.Title,
-		Description: result.Description,
-		ImgUrl:      result.ImgUrl,
-		Version:     result.Version,
-		Status:      result.Status,
-		Type:        result.Type,
-		Questions:   questions,
+		Code:         result.Code,
+		Title:        result.Title,
+		Description:  result.Description,
+		ImgUrl:       result.ImgUrl,
+		Version:      result.Version,
+		Status:       result.Status,
+		Type:         result.Type,
+		Questions:    questions,
+		ReleaseState: questionnaireReleaseStateResponse(result.ReleaseState),
 	}
 }
 
@@ -135,22 +146,31 @@ func NewQuestionnaireSummaryListResponse(result *questionnaire.QuestionnaireSumm
 	questionnaires := make([]QuestionnaireSummaryResponse, 0, len(result.Items))
 	for _, item := range result.Items {
 		questionnaires = append(questionnaires, QuestionnaireSummaryResponse{
-			Code:        item.Code,
-			Title:       item.Title,
-			Description: item.Description,
-			ImgUrl:      item.ImgUrl,
-			Version:     item.Version,
-			Status:      item.Status,
-			Type:        item.Type,
-			CreatedBy:   item.CreatedBy,
-			CreatedAt:   item.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedBy:   item.UpdatedBy,
-			UpdatedAt:   item.UpdatedAt.Format("2006-01-02 15:04:05"),
+			Code:         item.Code,
+			Title:        item.Title,
+			Description:  item.Description,
+			ImgUrl:       item.ImgUrl,
+			Version:      item.Version,
+			Status:       item.Status,
+			Type:         item.Type,
+			CreatedBy:    item.CreatedBy,
+			CreatedAt:    item.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedBy:    item.UpdatedBy,
+			UpdatedAt:    item.UpdatedAt.Format("2006-01-02 15:04:05"),
+			ReleaseState: questionnaireReleaseStateResponse(item.ReleaseState),
 		})
 	}
 
 	return &QuestionnaireSummaryListResponse{
 		Questionnaires: questionnaires,
 		TotalCount:     result.Total,
+	}
+}
+
+func questionnaireReleaseStateResponse(state questionnaire.QuestionnaireReleaseState) QuestionnaireReleaseStateResponse {
+	return QuestionnaireReleaseStateResponse{
+		WorkingStatus: state.WorkingStatus, WorkingVersion: state.WorkingVersion,
+		OnlineStatus: state.OnlineStatus, ActiveVersion: state.ActiveVersion,
+		HasUnpublishedChanges: state.HasUnpublishedChanges,
 	}
 }

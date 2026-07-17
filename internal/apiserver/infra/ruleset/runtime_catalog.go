@@ -18,9 +18,10 @@ type RuntimePublishedCatalog struct {
 }
 
 var (
-	_ port.Catalog              = (*RuntimePublishedCatalog)(nil)
-	_ port.PublishedModelReader = (*RuntimePublishedCatalog)(nil)
-	_ port.PublishedModelLister = (*RuntimePublishedCatalog)(nil)
+	_ port.Catalog                    = (*RuntimePublishedCatalog)(nil)
+	_ port.PublishedModelReader       = (*RuntimePublishedCatalog)(nil)
+	_ port.ActivePublishedModelReader = (*RuntimePublishedCatalog)(nil)
+	_ port.PublishedModelLister       = (*RuntimePublishedCatalog)(nil)
 )
 
 // NewRuntimePublishedCatalogWithStore wires a runtime catalog for tests.
@@ -53,6 +54,20 @@ func (c *RuntimePublishedCatalog) GetPublishedModelByRef(ctx context.Context, re
 		return nil, domain.ErrVersionRequired
 	}
 	return c.store.GetPublishedModelByRef(ctx, ref)
+}
+
+func (c *RuntimePublishedCatalog) GetActivePublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
+	if c == nil || c.store == nil {
+		return nil, domain.ErrNotFound
+	}
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
+	}
+	reader, ok := c.store.(port.ActivePublishedModelReader)
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return reader.GetActivePublishedModelByRef(ctx, ref)
 }
 
 func (c *RuntimePublishedCatalog) FindPublishedModelByQuestionnaire(

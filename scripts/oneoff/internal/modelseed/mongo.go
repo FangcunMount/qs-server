@@ -84,22 +84,22 @@ func InspectActivePublished(ctx context.Context, collection PublishedCollection,
 	}
 	questionnaireOtherModel, err := collection.CountDocuments(ctx, bson.M{
 		"record_role":           "published_snapshot",
-		"is_active_published":   true,
 		"status":                "published",
 		"deleted_at":            nil,
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
 		"code":                  bson.M{"$ne": modelCode},
+		"$or":                   activeReleaseClause(),
 	})
 	if err != nil {
 		return ActivePublishedState{}, fmt.Errorf("count questionnaire conflicts: %w", err)
 	}
 	modelOtherQuestionnaire, err := collection.CountDocuments(ctx, bson.M{
-		"record_role":         "published_snapshot",
-		"is_active_published": true,
-		"status":              "published",
-		"deleted_at":          nil,
-		"code":                modelCode,
+		"record_role": "published_snapshot",
+		"status":      "published",
+		"deleted_at":  nil,
+		"code":        modelCode,
+		"$or":         activeReleaseClause(),
 		"$nor": []bson.M{{
 			"questionnaire_code":    questionnaireCode,
 			"questionnaire_version": questionnaireVersion,
@@ -146,6 +146,8 @@ func RetireMatchingPublished(ctx context.Context, collection PublishedCollection
 	}
 	result, err := collection.UpdateMany(ctx, matchingPublishedFilter(modelCode, questionnaireCode, questionnaireVersion), bson.M{"$set": bson.M{
 		"is_active_published": false,
+		"release_status":      "archived",
+		"release_archived_at": now,
 		"updated_at":          now,
 	}})
 	if err != nil {
@@ -160,11 +162,18 @@ func RetireMatchingPublished(ctx context.Context, collection PublishedCollection
 func matchingPublishedFilter(modelCode, questionnaireCode, questionnaireVersion string) bson.M {
 	return bson.M{
 		"record_role":           "published_snapshot",
-		"is_active_published":   true,
 		"status":                "published",
 		"deleted_at":            nil,
 		"code":                  modelCode,
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
+		"$or":                   activeReleaseClause(),
+	}
+}
+
+func activeReleaseClause() bson.A {
+	return bson.A{
+		bson.M{"release_status": "active"},
+		bson.M{"release_status": bson.M{"$exists": false}, "is_active_published": true},
 	}
 }

@@ -113,14 +113,14 @@ const target = db.getSiblingDB(process.env.MONGO_DB);
 for (const code of ["gXkk9W", "bJFKi3"]) {
   printjson({
     code,
-    drafts: target.assessment_models.countDocuments({code, deleted_at: null}),
-    published: target.published_assessment_models.countDocuments({model_code: code, deleted_at: null})
+    heads: target.assessment_models.countDocuments({code, record_role: "head", deleted_at: null}),
+    snapshots: target.assessment_models.countDocuments({code, record_role: "published_snapshot", deleted_at: null})
   });
 }
 '
 ```
 
-首次初始化时，两个 code 的 `drafts` 和 `published` 都应为 `0`。如果任何值大于 `0`：
+首次初始化时，两个 code 的 `heads` 和 `snapshots` 都应为 `0`。如果任何值大于 `0`：
 
 - 不要执行普通 `--apply`；
 - 不要立即追加 `--force`；
@@ -140,13 +140,10 @@ mongodump --uri="$MONGO_URL" --db="$MONGO_DB" \
   --collection=assessment_norms --out="$BACKUP_DIR"
 mongodump --uri="$MONGO_URL" --db="$MONGO_DB" \
   --collection=assessment_models --out="$BACKUP_DIR"
-mongodump --uri="$MONGO_URL" --db="$MONGO_DB" \
-  --collection=published_assessment_models --out="$BACKUP_DIR"
-
 find "$BACKUP_DIR" -maxdepth 3 -type f -print
 ```
 
-确认三个集合都有 `.bson` 文件后再继续。备份目录可能包含敏感数据，应限制权限并按服务器规范转存：
+确认两个集合都有 `.bson` 文件后再继续。备份目录可能包含敏感数据，应限制权限并按服务器规范转存：
 
 ```bash
 chmod -R go-rwx "$BACKUP_DIR"
@@ -278,15 +275,15 @@ for (const spec of [
     {table_version: spec.norm, deleted_at: null},
     {table_version: 1, kind: 1, algorithm: 1, form_variant: 1}
   );
-  const draft = target.assessment_models.findOne(
-    {code: spec.code, deleted_at: null},
+  const head = target.assessment_models.findOne(
+    {code: spec.code, record_role: "head", deleted_at: null},
     {code: 1, kind: 1, algorithm: 1, questionnaire_code: 1, questionnaire_version: 1, status: 1}
   );
-  const published = target.published_assessment_models.findOne(
-    {model_code: spec.code, deleted_at: null},
-    {model_code: 1, model_algorithm: 1, questionnaire_code: 1, questionnaire_version: 1}
+  const published = target.assessment_models.findOne(
+    {code: spec.code, record_role: "published_snapshot", release_status: "active", deleted_at: null},
+    {code: 1, algorithm: 1, release_version: 1, questionnaire_code: 1, questionnaire_version: 1}
   );
-  printjson({expected: spec, norm, draft, published});
+  printjson({expected: spec, norm, head, published});
 }
 '
 ```

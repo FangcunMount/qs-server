@@ -38,6 +38,7 @@ type CachedPublishedModelStore struct {
 	catalogListVersion querycache.VersionTokenStore
 	catalogAlgorithms  *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
 	latestByCode       *adapterkit.ObjectCacheStore[port.PublishedModel]
+	exactByRef         *adapterkit.ObjectCacheStore[port.PublishedModel]
 }
 
 const publishedModelCatalogListVersionKind = "modelcatalog:published:list"
@@ -85,17 +86,25 @@ func NewCachedPublishedModelStore(
 		}),
 		latestByCode: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
 			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
-			Codec: adapterkit.CacheEntryCodec[port.PublishedModel]{
-				EncodeFunc: func(model *port.PublishedModel) ([]byte, error) { return json.Marshal(model) },
-				DecodeFunc: func(data []byte) (*port.PublishedModel, error) {
-					var model port.PublishedModel
-					if err := json.Unmarshal(data, &model); err != nil {
-						return nil, err
-					}
-					return &model, nil
-				},
-			},
+			Codec: publishedModelCodec(),
 		}),
+		exactByRef: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
+			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
+			Codec: publishedModelCodec(),
+		}),
+	}
+}
+
+func publishedModelCodec() adapterkit.CacheEntryCodec[port.PublishedModel] {
+	return adapterkit.CacheEntryCodec[port.PublishedModel]{
+		EncodeFunc: func(model *port.PublishedModel) ([]byte, error) { return json.Marshal(model) },
+		DecodeFunc: func(data []byte) (*port.PublishedModel, error) {
+			var model port.PublishedModel
+			if err := json.Unmarshal(data, &model); err != nil {
+				return nil, err
+			}
+			return &model, nil
+		},
 	}
 }
 
@@ -141,7 +150,31 @@ func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, 
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	return c.inner.GetPublishedModelByRef(ctx, ref)
+	if c.exactByRef == nil || !c.exactByRef.Available() {
+		return c.inner.GetPublishedModelByRef(ctx, ref)
+	}
+	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
+		PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
+		CacheKey:  c.refCacheKey(ref), PolicyProvider: c.policies,
+		Observer: c.observer, Store: c.exactByRef, AsyncSetCached: false,
+		Load: func(loadCtx context.Context) (*port.PublishedModel, error) {
+			return c.inner.GetPublishedModelByRef(loadCtx, ref)
+		},
+	})
+}
+
+// GetActivePublishedModelByRef deliberately bypasses exact-version payload
+// caching: an immutable payload may remain cached after its release is
+// archived, so admission must re-check active state against Mongo.
+func (c *CachedPublishedModelStore) GetActivePublishedModelByRef(ctx context.Context, ref port.Ref) (*port.PublishedModel, error) {
+	if c == nil || c.inner == nil {
+		return nil, domain.ErrNotFound
+	}
+	reader, ok := c.inner.(port.ActivePublishedModelReader)
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return reader.GetActivePublishedModelByRef(ctx, ref)
 }
 
 func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
@@ -152,6 +185,17 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 		return nil, domain.ErrNotFound
 	}
 	return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}
+
+func (c *CachedPublishedModelStore) ListPublishedReleaseHistory(ctx context.Context, code string) ([]*port.PublishedModel, error) {
+	if c == nil || c.inner == nil {
+		return nil, domain.ErrNotFound
+	}
+	reader, ok := c.inner.(port.PublishedReleaseHistoryReader)
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return reader.ListPublishedReleaseHistory(ctx, code)
 }
 
 func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
@@ -377,6 +421,16 @@ func (c *CachedPublishedModelStore) invalidatePublishedModel(ctx context.Context
 	c.invalidateCatalogListCaches(ctx)
 }
 
+// InvalidatePublishedModel removes only mutable-visibility caches. Immutable
+// exact-version entries are deliberately retained. Callers invoke this after
+// the Mongo transaction commits.
+func (c *CachedPublishedModelStore) InvalidatePublishedModel(ctx context.Context, kind domain.Kind, code string) {
+	if c == nil || code == "" {
+		return
+	}
+	c.invalidatePublishedModel(ctx, &port.PublishedModel{Kind: kind, Code: code})
+}
+
 func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Context) {
 	if c.catalogList == nil || !c.catalogList.Available() {
 		return
@@ -415,9 +469,11 @@ func (c *CachedPublishedModelStore) invalidateCatalogListCache(ctx context.Conte
 }
 
 var (
-	_ port.PublishedModelReader        = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedModelLister        = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedWriter             = (*CachedPublishedModelStore)(nil)
-	_ port.PublishedAlgorithmLister    = (*CachedPublishedModelStore)(nil)
-	_ cachetarget.PublishedModelWarmer = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedModelReader          = (*CachedPublishedModelStore)(nil)
+	_ port.ActivePublishedModelReader    = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedReleaseHistoryReader = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedModelLister          = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedWriter               = (*CachedPublishedModelStore)(nil)
+	_ port.PublishedAlgorithmLister      = (*CachedPublishedModelStore)(nil)
+	_ cachetarget.PublishedModelWarmer   = (*CachedPublishedModelStore)(nil)
 )

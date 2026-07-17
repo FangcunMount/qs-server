@@ -26,7 +26,10 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		Status:            bo.GetStatus().String(),
 		Type:              bo.GetType().String(),
 		RecordRole:        bo.GetRecordRole().String(),
-		IsActivePublished: bo.IsActivePublished(),
+		IsActivePublished: false,
+		ReleaseStatus:     string(bo.GetReleaseStatus()),
+		PublishedAt:       bo.GetPublishedAt(),
+		ReleaseArchivedAt: bo.GetReleaseArchivedAt(),
 	}
 	po.CreatedAt = bo.GetCreatedAt()
 	po.CreatedBy = bo.GetCreatedBy().Uint64()
@@ -106,6 +109,9 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 		questionnaire.WithType(questionnaire.NormalizeQuestionnaireType(po.Type)),
 		questionnaire.WithRecordRole(questionnaire.NormalizeRecordRole(po.RecordRole)),
 		questionnaire.WithActivePublished(po.IsActivePublished),
+		questionnaire.WithReleaseStatus(questionnaire.NormalizeReleaseStatus(questionnaire.ReleaseStatus(po.ReleaseStatus), po.IsActivePublished)),
+		questionnaire.WithPublishedAt(po.PublishedAt),
+		questionnaire.WithReleaseArchivedAt(po.ReleaseArchivedAt),
 		questionnaire.WithQuestionCount(po.QuestionCount),
 		questionnaire.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
 		questionnaire.WithCreatedAt(po.CreatedAt),

@@ -34,7 +34,8 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 		SchemaVersion:           schemaVersion,
 		PayloadFormat:           model.PayloadFormat,
 		RecordRole:              recordRolePublishedSnapshot,
-		IsActivePublished:       true,
+		IsActivePublished:       false,
+		ReleaseStatus:           string(domain.NormalizeReleaseStatus(model.ReleaseStatus, true)),
 		ProductChannel:          string(productChannel),
 		Kind:                    string(kind),
 		SubKind:                 string(model.SubKind),
@@ -56,6 +57,8 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 		Payload:                 append([]byte(nil), model.Payload...),
 		DefinitionSchemaVersion: definitionSchemaVersion(model.DefinitionV2),
 		DefinitionV2:            definitionToPO(model.DefinitionV2),
+		PublishedAt:             model.PublishedAt,
+		ReleaseArchivedAt:       model.ReleaseArchivedAt,
 	}
 }
 
@@ -89,6 +92,9 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		Reporters:            append([]string(nil), po.Reporters...),
 		Tags:                 append([]string(nil), po.Tags...),
 		Status:               po.Status,
+		ReleaseStatus:        domain.NormalizeReleaseStatus(domain.ReleaseStatus(po.ReleaseStatus), po.IsActivePublished),
+		PublishedAt:          po.PublishedAt,
+		ReleaseArchivedAt:    po.ReleaseArchivedAt,
 		DecisionKind:         domain.DecisionKind(po.DecisionKind),
 		QuestionnaireCode:    po.QuestionnaireCode,
 		QuestionnaireVersion: po.QuestionnaireVersion,

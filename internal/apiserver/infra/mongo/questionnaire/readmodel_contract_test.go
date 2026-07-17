@@ -86,14 +86,20 @@ func TestQuestionnairePublishedReadModelFilterDefaultsToPublishedSnapshotSemanti
 	if !ok {
 		t.Fatalf("snapshot branch = %#v, want bson.M", branches[0])
 	}
-	if snapshotBranch["record_role"] != domainQuestionnaire.RecordRolePublishedSnapshot.String() {
-		t.Fatalf("record_role = %#v, want published snapshot", snapshotBranch["record_role"])
+	andBranches, ok := snapshotBranch["$and"].(bson.A)
+	if !ok || len(andBranches) != 2 {
+		t.Fatalf("snapshot $and = %#v, want identity + active-release clauses", snapshotBranch["$and"])
 	}
-	if snapshotBranch["is_active_published"] != true {
-		t.Fatalf("is_active_published = %#v, want true", snapshotBranch["is_active_published"])
+	identity, _ := andBranches[0].(bson.M)
+	if identity["record_role"] != domainQuestionnaire.RecordRolePublishedSnapshot.String() {
+		t.Fatalf("record_role = %#v, want published snapshot", identity["record_role"])
 	}
-	if snapshotBranch["status"] != domainQuestionnaire.STATUS_PUBLISHED.String() {
-		t.Fatalf("status = %#v, want published", snapshotBranch["status"])
+	active, _ := andBranches[1].(bson.M)
+	if _, ok := active["$or"]; !ok {
+		t.Fatalf("active release clause = %#v, want dual-read $or", active)
+	}
+	if identity["status"] != domainQuestionnaire.STATUS_PUBLISHED.String() {
+		t.Fatalf("status = %#v, want published", identity["status"])
 	}
 }
 

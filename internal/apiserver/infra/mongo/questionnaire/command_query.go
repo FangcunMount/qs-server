@@ -47,11 +47,13 @@ func commandPublishedCodeMatch(code string) bson.M {
 		"code":       code,
 		"deleted_at": nil,
 		"$or": bson.A{
-			bson.M{
-				"record_role":         domainQuestionnaire.RecordRolePublishedSnapshot.String(),
-				"is_active_published": true,
-				"status":              statusValue,
-			},
+			bson.M{"$and": bson.A{
+				bson.M{
+					"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
+					"status":      statusValue,
+				},
+				questionnaireActiveReleaseClause(),
+			}},
 			bson.M{
 				"status": statusValue,
 				"$or":    headRoleCandidates(),
@@ -84,10 +86,26 @@ func commandPublishedPriorityExpr() bson.M {
 	return bson.M{"$cond": bson.A{
 		bson.M{"$and": bson.A{
 			bson.M{"$eq": bson.A{"$record_role", domainQuestionnaire.RecordRolePublishedSnapshot.String()}},
-			bson.M{"$eq": bson.A{"$is_active_published", true}},
+			bson.M{"$or": bson.A{
+				bson.M{"$eq": bson.A{"$release_status", string(domainQuestionnaire.ReleaseStatusActive)}},
+				bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{"$is_active_published", true}},
+					bson.M{"$eq": bson.A{bson.M{"$type": "$release_status"}, "missing"}},
+				}},
+			}},
 		}},
 		2,
 		1,
+	}}
+}
+
+func questionnaireActiveReleaseClause() bson.M {
+	return bson.M{"$or": bson.A{
+		bson.M{"release_status": string(domainQuestionnaire.ReleaseStatusActive)},
+		bson.M{
+			"release_status":      bson.M{"$exists": false},
+			"is_active_published": true,
+		},
 	}}
 }
 
@@ -102,6 +120,9 @@ func commandBaseProjectStage() bson.M {
 		"type":                1,
 		"record_role":         1,
 		"is_active_published": 1,
+		"release_status":      1,
+		"published_at":        1,
+		"release_archived_at": 1,
 		"question_count":      1,
 		"created_by":          1,
 		"created_at":          1,

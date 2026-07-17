@@ -494,6 +494,23 @@ definitions:
       questionnaire_version:
         type: string
     type: object
+  modelcatalog.AssessmentReleaseVersion:
+    properties:
+      archived_at:
+        type: string
+      current:
+        type: boolean
+      model_version:
+        type: string
+      published_at:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      release_status:
+        type: string
+    type: object
   modelcatalog.Definition:
     properties:
       calibration:
@@ -544,6 +561,8 @@ definitions:
         type: string
       rank:
         type: integer
+      release_state:
+        $ref: '#/definitions/modelcatalog.ReleaseState'
       reporters:
         items:
           type: string
@@ -596,6 +615,8 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      release_state:
+        $ref: '#/definitions/modelcatalog.ReleaseState'
       reporters:
         items:
           type: string
@@ -670,6 +691,8 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      release_state:
+        $ref: '#/definitions/modelcatalog.ReleaseState'
       reporters:
         items:
           type: string
@@ -694,6 +717,19 @@ definitions:
       version:
         type: string
     type: object
+  modelcatalog.ReleaseState:
+    properties:
+      active_version:
+        type: string
+      has_unpublished_changes:
+        type: boolean
+      online_status:
+        type: string
+      working_status:
+        type: string
+      working_version:
+        type: string
+    type: object
   modelcatalog.ValidationIssue:
     properties:
       code:
@@ -710,6 +746,19 @@ definitions:
       factorCode:
         type: string
       normTableVersion:
+        type: string
+    type: object
+  questionnaire.QuestionnaireReleaseVersion:
+    properties:
+      archived_at:
+        type: string
+      current:
+        type: boolean
+      published_at:
+        type: string
+      release_status:
+        type: string
+      version:
         type: string
     type: object
   request.AddQuestionRequest:
@@ -1551,6 +1600,8 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      release_state:
+        $ref: '#/definitions/modelcatalog.ReleaseState'
       reporters:
         items:
           type: string
@@ -2755,6 +2806,8 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      release_state:
+        $ref: '#/definitions/modelcatalog.ReleaseState'
       reporters:
         items:
           type: string
@@ -2798,6 +2851,19 @@ definitions:
       total_count:
         type: integer
     type: object
+  response.QuestionnaireReleaseStateResponse:
+    properties:
+      active_version:
+        type: string
+      has_unpublished_changes:
+        type: boolean
+      online_status:
+        type: string
+      working_status:
+        type: string
+      working_version:
+        type: string
+    type: object
   response.QuestionnaireResponse:
     properties:
       code:
@@ -2810,6 +2876,8 @@ definitions:
         items:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
+      release_state:
+        $ref: '#/definitions/response.QuestionnaireReleaseStateResponse'
       status:
         type: string
       title:
@@ -4479,34 +4547,6 @@ paths:
       summary: 获取测评模型详情
       tags:
       - AssessmentModel
-  /api/v1/assessment-models/{code}/archive:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 模型编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentModelResponse'
-              type: object
-      summary: 归档测评模型
-      tags:
-      - AssessmentModel
   /api/v1/assessment-models/{code}/basic-info:
     put:
       consumes:
@@ -4718,34 +4758,6 @@ paths:
       summary: 预览测评模型报告
       tags:
       - AssessmentModel
-  /api/v1/assessment-models/{code}/publish:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 模型编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentModelResponse'
-              type: object
-      summary: 发布测评模型
-      tags:
-      - AssessmentModel
   /api/v1/assessment-models/{code}/qrcode:
     get:
       parameters:
@@ -4835,62 +4847,6 @@ paths:
                   $ref: '#/definitions/response.AssessmentModelQuestionnaireResponse'
               type: object
       summary: 绑定问卷
-      tags:
-      - AssessmentModel
-  /api/v1/assessment-models/{code}/restore-draft:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 模型编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentModelResponse'
-              type: object
-      summary: 从发布快照恢复测评草稿
-      tags:
-      - AssessmentModel
-  /api/v1/assessment-models/{code}/unpublish:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 模型编码
-        in: path
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentModelResponse'
-              type: object
-      summary: 下架测评模型
       tags:
       - AssessmentModel
   /api/v1/assessment-models/{code}/validate:
@@ -5112,6 +5068,64 @@ paths:
                   $ref: '#/definitions/modelcatalog.AssessmentRelease'
               type: object
       summary: 发布测评版本
+      tags:
+      - AssessmentRelease
+  /api/v1/assessment-releases/{code}/unpublish:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/modelcatalog.AssessmentRelease'
+              type: object
+      summary: 下架测评版本
+      tags:
+      - AssessmentRelease
+  /api/v1/assessment-releases/{code}/versions:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/modelcatalog.AssessmentReleaseVersion'
+                  type: array
+              type: object
+      summary: 查询测评发布版本历史
       tags:
       - AssessmentRelease
   /api/v1/assessments/{id}/wait-report:
@@ -8018,6 +8032,36 @@ paths:
       summary: 下架问卷
       tags:
       - Questionnaire-Lifecycle
+  /api/v1/questionnaires/{code}/versions:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 问卷编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/questionnaire.QuestionnaireReleaseVersion'
+                  type: array
+              type: object
+      summary: 查询问卷发布版本历史
+      tags:
+      - Questionnaire-Query
   /api/v1/questionnaires/published:
     get:
       consumes:

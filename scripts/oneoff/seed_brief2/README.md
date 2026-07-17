@@ -6,7 +6,7 @@
 
 - `assessment_norms`：`brief2-parent-cn-legacy-gXkk9W-v1`，以年龄（月）和性别分层的 T 分/百分位查表项；
 - `assessment_models`：`behavioral_rating + brief2 + behavior_ability` 草稿；
-- `published_assessment_models`：冻结的 BRIEF-2 运行快照。
+- `assessment_models` 中的 `published_snapshot`：冻结的 BRIEF-2 运行快照。
 
 脚本只需要 MongoDB，不使用 MySQL。常模已经作为版本化、gzip+base64 编码的 JSON 资产内嵌在 `data/brief2-parent-cn-legacy-gXkk9W-v1.json.gz.b64`，服务器不需要 PHP，也不需要本地附件。Base64 不是加密，不应把未经授权的常模资产提交到公开仓库。
 
@@ -55,7 +55,7 @@ db.assessment_models.find(
   { code: "gXkk9W", deleted_at: null },
   { code: 1, kind: 1, algorithm: 1, product_channel: 1, questionnaire_code: 1, questionnaire_version: 1, status: 1 }
 )
-db.published_assessment_models.find(
+db.assessment_models.find(
   { model_code: "gXkk9W", deleted_at: null },
   { model_code: 1, model_kind: 1, model_algorithm: 1, model_product_channel: 1, questionnaire_code: 1, questionnaire_version: 1 }
 )

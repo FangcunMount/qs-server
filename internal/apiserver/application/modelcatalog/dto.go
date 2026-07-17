@@ -95,24 +95,43 @@ type ApplyCodesDTO struct {
 }
 
 type ModelSummary struct {
-	Code                 string   `json:"code"`
-	Kind                 string   `json:"kind" example:"typology"`
-	SubKind              string   `json:"sub_kind,omitempty" example:"typology"`
-	Algorithm            string   `json:"algorithm,omitempty"`
-	ProductChannel       string   `json:"product_channel,omitempty" example:"typology"`
-	AlgorithmFamily      string   `json:"algorithm_family,omitempty"`
-	Title                string   `json:"title"`
-	Description          string   `json:"description,omitempty"`
-	Status               string   `json:"status"`
-	Category             string   `json:"category,omitempty"`
-	Stages               []string `json:"stages,omitempty"`
-	ApplicableAges       []string `json:"applicable_ages,omitempty"`
-	Reporters            []string `json:"reporters,omitempty"`
-	Tags                 []string `json:"tags,omitempty"`
-	QuestionnaireCode    string   `json:"questionnaire_code,omitempty"`
-	QuestionnaireVersion string   `json:"questionnaire_version,omitempty"`
-	CreatedAt            string   `json:"created_at,omitempty"`
-	UpdatedAt            string   `json:"updated_at,omitempty"`
+	Code                 string       `json:"code"`
+	Kind                 string       `json:"kind" example:"typology"`
+	SubKind              string       `json:"sub_kind,omitempty" example:"typology"`
+	Algorithm            string       `json:"algorithm,omitempty"`
+	ProductChannel       string       `json:"product_channel,omitempty" example:"typology"`
+	AlgorithmFamily      string       `json:"algorithm_family,omitempty"`
+	Title                string       `json:"title"`
+	Description          string       `json:"description,omitempty"`
+	Status               string       `json:"status"`
+	Category             string       `json:"category,omitempty"`
+	Stages               []string     `json:"stages,omitempty"`
+	ApplicableAges       []string     `json:"applicable_ages,omitempty"`
+	Reporters            []string     `json:"reporters,omitempty"`
+	Tags                 []string     `json:"tags,omitempty"`
+	QuestionnaireCode    string       `json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string       `json:"questionnaire_version,omitempty"`
+	CreatedAt            string       `json:"created_at,omitempty"`
+	UpdatedAt            string       `json:"updated_at,omitempty"`
+	ReleaseState         ReleaseState `json:"release_state"`
+}
+
+type ReleaseState struct {
+	WorkingStatus         string `json:"working_status"`
+	WorkingVersion        string `json:"working_version"`
+	OnlineStatus          string `json:"online_status"`
+	ActiveVersion         string `json:"active_version,omitempty"`
+	HasUnpublishedChanges bool   `json:"has_unpublished_changes"`
+}
+
+type AssessmentReleaseVersion struct {
+	ModelVersion         string `json:"model_version"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	ReleaseStatus        string `json:"release_status"`
+	PublishedAt          string `json:"published_at,omitempty"`
+	ArchivedAt           string `json:"archived_at,omitempty"`
+	Current              bool   `json:"current"`
 }
 
 // PublishedModelDetail is the transport-neutral published catalogue view.

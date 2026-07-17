@@ -6,7 +6,10 @@ import (
 )
 
 // ErrNotFound 表示问卷仓储未找到目标记录。
-var ErrNotFound = stderrors.New("questionnaire not found")
+var (
+	ErrNotFound               = stderrors.New("questionnaire not found")
+	ErrReleaseVersionConflict = stderrors.New("questionnaire release version conflicts with existing content")
+)
 
 // IsNotFound 判断错误是否为问卷仓储未找到。
 func IsNotFound(err error) bool {
@@ -35,4 +38,10 @@ type Repository interface {
 	HardDeleteFamily(ctx context.Context, code string) error
 	ExistsByCode(ctx context.Context, code string) (bool, error)
 	HasPublishedSnapshots(ctx context.Context, code string) (bool, error)
+}
+
+// ReleaseHistoryRepository is the operator-only read boundary for immutable
+// questionnaire release metadata.
+type ReleaseHistoryRepository interface {
+	ListPublishedReleaseHistory(ctx context.Context, code string) ([]*Questionnaire, error)
 }

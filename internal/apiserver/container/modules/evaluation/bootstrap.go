@@ -21,23 +21,24 @@ import (
 
 // BootstrapInput carries container integration inputs for evaluation module bootstrap.
 type BootstrapInput struct {
-	MySQLDB                   *gorm.DB
-	InputResolver             evaluationinput.Resolver
-	ScaleCatalog              evaluationinput.ScaleCatalog
-	EventPublisher            event.EventPublisher
-	RedisClient               redis.UniversalClient
-	CacheBuilder              *keyspace.Builder
-	CachePolicies             sharedcache.PolicyProvider
-	QueryRedisClient          redis.UniversalClient
-	QueryCacheBuilder         *keyspace.Builder
-	VersionStore              querycache.VersionTokenStore
-	Observer                  *observability.ComponentObserver
-	MySQLLimiter              backpressure.Acquirer
-	TesteeAccessChecker       evaluationoperator.AccessChecker
-	ExecutionPaths            []modelcatalog.ExecutionPath
-	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
-	PublishedModelReader      rulesetport.PublishedModelReader
-	OutboxProfile             appEventing.ProfileBinding
+	MySQLDB                    *gorm.DB
+	InputResolver              evaluationinput.Resolver
+	ScaleCatalog               evaluationinput.ScaleCatalog
+	EventPublisher             event.EventPublisher
+	RedisClient                redis.UniversalClient
+	CacheBuilder               *keyspace.Builder
+	CachePolicies              sharedcache.PolicyProvider
+	QueryRedisClient           redis.UniversalClient
+	QueryCacheBuilder          *keyspace.Builder
+	VersionStore               querycache.VersionTokenStore
+	Observer                   *observability.ComponentObserver
+	MySQLLimiter               backpressure.Acquirer
+	TesteeAccessChecker        evaluationoperator.AccessChecker
+	ExecutionPaths             []modelcatalog.ExecutionPath
+	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
+	PublishedModelReader       rulesetport.PublishedModelReader
+	ActivePublishedModelReader rulesetport.ActivePublishedModelReader
+	OutboxProfile              appEventing.ProfileBinding
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

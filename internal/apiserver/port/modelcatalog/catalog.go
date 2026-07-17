@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"context"
+	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -56,6 +57,9 @@ type AssessmentSnapshot struct {
 	Reporters            []string
 	Tags                 []string
 	Status               string
+	ReleaseStatus        domain.ReleaseStatus
+	PublishedAt          *time.Time
+	ReleaseArchivedAt    *time.Time
 	DecisionKind         domain.DecisionKind
 	QuestionnaireCode    string
 	QuestionnaireVersion string
@@ -80,11 +84,24 @@ type PublishedModelReader interface {
 	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*PublishedModel, error)
 }
 
+// ActivePublishedModelReader is the admission-time read boundary. Unlike
+// PublishedModelReader, it rejects retained archived snapshots even when the
+// caller supplies an exact version.
+type ActivePublishedModelReader interface {
+	GetActivePublishedModelByRef(ctx context.Context, ref Ref) (*PublishedModel, error)
+}
+
 // PublishedModelLister lists v2 published assessment model records for C-side catalogs.
 // FindPublishedModelByCode returns the latest published record for a model code.
 type PublishedModelLister interface {
 	FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*PublishedModel, error)
 	ListPublishedModels(ctx context.Context, filter ListPublishedFilter) ([]*PublishedModel, int64, error)
+}
+
+// PublishedReleaseHistoryReader lists every retained immutable release for an
+// operator history view. It is never used by assessment admission.
+type PublishedReleaseHistoryReader interface {
+	ListPublishedReleaseHistory(ctx context.Context, code string) ([]*PublishedModel, error)
 }
 
 // PublishedAlgorithmLister lists distinct published personality typology algorithms.

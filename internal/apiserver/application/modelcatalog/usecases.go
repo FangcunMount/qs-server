@@ -11,9 +11,6 @@ import (
 // CatalogManagementService 拥有模型目录生命周期命令
 type CatalogManagementService interface {
 	Create(ctx context.Context, actor ActorContext, input CreateModelDTO) (*ModelSummary, error)
-	// RestoreDraftFromPublished recreates a missing mutable draft head from an
-	// active immutable snapshot. The snapshot remains active until republished.
-	RestoreDraftFromPublished(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 	UpdateBasicInfo(ctx context.Context, actor ActorContext, input UpdateBasicInfoDTO) (*ModelSummary, error)
 	BindQuestionnaire(ctx context.Context, actor ActorContext, input BindQuestionnaireDTO) (*QuestionnaireBindingResult, error)
 	Archive(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
@@ -62,6 +59,7 @@ type PublicationService interface {
 // assessment model pair. Standalone publication is intentionally absent.
 type AssessmentReleaseService interface {
 	PublishRelease(ctx context.Context, actor ActorContext, modelCode string) (*AssessmentRelease, error)
+	UnpublishRelease(ctx context.Context, actor ActorContext, modelCode string) (*AssessmentRelease, error)
 	ArchiveRelease(ctx context.Context, actor ActorContext, modelCode string) (*AssessmentRelease, error)
 }
 
@@ -75,6 +73,7 @@ type CatalogQueryService interface {
 	GetQuestionnaire(ctx context.Context, actor ActorContext, code string) (*QuestionnaireBindingResult, error)
 	Options(ctx context.Context, actor ActorContext, kind string) (*OptionsResult, error)
 	GetQRCode(ctx context.Context, actor ActorContext, code string) (string, error)
+	ListReleaseVersions(ctx context.Context, actor ActorContext, code string) ([]AssessmentReleaseVersion, error)
 }
 
 // NormTableService owns immutable norm-table import and administration reads.
@@ -87,6 +86,7 @@ type NormTableService interface {
 // PublishedModelResolver 是运行时只读的不可变模型访问路径
 type PublishedModelResolver interface {
 	ResolveByRef(ctx context.Context, actor ActorContext, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error)
+	ResolveActiveByRef(ctx context.Context, actor ActorContext, ref modelcatalogport.Ref) (*modelcatalogport.PublishedModel, error)
 	ResolveByQuestionnaire(ctx context.Context, actor ActorContext, questionnaireCode, questionnaireVersion string) (*modelcatalogport.PublishedModel, error)
 	ResolveLatestByCode(ctx context.Context, actor ActorContext, kind domain.Kind, code string) (*modelcatalogport.PublishedModel, error)
 	ListPublished(ctx context.Context, actor ActorContext, filter modelcatalogport.ListPublishedFilter) ([]*modelcatalogport.PublishedModel, int64, error)

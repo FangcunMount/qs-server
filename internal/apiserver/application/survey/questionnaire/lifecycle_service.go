@@ -127,6 +127,9 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	if err := s.validateCode(ctx, code, "publish"); err != nil {
 		return nil, err
 	}
+	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
+		return nil, err
+	}
 
 	// 2. 获取问卷
 	q, err := s.findQuestionnaireByCode(ctx, code, "publish")
@@ -164,6 +167,21 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	)
 
 	return toQuestionnaireResult(q), nil
+}
+
+func (s *lifecycleService) rejectBoundStandaloneLifecycle(ctx context.Context, questionnaireCode string) error {
+	reader, ok := s.bindingSyncer.(QuestionnaireAssessmentBindingReader)
+	if !ok {
+		return nil
+	}
+	bound, err := reader.IsQuestionnaireBound(ctx, questionnaireCode)
+	if err != nil {
+		return err
+	}
+	if bound {
+		return errors.WithCode(errorCode.ErrConflict, "已绑定测评模型的问卷必须通过 Assessment Release 操作")
+	}
+	return nil
 }
 
 // PublishForRelease is the transactional questionnaire half of an
@@ -312,6 +330,15 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, q *questionna
 		return
 	}
 	s.cacheSignalNotifier.NotifyQuestionnaireCacheChanged(ctx, q.GetCode().String(), q.GetVersion().String(), action)
+}
+
+func (s *lifecycleService) InvalidateReleaseCache(ctx context.Context, code string) {
+	invalidator, ok := s.repo.(interface {
+		InvalidateQuestionnaireCache(context.Context, string)
+	})
+	if ok {
+		invalidator.InvalidateQuestionnaireCache(ctx, code)
+	}
 }
 
 func (s *lifecycleService) syncQuestionnaireBindingVersion(ctx context.Context, questionnaireCode, version string) error {

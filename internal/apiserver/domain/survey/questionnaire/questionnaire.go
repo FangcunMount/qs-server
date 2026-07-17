@@ -26,6 +26,9 @@ type Questionnaire struct {
 	// —— 版本记录角色
 	recordRole        RecordRole
 	isActivePublished bool
+	releaseStatus     ReleaseStatus
+	publishedAt       *time.Time
+	releaseArchivedAt *time.Time
 
 	// —— 问题列表
 	questions   []Question // 问卷中的所有问题
@@ -93,6 +96,15 @@ func WithRecordRole(role RecordRole) QuestionnaireOption {
 func WithActivePublished(active bool) QuestionnaireOption {
 	return func(q *Questionnaire) { q.isActivePublished = active }
 }
+func WithReleaseStatus(status ReleaseStatus) QuestionnaireOption {
+	return func(q *Questionnaire) { q.releaseStatus = status }
+}
+func WithPublishedAt(at *time.Time) QuestionnaireOption {
+	return func(q *Questionnaire) { q.publishedAt = at }
+}
+func WithReleaseArchivedAt(at *time.Time) QuestionnaireOption {
+	return func(q *Questionnaire) { q.releaseArchivedAt = at }
+}
 func WithQuestions(ques []Question) QuestionnaireOption {
 	return func(q *Questionnaire) {
 		q.questions = ques
@@ -143,11 +155,16 @@ func (q *Questionnaire) IsHead() bool { return q.GetRecordRole() == RecordRoleHe
 func (q *Questionnaire) IsPublishedSnapshot() bool {
 	return q.GetRecordRole() == RecordRolePublishedSnapshot
 }
-func (q *Questionnaire) IsActivePublished() bool { return q.isActivePublished }
-func (q *Questionnaire) GetCreatedBy() meta.ID   { return q.createdBy }
-func (q *Questionnaire) GetCreatedAt() time.Time { return q.createdAt }
-func (q *Questionnaire) GetUpdatedBy() meta.ID   { return q.updatedBy }
-func (q *Questionnaire) GetUpdatedAt() time.Time { return q.updatedAt }
+func (q *Questionnaire) GetReleaseStatus() ReleaseStatus {
+	return NormalizeReleaseStatus(q.releaseStatus, q.isActivePublished)
+}
+func (q *Questionnaire) IsActivePublished() bool          { return q.GetReleaseStatus().IsActive() }
+func (q *Questionnaire) GetPublishedAt() *time.Time       { return q.publishedAt }
+func (q *Questionnaire) GetReleaseArchivedAt() *time.Time { return q.releaseArchivedAt }
+func (q *Questionnaire) GetCreatedBy() meta.ID            { return q.createdBy }
+func (q *Questionnaire) GetCreatedAt() time.Time          { return q.createdAt }
+func (q *Questionnaire) GetUpdatedBy() meta.ID            { return q.updatedBy }
+func (q *Questionnaire) GetUpdatedAt() time.Time          { return q.updatedAt }
 
 // Status 问卷状态判断
 func (q *Questionnaire) IsDraft() bool     { return q.status == STATUS_DRAFT }
@@ -195,6 +212,16 @@ func (q *Questionnaire) SetRecordRole(role RecordRole) {
 
 func (q *Questionnaire) SetActivePublished(active bool) {
 	q.isActivePublished = active
+	if active {
+		q.releaseStatus = ReleaseStatusActive
+	} else if q.IsPublishedSnapshot() {
+		q.releaseStatus = ReleaseStatusArchived
+	}
+}
+
+func (q *Questionnaire) SetReleaseStatus(status ReleaseStatus) {
+	q.releaseStatus = NormalizeReleaseStatus(status, q.isActivePublished)
+	q.isActivePublished = q.releaseStatus.IsActive()
 }
 
 // GetQuestionByCode 根据问题编码获取问题

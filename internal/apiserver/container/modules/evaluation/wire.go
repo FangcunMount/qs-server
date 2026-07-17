@@ -91,25 +91,30 @@ func Wire(in WireInput) (WireResult, error) {
 	if reader, ok := catalog.(rulesetport.PublishedModelReader); ok {
 		publishedModelReader = reader
 	}
+	var activePublishedModelReader rulesetport.ActivePublishedModelReader
+	if reader, ok := catalog.(rulesetport.ActivePublishedModelReader); ok {
+		activePublishedModelReader = reader
+	}
 
 	module, err := Bootstrap(BootstrapInput{
-		MySQLDB:                   in.MySQLDB,
-		InputResolver:             inputResolver,
-		ScaleCatalog:              scaleCatalog,
-		EventPublisher:            in.EventPublisher,
-		RedisClient:               in.RedisClient,
-		CacheBuilder:              in.CacheBuilder,
-		CachePolicies:             in.CachePolicies,
-		QueryRedisClient:          in.QueryRedisClient,
-		QueryCacheBuilder:         in.QueryCacheBuilder,
-		VersionStore:              versionStore,
-		Observer:                  in.Observer,
-		MySQLLimiter:              in.MySQLLimiter,
-		TesteeAccessChecker:       in.TesteeAccessChecker,
-		ExecutionPaths:            executionPaths,
-		RuntimeDescriptorRegistry: in.RuntimeDescriptorRegistry,
-		PublishedModelReader:      publishedModelReader,
-		OutboxProfile:             in.OutboxProfile,
+		MySQLDB:                    in.MySQLDB,
+		InputResolver:              inputResolver,
+		ScaleCatalog:               scaleCatalog,
+		EventPublisher:             in.EventPublisher,
+		RedisClient:                in.RedisClient,
+		CacheBuilder:               in.CacheBuilder,
+		CachePolicies:              in.CachePolicies,
+		QueryRedisClient:           in.QueryRedisClient,
+		QueryCacheBuilder:          in.QueryCacheBuilder,
+		VersionStore:               versionStore,
+		Observer:                   in.Observer,
+		MySQLLimiter:               in.MySQLLimiter,
+		TesteeAccessChecker:        in.TesteeAccessChecker,
+		ExecutionPaths:             executionPaths,
+		RuntimeDescriptorRegistry:  in.RuntimeDescriptorRegistry,
+		PublishedModelReader:       publishedModelReader,
+		ActivePublishedModelReader: activePublishedModelReader,
+		OutboxProfile:              in.OutboxProfile,
 	})
 	if err != nil {
 		return WireResult{}, err

@@ -16,44 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type assessmentModelPublicationStub struct {
-	publishResult *modelcatalog.ModelSummary
-	publishErr    error
-	publishCalled bool
-}
-
-type assessmentModelManagementStub struct {
-	restoreResult *modelcatalog.ModelSummary
-	restoreErr    error
-	restoredCode  string
-}
-
-func (*assessmentModelManagementStub) Create(context.Context, modelcatalog.ActorContext, modelcatalog.CreateModelDTO) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-func (s *assessmentModelManagementStub) RestoreDraftFromPublished(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.ModelSummary, error) {
-	s.restoredCode = code
-	return s.restoreResult, s.restoreErr
-}
-func (*assessmentModelManagementStub) UpdateBasicInfo(context.Context, modelcatalog.ActorContext, modelcatalog.UpdateBasicInfoDTO) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-func (*assessmentModelManagementStub) BindQuestionnaire(context.Context, modelcatalog.ActorContext, modelcatalog.BindQuestionnaireDTO) (*modelcatalog.QuestionnaireBindingResult, error) {
-	return nil, nil
-}
-func (*assessmentModelManagementStub) Archive(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
-}
-func (*assessmentModelManagementStub) Delete(context.Context, modelcatalog.ActorContext, string) error {
-	return nil
-}
-func (*assessmentModelManagementStub) SynchronizeQuestionnaireVersion(context.Context, modelcatalog.ActorContext, string, string) error {
-	return nil
-}
-
 type assessmentReleaseStub struct {
-	publishCalled bool
-	archiveCalled bool
+	publishCalled   bool
+	unpublishCalled bool
+	archiveCalled   bool
 }
 
 func (s *assessmentReleaseStub) PublishRelease(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.AssessmentRelease, error) {
@@ -66,13 +32,9 @@ func (s *assessmentReleaseStub) ArchiveRelease(_ context.Context, _ modelcatalog
 	return &modelcatalog.AssessmentRelease{ModelCode: code, ModelStatus: "archived", QuestionnaireCode: "q1", QuestionnaireVersion: "1.0.0", QuestionnaireStatus: "archived"}, nil
 }
 
-func (s *assessmentModelPublicationStub) Publish(_ context.Context, _ modelcatalog.ActorContext, _ string) (*modelcatalog.ModelSummary, error) {
-	s.publishCalled = true
-	return s.publishResult, s.publishErr
-}
-
-func (*assessmentModelPublicationStub) Unpublish(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ModelSummary, error) {
-	return nil, nil
+func (s *assessmentReleaseStub) UnpublishRelease(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.AssessmentRelease, error) {
+	s.unpublishCalled = true
+	return &modelcatalog.AssessmentRelease{ModelCode: code, ModelStatus: "draft", QuestionnaireCode: "q1", QuestionnaireVersion: "1.0.0", QuestionnaireStatus: "draft"}, nil
 }
 
 type assessmentModelDefinitionStub struct {
@@ -125,53 +87,13 @@ func (*assessmentModelQueryStub) Options(context.Context, modelcatalog.ActorCont
 func (s *assessmentModelQueryStub) GetQRCode(context.Context, modelcatalog.ActorContext, string) (string, error) {
 	return s.qrCodeURL, s.qrCodeErr
 }
+func (*assessmentModelQueryStub) ListReleaseVersions(context.Context, modelcatalog.ActorContext, string) ([]modelcatalog.AssessmentReleaseVersion, error) {
+	return nil, nil
+}
 
 func setAssessmentModelActor(c *gin.Context) {
 	c.Set(restmiddleware.PrincipalKey, securityplane.Principal{Kind: securityplane.PrincipalKindUser, Source: securityplane.PrincipalSourceHTTPJWT, OrgID: 1, HasOrgID: true})
 	c.Set(restmiddleware.OrgScopeKey, securityplane.OrgScope{OrgID: 1, HasOrgID: true})
-}
-
-func TestAssessmentModelPublishUsesPublicationService(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	svc := &assessmentModelPublicationStub{publishResult: &modelcatalog.ModelSummary{Code: "model_ok", Title: "Model"}}
-	handler := NewAssessmentModelHandler(nil, nil, svc, nil)
-
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-models/model_bad/publish", nil)
-	c.Params = gin.Params{{Key: "code", Value: "model_bad"}}
-	setAssessmentModelActor(c)
-
-	handler.Publish(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if !svc.publishCalled {
-		t.Fatal("publication service was not called")
-	}
-}
-
-func TestAssessmentModelRestoreDraftUsesManagementService(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	svc := &assessmentModelManagementStub{restoreResult: &modelcatalog.ModelSummary{Code: "IPIP_BF50", Status: "draft"}}
-	handler := NewAssessmentModelHandler(svc, nil, nil, nil)
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-models/IPIP_BF50/restore-draft", nil)
-	c.Params = gin.Params{{Key: "code", Value: "IPIP_BF50"}}
-	setAssessmentModelActor(c)
-
-	handler.RestoreDraftFromPublished(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if svc.restoredCode != "IPIP_BF50" {
-		t.Fatalf("restored code = %q, want IPIP_BF50", svc.restoredCode)
-	}
 }
 
 func TestAssessmentReleaseHandlerUsesSinglePairService(t *testing.T) {
@@ -184,6 +106,7 @@ func TestAssessmentReleaseHandlerUsesSinglePairService(t *testing.T) {
 		call func(*gin.Context)
 	}{
 		{name: "publish", call: handler.Publish},
+		{name: "unpublish", call: handler.Unpublish},
 		{name: "archive", call: handler.Archive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -199,8 +122,8 @@ func TestAssessmentReleaseHandlerUsesSinglePairService(t *testing.T) {
 			}
 		})
 	}
-	if !svc.publishCalled || !svc.archiveCalled {
-		t.Fatalf("release calls = publish:%t archive:%t, want both true", svc.publishCalled, svc.archiveCalled)
+	if !svc.publishCalled || !svc.unpublishCalled || !svc.archiveCalled {
+		t.Fatalf("release calls = publish:%t unpublish:%t archive:%t, want all true", svc.publishCalled, svc.unpublishCalled, svc.archiveCalled)
 	}
 }
 
@@ -217,7 +140,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 			},
 		}),
 	}
-	handler := NewAssessmentModelHandler(nil, svc, nil, nil)
+	handler := NewAssessmentModelHandler(nil, svc, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -261,7 +184,7 @@ func TestAssessmentModelGetQRCodeReturnsURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	svc := &assessmentModelQueryStub{qrCodeURL: "https://example.com/qrcodes/personality_demo.png"}
-	handler := NewAssessmentModelHandler(nil, nil, nil, svc)
+	handler := NewAssessmentModelHandler(nil, nil, svc)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)

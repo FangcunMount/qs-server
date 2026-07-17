@@ -2,6 +2,8 @@ package questionnaire
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -38,6 +40,9 @@ func (r *Repository) Create(ctx context.Context, qDomain *domainQuestionnaire.Qu
 	po.BeforeInsert()
 	po.RecordRole = domainQuestionnaire.RecordRoleHead.String()
 	po.IsActivePublished = false
+	po.ReleaseStatus = ""
+	po.ReleaseArchivedAt = nil
+	po.PublishedAt = nil
 
 	insertData, err := po.ToBsonM()
 	if err != nil {
@@ -48,17 +53,25 @@ func (r *Repository) Create(ctx context.Context, qDomain *domainQuestionnaire.Qu
 	return err
 }
 
-// CreatePublishedSnapshot 创建或更新已发布快照
+// CreatePublishedSnapshot inserts an immutable release snapshot. Repeating the
+// same active snapshot is idempotent; content changes under the same version
+// and archived-version reactivation are rejected.
 func (r *Repository) CreatePublishedSnapshot(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire, active bool) error {
 	po := r.mapper.ToPO(qDomain)
 	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
 	po.RecordRole = domainQuestionnaire.RecordRolePublishedSnapshot.String()
-	po.IsActivePublished = active
-
-	updateData, err := po.ToBsonM()
-	if err != nil {
-		return err
+	po.IsActivePublished = false
+	po.ReleaseStatus = string(domainQuestionnaire.ReleaseStatusArchived)
+	now := time.Now()
+	if active {
+		po.ReleaseStatus = string(domainQuestionnaire.ReleaseStatusActive)
+		po.ReleaseArchivedAt = nil
+	} else {
+		po.ReleaseArchivedAt = &now
+	}
+	if po.PublishedAt == nil {
+		po.PublishedAt = &now
 	}
 
 	filter := bson.M{
@@ -67,10 +80,43 @@ func (r *Repository) CreatePublishedSnapshot(ctx context.Context, qDomain *domai
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 	}
-	update := bson.M{"$set": updateData}
+	var existing QuestionnairePO
+	findErr := r.Collection().FindOne(ctx, filter).Decode(&existing)
+	if findErr == nil {
+		if !sameImmutableQuestionnaireContent(&existing, po) {
+			return fmt.Errorf("%w: %s@%s", domainQuestionnaire.ErrReleaseVersionConflict, po.Code, po.Version)
+		}
+		existingStatus := domainQuestionnaire.NormalizeReleaseStatus(domainQuestionnaire.ReleaseStatus(existing.ReleaseStatus), existing.IsActivePublished)
+		if active && existingStatus != domainQuestionnaire.ReleaseStatusActive {
+			return fmt.Errorf("%w: archived questionnaire %s@%s cannot be reactivated", domainQuestionnaire.ErrReleaseVersionConflict, po.Code, po.Version)
+		}
+		return nil
+	}
+	if findErr != mongo.ErrNoDocuments {
+		return findErr
+	}
 
-	_, err = r.Collection().UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	mongoBase.ApplyAuditCreate(ctx, po)
+	po.BeforeInsert()
+	insertData, err := po.ToBsonM()
+	if err != nil {
+		return err
+	}
+	_, err = r.Collection().InsertOne(ctx, insertData)
 	return err
+}
+
+func sameImmutableQuestionnaireContent(a, b *QuestionnairePO) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	aCopy, bCopy := *a, *b
+	aCopy.BaseDocument, bCopy.BaseDocument = mongoBase.BaseDocument{}, mongoBase.BaseDocument{}
+	aCopy.IsActivePublished, bCopy.IsActivePublished = false, false
+	aCopy.ReleaseStatus, bCopy.ReleaseStatus = "", ""
+	aCopy.PublishedAt, bCopy.PublishedAt = nil, nil
+	aCopy.ReleaseArchivedAt, bCopy.ReleaseArchivedAt = nil, nil
+	return reflect.DeepEqual(aCopy, bCopy)
 }
 
 // FindByCode 根据编码查询工作版本
@@ -111,6 +157,28 @@ func (r *Repository) FindLatestPublishedByCode(ctx context.Context, code string)
 		return nil, err
 	}
 	return q, nil
+}
+
+func (r *Repository) ListPublishedReleaseHistory(ctx context.Context, code string) ([]*domainQuestionnaire.Questionnaire, error) {
+	cursor, err := r.Find(ctx, bson.M{
+		"code": code, "record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(), "deleted_at": nil,
+	}, options.Find().SetSort(bson.D{{Key: "published_at", Value: -1}, {Key: "version", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	items := make([]*domainQuestionnaire.Questionnaire, 0)
+	for cursor.Next(ctx) {
+		var po QuestionnairePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		items = append(items, r.mapper.ToBO(&po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 // FindByCodeVersion 根据编码和版本查询问卷
@@ -214,6 +282,9 @@ func (r *Repository) Update(ctx context.Context, qDomain *domainQuestionnaire.Qu
 	po.BeforeUpdate()
 	po.RecordRole = domainQuestionnaire.RecordRoleHead.String()
 	po.IsActivePublished = false
+	po.ReleaseStatus = ""
+	po.ReleaseArchivedAt = nil
+	po.PublishedAt = nil
 
 	updateData, err := po.ToBsonM()
 	if err != nil {
@@ -237,7 +308,8 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 	}, bson.M{"$set": bson.M{
-		"is_active_published": false,
+		"release_status":      string(domainQuestionnaire.ReleaseStatusArchived),
+		"release_archived_at": now,
 		"updated_at":          now,
 		"updated_by":          userID,
 	}})
@@ -250,11 +322,14 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 		"version":     version,
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
-	}, bson.M{"$set": bson.M{
-		"is_active_published": true,
-		"updated_at":          now,
-		"updated_by":          userID,
-	}})
+	}, bson.M{
+		"$set": bson.M{
+			"release_status": string(domainQuestionnaire.ReleaseStatusActive),
+			"updated_at":     now,
+			"updated_by":     userID,
+		},
+		"$unset": bson.M{"release_archived_at": ""},
+	})
 	if err != nil {
 		return err
 	}
@@ -273,7 +348,8 @@ func (r *Repository) ClearActivePublishedVersion(ctx context.Context, code strin
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 	}, bson.M{"$set": bson.M{
-		"is_active_published": false,
+		"release_status":      string(domainQuestionnaire.ReleaseStatusArchived),
+		"release_archived_at": now,
 		"updated_at":          now,
 		"updated_by":          userID,
 	}})

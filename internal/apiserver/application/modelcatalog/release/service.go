@@ -39,6 +39,7 @@ var _ modelcatalog.AssessmentReleaseService = Service{}
 func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
 	var result *modelcatalog.AssessmentRelease
+	var transitionedModel *domain.AssessmentModel
 	alreadyPublished := false
 	err := s.withTransaction(ctx, func(txCtx context.Context) error {
 		model, err := s.loadAndAuthorize(txCtx, actor, modelCode, modelcatalog.ActionPublishCatalog)
@@ -81,6 +82,7 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 		if _, err := publisher.Publish(txCtx, model, publication.PublishOptions{ReplaceKind: model.Kind}); err != nil {
 			return err
 		}
+		transitionedModel = model
 		result = releaseFrom(model, questionnaireResult.Status, "")
 		return nil
 	})
@@ -94,18 +96,60 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 	}
 	// Effects run after the transaction has committed, avoiding a QR/cache
 	// consumer observing a release that later rolls back.
-	model, err := s.Models.FindByCode(ctx, modelCode)
+	s.invalidateQuestionnaireCache(ctx, result.QuestionnaireCode)
+	s.Effects.AfterTransition(ctx, transitionedModel, lifecycle.ActionPublished)
+	logger.L(ctx).Infow("测评发布成功", "release_action", "publish", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
+	return result, nil
+}
+
+// UnpublishRelease atomically takes the current questionnaire/model pair
+// offline. Retained snapshots remain exact-version readable for assessments
+// created before the transition.
+func (s Service) UnpublishRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
+	start := time.Now()
+	var result *modelcatalog.AssessmentRelease
+	var transitionedModel *domain.AssessmentModel
+	err := s.withTransaction(ctx, func(txCtx context.Context) error {
+		model, err := s.loadAndAuthorize(txCtx, actor, modelCode, modelcatalog.ActionPublishCatalog)
+		if err != nil {
+			return err
+		}
+		if model.Binding.QuestionnaireCode == "" {
+			return errors.WithCode(code.ErrInvalidArgument, "assessment release requires a questionnaire binding")
+		}
+		questionnaireResult, err := s.Questionnaires.UnpublishForRelease(txCtx, model.Binding.QuestionnaireCode)
+		if err != nil {
+			return err
+		}
+		if err := s.Published.DeletePublished(txCtx, model.Kind, model.Code); err != nil {
+			return err
+		}
+		if model.IsPublished() {
+			if err := model.MarkUnpublished(s.now()); err != nil {
+				return err
+			}
+			if err := s.Models.Update(txCtx, model); err != nil {
+				return err
+			}
+		}
+		transitionedModel = model
+		result = releaseFrom(model, questionnaireResult.Status, "draft")
+		return nil
+	})
 	if err != nil {
+		logger.L(ctx).Errorw("测评下架事务失败", "release_action", "unpublish", "model_code", modelCode, "transaction_result", "rolled_back", "duration_ms", time.Since(start).Milliseconds(), "error", err.Error())
 		return nil, err
 	}
-	s.Effects.AfterTransition(ctx, model, lifecycle.ActionPublished)
-	logger.L(ctx).Infow("测评发布成功", "release_action", "publish", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
+	s.invalidateQuestionnaireCache(ctx, result.QuestionnaireCode)
+	s.Effects.AfterTransition(ctx, transitionedModel, lifecycle.ActionUnpublished)
+	logger.L(ctx).Infow("测评下架成功", "release_action", "unpublish", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
 	return result, nil
 }
 
 func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
 	var result *modelcatalog.AssessmentRelease
+	var transitionedModel *domain.AssessmentModel
 	err := s.withTransaction(ctx, func(txCtx context.Context) error {
 		model, err := s.loadAndAuthorize(txCtx, actor, modelCode, modelcatalog.ActionManageCatalog)
 		if err != nil {
@@ -119,10 +163,11 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 			return err
 		}
 		if !model.IsArchived() {
-			if model.IsPublished() {
-				if err := s.Published.DeletePublished(txCtx, model.Kind, model.Code); err != nil {
-					return err
-				}
+			// A draft head can still have an older active release. Archiving the
+			// release family must therefore archive by snapshot state rather than
+			// by the mutable head status.
+			if err := s.Published.DeletePublished(txCtx, model.Kind, model.Code); err != nil {
+				return err
 			}
 			if err := model.MarkArchived(s.now()); err != nil {
 				return err
@@ -131,6 +176,7 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 				return err
 			}
 		}
+		transitionedModel = model
 		result = releaseFrom(model, questionnaireResult.Status, "archived")
 		return nil
 	})
@@ -138,11 +184,8 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 		logger.L(ctx).Errorw("测评归档事务失败", "release_action", "archive", "model_code", modelCode, "transaction_result", "rolled_back", "duration_ms", time.Since(start).Milliseconds(), "error", err.Error())
 		return nil, err
 	}
-	model, err := s.Models.FindByCode(ctx, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	s.Effects.AfterTransition(ctx, model, lifecycle.ActionArchived)
+	s.invalidateQuestionnaireCache(ctx, result.QuestionnaireCode)
+	s.Effects.AfterTransition(ctx, transitionedModel, lifecycle.ActionArchived)
 	logger.L(ctx).Infow("测评归档成功", "release_action", "archive", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
 	return result, nil
 }
@@ -176,6 +219,12 @@ func (s Service) now() time.Time {
 		return s.Now().UTC()
 	}
 	return time.Now().UTC()
+}
+
+func (s Service) invalidateQuestionnaireCache(ctx context.Context, code string) {
+	if invalidator, ok := s.Questionnaires.(questionnaire.QuestionnaireReleaseCacheInvalidator); ok {
+		invalidator.InvalidateReleaseCache(ctx, code)
+	}
 }
 
 func releaseFrom(model *domain.AssessmentModel, questionnaireStatus, forcedStatus string) *modelcatalog.AssessmentRelease {
