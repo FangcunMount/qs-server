@@ -185,7 +185,7 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 	}
 	snapshots, duplicateIssues := deduplicateSnapshots(snapshots)
 	rep := report{Heads: len(heads), Snapshots: len(snapshots), Issues: duplicateIssues}
-	seenHeads, seenActive, seenRelease, seenActiveQuestionnaire := map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}
+	seenHeads := map[string]struct{}{}
 	for _, head := range heads {
 		code := stringField(head, "code")
 		if code == "" {
@@ -197,43 +197,17 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 		}
 		seenHeads[code] = struct{}{}
 	}
-	for _, row := range snapshots {
-		code, kind, version := snapshotField(row, "code"), snapshotField(row, "kind"), snapshotField(row, "version")
-		if code == "" || kind == "" || version == "" || len(bytesField(row, "payload")) == 0 {
-			rep.Issues = append(rep.Issues, fmt.Sprintf("invalid published snapshot code=%q kind=%q version=%q", code, kind, version))
-			continue
-		}
-		if stringField(row, "payload_format") == "" || stringField(row, "decision_kind") == "" || row["definition_v2"] == nil {
-			rep.Issues = append(rep.Issues, fmt.Sprintf("incomplete published snapshot %s@%s", code, version))
-		}
-		key := strings.Join([]string{kind, snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), code, version}, "|")
-		if _, ok := seenRelease[key]; ok {
-			rep.Issues = append(rep.Issues, "duplicate published release "+key)
-		}
-		seenRelease[key] = struct{}{}
-		if snapshotActive(row) {
-			if _, ok := seenActive[code]; ok {
-				rep.Issues = append(rep.Issues, "multiple active snapshots for "+code)
-			}
-			seenActive[code] = struct{}{}
-			bindingKey := stringField(row, "questionnaire_code") + "@" + stringField(row, "questionnaire_version")
-			if bindingKey == "@" {
-				rep.Issues = append(rep.Issues, "active snapshot without questionnaire binding "+code)
-			} else if _, ok := seenActiveQuestionnaire[bindingKey]; ok {
-				rep.Issues = append(rep.Issues, "multiple active snapshots for questionnaire "+bindingKey)
-			} else {
-				seenActiveQuestionnaire[bindingKey] = struct{}{}
-			}
-		} else {
-			rep.RetiredSnapshots++
-		}
-		if _, ok := seenHeads[code]; !ok {
-			rep.OrphanSnapshots++
-		}
-	}
+	modelInspection := inspectModelSnapshots(snapshots, seenHeads)
+	rep.Issues = append(rep.Issues, modelInspection.issues...)
+	rep.ActiveSnapshots = len(modelInspection.activeCodes)
+	rep.RetiredSnapshots = modelInspection.retired
+	rep.OrphanSnapshots = modelInspection.orphaned
 	for _, head := range heads {
 		code, status := stringField(head, "code"), stringField(head, "status")
-		_, active := seenActive[code]
+		if code == "" {
+			continue
+		}
+		_, active := modelInspection.activeCodes[code]
 		if status == "published" && !active {
 			rep.Issues = append(rep.Issues, "published model head without active snapshot "+code)
 		}
@@ -253,45 +227,133 @@ func audit(ctx context.Context, db *mongo.Database, headsName, snapshotsName str
 	rep.Issues = append(rep.Issues, questionnaireDuplicateIssues...)
 	rep.QuestionnaireHeads = len(questionnaireHeads)
 	rep.QuestionnaireSnapshots = len(questionnaireSnapshots)
-	activeQuestionnaireVersions := map[string]struct{}{}
-	activeQuestionnaireCodes := map[string]struct{}{}
-	for _, row := range questionnaireSnapshots {
+	questionnaireInspection := inspectQuestionnaireSnapshots(questionnaireSnapshots)
+	rep.Issues = append(rep.Issues, questionnaireInspection.issues...)
+	rep.ActiveQuestionnaires = len(questionnaireInspection.activeCodes)
+	for _, row := range snapshots {
 		if !snapshotActive(row) {
 			continue
 		}
-		code, version := stringField(row, "code"), stringField(row, "version")
-		if code == "" || version == "" {
-			rep.Issues = append(rep.Issues, "active questionnaire snapshot without identity")
+		questionnaireCode, questionnaireVersion := stringField(row, "questionnaire_code"), stringField(row, "questionnaire_version")
+		if questionnaireCode == "" || questionnaireVersion == "" {
 			continue
 		}
-		if _, ok := activeQuestionnaireCodes[code]; ok {
-			rep.Issues = append(rep.Issues, "multiple active questionnaire snapshots for "+code)
-		}
-		activeQuestionnaireCodes[code] = struct{}{}
-		activeQuestionnaireVersions[code+"@"+version] = struct{}{}
-	}
-	rep.ActiveSnapshots = len(seenActive)
-	rep.ActiveQuestionnaires = len(activeQuestionnaireCodes)
-	for _, row := range snapshots {
-		if snapshotActive(row) {
-			binding := stringField(row, "questionnaire_code") + "@" + stringField(row, "questionnaire_version")
-			if _, ok := activeQuestionnaireVersions[binding]; !ok {
-				rep.Issues = append(rep.Issues, "active model references non-active questionnaire "+binding)
-			}
+		binding := questionnaireCode + "@" + questionnaireVersion
+		if _, ok := questionnaireInspection.activeVersions[binding]; !ok {
+			rep.Issues = append(rep.Issues, "active model references non-active questionnaire "+binding)
 		}
 	}
-	for _, head := range questionnaireHeads {
-		code, status := stringField(head, "code"), stringField(head, "status")
-		_, active := activeQuestionnaireCodes[code]
-		if status == "published" && !active {
-			rep.Issues = append(rep.Issues, "published questionnaire head without active snapshot "+code)
-		}
-		if status == "archived" && active {
-			rep.Issues = append(rep.Issues, "archived questionnaire head with active snapshot "+code)
-		}
-	}
+	rep.Issues = append(rep.Issues, inspectQuestionnaireHeads(questionnaireHeads, questionnaireInspection.activeCodes)...)
 	sort.Strings(rep.Issues)
 	return rep, nil
+}
+
+type modelSnapshotInspection struct {
+	issues      []string
+	activeCodes map[string]struct{}
+	retired     int
+	orphaned    int
+}
+
+func inspectModelSnapshots(snapshots []bson.M, headCodes map[string]struct{}) modelSnapshotInspection {
+	result := modelSnapshotInspection{activeCodes: map[string]struct{}{}}
+	seenRelease := map[string]struct{}{}
+	seenActiveQuestionnaire := map[string]struct{}{}
+	for _, row := range snapshots {
+		code, kind, version := snapshotField(row, "code"), snapshotField(row, "kind"), snapshotField(row, "version")
+		if snapshotActive(row) {
+			if code != "" {
+				if _, ok := result.activeCodes[code]; ok {
+					result.issues = append(result.issues, "multiple active snapshots for "+code)
+				}
+				result.activeCodes[code] = struct{}{}
+			}
+			questionnaireCode, questionnaireVersion := stringField(row, "questionnaire_code"), stringField(row, "questionnaire_version")
+			if questionnaireCode == "" || questionnaireVersion == "" {
+				result.issues = append(result.issues, fmt.Sprintf("active snapshot without questionnaire binding %s code=%q version=%q", code, questionnaireCode, questionnaireVersion))
+			} else {
+				bindingKey := questionnaireCode + "@" + questionnaireVersion
+				if _, ok := seenActiveQuestionnaire[bindingKey]; ok {
+					result.issues = append(result.issues, "multiple active snapshots for questionnaire "+bindingKey)
+				} else {
+					seenActiveQuestionnaire[bindingKey] = struct{}{}
+				}
+			}
+		} else {
+			result.retired++
+		}
+		if code != "" {
+			if _, ok := headCodes[code]; !ok {
+				result.orphaned++
+			}
+		}
+
+		payload := bytesField(row, "payload")
+		if code == "" || kind == "" || version == "" || len(payload) == 0 {
+			result.issues = append(result.issues, fmt.Sprintf("invalid published snapshot code=%q kind=%q version=%q payload_type=%T", code, kind, version, row["payload"]))
+			continue
+		}
+		if stringField(row, "payload_format") == "" || stringField(row, "decision_kind") == "" || row["definition_v2"] == nil {
+			result.issues = append(result.issues, fmt.Sprintf("incomplete published snapshot %s@%s", code, version))
+		}
+		key := strings.Join([]string{kind, snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), code, version}, "|")
+		if _, ok := seenRelease[key]; ok {
+			result.issues = append(result.issues, "duplicate published release "+key)
+		}
+		seenRelease[key] = struct{}{}
+	}
+	return result
+}
+
+type questionnaireSnapshotInspection struct {
+	issues         []string
+	activeCodes    map[string]struct{}
+	activeVersions map[string]struct{}
+}
+
+func inspectQuestionnaireSnapshots(snapshots []bson.M) questionnaireSnapshotInspection {
+	result := questionnaireSnapshotInspection{
+		activeCodes:    map[string]struct{}{},
+		activeVersions: map[string]struct{}{},
+	}
+	for _, row := range snapshots {
+		code, version := stringField(row, "code"), stringField(row, "version")
+		if code == "" || version == "" {
+			result.issues = append(result.issues, fmt.Sprintf("questionnaire snapshot without identity code=%q version=%q", code, version))
+		}
+		if !snapshotActive(row) || code == "" {
+			continue
+		}
+		if _, ok := result.activeCodes[code]; ok {
+			result.issues = append(result.issues, "multiple active questionnaire snapshots for "+code)
+		}
+		result.activeCodes[code] = struct{}{}
+		if version != "" {
+			result.activeVersions[code+"@"+version] = struct{}{}
+		}
+	}
+	return result
+}
+
+func inspectQuestionnaireHeads(heads []bson.M, activeCodes map[string]struct{}) []string {
+	issues := make([]string, 0)
+	for _, head := range heads {
+		code, version, status := stringField(head, "code"), stringField(head, "version"), stringField(head, "status")
+		if code == "" || version == "" {
+			issues = append(issues, fmt.Sprintf("questionnaire head without identity code=%q version=%q", code, version))
+		}
+		if code == "" {
+			continue
+		}
+		_, active := activeCodes[code]
+		if status == "published" && !active {
+			issues = append(issues, "published questionnaire head without active snapshot "+code)
+		}
+		if status == "archived" && active {
+			issues = append(issues, "archived questionnaire head with active snapshot "+code)
+		}
+	}
+	return issues
 }
 
 func buildTemp(ctx context.Context, db *mongo.Database, temp, questionnaireTemp string) error {
@@ -762,13 +824,18 @@ func deduplicateSnapshots(rows []bson.M) ([]bson.M, []string) {
 	indexes := map[string]int{}
 	issues := make([]string, 0)
 	for _, row := range rows {
-		key := strings.Join([]string{snapshotField(row, "kind"), snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), snapshotField(row, "code"), snapshotField(row, "version")}, "|")
+		kind, code, version := snapshotField(row, "kind"), snapshotField(row, "code"), snapshotField(row, "version")
+		if kind == "" || code == "" || version == "" {
+			result = append(result, row)
+			continue
+		}
+		key := strings.Join([]string{kind, snapshotField(row, "sub_kind"), snapshotField(row, "algorithm"), code, version}, "|")
 		if index, ok := indexes[key]; ok {
 			existing := result[index]
 			same := payloadHash(bytesField(existing, "payload")) == payloadHash(bytesField(row, "payload")) &&
 				stringField(existing, "questionnaire_code") == stringField(row, "questionnaire_code") &&
 				stringField(existing, "questionnaire_version") == stringField(row, "questionnaire_version") &&
-				fmt.Sprint(existing["definition_v2"]) == fmt.Sprint(row["definition_v2"])
+				reflect.DeepEqual(existing["definition_v2"], row["definition_v2"])
 			if !same {
 				issues = append(issues, "conflicting duplicate published release "+key)
 				continue
@@ -796,7 +863,12 @@ func deduplicateQuestionnaireSnapshots(rows []bson.M) ([]bson.M, []string) {
 	indexes := map[string]int{}
 	issues := make([]string, 0)
 	for _, row := range rows {
-		key := stringField(row, "code") + "@" + stringField(row, "version")
+		code, version := stringField(row, "code"), stringField(row, "version")
+		if code == "" || version == "" {
+			result = append(result, row)
+			continue
+		}
+		key := code + "@" + version
 		if index, ok := indexes[key]; ok {
 			existing := result[index]
 			if !sameQuestionnaireReleaseContent(existing, row) {
@@ -858,7 +930,16 @@ func loadAll(ctx context.Context, c *mongo.Collection, filter bson.M) ([]bson.M,
 }
 
 func stringField(row bson.M, key string) string { value, _ := row[key].(string); return value }
-func bytesField(row bson.M, key string) []byte  { value, _ := row[key].([]byte); return value }
+func bytesField(row bson.M, key string) []byte {
+	switch value := row[key].(type) {
+	case []byte:
+		return value
+	case primitive.Binary:
+		return value.Data
+	default:
+		return nil
+	}
+}
 func legacySourceID(value any) string {
 	if id, ok := value.(primitive.ObjectID); ok {
 		return id.Hex()

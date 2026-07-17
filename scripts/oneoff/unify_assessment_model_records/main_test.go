@@ -1,12 +1,31 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+func TestBytesFieldReadsBSONBinaryAfterRoundTrip(t *testing.T) {
+	want := []byte(`{"version":"1"}`)
+	encoded, err := bson.Marshal(bson.M{"payload": want})
+	if err != nil {
+		t.Fatalf("marshal BSON: %v", err)
+	}
+	var row bson.M
+	if err := bson.Unmarshal(encoded, &row); err != nil {
+		t.Fatalf("unmarshal BSON: %v", err)
+	}
+	if _, ok := row["payload"].(primitive.Binary); !ok {
+		t.Fatalf("payload type = %T, want primitive.Binary", row["payload"])
+	}
+	if got := bytesField(row, "payload"); string(got) != string(want) {
+		t.Fatalf("payload = %q, want %q", got, want)
+	}
+}
 
 func TestConvertSnapshotMapsLegacyFieldsAndKeepsPayload(t *testing.T) {
 	legacyID := primitive.NewObjectID()
@@ -95,6 +114,34 @@ func TestDeduplicateSnapshotsRejectsPayloadConflict(t *testing.T) {
 	}
 }
 
+func TestDeduplicateSnapshotsRejectsBSONBinaryPayloadConflict(t *testing.T) {
+	base := bson.M{"model_kind": "scale", "model_code": "S-1", "model_version": "v1", "payload": primitive.Binary{Data: []byte("one")}, "questionnaire_code": "Q", "questionnaire_version": "1"}
+	conflict := bson.M{"kind": "scale", "code": "S-1", "release_version": "v1", "payload": primitive.Binary{Data: []byte("two")}, "questionnaire_code": "Q", "questionnaire_version": "1"}
+	_, issues := deduplicateSnapshots([]bson.M{base, conflict})
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one payload conflict", issues)
+	}
+}
+
+func TestInspectModelSnapshotsCountsLifecycleWhenPayloadIsInvalid(t *testing.T) {
+	active := bson.M{
+		"model_kind": "scale", "model_code": "S-1", "model_version": "v1",
+		"status": "published", "deleted_at": nil,
+		"questionnaire_code": "Q", "questionnaire_version": "1",
+	}
+	archived := bson.M{
+		"model_kind": "scale", "model_code": "S-2", "model_version": "v1",
+		"status": "published", "deleted_at": time.Now().UTC(),
+	}
+	got := inspectModelSnapshots([]bson.M{active, archived}, map[string]struct{}{"S-1": {}, "S-2": {}})
+	if len(got.activeCodes) != 1 || got.retired != 1 {
+		t.Fatalf("lifecycle active=%d retired=%d, want 1/1", len(got.activeCodes), got.retired)
+	}
+	if len(got.issues) != 2 || !strings.Contains(strings.Join(got.issues, "\n"), "invalid published snapshot") {
+		t.Fatalf("issues = %#v, want two invalid snapshot issues", got.issues)
+	}
+}
+
 func TestQuestionnaireSnapshotSourcesDuplicatesLegacyPublishedHeadAsRelease(t *testing.T) {
 	legacy := bson.M{"_id": primitive.NewObjectID(), "code": "Q-1", "version": "1", "status": "published", "questions": bson.A{bson.M{"code": "Q1"}}}
 	draft := bson.M{"_id": primitive.NewObjectID(), "code": "Q-2", "version": "1", "status": "draft"}
@@ -110,5 +157,30 @@ func TestDeduplicateQuestionnaireSnapshotsRejectsContentConflict(t *testing.T) {
 	_, issues := deduplicateQuestionnaireSnapshots([]bson.M{legacy, unified})
 	if len(issues) != 1 {
 		t.Fatalf("issues = %#v, want one conflict", issues)
+	}
+}
+
+func TestInspectQuestionnaireSnapshotsRejectsArchivedMissingVersion(t *testing.T) {
+	got := inspectQuestionnaireSnapshots([]bson.M{{
+		"record_role": roleSnapshot,
+		"code":        "Q-1",
+		"version":     "",
+		"status":      "published",
+		"deleted_at":  time.Now().UTC(),
+	}})
+	if len(got.issues) != 1 || !strings.Contains(got.issues[0], `code="Q-1" version=""`) {
+		t.Fatalf("issues = %#v, want archived snapshot identity issue", got.issues)
+	}
+}
+
+func TestInspectQuestionnaireHeadsRejectsMissingWorkingVersion(t *testing.T) {
+	issues := inspectQuestionnaireHeads([]bson.M{{
+		"record_role": roleHead,
+		"code":        "Q-1",
+		"version":     "",
+		"status":      "archived",
+	}}, map[string]struct{}{})
+	if len(issues) != 1 || !strings.Contains(issues[0], `code="Q-1" version=""`) {
+		t.Fatalf("issues = %#v, want head identity issue", issues)
 	}
 }
