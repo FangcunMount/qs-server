@@ -2,6 +2,8 @@ package statistics
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,12 +63,39 @@ func TestEpisodeJourneyMutationsDoNotCountRawAssessmentCreationAsFormedAssessmen
 type behaviorProjectorTxMarkerKey struct{}
 
 type behaviorProjectorRunnerStub struct {
-	txCount int
+	txCount  int
+	txErrors []error
+}
+
+type behaviorRollbackRunner struct {
+	behaviorProjectorRunnerStub
+	repo *behaviorProjectorRepoStub
+}
+
+func (r *behaviorRollbackRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	footprints := len(r.repo.footprints)
+	episodes := len(r.repo.savedEpisodes)
+	mutations := len(r.repo.mutations)
+	deleted := len(r.repo.deletedPending)
+	marked := len(r.repo.markedStatuses)
+	r.txCount++
+	err := fn(context.WithValue(ctx, behaviorProjectorTxMarkerKey{}, true))
+	r.txErrors = append(r.txErrors, err)
+	if err != nil {
+		r.repo.footprints = r.repo.footprints[:footprints]
+		r.repo.savedEpisodes = r.repo.savedEpisodes[:episodes]
+		r.repo.mutations = r.repo.mutations[:mutations]
+		r.repo.deletedPending = r.repo.deletedPending[:deleted]
+		r.repo.markedStatuses = r.repo.markedStatuses[:marked]
+	}
+	return err
 }
 
 func (r *behaviorProjectorRunnerStub) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
 	r.txCount++
-	return fn(context.WithValue(ctx, behaviorProjectorTxMarkerKey{}, "tx"))
+	err := fn(context.WithValue(ctx, behaviorProjectorTxMarkerKey{}, "tx"))
+	r.txErrors = append(r.txErrors, err)
+	return err
 }
 
 type behaviorProjectorRepoStub struct {
@@ -87,6 +116,7 @@ type behaviorProjectorRepoStub struct {
 	deletedPending     []string
 	markedStatuses     []string
 	sawTxCtx           bool
+	mutationErr        error
 }
 
 func (r *behaviorProjectorRepoStub) markTx(ctx context.Context) {
@@ -119,13 +149,17 @@ func (r *behaviorProjectorRepoStub) FindEpisodeByAnswerSheetID(ctx context.Conte
 
 func (r *behaviorProjectorRepoStub) FindEpisodeByAssessmentID(ctx context.Context, _ int64, _ uint64) (*domainStatistics.AssessmentEpisode, error) {
 	r.markTx(ctx)
-	return r.episodeByAssess, nil
+	if r.episodeByAssess == nil {
+		return nil, nil
+	}
+	copy := *r.episodeByAssess
+	return &copy, nil
 }
 
 func (r *behaviorProjectorRepoStub) ApplyStatisticsJourneyMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	r.markTx(ctx)
 	r.mutations = append(r.mutations, mutation)
-	return nil
+	return r.mutationErr
 }
 
 func (r *behaviorProjectorRepoStub) ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
@@ -301,5 +335,69 @@ func TestBehaviorProjectorReconcileCompletedDeletesPendingAndMarksCheckpoint(t *
 	}
 	if len(repo.markedStatuses) != 1 || repo.markedStatuses[0] != "evt-pending:"+domainStatistics.AnalyticsProjectorCheckpointStatusCompleted {
 		t.Fatalf("marked statuses = %+v, want completed checkpoint", repo.markedStatuses)
+	}
+}
+
+func TestBehaviorProjectorReconcileProjectionFailureRollsBackBeforeReschedule(t *testing.T) {
+	payload, err := marshalBehaviorProjectEventInput(BehaviorProjectEventInput{
+		EventID:      "evt-report",
+		EventType:    string(domainStatistics.BehaviorEventReportGenerated),
+		OrgID:        1,
+		TesteeID:     2,
+		AssessmentID: 4,
+		ReportID:     5,
+		OccurredAt:   time.Date(2026, 4, 28, 9, 2, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	repo := &behaviorProjectorRepoStub{
+		pendingRows: []*domainStatistics.AnalyticsPendingEvent{{
+			EventID:      "evt-report",
+			EventType:    string(domainStatistics.BehaviorEventReportGenerated),
+			PayloadJSON:  payload,
+			AttemptCount: 1,
+		}},
+		episodeByAssess: &domainStatistics.AssessmentEpisode{
+			EpisodeID:    3,
+			OrgID:        1,
+			TesteeID:     2,
+			AssessmentID: uint64Ptr(4),
+		},
+		mutationErr: errors.New("daily mutation failed"),
+	}
+	runner := &behaviorRollbackRunner{repo: repo}
+	projector := NewAssessmentEpisodeProjectorWithTransactionRunner(runner, repo)
+
+	processed, err := projector.ReconcilePendingBehaviorEvents(t.Context(), 10)
+	if err != nil {
+		t.Fatalf("ReconcilePendingBehaviorEvents() error = %v", err)
+	}
+	if processed != 0 {
+		t.Fatalf("processed = %d, want 0", processed)
+	}
+	if runner.txCount != 2 || len(runner.txErrors) != 2 || runner.txErrors[0] == nil || runner.txErrors[1] != nil {
+		t.Fatalf("transaction results = count:%d errors:%v, want projection rollback then reschedule commit", runner.txCount, runner.txErrors)
+	}
+	if len(repo.rescheduled) != 1 || !strings.Contains(repo.rescheduled[0], "daily mutation failed") {
+		t.Fatalf("rescheduled = %+v, want projection error", repo.rescheduled)
+	}
+	if len(repo.deletedPending) != 0 || len(repo.markedStatuses) != 0 {
+		t.Fatalf("failed projection must not settle pending: deleted=%v marked=%v", repo.deletedPending, repo.markedStatuses)
+	}
+	if len(repo.savedEpisodes) != 0 || len(repo.mutations) != 0 || len(repo.footprints) != 0 {
+		t.Fatalf("failed projection committed partial state: episodes=%d mutations=%d footprints=%d", len(repo.savedEpisodes), len(repo.mutations), len(repo.footprints))
+	}
+
+	repo.mutationErr = nil
+	processed, err = projector.ReconcilePendingBehaviorEvents(t.Context(), 10)
+	if err != nil {
+		t.Fatalf("retry ReconcilePendingBehaviorEvents() error = %v", err)
+	}
+	if processed != 1 || len(repo.savedEpisodes) != 1 || len(repo.mutations) != 1 || len(repo.footprints) != 1 {
+		t.Fatalf("retry result processed=%d episodes=%d mutations=%d footprints=%d, want exactly one", processed, len(repo.savedEpisodes), len(repo.mutations), len(repo.footprints))
+	}
+	if len(repo.deletedPending) != 1 || len(repo.markedStatuses) != 1 {
+		t.Fatalf("retry settlement deleted=%v marked=%v, want one completed settlement", repo.deletedPending, repo.markedStatuses)
 	}
 }

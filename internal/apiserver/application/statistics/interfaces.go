@@ -21,7 +21,13 @@ type ReadService interface {
 	GetCurrentClinicianStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianStatistics, error)
 	ListCurrentClinicianEntryStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter, page, pageSize int) (*statistics.AssessmentEntryStatisticsList, error)
 	GetCurrentClinicianTesteeSummary(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianTesteeSummaryStatistics, error)
-	GetContentBatchStatistics(ctx context.Context, orgID int64, refs []statistics.ContentReference) (*statistics.ContentBatchStatisticsResponse, error)
+	GetContentBatchStatistics(ctx context.Context, orgID int64, refs []statistics.ContentReference, access ContentStatisticsAccess) (*statistics.ContentBatchStatisticsResponse, error)
+}
+
+// ContentStatisticsAccess describes which typed content families the caller may query.
+type ContentStatisticsAccess struct {
+	Questionnaire bool
+	Scale         bool
 }
 
 // PeriodicStatsService 受试者周期性统计服务。

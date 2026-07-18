@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	authzApp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
@@ -439,7 +440,7 @@ func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 
 // BatchContentStatistics 批量查询统一内容统计。
 // @Summary 批量查询统一内容统计
-// @Description 按内容 type + code 批量查询测评形成数、完成数和完成率；需要问卷或量表管理权限
+// @Description 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale 需要 manage_assessment_models，混合请求需要同时具备两项权限
 // @Tags Statistics
 // @Accept json
 // @Produce json
@@ -447,6 +448,7 @@ func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 // @Param request body contentBatchRequest true "内容标识列表"
 // @Success 200 {object} core.Response{data=statistics.ContentBatchStatisticsResponse}
 // @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/contents/batch [post]
 func (h *StatisticsHandler) BatchContentStatistics(c *gin.Context) {
@@ -459,7 +461,12 @@ func (h *StatisticsHandler) BatchContentStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.GetContentBatchStatistics(c.Request.Context(), orgID, req.Items)
+	snapshot, _ := authzApp.FromContext(c.Request.Context())
+	access := statisticsApp.ContentStatisticsAccess{
+		Questionnaire: authzApp.SnapshotSatisfiesCapability(snapshot, authzApp.CapabilityManageQuestionnaires),
+		Scale:         authzApp.SnapshotSatisfiesCapability(snapshot, authzApp.CapabilityManageAssessmentModels),
+	}
+	stats, err := h.readService.GetContentBatchStatistics(c.Request.Context(), orgID, req.Items, access)
 	if err != nil {
 		h.Error(c, err)
 		return

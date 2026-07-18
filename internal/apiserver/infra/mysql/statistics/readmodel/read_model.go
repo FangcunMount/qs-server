@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -15,7 +14,9 @@ import (
 	evaluationInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/gorm"
 )
 
@@ -33,15 +34,34 @@ const (
 )
 
 type readModel struct {
-	db *gorm.DB
+	db      *gorm.DB
+	now     func() time.Time
+	limiter backpressure.Acquirer
 }
 
 // NewReadModel creates the MySQL-backed statistics read model adapter.
-func NewReadModel(db *gorm.DB) *readModel {
-	return &readModel{db: db}
+func NewReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) *readModel {
+	options := mysql.BaseRepositoryOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
+	return &readModel{db: db, now: time.Now, limiter: options.Limiter}
+}
+
+func (m *readModel) acquire(ctx context.Context) (context.Context, func(), error) {
+	if m == nil || m.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return m.limiter.Acquire(ctx)
 }
 
 func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (domainStatistics.OrganizationOverview, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.OrganizationOverview{}, err
+	}
+	defer release()
+
 	overview := domainStatistics.OrganizationOverview{}
 
 	var snapshot statisticsInfra.StatisticsOrgSnapshotPO
@@ -54,7 +74,6 @@ func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (d
 			ActiveEntryCount: snapshot.ActiveEntryCount,
 			AssessmentCount:  snapshot.AssessmentCount,
 			ReportCount:      snapshot.ReportCount,
-			ContentCount:     snapshot.DimensionContentCount,
 		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return overview, err
@@ -71,7 +90,7 @@ func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (d
 		}
 		if err := m.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
 			Where("org_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, true).
-			Where("expires_at IS NULL OR expires_at > ?", time.Now()).
+			Where("expires_at IS NULL OR expires_at > ?", m.currentTime()).
 			Count(&overview.ActiveEntryCount).Error; err != nil {
 			return overview, err
 		}
@@ -85,13 +104,13 @@ func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (d
 			Count(&overview.ReportCount).Error; err != nil {
 			return overview, err
 		}
-		contentCount, err := m.countOrganizationContent(ctx, orgID)
-		if err != nil {
-			return overview, err
-		}
-		overview.ContentCount = contentCount
 	}
 
+	contentCount, err := m.countOrganizationContent(ctx, orgID)
+	if err != nil {
+		return overview, err
+	}
+	overview.ContentCount = contentCount
 	if err := m.fillOrganizationAnswerSheetSubmissions(ctx, orgID, &overview); err != nil {
 		return overview, err
 	}
@@ -99,45 +118,47 @@ func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (d
 }
 
 func (m *readModel) fillOrganizationAnswerSheetSubmissions(ctx context.Context, orgID int64, overview *domainStatistics.OrganizationOverview) error {
-	todayStart := beginningOfDay(time.Now())
+	todayStart := beginningOfDay(m.currentTime())
 	tomorrowStart := todayStart.AddDate(0, 0, 1)
-	var projectionRows int64
-	if err := m.db.WithContext(ctx).Model(&statisticsInfra.StatisticsContentDailyPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Count(&projectionRows).Error; err != nil {
+	var row struct {
+		Total int64 `gorm:"column:total"`
+		Today int64 `gorm:"column:today"`
+	}
+	if err := buildOrganizationAnswerSheetSubmissionsQuery(m.db.WithContext(ctx), orgID, todayStart, tomorrowStart).
+		Scan(&row).Error; err != nil {
 		return err
 	}
-	if projectionRows > 0 {
-		var row struct {
-			Total int64
-			Today int64
-		}
-		if err := m.db.WithContext(ctx).Model(&statisticsInfra.StatisticsContentDailyPO{}).
-			Select("COALESCE(SUM(answersheet_submitted_count), 0) AS total, COALESCE(SUM(CASE WHEN stat_date >= ? AND stat_date < ? THEN answersheet_submitted_count ELSE 0 END), 0) AS today", todayStart, tomorrowStart).
-			Where("org_id = ? AND deleted_at IS NULL", orgID).
-			Scan(&row).Error; err != nil {
-			return err
-		}
-		overview.AnswerSheetSubmissionCount = row.Total
-		overview.TodayAnswerSheetSubmissionCount = row.Today
-		return nil
-	}
+	overview.AnswerSheetSubmissionCount = row.Total
+	overview.TodayAnswerSheetSubmissionCount = row.Today
+	return nil
+}
 
-	if err := m.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
-		Where("org_id = ? AND submitted_at IS NOT NULL AND deleted_at IS NULL", orgID).
-		Count(&overview.AnswerSheetSubmissionCount).Error; err != nil {
-		return err
+func buildOrganizationAnswerSheetSubmissionsQuery(db *gorm.DB, orgID int64, todayStart, tomorrowStart time.Time) *gorm.DB {
+	return db.Model(&evaluationInfra.AssessmentPO{}).
+		Select(`
+			COALESCE(SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS total,
+			COALESCE(SUM(CASE WHEN submitted_at >= ? AND submitted_at < ? THEN 1 ELSE 0 END), 0) AS today
+		`, todayStart, tomorrowStart).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+}
+
+func (m *readModel) currentTime() time.Time {
+	if m != nil && m.now != nil {
+		return m.now()
 	}
-	return m.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
-		Where("org_id = ? AND submitted_at >= ? AND submitted_at < ? AND deleted_at IS NULL", orgID, todayStart, tomorrowStart).
-		Count(&overview.TodayAnswerSheetSubmissionCount).Error
+	return time.Now()
 }
 
 func (m *readModel) countOrganizationContent(ctx context.Context, orgID int64) (int64, error) {
 	var row struct {
 		Count int64 `gorm:"column:count"`
 	}
-	err := m.db.WithContext(ctx).Raw(`
+	err := buildOrganizationContentCountQuery(m.db.WithContext(ctx), orgID).Scan(&row).Error
+	return row.Count, err
+}
+
+func buildOrganizationContentCountQuery(db *gorm.DB, orgID int64) *gorm.DB {
+	return db.Raw(`
 		SELECT COUNT(*) AS count
 		FROM (
 			SELECT DISTINCT
@@ -146,11 +167,16 @@ func (m *readModel) countOrganizationContent(ctx context.Context, orgID int64) (
 			FROM assessment
 			WHERE org_id = ? AND deleted_at IS NULL
 			  AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-		) content`, orgID).Scan(&row).Error
-	return row.Count, err
+		) content`, orgID)
 }
 
 func (m *readModel) GetAccessFunnel(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelWindow, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.AccessFunnelWindow{}, err
+	}
+	defer release()
+
 	var row struct {
 		EntryOpenedCount                 sql.NullInt64
 		IntakeConfirmedCount             sql.NullInt64
@@ -179,6 +205,12 @@ func (m *readModel) GetAccessFunnel(ctx context.Context, orgID int64, from, to t
 }
 
 func (m *readModel) GetAccessFunnelTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelTrend, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.AccessFunnelTrend{}, err
+	}
+	defer release()
+
 	type row struct {
 		StatDate                         time.Time
 		EntryOpenedCount                 int64
@@ -215,6 +247,12 @@ func (m *readModel) GetAccessFunnelTrend(ctx context.Context, orgID int64, from,
 const assessmentServiceAnswerSheetSubmittedScanAlias = "answer_sheet_submitted_count"
 
 func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceWindow, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.AssessmentServiceWindow{}, err
+	}
+	defer release()
+
 	var row struct {
 		AnswerSheetSubmittedCount sql.NullInt64
 		AssessmentCreatedCount    sql.NullInt64
@@ -243,6 +281,12 @@ func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from,
 }
 
 func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceTrend, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.AssessmentServiceTrend{}, err
+	}
+	defer release()
+
 	type row struct {
 		StatDate                  time.Time
 		AnswerSheetSubmittedCount int64
@@ -277,54 +321,58 @@ func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, 
 }
 
 func (m *readModel) GetDimensionAnalysisSummary(ctx context.Context, orgID int64) (domainStatistics.DimensionAnalysisSummary, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.DimensionAnalysisSummary{}, err
+	}
+	defer release()
+
 	summary := domainStatistics.DimensionAnalysisSummary{}
 	var snapshot statisticsInfra.StatisticsOrgSnapshotPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		First(&snapshot).Error; err == nil {
-		return domainStatistics.DimensionAnalysisSummary{
-			ClinicianCount: snapshot.DimensionClinicianCount,
-			EntryCount:     snapshot.DimensionEntryCount,
-			ContentCount:   snapshot.DimensionContentCount,
-		}, nil
+		summary.ClinicianCount = snapshot.DimensionClinicianCount
+		summary.EntryCount = snapshot.DimensionEntryCount
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return summary, err
+	} else {
+		if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
+			Where("org_id = ? AND deleted_at IS NULL", orgID).
+			Count(&summary.ClinicianCount).Error; err != nil {
+			return summary, err
+		}
+		if err := m.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
+			Where("org_id = ? AND deleted_at IS NULL", orgID).
+			Count(&summary.EntryCount).Error; err != nil {
+			return summary, err
+		}
 	}
-
-	if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Count(&summary.ClinicianCount).Error; err != nil {
+	contentCount, err := m.countOrganizationContent(ctx, orgID)
+	if err != nil {
 		return summary, err
 	}
-	if err := m.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Count(&summary.EntryCount).Error; err != nil {
-		return summary, err
-	}
-	var contentRow struct {
-		Count int64 `gorm:"column:count"`
-	}
-	if err := m.db.WithContext(ctx).Raw(`
-		SELECT COUNT(*) AS count
-		FROM (
-			SELECT DISTINCT
-				CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END AS content_type,
-				COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) AS content_code
-			FROM assessment
-			WHERE org_id = ? AND deleted_at IS NULL
-			  AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-		) content`, orgID).Scan(&contentRow).Error; err != nil {
-		return summary, err
-	}
-	summary.ContentCount = contentRow.Count
+	summary.ContentCount = contentCount
 	return summary, nil
 }
 
 func (m *readModel) GetPlanTaskOverview(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.PlanTaskActivityWindow, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.PlanTaskActivityWindow{}, err
+	}
+	defer release()
+
 	return m.getPlanTaskOverview(ctx, orgID, nil, from, to)
 }
 
 func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskActivityTrend, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.PlanTaskActivityTrend{}, err
+	}
+	defer release()
+
 	type row struct {
 		StatDate           time.Time
 		TaskCreatedCount   int64
@@ -348,6 +396,12 @@ func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *u
 }
 
 func (m *readModel) GetPlanTaskFulfillment(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentWindow, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.PlanTaskFulfillmentWindow{}, err
+	}
+	defer release()
+
 	var row struct {
 		PlannedTaskCount     sql.NullInt64
 		DueTaskCount         sql.NullInt64
@@ -369,6 +423,12 @@ func (m *readModel) GetPlanTaskFulfillment(ctx context.Context, orgID int64, pla
 }
 
 func (m *readModel) GetPlanTaskFulfillmentTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentTrend, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.PlanTaskFulfillmentTrend{}, err
+	}
+	defer release()
+
 	type row struct {
 		StatDate           time.Time
 		PlannedTaskCount   int64
@@ -392,6 +452,12 @@ func (m *readModel) GetPlanTaskFulfillmentTrend(ctx context.Context, orgID int64
 }
 
 func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+
 	var total int64
 	if err := buildClinicianSubjectQuery(m.db.WithContext(ctx), orgID).Count(&total).Error; err != nil {
 		return 0, err
@@ -400,6 +466,12 @@ func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (in
 }
 
 func (m *readModel) ListClinicianSubjects(ctx context.Context, orgID int64, page, pageSize int) ([]domainStatistics.ClinicianStatisticsSubject, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var clinicians []actorInfra.ClinicianPO
 	if err := buildClinicianSubjectQuery(m.db.WithContext(ctx), orgID).
 		Order("id DESC").
@@ -417,6 +489,12 @@ func (m *readModel) ListClinicianSubjects(ctx context.Context, orgID int64, page
 }
 
 func (m *readModel) GetClinicianSubject(ctx context.Context, orgID int64, clinicianID uint64) (*domainStatistics.ClinicianStatisticsSubject, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var clinician actorInfra.ClinicianPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, clinicianID).
@@ -432,6 +510,12 @@ func (m *readModel) GetClinicianSubject(ctx context.Context, orgID int64, clinic
 }
 
 func (m *readModel) GetCurrentClinicianSubject(ctx context.Context, orgID int64, operatorUserID int64) (*domainStatistics.ClinicianStatisticsSubject, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var operator actorInfra.OperatorPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND user_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, operatorUserID, true).
@@ -457,6 +541,12 @@ func (m *readModel) GetCurrentClinicianSubject(ctx context.Context, orgID int64,
 }
 
 func (m *readModel) GetClinicianStatisticsDetails(ctx context.Context, orgID int64, clinicianIDs []uint64, from, to time.Time) (map[uint64]statisticsApp.ClinicianStatisticsDetail, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	details := make(map[uint64]statisticsApp.ClinicianStatisticsDetail, len(clinicianIDs))
 	if len(clinicianIDs) == 0 {
 		return details, nil
@@ -569,6 +659,12 @@ func (m *readModel) GetClinicianStatisticsDetails(ctx context.Context, orgID int
 }
 
 func (m *readModel) GetClinicianSnapshot(ctx context.Context, orgID int64, clinicianID uint64) (domainStatistics.ClinicianStatisticsSnapshot, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return domainStatistics.ClinicianStatisticsSnapshot{}, err
+	}
+	defer release()
+
 	snapshot := domainStatistics.ClinicianStatisticsSnapshot{}
 
 	countByType := func(relationType string) (int64, error) {
@@ -581,7 +677,6 @@ func (m *readModel) GetClinicianSnapshot(ctx context.Context, orgID int64, clini
 		return count, err
 	}
 
-	var err error
 	if snapshot.PrimaryTesteeCount, err = countByType(string(actorDomainRelation.RelationTypePrimary)); err != nil {
 		return snapshot, err
 	}
@@ -609,6 +704,12 @@ func (m *readModel) GetClinicianSnapshot(ctx context.Context, orgID int64, clini
 }
 
 func (m *readModel) GetClinicianTesteeSummaryCounts(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (int64, int64, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer release()
+
 	var keyFocusCount int64
 	if err := scanCountQuery(m.db.WithContext(ctx).
 		Table("testee t").
@@ -636,6 +737,12 @@ func (m *readModel) GetClinicianTesteeSummaryCounts(ctx context.Context, orgID i
 }
 
 func (m *readModel) CountAssessmentEntries(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool) (int64, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+
 	query := buildAssessmentEntryMetaQuery(m.db.WithContext(ctx), orgID, clinicianID, activeOnly)
 
 	var total int64
@@ -646,6 +753,12 @@ func (m *readModel) CountAssessmentEntries(ctx context.Context, orgID int64, cli
 }
 
 func (m *readModel) ListAssessmentEntryMetas(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool, page, pageSize int) ([]domainStatistics.AssessmentEntryStatisticsMeta, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	query := buildAssessmentEntryMetaQuery(m.db.WithContext(ctx), orgID, clinicianID, activeOnly)
 
 	var entries []actorInfra.AssessmentEntryPO
@@ -660,6 +773,12 @@ func (m *readModel) ListAssessmentEntryMetas(ctx context.Context, orgID int64, c
 }
 
 func (m *readModel) GetAssessmentEntryMeta(ctx context.Context, orgID int64, entryID uint64) (*domainStatistics.AssessmentEntryStatisticsMeta, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var entry actorInfra.AssessmentEntryPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, entryID).
@@ -678,6 +797,12 @@ func (m *readModel) GetAssessmentEntryMeta(ctx context.Context, orgID int64, ent
 }
 
 func (m *readModel) GetAssessmentEntryStatisticsDetails(ctx context.Context, orgID int64, entryIDs []uint64, from, to time.Time) (map[uint64]statisticsApp.AssessmentEntryStatisticsDetail, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	details := make(map[uint64]statisticsApp.AssessmentEntryStatisticsDetail, len(entryIDs))
 	if len(entryIDs) == 0 {
 		return details, nil
@@ -752,37 +877,17 @@ func (m *readModel) GetAssessmentEntryStatisticsDetails(ctx context.Context, org
 }
 
 func (m *readModel) GetContentBatchTotals(ctx context.Context, orgID int64, refs []statisticsApp.ContentReference) ([]statisticsApp.ContentBatchTotal, error) {
+	ctx, release, err := m.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	if len(refs) == 0 {
 		return []statisticsApp.ContentBatchTotal{}, nil
 	}
 
-	rows, err := loadProjectedContentBatchTotals(m.db.WithContext(ctx), orgID, refs)
-	if err != nil {
-		return nil, err
-	}
-	found := make(map[statisticsApp.ContentReference]struct{}, len(rows))
-	items := make([]statisticsApp.ContentBatchTotal, 0, len(refs))
-	for _, rowItem := range rows {
-		ref := statisticsApp.ContentReference{Type: rowItem.Type, Code: rowItem.Code}
-		found[ref] = struct{}{}
-		items = append(items, rowItem)
-	}
-
-	missing := make([]statisticsApp.ContentReference, 0, len(refs))
-	for _, ref := range refs {
-		if _, ok := found[ref]; !ok {
-			missing = append(missing, ref)
-		}
-	}
-	if len(missing) == 0 {
-		return items, nil
-	}
-
-	realtimeRows, err := loadRealtimeContentBatchTotals(m.db.WithContext(ctx), orgID, missing)
-	if err != nil {
-		return nil, err
-	}
-	return append(items, realtimeRows...), nil
+	return loadAssessmentContentBatchTotals(m.db.WithContext(ctx), orgID, refs)
 }
 
 func buildClinicianSubjectQuery(db *gorm.DB, orgID int64) *gorm.DB {
@@ -803,75 +908,55 @@ func buildAssessmentEntryMetaQuery(db *gorm.DB, orgID int64, clinicianID *uint64
 	return query
 }
 
-func loadProjectedContentBatchTotals(db *gorm.DB, orgID int64, refs []statisticsApp.ContentReference) ([]statisticsApp.ContentBatchTotal, error) {
-	var rows []statisticsApp.ContentBatchTotal
-	err := buildProjectedContentBatchTotalsQuery(db, orgID, refs).Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	requested := make(map[statisticsApp.ContentReference]struct{}, len(refs))
-	for _, ref := range refs {
-		requested[ref] = struct{}{}
-	}
-	filtered := rows[:0]
-	for _, row := range rows {
-		if _, ok := requested[statisticsApp.ContentReference{Type: row.Type, Code: row.Code}]; ok {
-			filtered = append(filtered, row)
+func loadAssessmentContentBatchTotals(db *gorm.DB, orgID int64, refs []statisticsApp.ContentReference) ([]statisticsApp.ContentBatchTotal, error) {
+	questionnaireCodes, scaleCodes := splitContentReferenceCodes(refs)
+	items := make([]statisticsApp.ContentBatchTotal, 0, len(refs))
+	if len(questionnaireCodes) > 0 {
+		var rows []statisticsApp.ContentBatchTotal
+		if err := buildQuestionnaireContentBatchTotalsQuery(db, orgID, questionnaireCodes).Scan(&rows).Error; err != nil {
+			return nil, err
 		}
+		items = append(items, rows...)
 	}
-	return filtered, nil
-}
-
-func buildProjectedContentBatchTotalsQuery(db *gorm.DB, orgID int64, refs []statisticsApp.ContentReference) *gorm.DB {
-	types, codes := contentReferenceDimensions(refs)
-	return db.
-		Model(&statisticsInfra.StatisticsContentDailyPO{}).
-		Select("content_type AS type, content_code AS code, COALESCE(SUM(submission_count), 0) AS total_submissions, COALESCE(SUM(completion_count), 0) AS total_completions").
-		Where("org_id = ? AND content_type IN ? AND content_code IN ? AND deleted_at IS NULL", orgID, types, codes).
-		Group("content_type, content_code")
-}
-
-const (
-	assessmentContentTypeExpression = "CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END"
-	assessmentContentCodeExpression = "COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code)"
-)
-
-func loadRealtimeContentBatchTotals(db *gorm.DB, orgID int64, refs []statisticsApp.ContentReference) ([]statisticsApp.ContentBatchTotal, error) {
-	var rows []statisticsApp.ContentBatchTotal
-	err := buildRealtimeContentBatchTotalsQuery(db, orgID, refs).Scan(&rows).Error
-	return rows, err
-}
-
-func buildRealtimeContentBatchTotalsQuery(db *gorm.DB, orgID int64, refs []statisticsApp.ContentReference) *gorm.DB {
-	predicates := make([]string, 0, len(refs))
-	args := make([]interface{}, 0, len(refs)*2)
-	for _, ref := range refs {
-		predicates = append(predicates, "("+assessmentContentTypeExpression+" = ? AND "+assessmentContentCodeExpression+" = ?)")
-		args = append(args, ref.Type, ref.Code)
+	if len(scaleCodes) > 0 {
+		var rows []statisticsApp.ContentBatchTotal
+		if err := buildScaleContentBatchTotalsQuery(db, orgID, scaleCodes).Scan(&rows).Error; err != nil {
+			return nil, err
+		}
+		items = append(items, rows...)
 	}
+	return items, nil
+}
+
+func buildQuestionnaireContentBatchTotalsQuery(db *gorm.DB, orgID int64, codes []string) *gorm.DB {
 	return db.Table("assessment").
-		Select(assessmentContentTypeExpression+" AS type, "+assessmentContentCodeExpression+" AS code, COUNT(*) AS total_submissions, COALESCE(SUM(CASE WHEN status = 'evaluated' THEN 1 ELSE 0 END), 0) AS total_completions").
+		Select("'questionnaire' AS type, questionnaire_code AS code, COUNT(*) AS total_submissions, COALESCE(SUM(CASE WHEN status = 'evaluated' THEN 1 ELSE 0 END), 0) AS total_completions").
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where(strings.Join(predicates, " OR "), args...).
-		Group(assessmentContentTypeExpression + ", " + assessmentContentCodeExpression)
+		Where("(evaluation_model_kind IS NULL OR evaluation_model_kind <> 'scale') AND questionnaire_code IN ?", codes).
+		Group("questionnaire_code")
 }
 
-func contentReferenceDimensions(refs []statisticsApp.ContentReference) ([]string, []string) {
-	types := make([]string, 0, len(refs))
-	codes := make([]string, 0, len(refs))
-	seenTypes := make(map[string]struct{}, len(refs))
-	seenCodes := make(map[string]struct{}, len(refs))
+func buildScaleContentBatchTotalsQuery(db *gorm.DB, orgID int64, codes []string) *gorm.DB {
+	const scaleCodeExpression = "COALESCE(NULLIF(evaluation_model_code, ''), questionnaire_code)"
+	return db.Table("assessment").
+		Select("'scale' AS type, "+scaleCodeExpression+" AS code, COUNT(*) AS total_submissions, COALESCE(SUM(CASE WHEN status = 'evaluated' THEN 1 ELSE 0 END), 0) AS total_completions").
+		Where("org_id = ? AND deleted_at IS NULL AND evaluation_model_kind = 'scale'", orgID).
+		Where(scaleCodeExpression+" IN ?", codes).
+		Group(scaleCodeExpression)
+}
+
+func splitContentReferenceCodes(refs []statisticsApp.ContentReference) ([]string, []string) {
+	questionnaireCodes := make([]string, 0, len(refs))
+	scaleCodes := make([]string, 0, len(refs))
 	for _, ref := range refs {
-		if _, ok := seenTypes[ref.Type]; !ok {
-			seenTypes[ref.Type] = struct{}{}
-			types = append(types, ref.Type)
-		}
-		if _, ok := seenCodes[ref.Code]; !ok {
-			seenCodes[ref.Code] = struct{}{}
-			codes = append(codes, ref.Code)
+		switch ref.Type {
+		case string(domainStatistics.ContentTypeQuestionnaire):
+			questionnaireCodes = append(questionnaireCodes, ref.Code)
+		case string(domainStatistics.ContentTypeScale):
+			scaleCodes = append(scaleCodes, ref.Code)
 		}
 	}
-	return types, codes
+	return questionnaireCodes, scaleCodes
 }
 
 func buildPlanTaskTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to time.Time) *gorm.DB {

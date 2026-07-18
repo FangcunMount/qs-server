@@ -32,5 +32,5 @@ func (l *AssessmentEntryIntakeLogger) LogIntake(
 		AssignmentCreated: assignmentCreated,
 		IntakeAt:          intakeAt,
 	}
-	return l.repo.WithContext(ctx).Create(po).Error
+	return l.repo.writeAssessmentEntryIntakeLog(ctx, po)
 }

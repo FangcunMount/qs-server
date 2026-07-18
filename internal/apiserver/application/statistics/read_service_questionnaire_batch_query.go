@@ -13,9 +13,12 @@ type contentBatchQuery struct {
 	readModel ContentStatisticsReader
 }
 
-func (q *contentBatchQuery) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
+func (q *contentBatchQuery) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference, access ContentStatisticsAccess) (*domainStatistics.ContentBatchStatisticsResponse, error) {
 	cleanRefs, err := normalizeContentReferences(refs)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateContentStatisticsAccess(cleanRefs, access); err != nil {
 		return nil, err
 	}
 	items := make([]*domainStatistics.ContentBatchStatisticsItem, 0, len(cleanRefs))
@@ -44,9 +47,7 @@ func (q *contentBatchQuery) GetContentBatchStatistics(ctx context.Context, orgID
 		}
 		item.TotalSubmissions = total.TotalSubmissions
 		item.TotalCompletions = total.TotalCompletions
-		if item.TotalSubmissions > 0 {
-			item.CompletionRate = float64(item.TotalCompletions) / float64(item.TotalSubmissions) * 100
-		}
+		item.CompletionRate = domainStatistics.CompletionRate(item.TotalSubmissions, item.TotalCompletions)
 	}
 
 	for _, ref := range cleanRefs {
@@ -54,6 +55,25 @@ func (q *contentBatchQuery) GetContentBatchStatistics(ctx context.Context, orgID
 	}
 
 	return &domainStatistics.ContentBatchStatisticsResponse{Items: items}, nil
+}
+
+func validateContentStatisticsAccess(refs []domainStatistics.ContentReference, access ContentStatisticsAccess) error {
+	if len(refs) == 0 && !access.Questionnaire && !access.Scale {
+		return errors.WithCode(code.ErrPermissionDenied, "content statistics capability is required")
+	}
+	for _, ref := range refs {
+		switch ref.Type {
+		case domainStatistics.ContentTypeQuestionnaire:
+			if !access.Questionnaire {
+				return errors.WithCode(code.ErrPermissionDenied, "questionnaire statistics capability is required")
+			}
+		case domainStatistics.ContentTypeScale:
+			if !access.Scale {
+				return errors.WithCode(code.ErrPermissionDenied, "scale statistics capability is required")
+			}
+		}
+	}
+	return nil
 }
 
 func normalizeContentReferences(refs []domainStatistics.ContentReference) ([]domainStatistics.ContentReference, error) {

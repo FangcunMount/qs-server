@@ -15,10 +15,16 @@ var _ domainStatistics.AssessmentEpisodeRepository = (*StatisticsRepository)(nil
 var _ domainStatistics.StatisticsJourneyRepository = (*StatisticsRepository)(nil)
 
 func (r *StatisticsRepository) AppendBehaviorFootprint(ctx context.Context, footprint *domainStatistics.BehaviorFootprint) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if footprint == nil {
 		return nil
 	}
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
+	return r.withContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoNothing: true,
 	}).Create(behaviorFootprintFromDomain(footprint)).Error
@@ -32,8 +38,14 @@ func (r *StatisticsRepository) FindLatestFootprintByEvent(
 	occurredAt time.Time,
 	window time.Duration,
 ) (*domainStatistics.BehaviorFootprint, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var po BehaviorFootprintPO
-	query := r.WithContext(ctx).
+	query := r.withContext(ctx).
 		Where("org_id = ? AND testee_id = ? AND event_name = ? AND deleted_at IS NULL", orgID, testeeID, string(eventName)).
 		Where("occurred_at <= ?", occurredAt)
 	if window > 0 {
@@ -49,6 +61,12 @@ func (r *StatisticsRepository) FindLatestFootprintByEvent(
 }
 
 func (r *StatisticsRepository) SaveEpisode(ctx context.Context, episode *domainStatistics.AssessmentEpisode) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if episode == nil {
 		return nil
 	}
@@ -56,7 +74,7 @@ func (r *StatisticsRepository) SaveEpisode(ctx context.Context, episode *domainS
 	if po.EpisodeID == 0 {
 		po.EpisodeID = po.AnswerSheetID
 	}
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
+	return r.withContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "episode_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"org_id":                po.OrgID,
@@ -78,8 +96,14 @@ func (r *StatisticsRepository) SaveEpisode(ctx context.Context, episode *domainS
 }
 
 func (r *StatisticsRepository) FindEpisodeByAnswerSheetID(ctx context.Context, orgID int64, answerSheetID uint64) (*domainStatistics.AssessmentEpisode, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var po AssessmentEpisodePO
-	if err := r.WithContext(ctx).
+	if err := r.withContext(ctx).
 		Where("org_id = ? AND answersheet_id = ? AND deleted_at IS NULL", orgID, answerSheetID).
 		First(&po).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -91,8 +115,14 @@ func (r *StatisticsRepository) FindEpisodeByAnswerSheetID(ctx context.Context, o
 }
 
 func (r *StatisticsRepository) FindEpisodeByAssessmentID(ctx context.Context, orgID int64, assessmentID uint64) (*domainStatistics.AssessmentEpisode, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var po AssessmentEpisodePO
-	if err := r.WithContext(ctx).
+	if err := r.withContext(ctx).
 		Where("org_id = ? AND assessment_id = ? AND deleted_at IS NULL", orgID, assessmentID).
 		First(&po).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -104,8 +134,14 @@ func (r *StatisticsRepository) FindEpisodeByAssessmentID(ctx context.Context, or
 }
 
 func (r *StatisticsRepository) ListEpisodesForAttribution(ctx context.Context, orgID int64, testeeID uint64, intakeAt time.Time, window time.Duration) ([]*domainStatistics.AssessmentEpisode, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var rows []*AssessmentEpisodePO
-	query := r.WithContext(ctx).
+	query := r.withContext(ctx).
 		Where("org_id = ? AND testee_id = ? AND deleted_at IS NULL", orgID, testeeID).
 		Where("submitted_at >= ?", intakeAt)
 	if window > 0 {
@@ -122,6 +158,12 @@ func (r *StatisticsRepository) ListEpisodesForAttribution(ctx context.Context, o
 }
 
 func (r *StatisticsRepository) ApplyStatisticsJourneyMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	statDate := dateOnly(mutation.StatDate)
 	if err := r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectOrg, 0, statDate); err != nil {
 		return err
@@ -146,7 +188,7 @@ func (r *StatisticsRepository) upsertStatisticsJourneyDaily(ctx context.Context,
 		clinicianID = 0
 		entryID = 0
 	}
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
+	return r.withContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "org_id"}, {Name: "subject_type"}, {Name: "subject_id"}, {Name: "stat_date"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"clinician_id":                        clinicianID,
@@ -185,6 +227,12 @@ func (r *StatisticsRepository) upsertStatisticsJourneyDaily(ctx context.Context,
 }
 
 func (r *StatisticsRepository) ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if mutation.ClinicianID == 0 {
 		return nil
 	}
@@ -192,6 +240,12 @@ func (r *StatisticsRepository) ApplyStatisticsJourneyClinicianMutation(ctx conte
 }
 
 func (r *StatisticsRepository) ApplyStatisticsJourneyEntryMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if mutation.EntryID == 0 {
 		return nil
 	}
@@ -203,18 +257,36 @@ func dateOnly(v time.Time) time.Time {
 }
 
 func (r *StatisticsRepository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+
 	return checkpoint.NewRepository(r.db).TryBeginAnalyticsProjectorCheckpoint(ctx, eventID, eventType)
 }
 
 func (r *StatisticsRepository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	return checkpoint.NewRepository(r.db).MarkAnalyticsProjectorCheckpointStatus(ctx, eventID, status)
 }
 
 func (r *StatisticsRepository) UpsertAnalyticsPendingEvent(ctx context.Context, eventID, eventType, payload string, nextAttemptAt time.Time, lastError string) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if eventID == "" {
 		return nil
 	}
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
+	return r.withContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "event_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"event_type":      eventType,
@@ -234,8 +306,14 @@ func (r *StatisticsRepository) UpsertAnalyticsPendingEvent(ctx context.Context, 
 }
 
 func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context, limit int, now time.Time) ([]*domainStatistics.AnalyticsPendingEvent, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	var rows []*AnalyticsPendingEventPO
-	query := buildDueAnalyticsPendingEventsQuery(r.WithContext(ctx), now)
+	query := buildDueAnalyticsPendingEventsQuery(r.withContext(ctx), now)
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
@@ -264,7 +342,13 @@ func buildDueAnalyticsPendingEventsQuery(db *gorm.DB, now time.Time) *gorm.DB {
 }
 
 func (r *StatisticsRepository) RescheduleAnalyticsPendingEvent(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
-	return r.WithContext(ctx).
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	return r.withContext(ctx).
 		Model(&AnalyticsPendingEventPO{}).
 		Where("event_id = ?", eventID).
 		Updates(map[string]interface{}{
@@ -275,8 +359,14 @@ func (r *StatisticsRepository) RescheduleAnalyticsPendingEvent(ctx context.Conte
 }
 
 func (r *StatisticsRepository) DeleteAnalyticsPendingEvent(ctx context.Context, eventID string) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if eventID == "" {
 		return nil
 	}
-	return r.WithContext(ctx).Where("event_id = ?", eventID).Delete(&AnalyticsPendingEventPO{}).Error
+	return r.withContext(ctx).Where("event_id = ?", eventID).Delete(&AnalyticsPendingEventPO{}).Error
 }

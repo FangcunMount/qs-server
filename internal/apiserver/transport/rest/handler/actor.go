@@ -201,41 +201,6 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 	h.Success(c, toScaleAnalysisResponse(result))
 }
 
-// GetPeriodicStats 获取受试者周期统计。
-func (h *TesteeHandler) GetPeriodicStats(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
-			"action", "get_periodic_stats",
-			"testee_id", idStr,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-	if _, _, err := h.validateProtectedTesteeAccess(c, id); err != nil {
-		h.Error(c, err)
-		return
-	}
-	if _, err = h.testeeQueryService.GetByID(c.Request.Context(), id); err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get testee",
-			"action", "get_periodic_stats",
-			"testee_id", id,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	resp := &response.PeriodicStatsResponse{
-		Projects:       []response.PeriodicProjectResponse{},
-		TotalProjects:  0,
-		ActiveProjects: 0,
-	}
-	h.Success(c, resp)
-}
-
 // UpdateTestee 更新受试者。
 // @Summary 更新受试者
 // @Tags 受试者

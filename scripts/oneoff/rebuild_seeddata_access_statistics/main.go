@@ -1171,8 +1171,9 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 		statisticsCache.NewVersionTokenStore(metaClient, nil),
 		nil,
 	)
+	readModel := statisticsReadModelInfra.NewReadModel(db)
 	readService := statisticsApp.NewReadService(
-		statisticsReadModelInfra.NewReadModel(db),
+		statisticsApp.ReadServiceDeps{Overview: readModel, Clinicians: readModel, Entries: readModel, Contents: readModel},
 		statisticsApp.WithReadServiceCache(cache),
 	)
 

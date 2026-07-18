@@ -146,10 +146,6 @@ func main() {
 		}
 	}
 	if !cfg.apply {
-		if cfg.redisEnabled() && !cfg.skipCache {
-			queryPattern, versionPattern := cachePatterns(cfg.redisQueryNS)
-			log.Printf("dry-run cache patterns: query=%q version=%q", queryPattern, versionPattern)
-		}
 		log.Printf("dry-run only; re-run with --apply to rebuild %s", rebuildTargetDescription(cfg))
 		return
 	}
@@ -434,13 +430,22 @@ ORDER BY p.id`
 }
 
 func rebuildAggregates(ctx context.Context, db *gorm.DB, orgIDs []int64, startDate, endDate time.Time) error {
+	const maxJourneyWindowDays = 31
+
 	repo := statisticsInfra.NewStatisticsRepository(db)
 	for _, orgID := range orgIDs {
-		log.Printf("rebuild aggregate org_id=%d daily/content/journey window", orgID)
-		if err := withinTx(ctx, db, func(txCtx context.Context) error {
-			return repo.RebuildDailyStatistics(txCtx, orgID, startDate, endDate)
-		}); err != nil {
-			return fmt.Errorf("org %d daily: %w", orgID, err)
+		for windowStart := startDate; windowStart.Before(endDate); {
+			windowEnd := windowStart.AddDate(0, 0, maxJourneyWindowDays)
+			if windowEnd.After(endDate) {
+				windowEnd = endDate
+			}
+			log.Printf("rebuild aggregate org_id=%d journey window=[%s,%s)", orgID, windowStart.Format(time.DateOnly), windowEnd.Format(time.DateOnly))
+			if err := withinTx(ctx, db, func(txCtx context.Context) error {
+				return repo.RebuildDailyStatistics(txCtx, orgID, windowStart, windowEnd)
+			}); err != nil {
+				return fmt.Errorf("org %d journey window [%s,%s): %w", orgID, windowStart.Format(time.DateOnly), windowEnd.Format(time.DateOnly), err)
+			}
+			windowStart = windowEnd
 		}
 		log.Printf("rebuild aggregate org_id=%d org snapshot", orgID)
 		if err := withinTx(ctx, db, func(txCtx context.Context) error {
@@ -493,17 +498,6 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 		return fmt.Errorf("ping meta redis: %w", err)
 	}
 
-	queryPattern, versionPattern := cachePatterns(cfg.redisQueryNS)
-	queryDeleted, err := deleteRedisPattern(ctx, queryClient, queryPattern)
-	if err != nil {
-		return fmt.Errorf("delete query cache pattern %q: %w", queryPattern, err)
-	}
-	versionDeleted, err := deleteRedisPattern(ctx, metaClient, versionPattern)
-	if err != nil {
-		return fmt.Errorf("delete version cache pattern %q: %w", versionPattern, err)
-	}
-	log.Printf("cleared statistics query cache: query_keys=%d version_keys=%d", queryDeleted, versionDeleted)
-
 	cache := statisticsCache.NewStatisticsCacheWithBuilderProviderVersionStoreAndObserver(
 		queryClient,
 		keyspace.NewBuilderWithNamespace(cfg.redisQueryNS),
@@ -514,8 +508,9 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 		statisticsCache.NewVersionTokenStore(metaClient, nil),
 		nil,
 	)
+	readModel := statisticsReadModelInfra.NewReadModel(db)
 	readService := statisticsApp.NewReadService(
-		statisticsReadModelInfra.NewReadModel(db),
+		statisticsApp.ReadServiceDeps{Overview: readModel, Clinicians: readModel, Entries: readModel, Contents: readModel},
 		statisticsApp.WithReadServiceCache(cache),
 	)
 
@@ -533,46 +528,6 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 
 func newRedisClient(addr, username, password string, db int) *redis.Client {
 	return redis.NewClient(&redis.Options{Addr: addr, Username: username, Password: password, DB: db})
-}
-
-func deleteRedisPattern(ctx context.Context, client redis.UniversalClient, pattern string) (int64, error) {
-	var deleted int64
-	var batch []string
-	iter := client.Scan(ctx, 0, pattern, 1000).Iterator()
-	for iter.Next(ctx) {
-		batch = append(batch, iter.Val())
-		if len(batch) >= 500 {
-			n, err := client.Del(ctx, batch...).Result()
-			if err != nil {
-				return deleted, err
-			}
-			deleted += n
-			batch = batch[:0]
-		}
-	}
-	if err := iter.Err(); err != nil {
-		return deleted, err
-	}
-	if len(batch) > 0 {
-		n, err := client.Del(ctx, batch...).Result()
-		if err != nil {
-			return deleted, err
-		}
-		deleted += n
-	}
-	return deleted, nil
-}
-
-func cachePatterns(namespace string) (queryPattern, versionPattern string) {
-	return prefixRedisKey(namespace, "query:stats:query:*"), prefixRedisKey(namespace, "query:version:stats:query:*")
-}
-
-func prefixRedisKey(namespace, key string) string {
-	namespace = strings.Trim(strings.TrimSpace(namespace), ":")
-	if namespace == "" {
-		return key
-	}
-	return namespace + ":" + key
 }
 
 func (cfg config) redisEnabled() bool {

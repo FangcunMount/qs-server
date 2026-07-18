@@ -23,5 +23,5 @@ func (l *AssessmentEntryResolveLogger) LogResolve(ctx context.Context, orgID int
 		EntryID:     entryID,
 		ResolvedAt:  resolvedAt,
 	}
-	return l.repo.WithContext(ctx).Create(po).Error
+	return l.repo.writeAssessmentEntryResolveLog(ctx, po)
 }

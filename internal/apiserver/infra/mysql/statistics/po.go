@@ -13,9 +13,6 @@ const (
 	StatisticsJourneySubjectOrg       = "org"
 	StatisticsJourneySubjectClinician = "clinician"
 	StatisticsJourneySubjectEntry     = "entry"
-
-	StatisticsContentTypeQuestionnaire = "questionnaire"
-	StatisticsContentTypeScale         = "scale"
 )
 
 // StatisticsJourneyDailyPO 统一承载机构、医生、入口维度的行为旅程日聚合。
@@ -57,35 +54,6 @@ type StatisticsJourneyDailyPO struct {
 func (StatisticsJourneyDailyPO) TableName() string { return "statistics_journey_daily" }
 
 func (p *StatisticsJourneyDailyPO) BeforeCreate(_ *gorm.DB) error {
-	if p.ID == 0 {
-		p.ID = meta.New().Uint64()
-	}
-	return nil
-}
-
-// StatisticsContentDailyPO 承载问卷、量表等内容维度的日聚合。
-type StatisticsContentDailyPO struct {
-	ID          uint64         `gorm:"column:id;primaryKey"`
-	OrgID       int64          `gorm:"column:org_id;not null;uniqueIndex:uniq_statistics_content_daily,priority:1;index:idx_statistics_content_org_date,priority:1"`
-	ContentType string         `gorm:"column:content_type;size:50;not null;uniqueIndex:uniq_statistics_content_daily,priority:2"`
-	ContentCode string         `gorm:"column:content_code;size:100;not null;uniqueIndex:uniq_statistics_content_daily,priority:3"`
-	OriginType  string         `gorm:"column:origin_type;size:50;not null;default:'';uniqueIndex:uniq_statistics_content_daily,priority:4"`
-	StatDate    time.Time      `gorm:"column:stat_date;type:date;not null;uniqueIndex:uniq_statistics_content_daily,priority:5;index:idx_statistics_content_org_date,priority:2"`
-	CreatedAt   time.Time      `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
-
-	SubmissionCount           int64 `gorm:"column:submission_count;not null;default:0"`
-	CompletionCount           int64 `gorm:"column:completion_count;not null;default:0"`
-	AnswerSheetSubmittedCount int64 `gorm:"column:answersheet_submitted_count;not null;default:0"`
-	AssessmentCreatedCount    int64 `gorm:"column:assessment_created_count;not null;default:0"`
-	ReportGeneratedCount      int64 `gorm:"column:report_generated_count;not null;default:0"`
-	AssessmentFailedCount     int64 `gorm:"column:assessment_failed_count;not null;default:0"`
-}
-
-func (StatisticsContentDailyPO) TableName() string { return "statistics_content_daily" }
-
-func (p *StatisticsContentDailyPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = meta.New().Uint64()
 	}

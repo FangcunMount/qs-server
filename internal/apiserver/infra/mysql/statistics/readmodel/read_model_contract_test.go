@@ -1,7 +1,9 @@
 package readmodel
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,54 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
+
+type trackingAcquirer struct {
+	err      error
+	acquired int
+	released int
+}
+
+func (a *trackingAcquirer) Acquire(ctx context.Context) (context.Context, func(), error) {
+	a.acquired++
+	if a.err != nil {
+		return ctx, func() {}, a.err
+	}
+	return ctx, func() { a.released++ }, nil
+}
+
+func TestStatisticsReadModelLimiterReleasesOnSuccessAndSQLError(t *testing.T) {
+	t.Parallel()
+
+	successLimiter := &trackingAcquirer{}
+	successModel := NewReadModel(newDryRunStatisticsReadModelDB(t), mysql.BaseRepositoryOptions{Limiter: successLimiter})
+	if _, err := successModel.GetContentBatchTotals(context.Background(), 1, nil); err != nil {
+		t.Fatalf("empty content totals: %v", err)
+	}
+	if successLimiter.acquired != 1 || successLimiter.released != 1 {
+		t.Fatalf("success limiter acquired/released = %d/%d, want 1/1", successLimiter.acquired, successLimiter.released)
+	}
+
+	failedDB := newClosedStatisticsReadModelDB(t)
+	failureLimiter := &trackingAcquirer{}
+	failureModel := NewReadModel(failedDB, mysql.BaseRepositoryOptions{Limiter: failureLimiter})
+	_, err := failureModel.GetContentBatchTotals(context.Background(), 1, []statisticsApp.ContentReference{{Type: "questionnaire", Code: "Q-1"}})
+	if err == nil {
+		t.Fatal("content totals error = nil, want closed database error")
+	}
+	if failureLimiter.acquired != 1 || failureLimiter.released != 1 {
+		t.Fatalf("failure limiter acquired/released = %d/%d, want 1/1", failureLimiter.acquired, failureLimiter.released)
+	}
+
+	wantAcquireErr := errors.New("limited")
+	blockedLimiter := &trackingAcquirer{err: wantAcquireErr}
+	blockedModel := NewReadModel(nil, mysql.BaseRepositoryOptions{Limiter: blockedLimiter})
+	if _, err := blockedModel.GetContentBatchTotals(context.Background(), 1, nil); !errors.Is(err, wantAcquireErr) {
+		t.Fatalf("blocked content totals error = %v, want %v", err, wantAcquireErr)
+	}
+	if blockedLimiter.released != 0 {
+		t.Fatalf("blocked limiter released = %d, want 0", blockedLimiter.released)
+	}
+}
 
 func TestAssessmentServiceAnswerSheetScanAliasMatchesGORMNaming(t *testing.T) {
 	t.Parallel()
@@ -142,45 +192,77 @@ func TestBuildContentBatchTotalsQueriesPreserveTypedIdentityAndOrgScope(t *testi
 
 	db := newDryRunStatisticsReadModelDB(t)
 	var rows []statisticsApp.ContentBatchTotal
-	refs := []statisticsApp.ContentReference{{Type: "questionnaire", Code: "COMMON"}, {Type: "scale", Code: "COMMON"}}
-
-	stmt := buildProjectedContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, refs).
+	stmt := buildQuestionnaireContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, []string{"COMMON"}).
 		Find(&rows).Statement
 
 	sql := stmt.SQL.String()
 	for _, token := range []string{
-		"content_type AS type",
-		"content_code AS code",
-		"SUM(submission_count)",
-		"SUM(completion_count)",
+		"'questionnaire' AS type",
+		"questionnaire_code AS code",
+		"COUNT(*) AS total_submissions",
+		"status = 'evaluated'",
 		"org_id = ?",
-		"content_type IN",
+		"evaluation_model_kind <> 'scale'",
 		"deleted_at IS NULL",
-		"content_code IN",
-		"GROUP BY content_type, content_code",
+		"questionnaire_code IN",
+		"GROUP BY `questionnaire_code`",
 	} {
 		if !strings.Contains(sql, token) {
 			t.Fatalf("query sql %q does not contain %q", sql, token)
 		}
 	}
-	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "COMMON"} {
+	for _, want := range []interface{}{int64(9), "COMMON"} {
 		if !containsStatisticsReadModelVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
 		}
 	}
 
-	realtimeStmt := buildRealtimeContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, refs).
+	realtimeStmt := buildScaleContentBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, []string{"COMMON"}).
 		Find(&rows).Statement
 	realtimeSQL := realtimeStmt.SQL.String()
-	for _, token := range []string{"FROM `assessment`", "org_id = ?", "status = 'evaluated'", "evaluation_model_kind = 'scale'", "questionnaire_code", "GROUP BY"} {
+	for _, token := range []string{"'scale' AS type", "FROM `assessment`", "org_id = ?", "status = 'evaluated'", "evaluation_model_kind = 'scale'", "evaluation_model_code", "questionnaire_code", "GROUP BY"} {
 		if !strings.Contains(realtimeSQL, token) {
 			t.Fatalf("realtime query sql %q does not contain %q", realtimeSQL, token)
 		}
 	}
-	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "COMMON"} {
+	for _, want := range []interface{}{int64(9), "COMMON"} {
 		if !containsStatisticsReadModelVar(realtimeStmt.Vars, want) {
 			t.Fatalf("realtime query vars = %#v, want %v", realtimeStmt.Vars, want)
 		}
+	}
+}
+
+func TestBuildOrganizationCumulativeQueriesUseAssessmentFactsAndLocalDayBounds(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	today := time.Date(2026, 7, 18, 0, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	tomorrow := today.AddDate(0, 0, 1)
+	var submissions struct{ Total, Today int64 }
+	stmt := buildOrganizationAnswerSheetSubmissionsQuery(db.Session(&gorm.Session{DryRun: true}), 9, today, tomorrow).
+		Scan(&submissions).Statement
+	sql := stmt.SQL.String()
+	for _, token := range []string{"FROM `assessment`", "submitted_at IS NOT NULL", "submitted_at >= ?", "submitted_at < ?", "org_id = ?", "deleted_at IS NULL"} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("submission query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{today, tomorrow, int64(9)} {
+		if !containsStatisticsReadModelVar(stmt.Vars, want) {
+			t.Fatalf("submission query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+
+	var content struct{ Count int64 }
+	contentStmt := buildOrganizationContentCountQuery(db.Session(&gorm.Session{DryRun: true}), 9).Scan(&content).Statement
+	contentSQL := contentStmt.SQL.String()
+	for _, token := range []string{"FROM assessment", "SELECT DISTINCT", "evaluation_model_kind = 'scale'", "questionnaire_code", "org_id = ?", "deleted_at IS NULL"} {
+		if !strings.Contains(contentSQL, token) {
+			t.Fatalf("content count query sql %q does not contain %q", contentSQL, token)
+		}
+	}
+	if !containsStatisticsReadModelVar(contentStmt.Vars, int64(9)) {
+		t.Fatalf("content count vars = %#v, want org 9", contentStmt.Vars)
 	}
 }
 
@@ -382,6 +464,25 @@ func newDryRunStatisticsReadModelDB(t *testing.T) *gorm.DB {
 	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
 	if err != nil {
 		t.Fatalf("open dry-run gorm db: %v", err)
+	}
+	return db
+}
+
+func newClosedStatisticsReadModelDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_closed?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		t.Fatalf("open closed sql db: %v", err)
+	}
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		Conn:                      conn,
+		SkipInitializeWithVersion: true,
+	}), &gorm.Config{DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatalf("open closed gorm db: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close sql db: %v", err)
 	}
 	return db
 }

@@ -1,24 +1,35 @@
 package statistics
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
-func TestContentDailyInsertSQLGroupsByExpressions(t *testing.T) {
-	contentTypeExpr := "CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END"
-	contentCodeExpr := "COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code)"
-	originTypeExpr := "COALESCE(origin_type, '')"
+type repositoryTrackingAcquirer struct {
+	acquired int
+	released int
+}
 
-	for _, column := range []string{"created_at", "evaluated_at", "submitted_at", "failed_at"} {
-		want := "GROUP BY org_id, " + contentTypeExpr + ", " + contentCodeExpr + ", " + originTypeExpr + ", DATE(" + column + ")"
-		if !strings.Contains(contentDailyInsertSQL, want) {
-			t.Fatalf("content daily SQL must group %s branch by expressions, not select aliases", column)
-		}
+func (a *repositoryTrackingAcquirer) Acquire(ctx context.Context) (context.Context, func(), error) {
+	a.acquired++
+	return ctx, func() { a.released++ }, nil
+}
+
+func TestStatisticsRepositoryLimiterReleasesWhenTransactionIsRejected(t *testing.T) {
+	t.Parallel()
+
+	limiter := &repositoryTrackingAcquirer{}
+	repo := NewStatisticsRepository(nil, mysql.BaseRepositoryOptions{Limiter: limiter})
+	err := repo.RebuildDailyStatistics(context.Background(), 1, time.Now(), time.Now().AddDate(0, 0, 1))
+	if err == nil {
+		t.Fatal("RebuildDailyStatistics error = nil, want missing transaction error")
 	}
-
-	if strings.Contains(contentDailyInsertSQL, "GROUP BY org_id, content_type, content_code, origin_type") {
-		t.Fatal("content daily SQL must not group inner assessment branches by select aliases")
+	if limiter.acquired != 1 || limiter.released != 1 {
+		t.Fatalf("limiter acquired/released = %d/%d, want 1/1", limiter.acquired, limiter.released)
 	}
 }
 

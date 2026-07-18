@@ -75,8 +75,16 @@ func New(deps Deps) (*Module, error) {
 	}
 	txRunner := modtx.NewMySQLRunner(normalized.MySQLDB)
 
+	readModel := statisticsReadModelInfra.NewReadModel(normalized.MySQLDB, mysql.BaseRepositoryOptions{
+		Limiter: normalized.MySQLLimiter,
+	})
 	module.ReadService = statisticsApp.NewReadService(
-		statisticsReadModelInfra.NewReadModel(normalized.MySQLDB),
+		statisticsApp.ReadServiceDeps{
+			Overview:   readModel,
+			Clinicians: readModel,
+			Entries:    readModel,
+			Contents:   readModel,
+		},
 		statisticsApp.WithReadServiceCache(cache),
 		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
 		statisticsApp.WithReadServiceOverviewGuard(normalized.OverviewGuardOpts),

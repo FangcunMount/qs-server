@@ -8,9 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	componentErrors "github.com/FangcunMount/component-base/pkg/errors"
+	authzApp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,10 +38,11 @@ type stubStatisticsReadService struct {
 	currentClinicianResult       *domainStatistics.ClinicianStatistics
 	currentClinicianErr          error
 
-	lastBatchOrgID int64
-	lastBatchRefs  []domainStatistics.ContentReference
-	batchResult    *domainStatistics.ContentBatchStatisticsResponse
-	batchErr       error
+	lastBatchOrgID  int64
+	lastBatchRefs   []domainStatistics.ContentReference
+	lastBatchAccess statisticsApp.ContentStatisticsAccess
+	batchResult     *domainStatistics.ContentBatchStatisticsResponse
+	batchErr        error
 }
 
 func (s *stubStatisticsReadService) GetOverview(_ context.Context, orgID int64, filter statisticsApp.QueryFilter) (*domainStatistics.StatisticsOverview, error) {
@@ -93,9 +97,10 @@ func (*stubStatisticsReadService) GetCurrentClinicianTesteeSummary(context.Conte
 	return nil, nil
 }
 
-func (s *stubStatisticsReadService) GetContentBatchStatistics(_ context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
+func (s *stubStatisticsReadService) GetContentBatchStatistics(_ context.Context, orgID int64, refs []domainStatistics.ContentReference, access statisticsApp.ContentStatisticsAccess) (*domainStatistics.ContentBatchStatisticsResponse, error) {
 	s.lastBatchOrgID = orgID
 	s.lastBatchRefs = append([]domainStatistics.ContentReference(nil), refs...)
+	s.lastBatchAccess = access
 	if s.batchResult != nil {
 		return s.batchResult, s.batchErr
 	}
@@ -246,6 +251,8 @@ func TestStatisticsHandlerBatchContentStatisticsUsesProtectedOrgAndTypedItems(t 
 	handler := newStatisticsHandlerForTest(readService)
 	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/contents/batch", []byte(`{"items":[{"type":"questionnaire","code":"Q-1"},{"type":"scale","code":"S-1"}]}`))
 	c.Set(restmiddleware.OrgIDKey, uint64(91))
+	snapshot := &authzApp.Snapshot{Roles: []string{"qs:admin"}}
+	c.Request = c.Request.WithContext(authzApp.WithSnapshot(c.Request.Context(), snapshot))
 
 	handler.BatchContentStatistics(c)
 
@@ -257,6 +264,81 @@ func TestStatisticsHandlerBatchContentStatisticsUsesProtectedOrgAndTypedItems(t 
 	}
 	if readService.lastBatchRefs[0].Type != domainStatistics.ContentTypeQuestionnaire || readService.lastBatchRefs[1].Type != domainStatistics.ContentTypeScale {
 		t.Fatalf("unexpected typed refs: %+v", readService.lastBatchRefs)
+	}
+	if !readService.lastBatchAccess.Questionnaire || !readService.lastBatchAccess.Scale {
+		t.Fatalf("unexpected content access: %+v", readService.lastBatchAccess)
+	}
+}
+
+func TestStatisticsHandlerBatchContentStatisticsMapsIAMCapabilitiesByType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name              string
+		snapshot          *authzApp.Snapshot
+		wantQuestionnaire bool
+		wantScale         bool
+	}{
+		{
+			name: "questionnaire manager",
+			snapshot: &authzApp.Snapshot{Permissions: []authzApp.Permission{
+				{Resource: "qs:questionnaires", Action: "statistics"},
+			}},
+			wantQuestionnaire: true,
+		},
+		{
+			name: "assessment model manager",
+			snapshot: &authzApp.Snapshot{Permissions: []authzApp.Permission{
+				{Resource: "qs:assessment_models", Action: "update"},
+			}},
+			wantScale: true,
+		},
+		{
+			name: "both managers",
+			snapshot: &authzApp.Snapshot{Permissions: []authzApp.Permission{
+				{Resource: "qs:questionnaires", Action: "statistics"},
+				{Resource: "qs:assessment_models", Action: "update"},
+			}},
+			wantQuestionnaire: true,
+			wantScale:         true,
+		},
+		{name: "administrator", snapshot: &authzApp.Snapshot{Roles: []string{"qs:admin"}}, wantQuestionnaire: true, wantScale: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readService := &stubStatisticsReadService{batchResult: &domainStatistics.ContentBatchStatisticsResponse{}}
+			handler := newStatisticsHandlerForTest(readService)
+			c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/contents/batch", []byte(`{"items":[{"type":"questionnaire","code":"Q-1"},{"type":"scale","code":"S-1"}]}`))
+			c.Set(restmiddleware.OrgIDKey, uint64(91))
+			c.Request = c.Request.WithContext(authzApp.WithSnapshot(c.Request.Context(), tt.snapshot))
+
+			handler.BatchContentStatistics(c)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if readService.lastBatchAccess.Questionnaire != tt.wantQuestionnaire || readService.lastBatchAccess.Scale != tt.wantScale {
+				t.Fatalf("access = %+v, want questionnaire=%v scale=%v", readService.lastBatchAccess, tt.wantQuestionnaire, tt.wantScale)
+			}
+		})
+	}
+}
+
+func TestStatisticsHandlerBatchContentStatisticsMapsPermissionFailureToForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	readService := &stubStatisticsReadService{
+		batchErr: componentErrors.WithCode(code.ErrPermissionDenied, "both content capabilities are required"),
+	}
+	handler := newStatisticsHandlerForTest(readService)
+	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/contents/batch", []byte(`{"items":[{"type":"questionnaire","code":"Q-1"},{"type":"scale","code":"S-1"}]}`))
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+	c.Request = c.Request.WithContext(authzApp.WithSnapshot(c.Request.Context(), &authzApp.Snapshot{Roles: []string{"qs:admin"}}))
+
+	handler.BatchContentStatistics(c)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
 	}
 }
 

@@ -70,10 +70,3 @@ type ContentBatchTotal struct {
 type ContentStatisticsReader interface {
 	GetContentBatchTotals(context.Context, int64, []ContentReference) ([]ContentBatchTotal, error)
 }
-
-type StatisticsReadModel interface {
-	OverviewReader
-	ClinicianStatisticsReader
-	EntryStatisticsReader
-	ContentStatisticsReader
-}

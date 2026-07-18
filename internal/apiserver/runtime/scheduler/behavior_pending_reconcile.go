@@ -144,7 +144,10 @@ func (r *BehaviorPendingReconcileRunner) runOnce(ctx context.Context) error {
 			log.Warnf("failed to release behavior pending reconcile lock (lock_key=%s): %v", lockKey, err)
 		},
 	}, func(ctx context.Context) error {
-		_, err := r.projector.ReconcilePendingBehaviorEvents(ctx, r.opts.BatchLimit)
+		completed, err := r.projector.ReconcilePendingBehaviorEvents(ctx, r.opts.BatchLimit)
+		if err == nil {
+			log.Infof("behavior pending reconcile completed (completed=%d)", completed)
+		}
 		return err
 	})
 }

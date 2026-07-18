@@ -99,8 +99,9 @@ func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, i
 func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.Context, limit int) (int, error) {
 	startedAt := time.Now()
 	processed := 0
+	metrics := pendingReconcileMetrics{}
 	var resultErr error
-	defer func() { observePendingReconcile(startedAt, processed, resultErr) }()
+	defer func() { observePendingReconcile(startedAt, metrics, resultErr) }()
 	if limit <= 0 {
 		limit = 100
 	}
@@ -118,30 +119,53 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 				return p.pending.reschedule(txCtx, item.EventID, err.Error(), item.AttemptCount+1)
 			}); txErr != nil {
+				metrics.failed++
 				resultErr = txErr
 				return processed, txErr
 			}
+			metrics.rescheduledError++
 			continue
 		}
 
-		err = p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			status, err := p.router.projectEvent(txCtx, input)
+		status := BehaviorProjectEventStatusCompleted
+		projectErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+			var err error
+			status, err = p.router.projectEvent(txCtx, input)
 			if err != nil {
-				return p.pending.reschedule(txCtx, input.EventID, err.Error(), item.AttemptCount+1)
+				return err
 			}
 			if status == BehaviorProjectEventStatusPending {
-				return p.pending.reschedule(txCtx, input.EventID, "pending_attribution", item.AttemptCount+1)
+				return nil
 			}
 			if err := p.pending.delete(txCtx, input.EventID); err != nil {
 				return err
 			}
 			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusCompleted)
 		})
-		if err != nil {
-			resultErr = err
-			return processed, err
+		if projectErr != nil {
+			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return p.pending.reschedule(txCtx, input.EventID, projectErr.Error(), item.AttemptCount+1)
+			}); txErr != nil {
+				metrics.failed++
+				resultErr = txErr
+				return processed, txErr
+			}
+			metrics.rescheduledError++
+			continue
+		}
+		if status == BehaviorProjectEventStatusPending {
+			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return p.pending.reschedule(txCtx, input.EventID, "pending_attribution", item.AttemptCount+1)
+			}); txErr != nil {
+				metrics.failed++
+				resultErr = txErr
+				return processed, txErr
+			}
+			metrics.rescheduledPending++
+			continue
 		}
 		processed++
+		metrics.completed++
 	}
 	return processed, nil
 }

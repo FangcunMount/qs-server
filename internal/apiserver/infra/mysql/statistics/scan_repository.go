@@ -12,8 +12,14 @@ import (
 
 // LoadScanWatermark returns the watermark for a source/org pair.
 func (r *StatisticsRepository) LoadScanWatermark(ctx context.Context, orgID int64, sourceName string) (*domainStatistics.ScanWatermark, error) {
+	ctx, release, acquireErr := r.acquire(ctx)
+	if acquireErr != nil {
+		return nil, acquireErr
+	}
+	defer release()
+
 	var po AnalyticsScanWatermarkPO
-	err := r.WithContext(ctx).
+	err := r.withContext(ctx).
 		Where("source_name = ? AND org_id = ?", sourceName, orgID).
 		First(&po).Error
 	if err == gorm.ErrRecordNotFound {
@@ -27,11 +33,17 @@ func (r *StatisticsRepository) LoadScanWatermark(ctx context.Context, orgID int6
 
 // SaveScanWatermark upserts scan progress for a source/org pair.
 func (r *StatisticsRepository) SaveScanWatermark(ctx context.Context, watermark *domainStatistics.ScanWatermark) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	if watermark == nil {
 		return nil
 	}
 	po := scanWatermarkFromDomain(watermark)
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
+	return r.withContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "source_name"}, {Name: "org_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"last_seen_id",
@@ -53,10 +65,16 @@ func (r *StatisticsRepository) ListAssessmentCreatedFacts(
 	sinceTime time.Time,
 	limit int,
 ) ([]domainStatistics.AssessmentCreatedFact, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	if limit <= 0 {
 		return nil, nil
 	}
-	query := r.WithContext(ctx).
+	query := r.withContext(ctx).
 		Model(&evaluationInfra.AssessmentPO{}).
 		Select("id, org_id, testee_id, answer_sheet_id, created_at").
 		Where("org_id = ? AND deleted_at IS NULL", orgID)
@@ -88,10 +106,16 @@ func (r *StatisticsRepository) ListEntryResolveFacts(
 	sinceTime time.Time,
 	limit int,
 ) ([]domainStatistics.EntryResolveFact, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	if limit <= 0 {
 		return nil, nil
 	}
-	query := r.WithContext(ctx).
+	query := r.withContext(ctx).
 		Model(&AssessmentEntryResolveLogPO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID)
 	if !sinceTime.IsZero() {
@@ -122,10 +146,16 @@ func (r *StatisticsRepository) ListEntryIntakeFacts(
 	sinceTime time.Time,
 	limit int,
 ) ([]domainStatistics.EntryIntakeFact, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	if limit <= 0 {
 		return nil, nil
 	}
-	query := r.WithContext(ctx).
+	query := r.withContext(ctx).
 		Model(&AssessmentEntryIntakeLogPO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID)
 	if !sinceTime.IsZero() {

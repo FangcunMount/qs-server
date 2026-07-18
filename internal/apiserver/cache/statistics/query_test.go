@@ -202,3 +202,17 @@ func TestStatisticsTypedCacheDegradesInvalidJSONToMiss(t *testing.T) {
 		t.Fatalf("LoadOverview() = (%+v, %v), want miss", stats, ok)
 	}
 }
+
+func TestOverviewCacheKeyUsesCurrentContractVersion(t *testing.T) {
+	t.Parallel()
+
+	timeRange := domainStatistics.StatisticsTimeRange{
+		Preset: domainStatistics.TimeRangePresetToday,
+		From:   time.Date(2026, 7, 18, 0, 0, 0, 0, time.Local),
+		To:     time.Date(2026, 7, 19, 0, 0, 0, 0, time.Local),
+	}
+	key := overviewStatsCacheKey(12, timeRange)
+	if !strings.HasPrefix(key, "overview:v2:12:") {
+		t.Fatalf("overview cache key = %q, want v2 prefix", key)
+	}
+}

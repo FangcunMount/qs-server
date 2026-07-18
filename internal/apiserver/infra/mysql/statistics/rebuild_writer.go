@@ -9,14 +9,17 @@ import (
 )
 
 func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID int64, startDate, endDate time.Time) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
 		return err
 	}
 	if err := deleteDailyWindow(ctx, tx, "statistics_journey_daily", orgID, startDate, endDate); err != nil {
-		return err
-	}
-	if err := deleteDailyWindow(ctx, tx, "statistics_content_daily", orgID, startDate, endDate); err != nil {
 		return err
 	}
 	if err := r.rebuildJourneyDaily(ctx, tx, orgID, startDate, endDate); err != nil {
@@ -25,14 +28,17 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 	if err := r.rebuildAccessFunnelDaily(ctx, tx, orgID, startDate, endDate); err != nil {
 		return err
 	}
-	if err := r.rebuildAssessmentServiceDaily(ctx, tx, orgID, startDate, endDate); err != nil {
-		return err
-	}
-	return r.rebuildContentDaily(ctx, tx, orgID, startDate, endDate)
+	return r.rebuildAssessmentServiceDaily(ctx, tx, orgID, startDate, endDate)
 }
 
 // RebuildJourneyDailyWindow rebuilds statistics_journey_daily for a date window.
 func (r *StatisticsRepository) RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
 		return err
@@ -44,6 +50,12 @@ func (r *StatisticsRepository) RebuildJourneyDailyWindow(ctx context.Context, or
 }
 
 func (r *StatisticsRepository) RebuildOrgSnapshotStatistics(ctx context.Context, orgID int64, _ time.Time) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
 		return err
@@ -52,6 +64,12 @@ func (r *StatisticsRepository) RebuildOrgSnapshotStatistics(ctx context.Context,
 }
 
 func (r *StatisticsRepository) RebuildPlanStatistics(ctx context.Context, orgID int64) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
 		return err
@@ -92,15 +110,6 @@ func (r *StatisticsRepository) rebuildAccessFunnelDaily(ctx context.Context, tx 
 
 func (r *StatisticsRepository) rebuildAssessmentServiceDaily(ctx context.Context, tx *gorm.DB, orgID int64, startDate, endDate time.Time) error {
 	return tx.WithContext(ctx).Exec(assessmentServiceOrgInsertSQL, orgID,
-		orgID, startDate, endDate,
-		orgID, startDate, endDate,
-		orgID, startDate, endDate,
-		orgID, startDate, endDate,
-	).Error
-}
-
-func (r *StatisticsRepository) rebuildContentDaily(ctx context.Context, tx *gorm.DB, orgID int64, startDate, endDate time.Time) error {
-	return tx.WithContext(ctx).Exec(contentDailyInsertSQL,
 		orgID, startDate, endDate,
 		orgID, startDate, endDate,
 		orgID, startDate, endDate,
@@ -333,43 +342,6 @@ ON DUPLICATE KEY UPDATE
   service_assessment_created_count = VALUES(service_assessment_created_count),
   service_report_generated_count = VALUES(service_report_generated_count),
   service_assessment_failed_count = VALUES(service_assessment_failed_count),
-  updated_at = NOW(3)`
-
-const contentDailyInsertSQL = `
-INSERT INTO statistics_content_daily (
-  org_id, content_type, content_code, origin_type, stat_date,
-  submission_count, completion_count, answersheet_submitted_count,
-  assessment_created_count, report_generated_count, assessment_failed_count
-)
-SELECT
-  raw.org_id, raw.content_type, raw.content_code, raw.origin_type, raw.stat_date,
-  SUM(raw.submission_count), SUM(raw.completion_count), SUM(raw.answersheet_submitted_count),
-  SUM(raw.assessment_created_count), SUM(raw.report_generated_count), SUM(raw.assessment_failed_count)
-FROM (
-  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END AS content_type, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) AS content_code, COALESCE(origin_type, '') AS origin_type, DATE(created_at) AS stat_date, COUNT(*) AS submission_count, 0 AS completion_count, 0 AS answersheet_submitted_count, COUNT(*) AS assessment_created_count, 0 AS report_generated_count, 0 AS assessment_failed_count
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(created_at)
-  UNION ALL
-  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(evaluated_at), 0, COUNT(*), 0, 0, COUNT(*), 0
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND status = 'evaluated' AND evaluated_at IS NOT NULL AND evaluated_at >= ? AND evaluated_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(evaluated_at)
-  UNION ALL
-  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(submitted_at), 0, 0, COUNT(*), 0, 0, 0
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND submitted_at IS NOT NULL AND submitted_at >= ? AND submitted_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(submitted_at)
-  UNION ALL
-  SELECT org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(failed_at), 0, 0, 0, 0, 0, COUNT(*)
-  FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND failed_at IS NOT NULL AND failed_at >= ? AND failed_at < ? AND COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code) <> ''
-  GROUP BY org_id, CASE WHEN evaluation_model_kind = 'scale' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(CASE WHEN evaluation_model_kind = 'scale' THEN evaluation_model_code END, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(failed_at)
-) raw
-GROUP BY raw.org_id, raw.content_type, raw.content_code, raw.origin_type, raw.stat_date
-ON DUPLICATE KEY UPDATE
-  submission_count = VALUES(submission_count),
-  completion_count = VALUES(completion_count),
-  answersheet_submitted_count = VALUES(answersheet_submitted_count),
-  assessment_created_count = VALUES(assessment_created_count),
-  report_generated_count = VALUES(report_generated_count),
-  assessment_failed_count = VALUES(assessment_failed_count),
   updated_at = NOW(3)`
 
 const planDailyInsertSQL = `

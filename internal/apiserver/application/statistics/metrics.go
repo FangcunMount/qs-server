@@ -69,11 +69,21 @@ func observeBehaviorProjectionRebuild(start time.Time, err error) {
 	behaviorProjectionRebuildTotal.WithLabelValues(result).Inc()
 }
 
-func observePendingReconcile(start time.Time, processed int, err error) {
-	result := "ok"
-	if err != nil {
-		result = "error"
+type pendingReconcileMetrics struct {
+	completed          int
+	rescheduledPending int
+	rescheduledError   int
+	failed             int
+}
+
+func observePendingReconcile(start time.Time, metrics pendingReconcileMetrics, err error) {
+	behaviorPendingReconcileTotal.WithLabelValues("ok").Add(float64(metrics.completed))
+	behaviorPendingReconcileTotal.WithLabelValues("rescheduled_pending").Add(float64(metrics.rescheduledPending))
+	behaviorPendingReconcileTotal.WithLabelValues("rescheduled_error").Add(float64(metrics.rescheduledError))
+	failed := metrics.failed
+	if err != nil && failed == 0 {
+		failed = 1
 	}
-	behaviorPendingReconcileTotal.WithLabelValues(result).Add(float64(processed))
+	behaviorPendingReconcileTotal.WithLabelValues("error").Add(float64(failed))
 	behaviorPendingReconcileDuration.Observe(time.Since(start).Seconds())
 }

@@ -17,6 +17,12 @@ import (
 )
 
 func (r *StatisticsRepository) GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*domainStatistics.TesteePeriodicStatisticsResponse, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	if err := r.ensureTesteeExists(ctx, orgID, testeeID); err != nil {
 		return nil, err
 	}
@@ -34,7 +40,7 @@ func (r *StatisticsRepository) GetPeriodicStats(ctx context.Context, orgID int64
 
 func (r *StatisticsRepository) ensureTesteeExists(ctx context.Context, orgID int64, testeeID uint64) error {
 	var testee actorInfra.TesteePO
-	if err := r.WithContext(ctx).
+	if err := r.withContext(ctx).
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, testeeID).
 		First(&testee).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -47,7 +53,7 @@ func (r *StatisticsRepository) ensureTesteeExists(ctx context.Context, orgID int
 
 func (r *StatisticsRepository) loadPeriodicTasks(ctx context.Context, orgID int64, testeeID uint64) ([]planInfra.AssessmentTaskPO, error) {
 	var tasks []planInfra.AssessmentTaskPO
-	if err := r.WithContext(ctx).
+	if err := r.withContext(ctx).
 		Table("assessment_task t").
 		Joins("JOIN assessment_plan p ON p.id = t.plan_id AND p.deleted_at IS NULL").
 		Where("t.org_id = ? AND t.testee_id = ? AND t.deleted_at IS NULL", orgID, testeeID).
@@ -77,7 +83,7 @@ func (r *StatisticsRepository) loadAssessmentNames(ctx context.Context, orgID in
 		return assessmentNames, nil
 	}
 	var assessments []evaluationInfra.AssessmentPO
-	if err := r.WithContext(ctx).
+	if err := r.withContext(ctx).
 		Select("id, evaluation_model_title").
 		Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, assessmentIDs).
 		Find(&assessments).Error; err != nil {

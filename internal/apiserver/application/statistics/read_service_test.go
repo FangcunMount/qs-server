@@ -47,6 +47,15 @@ type statisticsReadModelStub struct {
 	contentBatchTotals []ContentBatchTotal
 }
 
+func newReadServiceWithStub(stub *statisticsReadModelStub, opts ...ReadServiceOption) ReadService {
+	return NewReadService(ReadServiceDeps{
+		Overview:   stub,
+		Clinicians: stub,
+		Entries:    stub,
+		Contents:   stub,
+	}, opts...)
+}
+
 func (s *statisticsReadModelStub) GetOrganizationOverview(context.Context, int64) (domainStatistics.OrganizationOverview, error) {
 	s.overviewReadCalls++
 	return s.organizationOverview, nil
@@ -166,7 +175,7 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 			},
 		},
 	}
-	service := NewReadService(stub)
+	service := newReadServiceWithStub(stub)
 
 	got, err := service.GetOverview(context.Background(), 9, QueryFilter{
 		From: "2026-04-01",
@@ -219,7 +228,7 @@ func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
 			CompletionRate:     70,
 		},
 	}
-	service := NewReadService(stub, WithReadServiceCache(cache))
+	service := newReadServiceWithStub(stub, WithReadServiceCache(cache))
 	filter := QueryFilter{
 		From: "2026-04-01",
 		To:   "2026-04-02",
@@ -262,7 +271,7 @@ func TestReadServiceListAssessmentEntryStatisticsNormalizesPaginationBeforeReadM
 		countAssessmentEntriesResult: 3,
 		listAssessmentEntryMetas:     []domainStatistics.AssessmentEntryStatisticsMeta{},
 	}
-	service := NewReadService(stub)
+	service := newReadServiceWithStub(stub)
 
 	got, err := service.ListAssessmentEntryStatistics(context.Background(), 12, nil, nil, QueryFilter{}, 0, 500)
 	if err != nil {
@@ -282,7 +291,7 @@ func TestReadServiceListsClinicianStatisticsWithOneBatchDetailRead(t *testing.T)
 	stub := &statisticsReadModelStub{clinicianSubjects: []domainStatistics.ClinicianStatisticsSubject{
 		{ID: meta.FromUint64(10)}, {ID: meta.FromUint64(20)}, {ID: meta.FromUint64(30)},
 	}}
-	service := NewReadService(stub)
+	service := newReadServiceWithStub(stub)
 	if _, err := service.ListClinicianStatistics(context.Background(), 12, QueryFilter{}, 1, 20); err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +305,7 @@ func TestReadServiceListsEntryStatisticsWithOneBatchDetailRead(t *testing.T) {
 	stub := &statisticsReadModelStub{listAssessmentEntryMetas: []domainStatistics.AssessmentEntryStatisticsMeta{
 		{ID: meta.FromUint64(101)}, {ID: meta.FromUint64(202)},
 	}}
-	service := NewReadService(stub)
+	service := newReadServiceWithStub(stub)
 	if _, err := service.ListAssessmentEntryStatistics(context.Background(), 12, nil, nil, QueryFilter{}, 1, 20); err != nil {
 		t.Fatal(err)
 	}
@@ -314,13 +323,13 @@ func TestReadServiceGetContentBatchStatisticsKeepsTypedIdentityAndOrder(t *testi
 			{Type: "scale", Code: "COMMON", TotalSubmissions: 4, TotalCompletions: 1},
 		},
 	}
-	service := NewReadService(stub)
+	service := newReadServiceWithStub(stub)
 
 	got, err := service.GetContentBatchStatistics(context.Background(), 21, []domainStatistics.ContentReference{
 		{Type: "QUESTIONNAIRE", Code: " COMMON "},
 		{Type: "scale", Code: "COMMON"},
 		{Type: "questionnaire", Code: "COMMON"},
-	})
+	}, ContentStatisticsAccess{Questionnaire: true, Scale: true})
 	if err != nil {
 		t.Fatalf("GetContentBatchStatistics returned error: %v", err)
 	}
@@ -348,9 +357,53 @@ func TestReadServiceGetContentBatchStatisticsKeepsTypedIdentityAndOrder(t *testi
 func TestReadServiceGetContentBatchStatisticsRejectsInvalidReference(t *testing.T) {
 	t.Parallel()
 
-	service := NewReadService(&statisticsReadModelStub{})
-	if _, err := service.GetContentBatchStatistics(context.Background(), 21, []domainStatistics.ContentReference{{Type: "unknown", Code: "X"}}); err == nil {
+	service := newReadServiceWithStub(&statisticsReadModelStub{})
+	if _, err := service.GetContentBatchStatistics(context.Background(), 21, []domainStatistics.ContentReference{{Type: "unknown", Code: "X"}}, ContentStatisticsAccess{}); err == nil {
 		t.Fatal("GetContentBatchStatistics() error = nil, want invalid argument")
+	}
+}
+
+func TestReadServiceGetContentBatchStatisticsRequiresAccessForEveryContentType(t *testing.T) {
+	t.Parallel()
+	service := newReadServiceWithStub(&statisticsReadModelStub{})
+	refs := []domainStatistics.ContentReference{
+		{Type: domainStatistics.ContentTypeQuestionnaire, Code: "Q-1"},
+		{Type: domainStatistics.ContentTypeScale, Code: "S-1"},
+	}
+	if _, err := service.GetContentBatchStatistics(context.Background(), 21, refs, ContentStatisticsAccess{Questionnaire: true}); err == nil {
+		t.Fatal("mixed content request without scale access should fail")
+	}
+	if _, err := service.GetContentBatchStatistics(context.Background(), 21, refs, ContentStatisticsAccess{Questionnaire: true, Scale: true}); err != nil {
+		t.Fatalf("mixed content request with both capabilities failed: %v", err)
+	}
+}
+
+func TestReadServiceGetContentBatchStatisticsAccessMatrix(t *testing.T) {
+	t.Parallel()
+
+	service := newReadServiceWithStub(&statisticsReadModelStub{})
+	tests := []struct {
+		name    string
+		refs    []domainStatistics.ContentReference
+		access  ContentStatisticsAccess
+		wantErr bool
+	}{
+		{name: "questionnaire capability", refs: []domainStatistics.ContentReference{{Type: domainStatistics.ContentTypeQuestionnaire, Code: "Q-1"}}, access: ContentStatisticsAccess{Questionnaire: true}},
+		{name: "questionnaire denied", refs: []domainStatistics.ContentReference{{Type: domainStatistics.ContentTypeQuestionnaire, Code: "Q-1"}}, access: ContentStatisticsAccess{Scale: true}, wantErr: true},
+		{name: "scale capability", refs: []domainStatistics.ContentReference{{Type: domainStatistics.ContentTypeScale, Code: "S-1"}}, access: ContentStatisticsAccess{Scale: true}},
+		{name: "scale denied", refs: []domainStatistics.ContentReference{{Type: domainStatistics.ContentTypeScale, Code: "S-1"}}, access: ContentStatisticsAccess{Questionnaire: true}, wantErr: true},
+		{name: "empty with questionnaire entry", refs: nil, access: ContentStatisticsAccess{Questionnaire: true}},
+		{name: "empty with scale entry", refs: nil, access: ContentStatisticsAccess{Scale: true}},
+		{name: "empty denied", refs: nil, access: ContentStatisticsAccess{}, wantErr: true},
+		{name: "invalid before permission", refs: []domainStatistics.ContentReference{{Type: "bad", Code: "X"}}, access: ContentStatisticsAccess{}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.GetContentBatchStatistics(context.Background(), 21, tt.refs, tt.access)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -387,5 +440,8 @@ func statisticsCacheOverviewKey(orgID int64, timeRange domainStatistics.Statisti
 	)
 }
 
-var _ StatisticsReadModel = (*statisticsReadModelStub)(nil)
+var _ OverviewReader = (*statisticsReadModelStub)(nil)
+var _ ClinicianStatisticsReader = (*statisticsReadModelStub)(nil)
+var _ EntryStatisticsReader = (*statisticsReadModelStub)(nil)
+var _ ContentStatisticsReader = (*statisticsReadModelStub)(nil)
 var _ statisticscache.Cache = (*memoryStatisticsCache)(nil)

@@ -45,6 +45,7 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/statistics/entries/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/statistics/testees/{testee_id}/periodic", "get")
 	assertOpenAPIOperation(t, spec, "/statistics/contents/batch", "post")
+	assertOpenAPIOperationAbsent(t, spec, "/statistics/questionnaires/batch", "post")
 	assertOpenAPIOperation(t, spec, "/testees/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
 }
@@ -155,5 +156,17 @@ func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string)
 	}
 	if _, ok := ops[method]; !ok {
 		t.Fatalf("OpenAPI path %s missing method %s", path, method)
+	}
+}
+
+func assertOpenAPIOperationAbsent(t *testing.T, spec openAPISpec, path, method string) {
+	t.Helper()
+	if !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/internal/") {
+		path = "/api/v1" + path
+	}
+	if ops, ok := spec.Paths[path]; ok {
+		if _, registered := ops[method]; registered {
+			t.Fatalf("OpenAPI unexpectedly contains %s %s", method, path)
+		}
 	}
 }

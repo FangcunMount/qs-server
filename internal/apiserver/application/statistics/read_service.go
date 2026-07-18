@@ -14,7 +14,6 @@ import (
 )
 
 type readService struct {
-	readModel         StatisticsReadModel
 	cache             statisticscache.Cache
 	hotset            cachetarget.HotsetRecorder
 	overviewGuardOpts StatisticsReadGuardOptions
@@ -24,6 +23,14 @@ type readService struct {
 	entryStats     *entryStatsQuery
 	contentBatch   *contentBatchQuery
 	cacheHelper    *statisticsCacheHelper
+}
+
+// ReadServiceDeps exposes only the read capabilities used by each query family.
+type ReadServiceDeps struct {
+	Overview   OverviewReader
+	Clinicians ClinicianStatisticsReader
+	Entries    EntryStatisticsReader
+	Contents   ContentStatisticsReader
 }
 
 type ReadServiceOption func(*readService)
@@ -47,8 +54,8 @@ func WithReadServiceHotset(hotset cachetarget.HotsetRecorder) ReadServiceOption 
 }
 
 // NewReadService 创建统一统计读服务。
-func NewReadService(readModel StatisticsReadModel, opts ...ReadServiceOption) ReadService {
-	service := &readService{readModel: readModel}
+func NewReadService(deps ReadServiceDeps, opts ...ReadServiceOption) ReadService {
+	service := &readService{}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(service)
@@ -59,10 +66,10 @@ func NewReadService(readModel StatisticsReadModel, opts ...ReadServiceOption) Re
 	if overviewOpts == (StatisticsReadGuardOptions{}) {
 		overviewOpts = DefaultStatisticsReadGuardOptions()
 	}
-	service.overview = newOverviewQuery(readModel, service.cacheHelper, overviewOpts)
-	service.clinicianStats = &clinicianStatsQuery{readModel: readModel}
-	service.entryStats = &entryStatsQuery{readModel: readModel}
-	service.contentBatch = &contentBatchQuery{readModel: readModel}
+	service.overview = newOverviewQuery(deps.Overview, service.cacheHelper, overviewOpts)
+	service.clinicianStats = &clinicianStatsQuery{readModel: deps.Clinicians}
+	service.entryStats = &entryStatsQuery{readModel: deps.Entries}
+	service.contentBatch = &contentBatchQuery{readModel: deps.Contents}
 	return service
 }
 
@@ -98,8 +105,8 @@ func (s *readService) GetCurrentClinicianTesteeSummary(ctx context.Context, orgI
 	return s.clinicianStats.GetCurrentClinicianTesteeSummary(ctx, orgID, operatorUserID, filter)
 }
 
-func (s *readService) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference) (*domainStatistics.ContentBatchStatisticsResponse, error) {
-	return s.contentBatch.GetContentBatchStatistics(ctx, orgID, refs)
+func (s *readService) GetContentBatchStatistics(ctx context.Context, orgID int64, refs []domainStatistics.ContentReference, access ContentStatisticsAccess) (*domainStatistics.ContentBatchStatisticsResponse, error) {
+	return s.contentBatch.GetContentBatchStatistics(ctx, orgID, refs, access)
 }
 
 func normalizeQueryFilter(filter QueryFilter) (domainStatistics.StatisticsTimeRange, error) {

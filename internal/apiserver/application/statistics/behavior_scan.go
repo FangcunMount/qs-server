@@ -212,6 +212,7 @@ func (s *behaviorJourneyScanner) scanSource(
 		if !dryRun {
 			_ = s.scanRepo.SaveScanWatermark(ctx, watermark)
 		}
+		result.WatermarkID = watermark.LastSeenID
 		return result
 	}
 	if batch.scanned > 0 && batch.lastSeenTime != nil {
@@ -227,6 +228,7 @@ func (s *behaviorJourneyScanner) scanSource(
 		}
 	}
 	result.Skipped = batch.scanned - batch.projected
+	result.WatermarkID = watermark.LastSeenID
 	return result
 }
 

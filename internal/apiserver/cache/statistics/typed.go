@@ -57,9 +57,9 @@ func overviewStatsCacheKey(orgID int64, timeRange domainStatistics.StatisticsTim
 	from := normalizeLocalDay(timeRange.From).Format("2006-01-02")
 	to := normalizeLocalDay(timeRange.To).Format("2006-01-02")
 	if preset, ok := overviewWarmupPreset(timeRange); ok {
-		return fmt.Sprintf("overview:%d:preset:%s:%s:%s", orgID, preset, from, to)
+		return fmt.Sprintf("overview:v2:%d:preset:%s:%s:%s", orgID, preset, from, to)
 	}
-	return fmt.Sprintf("overview:%d:range:%s:%s", orgID, from, to)
+	return fmt.Sprintf("overview:v2:%d:range:%s:%s", orgID, from, to)
 }
 
 func overviewWarmupPreset(timeRange domainStatistics.StatisticsTimeRange) (string, bool) {
