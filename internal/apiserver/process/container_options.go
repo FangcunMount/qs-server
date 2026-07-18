@@ -17,7 +17,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	cacheplanebootstrap "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/control/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
@@ -25,18 +24,37 @@ import (
 
 type containerOptionsInput struct {
 	cacheSubsystem *cachebootstrap.Subsystem
-	redisRuntime   *cacheplanebootstrap.RuntimeBundle
-	backpressure   container.BackpressureOptions
+	resilience     *resiliencesubsystem.Subsystem
 	eventSubsystem *eventsubsystem.Subsystem
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
+	resilience := input.resilience
+	var locks *locksubsystem.Subsystem
+	if resilience != nil {
+		locks = resilience.Locks()
+	}
+	return container.ContainerOptions{
+		EventSubsystem:             input.eventSubsystem,
+		Cache:                      s.buildContainerCacheOptions(),
+		CacheSubsystem:             input.cacheSubsystem,
+		LockSubsystem:              locks,
+		Resilience:                 resilience,
+		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
+		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
+		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
+		Signaling:                  s.config.Signaling,
+		SystemGovernance:           s.config.SystemGovernance,
+	}
+}
+
+func (s *server) buildResilienceSubsystem(runtime *cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
 	renewalEnabled := s.config.LockLease != nil && s.config.LockLease.RenewalEnabled
 	var lockHandle *redisruntime.Handle
 	var lockStatus *redisobserve.FamilyStatusRegistry
-	if input.redisRuntime != nil {
-		lockHandle = input.redisRuntime.Handle(redisruntime.FamilyLock)
-		lockStatus = input.redisRuntime.StatusRegistry
+	if runtime != nil {
+		lockHandle = runtime.Handle(redisruntime.FamilyLock)
+		lockStatus = runtime.StatusRegistry
 	}
 	locks := locksubsystem.New(locksubsystem.Options{
 		Component:      "apiserver",
@@ -54,34 +72,17 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		},
 	})
 	var stateStore *controlredis.Store
-	if input.redisRuntime != nil {
-		if ops := input.redisRuntime.Handle(redisruntime.FamilyOps); ops != nil {
+	if runtime != nil {
+		if ops := runtime.Handle(redisruntime.FamilyOps); ops != nil {
 			stateStore = controlredis.NewStore(ops.Client, ops.Builder)
 		}
 	}
-	resilience := resiliencesubsystem.New(resiliencesubsystem.Options{
-		RateLimit: s.config.RateLimit,
-		Backpressure: map[string]backpressure.Acquirer{
-			"mysql": input.backpressure.MySQL,
-			"mongo": input.backpressure.Mongo,
-			"iam":   input.backpressure.IAM,
-		},
-		Locks:      locks,
-		StateStore: stateStore,
+	return resiliencesubsystem.New(resiliencesubsystem.Options{
+		RateLimit:    s.config.RateLimit,
+		Backpressure: s.config.Backpressure,
+		Locks:        locks,
+		StateStore:   stateStore,
 	})
-	return container.ContainerOptions{
-		EventSubsystem:             input.eventSubsystem,
-		Cache:                      s.buildContainerCacheOptions(),
-		CacheSubsystem:             input.cacheSubsystem,
-		LockSubsystem:              locks,
-		Backpressure:               input.backpressure,
-		Resilience:                 resilience,
-		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
-		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
-		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
-		Signaling:                  s.config.Signaling,
-		SystemGovernance:           s.config.SystemGovernance,
-	}
 }
 
 func buildEventConsumerOptions(cfg *config.Config) map[string]eventsubsystem.ConsumerOptions {

@@ -487,11 +487,13 @@ collection 的保护层包括：
 | RateLimit | Router / `rateLimitedHandlers` | 支持 Redis distributed limiter，不可用时本地 limiter |
 | SubmitQueue | `answersheet.SubmitQueue` | 削峰，HTTP 202 后异步 gRPC |
 | SubmitGuard | `redisops.NewSubmitGuard` | 基于 Redis / LockLease Runner 的提交幂等前置保护 |
-| gRPC max-inflight | `grpcclient.Manager` | 对 collection -> apiserver 的 RPC 并发做上限 |
+| gRPC max-inflight | collection resilience subsystem 的 `grpc_downstream` gate | 所有 collection -> apiserver RPC client 共享同一进程级预算，manager 只接收注入 |
 | HTTP concurrency | transport stage | 对整个 HTTP server 做并发限制 |
 | Governance endpoint | HealthHandler | `/governance/redis`、`/governance/resilience` |
 
 这些能力都应该归入 `03-基础设施/concurrency` 或 `03-基础设施/runtime` 深讲。collection runtime 文档只说明它们在哪里挂载、如何影响进程行为。
+
+治理控制面启用时，collection 必须先读取并应用 SubmitQueue 的持久化期望状态，才允许 `/readyz` 返回成功。冷同步读取失败、非法状态或初始 drain 未完成只影响 Ready，不影响存活检查；首次同步成功后的短暂控制面故障不撤销 Ready，进程继续使用最后有效状态。
 
 ---
 

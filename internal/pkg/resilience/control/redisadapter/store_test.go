@@ -54,6 +54,16 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	if err := store.Heartbeat(ctx, identity, time.Minute); err != nil {
 		t.Fatal(err)
 	}
+	secondGeneration := identity
+	secondGeneration.Generation = "generation-2"
+	if err := store.Heartbeat(ctx, secondGeneration, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	firstKey := keyspace.NewBuilderWithNamespace("ops:runtime").BuildResilienceInstanceKey(identity.Component, identity.InstanceID, identity.Generation)
+	secondKey := keyspace.NewBuilderWithNamespace("ops:runtime").BuildResilienceInstanceKey(identity.Component, identity.InstanceID, secondGeneration.Generation)
+	if count, err := client.Exists(ctx, firstKey, secondKey).Result(); err != nil || count != 2 {
+		t.Fatalf("generation heartbeat keys count=%d err=%v", count, err)
+	}
 	command := control.Command{RequestID: "request-1", ActionID: "resilience.drain_queue",
 		Target: control.Target{Component: "collection-server", InstanceID: "all"}, Actor: control.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Minute)}
 	if err := store.PublishCommand(ctx, command, time.Minute); err != nil {
@@ -82,7 +92,7 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 		t.Fatalf("ListCommandResults() = %+v, %v", results, err)
 	}
 	instances, err := store.ListInstances(ctx, identity.Component)
-	if err != nil || len(instances) != 1 || instances[0].Generation == "" {
+	if err != nil || len(instances) != 2 || instances[0].Generation == "" || instances[1].Generation == "" {
 		t.Fatalf("ListInstances() = %+v, %v", instances, err)
 	}
 }

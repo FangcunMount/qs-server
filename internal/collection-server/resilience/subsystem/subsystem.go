@@ -24,10 +24,11 @@ const (
 )
 
 const (
-	GateQuery      = "query"
-	GateCatalog    = "catalog"
-	GateSubmit     = "submit"
-	GateWaitReport = "wait_report"
+	GateQuery          = "query"
+	GateCatalog        = "catalog"
+	GateSubmit         = "submit"
+	GateWaitReport     = "wait_report"
+	GateGRPCDownstream = "grpc_downstream"
 )
 
 type Options struct {
@@ -35,6 +36,7 @@ type Options struct {
 	RateLimit    *options.RateLimitOptions
 	Concurrency  *options.ConcurrencyOptions
 	WaitReport   *options.WaitReportOptions
+	GRPCClient   *options.GRPCClientOptions
 	Backend      ratelimit.Backend
 	Locks        *locksubsystem.Subsystem
 	OpsAvailable bool
@@ -47,17 +49,20 @@ type queueRegistration struct {
 }
 
 type Subsystem struct {
-	identity     control.InstanceIdentity
-	rateEnabled  bool
-	budgets      map[ratelimit.BudgetID]*ratelimit.Budget
-	gates        map[string]*concurrency.Gate
-	locks        *locksubsystem.Subsystem
-	opsAvailable bool
-	stateStore   control.StateStore
-	appliedRate  map[ratelimit.BudgetID]uint64
-	queueMu      sync.RWMutex
-	queues       map[string]queueRegistration
-	controlReady atomic.Bool
+	identity         control.InstanceIdentity
+	rateEnabled      bool
+	budgets          map[ratelimit.BudgetID]*ratelimit.Budget
+	gates            map[string]*concurrency.Gate
+	locks            *locksubsystem.Subsystem
+	opsAvailable     bool
+	stateStore       control.StateStore
+	appliedRate      map[ratelimit.BudgetID]uint64
+	queueMu          sync.RWMutex
+	queues           map[string]queueRegistration
+	commandMu        sync.Mutex
+	activeCommands   map[string]struct{}
+	controlReady     atomic.Bool
+	grpcInflightWait time.Duration
 }
 
 func New(opts Options) *Subsystem {
@@ -69,14 +74,18 @@ func New(opts Options) *Subsystem {
 		identity:    control.ResolveInstanceIdentity("collection-server", opts.InstanceID),
 		rateEnabled: rateCfg.Enabled, budgets: make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		gates: make(map[string]*concurrency.Gate), locks: opts.Locks, opsAvailable: opts.OpsAvailable, stateStore: opts.StateStore,
-		appliedRate: make(map[ratelimit.BudgetID]uint64),
-		queues:      make(map[string]queueRegistration),
+		appliedRate:    make(map[ratelimit.BudgetID]uint64),
+		queues:         make(map[string]queueRegistration),
+		activeCommands: make(map[string]struct{}),
 	}
 	s.budgets[BudgetQuery] = newBudget(BudgetQuery, opts.Backend, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst)
 	s.budgets[BudgetSubmit] = newBudget(BudgetSubmit, opts.Backend, rateCfg.SubmitGlobalQPS, rateCfg.SubmitGlobalBurst, rateCfg.SubmitUserQPS, rateCfg.SubmitUserBurst)
 	s.budgets[BudgetWaitReport] = newBudget(BudgetWaitReport, opts.Backend, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst)
 	s.budgets[BudgetReportEvents] = newBudget(BudgetReportEvents, opts.Backend, rateCfg.ReportEventsGlobalQPS, rateCfg.ReportEventsGlobalBurst, rateCfg.ReportEventsUserQPS, rateCfg.ReportEventsUserBurst)
 	s.buildGates(opts.Concurrency, opts.WaitReport)
+	grpcOptions := opts.GRPCClient
+	s.gates[GateGRPCDownstream] = concurrency.NewGate(grpcOptions.ResolvedMaxInflight())
+	s.grpcInflightWait = grpcOptions.ResolvedInflightWait()
 	if opts.StateStore == nil || !opts.OpsAvailable {
 		s.controlReady.Store(true)
 	}
@@ -92,10 +101,13 @@ func (s *Subsystem) Sync(ctx context.Context) error {
 		}
 		return nil
 	}
-	if _, _, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit"); err != nil {
+	state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit")
+	if err != nil {
 		return err
 	}
-	s.reconcile(ctx)
+	if err := s.applyQueueDesiredState(ctx, state, exists, true); err != nil {
+		return err
+	}
 	s.controlReady.Store(true)
 	return nil
 }
@@ -117,7 +129,11 @@ func (s *Subsystem) Start(ctx context.Context) context.CancelFunc {
 			signals, _ = watcher.WatchStateSignals(ctx)
 		}
 		for {
-			_ = s.Sync(ctx)
+			if !s.controlReady.Load() {
+				_ = s.Sync(ctx)
+			} else {
+				s.reconcile(ctx)
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -179,31 +195,57 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 
 func (s *Subsystem) reconcileQueues(ctx context.Context) {
 	state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit")
-	if err != nil || !exists {
+	if err != nil {
 		return
 	}
+	_ = s.applyQueueDesiredState(ctx, state, exists, false)
+}
+
+func (s *Subsystem) applyQueueDesiredState(ctx context.Context, state control.VersionedState, exists, requireSettled bool) error {
+	if !exists {
+		return nil
+	}
 	var change control.QueueChange
-	if json.Unmarshal(state.Payload, &change) != nil || (change.Target != "" && change.Target != "all" && change.Target != s.identity.InstanceID) {
-		return
+	if err := json.Unmarshal(state.Payload, &change); err != nil {
+		return err
+	}
+	if change.Target != "" && change.Target != "all" && change.Target != s.identity.InstanceID {
+		return nil
 	}
 	s.queueMu.RLock()
 	queue, ok := s.queues["answersheet_submit"]
 	s.queueMu.RUnlock()
 	if !ok {
-		return
+		return control.ErrUnavailable
 	}
 	snapshot := queue.snapshot(time.Now())
 	switch change.DesiredState {
 	case control.QueueStatePaused:
 		if snapshot.State == string(control.QueueStatePaused) {
-			return
+			return nil
 		}
 		timeout := time.Duration(change.TimeoutSeconds) * time.Second
-		_, _ = queue.controller.Drain(ctx, control.DrainOptions{Timeout: timeout})
-	case control.QueueStateActive:
-		if snapshot.State == string(control.QueueStatePaused) {
-			_ = queue.controller.Resume(ctx)
+		if timeout <= 0 {
+			timeout = time.Minute
 		}
+		result, err := queue.controller.Drain(ctx, control.DrainOptions{Timeout: timeout})
+		if err != nil {
+			return err
+		}
+		if requireSettled && result.State != control.QueueStatePaused {
+			return control.ErrInvalidState
+		}
+		return nil
+	case control.QueueStateActive:
+		if snapshot.State == string(control.QueueStateActive) {
+			return nil
+		}
+		if snapshot.State == string(control.QueueStatePaused) {
+			return queue.controller.Resume(ctx)
+		}
+		return control.ErrInvalidState
+	default:
+		return control.ErrInvalidState
 	}
 }
 
@@ -317,6 +359,13 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	s.queueMu.RUnlock()
 	if s.locks != nil {
 		snapshot.Locks = s.locks.Snapshots()
+	}
+	if gate := s.gates[GateGRPCDownstream]; gate != nil {
+		snapshot.Backpressure = append(snapshot.Backpressure, resilience.BackpressureSnapshot{
+			Component: "collection-server", Name: GateGRPCDownstream, Dependency: "apiserver_grpc",
+			Strategy: "semaphore_wait", Enabled: true, MaxInflight: gate.Capacity(), InFlight: gate.InFlight(),
+			TimeoutMillis: s.grpcInflightWait.Milliseconds(),
+		})
 	}
 	configured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded && s.opsAvailable
 	snapshot.Idempotency = []resilience.CapabilitySnapshot{{

@@ -49,6 +49,18 @@ var resilienceBackpressureWaitDuration = promauto.NewHistogramVec(
 	[]string{"component", "scope", "resource", "strategy", "outcome"},
 )
 
+var collectionHTTPGateWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+	Name:    "collection_http_gate_wait_seconds",
+	Help:    "Time spent waiting for collection-server HTTP concurrency slots.",
+	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+})
+
+var collectionGRPCInflightWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+	Name:    "collection_grpc_inflight_wait_seconds",
+	Help:    "Time spent waiting for collection-server gRPC client inflight slots.",
+	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+})
+
 type PrometheusObserver struct{}
 
 func NewPrometheusObserver() *PrometheusObserver {
@@ -123,4 +135,18 @@ func ObserveBackpressureWaitDuration(subject Subject, outcome Outcome, duration 
 		normalized.Strategy,
 		outcome.String(),
 	).Observe(duration.Seconds())
+}
+
+func ObserveHTTPGateWait(duration time.Duration) {
+	if duration < 0 {
+		return
+	}
+	collectionHTTPGateWaitSeconds.Observe(duration.Seconds())
+}
+
+func ObserveGRPCInflightWait(duration time.Duration) {
+	if duration < 0 {
+		return
+	}
+	collectionGRPCInflightWaitSeconds.Observe(duration.Seconds())
 }

@@ -31,9 +31,15 @@ func (actionRunPO) TableName() string { return "system_governance_action_runs" }
 
 type ActionAuditStore struct{ db *gorm.DB }
 
+type actionAuditEnvelope struct {
+	SchemaVersion int                   `json:"schema_version"`
+	Result        *app.ActionRunResult  `json:"result,omitempty"`
+	Error         *app.ActionAuditError `json:"error,omitempty"`
+}
+
 func NewActionAuditStore(db *gorm.DB) *ActionAuditStore { return &ActionAuditStore{db: db} }
 
-func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditRecord) (*app.ActionRunResult, bool, error) {
+func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditRecord) (*app.ActionAuditReplay, bool, error) {
 	input, err := json.Marshal(record.Input)
 	if err != nil {
 		return nil, false, err
@@ -58,17 +64,17 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 	if existing.Status == "running" || existing.ResultJSON == "" {
 		return nil, false, nil
 	}
-	var prior app.ActionRunResult
-	if err := json.Unmarshal([]byte(existing.ResultJSON), &prior); err != nil {
-		return nil, false, err
+	prior, err := decodeActionAuditReplay(existing.ResultJSON)
+	if prior != nil {
+		prior.ActionID = existing.ActionID
 	}
-	return &prior, false, nil
+	return prior, false, err
 }
 
 func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditRecord) error {
 	resultJSON := ""
-	if record.Result != nil {
-		encoded, err := json.Marshal(record.Result)
+	if record.Result != nil || record.Error != nil {
+		encoded, err := json.Marshal(actionAuditEnvelope{SchemaVersion: 2, Result: record.Result, Error: record.Error})
 		if err != nil {
 			return err
 		}
@@ -88,6 +94,21 @@ func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditR
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func decodeActionAuditReplay(raw string) (*app.ActionAuditReplay, error) {
+	var envelope actionAuditEnvelope
+	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
+		return nil, err
+	}
+	if envelope.SchemaVersion >= 2 {
+		return &app.ActionAuditReplay{Result: envelope.Result, Error: envelope.Error}, nil
+	}
+	var legacy app.ActionRunResult
+	if err := json.Unmarshal([]byte(raw), &legacy); err != nil {
+		return nil, err
+	}
+	return &app.ActionAuditReplay{ActionID: legacy.ActionID, Result: &legacy}, nil
 }
 
 var _ app.ActionAuditStore = (*ActionAuditStore)(nil)

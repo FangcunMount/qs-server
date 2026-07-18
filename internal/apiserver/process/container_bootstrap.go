@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 type containerStageDeps struct {
@@ -43,8 +44,12 @@ func (s *server) buildContainerStageDeps(resources resourceOutput) containerStag
 	}
 	if s.config != nil {
 		deps.newIAMModule = func(ctx context.Context) (*container.IAMModule, error) {
+			var limiter backpressure.Acquirer
+			if resilience := resources.containerInput.containerOptions.Resilience; resilience != nil {
+				limiter = resilience.Backpressure("iam")
+			}
 			return container.NewIAMModuleWithRuntimeOptions(ctx, s.config.IAMOptions, container.IAMModuleRuntimeOptions{
-				Limiter: resources.containerInput.containerOptions.Backpressure.IAM,
+				Limiter: limiter,
 			})
 		}
 	}

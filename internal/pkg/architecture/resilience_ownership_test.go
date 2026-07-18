@@ -147,3 +147,38 @@ func TestBusinessLayersDoNotImportResilienceRedisAdapter(t *testing.T) {
 		})
 	}
 }
+
+func TestAdmissionDelegatesPrometheusRegistrationToResilienceCore(t *testing.T) {
+	root := repoRoot(t)
+	walkGoFiles(t, filepath.Join(root, "internal", "pkg", "resilience", "admission"), func(path, text string) {
+		if strings.Contains(text, "github.com/prometheus/client_golang") {
+			t.Fatalf("%s imports Prometheus directly; metric registration belongs to the resilience core", mustRel(t, root, path))
+		}
+	})
+}
+
+func TestGRPCManagerDoesNotConstructInflightSemaphore(t *testing.T) {
+	root := repoRoot(t)
+	walkGoFiles(t, filepath.Join(root, "internal", "collection-server", "infra", "grpcclient"), func(path, text string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		if strings.Contains(text, "admission.NewChannelSemaphore(") {
+			t.Fatalf("%s constructs an inflight semaphore; inject the process-owned grpc_downstream gate", mustRel(t, root, path))
+		}
+	})
+}
+
+func TestAPIServerCompositionDoesNotConstructBackpressureLimiters(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range []string{"internal/apiserver/process", "internal/apiserver/container"} {
+		walkGoFiles(t, filepath.Join(root, filepath.FromSlash(rel)), func(path, text string) {
+			if strings.HasSuffix(path, "_test.go") {
+				return
+			}
+			if strings.Contains(text, "backpressure.NewLimiter") {
+				t.Fatalf("%s constructs a backpressure limiter; obtain it from the apiserver resilience subsystem", mustRel(t, root, path))
+			}
+		})
+	}
+}

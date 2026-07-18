@@ -84,8 +84,6 @@ type Deps struct {
 	GovernanceStatusService  statisticsApp.GovernanceStatusReader
 	EventStatusService       appEventing.StatusService
 	SystemGovernanceFacade   systemgovApp.Facade
-	Backpressure             []resilience.BackpressureSnapshot
-	Locks                    []resilience.CapabilitySnapshot
 	ResilienceSnapshot       func() resilience.RuntimeSnapshot
 	IAM                      IAMDeps
 }

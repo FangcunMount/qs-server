@@ -6,7 +6,6 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
@@ -20,8 +19,6 @@ type ContainerOptions struct {
 	CacheSubsystem *cachebootstrap.Subsystem
 	// LockSubsystem owns distributed lease lifecycle independently from cache.
 	LockSubsystem *locksubsystem.Subsystem
-	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
-	Backpressure BackpressureOptions
 	// Resilience owns process-local resilience composition and governance projection.
 	Resilience *resiliencesubsystem.Subsystem
 	// PlanEntryBaseURL 测评计划任务入口基础地址
@@ -35,12 +32,6 @@ type ContainerOptions struct {
 	Silent bool
 	// SystemGovernance unified governance facade configuration.
 	SystemGovernance *apiserveroptions.SystemGovernanceOptions
-}
-
-type BackpressureOptions struct {
-	MySQL backpressure.Acquirer
-	Mongo backpressure.Acquirer
-	IAM   backpressure.Acquirer
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

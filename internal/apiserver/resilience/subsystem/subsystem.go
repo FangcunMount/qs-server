@@ -25,7 +25,7 @@ const (
 type Options struct {
 	InstanceID   string
 	RateLimit    *options.RateLimitOptions
-	Backpressure map[string]backpressure.Acquirer
+	Backpressure *options.BackpressureOptions
 	Locks        *locksubsystem.Subsystem
 	StateStore   control.StateStore
 }
@@ -48,7 +48,7 @@ func New(opts Options) *Subsystem {
 		identity:     control.ResolveInstanceIdentity("apiserver", opts.InstanceID),
 		rateEnabled:  cfg.Enabled,
 		budgets:      make(map[ratelimit.BudgetID]*ratelimit.Budget),
-		backpressure: cloneBackpressure(opts.Backpressure),
+		backpressure: buildBackpressure(opts.Backpressure),
 		locks:        opts.Locks,
 		stateStore:   opts.StateStore,
 	}
@@ -159,10 +159,24 @@ func ratePolicy(scope, resource, strategy string, qps float64, burst int) rateli
 	}
 }
 
-func cloneBackpressure(source map[string]backpressure.Acquirer) map[string]backpressure.Acquirer {
-	result := make(map[string]backpressure.Acquirer, len(source))
-	for name, limiter := range source {
-		result[name] = limiter
+func buildBackpressure(cfg *options.BackpressureOptions) map[string]backpressure.Acquirer {
+	result := map[string]backpressure.Acquirer{"mysql": nil, "mongo": nil, "iam": nil}
+	if cfg == nil {
+		return result
+	}
+	for name, dependency := range map[string]*options.DependencyBackpressure{
+		"mysql": cfg.MySQL,
+		"mongo": cfg.Mongo,
+		"iam":   cfg.IAM,
+	} {
+		if dependency == nil || !dependency.Enabled {
+			continue
+		}
+		result[name] = backpressure.NewLimiterWithOptions(
+			dependency.MaxInflight,
+			time.Duration(dependency.TimeoutMs)*time.Millisecond,
+			backpressure.Options{Component: "apiserver", Dependency: name},
+		)
 	}
 	return result
 }
@@ -191,6 +205,15 @@ func (s *Subsystem) Backpressure(name string) backpressure.Acquirer {
 		return nil
 	}
 	return s.backpressure[name]
+}
+
+// Locks exposes the independently managed lock subsystem through the process
+// composition root without duplicating its lifecycle.
+func (s *Subsystem) Locks() *locksubsystem.Subsystem {
+	if s == nil {
+		return nil
+	}
+	return s.locks
 }
 
 func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {

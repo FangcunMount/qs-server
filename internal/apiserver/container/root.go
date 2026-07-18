@@ -36,7 +36,6 @@ type Container struct {
 	cacheOptions               ContainerCacheOptions
 	cache                      *cachebootstrap.Subsystem
 	locks                      *locksubsystem.Subsystem
-	backpressure               BackpressureOptions
 	resilience                 *resiliencesubsystem.Subsystem
 	resilienceCancel           context.CancelFunc
 	planEntryURL               string
@@ -130,7 +129,6 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.locks = opts.LockSubsystem
-	c.backpressure = opts.Backpressure
 	if opts.Resilience != nil {
 		c.resilience = opts.Resilience
 	}

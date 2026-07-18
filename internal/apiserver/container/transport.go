@@ -40,7 +40,6 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		QRCodeObjectKeyPrefix:   c.QRCodeObjectKeyPrefix,
 		GovernanceStatusService: c.CacheGovernanceStatusService(),
 		EventStatusService:      c.buildRESTEventStatusService(),
-		Backpressure:            c.buildBackpressureSnapshots(),
 		IAM:                     c.exportRESTIAMDeps(),
 	})
 	deps.CodesService = platformDeps.CodesService
@@ -50,7 +49,6 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.AssessmentAssetKeyPrefix = c.AssessmentAssetKeyPrefix
 	deps.GovernanceStatusService = platformDeps.GovernanceStatusService
 	deps.EventStatusService = platformDeps.EventStatusService
-	deps.Backpressure = platformDeps.Backpressure
 	deps.RateBudgets = c.resilience
 	if c.resilience != nil {
 		deps.ResilienceSnapshot = func() resilience.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
@@ -161,35 +159,6 @@ func (c *Container) exportRESTIAMDeps() platformmod.RESTIAMDeps {
 		deps.ForceRemoteVerification = client.Config().JWT.ForceRemoteVerification
 	}
 	return deps
-}
-
-type backpressureSnapshotter interface {
-	Snapshot(name string) resilience.BackpressureSnapshot
-}
-
-func (c *Container) buildBackpressureSnapshots() []resilience.BackpressureSnapshot {
-	if c == nil {
-		return nil
-	}
-	return []resilience.BackpressureSnapshot{
-		backpressureSnapshot("mysql", c.backpressure.MySQL),
-		backpressureSnapshot("mongo", c.backpressure.Mongo),
-		backpressureSnapshot("iam", c.backpressure.IAM),
-	}
-}
-
-func backpressureSnapshot(name string, limiter interface{}) resilience.BackpressureSnapshot {
-	if snapshotter, ok := limiter.(backpressureSnapshotter); ok {
-		return snapshotter.Snapshot(name)
-	}
-	return resilience.BackpressureSnapshot{
-		Component:  "apiserver",
-		Name:       name,
-		Dependency: name,
-		Strategy:   "semaphore",
-		Enabled:    false,
-		Reason:     "backpressure disabled",
-	}
 }
 
 func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {

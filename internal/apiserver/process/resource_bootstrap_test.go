@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	cacheplanebootstrap "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
@@ -40,11 +41,11 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	catalog := eventcatalog.NewCatalog(nil)
 	events := &eventsubsystem.Subsystem{}
 
-	var backpressureConfigured bool
+	var resilienceConfigured bool
 	var buildOptionsInput containerOptionsInput
 	var eventOptions eventsubsystem.Options
 	wantOptions := container.ContainerOptions{PlanEntryBaseURL: "https://entry.example", EventSubsystem: events}
-	backpressureOptions := container.BackpressureOptions{}
+	resilience := resiliencesubsystem.New(resiliencesubsystem.Options{Backpressure: apiserveroptions.NewBackpressureOptions()})
 
 	got, err := prepareResources(resourceStageDeps{
 		database: databaseResourceDeps{
@@ -75,9 +76,12 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			},
 		},
 		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return catalog, nil },
-		buildBackpressure: func() container.BackpressureOptions {
-			backpressureConfigured = true
-			return backpressureOptions
+		buildResilience: func(got *cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
+			if got != runtimeBundle {
+				t.Fatalf("resilience runtime = %#v, want %#v", got, runtimeBundle)
+			}
+			resilienceConfigured = true
+			return resilience
 		},
 		buildContainerOptions: func(output containerOptionsInput) container.ContainerOptions {
 			buildOptionsInput = output
@@ -88,8 +92,8 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 		t.Fatalf("prepareResources() error = %v", err)
 	}
 
-	if !backpressureConfigured {
-		t.Fatal("buildBackpressure was not called")
+	if !resilienceConfigured {
+		t.Fatal("buildResilience was not called")
 	}
 	if got.handles.mysqlDB != &mysqlDB || got.handles.mongoDB != &mongoDB {
 		t.Fatalf("database output mismatch: %+v", got)
@@ -112,11 +116,14 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if !reflect.DeepEqual(got.containerInput.containerOptions, wantOptions) {
 		t.Fatalf("containerOptions = %#v, want %#v", got.containerInput.containerOptions, wantOptions)
 	}
-	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.eventSubsystem != events || buildOptionsInput.backpressure != backpressureOptions {
+	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.eventSubsystem != events || buildOptionsInput.resilience != resilience {
 		t.Fatalf("buildContainerOptions input mismatch: %#v", buildOptionsInput)
 	}
 	if eventOptions.MySQLDB != &mysqlDB || eventOptions.MongoDB != &mongoDB || eventOptions.Catalog != catalog || eventOptions.MQPublisher != publisher {
 		t.Fatalf("event subsystem options mismatch: %#v", eventOptions)
+	}
+	if eventOptions.MySQLLimiter != resilience.Backpressure("mysql") || eventOptions.MongoLimiter != resilience.Backpressure("mongo") {
+		t.Fatal("event subsystem did not receive shared resilience backpressure instances")
 	}
 }
 
@@ -166,8 +173,8 @@ func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
 func TestAPIServerBuildResourceStageDepsWithoutConfigOmitsConfigBoundBuilders(t *testing.T) {
 	deps := (&server{}).buildResourceStageDeps()
 
-	if deps.buildBackpressure != nil {
-		t.Fatal("buildBackpressure != nil, want nil")
+	if deps.buildResilience != nil {
+		t.Fatal("buildResilience != nil, want nil")
 	}
 	if deps.buildContainerOptions != nil {
 		t.Fatal("buildContainerOptions != nil, want nil")
@@ -182,8 +189,8 @@ func TestAPIServerBuildResourceStageDepsWithConfigIncludesConfigBoundBuilders(t 
 
 	deps := (&server{config: cfg}).buildResourceStageDeps()
 
-	if deps.buildBackpressure == nil {
-		t.Fatal("buildBackpressure = nil, want callback")
+	if deps.buildResilience == nil {
+		t.Fatal("buildResilience = nil, want callback")
 	}
 	if deps.buildContainerOptions == nil {
 		t.Fatal("buildContainerOptions = nil, want builder")

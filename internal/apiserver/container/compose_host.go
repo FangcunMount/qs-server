@@ -59,9 +59,19 @@ func (c *Container) EventProfile(profile eventcatalog.OutboxProfile) appEventing
 	return c.eventSubsystem.Profile(profile)
 }
 
-func (c *Container) MySQLLimiter() backpressure.Acquirer { return c.backpressure.MySQL }
+func (c *Container) MySQLLimiter() backpressure.Acquirer {
+	if c == nil || c.resilience == nil {
+		return nil
+	}
+	return c.resilience.Backpressure("mysql")
+}
 
-func (c *Container) MongoLimiter() backpressure.Acquirer { return c.backpressure.Mongo }
+func (c *Container) MongoLimiter() backpressure.Acquirer {
+	if c == nil || c.resilience == nil {
+		return nil
+	}
+	return c.resilience.Backpressure("mongo")
+}
 
 func (c *Container) PlanEntryBaseURL() string { return c.planEntryURL }
 
@@ -268,7 +278,7 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	}
 	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
 		MongoDB:       c.mongoDB,
-		MongoLimiter:  c.backpressure.Mongo,
+		MongoLimiter:  c.MongoLimiter(),
 		StaticRedis:   staticRedis,
 		StaticBuilder: c.CacheBuilder(redisruntime.FamilyStatic),
 		CachePolicies: provider,

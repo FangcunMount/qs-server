@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -11,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -28,7 +28,7 @@ type resourceStageDeps struct {
 	mqPublisher           mqPublisherStageDeps
 	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
-	buildBackpressure     func() container.BackpressureOptions
+	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
 
@@ -72,10 +72,17 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		mqPublisher:           s.buildMQPublisherDeps(),
 		eventSubsystem:        s.buildEventSubsystemResourceDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
-		buildBackpressure:     s.buildBackpressureDeps(),
+		buildResilience:       s.buildResilienceDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
 	return deps
+}
+
+func (s *server) buildResilienceDeps() func(*cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
+	if s == nil || s.config == nil {
+		return nil
+	}
+	return s.buildResilienceSubsystem
 }
 
 func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
@@ -153,13 +160,6 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 	return deps
 }
 
-func (s *server) buildBackpressureDeps() func() container.BackpressureOptions {
-	if s == nil || s.config == nil {
-		return nil
-	}
-	return s.buildBackpressureOptions
-}
-
 func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) container.ContainerOptions {
 	if s == nil || s.config == nil {
 		return nil
@@ -172,17 +172,17 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if err != nil {
 		return resourceOutput{}, err
 	}
-	var backpressureOptions container.BackpressureOptions
-	if deps.buildBackpressure != nil {
-		backpressureOptions = deps.buildBackpressure()
-	}
 	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
+	var resilience *resiliencesubsystem.Subsystem
+	if deps.buildResilience != nil {
+		resilience = deps.buildResilience(redisRuntime)
+	}
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
 	}
-	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, backpressureOptions, deps.eventSubsystem)
+	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
 	}
@@ -206,8 +206,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if deps.buildContainerOptions != nil {
 		containerOptions := deps.buildContainerOptions(containerOptionsInput{
 			cacheSubsystem: cacheSubsystem,
-			redisRuntime:   redisRuntime,
-			backpressure:   backpressureOptions,
+			resilience:     resilience,
 			eventSubsystem: events,
 		})
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
@@ -222,7 +221,7 @@ func buildResourceEventSubsystem(
 	catalog *eventcatalog.Catalog,
 	mqPublisher messaging.Publisher,
 	publishMode eventruntime.PublishMode,
-	backpressureOptions container.BackpressureOptions,
+	resilience *resiliencesubsystem.Subsystem,
 	deps eventSubsystemResourceDeps,
 ) (*eventsubsystem.Subsystem, error) {
 	if deps.newSubsystem == nil {
@@ -232,10 +231,15 @@ func buildResourceEventSubsystem(
 	if cacheSubsystem != nil {
 		opsRedis = cacheSubsystem.Client(redisruntime.FamilyOps)
 	}
+	var mysqlLimiter, mongoLimiter backpressure.Acquirer
+	if resilience != nil {
+		mysqlLimiter = resilience.Backpressure("mysql")
+		mongoLimiter = resilience.Backpressure("mongo")
+	}
 	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
 		Catalog: catalog, MQPublisher: mqPublisher, PublisherMode: publishMode,
-		MySQLLimiter: backpressureOptions.MySQL, MongoLimiter: backpressureOptions.Mongo,
+		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
 		SubscriberFactory: deps.subscriberFactory, Consumers: deps.consumers,
 	})
@@ -257,30 +261,6 @@ func initializeDatabaseConnections(deps databaseResourceDeps) (*gorm.DB, *mongo.
 		return nil, nil, err
 	}
 	return mysqlDB, mongoDB, nil
-}
-
-func (s *server) buildBackpressureOptions() container.BackpressureOptions {
-	if s == nil || s.config == nil || s.config.Backpressure == nil {
-		return container.BackpressureOptions{}
-	}
-	options := container.BackpressureOptions{}
-	if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
-		options.MySQL = newDependencyBackpressureLimiter("mysql", bp.MaxInflight, bp.TimeoutMs)
-	}
-	if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
-		options.Mongo = newDependencyBackpressureLimiter("mongo", bp.MaxInflight, bp.TimeoutMs)
-	}
-	if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
-		options.IAM = newDependencyBackpressureLimiter("iam", bp.MaxInflight, bp.TimeoutMs)
-	}
-	return options
-}
-
-func newDependencyBackpressureLimiter(dependency string, maxInflight int, timeoutMs int) *backpressure.Limiter {
-	return backpressure.NewLimiterWithOptions(maxInflight, time.Duration(timeoutMs)*time.Millisecond, backpressure.Options{
-		Component:  "apiserver",
-		Dependency: dependency,
-	})
 }
 
 func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *cacheplanebootstrap.RuntimeBundle, *cachebootstrap.Subsystem) {

@@ -278,8 +278,13 @@ func commandTargetInstances(ctx context.Context, store control.CommandStore, com
 		return nil, err
 	}
 	result := []string{}
+	seen := make(map[string]struct{})
 	for _, identity := range instances {
 		if target == "" || target == "all" || target == identity.InstanceID {
+			if _, exists := seen[identity.InstanceID]; exists {
+				continue
+			}
+			seen[identity.InstanceID] = struct{}{}
 			result = append(result, identity.InstanceID)
 		}
 	}

@@ -22,13 +22,13 @@ import (
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
-	Endpoint     string        // apiserver 地址，如 "localhost:9090"
-	Timeout      time.Duration // 请求超时时间
-	InflightWait time.Duration // inflight 槽位排队最长等待；0 表示等到 RPC 超时
-	Insecure     bool          // 是否使用不安全连接（开发环境）
-	PoolSize     int           // 连接池大小（默认 1）
-	MaxRetries   int           // 最大重试次数
-	MaxInflight  int           // 最大并发调用数
+	Endpoint          string              // apiserver 地址，如 "localhost:9090"
+	Timeout           time.Duration       // 请求超时时间
+	InflightWait      time.Duration       // inflight 槽位排队最长等待；0 表示等到 RPC 超时
+	Insecure          bool                // 是否使用不安全连接（开发环境）
+	PoolSize          int                 // 连接池大小（默认 1）
+	MaxRetries        int                 // 最大重试次数
+	InflightSemaphore admission.Semaphore // 进程级共享并发闸门
 
 	// TLS 配置
 	TLSCertFile   string // 客户端证书文件
@@ -63,21 +63,24 @@ type Manager struct {
 
 // NewManager 创建 gRPC 客户端管理器
 func NewManager(cfg *ManagerConfig) (*Manager, error) {
+	if cfg == nil {
+		return nil, errors.New("grpc client manager config is required")
+	}
 	if cfg.PoolSize <= 0 {
 		cfg.PoolSize = 1
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 30 * time.Second
 	}
-	if cfg.MaxInflight <= 0 {
-		cfg.MaxInflight = 200
+	if cfg.InflightSemaphore == nil {
+		return nil, errors.New("grpc client inflight semaphore is required")
 	}
 
 	m := &Manager{
 		config:      cfg,
 		perRPC:      cfg.PerRPCCredentials,
 		clients:     make(map[string]interface{}),
-		inflightSem: admission.NewChannelSemaphore(cfg.MaxInflight),
+		inflightSem: cfg.InflightSemaphore,
 	}
 
 	// 初始化连接

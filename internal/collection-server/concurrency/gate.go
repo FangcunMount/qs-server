@@ -2,6 +2,7 @@ package concurrency
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
@@ -10,29 +11,43 @@ import (
 
 // Gate 基于 channel 的 HTTP 并发槽位控制。
 type Gate struct {
-	sem admission.Semaphore
+	sem      admission.Semaphore
+	max      int
+	inFlight atomic.Int64
 }
 
 func NewGate(max int) *Gate {
 	if max <= 0 {
 		return nil
 	}
-	return &Gate{sem: admission.NewChannelSemaphore(max)}
+	return &Gate{sem: admission.NewChannelSemaphore(max), max: max}
 }
 
-// Semaphore 暴露底层准入槽位，供 gRPC 等路径复用。
+// Semaphore exposes the gate through the narrow admission contract.
 func (g *Gate) Semaphore() admission.Semaphore {
 	if g == nil {
 		return nil
 	}
-	return g.sem
+	return g
 }
 
 func (g *Gate) TryAcquire() bool {
 	if g == nil || g.sem == nil {
 		return true
 	}
-	return g.sem.TryAcquire()
+	acquired := g.sem.TryAcquire()
+	if acquired {
+		g.inFlight.Add(1)
+	}
+	return acquired
+}
+
+func (g *Gate) AcquireBlocking() {
+	if g == nil || g.sem == nil {
+		return
+	}
+	g.sem.AcquireBlocking()
+	g.inFlight.Add(1)
 }
 
 func (g *Gate) Release() {
@@ -40,6 +55,7 @@ func (g *Gate) Release() {
 		return
 	}
 	g.sem.Release()
+	g.inFlight.Add(-1)
 }
 
 // AcquireWithWait 在 maxWait 内等待槽位；超时返回 false。
@@ -47,8 +63,28 @@ func (g *Gate) AcquireWithWait(ctx context.Context, maxWait time.Duration) (acqu
 	if g == nil || g.sem == nil {
 		return true, 0
 	}
-	return g.sem.AcquireWithWait(ctx, maxWait)
+	acquired, waited = g.sem.AcquireWithWait(ctx, maxWait)
+	if acquired {
+		g.inFlight.Add(1)
+	}
+	return acquired, waited
 }
+
+func (g *Gate) Capacity() int {
+	if g == nil {
+		return 0
+	}
+	return g.max
+}
+
+func (g *Gate) InFlight() int {
+	if g == nil {
+		return 0
+	}
+	return int(g.inFlight.Load())
+}
+
+var _ admission.Semaphore = (*Gate)(nil)
 
 // WaitMiddleware 在 maxWait 内等待槽位，超时执行 onReject 并中断请求链。
 func (g *Gate) WaitMiddleware(maxWait time.Duration, onReject gin.HandlerFunc) gin.HandlerFunc {

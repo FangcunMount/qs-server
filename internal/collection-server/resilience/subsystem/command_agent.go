@@ -18,7 +18,7 @@ func (s *Subsystem) processCommands(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	found := false
+	found := s.hasActiveCommands()
 	for _, command := range commands {
 		if command.ActionID != "resilience.drain_queue" && command.ActionID != "resilience.resume_queue" {
 			continue
@@ -31,14 +31,48 @@ func (s *Subsystem) processCommands(ctx context.Context) bool {
 		if finished {
 			continue
 		}
-		found = true
+		commandKey := control.ScopedRequestID(command.Actor.OrgID, command.RequestID)
+		if s.commandActive(commandKey) {
+			found = true
+			continue
+		}
 		claimed, err := store.Claim(ctx, control.ScopedRequestID(command.Actor.OrgID, command.RequestID), s.identity.InstanceID, time.Until(command.ExpiresAt)+time.Minute)
 		if err != nil || !claimed {
 			continue
 		}
-		go s.executeQueueCommand(ctx, store, command)
+		s.markCommandActive(commandKey)
+		found = true
+		go func() {
+			defer s.clearCommandActive(commandKey)
+			s.executeQueueCommand(ctx, store, command)
+		}()
 	}
 	return found
+}
+
+func (s *Subsystem) commandActive(key string) bool {
+	s.commandMu.Lock()
+	defer s.commandMu.Unlock()
+	_, ok := s.activeCommands[key]
+	return ok
+}
+
+func (s *Subsystem) hasActiveCommands() bool {
+	s.commandMu.Lock()
+	defer s.commandMu.Unlock()
+	return len(s.activeCommands) > 0
+}
+
+func (s *Subsystem) markCommandActive(key string) {
+	s.commandMu.Lock()
+	s.activeCommands[key] = struct{}{}
+	s.commandMu.Unlock()
+}
+
+func (s *Subsystem) clearCommandActive(key string) {
+	s.commandMu.Lock()
+	delete(s.activeCommands, key)
+	s.commandMu.Unlock()
 }
 
 func (s *Subsystem) executeQueueCommand(ctx context.Context, store control.CommandStore, command control.Command) {
@@ -60,7 +94,11 @@ func (s *Subsystem) executeQueueCommand(ctx context.Context, store control.Comma
 	}
 	switch command.ActionID {
 	case "resilience.drain_queue":
-		drained, err := queue.controller.Drain(ctx, control.DrainOptions{Timeout: time.Duration(change.TimeoutSeconds) * time.Second})
+		timeout := time.Duration(change.TimeoutSeconds) * time.Second
+		if timeout <= 0 {
+			timeout = time.Minute
+		}
+		drained, err := queue.controller.Drain(ctx, control.DrainOptions{Timeout: timeout})
 		result.Payload, _ = json.Marshal(drained)
 		if err == nil {
 			result.Status = control.CommandStatusOK

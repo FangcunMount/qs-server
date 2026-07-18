@@ -468,7 +468,7 @@ assessment_mysql_events.DispatchDue
 | 新增后台调度 | `runtime/scheduler` + `process/runtime_bootstrap.go` |
 | 新增 outbox relay | 对应 outbox store/relay + `process/runtime_bootstrap.go` |
 | 新增 cache family 或 TTL | cache options + `process/container_options.go` + Redis docs |
-| 新增下游背压 | backpressure config + `buildBackpressureOptions` + resilience docs |
+| 新增下游背压 | backpressure config + `internal/apiserver/resilience/subsystem` + resilience docs |
 | 修改 shutdown 行为 | `process/lifecycle.go` |
 | 修改 gRPC 安全链 | `process/transport_bootstrap.go` + `internal/pkg/grpc` |
 

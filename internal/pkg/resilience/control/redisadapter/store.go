@@ -207,8 +207,9 @@ func (s *Store) ListInstances(ctx context.Context, component string) ([]control.
 	if s == nil || s.client == nil {
 		return nil, control.ErrUnavailable
 	}
-	pattern := s.builder.BuildResilienceInstanceKey(component, "*")
+	pattern := s.builder.BuildResilienceInstanceKey(component, "*", "*")
 	instances := []control.InstanceIdentity{}
+	seen := make(map[string]struct{})
 	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
@@ -220,6 +221,11 @@ func (s *Store) ListInstances(ctx context.Context, component string) ([]control.
 		}
 		var identity control.InstanceIdentity
 		if json.Unmarshal(raw, &identity) == nil {
+			key := identity.InstanceID + "\x00" + identity.Generation
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
 			instances = append(instances, identity)
 		}
 	}
@@ -234,7 +240,7 @@ func (s *Store) Heartbeat(ctx context.Context, identity control.InstanceIdentity
 	if err != nil {
 		return err
 	}
-	return s.client.Set(ctx, s.builder.BuildResilienceInstanceKey(identity.Component, identity.InstanceID), raw, ttl).Err()
+	return s.client.Set(ctx, s.builder.BuildResilienceInstanceKey(identity.Component, identity.InstanceID, identity.Generation), raw, ttl).Err()
 }
 
 func (s *Store) WatchStateSignals(ctx context.Context) (<-chan string, error) {

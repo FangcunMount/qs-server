@@ -128,8 +128,9 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *
 	var rateCfg *options.RateLimitOptions
 	var concurrencyCfg *options.ConcurrencyOptions
 	var waitCfg *options.WaitReportOptions
+	var grpcCfg *options.GRPCClientOptions
 	if opts != nil {
-		rateCfg, concurrencyCfg, waitCfg = opts.RateLimit, opts.Concurrency, opts.WaitReport
+		rateCfg, concurrencyCfg, waitCfg, grpcCfg = opts.RateLimit, opts.Concurrency, opts.WaitReport, opts.GRPCClient
 	}
 	c := &Container{
 		opts:           opts,
@@ -139,7 +140,7 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *
 		initialized:    false,
 		cacheSubsystem: collectioncache.NewSubsystem(collectionCacheConfig(opts), opsHandle),
 		resilience: resiliencesubsystem.New(resiliencesubsystem.Options{
-			RateLimit: rateCfg, Concurrency: concurrencyCfg, WaitReport: waitCfg,
+			RateLimit: rateCfg, Concurrency: concurrencyCfg, WaitReport: waitCfg, GRPCClient: grpcCfg,
 			Backend: backend, Locks: locks, OpsAvailable: opsHandle != nil && opsHandle.Client != nil, StateStore: stateStore,
 		}),
 	}
@@ -430,6 +431,13 @@ func (c *Container) QueryConcurrencyGate() *concurrency.Gate {
 		return nil
 	}
 	return c.queryConcurrencyGate
+}
+
+func (c *Container) GRPCDownstreamGate() *concurrency.Gate {
+	if c == nil || c.resilience == nil {
+		return nil
+	}
+	return c.resilience.Gate(resiliencesubsystem.GateGRPCDownstream)
 }
 
 func (c *Container) CatalogConcurrencyGate() *concurrency.Gate {

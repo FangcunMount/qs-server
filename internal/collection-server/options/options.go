@@ -50,6 +50,20 @@ type GRPCClientOptions struct {
 	TLSServerName string `json:"tls_server_name" mapstructure:"tls-server-name"` // 服务端名称（用于验证）
 }
 
+func (g *GRPCClientOptions) ResolvedMaxInflight() int {
+	if g == nil || g.MaxInflight <= 0 {
+		return 200
+	}
+	return g.MaxInflight
+}
+
+func (g *GRPCClientOptions) ResolvedInflightWait() time.Duration {
+	if g == nil || g.InflightWaitMs <= 0 {
+		return 0
+	}
+	return time.Duration(g.InflightWaitMs) * time.Millisecond
+}
+
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency        int `json:"max_concurrency" mapstructure:"max_concurrency"`                 // 兼容：未配置 max_query_concurrency 时作为读池上限

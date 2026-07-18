@@ -156,8 +156,8 @@ func (b *Builder) BuildResilienceSignalChannel() string {
 	return NewOpsKeyspace(b.namespace()).ResilienceSignal()
 }
 
-func (b *Builder) BuildResilienceInstanceKey(component, instanceID string) string {
-	return NewOpsKeyspace(b.namespace()).ResilienceInstance(component, instanceID)
+func (b *Builder) BuildResilienceInstanceKey(component, instanceID, generation string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceInstance(component, instanceID, generation)
 }
 
 func (b *Builder) BuildResilienceClaimKey(requestID, instanceID string) string {

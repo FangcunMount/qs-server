@@ -72,10 +72,13 @@ func (e *ActionExecutor) Run(
 			return nil, errors.WithCode(code.ErrInternalServerError, "claim governance audit: %s", err.Error())
 		}
 		if existing != nil {
-			if existing.ActionID != actionID {
+			if existing.ActionID != "" && existing.ActionID != actionID {
 				return nil, errors.WithCode(code.ErrConflict, "request_id already belongs to action %s", existing.ActionID)
 			}
-			return existing, nil
+			if existing.Error != nil {
+				return nil, errors.WithCode(existing.Error.Code, "%s", existing.Error.Message)
+			}
+			return existing.Result, nil
 		}
 		if !claimed {
 			return nil, errors.WithCode(code.ErrConflict, "request_id is already running")
@@ -84,13 +87,13 @@ func (e *ActionExecutor) Run(
 			audit.FinishedAt = time.Now()
 			audit.Status = actionAuditStatus(runResult, runErr)
 			audit.Result = runResult
-			if audit.Result == nil {
+			if runErr != nil {
+				coder := errors.ParseCoder(runErr)
+				audit.Error = &ActionAuditError{Code: coder.Code(), Message: runErr.Error()}
+			} else if audit.Result == nil {
 				audit.Result = &ActionRunResult{
 					RequestID: requestID, ActionID: actionID, StartedAt: startedAt,
 					FinishedAt: audit.FinishedAt, Status: audit.Status,
-				}
-				if runErr != nil {
-					audit.Result.Message = runErr.Error()
 				}
 			}
 			auditCtx, cancelAudit := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)

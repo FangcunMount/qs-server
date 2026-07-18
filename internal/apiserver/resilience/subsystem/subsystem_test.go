@@ -19,7 +19,7 @@ import (
 )
 
 func TestSubsystemOwnsStableSharedBudgetsAndSnapshot(t *testing.T) {
-	s := New(Options{RateLimit: options.NewRateLimitOptions()})
+	s := New(Options{RateLimit: options.NewRateLimitOptions(), Backpressure: options.NewBackpressureOptions()})
 	left, ok := s.Budget(BudgetQuery)
 	if !ok {
 		t.Fatal("query budget unavailable")
@@ -31,6 +31,13 @@ func TestSubsystemOwnsStableSharedBudgetsAndSnapshot(t *testing.T) {
 	snapshot := s.Snapshot(time.Now())
 	if snapshot.Component != "apiserver" || snapshot.InstanceID == "" || len(snapshot.RateLimits) != 8 || len(snapshot.Backpressure) != 3 {
 		t.Fatalf("Snapshot() = %+v", snapshot)
+	}
+	for _, name := range []string{"mysql", "mongo", "iam"} {
+		left := s.Backpressure(name)
+		right := s.Backpressure(name)
+		if left == nil || left != right {
+			t.Fatalf("%s backpressure is not a stable shared instance", name)
+		}
 	}
 }
 
@@ -151,6 +158,26 @@ func TestRateOverrideReconcilesAcrossInstancesAndResetRestoresConfig(t *testing.
 		t.Fatalf("TuneRateLimit() after reset = %+v, %v", result, err)
 	}
 	waitForBudget(t, right, 4, "governance")
+}
+
+func TestCommandTargetInstancesDeduplicatesGenerations(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	store := controlredis.NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
+	identity := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	if err := store.Heartbeat(context.Background(), identity, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	identity.Generation = "new-generation"
+	if err := store.Heartbeat(context.Background(), identity, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+
+	instances, err := commandTargetInstances(context.Background(), store, identity.Component, "all")
+	if err != nil || len(instances) != 1 || instances[0] != identity.InstanceID {
+		t.Fatalf("commandTargetInstances() = %v, %v", instances, err)
+	}
 }
 
 func waitForBudget(t *testing.T, subsystem *Subsystem, version uint64, source string) {

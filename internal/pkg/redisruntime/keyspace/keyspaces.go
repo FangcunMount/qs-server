@@ -193,8 +193,8 @@ func (k OpsKeyspace) ResilienceSignal() string {
 	return k.keyspace.Prefix("resilience:signal")
 }
 
-func (k OpsKeyspace) ResilienceInstance(component, instanceID string) string {
-	return k.keyspace.Prefix("resilience:instance:" + component + ":" + instanceID)
+func (k OpsKeyspace) ResilienceInstance(component, instanceID, generation string) string {
+	return k.keyspace.Prefix("resilience:instance:" + component + ":" + instanceID + ":" + generation)
 }
 
 func (k OpsKeyspace) ResilienceClaim(requestID, instanceID string) string {

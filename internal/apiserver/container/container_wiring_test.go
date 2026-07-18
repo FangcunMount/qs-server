@@ -40,7 +40,7 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 		CacheBuilder:  c.CacheBuilder(redisruntime.FamilyObject),
 		CachePolicies: provider,
 		Observer:      c.cacheObserver(),
-		MySQLLimiter:  c.backpressure.MySQL,
+		MySQLLimiter:  c.MySQLLimiter(),
 	}
 	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyObject) {
 		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyObject))

@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	internalcode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 func TestActionExecutorRequiresConfirmForManualWarmup(t *testing.T) {
@@ -52,7 +54,7 @@ func TestActionExecutorRejectsPlannedAction(t *testing.T) {
 
 func TestActionExecutorRequestIDIsClaimedAndReplayedFromAudit(t *testing.T) {
 	governance := &fakeStatisticsGovernance{}
-	audit := &memoryActionAudit{results: map[string]*ActionRunResult{}}
+	audit := &memoryActionAudit{results: map[string]*ActionAuditReplay{}}
 	executor := NewActionExecutorWithResilience(NewActionRegistry(), governance, nil, nil, audit)
 	req := ActionRunRequest{
 		RequestID: "governance-request-1", Confirm: true,
@@ -71,15 +73,38 @@ func TestActionExecutorRequestIDIsClaimedAndReplayedFromAudit(t *testing.T) {
 	}
 }
 
+func TestActionExecutorReplaysApplicationErrorsWithoutExecutingAgain(t *testing.T) {
+	for _, errorCode := range []int{internalcode.ErrInvalidArgument, internalcode.ErrConflict, internalcode.ErrInternalServerError} {
+		t.Run(baseerrors.ParseCoder(baseerrors.WithCode(errorCode, "failure")).String(), func(t *testing.T) {
+			governance := &fakeStatisticsGovernance{manualErr: baseerrors.WithCode(errorCode, "governance failure")}
+			audit := &memoryActionAudit{results: map[string]*ActionAuditReplay{}}
+			executor := NewActionExecutorWithResilience(NewActionRegistry(), governance, nil, nil, audit)
+			req := ActionRunRequest{RequestID: "failed-request", Confirm: true, Input: map[string]interface{}{"targets": []interface{}{}}}
+
+			_, firstErr := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+			_, secondErr := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+			if firstErr == nil || secondErr == nil {
+				t.Fatalf("errors = (%v, %v), want replayed errors", firstErr, secondErr)
+			}
+			if baseerrors.ParseCoder(firstErr).Code() != errorCode || baseerrors.ParseCoder(secondErr).Code() != errorCode || firstErr.Error() != secondErr.Error() {
+				t.Fatalf("first=%v second=%v, want same code/message", firstErr, secondErr)
+			}
+			if governance.manualCalls != 1 {
+				t.Fatalf("manual calls=%d, want 1", governance.manualCalls)
+			}
+		})
+	}
+}
+
 type memoryActionAudit struct {
 	mu        sync.Mutex
 	claims    int
 	completes int
 	running   bool
-	results   map[string]*ActionRunResult
+	results   map[string]*ActionAuditReplay
 }
 
-func (a *memoryActionAudit) Claim(_ context.Context, record ActionAuditRecord) (*ActionRunResult, bool, error) {
+func (a *memoryActionAudit) Claim(_ context.Context, record ActionAuditRecord) (*ActionAuditReplay, bool, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.claims++
@@ -98,7 +123,7 @@ func (a *memoryActionAudit) Complete(_ context.Context, record ActionAuditRecord
 	defer a.mu.Unlock()
 	a.completes++
 	a.running = false
-	a.results[record.RequestID] = record.Result
+	a.results[record.RequestID] = &ActionAuditReplay{ActionID: record.ActionID, Result: record.Result, Error: record.Error}
 	return nil
 }
 
@@ -107,6 +132,8 @@ type fakeStatisticsGovernance struct {
 	manualReq   statisticsApp.ManualWarmupRequest
 	repairOrgID int64
 	repairReq   statisticsApp.RepairCompleteRequest
+	manualErr   error
+	manualCalls int
 }
 
 func (f *fakeStatisticsGovernance) TriggerStatisticsWarmup(context.Context, int64, string) {}
@@ -118,6 +145,10 @@ func (f *fakeStatisticsGovernance) HandleRepairComplete(_ context.Context, orgID
 }
 
 func (f *fakeStatisticsGovernance) HandleManualWarmup(_ context.Context, orgID int64, req statisticsApp.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
+	f.manualCalls++
+	if f.manualErr != nil {
+		return nil, f.manualErr
+	}
 	f.manualOrgID = orgID
 	f.manualReq = req
 	now := time.Now()

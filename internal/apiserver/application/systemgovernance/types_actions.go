@@ -55,12 +55,26 @@ type ActionAuditRecord struct {
 	FinishedAt     time.Time
 	Status         string
 	Result         *ActionRunResult
+	Error          *ActionAuditError
+}
+
+// ActionAuditError is the persistence-neutral error metadata required to
+// replay a completed action with the same application error contract.
+type ActionAuditError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type ActionAuditReplay struct {
+	ActionID string            `json:"action_id,omitempty"`
+	Result   *ActionRunResult  `json:"result,omitempty"`
+	Error    *ActionAuditError `json:"error,omitempty"`
 }
 
 // ActionAuditStore atomically claims request IDs before execution and records
 // their terminal result. A failed claim returns either the completed prior
 // result or claimed=false while the first execution is still running.
 type ActionAuditStore interface {
-	Claim(context.Context, ActionAuditRecord) (existing *ActionRunResult, claimed bool, err error)
+	Claim(context.Context, ActionAuditRecord) (existing *ActionAuditReplay, claimed bool, err error)
 	Complete(context.Context, ActionAuditRecord) error
 }
