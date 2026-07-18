@@ -35,9 +35,20 @@ func TestReliableSubmissionArchitectureKeepsReadinessOwnershipContract(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"collection 同步 EnsureAssessment", "collection 当前同步等待 Assessment", "collection `SubmissionService.submitSync`"} {
+	for _, forbidden := range []string{
+		"collection 同步 EnsureAssessment",
+		"collection 当前同步等待 Assessment",
+		"collection `SubmissionService.submitSync`",
+		"Assessment ID 已同步返回",
+		"同步调用返错",
+	} {
 		if strings.Contains(string(activeDoc), forbidden) {
 			t.Fatalf("active reliable-submit documentation contains stale statement %q", forbidden)
+		}
+	}
+	for _, required := range []string{"202 accepted + answersheet_id", "Worker 是正常创建与恢复 Assessment 的唯一入口"} {
+		if !strings.Contains(string(activeDoc), required) {
+			t.Fatalf("active reliable-submit documentation is missing required statement %q", required)
 		}
 	}
 }

@@ -199,6 +199,43 @@ func TestAdmissionPolicyRouteMatrix(t *testing.T) {
 	})
 }
 
+func TestSubmitGateRejectsWithinConfiguredWait(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	gate := concurrency.NewGate(1)
+	if !gate.TryAcquire() {
+		t.Fatal("expected to occupy submit gate slot")
+	}
+	defer gate.Release()
+
+	const maxWait = 50 * time.Millisecond
+	policy := AdmissionPolicy{submitGate: gate, submitMaxWait: maxWait}
+	recorder := httptest.NewRecorder()
+	engine := gin.New()
+	handlerCalled := false
+	engine.POST("/api/v1/answersheets", policy.Wrap(admissionSubmit, func(c *gin.Context) {
+		handlerCalled = true
+		c.Status(http.StatusAccepted)
+	})...)
+
+	startedAt := time.Now()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/answersheets", nil))
+	elapsed := time.Since(startedAt)
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", recorder.Code)
+	}
+	if got := recorder.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
+	if handlerCalled {
+		t.Fatal("submit handler must not run after gate rejection")
+	}
+	if elapsed < maxWait/2 || elapsed > 500*time.Millisecond {
+		t.Fatalf("gate rejection elapsed = %s, want bounded wait around %s", elapsed, maxWait)
+	}
+}
+
 func TestAdmissionPolicyCatalogUsesWaitGateOnL1Miss(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)

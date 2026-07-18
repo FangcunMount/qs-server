@@ -32,6 +32,9 @@ func (r *ProfileAccessResolver) Resolve(ctx context.Context, writerID, testeeID 
 
 func (r *ProfileAccessResolver) validateProfileAccess(ctx context.Context, writerID, testeeID uint64) (*ActorTestee, uint64, error) {
 	l := logger.L(ctx)
+	if r.profileLinkService == nil || !r.profileLinkService.IsEnabled() {
+		return nil, 0, status.Error(codes.Unavailable, "profile link authorization is unavailable")
+	}
 
 	testee, resolvedTesteeID, err := r.resolveCanonicalTestee(ctx, testeeID)
 	if err != nil {
@@ -44,10 +47,6 @@ func (r *ProfileAccessResolver) validateProfileAccess(ctx context.Context, write
 			return nil, 0, err
 		}
 		return nil, 0, status.Error(codes.Unavailable, "查询受试者信息失败")
-	}
-
-	if r.profileLinkService == nil || !r.profileLinkService.IsEnabled() {
-		return nil, 0, status.Error(codes.Unavailable, "profile link authorization is unavailable")
 	}
 
 	if testee.IAMProfileID == "" {

@@ -10,9 +10,15 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type submissionActorStub struct{ testee *ActorTestee }
+type submissionActorStub struct {
+	testee *ActorTestee
+	calls  *int
+}
 
 func (s submissionActorStub) GetTestee(context.Context, uint64) (*ActorTestee, error) {
+	if s.calls != nil {
+		(*s.calls)++
+	}
 	if s.testee == nil {
 		return nil, status.Error(codes.NotFound, "testee not found")
 	}
@@ -126,6 +132,36 @@ func TestAcceptDurablyFailsClosedWhenProfileLinkDisabled(t *testing.T) {
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
 		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+}
+
+func TestAcceptDurablyChecksDisabledProfileLinkBeforeTesteeLookup(t *testing.T) {
+	actorCalls := 0
+	service := NewSubmissionService(&submissionWriterStub{}, nil,
+		submissionActorStub{calls: &actorCalls},
+		submissionProfileLinkStub{enabled: false}, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
+		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+	if actorCalls != 0 {
+		t.Fatalf("actor lookup calls = %d, want 0 while ProfileLink is disabled", actorCalls)
+	}
+}
+
+func TestAssessmentReadinessChecksDisabledProfileLinkBeforeTesteeLookup(t *testing.T) {
+	actorCalls := 0
+	service := NewSubmissionService(nil,
+		submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}},
+		submissionActorStub{calls: &actorCalls},
+		submissionProfileLinkStub{enabled: false}, nil, assessmentResolverStub{}, nil, time.Second)
+
+	if _, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7); status.Code(err) != codes.Unavailable {
+		t.Fatalf("GetAssessmentReadiness() error = %v, want Unavailable", err)
+	}
+	if actorCalls != 0 {
+		t.Fatalf("actor lookup calls = %d, want 0 while ProfileLink is disabled", actorCalls)
 	}
 }
 
