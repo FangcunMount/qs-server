@@ -1,65 +1,50 @@
 # Plan
 
-**本文回答**：Plan 如何负责测评计划、周期任务和任务生命周期编排，并与 Survey、Evaluation 协作。
+Plan 管测评计划、任务生成、任务生命周期与调度；它不执行测评算法，也不拥有答卷或报告。
 
----
+## 1. 领域模型
 
-## 1. 这个模块负责什么
+`internal/apiserver/domain/plan` 的核心对象包括：
 
-Plan 负责“什么时候、对谁、开放什么测评任务”：
+- `AssessmentPlan`：计划定义与状态；
+- `AssessmentTask`：面向受试者的具体任务；
+- `PlanLifecycle`、`TaskLifecycle`：状态迁移规则；
+- `PlanEnrollment`：计划与受试者纳入；
+- `TaskGenerator`：依据计划生成任务；
+- `PlanValidator`：跨字段业务校验。
 
-- `AssessmentPlan`：测评计划。
-- `AssessmentTask`：计划拆出的应测任务。
-- `PlanScheduleRule`：周期和触发规则。
-- 任务开放、完成、过期、取消。
-- 任务入口、通知和跨模块引用。
+计划状态、调度类型和任务状态以 `domain/plan/types.go` 为准。
 
----
+## 2. 应用服务
 
-## 2. 这个模块不负责什么
+`internal/apiserver/application/plan` 包含 command/lifecycle、enrollment、query、task scheduler、assessment resolver、notification context 等用例。application service 负责 repository、事务、事件发布和外部 port；状态转换仍由领域对象决定。
 
-- 不定义问卷题目。
-- 不执行计分。
-- 不生成报告。
-- 不维护统计读模型。
+## 3. 关键路径
 
-一句话：**Plan 只负责任务生命周期，Evaluation 负责真正的测评执行。**
+```text
+CreatePlan
+  -> 校验计划与模型/问卷引用
+  -> 保存 AssessmentPlan
+  -> Enrollment 生成或对账 AssessmentTask
+  -> Scheduler 打开/过期任务
+  -> 生成 AssessmentEntry 或解析任务测评上下文
+  -> 发布 task.* 事件
+```
 
----
+任务事件当前为 best-effort 通知，清单见 `configs/events.yaml`。业务状态不能依赖“消息一定到达”。
 
-## 3. 核心领域模型
+## 4. 边界
 
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `AssessmentPlan` | 测评计划 | [02-领域模型.md](./02-领域模型.md) |
-| `AssessmentTask` | 应测任务 | [05-任务状态机.md](./05-任务状态机.md) |
-| `PlanScheduleRule` | 周期规则 | [04-任务生成与周期调度链路.md](./04-任务生成与周期调度链路.md) |
-| `TaskExecutionRef` | 与答卷、测评、报告的引用 | [06-计划与测评执行协作.md](./06-计划与测评执行协作.md) |
+- ModelCatalog/Survey 提供可用内容引用，Plan 不复制其定义。
+- Actor 提供受试者与访问范围。
+- Evaluation/Survey 消费任务上下文，但 Plan 不推进其状态机。
+- Statistics 读取任务事实形成完成率等读模型。
 
----
+## 5. 证据与验证
 
-## 4. 关键业务链路
+- domain：`internal/apiserver/domain/plan`。
+- application：`internal/apiserver/application/plan`。
+- 装配：`internal/apiserver/container/modules/plan`。
+- 验证：plan domain/application/container 以及 scheduler/enrollment 定向测试。
 
-| 链路 | 文档 |
-| ---- | ---- |
-| 创建测评计划 | [03-测评计划创建链路.md](./03-测评计划创建链路.md) |
-| 生成任务和周期调度 | [04-任务生成与周期调度链路.md](./04-任务生成与周期调度链路.md) |
-| 任务状态机 | [05-任务状态机.md](./05-任务状态机.md) |
-| 与 Survey / Evaluation 协作 | [06-计划与测评执行协作.md](./06-计划与测评执行协作.md) |
-| 接口、事件和存储 | [07-接口事件与存储.md](./07-接口事件与存储.md) |
-
----
-
-## 5. 上下游依赖
-
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | `actor` | 提供受试者和操作者上下文 |
-| 下游 | `survey` | 任务入口引导答卷提交 |
-| 下游 | `evaluation` | 任务完成后关联测评执行 |
-| 下游 | `statistics` | 消费任务事件形成计划指标 |
-
-代码事实入口：
-
-- [`internal/apiserver/domain/plan`](../../../internal/apiserver/domain/plan/)
-- [`internal/apiserver/container/modules/plan`](../../../internal/apiserver/container/modules/plan/)
+状态：`已实现`（本轮核对到聚合、服务与主链；精确状态转移表待补证据）。

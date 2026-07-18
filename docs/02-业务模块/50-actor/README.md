@@ -1,65 +1,52 @@
 # Actor
 
-**本文回答**：Actor 如何表达测评业务里的参与者、受试者、操作者和访问上下文，以及它和 IAM 的边界。
+Actor 管参与者、关系、测评入口和访问上下文；它不拥有问卷、测评执行或报告状态机。
 
----
+## 1. 领域模型
 
-## 1. 这个模块负责什么
+当前领域子包位于 `internal/apiserver/domain/actor`：
 
-Actor 负责“谁在参与测评”：
+| 子域 | 核心事实 |
+| --- | --- |
+| `testee` | 受试者档案 |
+| `clinician` | 医生身份 |
+| `operator` | 后台操作员与角色投影 |
+| `relation` | Clinician-Testee 关系与分配策略 |
+| `assessmententry` | 对外测评入口与摄入上下文 |
 
-- `Testee`：被测评的人。
-- `Clinician` / `Operator`：从业者、操作者。
-- 业务关系和数据归属。
-- `ActorContext`：一次访问或测评入口里的业务上下文。
-- Assessment entry 入口上下文。
+跨模块引用使用 `TesteeRef` 等轻量标识，不共享 Actor 聚合的可变状态。
 
----
+## 2. 应用服务
 
-## 2. 这个模块不负责什么
+`internal/apiserver/application/actor` 按 `testee`、`clinician`、`operator`、`assessmententry`、`access`、`actorctx` 分用例组织。重点区分：
 
-- 不负责 IAM 登录认证。
-- 不替代 IAM 用户、组织和权限主系统。
-- 不定义问卷结构。
-- 不执行测评。
-- 不生成报告。
+- 生命周期/管理服务：修改 Actor 自身事实；
+- 查询服务：读取投影；
+- access/actorctx：为其它模块解析访问范围与参与者上下文；
+- assessment entry intake：把公开 token 入口转换为受控业务上下文。
 
-一句话：**IAM 负责认证身份，Actor 负责测评业务身份。**
+## 3. 关键路径
 
----
+```text
+公开 AssessmentEntry token
+  -> 解析入口与组织/医生上下文
+  -> 确认或创建 Testee
+  -> 生成 intake 结果
+  -> 交给后续 Survey/Evaluation journey
+```
 
-## 3. 核心领域模型
+医生分配受试者时，由 relation 的领域策略校验关系，再由 application service 编排 repository 与权限投影。
 
-| 模型 | 含义 | 深讲 |
-| ---- | ---- | ---- |
-| `Actor` | 业务参与者抽象 | [02-领域模型.md](./02-领域模型.md) |
-| `Testee` | 被测评的人 | [03-受试者建档链路.md](./03-受试者建档链路.md) |
-| `Operator` / `Clinician` | 操作者或从业者视图 | [05-权限与数据归属边界.md](./05-权限与数据归属边界.md) |
-| `ActorContext` | 测评访问上下文 | [04-参与者上下文解析链路.md](./04-参与者上下文解析链路.md) |
+## 4. 权限边界
 
----
+IAM 证明“调用者是谁、具有什么能力”；Actor access service 解析“可以访问哪些受试者”；具体业务模块仍需校验自身资源和组织归属。
 
-## 4. 关键业务链路
+## 5. 证据与验证
 
-| 链路 | 文档 |
-| ---- | ---- |
-| 创建受试者档案 | [03-受试者建档链路.md](./03-受试者建档链路.md) |
-| 从 IAM 身份解析业务参与者上下文 | [04-参与者上下文解析链路.md](./04-参与者上下文解析链路.md) |
-| 权限、关系和数据归属边界 | [05-权限与数据归属边界.md](./05-权限与数据归属边界.md) |
-| 接口、事件和存储 | [06-接口事件与存储.md](./06-接口事件与存储.md) |
+- domain：`internal/apiserver/domain/actor`。
+- application：`internal/apiserver/application/actor`。
+- 装配：`internal/apiserver/container/modules/actor`。
+- transport：Actor REST/gRPC exports 与 handler/service。
+- 验证：actor domain/application/container 定向测试和相关访问控制测试。
 
----
-
-## 5. 上下游依赖
-
-| 方向 | 模块 | 关系 |
-| ---- | ---- | ---- |
-| 上游 | IAM | 提供认证身份和组织上下文 |
-| 下游 | `survey` | 提供提交者和受试者上下文 |
-| 下游 | `plan` | 提供计划绑定对象 |
-| 下游 | `statistics` | 提供组织、人员和行为维度 |
-
-代码事实入口：
-
-- [`internal/apiserver/domain/actor`](../../../internal/apiserver/domain/actor/)
-- [`internal/apiserver/container/modules/actor`](../../../internal/apiserver/container/modules/actor/)
+状态：`已实现`（本轮核对到类型、服务分区和装配入口；更细状态机文档列为待补证据）。

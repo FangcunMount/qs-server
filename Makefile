@@ -109,7 +109,7 @@ COLOR_RED := \033[31m
 .PHONY: install-tools install-air install-golangci-lint install-security-tools install-govulncheck install-gosec create-dirs
 .PHONY: up down re st log
 .PHONY: quick-start
-.PHONY: docs-swagger docs-rest docs-hygiene docs-verify
+.PHONY: docs-swagger docs-rest docs-hygiene docs-facts docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
@@ -167,7 +167,10 @@ docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
 	python scripts/check_docs_hygiene.py
 
-docs-verify: docs-rest docs-hygiene ## 对比 api/rest 与 swagger，并检查现行文档卫生
+docs-facts: ## 检查现行文档层次、模块入口与关键契约名称
+	python scripts/check_docs_facts.py
+
+docs-verify: docs-rest docs-hygiene docs-facts ## 对比 api/rest 与 swagger，并检查现行文档
 	python scripts/compare_api_docs.py
 
 # ============================================================================

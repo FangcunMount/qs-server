@@ -1,219 +1,22 @@
 # apiserver REST
 
-**本文回答**：qs-apiserver 的 REST 面如何分成 public、protected、internal 三层；每层注册哪些路由；IAM/JWT/OrgScope/AuthzSnapshot 中间件如何挂载；治理类 internal endpoint 应如何理解和排障。
+## 1. 事实源
 
----
+[`api/rest/apiserver.yaml`](../../api/rest/apiserver.yaml) 是当前对外 REST 契约。Swagger 注解和 handler 是生成来源；本文不复制端点清单。
 
-## 30 秒结论
+## 2. 服务责任
 
-| 分组 | 路径 | 说明 |
-| ---- | ---- | ---- |
-| Public | `/health`、`/readyz`、`/ping`、`/governance/redis`、`/api/v1/public/*`、`/api/v1/qrcodes/:filename` | 基础健康、公开信息、二维码对象 |
-| Protected | `/api/v1/*`、`/api/v2/*` | 后台业务 API：ModelCatalog、问卷、答卷、Evaluation、Interpretation 查询、Actor、Plan、Statistics、Codes、Admin |
-| Internal | `/internal/v1/*` | Plan/Statistics/Cache/Event/Resilience，以及 Interpretation 生命周期审计 |
-| Auth chain | Protected/Internal group | JWT → UserIdentity → TenantDomain → OrgScope → ActiveOperator → AuthzSnapshot |
+apiserver REST 面向后台管理、业务查询、公开入口和治理能力。路由进入 transport 后应调用 application service，不直接操作 repository。
 
-一句话概括：
+## 3. 鉴权核对
 
-> **apiserver REST 是后台管理和 internal governance 面，不是前台提交 BFF。**
+检查 OpenAPI `security`、middleware、IAM capability、actor access scope 和业务资源归属。某个端点在 OpenAPI 标记 public，只表示无需用户 Bearer token，不代表其 token/签名/租户规则可以省略。
 
----
-
-## 1. 路由注册总图
-
-```mermaid
-flowchart TB
-    Router["apiserver Router"]
-
-    Public["publicRouteRegistrar"]
-    Protected["protectedRouteRegistrar"]
-    Internal["internalRouteRegistrar"]
-
-    Router --> Public
-    Router --> Protected
-    Router --> Internal
-
-    Public --> health["/health /readyz /ping /governance/redis"]
-    Public --> pubapi["/api/v1/public"]
-    Public --> qrcode["/api/v1/qrcodes/:filename"]
-
-    Protected --> api["/api/v1 + /api/v2"]
-    Internal --> internal["/internal/v1"]
-```
-
----
-
-## 2. Public Routes
-
-apiserver public registrar 注册：
-
-| 路径 | 说明 |
-| ---- | ---- |
-| `GET /health` | 业务健康检查 |
-| `GET /readyz` | ready 检查 |
-| `GET /ping` | ping |
-| `GET /governance/redis` | Redis governance 只读状态 |
-| `GET /api/v1/public/info` | 服务信息 |
-| actor public routes | Actor 公开路由 |
-| `GET /api/v1/qrcodes/:filename` | 二维码对象读取 |
-
-注意：`/governance/redis` 是 governance 面，不等于业务 API。
-
----
-
-## 3. Protected Routes
-
-Protected group：
-
-```text
-/api/v1
-```
-
-注册模块：
-
-- User。
-- Questionnaire。
-- AnswerSheet。
-- ModelCatalog（`/assessment-models`、DefinitionV2、预览和发布）。
-- Evaluation：兼容读写在 `/api/v1/evaluations*`，新事实读模型在 `/api/v2/evaluations/assessments*`。
-- Interpretation：面向临床人员的报告查询在 `/api/v1`，生命周期审计在 internal。
-- Actor。
-- Plan。
-- Statistics。
-- Codes。
-- Admin。
-
-每组 route 的详细业务语义应回到 `02-业务模块/`，这里不重复字段级说明。
-
----
-
-## 4. Internal Routes
-
-Internal group：
-
-```text
-/internal/v1
-```
-
-注册：
-
-| 路由组 | 说明 |
-| ------ | ---- |
-| Plan internal | 计划任务手工调度 |
-| Statistics internal | 统计同步手工触发 |
-| Cache governance | cache status、hotset、repair-complete |
-| Event status | event catalog/outbox 只读状态 |
-| Resilience status | rate limit/backpressure/lock 等只读状态 |
-| Interpretation operations | generation、run、report 生命周期审计 |
-
-Internal 并不等于“无认证”。当前 internal group 也会应用 protected group middleware。
-
----
-
-## 5. Auth Middleware Chain
-
-当 IAM enabled 且 TokenVerifier 可用时，Protected/Internal group 会挂：
-
-```text
-JWTAuthMiddlewareWithOptions
-UserIdentityMiddleware
-RequireTenantDomainMiddleware
-RequireOrgScopeMiddleware
-RequireActiveOperatorMiddleware
-AuthzSnapshotMiddleware
-```
-
-含义：
-
-- JWT 负责认证。
-- UserIdentity 投影 Principal/OrgScope。
-- TenantDomain 保证 IAM 授权域，OrgScope 保证 QS 业务组织范围。
-- ActiveOperator 检查当前用户是本地有效 operator。
-- AuthzSnapshot 加载 IAM 授权快照。
-
-如果 SnapshotLoader 缺失，会打印 warning，authorization snapshot disabled。
-
----
-
-## 6. IAM disabled 行为
-
-如果 IAM disabled：
-
-```text
-routes are unprotected
-```
-
-这是高风险开发/测试模式，生产不应依赖。
-
-如果 TokenVerifier 缺失，也会禁用 JWT authentication。
-
----
-
-## 7. OpenAPI 与 route 注册
-
-apiserver OpenAPI 导出文件：
-
-```text
-api/rest/apiserver.yaml
-```
-
-但最终是否暴露以 route 注册为准：
-
-```text
-internal/apiserver/transport/rest/registrars.go
-internal/apiserver/transport/rest/routes_*.go
-```
-
-规范中的 `servers` 只包含 host；`paths` 保留完整运行时路径（包括 `/api/v1`、`/api/v2`、`/internal/v1`）。root `BearerAuth` 适用于默认 operation，公开 operation 用 `security: []` 覆盖；operation 级 security 不会被生成器丢弃。修改路由后必须更新 OpenAPI。
-
----
-
-## 8. 常见排障
-
-### 8.1 401 / token rejected
-
-检查：
-
-1. IAM enabled。
-2. TokenVerifier 是否注入。
-3. Authorization header。
-4. ForceRemoteVerification。
-5. JWT metadata。
-
-### 8.2 tenant_domain required / org_id required
-
-检查：
-
-1. token claims。
-2. 是否有 TenantDomain。
-3. 是否有有效 org_id。
-4. 是否应该挂在 public route。
-
-### 8.3 permission denied
-
-检查：
-
-1. AuthzSnapshot 是否加载。
-2. Capability middleware。
-3. IAM permissions resource/action。
-4. Operator active 状态。
-
-### 8.4 internal route 404
-
-检查：
-
-1. 是否挂在 `/internal/v1`。
-2. route 文件是否注册。
-3. 是否访问了历史旧路径。
-4. OpenAPI 是否滞后。
-
----
-
-## 9. Verify
+## 4. 验证
 
 ```bash
-go test ./internal/apiserver/transport/rest
-go test ./internal/apiserver
 make docs-rest
 make docs-verify
 ```
+
+再运行受影响 handler/application 定向测试。
