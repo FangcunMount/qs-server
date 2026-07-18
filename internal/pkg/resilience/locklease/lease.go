@@ -22,9 +22,10 @@ var (
 	ErrLeaseRelinquished  = errors.New("leader lease relinquished")
 )
 
-// RunResult describes an executed lease-protected workload. ReleaseErr is
-// informational: token-safe release remains best-effort and never replaces the
-// body or renewal result.
+// RunResult describes a lease-protected workload. Acquired reports whether the
+// workload was admitted to execute, not whether Redis briefly granted a lease
+// that was released before admission. ReleaseErr is informational: token-safe
+// release remains best-effort and never replaces the body or renewal result.
 type RunResult struct {
 	Acquired   bool
 	ReleaseErr error

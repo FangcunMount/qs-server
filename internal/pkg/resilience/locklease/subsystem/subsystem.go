@@ -290,16 +290,30 @@ func (s *Subsystem) Run(
 		return result, fmt.Errorf("%w: workload %s: %w", locklease.ErrLeaseAcquireFailed, workload, err)
 	}
 	if !acquired {
+		if cause := context.Cause(ctx); cause != nil {
+			return result, cause
+		}
 		return result, nil
 	}
-	result.Acquired = true
 
 	if body == nil {
+		_, admitted, admissionErr := s.admitAcquiredLease(ctx, workload, nil)
+		if !admitted {
+			result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
+			return result, admissionErr
+		}
+		result.Acquired = true
 		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
 		return result, nil
 	}
 	bodyCtx, cancelBody := context.WithCancelCause(ctx)
-	run := s.registerActive(workload, cancelBody)
+	run, admitted, admissionErr := s.admitAcquiredLease(bodyCtx, workload, cancelBody)
+	if !admitted {
+		cancelBody(nil)
+		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
+		return result, admissionErr
+	}
+	result.Acquired = true
 	defer cancelBody(nil)
 	defer func() {
 		result.ReleaseErr = s.manager.ReleaseSpec(context.Background(), capability.Spec, key, lease)
@@ -406,9 +420,29 @@ func (s *Subsystem) ApplyLeaderCooldown(workload locklease.WorkloadID, until tim
 	return nil
 }
 
-func (s *Subsystem) registerActive(workload locklease.WorkloadID, cancel context.CancelCauseFunc) *activeRun {
+// admitAcquiredLease is the authoritative admission point after Redis acquire.
+// Cooldown publication and active-run registration are linearized by activeMu.
+// A nil cancel checks admission without registering an active body.
+func (s *Subsystem) admitAcquiredLease(
+	ctx context.Context,
+	workload locklease.WorkloadID,
+	cancel context.CancelCauseFunc,
+) (*activeRun, bool, error) {
 	s.activeMu.Lock()
 	defer s.activeMu.Unlock()
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, false, cause
+	}
+	if s.cooldownActiveLocked(workload) {
+		return nil, false, nil
+	}
+	if cancel == nil {
+		return nil, true, nil
+	}
+	return s.registerActiveLocked(workload, cancel), true, nil
+}
+
+func (s *Subsystem) registerActiveLocked(workload locklease.WorkloadID, cancel context.CancelCauseFunc) *activeRun {
 	s.nextRunID++
 	run := &activeRun{id: s.nextRunID, workload: workload, cancel: cancel, done: make(chan struct{})}
 	if s.active[workload] == nil {
@@ -444,6 +478,10 @@ func (s *Subsystem) inCooldown(workload locklease.WorkloadID) bool {
 	}
 	s.activeMu.Lock()
 	defer s.activeMu.Unlock()
+	return s.cooldownActiveLocked(workload)
+}
+
+func (s *Subsystem) cooldownActiveLocked(workload locklease.WorkloadID) bool {
 	until := s.cooldownUntil[workload]
 	if until.IsZero() || !s.now().Before(until) {
 		delete(s.cooldownUntil, workload)

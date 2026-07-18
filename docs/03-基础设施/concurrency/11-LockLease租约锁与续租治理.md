@@ -33,21 +33,29 @@ sequenceDiagram
     alt contention
         Runner-->>Caller: Acquired=false
     else acquired
-        Runner->>Body: body(childCtx)
-        loop every TTL / 3
-            Runner->>Redis: compare token + PEXPIRE
+        Runner->>Runner: 原子检查 parent cause 与 cooldown，并登记 active run
+        alt parent canceled or cooldown active
+            Runner->>Redis: token-safe best-effort release
+            Runner-->>Caller: Acquired=false
+        else body admitted
+            Runner->>Body: body(childCtx)
+            loop every TTL / 3
+                Runner->>Redis: compare token + PEXPIRE
+            end
+            alt token missing or mismatched
+                Runner->>Body: cancel cause ErrLeaseLost
+            else Redis cannot confirm
+                Runner->>Body: cancel cause ErrLeaseRenewFailed
+            end
+            Body-->>Runner: exit after cancellation
+            Runner->>Runner: cancel renewal-only context and join renew loop
+            Runner->>Redis: token-safe best-effort release
+            Runner-->>Caller: body or renewal result
         end
-        alt token missing or mismatched
-            Runner->>Body: cancel cause ErrLeaseLost
-        else Redis cannot confirm
-            Runner->>Body: cancel cause ErrLeaseRenewFailed
-        end
-        Body-->>Runner: exit after cancellation
-        Runner->>Runner: cancel renewal-only context and join renew loop
-        Runner->>Redis: token-safe best-effort release
-        Runner-->>Caller: body or renewal result
     end
 ```
+
+Redis acquire 成功后还必须经过进程内原子准入：在同一把状态锁下依次检查父 context、检查 leader cooldown、登记 active run。`RunResult.Acquired` 表示 workload 已获准执行，而不是 Redis 曾短暂授予租约。父 context 在 acquire 期间取消时优先于 contention；若 Redis 已授予租约但准入失败，Runner 会立即按原 token 释放且不启动 body。
 
 续租没有比例、重试次数等动态参数：周期固定为 `TTL / 3`，一次失败立即 fail-closed。Runner 分离 `bodyCtx` 和 `renewCtx`：body 先完成时立即取消正在进行的 Redis renew，等续租 goroutine 退出后再 release；父 context 或租约失败时则取消 body。业务代码必须把 child context 继续传给数据库、gRPC 和循环。若 body 不退出，Runner 不会伪装成功或遗留后台写入，从下一个续租周期开始持续告警，日志包含 component、workload 和 cancellation cause。
 
@@ -56,7 +64,7 @@ sequenceDiagram
 - `ErrLeaseAcquireFailed`：初次 Redis 获取失败；worker 保持 degraded-open。
 - `ErrLeaseLost`：token 不匹配或 key 已过期；取消 child context。
 - `ErrLeaseRenewFailed`：Redis 无法确认所有权；取消 child context。
-- 父 context 取消：直接返回父 cause，不包装成 acquire/renew failure，也不触发 worker degraded-open。
+- 父 context 取消：直接返回父 cause，不包装成 acquire/renew failure，也不触发 worker degraded-open；若取消发生在 acquire 调用中，父 cause 也优先于随后返回的 contention。
 - body 因 context 或 gRPC `Canceled` 退出时，已确认的 lease error 优先；body 的非取消业务错误优先于 lease error。
 - release 始终 token-safe、best-effort，错误记录在 `RunResult.ReleaseErr`，不覆盖主体结果。
 

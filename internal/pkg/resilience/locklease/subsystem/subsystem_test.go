@@ -26,6 +26,7 @@ type managerStub struct {
 	lease        *locklease.Lease
 	acquired     bool
 	acquireErr   error
+	acquireFunc  func(context.Context) (*locklease.Lease, bool, error)
 	renewOwned   bool
 	renewErr     error
 	renewFunc    func(context.Context) (bool, error)
@@ -34,7 +35,10 @@ type managerStub struct {
 	releaseCalls int
 }
 
-func (m *managerStub) AcquireSpec(context.Context, locklease.Spec, string, ...time.Duration) (*locklease.Lease, bool, error) {
+func (m *managerStub) AcquireSpec(ctx context.Context, _ locklease.Spec, _ string, _ ...time.Duration) (*locklease.Lease, bool, error) {
+	if m.acquireFunc != nil {
+		return m.acquireFunc(ctx)
+	}
 	return m.lease, m.acquired, m.acquireErr
 }
 
@@ -85,6 +89,117 @@ func TestRunParentCancellationDuringAcquireIsNotAcquireFailure(t *testing.T) {
 	}
 	if errors.Is(err, locklease.ErrLeaseAcquireFailed) {
 		t.Fatalf("Run() error = %v, must not be ErrLeaseAcquireFailed", err)
+	}
+}
+
+func TestRunParentCancellationBeforeSuccessfulAcquireReturnsDoesNotAdmitBody(t *testing.T) {
+	acquireStarted := make(chan struct{})
+	allowAcquireReturn := make(chan struct{})
+	releaseErr := errors.New("release failed")
+	manager := &managerStub{
+		acquireFunc: func(context.Context) (*locklease.Lease, bool, error) {
+			close(acquireStarted)
+			<-allowAcquireReturn
+			return &locklease.Lease{Key: "lock", Token: "token"}, true, nil
+		},
+		releaseErr: releaseErr,
+	}
+	s := New(Options{Component: "worker", Manager: manager})
+	parent, cancel := context.WithCancel(context.Background())
+	bodyCalled := false
+	type runResponse struct {
+		result locklease.RunResult
+		err    error
+	}
+	finished := make(chan runResponse, 1)
+	go func() {
+		result, err := s.Run(parent, locklease.WorkloadAnswersheetProcessing, "answer:cancel-after-acquire", time.Minute, func(context.Context) error {
+			bodyCalled = true
+			return nil
+		})
+		finished <- runResponse{result: result, err: err}
+	}()
+
+	<-acquireStarted
+	cancel()
+	close(allowAcquireReturn)
+	response := <-finished
+	if !errors.Is(response.err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", response.err)
+	}
+	if errors.Is(response.err, locklease.ErrLeaseAcquireFailed) {
+		t.Fatalf("Run() error = %v, must not be ErrLeaseAcquireFailed", response.err)
+	}
+	if response.result.Acquired || bodyCalled {
+		t.Fatalf("Run() result = %+v, body called = %v; want unadmitted body", response.result, bodyCalled)
+	}
+	if manager.releaseCalls != 1 {
+		t.Fatalf("release calls = %d, want 1", manager.releaseCalls)
+	}
+	if !errors.Is(response.result.ReleaseErr, releaseErr) {
+		t.Fatalf("release error = %v, want %v", response.result.ReleaseErr, releaseErr)
+	}
+}
+
+func TestRunParentCancellationBeforeSuccessfulAcquireReturnsWithNilBody(t *testing.T) {
+	acquireStarted := make(chan struct{})
+	allowAcquireReturn := make(chan struct{})
+	manager := &managerStub{acquireFunc: func(context.Context) (*locklease.Lease, bool, error) {
+		close(acquireStarted)
+		<-allowAcquireReturn
+		return &locklease.Lease{Key: "lock", Token: "token"}, true, nil
+	}}
+	s := New(Options{Component: "worker", Manager: manager})
+	parent, cancel := context.WithCancel(context.Background())
+	type runResponse struct {
+		result locklease.RunResult
+		err    error
+	}
+	finished := make(chan runResponse, 1)
+	go func() {
+		result, err := s.Run(parent, locklease.WorkloadAnswersheetProcessing, "answer:nil-body-cancel", time.Minute, nil)
+		finished <- runResponse{result: result, err: err}
+	}()
+
+	<-acquireStarted
+	cancel()
+	close(allowAcquireReturn)
+	response := <-finished
+	if !errors.Is(response.err, context.Canceled) || response.result.Acquired {
+		t.Fatalf("Run() = %+v, %v; want canceled and unadmitted", response.result, response.err)
+	}
+	if manager.releaseCalls != 1 {
+		t.Fatalf("release calls = %d, want 1", manager.releaseCalls)
+	}
+}
+
+func TestRunParentCancellationBeforeContentionReturnsWinsOverContention(t *testing.T) {
+	acquireStarted := make(chan struct{})
+	allowAcquireReturn := make(chan struct{})
+	manager := &managerStub{acquireFunc: func(context.Context) (*locklease.Lease, bool, error) {
+		close(acquireStarted)
+		<-allowAcquireReturn
+		return nil, false, nil
+	}}
+	s := New(Options{Component: "worker", Manager: manager})
+	parent, cancel := context.WithCancel(context.Background())
+	finished := make(chan error, 1)
+	go func() {
+		_, err := s.Run(parent, locklease.WorkloadAnswersheetProcessing, "answer:cancel-contention", time.Minute, func(context.Context) error {
+			t.Error("body must not run after contention")
+			return nil
+		})
+		finished <- err
+	}()
+
+	<-acquireStarted
+	cancel()
+	close(allowAcquireReturn)
+	if err := <-finished; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+	if manager.releaseCalls != 0 {
+		t.Fatalf("release calls = %d, want 0", manager.releaseCalls)
 	}
 }
 
@@ -309,6 +424,54 @@ func TestRunPreservesBusinessErrorAndReportsReleaseError(t *testing.T) {
 	}
 }
 
+func TestRunPreservesBusinessErrorWhenRenewalFails(t *testing.T) {
+	tests := []struct {
+		name       string
+		renewOwned bool
+		renewErr   error
+	}{
+		{name: "ownership lost", renewOwned: false},
+		{name: "redis error", renewErr: errors.New("redis unavailable")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manual := &manualTicker{ch: make(chan time.Time, 1)}
+			manager := &managerStub{
+				lease:      &locklease.Lease{Key: "lock", Token: "token"},
+				acquired:   true,
+				renewOwned: tt.renewOwned,
+				renewErr:   tt.renewErr,
+			}
+			s := New(Options{
+				Component:      "worker",
+				Manager:        manager,
+				RenewalEnabled: true,
+				tickerFactory:  func(time.Duration) ticker { return manual },
+			})
+			businessErr := errors.New("business failed")
+			bodyStarted := make(chan struct{})
+			finished := make(chan error, 1)
+			go func() {
+				_, err := s.Run(context.Background(), locklease.WorkloadAnswersheetProcessing, "answer:business-error", time.Minute, func(ctx context.Context) error {
+					close(bodyStarted)
+					<-ctx.Done()
+					return businessErr
+				})
+				finished <- err
+			}()
+
+			<-bodyStarted
+			manual.ch <- time.Now()
+			if err := <-finished; !errors.Is(err, businessErr) {
+				t.Fatalf("Run() error = %v, want business error", err)
+			}
+			if manager.releaseCalls != 1 {
+				t.Fatalf("release calls = %d, want 1", manager.releaseCalls)
+			}
+		})
+	}
+}
+
 func TestRunWarnsUntilBodyStopsAfterParentCancellation(t *testing.T) {
 	manual := &manualTicker{ch: make(chan time.Time, 2)}
 	manager := &managerStub{
@@ -453,6 +616,54 @@ func TestRelinquishLeaderCancelsBodyBeforeTokenSafeRelease(t *testing.T) {
 	})
 	if err != nil || second.Acquired {
 		t.Fatalf("Run() during cooldown = %+v, %v", second, err)
+	}
+}
+
+func TestRelinquishLeaderDuringAcquirePreventsBodyAdmission(t *testing.T) {
+	acquireStarted := make(chan struct{})
+	allowAcquireReturn := make(chan struct{})
+	releaseErr := errors.New("release failed")
+	manager := &managerStub{
+		acquireFunc: func(context.Context) (*locklease.Lease, bool, error) {
+			close(acquireStarted)
+			<-allowAcquireReturn
+			return &locklease.Lease{Key: "lock", Token: "token"}, true, nil
+		},
+		releaseErr: releaseErr,
+	}
+	s := New(Options{Component: "apiserver", Manager: manager})
+	bodyCalled := false
+	type runResponse struct {
+		result locklease.RunResult
+		err    error
+	}
+	finished := make(chan runResponse, 1)
+	go func() {
+		result, err := s.Run(context.Background(), locklease.WorkloadPlanSchedulerLeader, "leader", time.Minute, func(context.Context) error {
+			bodyCalled = true
+			return nil
+		})
+		finished <- runResponse{result: result, err: err}
+	}()
+
+	<-acquireStarted
+	relinquished, err := s.RelinquishLeader(context.Background(), locklease.WorkloadPlanSchedulerLeader, locklease.RelinquishOptions{
+		Cooldown: time.Minute,
+		Timeout:  time.Second,
+	})
+	if err != nil || relinquished.ActiveCount != 0 || relinquished.Relinquished != 0 {
+		t.Fatalf("RelinquishLeader() = %+v, %v", relinquished, err)
+	}
+	close(allowAcquireReturn)
+	response := <-finished
+	if response.err != nil || response.result.Acquired || bodyCalled {
+		t.Fatalf("Run() = %+v, %v; body called=%v", response.result, response.err, bodyCalled)
+	}
+	if manager.releaseCalls != 1 {
+		t.Fatalf("release calls = %d, want 1", manager.releaseCalls)
+	}
+	if !errors.Is(response.result.ReleaseErr, releaseErr) {
+		t.Fatalf("release error = %v, want %v", response.result.ReleaseErr, releaseErr)
 	}
 }
 

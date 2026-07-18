@@ -256,39 +256,51 @@ func TestManagerCancellationDoesNotDegradeRedisFamily(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
 
-	registry := redisobserve.NewFamilyStatusRegistry("worker")
+	const component = "locklease-cancellation-test"
+	registry := redisobserve.NewFamilyStatusRegistry(component)
 	registry.Update(redisobserve.FamilyStatus{
-		Component:  "worker",
+		Component:  component,
 		Family:     string(redisruntime.FamilyLock),
 		Configured: true,
 		Available:  true,
 		Mode:       redisobserve.FamilyModeNamedProfile,
 	})
 	decisions := &lockleaseRecordingObserver{}
-	manager := NewManagerWithObservers("worker", "lock_lease", &redisruntime.Handle{
+	manager := NewManagerWithObservers(component, "lock_lease", &redisruntime.Handle{
 		Family:  redisruntime.FamilyLock,
 		Client:  client,
 		Builder: keyspace.NewBuilderWithNamespace("cache:lock"),
-	}, decisions, redisobserve.NewComponentObserver("worker", registry))
+	}, decisions, redisobserve.NewComponentObserver(component, registry))
 	spec, _ := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, acquired, acquireErr := manager.AcquireSpec(canceled, spec.Spec, "answersheet:processing:canceled-acquire"); !errors.Is(acquireErr, context.Canceled) || acquired {
+		t.Fatalf("AcquireSpec() acquired=%v err=%v, want canceled", acquired, acquireErr)
+	}
 
 	lease, acquired, err := manager.AcquireSpec(context.Background(), spec.Spec, "answersheet:processing:cancel")
 	if err != nil || !acquired {
 		t.Fatalf("AcquireSpec() acquired=%v err=%v", acquired, err)
 	}
 
-	canceled, cancel := context.WithCancel(context.Background())
-	cancel()
 	if owned, renewErr := manager.RenewSpec(canceled, spec.Spec, "answersheet:processing:cancel", lease); !errors.Is(renewErr, context.Canceled) || owned {
 		t.Fatalf("RenewSpec() owned=%v err=%v, want canceled", owned, renewErr)
 	}
 
+	if releaseErr := manager.ReleaseSpec(canceled, spec.Spec, "answersheet:processing:cancel", lease); !errors.Is(releaseErr, context.Canceled) {
+		t.Fatalf("ReleaseSpec() error = %v, want canceled", releaseErr)
+	}
+	if releaseErr := manager.ReleaseSpec(context.Background(), spec.Spec, "answersheet:processing:cancel", lease); releaseErr != nil {
+		t.Fatalf("ReleaseSpec() cleanup error = %v", releaseErr)
+	}
+
 	statuses := registry.Snapshot()
 	if len(statuses) != 1 || !statuses[0].Available || statuses[0].Degraded || statuses[0].ConsecutiveFailures != 0 {
-		t.Fatalf("family status after canceled renew = %+v", statuses)
+		t.Fatalf("family status after canceled operations = %+v", statuses)
 	}
-	if decisions.has(resilience.OutcomeLockRenewError) {
-		t.Fatalf("canceled renew emitted lock_renew_error: %#v", decisions.decisions)
+	if decisions.has(resilience.OutcomeLockRenewError) || decisions.has(resilience.OutcomeLockError) {
+		t.Fatalf("canceled operation emitted failure outcome: %#v", decisions.decisions)
 	}
 }
 
