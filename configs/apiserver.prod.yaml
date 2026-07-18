@@ -360,12 +360,12 @@ behavior_journey_scan:    # behavior_footprint 的唯一常规写入路径；不
 # 禁止用它驱动 behavior_footprint，行为轨迹由 behavior_journey_scan 重建。
 outbox_relay:
   mongo:
-    interval: "60s"                # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
+    interval: "1s"                # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
     batch_size: 1000              # 每轮最多 claim 的 Mongo profile 事件数
     publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；保留 48
     immediate_max_concurrent: 24  # mixed_300 chain_probe：略提 immediate 旁路并发
   assessment:
-    interval: "60s"               # assessment_mysql_events DB fallback relay 周期
+    interval: "1s"               # assessment_mysql_events DB fallback relay 周期
     batch_size: 200               # 每轮最多 claim 的 MySQL profile 事件数
     publish_workers: 24           # MySQL profile 并发 publish
     immediate_max_concurrent: 24  # evaluation.requested / outcome.committed immediate 并发上限
@@ -619,10 +619,10 @@ assessment_assets:
 # 5.1 日志配置（生产环境 - 使用 component-base duplicate 模式）
 # ----------------------------------------------------------------------------
 log:
-  level: debug                   # 日志基本级别：debug, info, warn, error, fatal, panic
-  format: console               # 日志格式（json 适合生产环境，console 适合开发环境）
-  enable-color: true            # 文件输出启用颜色
-  development: true             # 开发模式: true, false
+  level: info                   # 日志基本级别：debug, info, warn, error, fatal, panic
+  format: json               # 日志格式（json 适合生产环境，console 适合开发环境）
+  enable-color: false            # 文件输出启用颜色
+  development: false             # 开发模式: true, false
   name: "qs-apiserver"          # 日志名称
 
   # 📊 日志轮转配置
