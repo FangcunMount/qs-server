@@ -463,8 +463,8 @@ func (h *StatisticsHandler) BatchContentStatistics(c *gin.Context) {
 	}
 	snapshot, _ := authzApp.FromContext(c.Request.Context())
 	access := statisticsApp.ContentStatisticsAccess{
-		Questionnaire: authzApp.SnapshotSatisfiesCapability(snapshot, authzApp.CapabilityManageQuestionnaires),
-		Scale:         authzApp.SnapshotSatisfiesCapability(snapshot, authzApp.CapabilityManageAssessmentModels),
+		Questionnaire: authzApp.DecideCapability(snapshot, authzApp.CapabilityManageQuestionnaires).Allowed,
+		Scale:         authzApp.DecideCapability(snapshot, authzApp.CapabilityManageAssessmentModels).Allowed,
 	}
 	stats, err := h.readService.GetContentBatchStatistics(c.Request.Context(), orgID, req.Items, access)
 	if err != nil {
