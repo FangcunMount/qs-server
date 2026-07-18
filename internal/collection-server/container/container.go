@@ -267,10 +267,6 @@ func (c *Container) initApplicationServices() {
 
 	submitRuntime := c.buildSubmitRuntime(profileLinkService, c.questionnaireQueryService)
 	c.submissionService = submitRuntime.submission
-	if c.resilience != nil && c.submissionService != nil {
-		c.resilience.RegisterQueue("answersheet_submit", c.submissionService.SubmitQueueController(), c.submissionService.SubmitQueueStatusSnapshot)
-	}
-
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
 		c.assessmentModelCatalogQueryService,
@@ -433,6 +429,13 @@ func (c *Container) ConcurrencyOptions() *options.ConcurrencyOptions {
 		return options.NewOptions().Concurrency
 	}
 	return c.opts.Concurrency
+}
+
+func (c *Container) SubmitOptions() *options.SubmitOptions {
+	if c == nil || c.opts == nil || c.opts.Submit == nil {
+		return options.NewSubmitOptions()
+	}
+	return c.opts.Submit
 }
 
 func (c *Container) QueryConcurrencyGate() *concurrency.Gate {

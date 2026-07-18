@@ -334,12 +334,7 @@ func queueDecisionLabels(component string, queue resilience.QueueSnapshot, outco
 }
 
 func queueResource(queue resilience.QueueSnapshot) string {
-	switch queue.Name {
-	case "answersheet_submit", "submit":
-		return "submit_queue"
-	default:
-		return "default"
-	}
+	return "default"
 }
 
 func backpressureDecisionLabels(component string, bp resilience.BackpressureSnapshot, outcome resilience.Outcome) map[string]string {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,7 @@ type AdmissionPolicy struct {
 	waitReportGate *concurrency.Gate
 	waitReport     *options.WaitReportOptions
 	maxWait        time.Duration
+	submitMaxWait  time.Duration
 	catalogMaxWait time.Duration
 	catalogPeek    catalogL1PeekFunc
 }
@@ -46,6 +48,7 @@ func (r *Router) admissionPolicy() AdmissionPolicy {
 	policy.submitGate = r.container.SubmitConcurrencyGate()
 	policy.waitReportGate = r.container.WaitReportConcurrencyGate()
 	policy.waitReport = r.container.WaitReportOptions()
+	policy.submitMaxWait = r.submitMaxWait()
 	return policy
 }
 
@@ -58,12 +61,23 @@ func (p AdmissionPolicy) Wrap(route admissionRoute, handlers ...gin.HandlerFunc)
 	case admissionQuery:
 		return waitGateHandlers(p.queryGate, p.maxWait, handlers...)
 	case admissionSubmit:
-		return waitGateHandlers(p.submitGate, p.maxWait, handlers...)
+		return waitSubmitGateHandlers(p.submitGate, p.submitMaxWait, handlers...)
 	case admissionWaitReport:
 		return waitConcurrencyHandlers(p.waitReportGate, p.waitReport, handlers...)
 	default:
 		return handlers
 	}
+}
+
+func (r *Router) submitMaxWait() time.Duration {
+	if r == nil || r.container == nil {
+		return 0
+	}
+	opts := r.container.SubmitOptions()
+	if opts == nil || opts.GateWaitMs <= 0 {
+		return 0
+	}
+	return time.Duration(opts.GateWaitMs) * time.Millisecond
 }
 
 func (r *Router) concurrencyMaxWait() time.Duration {
@@ -130,6 +144,18 @@ func waitGateHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ..
 	}
 	mw := gate.WaitMiddleware(maxWait, func(c *gin.Context) {
 		WriteServiceUnavailable(c, 1)
+	})
+	return append([]gin.HandlerFunc{mw}, handlers...)
+}
+
+func waitSubmitGateHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	if gate == nil {
+		return handlers
+	}
+	mw := gate.WaitMiddleware(maxWait, func(c *gin.Context) {
+		resilience.ObserveSubmitGateReject()
+		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
+		c.AbortWithStatusJSON(429, gin.H{"code": 429, "message": "submit gate busy"})
 	})
 	return append([]gin.HandlerFunc{mw}, handlers...)
 }

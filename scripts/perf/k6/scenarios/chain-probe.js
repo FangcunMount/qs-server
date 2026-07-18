@@ -1,9 +1,8 @@
 import { sleep, check } from 'k6';
-import { responseItems } from '../lib/util.js';
 import { scenarioData, buildMedicalSubmitRequest, buildSubmitPayloadFromCase, buildPersonalityCaseFromSession, renderPath } from '../lib/data.js';
-import { timedRequest, authHeaders, jsonHeaders, collectionToken, apiserverToken, responseData, recordHTTPStatus } from '../lib/http.js';
+import { timedRequest, authHeaders, jsonHeaders, collectionToken, responseData, recordHTTPStatus } from '../lib/http.js';
 import {
-  APISERVER_BASE_URL, COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_STATUS_PATH,
+  COLLECTION_BASE_URL, SUBMIT_PATH, ASSESSMENT_READINESS_PATH,
   REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, PERSONALITY_REPORT_PATH,
   BEHAVIOR_REPORT_STATUS_PATH,
   IDEMPOTENCY_PREFIX, CHAIN_PROBE_TIMEOUT_SECONDS, CHAIN_PROBE_POLL_SECONDS, REPORT_TIMEOUT,
@@ -55,20 +54,15 @@ export function runAsyncChainProbe(ctx, modelType) {
     model_type: modelType,
   });
 
-  if (submitRes.status !== 202) {
+  const accepted = responseData(submitRes);
+  if (submitRes.status !== 202 || accepted.status !== 'accepted' || !accepted.answersheet_id) {
     chainProbeFailed.add(1, { reason: 'submit_not_accepted', model_type: modelType });
     return;
   }
 
-  const submitResult = waitSubmitDone(requestID);
-  if (!submitResult || !submitResult.answerSheetID) {
-    chainProbeFailed.add(1, { reason: 'submit_status_timeout', model_type: modelType });
-    return;
-  }
-
-  const assessmentID = submitResult.assessmentID || waitAssessmentID(submitResult.answerSheetID, payload.testee_id, modelType);
+  const assessmentID = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType);
   if (!assessmentID) {
-    chainProbeFailed.add(1, { reason: 'assessment_lookup_failed', model_type: modelType });
+    chainProbeFailed.add(1, { reason: 'assessment_readiness_timeout', model_type: modelType });
     return;
   }
   submitToAssessmentLatency.add(Date.now() - start, { model_type: modelType });
@@ -119,78 +113,25 @@ export function runAsyncChainProbe(ctx, modelType) {
   chainProbeTerminal.add(1, { assessment_status: terminalStatus, model_type: modelType });
 }
 
-export function waitSubmitDone(requestID) {
+export function waitAssessmentReadiness(answerSheetID, testeeID, modelType) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
   while (Date.now() < deadline) {
-    const path = renderPath(SUBMIT_STATUS_PATH, { request_id: encodeURIComponent(requestID) });
+    const path = renderPath(ASSESSMENT_READINESS_PATH, {
+      answersheet_id: encodeURIComponent(answerSheetID),
+      testee_id: encodeURIComponent(testeeID),
+    });
     const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
-      endpoint: 'chain_probe_submit_status',
+      endpoint: 'chain_probe_assessment_readiness',
       service: 'collection-server',
+      model_type: modelType,
     });
     if (res.status === 200) {
       const data = responseData(res);
-      if (data.status === 'done' && data.answersheet_id) {
-        return {
-          answerSheetID: data.answersheet_id,
-          assessmentID: data.assessment_id || '',
-        };
+      if (data.status === 'ready' && data.assessment_id) {
+        return String(data.assessment_id);
       }
-      if (data.status === 'failed') {
-        return null;
-      }
-    }
-    sleep(CHAIN_PROBE_POLL_SECONDS);
-  }
-  return null;
-}
-
-export function findAssessmentIDByAnswerSheet(data, answerSheetID) {
-  const target = String(answerSheetID);
-  for (const item of responseItems(data)) {
-    const sheetID = String(item.answer_sheet_id || item.answerSheetId || item.answersheet_id || '');
-    if (sheetID && sheetID === target) {
-      const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
-      if (assessmentID) {
-        return assessmentID;
-      }
-      if (item.status === 'failed') {
-        return '';
-      }
-    }
-  }
-  return null;
-}
-
-export function waitAssessmentID(answerSheetID, testeeID, modelType) {
-  const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
-  const personality = modelType === 'personality';
-  const behavior = modelType === 'behavior';
-  while (Date.now() < deadline) {
-    const path = personality
-      ? `/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`
-      : (behavior
-        ? `/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`
-        : `/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`);
-    const res = timedRequest(
-      'GET',
-      personality || behavior ? COLLECTION_BASE_URL : APISERVER_BASE_URL,
-      path,
-      null,
-      authHeaders(personality || behavior ? collectionToken() : apiserverToken()),
-      {
-        endpoint: personality ? 'chain_probe_typology_assessment_lookup' : (behavior ? 'chain_probe_behavior_assessment_lookup' : 'chain_probe_evaluation_assessment_lookup'),
-        service: personality || behavior ? 'collection-server' : 'qs-apiserver',
-        model_type: modelType,
-      }
-    );
-    if (res.status === 200) {
-      const assessmentID = findAssessmentIDByAnswerSheet(responseData(res), answerSheetID);
-      if (assessmentID === '') {
-        return '';
-      }
-      if (assessmentID) {
-        return assessmentID;
-      }
+      sleep(Math.max(0.2, Number(data.next_poll_after_ms || CHAIN_PROBE_POLL_SECONDS * 1000) / 1000));
+      continue;
     }
     sleep(CHAIN_PROBE_POLL_SECONDS);
   }

@@ -107,16 +107,6 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 			Planned:   true,
 		},
 		{
-			ID: "resilience.drain_queue", Domain: DomainResilience, Label: "Drain in-memory queue", RiskLevel: "high",
-			Enabled: enabled["resilience.drain_queue"], Planned: !enabled["resilience.drain_queue"], RequiresConfirmation: true,
-			InputSchema: queueActionSchema(),
-		},
-		{
-			ID: "resilience.resume_queue", Domain: DomainResilience, Label: "Resume drained queue", RiskLevel: "high",
-			Enabled: enabled["resilience.resume_queue"], Planned: !enabled["resilience.resume_queue"], RequiresConfirmation: true,
-			InputSchema: queueActionSchema(),
-		},
-		{
 			ID: "resilience.release_lock", Domain: DomainResilience, Label: "Relinquish leader lease", RiskLevel: "high",
 			Enabled: enabled["resilience.release_lock"], Planned: !enabled["resilience.release_lock"], RequiresConfirmation: true,
 			InputSchema: map[string]interface{}{"type": "object", "required": []string{"component", "instance_id", "workload"}},
@@ -127,14 +117,6 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 			InputSchema: map[string]interface{}{"type": "object", "required": []string{"mode", "component", "budget", "expected_version"}},
 		},
 	}
-}
-
-func queueActionSchema() map[string]interface{} {
-	return map[string]interface{}{"type": "object", "required": []string{"component", "queue"}, "properties": map[string]interface{}{
-		"component": map[string]interface{}{"type": "string", "enum": []string{"collection-server"}},
-		"queue":     map[string]interface{}{"type": "string", "enum": []string{"answersheet_submit"}},
-		"target":    map[string]interface{}{"type": "string"}, "timeout_seconds": map[string]interface{}{"type": "integer", "minimum": 1},
-	}}
 }
 
 func warmupKindEnum() []string {

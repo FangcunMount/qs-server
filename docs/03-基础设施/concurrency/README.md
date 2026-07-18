@@ -7,8 +7,8 @@
 | 机制 | 解决问题 | 典型失败语义 |
 | --- | --- | --- |
 | RateLimit | 单位时间入口过载 | 快速拒绝，客户端稍后重试 |
-| SubmitQueue | 短时突发削峰 | 排队超时或队列已满 |
-| SubmitGuard | 同一业务请求并发重复 | 合并、抑制或返回既有请求状态 |
+| Submit Gate | 限制可靠提交在途数 | 50ms 未取得槽位返回 429 |
+| SubmitGuard | 同一幂等意图的跨实例并发降噪 | 争用时 429；Redis 故障 degraded-open，交给 Mongo 幂等收敛 |
 | Backpressure | 下游资源饱和 | 有界拒绝，不继续放大压力 |
 | LockLease | 长任务互斥与续租 | 失租后停止持有者动作，避免双写 |
 | Resilience control | 运行时治理与恢复 | 操作审计、幂等重试、备用记录回填 |
@@ -20,6 +20,8 @@
 - 治理用例：`internal/apiserver/application/systemgovernance`。
 - 组合与恢复 runner：`internal/apiserver/container/modules/platform`。
 - 架构护栏：`internal/pkg/architecture/resilience_ownership_test.go` 等。
+
+答卷提交不再使用进程内 Queue。`submit.accept_timeout_ms=2000`、`submit.gate_wait_ms=50`、`concurrency.max_submit_concurrency=96` 是初始生产基线，必须通过 24/s 稳态、48/s 突发和 96/s 准入边界专项压测校准。
 
 ## 3. 报告查询治理
 

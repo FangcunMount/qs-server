@@ -11,8 +11,8 @@ func TestCollectionOpenAPICoversK6PerfPaths(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	required := map[string][]string{
-		"/answersheets":                            {"post"},
-		"/answersheets/submit-status":              {"get"},
+		"/answersheets": {"post"},
+		"/answersheets/{id}/assessment-readiness":  {"get"},
 		"/assessment-models":                       {"get"},
 		"/assessment-models/hot":                   {"get"},
 		"/assessment-models/options":               {"get"},
@@ -45,20 +45,23 @@ func TestCollectionOpenAPICoversK6PerfPaths(t *testing.T) {
 	}
 }
 
-func TestCollectionOpenAPISubmitStatusHasAssessmentID(t *testing.T) {
+func TestCollectionOpenAPIReliableSubmitAndReadinessContract(t *testing.T) {
 	t.Parallel()
 
 	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
-	schema, ok := schemas["answersheet.SubmitStatusResponse"].(map[string]any)
+	schema, ok := schemas["answersheet.SubmitAcceptedResponse"].(map[string]any)
 	if !ok {
-		t.Fatal("missing answersheet.SubmitStatusResponse schema")
+		t.Fatal("missing answersheet.SubmitAcceptedResponse schema")
 	}
 	props, ok := schema["properties"].(map[string]any)
 	if !ok {
-		t.Fatal("SubmitStatusResponse has no properties")
+		t.Fatal("SubmitAcceptedResponse has no properties")
 	}
-	if _, ok := props["assessment_id"]; !ok {
-		t.Fatal("SubmitStatusResponse missing assessment_id")
+	if _, ok := props["answersheet_id"]; !ok {
+		t.Fatal("SubmitAcceptedResponse missing answersheet_id")
+	}
+	if _, ok := props["assessment_id"]; ok {
+		t.Fatal("SubmitAcceptedResponse must not contain assessment_id")
 	}
 }
 
@@ -68,6 +71,7 @@ func TestCollectionOpenAPIHasNoK6RemovedLegacyPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	for _, path := range []string{
 		"/api/v1/answersheets/{id}/assessment",
+		"/api/v1/answersheets/submit-status",
 		"/api/v1/personality-models",
 		"/api/v1/personality-assessment-sessions",
 		"/api/v1/personality-assessments",

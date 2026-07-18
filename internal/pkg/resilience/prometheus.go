@@ -61,6 +61,33 @@ var collectionGRPCInflightWaitSeconds = promauto.NewHistogram(prometheus.Histogr
 	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
 })
 
+var collectionSubmitGateRejectTotal = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "qs_collection_submit_gate_reject_total",
+	Help: "Total AnswerSheet submissions rejected after the bounded gate wait.",
+})
+
+var collectionAnswerSheetSubmitTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_collection_answersheet_submit_total",
+	Help: "Durable AnswerSheet acceptance attempts by outcome.",
+}, []string{"outcome"})
+
+var collectionAnswerSheetSubmitStageDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Name:    "qs_collection_answersheet_submit_stage_duration_seconds",
+	Help:    "Duration of bounded reliable AnswerSheet acceptance stages.",
+	Buckets: prometheus.ExponentialBuckets(0.001, 2, 12),
+}, []string{"stage", "outcome"})
+
+var collectionAssessmentReadinessTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_collection_assessment_readiness_total",
+	Help: "Assessment readiness checks by result.",
+}, []string{"status"})
+
+var collectionSubmitToAssessmentReadyDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+	Name:    "qs_collection_submit_to_assessment_ready_seconds",
+	Help:    "Observed time from AnswerSheet creation to Assessment readiness.",
+	Buckets: prometheus.ExponentialBuckets(1, 2, 10),
+})
+
 var resilienceControlOperationTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "resilience_control_operation_total",
@@ -157,6 +184,43 @@ func ObserveGRPCInflightWait(duration time.Duration) {
 		return
 	}
 	collectionGRPCInflightWaitSeconds.Observe(duration.Seconds())
+}
+
+func ObserveSubmitGateReject() {
+	collectionSubmitGateRejectTotal.Inc()
+}
+
+func ObserveAnswerSheetSubmitStage(stage, outcome string, duration time.Duration) {
+	if stage == "" {
+		stage = "unknown"
+	}
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	if duration < 0 {
+		return
+	}
+	collectionAnswerSheetSubmitStageDuration.WithLabelValues(stage, outcome).Observe(duration.Seconds())
+}
+
+func ObserveAnswerSheetSubmitOutcome(outcome string) {
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	collectionAnswerSheetSubmitTotal.WithLabelValues(outcome).Inc()
+}
+
+func ObserveAssessmentReadiness(status string) {
+	if status == "" {
+		status = "unknown"
+	}
+	collectionAssessmentReadinessTotal.WithLabelValues(status).Inc()
+}
+
+func ObserveSubmitToAssessmentReady(duration time.Duration) {
+	if duration >= 0 {
+		collectionSubmitToAssessmentReadyDuration.Observe(duration.Seconds())
+	}
 }
 
 func ObserveControlOperation(component, operation, outcome string) {

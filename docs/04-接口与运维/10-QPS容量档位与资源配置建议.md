@@ -1,6 +1,6 @@
 # QPS 容量档位与资源配置建议
 
-**本文回答**：如果希望 qs-server 承接 QPS 100、200、300、500、700、900、1000，应调整哪些入口限流、SubmitQueue、Backpressure、连接池、worker 并发、容器资源和主机资源。本文给容量规划基线，不替代真实压测。
+**本文回答**：如果希望 qs-server 承接 QPS 100、200、300、500、700、900、1000，应调整哪些入口限流、Submit Gate、Backpressure、连接池、worker 并发、容器资源和主机资源。本文给容量规划基线，不替代真实压测。
 
 ---
 
@@ -21,10 +21,12 @@
 
 **单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，**280 边际 + Step2 过、全量 300 未过**（§2.4、SOP §3.8.3）。
 
+> 上述数据是旧提交链历史基线，不能直接作为可靠受理新链的容量承诺。直接切换后必须重跑 `perf-reliable-submit24`、`perf-reliable-submit48-burst`、`perf-reliable-submit96-boundary` 和 8C/16G `perf-mixed300`。
+
 核心原则：
 
 1. `rate_limit.*_global_qps` 只控制入口速率，不能提高真实处理能力。
-2. `submit_queue` 只削峰，不是跨实例持久队列。
+2. 答卷提交不再经过进程内队列；Submit Gate 只限制在途数，`202` 必须来自可靠提交。
 3. `backpressure.*.max_inflight` 应匹配数据库连接池和下游承载能力。
 4. QPS 500 以上优先横向扩容。
 5. 容量档位必须用压测确认。
@@ -39,7 +41,7 @@
 | ---- | ------ | ---- |
 | collection rate_limit | submit/query global QPS 300；**report_events global 120** | 入口保护（压测配比见 k6 profile） |
 | collection grpc_client | max_inflight **420** | 4C/8G 榨干档 |
-| collection submit_queue | queue_size **2800**，worker_count **56** | 提交削峰 |
+| collection submit | accept timeout **2000ms**，gate wait **50ms** | 可靠受理时限和有界等待 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
 | collection typology_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
@@ -60,15 +62,15 @@
 
 ### 2.1 collection-server
 
-| 目标 QPS | global QPS | burst | grpc max_inflight | queue_size | worker_count |
-| -------- | ---------- | ----- | ----------------- | ---------- | ------------ |
-| 100 | 100 | 150 | 50 | 300 | 4 |
-| 200 | 200-250 | 300-400 | 80 | 500 | 8 |
-| 300 | 300 | 450 | 120 | 800 | 12 |
-| 500 | 500 | 750 | 200 | 1200 | 20 |
-| 700 | 700 | 1050 | 280 | 1600 | 28 |
-| 900 | 900 | 1350 | 360 | 2200 | 36 |
-| 1000 | 1000 | 1500 | 400 | 2500 | 40 |
+| 目标 QPS | global QPS | burst | grpc max_inflight | submit max concurrency | gate wait |
+| -------- | ---------- | ----- | ----------------- | ---------------------- | --------- |
+| 100 | 100 | 150 | 50 | 48 | 50ms |
+| 200 | 200-250 | 300-400 | 80 | 64 | 50ms |
+| 300 | 300 | 450 | 120 | 96 | 50ms |
+| 500 | 500 | 750 | 200 | 压测定标 | 50ms |
+| 700 | 700 | 1050 | 280 | 压测定标 | 50ms |
+| 900 | 900 | 1350 | 360 | 压测定标 | 50ms |
+| 1000 | 1000 | 1500 | 400 | 压测定标 | 50ms |
 
 注意：单实例 `concurrency.max-concurrency` 不应无限提高，QPS 700+ 应靠多实例。
 
@@ -114,7 +116,7 @@
 
 当前 **serverA 4C/8G** 部署：`qs-apiserver` 4 CPU / 4GiB，`qs-collection-server` 3 CPU / 3GiB（见 `build/docker/docker-compose.prod.yml`）。
 8C/16G 历史验收：`qs-apiserver` 5 CPU / 8GiB，`qs-collection-server` 2 CPU / 4GiB。
-submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约束。
+submit 稳态由 Submit Gate、gRPC inflight、Mongo 事务与 Outbox Stage 能力共同约束。
 
 ### 2.4 serverA 4C/8G 榨干档（2026-07）
 
@@ -126,7 +128,8 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 | collection `rate_limit.report_events_global_qps` | **120** | WS subscribe 96/s 留余量 |
 | collection `grpc_client.max_inflight` | **420** | 对齐 apiserver gRPC 承载 |
 | collection `grpc_client.inflight_wait_ms` | **4000** | 减少 2s 快速失败 |
-| collection `submit_queue.worker_count` | **56** | 对齐 24/s submit |
+| collection `concurrency.max_submit_concurrency` | **96** | 可靠提交初始准入边界 |
+| collection `submit.gate_wait_ms` / `accept_timeout_ms` | **50 / 2000** | 有界等待与总受理超时 |
 | apiserver `backpressure.mongo.max_inflight` | **120** | submit+outbox 主瓶颈（原 80） |
 | apiserver `backpressure.mysql.max_inflight` | **150** | 对齐 mysql pool |
 | apiserver backpressure `timeout_ms` | **4000～5000** | 应用内排队，避免 k6 30s 雪崩 |
@@ -184,11 +187,12 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 | HTTP 5xx | 非预期 0 |
 | 错误率 | < 1% |
 | 普通查询 p95 | < 500ms |
-| 提交链路 p95 | < 1000ms |
-| p99 | 可解释，不能持续恶化 |
+| 可靠提交 24/s p95 | < 500ms |
+| 可靠提交 24/s p99 | < 1000ms |
 | 429 | 只在超过目标 QPS/burst 出现 |
 | backpressure_timeout | 稳态不应持续出现 |
-| SubmitQueue depth | burst 后应回落 |
+| 202 后 AnswerSheet + Outbox 可查率 | 100% |
+| 重复幂等意图产生新 AnswerSheet | 0 |
 | MQ depth | 不持续增长 |
 | DB 慢查询 | 不随 QPS 线性恶化 |
 | RSS | 低于 mem_limit，有 GC 余量 |
@@ -199,7 +203,7 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 
 1. 确定请求混合比例。
 2. 调 collection rate limit。
-3. 调 collection grpc max_inflight 和 submit_queue。
+3. 调 collection grpc max_inflight 和 Submit Gate，不得引入进程内排队。
 4. 调 apiserver rate limit 和 backpressure。
 5. 调 DB/Mongo/Redis/MQ 资源。
 6. 调容器 CPU/memory/GOMEMLIMIT。
@@ -211,7 +215,7 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 ## 8. 常见错误
 
 - 只把 QPS 数字调大。
-- queue_size 过大掩盖下游慢。
+- 通过无界等待掩盖下游慢。
 - backpressure 高于 DB 承载。
 - worker 并发高于 apiserver 处理能力。
 - 只压缓存命中接口就承诺提交 QPS。

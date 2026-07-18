@@ -126,13 +126,11 @@ rate_limit:                          # 限流配置
   report_events_user_burst: 40       # 报告事件用户突发 40
 
 # -------------------------------------------------------
-# 3.4 提交排队配置
+# 3.4 可靠提交配置
 # -------------------------------------------------------
-submit_queue:                       # 提交排队配置
-  enabled: true                     # 启用提交排队
-  queue_size: 2800                  # 4C/8G：略增削峰深度（24/s 压测）
-  worker_count: 56                  # 4C/8G mixed_280+（原 48；对齐 apiserver mongo 排水）
-  wait_timeout_ms: 500              # 兼容旧配置；当前非阻塞入队不使用该字段作为削峰等待旋钮
+submit:
+  accept_timeout_ms: 2000           # 问卷/ProfileLink/gRPC/Mongo 可靠受理总超时
+  gate_wait_ms: 50                  # Submit Gate 最长等待，超时返回 429
 
 cache:
   capabilities:

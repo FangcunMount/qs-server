@@ -81,8 +81,7 @@ export const endpointFailureCounters = {
   statistics_overview: buildEndpointFailureCounters('statistics_overview'),
   statistics_content_batch: buildEndpointFailureCounters('statistics_content_batch'),
   chain_probe_submit: buildEndpointFailureCounters('chain_probe_submit'),
-  chain_probe_submit_status: buildEndpointFailureCounters('chain_probe_submit_status'),
-  chain_probe_assessment_lookup: buildEndpointFailureCounters('chain_probe_assessment_lookup'),
+  chain_probe_assessment_readiness: buildEndpointFailureCounters('chain_probe_assessment_readiness'),
   chain_probe_report_status: buildEndpointFailureCounters('chain_probe_report_status'),
   discover_scale: buildEndpointFailureCounters('discover_scale'),
   discover_questionnaire: buildEndpointFailureCounters('discover_questionnaire'),
@@ -158,7 +157,7 @@ export function buildThresholds() {
     thresholds.questionnaire_query_duration = ['p(95)<500', 'p(99)<1200'];
   }
   if (submitRps > 0 || chainProbeRps > 0) {
-    thresholds.answer_submit_duration = ['p(95)<1000', 'p(99)<2000'];
+    thresholds.answer_submit_duration = ['p(95)<500', 'p(99)<1000'];
   }
   if (reportRps > 0 || chainProbeRps > 0) {
     thresholds.report_status_duration = reportDurationThresholds();

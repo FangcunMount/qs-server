@@ -61,7 +61,7 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 	if result == nil {
 		t.Fatal("createAndSaveAnswerSheet() returned nil sheet")
 	}
-	if store.lastMeta.IdempotencyKey != "idem-1" {
+	if store.lastMeta.IdempotencyKey != "idem-1" || store.lastMeta.WriterID != 301 || len(store.lastMeta.Fingerprint) != 64 {
 		t.Fatalf("unexpected durable meta: %+v", store.lastMeta)
 	}
 	if store.lastSheet == nil {

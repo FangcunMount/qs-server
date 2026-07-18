@@ -33,7 +33,7 @@ type AssessmentSummaryResponse struct {
 	ID                   string `json:"id"`
 	QuestionnaireCode    string `json:"questionnaire_code"`
 	QuestionnaireVersion string `json:"questionnaire_version"`
-	// 关联答卷 ID；提交后可用其与 answersheet_id 匹配取得 assessment_id（R121 后推荐方式）。
+	// 关联答卷 ID；仅用于测评摘要展示与历史追溯。新提交通过 assessment-readiness 取得 assessment_id。
 	AnswerSheetID string                `json:"answer_sheet_id,omitempty"`
 	Model         ModelIdentityResponse `json:"model"`
 	PrimaryScore  *ScoreValueResponse   `json:"primary_score,omitempty"`

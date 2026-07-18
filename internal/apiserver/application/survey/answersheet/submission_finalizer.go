@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	stderrors "errors"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -9,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -81,14 +83,31 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 	sheet *answersheet.AnswerSheet,
 ) (*answersheet.AnswerSheet, error) {
 	l.Infow("开始保存答卷", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode)
+	fingerprint, err := submitport.Fingerprint(sheet)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "计算答卷提交指纹失败")
+	}
 	storedSheet, existing, err := s.durableStore.CreateDurably(ctx, sheet, DurableSubmitMeta{
 		IdempotencyKey: dto.IdempotencyKey,
+		WriterID:       dto.FillerID,
+		Fingerprint:    fingerprint,
 	})
 	if err != nil {
+		if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
+			observeDurableSubmit("idempotency_conflict")
+			l.Warnw("答卷幂等键与已保存业务内容冲突",
+				"action", "create", "resource", "answersheet", "result", "idempotency_conflict",
+				"writer_id", dto.FillerID, "idempotency_key", dto.IdempotencyKey,
+				"questionnaire_code", dto.QuestionnaireCode, "testee_id", dto.TesteeID,
+			)
+			return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)
+		}
+		observeDurableSubmit("failed")
 		l.Errorw("保存答卷失败", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
 	if existing {
+		observeDurableSubmit("idempotency_hit")
 		l.Infow("答卷提交命中业务幂等键，返回已存在答卷",
 			"action", "create",
 			"resource", "answersheet",
@@ -96,6 +115,9 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 			"answersheet_id", storedSheet.ID().Uint64(),
 			"result", "idempotent_hit",
 		)
+	}
+	if !existing {
+		observeDurableSubmit("created")
 	}
 	return storedSheet, nil
 }

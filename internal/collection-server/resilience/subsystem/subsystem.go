@@ -116,11 +116,7 @@ func (s *Subsystem) Sync(ctx context.Context) error {
 	if s.stateStore == nil || !s.opsAvailable {
 		return control.ErrUnavailable
 	}
-	state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit")
-	if err != nil {
-		return err
-	}
-	if err := s.applyQueueDesiredState(ctx, state, exists, true); err != nil {
+	if err := s.syncRegisteredQueues(ctx, true); err != nil {
 		return err
 	}
 	s.controlReady.Store(true)
@@ -207,16 +203,27 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 		}
 	}
 	if !s.processCommands(ctx) {
-		s.reconcileQueues(ctx)
+		_ = s.syncRegisteredQueues(ctx, false)
 	}
 }
 
-func (s *Subsystem) reconcileQueues(ctx context.Context) {
-	state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit")
-	if err != nil {
-		return
+func (s *Subsystem) syncRegisteredQueues(ctx context.Context, requireSettled bool) error {
+	s.queueMu.RLock()
+	names := make([]string, 0, len(s.queues))
+	for name := range s.queues {
+		names = append(names, name)
 	}
-	_ = s.applyQueueDesiredState(ctx, state, exists, false)
+	s.queueMu.RUnlock()
+	for _, name := range names {
+		state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:"+name)
+		if err != nil {
+			return err
+		}
+		if err := s.applyQueueDesiredState(ctx, state, exists, requireSettled); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Subsystem) applyQueueDesiredState(ctx context.Context, state control.VersionedState, exists, requireSettled bool) error {
@@ -231,7 +238,7 @@ func (s *Subsystem) applyQueueDesiredState(ctx context.Context, state control.Ve
 		return nil
 	}
 	s.queueMu.RLock()
-	queue, ok := s.queues["answersheet_submit"]
+	queue, ok := s.queues[change.Queue]
 	s.queueMu.RUnlock()
 	if !ok {
 		return control.ErrUnavailable

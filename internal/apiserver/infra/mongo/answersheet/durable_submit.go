@@ -26,11 +26,16 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	if _, err := r.idempotencyColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "writer_id", Value: 1}, {Key: "idempotency_key", Value: 1}},
+		Options: options.Index().SetName("uk_writer_id_idempotency_key").SetUnique(true),
+	}); err != nil {
+		return fmt.Errorf("create scoped answersheet idempotency index: %w", err)
+	}
+	if _, err := r.idempotencyColl.Indexes().DropOne(ctx, "uk_idempotency_key"); err != nil && !isIndexNotFound(err) {
+		return fmt.Errorf("drop legacy answersheet idempotency index: %w", err)
+	}
 	if _, err := r.idempotencyColl.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{
-			Keys:    bson.D{{Key: "idempotency_key", Value: 1}},
-			Options: options.Index().SetName("uk_idempotency_key").SetUnique(true),
-		},
 		{
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}},
 			Options: options.Index().SetName("idx_status_updated_at"),
@@ -42,12 +47,17 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
-func (r *Repository) FindCompletedSubmission(ctx context.Context, idempotencyKey string) (*domainAnswerSheet.AnswerSheet, error) {
-	return r.findByIdempotencyKey(ctx, idempotencyKey)
+func isIndexNotFound(err error) bool {
+	var commandErr mongo.CommandError
+	return stderrors.As(err, &commandErr) && commandErr.HasErrorCode(27)
 }
 
-func (r *Repository) WaitForCompletedSubmission(ctx context.Context, idempotencyKey string) (*domainAnswerSheet.AnswerSheet, error) {
-	return r.waitForCompletedIdempotentResult(ctx, idempotencyKey)
+func (r *Repository) FindCompletedSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	return r.findByIdempotencyKey(ctx, metaInfo)
+}
+
+func (r *Repository) WaitForCompletedSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	return r.waitForCompletedIdempotentResult(ctx, metaInfo)
 }
 
 func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) ([]event.DomainEvent, error) {
@@ -89,6 +99,7 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 		idempotencyDoc = &AnswerSheetSubmitIdempotencyPO{
 			IdempotencyKey:       metaInfo.IdempotencyKey,
 			WriterID:             writerID,
+			Fingerprint:          metaInfo.Fingerprint,
 			TesteeID:             testeeID,
 			QuestionnaireCode:    code,
 			QuestionnaireVersion: version,
@@ -113,14 +124,15 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	return events, nil
 }
 
-func (r *Repository) findByIdempotencyKey(ctx context.Context, key string) (*domainAnswerSheet.AnswerSheet, error) {
-	if key == "" {
+func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	if metaInfo.IdempotencyKey == "" {
 		return nil, nil
 	}
 
 	var po AnswerSheetSubmitIdempotencyPO
 	if err := r.idempotencyColl.FindOne(ctx, bson.M{
-		"idempotency_key": key,
+		"writer_id":       metaInfo.WriterID,
+		"idempotency_key": metaInfo.IdempotencyKey,
 		"status":          idempotencyStatusCompleted,
 	}).Decode(&po); err != nil {
 		if stderrors.Is(err, mongo.ErrNoDocuments) {
@@ -129,13 +141,27 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, key string) (*dom
 		return nil, err
 	}
 
-	return r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
+	sheet, err := r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
+	if err != nil || sheet == nil || metaInfo.Fingerprint == "" {
+		return sheet, err
+	}
+	storedFingerprint := po.Fingerprint
+	if storedFingerprint == "" {
+		storedFingerprint, err = submitport.Fingerprint(sheet)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if storedFingerprint != metaInfo.Fingerprint {
+		return nil, submitport.ErrIdempotencyConflict
+	}
+	return sheet, nil
 }
 
-func (r *Repository) waitForCompletedIdempotentResult(ctx context.Context, key string) (*domainAnswerSheet.AnswerSheet, error) {
+func (r *Repository) waitForCompletedIdempotentResult(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	deadline := time.Now().Add(idempotencyLookupTimeout)
 	for {
-		existing, err := r.findByIdempotencyKey(ctx, key)
+		existing, err := r.findByIdempotencyKey(ctx, metaInfo)
 		if err != nil {
 			return nil, err
 		}

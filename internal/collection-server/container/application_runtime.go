@@ -57,10 +57,10 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 			acl.NewAnswerSheetBFFReader(c.answerSheetClient),
 			acl.NewTesteeActorLookup(c.actorClient),
 			profileLinkService,
-			c.opts.SubmitQueue,
 			submitGuard,
 			c.assessmentIntakeClient,
 			questionnaireReader,
+			c.opts.Submit.ResolvedAcceptTimeout(),
 		),
 	}
 }

@@ -582,12 +582,11 @@ export const PERSONALITY_SESSION_PATH = envOrConfigString(
   ['personalitySessionPath', 'personality_session_path', 'paths.personalitySession', 'paths.personality_session'],
   '/api/v1/typology-assessment-sessions'
 );
-export const SUBMIT_STATUS_PATH = envOrConfigString(
-  'SUBMIT_STATUS_PATH',
-  ['submitStatusPath', 'submit_status_path', 'paths.submitStatus', 'paths.submit_status'],
-  '/api/v1/answersheets/submit-status?request_id={request_id}'
+export const ASSESSMENT_READINESS_PATH = envOrConfigString(
+  'ASSESSMENT_READINESS_PATH',
+  ['assessmentReadinessPath', 'assessment_readiness_path', 'paths.assessmentReadiness', 'paths.assessment_readiness'],
+  '/api/v1/answersheets/{answersheet_id}/assessment-readiness?testee_id={testee_id}'
 );
-// R121 后 chain-probe 用 typology-assessments / evaluations/assessments 列表按 answer_sheet_id 匹配。
 
 export const TESTEE_IDS = envOrConfigList('TESTEE_IDS', ['testeeIds', 'testee_ids'], __ENV.TESTEE_ID || '');
 export const ASSESSMENT_IDS = envOrConfigList('ASSESSMENT_IDS', ['assessmentIds', 'assessment_ids'], __ENV.ASSESSMENT_ID || '');

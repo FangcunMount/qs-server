@@ -127,13 +127,11 @@ rate_limit:
   report_events_user_burst: 20
 
 # ============================================================
-# 3.4 提交排队配置
+# 3.4 可靠提交配置
 # ============================================================
-submit_queue:
-  enabled: true
-  queue_size: 1000
-  worker_count: 8
-  wait_timeout_ms: 200
+submit:
+  accept_timeout_ms: 2000
+  gate_wait_ms: 50
 
 cache:
   capabilities:

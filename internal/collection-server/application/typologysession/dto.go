@@ -61,9 +61,8 @@ type SubmitContractResponse struct {
 }
 
 type SessionEndpointsResponse struct {
-	SubmitAnswerSheet string `json:"submit_answer_sheet"`
-	// 已下线（R121）端点 URL 模板，勿调用。assessment_id 请用 GET /typology-assessments 列表按 answer_sheet_id 匹配。
-	AssessmentByAnswerSheet string `json:"assessment_by_answer_sheet"`
+	SubmitAnswerSheet   string `json:"submit_answer_sheet"`
+	AssessmentReadiness string `json:"assessment_readiness"`
 	// legacy 长轮询；推荐改用 report-status 短轮询或 WSS /report-events（kind=personality）。
 	WaitReport string `json:"wait_report"`
 	Report     string `json:"report"`
@@ -87,9 +86,9 @@ func buildSubmitContract(model *typologymodel.TypologyModelResponse, testeeID ui
 func buildEndpoints(testeeID uint64) SessionEndpointsResponse {
 	testeeIDStr := strconv.FormatUint(testeeID, 10)
 	return SessionEndpointsResponse{
-		SubmitAnswerSheet:       "/api/v1/answersheets",
-		AssessmentByAnswerSheet: "/api/v1/answersheets/{answersheet_id}/assessment",
-		WaitReport:              fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/wait-report?testee_id=%s", testeeIDStr),
-		Report:                  fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/report?testee_id=%s", testeeIDStr),
+		SubmitAnswerSheet:   "/api/v1/answersheets",
+		AssessmentReadiness: fmt.Sprintf("/api/v1/answersheets/{answersheet_id}/assessment-readiness?testee_id=%s", testeeIDStr),
+		WaitReport:          fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/wait-report?testee_id=%s", testeeIDStr),
+		Report:              fmt.Sprintf("/api/v1/typology-assessments/{assessment_id}/report?testee_id=%s", testeeIDStr),
 	}
 }

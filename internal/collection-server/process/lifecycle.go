@@ -54,6 +54,10 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 }
 
 func runCollectionLifecycle(deps lifecycleDeps) {
+	// Drain in-flight reliable submissions before their downstream dependencies.
+	if deps.closeHTTP != nil {
+		deps.closeHTTP()
+	}
 	lifecycle := processruntime.Lifecycle{}
 	lifecycle.AddShutdownHook("close grpc clients", deps.closeGRPCManager)
 	lifecycle.AddShutdownHook("close database", deps.closeDatabase)
@@ -63,9 +67,6 @@ func runCollectionLifecycle(deps lifecycleDeps) {
 	lifecycle.Run(func(name string, err error) {
 		log.Errorf("Failed to %s: %v", name, err)
 	})
-	if deps.closeHTTP != nil {
-		deps.closeHTTP()
-	}
 }
 
 func (s preparedServer) Run() error {

@@ -28,7 +28,7 @@ type Options struct {
 	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
 	ReportEvents            *ReportEventsOptions                    `json:"report_events" mapstructure:"report_events"`
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
-	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
+	Submit                  *SubmitOptions                          `json:"submit" mapstructure:"submit"`
 	Cache                   *CacheOptions                           `json:"cache" mapstructure:"cache"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
@@ -140,12 +140,16 @@ func (c *ConcurrencyOptions) ResolvedSubmitConcurrency() int {
 	return 32
 }
 
-// SubmitQueueOptions 提交排队配置
-type SubmitQueueOptions struct {
-	Enabled       bool `json:"enabled" mapstructure:"enabled"` // Deprecated: submit queue is always enabled.
-	QueueSize     int  `json:"queue_size" mapstructure:"queue_size"`
-	WorkerCount   int  `json:"worker_count" mapstructure:"worker_count"`
-	WaitTimeoutMs int  `json:"wait_timeout_ms" mapstructure:"wait_timeout_ms"` // Deprecated: submit no longer waits synchronously for queue results.
+type SubmitOptions struct {
+	AcceptTimeoutMs int `json:"accept_timeout_ms" mapstructure:"accept_timeout_ms"`
+	GateWaitMs      int `json:"gate_wait_ms" mapstructure:"gate_wait_ms"`
+}
+
+func (s *SubmitOptions) ResolvedAcceptTimeout() time.Duration {
+	if s == nil || s.AcceptTimeoutMs <= 0 {
+		return 2 * time.Second
+	}
+	return time.Duration(s.AcceptTimeoutMs) * time.Millisecond
 }
 
 // RateLimitOptions 限流配置
@@ -255,7 +259,7 @@ func NewOptions() *Options {
 		WaitReport:   NewWaitReportOptions(),
 		ReportEvents: NewReportEventsOptions(),
 		Signaling:    genericoptions.NewSignalingOptions(),
-		SubmitQueue:  NewSubmitQueueOptions(),
+		Submit:       NewSubmitOptions(),
 		Cache:        NewCacheOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
@@ -294,14 +298,8 @@ func NewRuntimeOptions() *RuntimeOptions {
 	}
 }
 
-// NewSubmitQueueOptions 创建默认提交排队配置
-func NewSubmitQueueOptions() *SubmitQueueOptions {
-	return &SubmitQueueOptions{
-		Enabled:       true,
-		QueueSize:     1000,
-		WorkerCount:   8,
-		WaitTimeoutMs: 0,
-	}
+func NewSubmitOptions() *SubmitOptions {
+	return &SubmitOptions{AcceptTimeoutMs: 2000, GateWaitMs: 50}
 }
 
 // NewRateLimitOptions 创建默认限流配置
@@ -365,7 +363,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.ReportEvents.AddFlags(fss.FlagSet("report_events"))
-	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
+	o.Submit.AddFlags(fss.FlagSet("submit"))
 	o.Cache.Capabilities.Catalog.Questionnaire.AddFlags(fss.FlagSet("cache.capabilities.catalog.questionnaire"))
 	o.Cache.Capabilities.Catalog.Typology.AddFlags(fss.FlagSet("cache.capabilities.catalog.typology"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
@@ -409,12 +407,9 @@ func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 		"Maximum wait in milliseconds for catalog slots on L1 cache miss (0 uses max-wait-ms).")
 }
 
-// AddFlags 添加提交排队相关的命令行参数
-func (s *SubmitQueueOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&s.Enabled, "submit_queue.enabled", s.Enabled, "Deprecated: submit queue is always enabled.")
-	fs.IntVar(&s.QueueSize, "submit_queue.queue-size", s.QueueSize, "Submit queue size.")
-	fs.IntVar(&s.WorkerCount, "submit_queue.worker-count", s.WorkerCount, "Submit queue worker count.")
-	fs.IntVar(&s.WaitTimeoutMs, "submit_queue.wait-timeout-ms", s.WaitTimeoutMs, "Deprecated: submit no longer waits synchronously for queue results.")
+func (s *SubmitOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.IntVar(&s.AcceptTimeoutMs, "submit.accept-timeout-ms", s.AcceptTimeoutMs, "Reliable submit acceptance timeout in milliseconds.")
+	fs.IntVar(&s.GateWaitMs, "submit.gate-wait-ms", s.GateWaitMs, "Maximum submit gate wait in milliseconds before returning 429.")
 }
 
 // AddFlags 添加限流相关的命令行参数
@@ -493,7 +488,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionGRPCClient(o.GRPCClient)...)
 	errs = append(errs, validateCollectionRedis(o.RedisOptions, o.RedisRuntime, o.RedisProfiles)...)
 	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
-	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
+	errs = append(errs, validateCollectionSubmit(o.Submit)...)
 	if o.Cache != nil && o.Cache.Capabilities != nil && o.Cache.Capabilities.Catalog != nil {
 		errs = append(errs, validateQuestionnaireCacheOptions(o.Cache.Capabilities.Catalog.Questionnaire)...)
 		errs = append(errs, validateTypologyCacheOptions(o.Cache.Capabilities.Catalog.Typology)...)
@@ -582,20 +577,17 @@ func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
 	return errs
 }
 
-func validateCollectionSubmitQueue(opts *SubmitQueueOptions) []error {
+func validateCollectionSubmit(opts *SubmitOptions) []error {
 	if opts == nil {
-		return nil
+		return []error{fmt.Errorf("submit cannot be nil")}
 	}
 
 	var errs []error
-	if opts.QueueSize <= 0 {
-		errs = append(errs, fmt.Errorf("submit_queue.queue_size must be greater than 0"))
+	if opts.AcceptTimeoutMs <= 0 {
+		errs = append(errs, fmt.Errorf("submit.accept_timeout_ms must be greater than 0"))
 	}
-	if opts.WorkerCount <= 0 {
-		errs = append(errs, fmt.Errorf("submit_queue.worker_count must be greater than 0"))
-	}
-	if opts.WaitTimeoutMs < 0 {
-		errs = append(errs, fmt.Errorf("submit_queue.wait_timeout_ms cannot be negative"))
+	if opts.GateWaitMs <= 0 {
+		errs = append(errs, fmt.Errorf("submit.gate_wait_ms must be greater than 0"))
 	}
 	return errs
 }

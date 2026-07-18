@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"google.golang.org/grpc"
@@ -14,6 +15,8 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 )
+
+var safeAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$`)
 
 // AnswerSheetService 答卷 gRPC 服务 - C端接口
 // 提供答卷的提交、查询功能：提交答卷、查看我的答卷列表、查看我的答卷详情
@@ -51,6 +54,9 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	}
 	if req.TesteeId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+	if !safeAnswerSheetIdempotencyKey.MatchString(req.IdempotencyKey) {
+		return nil, status.Error(codes.InvalidArgument, "idempotency_key 必须包含 8-128 个安全字符")
 	}
 	if len(req.Answers) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "answers 不能为空")
@@ -247,6 +253,10 @@ func toAnswerSheetGRPCError(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errorCode.ErrPermissionDenied:
 		return status.Error(codes.PermissionDenied, err.Error())
+	case errorCode.ErrConflict:
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errorCode.ErrDatabase, errorCode.ErrInternalServerError:
+		return status.Error(codes.Unavailable, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

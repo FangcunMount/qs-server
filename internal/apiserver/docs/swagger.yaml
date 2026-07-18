@@ -8339,7 +8339,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale 需要 manage_assessment_models，混合请求需要同时具备两项权限
+      description: 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale
+        需要 manage_assessment_models，混合请求需要同时具备两项权限
       parameters:
       - description: Bearer 用户令牌
         in: header

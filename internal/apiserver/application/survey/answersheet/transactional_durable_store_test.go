@@ -38,10 +38,14 @@ type durableStoreWriterStub struct {
 	waitCalled   bool
 	saveSawTxCtx bool
 	waitKey      string
+	findMeta     DurableSubmitMeta
+	waitMeta     DurableSubmitMeta
+	waitCtxErr   error
 }
 
-func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, _ string) (*domainAnswerSheet.AnswerSheet, error) {
+func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	w.findCalled = true
+	w.findMeta = meta
 	return w.existing, nil
 }
 
@@ -51,10 +55,33 @@ func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, _
 	return w.saveEvents, w.saveErr
 }
 
-func (w *durableStoreWriterStub) WaitForCompletedSubmission(_ context.Context, key string) (*domainAnswerSheet.AnswerSheet, error) {
+func (w *durableStoreWriterStub) WaitForCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	w.waitCalled = true
-	w.waitKey = key
+	w.waitCtxErr = ctx.Err()
+	w.waitKey = meta.IdempotencyKey
+	w.waitMeta = meta
 	return w.waitExisting, nil
+}
+
+func TestTransactionalSubmissionDurableStoreUnknownCommitRecoversAfterRequestCancellation(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	existing := newDurableStoreTestSheet(t)
+	runner := &durableStoreRunnerStub{err: context.Canceled}
+	writer := &durableStoreWriterStub{waitExisting: existing}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	got, existed, err := store.CreateDurably(ctx, sheet, DurableSubmitMeta{IdempotencyKey: "idem-unknown-commit"})
+	if err != nil {
+		t.Fatalf("CreateDurably() error = %v", err)
+	}
+	if !existed || got != existing {
+		t.Fatalf("CreateDurably() = (%p, %v), want recovered existing sheet", got, existed)
+	}
+	if !writer.waitCalled || writer.waitCtxErr != nil {
+		t.Fatalf("recovery lookup context error = %v, want detached live context", writer.waitCtxErr)
+	}
 }
 
 type durableStoreStagerStub struct {
@@ -173,6 +200,32 @@ func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *te
 	}
 	if postCommit.calls != 0 {
 		t.Fatalf("rollback notified post-commit %d times", postCommit.calls)
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreCommitFailureDoesNotAcknowledgeOrClearEvents(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	commitErr := errors.New("commit failed")
+	runner := &durableStoreRunnerStub{err: commitErr}
+	writer := &durableStoreWriterStub{
+		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
+	}
+	stager := &durableStoreStagerStub{}
+	postCommit := &durableStorePostCommitStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, postCommit)
+
+	_, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{})
+	if !errors.Is(err, commitErr) {
+		t.Fatalf("CreateDurably() error = %v, want %v", err, commitErr)
+	}
+	if existed {
+		t.Fatal("commit failure must not be acknowledged as an existing result")
+	}
+	if len(sheet.Events()) == 0 {
+		t.Fatal("events must remain when commit is not confirmed")
+	}
+	if postCommit.calls != 0 {
+		t.Fatalf("commit failure notified post-commit %d times", postCommit.calls)
 	}
 }
 

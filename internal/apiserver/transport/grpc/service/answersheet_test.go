@@ -56,6 +56,7 @@ func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode:    "QNR-001",
 		QuestionnaireVersion: "1.0.0",
+		IdempotencyKey:       "submit-0001",
 		OrgId:                1,
 		WriterId:             101,
 		TesteeId:             202,
@@ -101,6 +102,7 @@ func TestAnswerSheetServiceSaveAnswerSheetMapsInvalidDomainError(t *testing.T) {
 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode: "QNR-001",
+		IdempotencyKey:    "submit-0002",
 		WriterId:          101,
 		TesteeId:          202,
 		Answers: []*pb.Answer{
@@ -112,5 +114,48 @@ func TestAnswerSheetServiceSaveAnswerSheetMapsInvalidDomainError(t *testing.T) {
 	}
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %s", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceSaveAnswerSheetRequiresSafeIdempotencyKey(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+			t.Fatal("submission service must not be called")
+			return nil, nil
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
+		QuestionnaireCode: "QNR-001",
+		WriterId:          101,
+		TesteeId:          202,
+		Answers:           []*pb.Answer{{QuestionCode: "q1", QuestionType: "Radio", Value: "A"}},
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %s", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceSaveAnswerSheetMapsIdempotencyConflict(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+			return nil, pkgerrors.WithCode(errorCode.ErrConflict, "idempotency conflict")
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
+		QuestionnaireCode: "QNR-001",
+		IdempotencyKey:    "submit-conflict",
+		OrgId:             1,
+		WriterId:          101,
+		TesteeId:          202,
+		Answers:           []*pb.Answer{{QuestionCode: "q1", QuestionType: "Radio", Value: "A"}},
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("expected AlreadyExists, got %s", status.Code(err))
 	}
 }

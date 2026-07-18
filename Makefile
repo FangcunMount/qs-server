@@ -112,7 +112,7 @@ COLOR_RED := \033[31m
 .PHONY: docs-swagger docs-rest docs-hygiene docs-facts docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
-.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
+.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
@@ -256,6 +256,18 @@ perf-pretest120: perf-preflight ## k6 pretest_120 中档 (5min)
 perf-pretest120-submit-only: perf-preflight ## k6 pretest_120 隔离：仅 submit=19QPS (5min)
 	@mkdir -p $(PERF_DIR)/pretest120-submit-only
 	$(MAKE) perf-k6 QPS_PROFILE=pretest_120_submit_only SUMMARY_EXPORT=$(PERF_DIR)/pretest120-submit-only/k6-summary.json
+
+perf-reliable-submit24: perf-preflight ## 可靠受理稳态24/s（10min）
+	@mkdir -p $(PERF_DIR)/reliable-submit24
+	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_24 STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit24/k6-summary.json
+
+perf-reliable-submit48-burst: perf-preflight ## 可靠受理突发48/s（2min）
+	@mkdir -p $(PERF_DIR)/reliable-submit48-burst
+	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_48_burst STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit48-burst/k6-summary.json
+
+perf-reliable-submit96-boundary: perf-preflight ## 可靠受理准入边界96/s（5min）
+	@mkdir -p $(PERF_DIR)/reliable-submit96-boundary
+	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_96_boundary STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit96-boundary/k6-summary.json
 
 perf-pretest120-balanced: perf-preflight ## k6 pretest_120 混合降读压：34/19/26/13 (5min)
 	@mkdir -p $(PERF_DIR)/pretest120-balanced

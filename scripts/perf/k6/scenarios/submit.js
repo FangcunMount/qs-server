@@ -1,6 +1,6 @@
 import { check } from 'k6';
 import { scenarioData, weightedPickModelType, buildMedicalSubmitRequest, buildPersonalitySubmitPayload } from '../lib/data.js';
-import { timedRequest, jsonHeaders, collectionToken, recordHTTPStatus } from '../lib/http.js';
+import { timedRequest, jsonHeaders, collectionToken, recordHTTPStatus, responseData } from '../lib/http.js';
 import { COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_MIX, IDEMPOTENCY_PREFIX } from '../lib/config.js';
 import { answerSubmitDuration, answerSubmitAccepted, answerSubmitFailed, answerSubmitSuccessRate } from '../lib/metrics.js';
 
@@ -43,7 +43,8 @@ export function submitAnswerSheet(ctx, modelType) {
   });
 
   answerSubmitDuration.add(res.timings.duration, res.tags);
-  const accepted = res.status === 202;
+  const data = responseData(res);
+  const accepted = res.status === 202 && data.status === 'accepted' && Boolean(data.answersheet_id);
   if (accepted) {
     answerSubmitAccepted.add(1, res.tags);
   }
@@ -51,5 +52,6 @@ export function submitAnswerSheet(ctx, modelType) {
   answerSubmitSuccessRate.add(accepted, res.tags);
   check(res, {
     'answersheet submit status is 202': (r) => r.status === 202,
+    'answersheet submit is durably accepted': () => accepted,
   });
 }

@@ -50,7 +50,7 @@ func TestMetricEvidenceReaderScopesResilienceDecisionLabels(t *testing.T) {
 	}, "5m", now)
 
 	wantQueries := []string{
-		`sum(increase(qs_resilience_decision_total{component="collection-server",kind="queue",outcome="queue_full",resource="submit_queue",scope="answersheet_submit",strategy="memory_channel"}[5m]))`,
+		`sum(increase(qs_resilience_decision_total{component="collection-server",kind="queue",outcome="queue_full",resource="default",scope="answersheet_submit",strategy="memory_channel"}[5m]))`,
 		`sum(increase(qs_resilience_decision_total{component="apiserver",kind="backpressure",outcome="backpressure_timeout",resource="downstream",scope="mysql",strategy="semaphore"}[5m]))`,
 	}
 	if len(metrics.specs) != len(wantQueries) {

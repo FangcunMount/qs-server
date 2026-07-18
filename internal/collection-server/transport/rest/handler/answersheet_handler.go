@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -17,8 +16,8 @@ import (
 )
 
 type answerSheetSubmissionService interface {
-	SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) error
-	GetSubmitStatus(ctx context.Context, requestID string) (*answersheet.SubmitStatusResponse, bool)
+	AcceptDurably(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error)
+	GetAssessmentReadiness(ctx context.Context, writerID, answerSheetID, testeeID uint64) (*answersheet.AssessmentReadinessResponse, error)
 	Get(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error)
 }
 
@@ -47,7 +46,9 @@ func NewAnswerSheetHandler(submissionService answerSheetSubmissionService) *Answ
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Security BearerAuth
 // @Router /api/v1/answersheets [post]
 func (h *AnswerSheetHandler) Submit(c *gin.Context) {
@@ -74,24 +75,14 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		requestID = uuid.Must(uuid.NewV4(), nil).String()
 	}
 
-	if err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req); err != nil {
-		if errors.Is(err, answersheet.ErrQueueDraining) {
-			ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
-			c.JSON(http.StatusServiceUnavailable, core.ErrResponse{
-				Code:    http.StatusServiceUnavailable,
-				Message: "submit queue draining",
-			})
-			return
-		}
-		if errors.Is(err, answersheet.ErrQueueFull) {
-			ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
-			c.JSON(http.StatusTooManyRequests, core.ErrResponse{
-				Code:    http.StatusTooManyRequests,
-				Message: "submit queue full",
-			})
-			return
-		}
+	result, err := h.submissionService.AcceptDurably(c.Request.Context(), requestID, writerID, &req)
+	if err != nil {
 		h.respondSubmitError(c, err)
+		return
+	}
+	if result == nil || result.ID == "" {
+		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
+		c.JSON(http.StatusServiceUnavailable, core.ErrResponse{Code: http.StatusServiceUnavailable, Message: "save answer sheet returned no durable result"})
 		return
 	}
 
@@ -99,8 +90,9 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		Code:    0,
 		Message: "accepted",
 		Data: answersheet.SubmitAcceptedResponse{
-			Status:    answersheet.SubmitStatusQueued,
-			RequestID: requestID,
+			Status:        "accepted",
+			RequestID:     requestID,
+			AnswerSheetID: result.ID,
 		},
 	})
 }
@@ -134,47 +126,61 @@ func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
 			Message: st.Message(),
 		})
 	case codes.ResourceExhausted:
+		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
 		c.JSON(http.StatusTooManyRequests, core.ErrResponse{
 			Code:    http.StatusTooManyRequests,
 			Message: st.Message(),
 		})
-	case codes.Unavailable:
+	case codes.Unavailable, codes.DeadlineExceeded, codes.Internal, codes.Unknown:
+		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
 		c.JSON(http.StatusServiceUnavailable, core.ErrResponse{
 			Code:    http.StatusServiceUnavailable,
 			Message: st.Message(),
 		})
+	case codes.AlreadyExists:
+		c.JSON(http.StatusConflict, core.ErrResponse{Code: http.StatusConflict, Message: st.Message()})
 	default:
-		h.InternalErrorResponse(c, "save answer sheet failed", err)
+		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
+		c.JSON(http.StatusServiceUnavailable, core.ErrResponse{Code: http.StatusServiceUnavailable, Message: "submit dependency unavailable"})
 	}
 }
 
-// SubmitStatus 查询提交状态
-// @Summary 查询提交状态
-// @Description 根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带 assessment_id（人格/医学通用），未就绪可继续轮询。
+// AssessmentReadiness 查询异步 Assessment 是否已创建。
+// @Summary 查询测评就绪状态
+// @Description 校验答卷归属与 ProfileLink 后，返回 pending 或 ready。
 // @Tags 答卷
 // @Produce json
-// @Param request_id query string true "请求ID"
-// @Success 200 {object} core.Response{data=answersheet.SubmitStatusResponse}
-// @Failure 429 {object} core.ErrResponse
+// @Param id path int true "答卷ID"
+// @Param testee_id query string true "受试者ID"
+// @Success 200 {object} core.Response{data=answersheet.AssessmentReadinessResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Security BearerAuth
-// @Router /api/v1/answersheets/submit-status [get]
-func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
-	requestID := h.GetQueryParam(c, "request_id")
-	if requestID == "" {
-		h.BadRequestResponse(c, "request_id is required", nil)
+// @Router /api/v1/answersheets/{id}/assessment-readiness [get]
+func (h *AnswerSheetHandler) AssessmentReadiness(c *gin.Context) {
+	answerSheetID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
+	if err != nil || answerSheetID == 0 {
+		h.BadRequestResponse(c, "invalid answersheet id", err)
 		return
 	}
-
-	status, ok := h.submissionService.GetSubmitStatus(c.Request.Context(), requestID)
-	if !ok {
-		h.NotFoundResponse(c, "submit status not found", nil)
+	testeeID, err := strconv.ParseUint(h.GetQueryParam(c, "testee_id"), 10, 64)
+	if err != nil || testeeID == 0 {
+		h.BadRequestResponse(c, "testee_id is required", err)
 		return
 	}
-
-	h.Success(c, status)
+	writerID := h.GetUserID(c)
+	if writerID == 0 {
+		h.UnauthorizedResponse(c, "user not authenticated")
+		return
+	}
+	result, err := h.submissionService.GetAssessmentReadiness(c.Request.Context(), writerID, answerSheetID, testeeID)
+	if err != nil {
+		h.respondSubmitError(c, err)
+		return
+	}
+	h.Success(c, result)
 }
 
 // Get 获取答卷详情

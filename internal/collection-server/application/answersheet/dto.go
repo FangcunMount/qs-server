@@ -10,7 +10,7 @@ import (
 type SubmitAnswerSheetRequest struct {
 	QuestionnaireCode    string `json:"questionnaire_code" binding:"required"`
 	QuestionnaireVersion string `json:"questionnaire_version" binding:"required"`
-	IdempotencyKey       string `json:"idempotency_key,omitempty"`
+	IdempotencyKey       string `json:"idempotency_key" binding:"required" minLength:"8" maxLength:"128"`
 	Title                string `json:"title"`
 	// The decoder accepts both JSON number and string. Publish string to avoid
 	// JavaScript precision loss for uint64 identifiers.
@@ -75,24 +75,24 @@ type Answer struct {
 
 // SubmitAnswerSheetResponse 提交答卷响应
 type SubmitAnswerSheetResponse struct {
-	ID           string `json:"id"`
-	AssessmentID string `json:"assessment_id,omitempty"`
-	Message      string `json:"message"`
+	ID      string `json:"id"`
+	Message string `json:"message"`
 }
 
 // SubmitAcceptedResponse 提交受理响应
 type SubmitAcceptedResponse struct {
-	Status    string `json:"status"`
-	RequestID string `json:"request_id"`
+	Status        string `json:"status"`
+	RequestID     string `json:"request_id"`
+	AnswerSheetID string `json:"answersheet_id"`
 }
 
-// SubmitStatusResponse 提交状态响应
-type SubmitStatusResponse struct {
-	Status        string `json:"status"`
-	AnswerSheetID string `json:"answersheet_id,omitempty"`
-	// AssessmentID 与 AnswerSheetID 共同构成 status=done 的完成不变量。
-	AssessmentID string `json:"assessment_id,omitempty"`
-	UpdatedAt    int64  `json:"updated_at"`
+// AssessmentReadinessResponse describes whether the asynchronous worker has
+// created the Assessment corresponding to a durably accepted AnswerSheet.
+type AssessmentReadinessResponse struct {
+	Status          string `json:"status"`
+	AnswerSheetID   string `json:"answersheet_id"`
+	AssessmentID    string `json:"assessment_id,omitempty"`
+	NextPollAfterMs int    `json:"next_poll_after_ms,omitempty"`
 }
 
 // GetAnswerSheetRequest 获取答卷请求

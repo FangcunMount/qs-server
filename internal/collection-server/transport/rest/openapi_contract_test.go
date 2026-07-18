@@ -16,7 +16,7 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
 	assertOpenAPIOperation(t, spec, "/answersheets", "post")
-	assertOpenAPIOperation(t, spec, "/answersheets/submit-status", "get")
+	assertOpenAPIOperation(t, spec, "/answersheets/{id}/assessment-readiness", "get")
 	assertOpenAPIOperation(t, spec, "/assessments", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/report", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")

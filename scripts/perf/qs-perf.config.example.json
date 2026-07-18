@@ -177,6 +177,57 @@
         }
       }
     },
+    "reliable_submit_24": {
+      "duration": "10m",
+      "description": "可靠受理稳态验收：仅 AnswerSheet durable submit=24/s",
+      "qps": {
+        "query": 0,
+        "submit": 24,
+        "report": 0,
+        "stats": 0,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "submit": {
+          "preAllocated": 96,
+          "max": 384
+        }
+      }
+    },
+    "reliable_submit_48_burst": {
+      "duration": "2m",
+      "description": "可靠受理突发验收：仅 AnswerSheet durable submit=48/s",
+      "qps": {
+        "query": 0,
+        "submit": 48,
+        "report": 0,
+        "stats": 0,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "submit": {
+          "preAllocated": 160,
+          "max": 512
+        }
+      }
+    },
+    "reliable_submit_96_boundary": {
+      "duration": "5m",
+      "description": "可靠受理准入边界：仅 AnswerSheet durable submit=96/s",
+      "qps": {
+        "query": 0,
+        "submit": 96,
+        "report": 0,
+        "stats": 0,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "submit": {
+          "preAllocated": 256,
+          "max": 768
+        }
+      }
+    },
     "pretest_120_balanced": {
       "duration": "5m",
       "description": "混合降读压：questionnaire 34 + submit 19 + report 26 + stats 13（总 92QPS）",
@@ -1216,7 +1267,7 @@
     ],
     "statisticsContentBatch": "/api/v1/statistics/contents/batch",
     "submit": "/api/v1/answersheets",
-    "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
+    "assessmentReadiness": "/api/v1/answersheets/{answersheet_id}/assessment-readiness?testee_id={testee_id}",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "reportEvents": "/api/v1/report-events",
     "typologySession": "/api/v1/typology-assessment-sessions",

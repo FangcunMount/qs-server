@@ -5,7 +5,6 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 )
 
 // FactorScoreOutput 因子得分输出
@@ -378,7 +377,7 @@ func (c *ParticipantReportClient) GetAssessmentReport(ctx context.Context, teste
 	return convertAssessmentReport(resp.GetReport()), nil
 }
 
-// ResolveAssessmentByAnswerSheetID resolves ownership keys for a legacy answer-sheet lookup RPC.
+// ResolveAssessmentByAnswerSheetID resolves the asynchronous Assessment for the readiness contract.
 type AssessmentIntakeClient struct {
 	client       *Client
 	intakeClient pb.AssessmentIntakeServiceClient
@@ -398,16 +397,6 @@ func (c *AssessmentIntakeClient) ResolveAssessmentByAnswerSheetID(ctx context.Co
 		return 0, 0, err
 	}
 	return resp.GetTesteeId(), resp.GetAssessmentId(), nil
-}
-
-func (c *AssessmentIntakeClient) EnsureAssessment(ctx context.Context, input answersheet.EnsureAssessmentInput) (uint64, error) {
-	ctx, cancel := c.client.ContextWithTimeout(ctx)
-	defer cancel()
-	resp, err := c.intakeClient.EnsureAssessment(ctx, &pb.EnsureAssessmentRequest{OrgId: input.OrgID, AnswerSheetId: input.AnswerSheetID, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, TesteeId: input.TesteeID, FillerId: input.FillerID, TaskId: input.TaskID})
-	if err != nil {
-		return 0, err
-	}
-	return resp.GetAssessmentId(), nil
 }
 
 func convertAssessmentDetail(assessment *pb.AssessmentDetail) *AssessmentDetailOutput {

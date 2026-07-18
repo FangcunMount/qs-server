@@ -330,7 +330,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.SubmitUserBurst,
 			answerSheetHandler.Submit,
 		)...)
-		answersheets.GET("/submit-status", r.rateLimitedQueryHandlers(
+		answersheets.GET("/:id/assessment-readiness", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -338,7 +338,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			answerSheetHandler.SubmitStatus,
+			answerSheetHandler.AssessmentReadiness,
 		)...)
 		answersheets.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),

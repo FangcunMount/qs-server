@@ -29,8 +29,21 @@ definitions:
       writer_name:
         type: string
     type: object
+  answersheet.AssessmentReadinessResponse:
+    properties:
+      answersheet_id:
+        type: string
+      assessment_id:
+        type: string
+      next_poll_after_ms:
+        type: integer
+      status:
+        type: string
+    type: object
   answersheet.SubmitAcceptedResponse:
     properties:
+      answersheet_id:
+        type: string
       request_id:
         type: string
       status:
@@ -43,6 +56,8 @@ definitions:
           $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer'
         type: array
       idempotency_key:
+        maxLength: 128
+        minLength: 8
         type: string
       questionnaire_code:
         type: string
@@ -60,21 +75,10 @@ definitions:
         type: string
     required:
     - answers
+    - idempotency_key
     - questionnaire_code
     - questionnaire_version
     - testee_id
-    type: object
-  answersheet.SubmitStatusResponse:
-    properties:
-      answersheet_id:
-        type: string
-      assessment_id:
-        description: AssessmentID 与 AnswerSheetID 共同构成 status=done 的完成不变量。
-        type: string
-      status:
-        type: string
-      updated_at:
-        type: integer
     type: object
   behaviorassessment.AssessmentDetailResponse:
     properties:
@@ -328,7 +332,7 @@ definitions:
   evaluation.AssessmentSummaryResponse:
     properties:
       answer_sheet_id:
-        description: 关联答卷 ID；提交后可用其与 answersheet_id 匹配取得 assessment_id（R121 后推荐方式）。
+        description: 关联答卷 ID；仅用于测评摘要展示与历史追溯。新提交通过 assessment-readiness 取得 assessment_id。
         type: string
       created_at:
         type: string
@@ -1314,9 +1318,7 @@ definitions:
     type: object
   typologysession.SessionEndpointsResponse:
     properties:
-      assessment_by_answer_sheet:
-        description: 已下线（R121）端点 URL 模板，勿调用。assessment_id 请用 GET /typology-assessments
-          列表按 answer_sheet_id 匹配。
+      assessment_readiness:
         type: string
       report:
         type: string
@@ -1413,12 +1415,20 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "429":
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
@@ -1468,14 +1478,18 @@ paths:
       summary: 获取答卷详情
       tags:
       - 答卷
-  /api/v1/answersheets/submit-status:
+  /api/v1/answersheets/{id}/assessment-readiness:
     get:
-      description: 根据 request_id 查询提交处理状态。status=done 时返回 answersheet_id；异步测评落库后附带
-        assessment_id（人格/医学通用），未就绪可继续轮询。
+      description: 校验答卷归属与 ProfileLink 后，返回 pending 或 ready。
       parameters:
-      - description: 请求ID
+      - description: 答卷ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
         in: query
-        name: request_id
+        name: testee_id
         required: true
         type: string
       produces:
@@ -1488,27 +1502,27 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/answersheet.SubmitStatusResponse'
+                  $ref: '#/definitions/answersheet.AssessmentReadinessResponse'
               type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/core.ErrResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:
       - BearerAuth: []
-      summary: 查询提交状态
+      summary: 查询测评就绪状态
       tags:
       - 答卷
   /api/v1/assessment-models:
@@ -2528,9 +2542,9 @@ paths:
       consumes:
       - application/json
       description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session
-        → POST /answersheets → GET /answersheets/submit-status → GET /typology-assessments（按
-        answer_sheet_id 取 assessment_id）→ GET .../report-status（或 WSS /report-events，subscribe.kind=personality）→
-        GET .../report。模型目录 kind/product_channel 为 typology；报告 model.kind 仍为 personality。
+        → POST /answersheets → GET /answersheets/{id}/assessment-readiness → GET .../report-status（或
+        WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录 kind/product_channel
+        为 typology；报告 model.kind 仍为 personality。
       parameters:
       - description: 开始会话请求
         in: body
@@ -2567,8 +2581,7 @@ paths:
       - 类型学测评
   /api/v1/typology-assessments:
     get:
-      description: 返回受试者人格测评列表。提交答卷后可用 items[].answer_sheet_id 与 submit-status 返回的
-        answersheet_id 匹配，取得 assessment_id（id 字段）。R121 后不再支持按答卷反查测评。
+      description: 返回受试者人格测评列表。提交答卷后使用 answersheet assessment-readiness 取得 assessment_id；本列表用于历史测评浏览。
       parameters:
       - description: 受试者ID（建议字符串）
         in: query

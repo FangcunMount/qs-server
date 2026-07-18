@@ -62,7 +62,7 @@ func TestRunCollectionLifecycleRunsInExpectedOrder(t *testing.T) {
 		},
 	})
 
-	want := []string{"grpc", "database", "authz", "iam", "container", "http"}
+	want := []string{"http", "grpc", "database", "authz", "iam", "container"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("lifecycle order = %#v, want %#v", order, want)
 	}

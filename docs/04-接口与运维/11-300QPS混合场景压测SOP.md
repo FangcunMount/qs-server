@@ -65,7 +65,7 @@ smoke_4
 
 | 能力   | 覆盖场景                                                             | 主要指标                                                  |
 | ---- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| 前台读写 | catalog/query、answersheet submit、report status/events、statistics | `http_req_failed`、场景 p95、submit 202、report success    |
+| 前台读写 | catalog/query、answersheet submit、report status/events、statistics | `http_req_failed`、场景 p95、submit `202 + accepted + answersheet_id`、report success |
 | 异步链路 | `chain_probe` 从提交到报告可用                                           | `chain_probe_failed`、submit-to-report SLA             |
 | 后台排水 | Mongo/MySQL outbox、NSQ、worker、report 生成                          | outbox pending/publishing/failed、oldest age、worker 消费 |
 
@@ -79,7 +79,7 @@ smoke_4
 | ----------- | ------------------------------------------------------- |
 | HTTP 全局     | `http_req_failed < 1%`                                  |
 | checks      | `checks > 99%`                                          |
-| submit      | `answer_submit_success_rate > 99%`，状态码 202              |
+| submit      | `answer_submit_success_rate > 99%`，必须同时满足 202、`status=accepted`、`answersheet_id` 非空 |
 | report      | `report_status_success_rate > 99%`；WS 101 连接成功也计入该 rate |
 | chain probe | `chain_probe_failed < 3`，高档目标为 0                        |
 | query 延迟    | 攻关档 query p95 目标 < 500ms；边际档可结合 failed 与尖刺判断            |
@@ -165,6 +165,9 @@ make perf-verify
 | `smoke_4`                      | 30s | 默认          | query 1 / submit 1 / report 1 / stats 1                                                                                     | `make perf-smoke`                       |
 | `pretest_60`                   | 3m  | 默认          | query 25 / submit 10 / report 19 / stats 6                                                                                  | `make perf-pretest60`                   |
 | `pretest_120`                  | 5m  | 默认          | query 51 / submit 19 / report 38 / stats 12                                                                                 | `make perf-pretest120`                  |
+| `reliable_submit_24`           | 10m | 默认          | 可靠受理稳态 submit 24/s                                                                                                 | `make perf-reliable-submit24`           |
+| `reliable_submit_48_burst`     | 2m  | 默认          | 可靠受理突发 submit 48/s                                                                                                 | `make perf-reliable-submit48-burst`     |
+| `reliable_submit_96_boundary`  | 5m  | 默认          | Submit Gate 96/s 准入边界                                                                                                    | `make perf-reliable-submit96-boundary`  |
 | `mixed_140`                    | 5m  | 默认          | query 58 / submit 24 / report 44 / stats 14                                                                                 | `make perf-mixed140`                    |
 | `mixed_160`                    | 5m  | 默认          | query 68 / submit 24 / report 52 / stats 16                                                                                 | `make perf-mixed160`                    |
 | `mixed_180`                    | 5m  | 默认          | query 80 / submit 24 / report 58 / stats 18                                                                                 | `make perf-mixed180`                    |
@@ -297,11 +300,26 @@ http_401_total / http_403_total / http_429_total / http_5xx_total
 各场景 p95 / max / dropped_iterations / vus_max
 ```
 
+可靠受理专项还必须观测：
+
+```text
+qs_collection_answersheet_submit_total
+qs_collection_answersheet_submit_stage_duration_seconds{stage="preflight|identity|profile_link|grpc_save|total"}
+qs_collection_submit_gate_reject_total
+qs_resilience_decision_total{scope="answersheet_submit",outcome="degraded_open"}
+qs_apiserver_answersheet_durable_submit_total
+qs_apiserver_answersheet_durable_stage_duration_seconds{stage="mongo_transaction|outbox_stage"}
+qs_collection_submit_to_assessment_ready_seconds
+qs_event_outbox_oldest_age_seconds
+```
+
+指标标签不得包含 request/idempotency/answersheet/assessment/testee 等业务 ID。这些 ID 只出现在结构化日志中。
+
 推荐判读顺序：
 
 1. `http_401_total`：token 过期或无效。
 2. `http_403_total`：鉴权/权限/租户问题。
-3. `http_429_total`：rate limit、submit queue、保护策略。
+3. `http_429_total`：rate limit 或 Submit Gate 50ms 拒绝；无进程内 submit queue。
 4. `http_5xx_total`：Nginx 或应用异常。
 5. timeout / EOF：排队、VU 螺旋、上游连接或下游耗尽。
 6. `chain_probe_failed`：异步 SLA 不达标，单独查 outbox/worker/report 生成。
@@ -392,7 +410,7 @@ Nginx 判断：
 | report WS 失败 / EOF                          | report-events 未开启或代理异常     | 查 `report_events.enabled=true`、Nginx WS 代理、`paths.reportEvents`          |
 | `mixed_300` failed 约 45%，`vus_max` 接近 2000  | 未同步旧 VU 配置                 | 作废跑次，执行 `make perf-sync-vusers` 后重跑                                      |
 | catalog 503，非 429                           | query semaphore Try reject | 查 `max-query-concurrency`、query p95、dropped iterations；不要按 rate limit 处理 |
-| submit 429                                  | submit 队列/保护策略             | 降 submit 到 24/s，跑 submit-only 诊断                                         |
+| submit 429                                  | Submit Gate / 入口限流             | 降 submit 到 24/s，跑 reliable-submit 专项诊断                                  |
 | query 30s timeout                           | 下游排队或 VU 螺旋                | 查 L1 命中、apiserver gRPC、Mongo/MySQL、VU max                                |
 | stats timeout                               | statistics 读模型或缓存击穿        | 跑 `stats_isolate_29` 和 `mixed_300_http_query_nostats`                    |
 | outbox oldest age > 3min                    | 后台排水不足                     | 跑 `perf-outbox120`，查 relay publish/mark 日志                               |

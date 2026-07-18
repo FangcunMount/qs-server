@@ -39,7 +39,7 @@ func NewTypologyAssessmentHandler(
 
 // List lists typology assessments for a testee.
 // @Summary 查询类型学测评列表
-// @Description 返回受试者人格测评列表。提交答卷后可用 items[].answer_sheet_id 与 submit-status 返回的 answersheet_id 匹配，取得 assessment_id（id 字段）。R121 后不再支持按答卷反查测评。
+// @Description 返回受试者人格测评列表。提交答卷后使用 answersheet assessment-readiness 取得 assessment_id；本列表用于历史测评浏览。
 // @Tags 类型学测评
 // @Produce json
 // @Param testee_id query string true "受试者ID（建议字符串）"

@@ -12,7 +12,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
@@ -85,9 +85,6 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			assertRenewalMode(t, name, opts.LockLease)
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
-			}
-			if opts.SubmitQueue == nil || opts.SubmitQueue.QueueSize <= 0 || opts.SubmitQueue.WorkerCount <= 0 {
-				t.Fatal("collection submit queue config must define positive queue size and worker count")
 			}
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("collection IAM service auth config must be traceable")

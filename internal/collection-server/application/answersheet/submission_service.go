@@ -2,43 +2,23 @@ package answersheet
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	collectionquestionnaire "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-type EnsureAssessmentInput struct {
-	OrgID                uint64
-	AnswerSheetID        uint64
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	TesteeID             uint64
-	FillerID             uint64
-	TaskID               string
-}
-
-// SubmitAssessmentIntake synchronously advances accepted submission work to a durable Assessment.
-type SubmitAssessmentIntake interface {
-	EnsureAssessment(ctx context.Context, input EnsureAssessmentInput) (assessmentID uint64, err error)
+// AssessmentResolver reads the asynchronous Assessment created by the worker.
+type AssessmentResolver interface {
 	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
-}
-
-// IdempotencyGuard protects cross-instance submit idempotency for the same request key.
-type IdempotencyGuard interface {
-	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *locklease.Lease, acquired bool, err error)
-	Complete(ctx context.Context, key string, lease *locklease.Lease, answerSheetID string) error
-	Abort(ctx context.Context, key string, lease *locklease.Lease) error
 }
 
 type LeaseIdempotencyGuard interface {
@@ -70,10 +50,10 @@ type SubmissionService struct {
 	profileAccess      *ProfileAccessResolver
 	answerConverter    AnswerConverter
 	committer          *SubmissionCommitter
-	queue              *SubmitQueue
-	submitGuard        IdempotencyGuard
-	assessmentIntake   SubmitAssessmentIntake
+	submitGuard        LeaseIdempotencyGuard
+	assessmentResolver AssessmentResolver
 	questionnaire      submissionQuestionnaireReader
+	acceptTimeout      time.Duration
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -82,12 +62,15 @@ func NewSubmissionService(
 	answerSheetReader AnswerSheetReader,
 	actorClient ActorLookup,
 	profileLinkService profileLinkChecker,
-	queueOptions *options.SubmitQueueOptions,
-	submitGuard IdempotencyGuard,
-	assessmentIntake SubmitAssessmentIntake,
+	submitGuard LeaseIdempotencyGuard,
+	assessmentResolver AssessmentResolver,
 	questionnaire submissionQuestionnaireReader,
+	acceptTimeout time.Duration,
 ) *SubmissionService {
-	service := &SubmissionService{
+	if acceptTimeout <= 0 {
+		acceptTimeout = 2 * time.Second
+	}
+	return &SubmissionService{
 		answerSheetWriter:  answerSheetWriter,
 		answerSheetReader:  answerSheetReader,
 		actorClient:        actorClient,
@@ -96,43 +79,24 @@ func NewSubmissionService(
 		answerConverter:    AnswerConverter{},
 		committer:          NewSubmissionCommitter(answerSheetWriter),
 		submitGuard:        submitGuard,
-		assessmentIntake:   assessmentIntake,
+		assessmentResolver: assessmentResolver,
 		questionnaire:      questionnaire,
+		acceptTimeout:      acceptTimeout,
 	}
-
-	if queueOptions == nil {
-		queueOptions = options.NewSubmitQueueOptions()
-	}
-	service.queue = NewSubmitQueue(
-		queueOptions.WorkerCount,
-		queueOptions.QueueSize,
-		service.submitWithGuard,
-	)
-
-	return service
 }
 
-// Submit 提交答卷
-// writerID 来自认证中间件解析的当前用户
-func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
-	return s.submitWithGuard(ctx, requestKey("", req), writerID, req)
+var safeIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$`)
+
+func observeSubmitStage(stage, outcome string, started time.Time) {
+	resilience.ObserveAnswerSheetSubmitStage(stage, outcome, time.Since(started))
 }
 
-// SubmitQueued 提交答卷（固定走排队受理）
-func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) error {
-	if s.queue == nil {
-		return fmt.Errorf("submit queue not initialized")
-	}
-	if err := s.validateBeforeQueue(ctx, req); err != nil {
-		return err
-	}
-
-	return s.queue.Enqueue(ctx, requestID, writerID, req)
-}
-
-func (s *SubmissionService) validateBeforeQueue(ctx context.Context, req *SubmitAnswerSheetRequest) error {
+func (s *SubmissionService) validateBeforeAccept(ctx context.Context, req *SubmitAnswerSheetRequest) error {
 	if req == nil {
 		return status.Error(codes.InvalidArgument, "answersheet request is required")
+	}
+	if !safeIdempotencyKey.MatchString(req.IdempotencyKey) {
+		return status.Error(codes.InvalidArgument, "idempotency_key must contain 8-128 safe characters")
 	}
 	if s.questionnaire == nil {
 		return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
@@ -189,209 +153,61 @@ func questionnaireSubmissionSpec(qnr *collectionquestionnaire.QuestionnaireRespo
 	return surveyvalidation.Spec{QuestionnaireCode: qnr.Code, QuestionnaireVersion: qnr.Version, Questions: questions}
 }
 
-func requestKey(requestID string, req *SubmitAnswerSheetRequest) string {
-	if req != nil && req.IdempotencyKey != "" {
-		return req.IdempotencyKey
-	}
-	return requestID
-}
-
-func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
-	key := requestKey(requestID, req)
-	l := logger.L(ctx)
-	if key == "" || s.submitGuard == nil {
-		return s.submitSync(ctx, writerID, req)
-	}
-	req = withEffectiveIdempotencyKey(req, key)
-	if leaseGuard, ok := s.submitGuard.(LeaseIdempotencyGuard); ok {
-		return s.submitWithLeaseGuard(ctx, requestID, key, writerID, req, leaseGuard)
-	}
-
-	doneID, lease, acquired, err := s.submitGuard.Begin(ctx, key)
-	if err != nil {
+// AcceptDurably returns only after the apiserver has committed the AnswerSheet,
+// idempotency record and outbox event in one transaction.
+func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+	totalStarted := time.Now()
+	totalOutcome := "rejected"
+	defer func() {
+		observeSubmitStage("total", totalOutcome, totalStarted)
+		resilience.ObserveAnswerSheetSubmitOutcome(totalOutcome)
+	}()
+	ctx, cancel := context.WithTimeout(ctx, s.acceptTimeout)
+	defer cancel()
+	preflightStarted := time.Now()
+	if err := s.validateBeforeAccept(ctx, req); err != nil {
+		observeSubmitStage("preflight", "failed", preflightStarted)
 		return nil, err
 	}
-	if doneID != "" {
-		assessmentID := ""
-		if answerSheetID, parseErr := strconv.ParseUint(doneID, 10, 64); parseErr == nil && s.assessmentIntake != nil {
-			_, id, resolveErr := s.assessmentIntake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
-			if resolveErr != nil {
-				return nil, resolveErr
-			}
-			if id != 0 {
-				assessmentID = strconv.FormatUint(id, 10)
-			}
+	observeSubmitStage("preflight", "ok", preflightStarted)
+	if s.submitGuard == nil {
+		response, err := s.accept(ctx, requestID, writerID, req)
+		if err == nil {
+			totalOutcome = "accepted"
+		} else if status.Code(err) == codes.AlreadyExists {
+			totalOutcome = "conflict"
+		} else if status.Code(err) == codes.Unavailable || status.Code(err) == codes.DeadlineExceeded {
+			totalOutcome = "unavailable"
 		}
-		if assessmentID == "" {
-			return nil, fmt.Errorf("completed answer sheet is missing assessment id")
-		}
-		l.Infow("答卷提交命中幂等结果",
-			"action", "submit_answersheet",
-			"request_id", requestID,
-			"idempotency_key", key,
-			"answersheet_id", doneID,
-			"assessment_id", assessmentID,
-			"result", "idempotent_hit",
-		)
-		return &SubmitAnswerSheetResponse{
-			ID:           doneID,
-			AssessmentID: assessmentID,
-			Message:      "already submitted",
-		}, nil
+		return response, err
 	}
-	if !acquired {
-		return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
-	}
-
-	resp, submitErr := s.submitSync(ctx, writerID, req)
-	if submitErr != nil {
-		_ = s.submitGuard.Abort(context.Background(), key, lease)
-		return nil, submitErr
-	}
-	if resp != nil {
-		if s.queue != nil && resp.AssessmentID != "" {
-			s.queue.setAssessmentID(requestID, resp.AssessmentID)
-		}
-		if err := s.submitGuard.Complete(context.Background(), key, lease, resp.ID); err != nil {
-			return nil, err
-		}
-		l.Infow("答卷提交链路已完成受理",
-			"action", "submit_answersheet",
-			"request_id", requestID,
-			"idempotency_key", key,
-			"answersheet_id", resp.ID,
-			"assessment_id", resp.AssessmentID,
-			"result", "success",
-		)
-	}
-	return resp, nil
-}
-
-func (s *SubmissionService) submitWithLeaseGuard(
-	ctx context.Context,
-	requestID string,
-	key string,
-	writerID uint64,
-	req *SubmitAnswerSheetRequest,
-	guard LeaseIdempotencyGuard,
-) (*SubmitAnswerSheetResponse, error) {
 	var response *SubmitAnswerSheetResponse
-	doneID, acquired, err := guard.Run(ctx, key, func(runCtx context.Context) (string, error) {
-		var submitErr error
-		response, submitErr = s.submitSync(runCtx, writerID, req)
-		if submitErr != nil || response == nil {
-			return "", submitErr
+	guardKey := strconv.FormatUint(writerID, 10) + ":" + req.IdempotencyKey
+	_, acquired, err := s.submitGuard.Run(ctx, guardKey, func(runCtx context.Context) (string, error) {
+		var acceptErr error
+		response, acceptErr = s.accept(runCtx, requestID, writerID, req)
+		if acceptErr != nil || response == nil {
+			return "", acceptErr
 		}
 		return response.ID, nil
 	})
-	if errors.Is(err, locklease.ErrLeaseLost) || errors.Is(err, locklease.ErrLeaseRenewFailed) {
-		return nil, retryableLeaseFailure{cause: err}
-	}
 	if err != nil {
+		if status.Code(err) == codes.AlreadyExists {
+			totalOutcome = "conflict"
+		} else if status.Code(err) == codes.Unavailable || status.Code(err) == codes.DeadlineExceeded {
+			totalOutcome = "unavailable"
+		}
 		return nil, err
 	}
 	if !acquired {
-		if doneID == "" {
-			return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
-		}
-		return s.completedSubmitResponse(ctx, requestID, key, doneID)
+		totalOutcome = "busy"
+		return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
 	}
-	if response != nil {
-		if s.queue != nil && response.AssessmentID != "" {
-			s.queue.setAssessmentID(requestID, response.AssessmentID)
-		}
-		logger.L(ctx).Infow("答卷提交链路已完成受理",
-			"action", "submit_answersheet",
-			"request_id", requestID,
-			"idempotency_key", key,
-			"answersheet_id", response.ID,
-			"assessment_id", response.AssessmentID,
-			"result", "success",
-		)
-	}
+	totalOutcome = "accepted"
 	return response, nil
 }
 
-type retryableLeaseFailure struct{ cause error }
-
-func (e retryableLeaseFailure) Error() string {
-	return "submit lease was lost; retry with the same idempotency key: " + e.cause.Error()
-}
-
-func (e retryableLeaseFailure) Unwrap() error { return e.cause }
-
-func (e retryableLeaseFailure) GRPCStatus() *status.Status {
-	return status.New(codes.Unavailable, "submit lease was lost; retry with the same idempotency key")
-}
-
-func (s *SubmissionService) completedSubmitResponse(ctx context.Context, requestID, key, doneID string) (*SubmitAnswerSheetResponse, error) {
-	assessmentID := ""
-	if answerSheetID, parseErr := strconv.ParseUint(doneID, 10, 64); parseErr == nil && s.assessmentIntake != nil {
-		_, id, resolveErr := s.assessmentIntake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
-		if resolveErr != nil {
-			return nil, resolveErr
-		}
-		if id != 0 {
-			assessmentID = strconv.FormatUint(id, 10)
-		}
-	}
-	if assessmentID == "" {
-		return nil, fmt.Errorf("completed answer sheet is missing assessment id")
-	}
-	logger.L(ctx).Infow("答卷提交命中幂等结果",
-		"action", "submit_answersheet",
-		"request_id", requestID,
-		"idempotency_key", key,
-		"answersheet_id", doneID,
-		"assessment_id", assessmentID,
-		"result", "idempotent_hit",
-	)
-	return &SubmitAnswerSheetResponse{ID: doneID, AssessmentID: assessmentID, Message: "already submitted"}, nil
-}
-
-func withEffectiveIdempotencyKey(req *SubmitAnswerSheetRequest, key string) *SubmitAnswerSheetRequest {
-	if req == nil || key == "" || req.IdempotencyKey == key {
-		return req
-	}
-	cloned := *req
-	cloned.IdempotencyKey = key
-	return &cloned
-}
-
-// GetSubmitStatus 获取提交状态。done 必须已经同时持久化两个 ID。
-func (s *SubmissionService) GetSubmitStatus(ctx context.Context, requestID string) (*SubmitStatusResponse, bool) {
-	if s.queue == nil {
-		return nil, false
-	}
-
-	status, ok := s.queue.GetStatus(requestID)
-	if !ok {
-		return nil, false
-	}
-	return &status, true
-}
-
-func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilience.QueueSnapshot {
-	if s == nil || s.queue == nil {
-		return resilience.QueueSnapshot{
-			GeneratedAt:       now,
-			Component:         "collection-server",
-			Name:              "answersheet_submit",
-			Strategy:          "memory_channel",
-			LifecycleBoundary: "process_memory_no_drain",
-		}
-	}
-	return s.queue.StatusSnapshot(now)
-}
-
-func (s *SubmissionService) SubmitQueueController() *SubmitQueue {
-	if s == nil {
-		return nil
-	}
-	return s.queue
-}
-
-func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+func (s *SubmissionService) accept(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -407,15 +223,21 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	)
 
 	// 1. 校验填写人认证
+	identityStarted := time.Now()
 	if err := s.validateWriter(ctx, writerID); err != nil {
+		observeSubmitStage("identity", "failed", identityStarted)
 		return nil, err
 	}
+	observeSubmitStage("identity", "ok", identityStarted)
 
 	// 2. 校验 active ProfileLink 权限，并获取 testee 信息（用于获取 OrgID）
+	profileLinkStarted := time.Now()
 	testee, resolvedTesteeID, err := s.profileAccess.Resolve(ctx, writerID, req.TesteeID)
 	if err != nil {
+		observeSubmitStage("profile_link", "failed", profileLinkStarted)
 		return nil, err
 	}
+	observeSubmitStage("profile_link", "ok", profileLinkStarted)
 
 	answers := s.answerConverter.Convert(req.Answers)
 
@@ -424,52 +246,97 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	if testee != nil {
 		orgID = testee.OrgID
 	}
+	grpcSaveStarted := time.Now()
 	result, err := s.committer.Save(ctx, writerID, orgID, resolvedTesteeID, req, answers)
 	if err != nil {
+		observeSubmitStage("grpc_save", "failed", grpcSaveStarted)
 		return nil, err
 	}
-	l.Infow("答卷已持久化，开始确保测评",
-		"action", "submit_answersheet",
-		"answersheet_id", result.ID,
-		"org_id", orgID,
-		"testee_id", resolvedTesteeID,
-		"questionnaire_code", req.QuestionnaireCode,
-	)
-
-	if s.assessmentIntake == nil {
-		return nil, fmt.Errorf("assessment intake not configured")
+	if result == nil || result.ID == 0 {
+		observeSubmitStage("grpc_save", "failed", grpcSaveStarted)
+		return nil, status.Error(codes.Unavailable, "answer sheet durable save returned no result")
 	}
-	assessmentID, err := s.assessmentIntake.EnsureAssessment(ctx, EnsureAssessmentInput{
-		OrgID: orgID, AnswerSheetID: result.ID, QuestionnaireCode: req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion, TesteeID: resolvedTesteeID,
-		FillerID: writerID, TaskID: req.TaskID,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if assessmentID == 0 {
-		return nil, fmt.Errorf("assessment intake returned empty assessment id")
-	}
-	l.Infow("测评已确保，等待评估事件处理",
-		"action", "submit_answersheet",
-		"answersheet_id", result.ID,
-		"assessment_id", assessmentID,
-		"org_id", orgID,
-		"testee_id", resolvedTesteeID,
-	)
-
-	// 5. 记录成功日志
+	observeSubmitStage("grpc_save", "ok", grpcSaveStarted)
 	duration := time.Since(startTime)
-	l.Infow("提交答卷成功", "action", "submit_answersheet", "result", "success",
+	l.Infow("答卷可靠受理成功", "action", "submit_answersheet", "result", "accepted",
+		"request_id", requestID,
+		"idempotency_key", req.IdempotencyKey,
 		"answersheet_id", result.ID,
-		"assessment_id", assessmentID,
 		"duration_ms", duration.Milliseconds(),
 	)
 
 	return &SubmitAnswerSheetResponse{
-		ID:           strconv.FormatUint(result.ID, 10),
-		AssessmentID: strconv.FormatUint(assessmentID, 10),
-		Message:      result.Message,
+		ID:      strconv.FormatUint(result.ID, 10),
+		Message: result.Message,
+	}, nil
+}
+
+func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID, answerSheetID, requestedTesteeID uint64) (response *AssessmentReadinessResponse, returnErr error) {
+	defer func() {
+		readinessStatus := "error"
+		if response != nil && response.Status != "" {
+			readinessStatus = response.Status
+		} else {
+			switch status.Code(returnErr) {
+			case codes.InvalidArgument:
+				readinessStatus = "invalid"
+			case codes.PermissionDenied:
+				readinessStatus = "forbidden"
+			case codes.NotFound:
+				readinessStatus = "not_found"
+			}
+		}
+		resilience.ObserveAssessmentReadiness(readinessStatus)
+	}()
+	if writerID == 0 || requestedTesteeID == 0 {
+		return nil, status.Error(codes.InvalidArgument, "writer_id and testee_id are required")
+	}
+	sheet, err := s.Get(ctx, answerSheetID)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		return nil, status.Error(codes.Unavailable, "answer sheet readiness dependency is unavailable")
+	}
+	if sheet == nil {
+		return nil, status.Error(codes.NotFound, "answer sheet not found")
+	}
+	actualTesteeID, err := strconv.ParseUint(sheet.TesteeID, 10, 64)
+	if err != nil || actualTesteeID == 0 {
+		return nil, status.Error(codes.Unavailable, "answer sheet ownership is unavailable")
+	}
+	if actualTesteeID != requestedTesteeID {
+		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to testee")
+	}
+	if _, resolvedID, err := s.profileAccess.Resolve(ctx, writerID, requestedTesteeID); err != nil {
+		return nil, err
+	} else if resolvedID != actualTesteeID {
+		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to testee")
+	}
+	if s.assessmentResolver == nil {
+		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
+	}
+	resolvedTesteeID, assessmentID, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+	if status.Code(err) == codes.NotFound {
+		logger.L(ctx).Infow("测评尚未就绪", "action", "assessment_readiness", "stage", "assessment_pending",
+			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "pending")
+		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: strconv.FormatUint(answerSheetID, 10), NextPollAfterMs: 2000}, nil
+	}
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
+	}
+	if resolvedTesteeID != actualTesteeID || assessmentID == 0 {
+		return nil, status.Error(codes.Unavailable, "assessment readiness is inconsistent")
+	}
+	if createdAt, parseErr := time.Parse(time.RFC3339Nano, sheet.CreatedAt); parseErr == nil {
+		resilience.ObserveSubmitToAssessmentReady(time.Since(createdAt))
+	}
+	logger.L(ctx).Infow("测评已就绪", "action", "assessment_readiness", "stage", "assessment_ready",
+		"answersheet_id", answerSheetID, "assessment_id", assessmentID, "testee_id", actualTesteeID, "result", "ready")
+	return &AssessmentReadinessResponse{
+		Status:        "ready",
+		AnswerSheetID: strconv.FormatUint(answerSheetID, 10),
+		AssessmentID:  strconv.FormatUint(assessmentID, 10),
 	}, nil
 }
 

@@ -11,6 +11,7 @@ const (
 type AnswerSheetSubmitIdempotencyPO struct {
 	IdempotencyKey       string    `bson:"idempotency_key"`
 	WriterID             uint64    `bson:"writer_id"`
+	Fingerprint          string    `bson:"fingerprint,omitempty"`
 	TesteeID             uint64    `bson:"testee_id"`
 	QuestionnaireCode    string    `bson:"questionnaire_code"`
 	QuestionnaireVersion string    `bson:"questionnaire_version"`

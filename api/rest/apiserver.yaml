@@ -7239,7 +7239,8 @@ paths:
       tags:
       - Statistics
       summary: 批量查询统一内容统计
-      description: 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale 需要 manage_assessment_models，混合请求需要同时具备两项权限
+      description: 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale
+        需要 manage_assessment_models，混合请求需要同时具备两项权限
       operationId: 批量查询统一内容统计
       parameters:
       - type: string
@@ -7271,6 +7272,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '429':
           description: Too Many Requests
           content:
@@ -7279,12 +7286,6 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
           content:
             application/json:
               schema:

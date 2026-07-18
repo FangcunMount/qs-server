@@ -25,7 +25,7 @@ func NewProfileAccessResolver(actorClient ActorLookup, profileLinkService profil
 
 func (r *ProfileAccessResolver) Resolve(ctx context.Context, writerID, testeeID uint64) (*ActorTestee, uint64, error) {
 	if r == nil {
-		return nil, 0, fmt.Errorf("profile access resolver is not configured")
+		return nil, 0, status.Error(codes.Unavailable, "profile access resolver is not configured")
 	}
 	return r.validateProfileAccess(ctx, writerID, testeeID)
 }
@@ -40,7 +40,10 @@ func (r *ProfileAccessResolver) validateProfileAccess(ctx context.Context, write
 			"testee_id", testeeID,
 			"error", err.Error(),
 		)
-		return nil, 0, err
+		if status.Code(err) == codes.NotFound {
+			return nil, 0, err
+		}
+		return nil, 0, status.Error(codes.Unavailable, "查询受试者信息失败")
 	}
 
 	if r.profileLinkService == nil || !r.profileLinkService.IsEnabled() {
@@ -63,6 +66,9 @@ func (r *ProfileAccessResolver) validateProfileAccess(ctx context.Context, write
 }
 
 func (r *ProfileAccessResolver) resolveCanonicalTestee(ctx context.Context, rawTesteeID uint64) (*ActorTestee, uint64, error) {
+	if r.actorClient == nil {
+		return nil, 0, status.Error(codes.Unavailable, "testee lookup is unavailable")
+	}
 	testee, err := r.actorClient.GetTestee(ctx, rawTesteeID)
 	if err == nil {
 		return testee, rawTesteeID, nil
@@ -107,7 +113,7 @@ func (r *ProfileAccessResolver) checkProfileLinkAccess(ctx context.Context, writ
 			"iam_profile_id", iamProfileID,
 			"error", err.Error(),
 		)
-		return fmt.Errorf("校验 ProfileLink 权限失败: %w", err)
+		return status.Error(codes.Unavailable, "校验 ProfileLink 权限失败")
 	}
 
 	if !hasActiveProfileLink {
@@ -119,7 +125,7 @@ func (r *ProfileAccessResolver) checkProfileLinkAccess(ctx context.Context, writ
 			"testee_name", testeeName,
 			"result", "forbidden",
 		)
-		return fmt.Errorf("无权为该受试者提交答卷")
+		return status.Error(codes.PermissionDenied, "无权为该受试者提交答卷")
 	}
 
 	l.Infow("ProfileLink 权限验证通过",
