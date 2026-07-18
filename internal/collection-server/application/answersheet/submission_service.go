@@ -200,8 +200,17 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 		return nil, err
 	}
 	if !acquired {
-		totalOutcome = "busy"
-		return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
+		// The Redis lease is advisory only. Mongo's writer-scoped unique index
+		// and submission fingerprint remain the source of idempotent truth.
+		response, err = s.accept(ctx, requestID, writerID, req)
+		if err != nil {
+			if status.Code(err) == codes.AlreadyExists {
+				totalOutcome = "conflict"
+			} else {
+				totalOutcome = "unavailable"
+			}
+			return nil, err
+		}
 	}
 	totalOutcome = "accepted"
 	return response, nil
@@ -216,6 +225,9 @@ func (s *SubmissionService) accept(ctx context.Context, requestID string, writer
 
 	l.Infow("开始提交答卷",
 		"action", "submit_answersheet",
+		"stage", "accept",
+		"result", "started",
+		"request_id", requestID,
 		"writer_id", writerID,
 		"testee_id", req.TesteeID,
 		"questionnaire_code", req.QuestionnaireCode,
@@ -258,7 +270,7 @@ func (s *SubmissionService) accept(ctx context.Context, requestID string, writer
 	}
 	observeSubmitStage("grpc_save", "ok", grpcSaveStarted)
 	duration := time.Since(startTime)
-	l.Infow("答卷可靠受理成功", "action", "submit_answersheet", "result", "accepted",
+	l.Infow("答卷可靠受理成功", "action", "submit_answersheet", "stage", "accept", "result", "accepted",
 		"request_id", requestID,
 		"idempotency_key", req.IdempotencyKey,
 		"answersheet_id", result.ID,
@@ -328,8 +340,10 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 	if resolvedTesteeID != actualTesteeID || assessmentID == 0 {
 		return nil, status.Error(codes.Unavailable, "assessment readiness is inconsistent")
 	}
-	if createdAt, parseErr := time.Parse(time.RFC3339Nano, sheet.CreatedAt); parseErr == nil {
+	if createdAt, parseErr := parseAnswerSheetCreatedAt(sheet.CreatedAt); parseErr == nil {
 		resilience.ObserveSubmitToAssessmentReady(time.Since(createdAt))
+	} else {
+		resilience.ObserveAssessmentReadiness("invalid_created_at")
 	}
 	logger.L(ctx).Infow("测评已就绪", "action", "assessment_readiness", "stage", "assessment_ready",
 		"answersheet_id", answerSheetID, "assessment_id", assessmentID, "testee_id", actualTesteeID, "result", "ready")
@@ -338,6 +352,13 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 		AnswerSheetID: strconv.FormatUint(answerSheetID, 10),
 		AssessmentID:  strconv.FormatUint(assessmentID, 10),
 	}, nil
+}
+
+func parseAnswerSheetCreatedAt(value string) (time.Time, error) {
+	if createdAt, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return createdAt, nil
+	}
+	return time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
 }
 
 // validateWriter 校验填写人认证

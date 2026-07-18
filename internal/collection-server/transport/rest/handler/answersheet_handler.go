@@ -127,8 +127,8 @@ func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
 		})
 	case codes.ResourceExhausted:
 		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), 1)
-		c.JSON(http.StatusTooManyRequests, core.ErrResponse{
-			Code:    http.StatusTooManyRequests,
+		c.JSON(http.StatusServiceUnavailable, core.ErrResponse{
+			Code:    http.StatusServiceUnavailable,
 			Message: st.Message(),
 		})
 	case codes.Unavailable, codes.DeadlineExceeded, codes.Internal, codes.Unknown:

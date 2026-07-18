@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -126,10 +128,7 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 		basegrpc.RecoveryInterceptor())
 
 	// 2. RequestID（生成请求 ID）
-	interceptorChain = append(interceptorChain,
-		basegrpc.RequestIDInterceptor(
-			basegrpc.WithRequestIDGenerator(RequestIDGenerator()),
-		))
+	interceptorChain = append(interceptorChain, propagatingRequestIDInterceptor())
 
 	// 3. Logging（记录请求日志）
 	interceptorChain = append(interceptorChain,
@@ -180,6 +179,22 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 	}
 
 	return interceptorChain
+}
+
+func propagatingRequestIDInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		requestID := ""
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if values := md.Get("x-request-id"); len(values) > 0 {
+				requestID = values[0]
+			}
+		}
+		if requestID == "" {
+			requestID = RequestIDGenerator()()
+		}
+		ctx = context.WithValue(ctx, basegrpc.RequestIDContextKey, requestID)
+		return handler(ctx, req)
+	}
 }
 
 // loadACLConfig 从配置文件加载 ACL 规则

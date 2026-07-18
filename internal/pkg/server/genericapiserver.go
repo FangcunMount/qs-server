@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -171,19 +172,29 @@ func (s *GenericAPIServer) Run() error {
 
 // Close 关闭 HTTP 服务器
 func (s *GenericAPIServer) Close() {
-	// 创建一个 10 秒的上下文
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownTimeout := s.ShutdownTimeout
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = 10 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	// 关闭 HTTPS 服务器
-	if err := s.secureServer.Shutdown(ctx); err != nil {
-		log.Warnf("Shutdown secure server failed: %s", err.Error())
+	var wg sync.WaitGroup
+	shutdown := func(name string, server *http.Server) {
+		if server == nil {
+			return
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := server.Shutdown(ctx); err != nil {
+				log.Warnf("Shutdown %s server failed: %s", name, err.Error())
+			}
+		}()
 	}
-
-	// 关闭 HTTP 服务器
-	if err := s.insecureServer.Shutdown(ctx); err != nil {
-		log.Warnf("Shutdown insecure server failed: %s", err.Error())
-	}
+	shutdown("secure", s.secureServer)
+	shutdown("insecure", s.insecureServer)
+	wg.Wait()
 }
 
 // ping 检查服务器是否正常运行

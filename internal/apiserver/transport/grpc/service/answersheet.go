@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -89,6 +90,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  questionnaireVer,
 		IdempotencyKey:    req.IdempotencyKey,
+		RequestID:         basegrpc.RequestIDFromContext(ctx),
 		TesteeID:          req.TesteeId, // 受试者ID（传递给测评层）
 		OrgID:             orgID,        // 机构ID（传递给测评层）
 		FillerID:          req.WriterId, // proto 中使用 writer_id
@@ -210,14 +212,16 @@ func (s *AnswerSheetService) toProtoAnswerSheet(result *answersheet.AnswerSheetR
 	}
 
 	return &pb.AnswerSheet{
-		Id:                result.ID,
-		QuestionnaireCode: result.QuestionnaireCode,
-		Title:             result.QuestionnaireTitle,
-		Score:             result.Score,
-		WriterId:          result.FillerID,
-		WriterName:        result.FillerName,
-		Answers:           protoAnswers,
-		CreatedAt:         result.FilledAt.Format("2006-01-02 15:04:05"),
+		Id:                   result.ID,
+		QuestionnaireCode:    result.QuestionnaireCode,
+		QuestionnaireVersion: result.QuestionnaireVer,
+		Title:                result.QuestionnaireTitle,
+		Score:                result.Score,
+		WriterId:             result.FillerID,
+		WriterName:           result.FillerName,
+		TesteeId:             result.TesteeID,
+		Answers:              protoAnswers,
+		CreatedAt:            result.FilledAt.Format("2006-01-02 15:04:05"),
 	}
 }
 

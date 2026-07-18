@@ -2,12 +2,14 @@ package answersheet
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 )
 
 type transactionalSubmissionDurableStore struct {
@@ -47,12 +49,12 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		stagedEvents = events
+		stagedEvents = withSubmissionRequestID(events, meta.RequestID)
 		if len(events) == 0 {
 			return nil
 		}
 		outboxStarted := time.Now()
-		err = s.stager.Stage(txCtx, events...)
+		err = s.stager.Stage(txCtx, stagedEvents...)
 		if err != nil {
 			observeDurableStage("outbox_stage", "failed", outboxStarted)
 			return err
@@ -68,6 +70,9 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 			recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), durableSubmitRecoveryTimeout)
 			existing, lookupErr := s.writer.WaitForCompletedSubmission(recoveryCtx, meta)
 			cancel()
+			if lookupErr != nil && stderrors.Is(lookupErr, submitport.ErrIdempotencyConflict) {
+				return nil, false, lookupErr
+			}
 			if lookupErr == nil && existing != nil {
 				sheet.ClearEvents()
 				return existing, true, nil
@@ -82,4 +87,23 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 
 	sheet.ClearEvents()
 	return sheet, false, nil
+}
+
+func withSubmissionRequestID(events []event.DomainEvent, requestID string) []event.DomainEvent {
+	if requestID == "" || len(events) == 0 {
+		return events
+	}
+	enriched := append([]event.DomainEvent(nil), events...)
+	for index, evt := range enriched {
+		switch submitted := evt.(type) {
+		case domainAnswerSheet.AnswerSheetSubmittedEvent:
+			submitted.Data.RequestID = requestID
+			enriched[index] = submitted
+		case *domainAnswerSheet.AnswerSheetSubmittedEvent:
+			copy := *submitted
+			copy.Data.RequestID = requestID
+			enriched[index] = copy
+		}
+	}
+	return enriched
 }

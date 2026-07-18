@@ -3,14 +3,35 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func TestAnswerSheetServiceMapsOwnershipFieldsToProto(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+		return nil, nil
+	}}, &managementServiceStub{})
+	filledAt := time.Date(2026, 7, 18, 12, 34, 56, 0, time.Local)
+	got := svc.toProtoAnswerSheet(&appanswersheet.AnswerSheetResult{
+		ID: 42, QuestionnaireCode: "Q", QuestionnaireVer: "1.2.3", TesteeID: 77, FilledAt: filledAt,
+	})
+
+	if got.GetQuestionnaireVersion() != "1.2.3" || got.GetTesteeId() != 77 {
+		t.Fatalf("toProtoAnswerSheet() = %#v", got)
+	}
+	if got.GetCreatedAt() != filledAt.Format("2006-01-02 15:04:05") {
+		t.Fatalf("created_at = %q", got.GetCreatedAt())
+	}
+}
 
 type submissionServiceStub struct {
 	submitFunc func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error)
@@ -53,7 +74,8 @@ func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) 
 		},
 	}, &managementServiceStub{})
 
-	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
+	ctx := context.WithValue(context.Background(), basegrpc.RequestIDContextKey, "request-propagated")
+	_, err := svc.SaveAnswerSheet(ctx, &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode:    "QNR-001",
 		QuestionnaireVersion: "1.0.0",
 		IdempotencyKey:       "submit-0001",
@@ -72,6 +94,9 @@ func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) 
 
 	if len(captured.Answers) != 3 {
 		t.Fatalf("expected 3 answers, got %d", len(captured.Answers))
+	}
+	if captured.RequestID != "request-propagated" {
+		t.Fatalf("request ID = %q, want propagated request ID", captured.RequestID)
 	}
 
 	checkboxValue, ok := captured.Answers[1].Value.([]string)

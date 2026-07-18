@@ -47,15 +47,15 @@ func (r *ProfileAccessResolver) validateProfileAccess(ctx context.Context, write
 	}
 
 	if r.profileLinkService == nil || !r.profileLinkService.IsEnabled() {
-		return testee, resolvedTesteeID, nil
+		return nil, 0, status.Error(codes.Unavailable, "profile link authorization is unavailable")
 	}
 
 	if testee.IAMProfileID == "" {
-		l.Warnw("受试者未绑定 IAM Profile，跳过权限校验",
+		l.Warnw("受试者未绑定 IAM Profile，拒绝权限校验",
 			"testee_id", resolvedTesteeID,
 			"testee_name", testee.Name,
 		)
-		return testee, resolvedTesteeID, nil
+		return nil, 0, status.Error(codes.PermissionDenied, "testee is not bound to an IAM profile")
 	}
 
 	if err := r.checkProfileLinkAccess(ctx, writerID, resolvedTesteeID, testee.IAMProfileID, testee.Name); err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -31,6 +32,7 @@ func (r *durableStoreRunnerStub) WithinTransaction(ctx context.Context, fn func(
 type durableStoreWriterStub struct {
 	existing     *domainAnswerSheet.AnswerSheet
 	waitExisting *domainAnswerSheet.AnswerSheet
+	waitErr      error
 	saveEvents   []event.DomainEvent
 	saveErr      error
 	findCalled   bool
@@ -60,7 +62,7 @@ func (w *durableStoreWriterStub) WaitForCompletedSubmission(ctx context.Context,
 	w.waitCtxErr = ctx.Err()
 	w.waitKey = meta.IdempotencyKey
 	w.waitMeta = meta
-	return w.waitExisting, nil
+	return w.waitExisting, w.waitErr
 }
 
 func TestTransactionalSubmissionDurableStoreUnknownCommitRecoversAfterRequestCancellation(t *testing.T) {
@@ -89,6 +91,7 @@ type durableStoreStagerStub struct {
 	called     bool
 	sawTxCtx   bool
 	eventTypes []string
+	events     []event.DomainEvent
 }
 
 type durableStorePostCommitStub struct {
@@ -103,11 +106,31 @@ func (s *durableStorePostCommitStub) AfterCommit(_ context.Context, events []eve
 	}
 }
 
+func TestTransactionalSubmissionDurableStoreEnrichesSubmittedEventRequestID(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	runner := &durableStoreRunnerStub{}
+	writer := &durableStoreWriterStub{saveEvents: sheet.Events()}
+	stager := &durableStoreStagerStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
+
+	if _, _, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{RequestID: "request-123"}); err != nil {
+		t.Fatalf("CreateDurably() error = %v", err)
+	}
+	if len(stager.events) != 1 {
+		t.Fatalf("staged events = %d, want 1", len(stager.events))
+	}
+	submitted, ok := stager.events[0].(domainAnswerSheet.AnswerSheetSubmittedEvent)
+	if !ok || submitted.Data.RequestID != "request-123" {
+		t.Fatalf("staged event = %#v, want propagated request ID", stager.events[0])
+	}
+}
+
 func (s *durableStoreStagerStub) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	s.called = true
 	s.sawTxCtx = ctx.Value(durableStoreTxMarkerKey{}) == "tx"
 	for _, evt := range events {
 		s.eventTypes = append(s.eventTypes, evt.EventType())
+		s.events = append(s.events, evt)
 	}
 	return s.err
 }
@@ -253,6 +276,48 @@ func TestTransactionalSubmissionDurableStoreFailureCanReturnCompletedIdempotentR
 	}
 	if len(sheet.Events()) != 0 {
 		t.Fatalf("events should be cleared when idempotent result is returned")
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreFailurePreservesIdempotencyConflict(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	commitErr := errors.New("duplicate key")
+	runner := &durableStoreRunnerStub{err: commitErr}
+	writer := &durableStoreWriterStub{waitErr: submitport.ErrIdempotencyConflict}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
+
+	_, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{IdempotencyKey: "idem-conflict"})
+	if !errors.Is(err, submitport.ErrIdempotencyConflict) {
+		t.Fatalf("CreateDurably() error = %v, want idempotency conflict", err)
+	}
+	if existed {
+		t.Fatal("conflicting submission must not be reported as an idempotency hit")
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreRecoveryDoesNotAcknowledgeLookupFailures(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		waitErr error
+	}{
+		{name: "timeout", waitErr: context.DeadlineExceeded},
+		{name: "query error", waitErr: errors.New("idempotency lookup failed")},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sheet := newDurableStoreTestSheet(t)
+			commitErr := errors.New("commit result unknown")
+			runner := &durableStoreRunnerStub{err: commitErr}
+			writer := &durableStoreWriterStub{waitErr: testCase.waitErr}
+			store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
+
+			got, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{IdempotencyKey: "idem-recovery-failed"})
+			if got != nil || existed || !errors.Is(err, commitErr) {
+				t.Fatalf("CreateDurably() = (%v, %v, %v), want unacknowledged transaction error", got, existed, err)
+			}
+			if !writer.waitCalled || len(sheet.Events()) == 0 {
+				t.Fatal("failed recovery must be attempted without clearing the pending domain event")
+			}
+		})
 	}
 }
 

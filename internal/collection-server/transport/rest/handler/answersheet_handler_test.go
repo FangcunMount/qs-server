@@ -79,6 +79,22 @@ func TestAnswerSheetHandlerDoesNotReturn202WhenDurableSaveFails(t *testing.T) {
 	}
 }
 
+func TestAnswerSheetHandlerMapsDownstreamCapacityToServiceUnavailable(t *testing.T) {
+	service := &fakeAnswerSheetSubmissionService{accept: func(context.Context, string, uint64, *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error) {
+		return nil, status.Error(codes.ResourceExhausted, "grpc client inflight full")
+	}}
+	handler := NewAnswerSheetHandler(service)
+	recorder, c := newAnswerSheetTestContext(http.MethodPost, "/api/v1/answersheets", `{
+		"questionnaire_code":"qs","questionnaire_version":"v1","idempotency_key":"submit-1234",
+		"testee_id":1,"answers":[{"question_code":"q1","question_type":"Text","value":"answer"}]
+	}`)
+	c.Set(collectionmiddleware.UserIDKey, uint64(99))
+	handler.Submit(c)
+	if recorder.Code != http.StatusServiceUnavailable || recorder.Header().Get("Retry-After") != "1" {
+		t.Fatalf("status=%d retry-after=%q", recorder.Code, recorder.Header().Get("Retry-After"))
+	}
+}
+
 func TestAnswerSheetHandlerMapsIdempotencyConflict(t *testing.T) {
 	service := &fakeAnswerSheetSubmissionService{accept: func(context.Context, string, uint64, *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error) {
 		return nil, status.Error(codes.AlreadyExists, "idempotency conflict")

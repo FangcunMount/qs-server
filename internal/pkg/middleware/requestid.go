@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -14,6 +15,26 @@ const (
 	XRequestIDKey = "X-Request-ID"
 )
 
+type requestIDContextKey struct{}
+
+// WithRequestID stores a request ID in a standard context so infrastructure
+// clients can propagate it beyond Gin.
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, requestIDContextKey{}, requestID)
+}
+
+// RequestIDFromStandardContext returns the request ID stored by RequestID.
+func RequestIDFromStandardContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	requestID, _ := ctx.Value(requestIDContextKey{}).(string)
+	return requestID
+}
+
 // 请求 ID 中间件，将 'X-Request-ID' 注入到每个请求的上下文和请求/响应头中
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -22,9 +43,10 @@ func RequestID() gin.HandlerFunc {
 
 		if rid == "" {
 			rid = uuid.Must(uuid.NewV4(), nil).String()
-			c.Request.Header.Set(XRequestIDKey, rid)
-			c.Set(XRequestIDKey, rid)
 		}
+		c.Request.Header.Set(XRequestIDKey, rid)
+		c.Set(XRequestIDKey, rid)
+		c.Request = c.Request.WithContext(WithRequestID(c.Request.Context(), rid))
 
 		// 设置 XRequestIDKey 头
 		c.Writer.Header().Set(XRequestIDKey, rid)

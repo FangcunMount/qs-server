@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -145,6 +147,9 @@ func (m *Manager) unaryInterceptor(
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) error {
+	if requestID := pkgmiddleware.RequestIDFromStandardContext(ctx); requestID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-request-id", requestID)
+	}
 	// 创建带超时的 context
 	ctx, cancel := m.withTimeout(ctx)
 	if cancel != nil {
@@ -159,7 +164,7 @@ func (m *Manager) unaryInterceptor(
 		release, _, err := strategy.Acquire(ctx)
 		if err != nil {
 			if errors.Is(err, admission.ErrWaitTimeout) {
-				return status.Error(codes.ResourceExhausted, "grpc client inflight limit exceeded")
+				return status.Error(codes.Unavailable, "grpc client inflight limit exceeded")
 			}
 			return err
 		}

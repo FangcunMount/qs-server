@@ -18,6 +18,7 @@ type AnswerSheetResult struct {
 	QuestionnaireTitle string         // 问卷标题
 	FillerID           uint64         // 填写人ID
 	FillerName         string         // 填写人姓名
+	TesteeID           uint64         // 受试者ID
 	FilledAt           time.Time      // 填写时间
 	Score              float64        // 总分
 	Answers            []AnswerResult // 答案列表
@@ -74,6 +75,9 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 		FilledAt:           as.FilledAt(),
 		Score:              as.Score(),
 		Answers:            make([]AnswerResult, 0),
+	}
+	if submissionContext := as.SubmissionContext(); !submissionContext.TesteeID().IsZero() {
+		result.TesteeID = submissionContext.TesteeID().Uint64()
 	}
 
 	// 填写人信息

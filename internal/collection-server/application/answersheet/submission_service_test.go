@@ -19,6 +19,18 @@ func (s submissionActorStub) GetTestee(context.Context, uint64) (*ActorTestee, e
 	return s.testee, nil
 }
 
+type submissionProfileLinkStub struct {
+	enabled bool
+	allowed bool
+	err     error
+}
+
+func (s submissionProfileLinkStub) IsEnabled() bool       { return s.enabled }
+func (submissionProfileLinkStub) GetDefaultOrgID() uint64 { return 9 }
+func (s submissionProfileLinkStub) HasActiveProfileLink(context.Context, string, string) (bool, error) {
+	return s.allowed, s.err
+}
+
 func (submissionActorStub) TesteeExists(context.Context, uint64, uint64) (bool, uint64, error) {
 	return false, 0, nil
 }
@@ -90,12 +102,72 @@ func validSubmitRequest() *SubmitAnswerSheetRequest {
 }
 
 func newAcceptService(writer AnswerSheetWriter, reader AnswerSheetReader, resolver AssessmentResolver) *SubmissionService {
-	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, Name: "testee"}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7", Name: "testee"}}
 	return NewSubmissionService(
-		writer, reader, actor, nil,
+		writer, reader, actor, submissionProfileLinkStub{enabled: true, allowed: true},
 		submissionGuardStub{acquired: true}, resolver,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second,
 	)
+}
+
+func TestAcceptDurablyFailsClosedWhenProfileLinkUnavailable(t *testing.T) {
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(&submissionWriterStub{}, nil, actor, nil, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
+		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+}
+
+func TestAcceptDurablyFailsClosedWhenProfileLinkDisabled(t *testing.T) {
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+		submissionProfileLinkStub{enabled: false, allowed: true}, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
+		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+}
+
+func TestAcceptDurablyRejectsMissingActiveProfileLink(t *testing.T) {
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+		submissionProfileLinkStub{enabled: true, allowed: false}, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("AcceptDurably() error = %v, want PermissionDenied", err)
+	}
+}
+
+func TestAcceptDurablyMapsProfileLinkDependencyErrorToUnavailable(t *testing.T) {
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded}, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
+		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+}
+
+func TestAcceptDurablyRejectsTesteeWithoutIAMProfile(t *testing.T) {
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9}}
+	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+		submissionProfileLinkStub{enabled: true, allowed: true}, nil, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("AcceptDurably() error = %v, want PermissionDenied", err)
+	}
+}
+
+func TestAcceptDurablyFallsThroughAdvisoryLeaseContention(t *testing.T) {
+	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 42}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(writer, nil, actor,
+		submissionProfileLinkStub{enabled: true, allowed: true}, submissionGuardStub{acquired: false}, nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
+	if got, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); err != nil || got == nil || got.ID != "42" {
+		t.Fatalf("AcceptDurably() = (%#v, %v), want durable database result", got, err)
+	}
 }
 
 func TestAcceptDurablyReturnsAnswerSheetOnlyAfterWriterSuccess(t *testing.T) {
@@ -150,13 +222,21 @@ func TestAssessmentReadinessPending(t *testing.T) {
 }
 
 func TestAssessmentReadinessReady(t *testing.T) {
-	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, assessmentID: 99})
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7", CreatedAt: "2026-07-18 12:34:56"}}, assessmentResolverStub{testeeID: 7, assessmentID: 99})
 	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
 	if err != nil {
 		t.Fatalf("GetAssessmentReadiness() error = %v", err)
 	}
 	if got.Status != "ready" || got.AssessmentID != "99" || got.NextPollAfterMs != 0 {
 		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	}
+}
+
+func TestParseAnswerSheetCreatedAtSupportsCurrentAndRFC3339Formats(t *testing.T) {
+	for _, value := range []string{"2026-07-18 12:34:56", "2026-07-18T12:34:56.123456789+08:00"} {
+		if _, err := parseAnswerSheetCreatedAt(value); err != nil {
+			t.Fatalf("parseAnswerSheetCreatedAt(%q) error = %v", value, err)
+		}
 	}
 }
 

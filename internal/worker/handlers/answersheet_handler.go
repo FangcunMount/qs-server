@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"google.golang.org/grpc/metadata"
 )
 
 type answerSheetProcessingGateMode string
@@ -78,9 +79,21 @@ func handleAnswerSheetSubmittedWithHooks(
 		}
 
 		return gate.Run(ctx, deps, env.ID, answerSheetID, func(runCtx context.Context) error {
+			if data.RequestID != "" {
+				runCtx = metadata.AppendToOutgoingContext(runCtx, "x-request-id", data.RequestID)
+			}
 			if err := createAssessmentFromAnswerSheet(runCtx, deps, answerSheetID, data); err != nil {
+				deps.Logger.Error("answersheet assessment ensure failed",
+					"action", "answersheet_submitted", "stage", "ensure_assessment", "result", "failed",
+					"error_category", "assessment_intake", "request_id", data.RequestID,
+					"event_id", env.ID, "answersheet_id", data.AnswerSheetID, "error", err.Error(),
+				)
 				return fmt.Errorf("failed to create assessment from answersheet: %w", err)
 			}
+			deps.Logger.Info("answersheet submitted event processed",
+				"action", "answersheet_submitted", "stage", "ensure_assessment", "result", "succeeded",
+				"request_id", data.RequestID, "event_id", env.ID, "answersheet_id", data.AnswerSheetID,
+			)
 			return nil
 		})
 	}
@@ -101,6 +114,9 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, u
 	}
 
 	deps.Logger.Info("received answersheet submitted event",
+		"action", "answersheet_submitted",
+		"stage", "event_received",
+		"result", "accepted",
 		"event_id", env.ID,
 		"answersheet_id", data.AnswerSheetID,
 		"questionnaire_code", data.QuestionnaireCode,
@@ -110,6 +126,7 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, u
 		"filler_id", data.FillerID,
 		"filler_type", data.FillerType,
 		"task_id", data.TaskID,
+		"request_id", data.RequestID,
 		"submitted_at", data.SubmittedAt,
 	)
 	return env, answerSheetID, &data, nil
@@ -321,6 +338,7 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 		return fmt.Errorf("assessment creation failed: empty response")
 	}
 	deps.Logger.Info("assessment ensured from answersheet event",
+		"request_id", data.RequestID,
 		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
 		"assessment_id", assessmentResp.AssessmentId,
 		"created", assessmentResp.Created,

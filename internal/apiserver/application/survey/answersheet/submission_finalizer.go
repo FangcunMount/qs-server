@@ -82,7 +82,8 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 	dto SubmitAnswerSheetDTO,
 	sheet *answersheet.AnswerSheet,
 ) (*answersheet.AnswerSheet, error) {
-	l.Infow("开始保存答卷", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode)
+	l.Infow("开始保存答卷", "action", "submit_answersheet", "stage", "durable_transaction", "result", "started",
+		"resource", "answersheet", "request_id", dto.RequestID, "questionnaire_code", dto.QuestionnaireCode)
 	fingerprint, err := submitport.Fingerprint(sheet)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "计算答卷提交指纹失败")
@@ -91,26 +92,32 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 		IdempotencyKey: dto.IdempotencyKey,
 		WriterID:       dto.FillerID,
 		Fingerprint:    fingerprint,
+		RequestID:      dto.RequestID,
 	})
 	if err != nil {
 		if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
 			observeDurableSubmit("idempotency_conflict")
 			l.Warnw("答卷幂等键与已保存业务内容冲突",
-				"action", "create", "resource", "answersheet", "result", "idempotency_conflict",
+				"action", "submit_answersheet", "stage", "durable_transaction", "result", "idempotency_conflict",
+				"error_category", "idempotency_conflict", "resource", "answersheet", "request_id", dto.RequestID,
 				"writer_id", dto.FillerID, "idempotency_key", dto.IdempotencyKey,
 				"questionnaire_code", dto.QuestionnaireCode, "testee_id", dto.TesteeID,
 			)
 			return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)
 		}
 		observeDurableSubmit("failed")
-		l.Errorw("保存答卷失败", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
+		l.Errorw("保存答卷失败", "action", "submit_answersheet", "stage", "durable_transaction", "result", "failed",
+			"error_category", "dependency_unavailable", "resource", "answersheet", "request_id", dto.RequestID,
+			"questionnaire_code", dto.QuestionnaireCode, "error", err.Error())
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
 	if existing {
 		observeDurableSubmit("idempotency_hit")
 		l.Infow("答卷提交命中业务幂等键，返回已存在答卷",
-			"action", "create",
+			"action", "submit_answersheet",
+			"stage", "durable_transaction",
 			"resource", "answersheet",
+			"request_id", dto.RequestID,
 			"idempotency_key", dto.IdempotencyKey,
 			"answersheet_id", storedSheet.ID().Uint64(),
 			"result", "idempotent_hit",
@@ -118,6 +125,11 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 	}
 	if !existing {
 		observeDurableSubmit("created")
+		l.Infow("答卷可靠事务已提交",
+			"action", "submit_answersheet", "stage", "durable_transaction", "result", "created",
+			"resource", "answersheet", "request_id", dto.RequestID,
+			"answersheet_id", storedSheet.ID().Uint64(), "questionnaire_code", dto.QuestionnaireCode,
+		)
 	}
 	return storedSheet, nil
 }

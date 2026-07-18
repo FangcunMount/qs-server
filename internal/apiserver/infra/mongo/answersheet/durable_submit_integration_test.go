@@ -185,6 +185,40 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 		}
 	}
 	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": concurrentKey}, 1)
+
+	conflictingKey := "integration-idem-conflicting"
+	conflictingSheets := []*domainanswersheet.AnswerSheet{newIntegrationSheet(t, 90010005, "left"), newIntegrationSheet(t, 90010006, "right")}
+	conflictErrs := make(chan error, len(conflictingSheets))
+	for _, candidate := range conflictingSheets {
+		fingerprint, fingerprintErr := submitport.Fingerprint(candidate)
+		if fingerprintErr != nil {
+			t.Fatal(fingerprintErr)
+		}
+		wg.Add(1)
+		go func(candidate *domainanswersheet.AnswerSheet, candidateFingerprint string) {
+			defer wg.Done()
+			_, _, submitErr := store.CreateDurably(ctx, candidate, appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: conflictingKey, Fingerprint: candidateFingerprint})
+			conflictErrs <- submitErr
+		}(candidate, fingerprint)
+	}
+	wg.Wait()
+	close(conflictErrs)
+	var successes, conflicts int
+	for submitErr := range conflictErrs {
+		switch {
+		case submitErr == nil:
+			successes++
+		case errors.Is(submitErr, submitport.ErrIdempotencyConflict):
+			conflicts++
+		default:
+			t.Fatalf("conflicting concurrent durable submit: %v", submitErr)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("conflicting concurrent results: successes=%d conflicts=%d", successes, conflicts)
+	}
+	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": conflictingKey}, 1)
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": bson.M{"$in": []uint64{90010005, 90010006}}}, 1)
 }
 
 func newIntegrationSheet(t *testing.T, id uint64, value string) *domainanswersheet.AnswerSheet {

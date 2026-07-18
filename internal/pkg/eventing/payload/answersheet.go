@@ -12,5 +12,6 @@ type AnswerSheetSubmittedData struct {
 	FillerID             uint64    `json:"filler_id"`
 	FillerType           string    `json:"filler_type"`
 	TaskID               string    `json:"task_id,omitempty"`
+	RequestID            string    `json:"request_id,omitempty"`
 	SubmittedAt          time.Time `json:"submitted_at"`
 }

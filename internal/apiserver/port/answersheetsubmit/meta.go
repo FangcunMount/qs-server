@@ -16,6 +16,7 @@ type DurableSubmitMeta struct {
 	IdempotencyKey string
 	WriterID       uint64
 	Fingerprint    string
+	RequestID      string
 }
 
 // Fingerprint returns a stable fingerprint of the submission's business

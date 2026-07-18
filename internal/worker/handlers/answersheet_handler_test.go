@@ -20,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
+	"google.golang.org/grpc/metadata"
 )
 
 type fakeWorkerInternalClient struct {
@@ -37,14 +38,19 @@ type fakeWorkerInternalClient struct {
 	createMessage                  string
 	ensureCreated                  *bool
 	ensureAutoSubmitted            bool
+	ensureRequestID                string
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
 
 func (f *fakeWorkerInternalClient) EnsureAssessment(
-	_ context.Context,
+	ctx context.Context,
 	_ *evalpb.EnsureAssessmentRequest,
 ) (*evalpb.EnsureAssessmentResponse, error) {
+	md, _ := metadata.FromOutgoingContext(ctx)
+	if values := md.Get("x-request-id"); len(values) > 0 {
+		f.ensureRequestID = values[0]
+	}
 	f.createCalls++
 	f.calls = append(f.calls, "create_assessment")
 	if f.calculateScoreMessage != "" && !f.calculateScoreSuccess {
@@ -199,6 +205,24 @@ func TestHandleAnswerSheetSubmitted_UsesSingleCreateAssessmentCall(t *testing.T)
 	}
 	if client.createCalls != 1 {
 		t.Fatalf("createCalls = %d, want 1", client.createCalls)
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_PropagatesRequestIDToEnsureAssessment(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-request-id"}, true, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error { return nil },
+	})
+
+	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayloadWithRequestID(t, 126, "req-worker-126")); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if client.ensureRequestID != "req-worker-126" {
+		t.Fatalf("EnsureAssessment request ID = %q, want req-worker-126", client.ensureRequestID)
 	}
 }
 
@@ -538,6 +562,10 @@ func newAnswerSheetTestRedisClientWithAddr(t *testing.T, addr string) redis.Univ
 }
 
 func mustBuildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []byte {
+	return mustBuildAnswerSheetSubmittedPayloadWithRequestID(t, answerSheetID, "")
+}
+
+func mustBuildAnswerSheetSubmittedPayloadWithRequestID(t *testing.T, answerSheetID uint64, requestID string) []byte {
 	t.Helper()
 
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
@@ -557,6 +585,7 @@ func mustBuildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []
 			"filler_id":             77,
 			"filler_type":           "testee",
 			"task_id":               "",
+			"request_id":            requestID,
 			"submitted_at":          now,
 		},
 	})
