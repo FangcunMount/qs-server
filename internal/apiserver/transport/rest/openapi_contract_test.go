@@ -77,6 +77,41 @@ func TestApiserverOpenAPIHasExplicitModelAndInterpretationWireSchemas(t *testing
 	}
 }
 
+func TestAdminSubmitOpenAPIExposesOptionalIdempotencyContract(t *testing.T) {
+	t.Parallel()
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/apiserver.yaml")
+	schema, ok := schemas["request.AdminSubmitAnswerSheetRequest"].(map[string]any)
+	if !ok {
+		t.Fatal("missing admin-submit request schema")
+	}
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("admin-submit request schema has no properties")
+	}
+	idempotency, ok := properties["idempotency_key"].(map[string]any)
+	if !ok {
+		t.Fatal("admin-submit request schema missing idempotency_key")
+	}
+	if idempotency["minLength"] != 8 || idempotency["maxLength"] != 128 {
+		t.Fatalf("unexpected idempotency_key bounds: %#v", idempotency)
+	}
+	for _, required := range schema["required"].([]any) {
+		if required == "idempotency_key" {
+			t.Fatal("idempotency_key must remain optional for existing clients")
+		}
+	}
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
+	operation := spec.Paths["/api/v1/answersheets/admin-submit"]["post"].(map[string]any)
+	responses := operation["responses"].(map[string]any)
+	for _, status := range []string{"400", "409", "503"} {
+		if _, ok := responses[status]; !ok {
+			t.Fatalf("admin-submit OpenAPI missing %s response", status)
+		}
+	}
+}
+
 func TestApiserverOpenAPIPreservesRootAndOperationSecurity(t *testing.T) {
 	t.Parallel()
 
