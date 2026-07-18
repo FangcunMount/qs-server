@@ -11,6 +11,7 @@ import (
 
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -210,9 +211,10 @@ func TestAnswerSheetHandlerAdminSubmitSuccess(t *testing.T) {
 	}
 	handler := newAnswerSheetHandlerForTest(&stubAnswerSheetManagementService{}, submission)
 
-	body := bytes.NewReader([]byte(`{"questionnaire_code":"QNR-ADMIN","questionnaire_version":"v1","testee_id":808,"answers":[{"question_code":"q1","question_type":"radio","value":"A"}]}`))
+	body := bytes.NewReader([]byte(`{"questionnaire_code":"QNR-ADMIN","questionnaire_version":"v1","idempotency_key":"seed.plan.admin-1","testee_id":808,"answers":[{"question_code":"q1","question_type":"radio","value":"A"}]}`))
 	c, rec := newHandlerTestContext(http.MethodPost, "/api/v1/answersheets/admin-submit", body)
 	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request = c.Request.WithContext(pkgmiddleware.WithRequestID(c.Request.Context(), "request-admin-1"))
 	c.Set(middleware.OrgIDKey, uint64(88))
 	c.Set(middleware.UserIDKey, uint64(909))
 
@@ -223,6 +225,9 @@ func TestAnswerSheetHandlerAdminSubmitSuccess(t *testing.T) {
 	}
 	if submission.lastSubmitDTO.OrgID != 88 || submission.lastSubmitDTO.FillerID != 909 || submission.lastSubmitDTO.TesteeID != 808 {
 		t.Fatalf("unexpected submit dto: %+v", submission.lastSubmitDTO)
+	}
+	if submission.lastSubmitDTO.IdempotencyKey != "seed.plan.admin-1" || submission.lastSubmitDTO.RequestID != "request-admin-1" {
+		t.Fatalf("unexpected submit identity: %+v", submission.lastSubmitDTO)
 	}
 	if len(submission.lastSubmitDTO.Answers) != 1 || submission.lastSubmitDTO.Answers[0].QuestionCode != "q1" {
 		t.Fatalf("unexpected submit answers: %+v", submission.lastSubmitDTO.Answers)

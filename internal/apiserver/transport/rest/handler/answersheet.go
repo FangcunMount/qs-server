@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -9,9 +11,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/gin-gonic/gin"
 )
+
+var safeAdminAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$`)
 
 // Note: C端提交相关的 API (Submit, GetMyAnswerSheet, ListMyAnswerSheets)
 // 由 gRPC 服务处理，不在此 RESTful Handler 中实现
@@ -110,11 +115,17 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 403 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/answersheets/admin-submit [post]
 func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 	var req request.AdminSubmitAnswerSheetRequest
 	if err := h.BindJSON(c, &req); err != nil {
+		return
+	}
+	if err := validateAdminSubmitIdempotencyKey(req.IdempotencyKey); err != nil {
+		h.Error(c, err)
 		return
 	}
 
@@ -133,7 +144,7 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64"))
 		return
 	}
-	dto := buildAdminSubmitDTO(req, fillerID, orgScope)
+	dto := buildAdminSubmitDTO(req, fillerID, orgScope, pkgmiddleware.RequestIDFromStandardContext(c.Request.Context()))
 
 	result, err := h.submissionService.Submit(c.Request.Context(), dto)
 	if err != nil {
@@ -198,7 +209,18 @@ func (h *AnswerSheetHandler) resolveAdminSubmitFillerID(c *gin.Context, req requ
 	}
 }
 
-func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, orgID uint64) answersheet.SubmitAnswerSheetDTO {
+func validateAdminSubmitIdempotencyKey(raw string) error {
+	key := strings.TrimSpace(raw)
+	if key == "" {
+		return nil
+	}
+	if !safeAdminAnswerSheetIdempotencyKey.MatchString(key) {
+		return errors.WithCode(code.ErrInvalidArgument, "idempotency_key 必须包含 8-128 个安全字符")
+	}
+	return nil
+}
+
+func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, orgID uint64, requestID string) answersheet.SubmitAnswerSheetDTO {
 	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
 	for _, answer := range req.Answers {
 		answers = append(answers, answersheet.AnswerDTO{
@@ -211,6 +233,8 @@ func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, or
 	return answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  req.QuestionnaireVersion,
+		IdempotencyKey:    strings.TrimSpace(req.IdempotencyKey),
+		RequestID:         strings.TrimSpace(requestID),
 		TesteeID:          req.TesteeID,
 		FillerID:          fillerID,
 		OrgID:             orgID,

@@ -212,6 +212,10 @@ func (a *Assessment) ApplyScoringProjectionAt(projection ScoringProjection, eval
 		a.riskLevel = &risk
 	}
 	summary := projection.Summary
+	if projection.Level != "" {
+		level := projection.Level
+		summary.Level = &level
+	}
 	a.summary = &summary
 	a.status = StatusEvaluated
 	a.evaluatedAt = &evaluatedAt

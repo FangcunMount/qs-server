@@ -231,6 +231,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/core.ErrResponse"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
@@ -239,6 +245,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -10445,6 +10457,11 @@ const docTemplate = `{
                 },
                 "filler_id": {
                     "type": "integer"
+                },
+                "idempotency_key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 8
                 },
                 "questionnaire_code": {
                     "type": "string"

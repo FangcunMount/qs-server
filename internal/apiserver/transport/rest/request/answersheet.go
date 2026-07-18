@@ -4,6 +4,7 @@ package request
 type AdminSubmitAnswerSheetRequest struct {
 	QuestionnaireCode    string              `json:"questionnaire_code" binding:"required"`
 	QuestionnaireVersion string              `json:"questionnaire_version"`
+	IdempotencyKey       string              `json:"idempotency_key,omitempty" minLength:"8" maxLength:"128"`
 	Title                string              `json:"title"`
 	TesteeID             uint64              `json:"testee_id" binding:"required"`
 	TaskID               string              `json:"task_id,omitempty"`

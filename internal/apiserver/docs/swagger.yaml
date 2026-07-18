@@ -799,6 +799,10 @@ definitions:
         type: array
       filler_id:
         type: integer
+      idempotency_key:
+        maxLength: 128
+        minLength: 8
+        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -4174,12 +4178,20 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "429":
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 管理员提交答卷

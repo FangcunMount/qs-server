@@ -72,19 +72,38 @@ func TestBuildAdminSubmitDTOPreservesAnswerPayload(t *testing.T) {
 	dto := buildAdminSubmitDTO(request.AdminSubmitAnswerSheetRequest{
 		QuestionnaireCode:    "QNR-002",
 		QuestionnaireVersion: "v2",
+		IdempotencyKey:       "seed.plan.1234",
 		TesteeID:             21,
 		TaskID:               "task-1",
 		Answers: []request.AdminAnswerSubmit{
 			{QuestionCode: "q1", QuestionType: "Radio", Value: "A"},
 			{QuestionCode: "q2", QuestionType: "Number", Value: 12},
 		},
-	}, 31, 41)
+	}, 31, 41, "request-42")
 
 	if dto.FillerID != 31 || dto.OrgID != 41 || dto.TesteeID != 21 {
 		t.Fatalf("unexpected dto identity fields: %+v", dto)
 	}
+	if dto.IdempotencyKey != "seed.plan.1234" || dto.RequestID != "request-42" {
+		t.Fatalf("unexpected submit identity: %+v", dto)
+	}
 	if len(dto.Answers) != 2 || dto.Answers[1].Value != 12 {
 		t.Fatalf("unexpected answers: %+v", dto.Answers)
+	}
+}
+
+func TestValidateAdminSubmitIdempotencyKey(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"", "seed.plan.1234", "abcdefgh"} {
+		if err := validateAdminSubmitIdempotencyKey(key); err != nil {
+			t.Fatalf("validateAdminSubmitIdempotencyKey(%q) returned error: %v", key, err)
+		}
+	}
+	for _, key := range []string{"short", "contains space", "包含中文字符"} {
+		if err := validateAdminSubmitIdempotencyKey(key); err == nil {
+			t.Fatalf("validateAdminSubmitIdempotencyKey(%q) expected error", key)
+		}
 	}
 }
 

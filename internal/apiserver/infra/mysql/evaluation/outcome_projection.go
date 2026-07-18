@@ -59,7 +59,21 @@ func applyLevelFields(po *AssessmentPO, a *assessment.Assessment) {
 		po.Severity = strPtr(evaluationRiskSeverity(*risk))
 		return
 	}
-	if summary := a.ResultSummary(); summary != nil && summary.PrimaryLabel != "" {
+	summary := a.ResultSummary()
+	if summary == nil {
+		return
+	}
+	if summary.Level != nil && *summary.Level != "" {
+		label := summary.PrimaryLabel
+		if label == "" {
+			label = *summary.Level
+		}
+		po.LevelCode = strPtr(*summary.Level)
+		po.LevelLabel = strPtr(label)
+		po.Severity = strPtr("none")
+		return
+	}
+	if summary.PrimaryLabel != "" {
 		po.LevelCode = strPtr(summary.PrimaryLabel)
 		po.LevelLabel = strPtr(summary.PrimaryLabel)
 		po.Severity = strPtr("none")

@@ -65,6 +65,66 @@ func TestApplyAssessmentOutcomeV2FieldsAtEvaluatedState(t *testing.T) {
 	}
 }
 
+func TestApplyAssessmentOutcomeV2FieldsSeparatesBehavioralRatingLevelCodeFromLongLabel(t *testing.T) {
+	t.Parallel()
+
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		modelcatalog.KindBehavioralRating,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmBrief2,
+		meta.ID(0),
+		meta.NewCode("gXkk9W"),
+		"v22",
+		"BRIEF-2",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(2002),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("gXkk9W"), "7.0.1"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(5002)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(103)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+
+	const label = "问卷提示日常执行功能表现的整体水平方面的困难较为明显，可能已影响学习、生活自理、情绪行为和人际适应的整体功能。"
+	if chars := len([]rune(label)); chars <= 50 {
+		t.Fatalf("test label has %d characters, want more than level_code capacity", chars)
+	}
+	legacyLevel := "none"
+	level := "moderate"
+	score := 0.0
+	if err := a.ApplyScoringProjectionAt(assessment.ScoringProjection{
+		ModelRef: modelRef,
+		Summary: assessment.ResultSummary{
+			PrimaryLabel: label,
+			Score:        &score,
+			Level:        &legacyLevel,
+		},
+		Score: &score,
+		Level: level,
+	}, time.Unix(100, 0)); err != nil {
+		t.Fatalf("ApplyScoringProjectionAt returned error: %v", err)
+	}
+
+	po := NewAssessmentMapper().ToPO(a)
+	if po.LevelCode == nil || *po.LevelCode != level {
+		t.Fatalf("level code = %v, want %q", po.LevelCode, level)
+	}
+	if po.LevelLabel == nil || *po.LevelLabel != label {
+		t.Fatalf("level label = %v, want %q", po.LevelLabel, label)
+	}
+	if po.Severity == nil || *po.Severity != "none" {
+		t.Fatalf("severity = %v, want none", po.Severity)
+	}
+}
+
 func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindTypology,

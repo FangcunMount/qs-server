@@ -315,6 +315,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '429':
           description: Too Many Requests
           content:
@@ -323,6 +329,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -10443,6 +10455,10 @@ components:
             $ref: '#/components/schemas/request.AdminAnswerSubmit'
         filler_id:
           type: integer
+        idempotency_key:
+          type: string
+          maxLength: 128
+          minLength: 8
         questionnaire_code:
           type: string
         questionnaire_version:
