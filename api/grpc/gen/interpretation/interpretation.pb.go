@@ -859,18 +859,26 @@ func (x *GenerateReportFromAssessmentRequest) GetOutcomeId() string {
 }
 
 type GenerateReportFromAssessmentResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	Retryable     bool                   `protobuf:"varint,4,opt,name=retryable,proto3" json:"retryable,omitempty"`
-	RunId         string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	FailureKind   string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`
-	GenerationId  string                 `protobuf:"bytes,7,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
-	ReportId      string                 `protobuf:"bytes,8,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
-	FailureCode   string                 `protobuf:"bytes,9,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	Success                    bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Status                     string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Message                    string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	Retryable                  bool                   `protobuf:"varint,4,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	RunId                      string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	FailureKind                string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`
+	GenerationId               string                 `protobuf:"bytes,7,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	ReportId                   string                 `protobuf:"bytes,8,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	FailureCode                string                 `protobuf:"bytes,9,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
+	RetryDisposition           string                 `protobuf:"bytes,10,opt,name=retry_disposition,json=retryDisposition,proto3" json:"retry_disposition,omitempty"`
+	AttemptOrigin              string                 `protobuf:"bytes,11,opt,name=attempt_origin,json=attemptOrigin,proto3" json:"attempt_origin,omitempty"`
+	CurrentAttempt             int32                  `protobuf:"varint,12,opt,name=current_attempt,json=currentAttempt,proto3" json:"current_attempt,omitempty"`
+	MaxAutomaticAttempts       int32                  `protobuf:"varint,13,opt,name=max_automatic_attempts,json=maxAutomaticAttempts,proto3" json:"max_automatic_attempts,omitempty"`
+	RemainingAutomaticAttempts int32                  `protobuf:"varint,14,opt,name=remaining_automatic_attempts,json=remainingAutomaticAttempts,proto3" json:"remaining_automatic_attempts,omitempty"`
+	NextAttemptAt              string                 `protobuf:"bytes,15,opt,name=next_attempt_at,json=nextAttemptAt,proto3" json:"next_attempt_at,omitempty"`
+	RetryEventId               string                 `protobuf:"bytes,16,opt,name=retry_event_id,json=retryEventId,proto3" json:"retry_event_id,omitempty"`
+	ActionRequestId            string                 `protobuf:"bytes,17,opt,name=action_request_id,json=actionRequestId,proto3" json:"action_request_id,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *GenerateReportFromAssessmentResponse) Reset() {
@@ -962,6 +970,62 @@ func (x *GenerateReportFromAssessmentResponse) GetReportId() string {
 func (x *GenerateReportFromAssessmentResponse) GetFailureCode() string {
 	if x != nil {
 		return x.FailureCode
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetRetryDisposition() string {
+	if x != nil {
+		return x.RetryDisposition
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetAttemptOrigin() string {
+	if x != nil {
+		return x.AttemptOrigin
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetCurrentAttempt() int32 {
+	if x != nil {
+		return x.CurrentAttempt
+	}
+	return 0
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetMaxAutomaticAttempts() int32 {
+	if x != nil {
+		return x.MaxAutomaticAttempts
+	}
+	return 0
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetRemainingAutomaticAttempts() int32 {
+	if x != nil {
+		return x.RemainingAutomaticAttempts
+	}
+	return 0
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetNextAttemptAt() string {
+	if x != nil {
+		return x.NextAttemptAt
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetRetryEventId() string {
+	if x != nil {
+		return x.RetryEventId
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetActionRequestId() string {
+	if x != nil {
+		return x.ActionRequestId
 	}
 	return ""
 }
@@ -1062,7 +1126,7 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\xaf\x02\n" +
+	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\x9e\x05\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -1072,7 +1136,16 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\x12#\n" +
 	"\rgeneration_id\x18\a \x01(\tR\fgenerationId\x12\x1b\n" +
 	"\treport_id\x18\b \x01(\tR\breportId\x12!\n" +
-	"\ffailure_code\x18\t \x01(\tR\vfailureCode2\xe8\x01\n" +
+	"\ffailure_code\x18\t \x01(\tR\vfailureCode\x12+\n" +
+	"\x11retry_disposition\x18\n" +
+	" \x01(\tR\x10retryDisposition\x12%\n" +
+	"\x0eattempt_origin\x18\v \x01(\tR\rattemptOrigin\x12'\n" +
+	"\x0fcurrent_attempt\x18\f \x01(\x05R\x0ecurrentAttempt\x124\n" +
+	"\x16max_automatic_attempts\x18\r \x01(\x05R\x14maxAutomaticAttempts\x12@\n" +
+	"\x1cremaining_automatic_attempts\x18\x0e \x01(\x05R\x1aremainingAutomaticAttempts\x12&\n" +
+	"\x0fnext_attempt_at\x18\x0f \x01(\tR\rnextAttemptAt\x12$\n" +
+	"\x0eretry_event_id\x18\x10 \x01(\tR\fretryEventId\x12*\n" +
+	"\x11action_request_id\x18\x11 \x01(\tR\x0factionRequestId2\xe8\x01\n" +
 	"\x18ParticipantReportService\x12n\n" +
 	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12\\\n" +
 	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xad\x01\n" +

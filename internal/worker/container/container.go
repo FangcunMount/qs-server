@@ -161,6 +161,7 @@ func (c *Container) initEventDispatcher() error {
 		LockKeyBuilder:                 c.lockBuilder,
 		Notifier:                       c.buildNotifier(),
 		ReportStatusReporter:           c.reportStatus,
+		DisableAutomaticRetry:          c.opts != nil && c.opts.RetryGovernance != nil && !c.opts.RetryGovernance.AutomaticRetryEnabled,
 	}
 
 	// 创建事件分发器

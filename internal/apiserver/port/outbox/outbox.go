@@ -4,8 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	base "github.com/FangcunMount/component-base/pkg/outbox"
 )
+
+// ScheduledStager stores durable events that must not be claimed before dueAt.
+type ScheduledStager interface {
+	StageAt(ctx context.Context, dueAt time.Time, events ...event.DomainEvent) error
+}
 
 type PendingEvent = base.PendingEvent
 type Store = base.Store

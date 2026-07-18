@@ -3,6 +3,8 @@ package run
 import (
 	"testing"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 func TestNextEvaluationRunIncrementsAttempt(t *testing.T) {
@@ -60,6 +62,26 @@ func TestEvaluationRunFailureRetryable(t *testing.T) {
 	}
 	if !run.Retryable() {
 		t.Fatal("expected retryable failure")
+	}
+	decision := run.RetryDecision()
+	if decision == nil || decision.Disposition != retrygovernance.DispositionAutomatic || decision.MaxAutomaticAttempts != 3 {
+		t.Fatalf("retry decision = %#v", decision)
+	}
+}
+
+func TestEvaluationRunRetryBudgetExhaustion(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	run := NewEvaluationRunWithAttempt(42, 3)
+	if err := run.Start(now); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Fail(now, Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := run.RetryDecision(); got == nil || got.Disposition != retrygovernance.DispositionManualRequired {
+		t.Fatalf("retry decision = %#v, want manual_required", got)
 	}
 }
 
@@ -137,6 +159,40 @@ func TestEvaluationRunRejectsInvalidClaim(t *testing.T) {
 			run := NewEvaluationRun(1)
 			if err := run.Claim(ClaimInput{Token: tc.token, ClaimedAt: now, LeaseExpiresAt: tc.until}); err == nil {
 				t.Fatal("expected invalid claim")
+			}
+		})
+	}
+}
+
+func TestEvaluationRunManualAndForceAuthorizeExactlyOneAttempt(t *testing.T) {
+	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name      string
+		retryable bool
+		origin    retrygovernance.AttemptOrigin
+		want      retrygovernance.Disposition
+	}{{"manual", true, retrygovernance.AttemptOriginManual, retrygovernance.DispositionManualRequired}, {"force", false, retrygovernance.AttemptOriginForce, retrygovernance.DispositionTerminal}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			run := NewEvaluationRunWithAttempt(9, 3)
+			if err := run.Claim(ClaimInput{Token: "owner", ClaimedAt: now.Add(-time.Minute), LeaseExpiresAt: now.Add(time.Minute)}); err != nil {
+				t.Fatal(err)
+			}
+			if err := run.Fail(now, Failure{Kind: FailureKindInternal, Message: "failed", Retryable: test.retryable}); err != nil {
+				t.Fatal(err)
+			}
+			if got := run.RetryDecision().Disposition; got != test.want {
+				t.Fatalf("initial disposition=%s want=%s", got, test.want)
+			}
+			if err := run.AuthorizeOneRetry(test.origin, "request-1", "event-1", now.Add(time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			decision := run.RetryDecision()
+			if decision.Disposition != retrygovernance.DispositionAutomatic || decision.ActionRequestID != "request-1" || decision.RetryEventID != "event-1" || decision.RemainingAutomaticAttempts != 0 {
+				t.Fatalf("authorized decision=%#v", decision)
+			}
+			if err := run.AuthorizeOneRetry(test.origin, "request-2", "event-2", now.Add(2*time.Second)); err == nil {
+				t.Fatal("second authorization unexpectedly succeeded")
 			}
 		})
 	}

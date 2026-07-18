@@ -18,6 +18,10 @@ type EvaluationRequestedData struct {
 	ScaleCode         string    `json:"scale_code,omitempty"`
 	ScaleVersion      string    `json:"scale_version,omitempty"`
 	RequestedAt       time.Time `json:"requested_at"`
+	ExpectedAttempt   int       `json:"expected_attempt,omitempty"`
+	AttemptOrigin     string    `json:"attempt_origin,omitempty"`
+	ActionRequestID   string    `json:"action_request_id,omitempty"`
+	Mode              string    `json:"mode,omitempty"`
 }
 
 // NeedsEvaluation reports whether the assessment should be evaluated.

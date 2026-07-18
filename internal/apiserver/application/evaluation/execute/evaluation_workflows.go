@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -14,7 +15,9 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 // loadedAssessment 加载的评估数据
@@ -188,6 +191,16 @@ func (f evaluationFailureFinalizer) Finalize(
 		return err
 	}
 	eventsToStage := assessmentToCommit.Events()
+	var retryEvent event.DomainEvent
+	var retryAt time.Time
+	if decision := runToCommit.RetryDecision(); decision != nil && decision.Disposition == retrygovernance.DispositionAutomatic && decision.NextAttemptAt != nil {
+		retryAt = *decision.NextAttemptAt
+		retry := assessment.NewEvaluationRetryRequestedEvent(assessmentToCommit, runToCommit.Attempt().Number, retrygovernance.AttemptOriginAutomatic, "", retryAt)
+		if err := runToCommit.AttachRetryEvent(retry.EventID()); err != nil {
+			return err
+		}
+		retryEvent = retry
+	}
 	if err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := f.repo.Save(txCtx, assessmentToCommit); err != nil {
 			return err
@@ -196,7 +209,16 @@ func (f evaluationFailureFinalizer) Finalize(
 			return err
 		}
 		if len(eventsToStage) > 0 {
-			return f.eventStager.Stage(txCtx, eventsToStage...)
+			if err := f.eventStager.Stage(txCtx, eventsToStage...); err != nil {
+				return err
+			}
+		}
+		if retryEvent != nil {
+			scheduled, ok := f.eventStager.(outboxport.ScheduledStager)
+			if !ok {
+				return evalerrors.ModuleNotConfigured("evaluation retry requires scheduled outbox staging")
+			}
+			return scheduled.StageAt(txCtx, retryAt, retryEvent)
 		}
 		return nil
 	}); err != nil {
@@ -211,6 +233,9 @@ func (f evaluationFailureFinalizer) Finalize(
 	*run = runToCommit
 	if f.postCommit != nil && len(eventsToStage) > 0 {
 		f.postCommit.AfterCommit(ctx, eventsToStage, time.Now())
+	}
+	if f.postCommit != nil && retryEvent != nil {
+		f.postCommit.AfterCommit(ctx, []event.DomainEvent{retryEvent}, retryAt)
 	}
 	return nil
 }

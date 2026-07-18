@@ -56,6 +56,15 @@ func TestHandleEvaluateAssessmentResponseRetryableFailedNacks(t *testing.T) {
 	}
 }
 
+func TestHandleEvaluateAssessmentResponseAcksDurablyScheduledFailure(t *testing.T) {
+	err := handleEvaluateAssessmentResponse(&evalpb.ExecuteEvaluationResponse{
+		Status: "failed", Retryable: true, RetryDisposition: "automatic", RetryEventId: "eval-retry:42:1:automatic",
+	})
+	if err != nil {
+		t.Fatalf("durably scheduled failure should ACK: %v", err)
+	}
+}
+
 func TestHandleEvaluateAssessmentResponseRetryableFailure(t *testing.T) {
 	for _, status := range []string{"", "skipped", "processing"} {
 		t.Run(status, func(t *testing.T) {

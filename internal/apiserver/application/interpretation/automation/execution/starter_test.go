@@ -12,6 +12,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type starterTx struct{ calls int }
@@ -201,7 +202,7 @@ func TestStarterReturnsProcessingForActiveLeaseAndRereadsUniqueConflict(t *testi
 	}
 }
 
-func TestStarterClosesStaleRunAndStartsNextAttemptInOneTransaction(t *testing.T) {
+func TestStarterReclaimsExpiredLeaseWithoutCreatingNextAttempt(t *testing.T) {
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	service, generations, runs, tx := newStarterFixture(t, now)
 	generationRecord, staleRun := seedGenerating(t, now.Add(-2*time.Minute), time.Minute)
@@ -212,14 +213,46 @@ func TestStarterClosesStaleRunAndStartsNextAttemptInOneTransaction(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != StartStatusStarted || result.Run.Attempt() != 2 || result.Generation.Status() != domaingeneration.StatusGenerating || result.Generation.LatestRunID() != result.Run.ID() {
+	if result.Status != StartStatusStarted || result.Run.Attempt() != 1 || result.Generation.Status() != domaingeneration.StatusGenerating || result.Generation.LatestRunID() != result.Run.ID() {
 		t.Fatalf("recovery result = %#v", result)
 	}
-	if staleRun.Status() != interpretationrun.StatusFailed || staleRun.Failure() == nil || staleRun.Failure().Code != "lease_expired" {
-		t.Fatalf("stale run not closed = %#v", staleRun)
+	if staleRun.Status() != interpretationrun.StatusRunning || staleRun.Origin() != retrygovernance.AttemptOriginLeaseRecovery || !staleRun.HasActiveLease(now) {
+		t.Fatalf("stale run not reclaimed = %#v", staleRun)
 	}
-	if tx.calls != 1 || runs.saves != 1 || runs.creates != 1 || generationRecord.Version() != 4 {
+	if tx.calls != 1 || runs.saves != 1 || runs.creates != 0 || generationRecord.Version() != 2 {
 		t.Fatalf("recovery writes tx=%d saves=%d creates=%d generation_version=%d", tx.calls, runs.saves, runs.creates, generationRecord.Version())
+	}
+}
+
+func TestStarterDoesNotStartFailedRunBeforeAutomaticRetryIsDue(t *testing.T) {
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	service, generations, runs, tx := newStarterFixture(t, now)
+	generationRecord, failedRun := seedFailed(t, now, 1, true)
+	generations.put(generationRecord)
+	runs.items[failedRun.ID()] = failedRun
+
+	result, err := service.Start(context.Background(), StartRequest{Key: starterKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != StartStatusBlocked || result.Run != failedRun || runs.creates != 0 || tx.calls != 0 {
+		t.Fatalf("blocked result=%#v creates=%d tx=%d", result, runs.creates, tx.calls)
+	}
+}
+
+func TestStarterDoesNotStartManualRequiredRun(t *testing.T) {
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	service, generations, runs, tx := newStarterFixture(t, now.Add(time.Hour))
+	generationRecord, failedRun := seedFailed(t, now, 3, true)
+	generations.put(generationRecord)
+	runs.items[failedRun.ID()] = failedRun
+
+	result, err := service.Start(context.Background(), StartRequest{Key: starterKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != StartStatusBlocked || failedRun.RetryDecision().Disposition != retrygovernance.DispositionManualRequired || runs.creates != 0 || tx.calls != 0 {
+		t.Fatalf("manual required result=%#v creates=%d tx=%d", result, runs.creates, tx.calls)
 	}
 }
 
@@ -281,6 +314,31 @@ func seedGenerating(t *testing.T, startedAt time.Time, lease time.Duration) (*do
 		t.Fatal(err)
 	}
 	if err := generationRecord.Begin(runRecord.ID(), startedAt); err != nil {
+		t.Fatal(err)
+	}
+	return generationRecord, runRecord
+}
+
+func seedFailed(t *testing.T, failedAt time.Time, attempt int, retryable bool) (*domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun) {
+	t.Helper()
+	generationRecord, err := domaingeneration.New(meta.FromUint64(1), starterKey(), failedAt.Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runRecord, err := interpretationrun.NewPending(meta.FromUint64(uint64(attempt+10)), generationRecord.ID(), attempt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runRecord.StartWithLease(failedAt.Add(-time.Minute), "existing", failedAt); err != nil {
+		t.Fatal(err)
+	}
+	if err := generationRecord.Begin(runRecord.ID(), failedAt.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runRecord.Fail(failedAt, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "failed", Retryable: retryable}); err != nil {
+		t.Fatal(err)
+	}
+	if err := generationRecord.Fail(runRecord.ID(), failedAt); err != nil {
 		t.Fatal(err)
 	}
 	return generationRecord, runRecord

@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 const (
@@ -166,7 +167,24 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 
 	now = time.Now()
 	retryAt := now.Add(r.retryDelay)
-	if r.batchPublisher != nil && len(failures) > 0 {
+	if governed, ok := r.store.(outboxport.GovernedFailureMarker); ok && len(failures) > 0 {
+		marked, markErr := governed.MarkEventsFailedGoverned(ctx, failures, now)
+		if markErr != nil {
+			return markErr
+		}
+		for _, failure := range failures {
+			r.observe(ctx, "", failure.EventType, eventobservability.OutboxOutcomePublishFailed)
+		}
+		if r.readyIndex != nil {
+			for _, result := range marked {
+				if result.Disposition != retrygovernance.DispositionAutomatic || result.NextAttemptAt == nil {
+					_ = r.readyIndex.Remove(ctx, result.EventType, result.EventID)
+					continue
+				}
+				_ = r.readyIndex.Enqueue(ctx, result.EventType, result.EventID, *result.NextAttemptAt, *result.NextAttemptAt)
+			}
+		}
+	} else if r.batchPublisher != nil && len(failures) > 0 {
 		_ = r.batchPublisher.MarkEventsFailed(ctx, failures, retryAt)
 		for _, failure := range failures {
 			r.observe(ctx, "", "", eventobservability.OutboxOutcomePublishFailed)

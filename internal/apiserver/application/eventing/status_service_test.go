@@ -132,6 +132,11 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 			Profile: eventcatalog.OutboxProfileAssessmentMySQL, Immediate: true, Priority: eventcatalog.PriorityP0,
 			Handler: "evaluation_requested_handler", Idempotency: "evaluation-run-state-claim", Settlement: eventcatalog.SettlementHandlerErrorNack,
 		},
+		eventcatalog.EvaluationRetryRequested: {
+			Type: eventcatalog.EvaluationRetryRequested, Owner: "evaluation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileAssessmentMySQL, Priority: eventcatalog.PriorityP1,
+			Handler: "evaluation_retry_requested_handler", Idempotency: "evaluation-latest-run-retry-decision", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
 		eventcatalog.EvaluationOutcomeCommitted: {
 			Type: eventcatalog.EvaluationOutcomeCommitted, Owner: "evaluation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
 			Profile: eventcatalog.OutboxProfileAssessmentMySQL, Immediate: true, Priority: eventcatalog.PriorityP1,
@@ -151,6 +156,11 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 			Type: eventcatalog.InterpretationReportFailed, Owner: "interpretation/report", Delivery: eventcatalog.DeliveryClassDurableOutbox,
 			Profile: eventcatalog.OutboxProfileMongoDomain, Priority: eventcatalog.PriorityP1,
 			Handler: "interpretation_report_failed_handler", Idempotency: "terminal-failure-fact", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.InterpretationRetryRequested: {
+			Type: eventcatalog.InterpretationRetryRequested, Owner: "interpretation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Priority: eventcatalog.PriorityP1,
+			Handler: "interpretation_retry_requested_handler", Idempotency: "generation-latest-run-retry-decision", Settlement: eventcatalog.SettlementHandlerErrorNack,
 		},
 		eventcatalog.TaskOpened: {
 			Type: eventcatalog.TaskOpened, Owner: "plan", Delivery: eventcatalog.DeliveryClassBestEffort,
@@ -186,11 +196,11 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 		profiles[profile.Name] = profile
 	}
 	mongo := profiles[eventcatalog.OutboxProfileMongoDomain]
-	if mongo.EventCount != 3 || !slices.Equal(mongo.ImmediateEventTypes, []string{eventcatalog.AnswerSheetSubmitted}) || !mongo.Running || !mongo.RelayEnabled || !mongo.ReconcilerEnabled || !mongo.ImmediateEnabled {
+	if mongo.EventCount != 4 || !slices.Equal(mongo.ImmediateEventTypes, []string{eventcatalog.AnswerSheetSubmitted}) || !mongo.Running || !mongo.RelayEnabled || !mongo.ReconcilerEnabled || !mongo.ImmediateEnabled {
 		t.Fatalf("mongo profile = %#v", mongo)
 	}
 	mysql := profiles[eventcatalog.OutboxProfileAssessmentMySQL]
-	if mysql.EventCount != 3 || !slices.Equal(mysql.ImmediateEventTypes, []string{eventcatalog.EvaluationOutcomeCommitted, eventcatalog.EvaluationRequested}) || mysql.Running || !mysql.RelayEnabled || !mysql.ReconcilerEnabled || !mysql.ImmediateEnabled {
+	if mysql.EventCount != 4 || !slices.Equal(mysql.ImmediateEventTypes, []string{eventcatalog.EvaluationOutcomeCommitted, eventcatalog.EvaluationRequested}) || mysql.Running || !mysql.RelayEnabled || !mysql.ReconcilerEnabled || !mysql.ImmediateEnabled {
 		t.Fatalf("assessment profile = %#v", mysql)
 	}
 

@@ -7,11 +7,13 @@ const (
 	AnswerSheetSubmitted = "answersheet.submitted"
 
 	EvaluationRequested        = "evaluation.requested"
+	EvaluationRetryRequested   = "evaluation.retry.requested"
 	EvaluationOutcomeCommitted = "evaluation.outcome.committed"
 	EvaluationFailed           = "evaluation.failed"
 
 	InterpretationReportGenerated = "interpretation.report.generated"
 	InterpretationReportFailed    = "interpretation.report.failed"
+	InterpretationRetryRequested  = "interpretation.retry.requested"
 
 	AssessmentModelChanged = "assessment_model.changed"
 
@@ -27,10 +29,12 @@ func EventTypes() []string {
 		QuestionnaireChanged,
 		AnswerSheetSubmitted,
 		EvaluationRequested,
+		EvaluationRetryRequested,
 		EvaluationOutcomeCommitted,
 		EvaluationFailed,
 		InterpretationReportGenerated,
 		InterpretationReportFailed,
+		InterpretationRetryRequested,
 		AssessmentModelChanged,
 		TaskOpened,
 		TaskCompleted,

@@ -15,6 +15,7 @@ import (
 type Facade interface {
 	GetOverview(ctx context.Context, window string) (*OverviewResponse, error)
 	GetEvents(ctx context.Context, window string) (*EventsView, error)
+	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
 	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
@@ -40,6 +41,8 @@ type FacadeDeps struct {
 	Actions                 *ActionExecutor
 	Registry                *ActionRegistry
 	CachePolicyReloader     CachePolicyReloader
+	RetryGovernanceReader   RetryGovernanceReader
+	RetryCandidateReader    RetryCandidateReader
 }
 
 type facade struct {
@@ -114,6 +117,17 @@ func (f *facade) GetEvents(ctx context.Context, window string) (*EventsView, err
 	return f.eventCollector().Collect(ctx, evalCtx)
 }
 
+func (f *facade) ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error) {
+	if f == nil || f.deps.RetryCandidateReader == nil {
+		return nil, errActionsUnavailable()
+	}
+	page, err := f.deps.RetryCandidateReader.ListRetryCandidates(ctx, orgID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &page, nil
+}
+
 func (f *facade) GetCache(ctx context.Context, window string) (*CacheView, error) {
 	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
@@ -143,6 +157,7 @@ func (f *facade) eventCollector() eventGovernanceCollector {
 		statusService: f.deps.EventStatusService,
 		typeSources:   f.deps.EventTypeSources,
 		metrics:       f.deps.Metrics,
+		retry:         f.deps.RetryGovernanceReader,
 	}
 }
 

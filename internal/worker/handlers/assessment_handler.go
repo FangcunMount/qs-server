@@ -37,6 +37,10 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 		if !data.NeedsEvaluation() {
 			return nil
 		}
+		if deps.DisableAutomaticRetry && data.AttemptOrigin == "automatic" {
+			deps.Logger.Warn("automatic evaluation retry disabled by emergency switch", "event_id", env.ID, "assessment_id", data.AssessmentID)
+			return ErrAutomaticRetryPaused
+		}
 		if deps.EvaluationWorkerClient == nil {
 			return fmt.Errorf("evaluation worker client is not available: cannot evaluate request for assessment %d", data.AssessmentID)
 		}
@@ -52,7 +56,8 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			}
 		}
 
-		resp, err := deps.EvaluationWorkerClient.ExecuteEvaluation(ctx, assessmentID)
+		callCtx := outgoingRetryAuthorization(ctx, env.ID, data.ExpectedAttempt, data.AttemptOrigin, data.ActionRequestID, data.Mode)
+		resp, err := deps.EvaluationWorkerClient.ExecuteEvaluation(callCtx, assessmentID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate assessment: %w", err)
 		}

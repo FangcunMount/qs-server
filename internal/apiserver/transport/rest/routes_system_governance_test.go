@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +18,8 @@ type stubSystemGovernanceFacade struct {
 	cache       *systemgov.CacheView
 	resilience  *systemgov.ResilienceView
 	checkpoints *systemgov.CheckpointView
+	candidates  *systemgov.RetryCandidatePage
+	candidateFn func(int64, string, int) (*systemgov.RetryCandidatePage, error)
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -28,6 +31,53 @@ func (s stubSystemGovernanceFacade) GetEvents(context.Context, string) (*systemg
 		return s.events, nil
 	}
 	return &systemgov.EventsView{}, nil
+}
+
+func (s stubSystemGovernanceFacade) ListRetryCandidates(_ context.Context, orgID int64, cursor string, limit int) (*systemgov.RetryCandidatePage, error) {
+	if s.candidateFn != nil {
+		return s.candidateFn(orgID, cursor, limit)
+	}
+	if s.candidates != nil {
+		return s.candidates, nil
+	}
+	return &systemgov.RetryCandidatePage{}, nil
+}
+
+func TestSystemGovernanceRetryCandidatesAreOrgScopedAndBounded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	called := false
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{candidateFn: func(orgID int64, cursor string, limit int) (*systemgov.RetryCandidatePage, error) {
+		called = true
+		if orgID < 1 {
+			t.Fatalf("orgID = %d, want resolved organization", orgID)
+		}
+		if cursor != "next-page" || limit != 25 {
+			t.Fatalf("cursor/limit = %q/%d, want next-page/25", cursor, limit)
+		}
+		return &systemgov.RetryCandidatePage{Items: []systemgov.RetryCandidate{{Kind: "evaluation", ResourceID: "42", Disposition: "manual_required", Attempt: 3}}}, nil
+	}}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
+	group := engine.Group("/internal/v1")
+	router.registerSystemGovernanceInternalRoutes(group)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/events/retry-candidates?cursor=next-page&limit=25", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("status/called = %d/%v, want 200/true", rec.Code, called)
+	}
+
+	badReq := httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/events/retry-candidates?limit=101", nil)
+	badRec := httptest.NewRecorder()
+	engine.ServeHTTP(badRec, badReq)
+	if badRec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid limit status = %d, want 400", badRec.Code)
+	}
 }
 
 func (s stubSystemGovernanceFacade) GetCache(context.Context, string) (*systemgov.CacheView, error) {

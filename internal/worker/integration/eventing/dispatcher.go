@@ -29,6 +29,7 @@ type HandlerDependencies struct {
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           *reportstatus.Reporter
+	DisableAutomaticRetry          bool
 }
 
 // HandlerRegistry is the explicit worker handler factory catalog consumed by
@@ -135,6 +136,7 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 		LockKeyBuilder:                 d.deps.LockKeyBuilder,
 		Notifier:                       d.deps.Notifier,
 		ReportStatusReporter:           d.deps.ReportStatusReporter,
+		DisableAutomaticRetry:          d.deps.DisableAutomaticRetry,
 	}
 }
 

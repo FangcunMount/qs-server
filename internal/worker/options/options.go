@@ -20,7 +20,8 @@ type Options struct {
 	// MongoDB 配置
 	MongoDB *genericoptions.MongoDBOptions `json:"mongodb" mapstructure:"mongodb"`
 	// 消息队列配置
-	Messaging *MessagingOptions `json:"messaging" mapstructure:"messaging"`
+	Messaging       *MessagingOptions       `json:"messaging" mapstructure:"messaging"`
+	RetryGovernance *RetryGovernanceOptions `json:"retry_governance" mapstructure:"retry_governance"`
 	// gRPC 客户端配置
 	GRPC *GRPCOptions `json:"grpc" mapstructure:"grpc"`
 	// Worker 配置
@@ -62,7 +63,17 @@ type MessagingOptions struct {
 	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq-addr"`
 	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
 	// RabbitMQ 配置
-	RabbitMQURL string `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
+	RabbitMQURL string           `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
+	Delivery    *DeliveryOptions `json:"delivery" mapstructure:"delivery"`
+}
+
+type DeliveryOptions struct {
+	Enable      bool `json:"enable" mapstructure:"enable"`
+	MaxAttempts int  `json:"max_attempts" mapstructure:"max-attempts"`
+}
+
+type RetryGovernanceOptions struct {
+	AutomaticRetryEnabled bool `json:"automatic_retry_enabled" mapstructure:"automatic-retry-enabled"`
 }
 
 // WorkerOptions Worker 运行配置
@@ -115,7 +126,9 @@ func NewOptions() *Options {
 			Provider:       "nsq",
 			NSQAddr:        "localhost:4150",
 			NSQLookupdAddr: "localhost:4161",
+			Delivery:       &DeliveryOptions{Enable: true, MaxAttempts: 8},
 		},
+		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true},
 		GRPC: &GRPCOptions{
 			ApiserverAddr: "localhost:9090",
 			Insecure:      true,
@@ -182,6 +195,18 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"NSQ lookupd address")
 	messagingFS.StringVar(&o.Messaging.RabbitMQURL, "messaging.rabbitmq-url", o.Messaging.RabbitMQURL,
 		"RabbitMQ connection URL")
+	if o.Messaging.Delivery == nil {
+		o.Messaging.Delivery = &DeliveryOptions{Enable: true, MaxAttempts: 8}
+	}
+	messagingFS.BoolVar(&o.Messaging.Delivery.Enable, "messaging.delivery.enable", o.Messaging.Delivery.Enable,
+		"Enable bounded transport retry")
+	messagingFS.IntVar(&o.Messaging.Delivery.MaxAttempts, "messaging.delivery.max-attempts", o.Messaging.Delivery.MaxAttempts,
+		"Maximum transport delivery attempts before dead letter")
+	if o.RetryGovernance == nil {
+		o.RetryGovernance = &RetryGovernanceOptions{AutomaticRetryEnabled: true}
+	}
+	messagingFS.BoolVar(&o.RetryGovernance.AutomaticRetryEnabled, "retry-governance.automatic-retry-enabled", o.RetryGovernance.AutomaticRetryEnabled,
+		"Emergency switch for automatic business retry events; manual and force events remain enabled")
 
 	// gRPC flags
 	grpcFS := fss.FlagSet("grpc")
@@ -253,6 +278,11 @@ func (o *Options) Validate() []error {
 		}
 		if o.Metrics.BindPort <= 0 {
 			errs = append(errs, fmt.Errorf("metrics.bind_port must be greater than 0 when metrics are enabled"))
+		}
+	}
+	if o.Messaging != nil && o.Messaging.Delivery != nil && o.Messaging.Delivery.Enable {
+		if o.Messaging.Delivery.MaxAttempts < 1 || o.Messaging.Delivery.MaxAttempts > 65535 {
+			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and 65535"))
 		}
 	}
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {

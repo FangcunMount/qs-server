@@ -15,6 +15,7 @@ type eventGovernanceCollector struct {
 	statusService appEventing.StatusService
 	typeSources   []EventTypeStatusSource
 	metrics       MetricsReader
+	retry         RetryGovernanceReader
 }
 
 func (c eventGovernanceCollector) Collect(ctx context.Context, evalCtx evaluationContext) (*EventsView, error) {
@@ -28,6 +29,13 @@ func (c eventGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 	}
 	eventTypes := ReadEventTypes(ctx, c.typeSources, evalCtx.evalAt)
 	projection := NewEventDrainEvaluator(c.metrics).Evaluate(ctx, snapshot, eventTypes, evalCtx.windowLabel, evalCtx.evalAt)
+	retrySummary := RetryGovernanceSummary{}
+	if c.retry != nil {
+		retrySummary, err = c.retry.ReadRetryGovernance(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &EventsView{
 		GeneratedAt: evalCtx.evalAt,
 		Window:      evalCtx.windowLabel,
@@ -38,6 +46,7 @@ func (c eventGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 		Summary:     projection.Summary,
 		OutboxRows:  projection.OutboxRows,
 		TypeRows:    projection.EventTypeRows,
+		Retry:       retrySummary,
 	}, nil
 }
 

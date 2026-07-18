@@ -16,6 +16,7 @@ import (
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
@@ -43,6 +44,10 @@ type Module struct {
 	administrationService interpretationadmin.Service
 	clinicianService      interpretationclinician.Service
 	operationsService     interpretationoperations.Service
+	governedRetryService  interpretationautomation.GovernedRetryService
+	leaseRecoverer        interpretationautomation.LeaseRecoverer
+	txRunner              apptransaction.Runner
+	eventStager           appEventing.EventStager
 	ReportStatusReporter  *reportstatus.Reporter
 }
 
@@ -93,6 +98,8 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
+	module.txRunner = mongoTxRunner
+	module.eventStager = deps.OutboxProfile.Stager
 	{
 		registry, err := buildReportBuilderRegistry()
 		if err != nil {
@@ -134,7 +141,23 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		m.reportRepo,
 		operationsAccessAdapter{},
 	)
+	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
+	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
 	return nil
+}
+
+func (m *Module) LeaseRecoverer() interpretationautomation.LeaseRecoverer {
+	if m == nil {
+		return nil
+	}
+	return m.leaseRecoverer
+}
+
+func (m *Module) GovernedRetryService() interpretationautomation.GovernedRetryService {
+	if m == nil {
+		return nil
+	}
+	return m.governedRetryService
 }
 
 func (m *Module) OperationsService() interpretationoperations.Service {

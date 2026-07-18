@@ -106,6 +106,15 @@ func scoreFromFact(fact *evaluationoutcome.ScoreFact) *Score {
 func runFromDomain(run evalrun.EvaluationRun) *Run {
 	attempt := run.Attempt()
 	result := &Run{RunID: run.ID().String(), AssessmentID: run.AssessmentID(), AttemptNo: attempt.Number, Status: attempt.Status.String(), Retryable: run.Retryable(), StartedAt: run.StartedAt(), FinishedAt: run.FinishedAt(), TraceID: run.TraceID(), InputSnapshotRef: run.InputSnapshotRef()}
+	result.AttemptOrigin = string(run.Origin())
+	if decision := run.RetryDecision(); decision != nil {
+		result.RetryDisposition = string(decision.Disposition)
+		result.MaxAutomaticAttempts = decision.MaxAutomaticAttempts
+		result.RemainingAutomaticAttempts = decision.RemainingAutomaticAttempts
+		result.NextAttemptAt = decision.NextAttemptAt
+		result.RetryEventID = decision.RetryEventID
+		result.ActionRequestID = decision.ActionRequestID
+	}
 	if failure := run.Failure(); failure != nil {
 		result.ErrorCode, result.ErrorMessage, result.Retryable = failure.Kind.String(), failure.Message, failure.Retryable
 	}

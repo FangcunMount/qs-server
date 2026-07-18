@@ -213,15 +213,22 @@ type InterpretationFailureWire struct {
 }
 
 type InterpretationRunWire struct {
-	ID             uint64                     `json:"ID"`
-	GenerationID   uint64                     `json:"GenerationID"`
-	Attempt        int                        `json:"Attempt"`
-	Status         string                     `json:"Status"`
-	TraceID        string                     `json:"TraceID,omitempty"`
-	Failure        *InterpretationFailureWire `json:"Failure,omitempty"`
-	StartedAt      *string                    `json:"StartedAt,omitempty"`
-	LeaseExpiresAt *string                    `json:"LeaseExpiresAt,omitempty"`
-	FinishedAt     *string                    `json:"FinishedAt,omitempty"`
+	ID                         uint64                     `json:"ID"`
+	GenerationID               uint64                     `json:"GenerationID"`
+	Attempt                    int                        `json:"Attempt"`
+	Status                     string                     `json:"Status"`
+	TraceID                    string                     `json:"TraceID,omitempty"`
+	Failure                    *InterpretationFailureWire `json:"Failure,omitempty"`
+	StartedAt                  *string                    `json:"StartedAt,omitempty"`
+	LeaseExpiresAt             *string                    `json:"LeaseExpiresAt,omitempty"`
+	FinishedAt                 *string                    `json:"FinishedAt,omitempty"`
+	AttemptOrigin              string                     `json:"AttemptOrigin,omitempty"`
+	RetryDisposition           string                     `json:"RetryDisposition,omitempty"`
+	MaxAutomaticAttempts       int                        `json:"MaxAutomaticAttempts,omitempty"`
+	RemainingAutomaticAttempts int                        `json:"RemainingAutomaticAttempts,omitempty"`
+	NextAttemptAt              *string                    `json:"NextAttemptAt,omitempty"`
+	RetryEventID               string                     `json:"RetryEventID,omitempty"`
+	ActionRequestID            string                     `json:"ActionRequestID,omitempty"`
 }
 
 type InterpretationGenerationWire struct {
@@ -236,6 +243,7 @@ type InterpretationGenerationWire struct {
 	CreatedAt       string                    `json:"CreatedAt"`
 	UpdatedAt       string                    `json:"UpdatedAt"`
 	LatestRun       *InterpretationRunWire    `json:"LatestRun,omitempty"`
+	Runs            []InterpretationRunWire   `json:"Runs,omitempty"`
 	Report          *InterpretationReportWire `json:"Report,omitempty"`
 }
 

@@ -19,6 +19,7 @@ type ExecuteStatus string
 const (
 	ExecuteStatusGenerated  ExecuteStatus = "generated"
 	ExecuteStatusProcessing ExecuteStatus = "processing"
+	ExecuteStatusBlocked    ExecuteStatus = "blocked"
 )
 
 type ExecuteResult struct {
@@ -96,6 +97,8 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 			"result", "processing",
 		)
 		return &ExecuteResult{Status: ExecuteStatusProcessing, Generation: start.Generation, Run: start.Run}, nil
+	case StartStatusBlocked:
+		return &ExecuteResult{Status: ExecuteStatusBlocked, Generation: start.Generation, Run: start.Run}, nil
 	case StartStatusStarted:
 		return e.buildAndCommit(ctx, input, start.Generation, start.Run)
 	default:
@@ -174,7 +177,7 @@ func (e *executor) fail(ctx context.Context, generationRecord *domaingeneration.
 	if err != nil {
 		return err
 	}
-	return &FailedError{GenerationID: committed.Generation.ID(), RunID: committed.Run.ID(), Failure: failure}
+	return &FailedError{GenerationID: committed.Generation.ID(), RunID: committed.Run.ID(), Failure: failure, Origin: committed.Run.Origin(), Decision: committed.Run.RetryDecision()}
 }
 
 // ExecuteOutcome is the production adapter from the immutable Evaluation

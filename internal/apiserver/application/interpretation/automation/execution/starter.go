@@ -13,6 +13,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type StartStatus string
@@ -21,6 +22,7 @@ const (
 	StartStatusStarted    StartStatus = "started"
 	StartStatusProcessing StartStatus = "processing"
 	StartStatusGenerated  StartStatus = "generated"
+	StartStatusBlocked    StartStatus = "blocked"
 )
 
 type StartRequest struct {
@@ -145,8 +147,10 @@ func (s *starter) startExisting(ctx context.Context, generationRecord *domaingen
 		return &StartResult{Status: StartStatusGenerated, Generation: generationRecord, InterpretReport: artifact}, nil
 	case domaingeneration.StatusGenerating:
 		return s.resumeOrRecover(ctx, generationRecord, request)
-	case domaingeneration.StatusPending, domaingeneration.StatusFailed:
-		return s.startNext(ctx, generationRecord, nil, request)
+	case domaingeneration.StatusPending:
+		return s.startNext(ctx, generationRecord, nil, retrygovernance.AttemptOriginInitial, request)
+	case domaingeneration.StatusFailed:
+		return s.startFailedIfAuthorized(ctx, generationRecord, request)
 	default:
 		return nil, fmt.Errorf("unsupported report generation status %s", generationRecord.Status())
 	}
@@ -164,25 +168,59 @@ func (s *starter) resumeOrRecover(ctx context.Context, generationRecord *domaing
 	if latest.Status() != interpretationrun.StatusRunning {
 		return nil, fmt.Errorf("generating report generation has non-running run %s", latest.Status())
 	}
-	failure := interpretationrun.Failure{
-		Kind:        interpretationrun.FailureKindTimeout,
-		Code:        "lease_expired",
-		SafeMessage: "报告生成任务超时，已重新调度",
-		Retryable:   true,
+	if reclaimer, ok := s.runs.(interpretationrun.LeaseReclaimer); ok {
+		reclaimed, claimed, reclaimErr := reclaimer.ReclaimExpiredLease(ctx, latest.ID(), at, request.TraceID, at.Add(s.leaseDuration))
+		if reclaimErr != nil {
+			return nil, reclaimErr
+		}
+		if claimed {
+			return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: reclaimed}, nil
+		}
+		winner, findErr := s.runs.FindByID(ctx, latest.ID())
+		if findErr != nil {
+			return nil, findErr
+		}
+		return &StartResult{Status: StartStatusProcessing, Generation: generationRecord, Run: winner}, nil
 	}
-	if err := latest.Fail(at, failure); err != nil {
+	if err := latest.ReclaimExpiredLease(at, request.TraceID, at.Add(s.leaseDuration)); err != nil {
 		return nil, err
 	}
-	if err := generationRecord.Fail(latest.ID(), at); err != nil {
+	if err := s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		return s.runs.Save(txCtx, latest)
+	}); err != nil {
 		return nil, err
 	}
-	return s.startNext(ctx, generationRecord, latest, request)
+	return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: latest}, nil
+}
+
+func (s *starter) startFailedIfAuthorized(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, request StartRequest) (*StartResult, error) {
+	latest, err := s.runs.FindLatestByGenerationID(ctx, generationRecord.ID())
+	if err != nil {
+		return nil, fmt.Errorf("load latest failed interpretation run: %w", err)
+	}
+	decision := latest.RetryDecision()
+	now := s.now()
+	if latest.Status() != interpretationrun.StatusFailed || decision == nil ||
+		decision.Disposition != retrygovernance.DispositionAutomatic || decision.NextAttemptAt == nil || decision.NextAttemptAt.After(now) {
+		return &StartResult{Status: StartStatusBlocked, Generation: generationRecord, Run: latest}, nil
+	}
+	authorization, ok := retrygovernance.AuthorizationFromContext(ctx)
+	if !ok || authorization.ExpectedAttempt != latest.Attempt() || authorization.EventID == "" ||
+		authorization.EventID != decision.RetryEventID || authorization.ActionRequestID != decision.ActionRequestID ||
+		(authorization.Origin != retrygovernance.AttemptOriginAutomatic && authorization.Origin != retrygovernance.AttemptOriginManual && authorization.Origin != retrygovernance.AttemptOriginForce) {
+		return &StartResult{Status: StartStatusBlocked, Generation: generationRecord, Run: latest}, nil
+	}
+	if (decision.ActionRequestID == "" && authorization.Origin != retrygovernance.AttemptOriginAutomatic) ||
+		(decision.ActionRequestID != "" && authorization.Origin == retrygovernance.AttemptOriginAutomatic) {
+		return &StartResult{Status: StartStatusBlocked, Generation: generationRecord, Run: latest}, nil
+	}
+	return s.startNext(ctx, generationRecord, nil, authorization.Origin, request)
 }
 
 // startNext persists the currently running Generation and a new running Run in
 // one Mongo transaction. staleRun, when present, has already transitioned to
 // failed and is persisted in the same transaction before the new attempt.
-func (s *starter) startNext(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, staleRun *interpretationrun.InterpretationRun, request StartRequest) (*StartResult, error) {
+func (s *starter) startNext(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, staleRun *interpretationrun.InterpretationRun, origin retrygovernance.AttemptOrigin, request StartRequest) (*StartResult, error) {
 	expectedVersion := generationRecord.Version()
 	if staleRun != nil {
 		// Fail followed by Begin advances the Generation twice. CAS protects the
@@ -192,7 +230,7 @@ func (s *starter) startNext(ctx context.Context, generationRecord *domaingenerat
 	var runRecord *interpretationrun.InterpretationRun
 	var err error
 	if staleRun != nil {
-		runRecord, err = interpretationrun.Next(s.newID(), staleRun)
+		runRecord, err = interpretationrun.NextWithOrigin(s.newID(), staleRun, origin)
 	} else if generationRecord.Status() == domaingeneration.StatusPending {
 		runRecord, err = interpretationrun.NewPending(s.newID(), generationRecord.ID(), 1)
 	} else {
@@ -200,7 +238,7 @@ func (s *starter) startNext(ctx context.Context, generationRecord *domaingenerat
 		if findErr != nil {
 			return nil, fmt.Errorf("load latest interpretation run: %w", findErr)
 		}
-		runRecord, err = interpretationrun.Next(s.newID(), latest)
+		runRecord, err = interpretationrun.NextWithOrigin(s.newID(), latest, origin)
 	}
 	if err != nil {
 		return nil, err

@@ -1,0 +1,14 @@
+[
+  {
+    "dropIndexes": "interpretation_runs",
+    "index": "idx_interpretation_run_retry_due"
+  },
+  {
+    "dropIndexes": "interpretation_runs",
+    "index": "idx_interpretation_run_action_request"
+  },
+  {
+    "dropIndexes": "domain_event_outbox",
+    "index": "idx_outbox_org_retry_due"
+  }
+]

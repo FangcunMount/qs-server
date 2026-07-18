@@ -29,7 +29,6 @@ metrics:
 worker:
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
   concurrency: 48              # 300QPS 目标：serverD 单实例消费并发（与 apiserver gRPC 跨云）
-  max-retries: 3              # 最大重试次数
 
 # ============================================================
 # 2. 消息队列配置
@@ -41,6 +40,12 @@ messaging:
   nsq-addr: "nsqd:4150"
   nsq-lookupd-addr: "nsqlookupd:4161"
   rabbitmq-url: "amqp://guest:guest@127.0.0.1:5672/"
+  delivery:
+    enable: true
+    max-attempts: 8
+
+retry_governance:
+  automatic-retry-enabled: true  # emergency switch; manual/force authorization is unaffected
 
 # ============================================================
 # 3. gRPC 客户端配置

@@ -31,14 +31,21 @@ type InterpretationFailurePO struct {
 type InterpretationRunPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	GenerationID   uint64                   `bson:"generation_id"`
-	Attempt        int                      `bson:"attempt"`
-	Status         string                   `bson:"status"`
-	Failure        *InterpretationFailurePO `bson:"failure,omitempty"`
-	TraceID        string                   `bson:"trace_id,omitempty"`
-	StartedAt      *time.Time               `bson:"started_at,omitempty"`
-	LeaseExpiresAt *time.Time               `bson:"lease_expires_at,omitempty"`
-	FinishedAt     *time.Time               `bson:"finished_at,omitempty"`
+	GenerationID       uint64                   `bson:"generation_id"`
+	Attempt            int                      `bson:"attempt"`
+	Status             string                   `bson:"status"`
+	Failure            *InterpretationFailurePO `bson:"failure,omitempty"`
+	TraceID            string                   `bson:"trace_id,omitempty"`
+	StartedAt          *time.Time               `bson:"started_at,omitempty"`
+	LeaseExpiresAt     *time.Time               `bson:"lease_expires_at,omitempty"`
+	FinishedAt         *time.Time               `bson:"finished_at,omitempty"`
+	AttemptOrigin      string                   `bson:"attempt_origin,omitempty"`
+	RetryDisposition   string                   `bson:"retry_disposition,omitempty"`
+	NextAttemptAt      *time.Time               `bson:"next_attempt_at,omitempty"`
+	PolicyMaxAttempts  int                      `bson:"policy_max_attempts,omitempty"`
+	RetryPolicyVersion string                   `bson:"retry_policy_version,omitempty"`
+	RetryEventID       string                   `bson:"retry_event_id,omitempty"`
+	ActionRequestID    string                   `bson:"action_request_id,omitempty"`
 }
 
 func (InterpretationRunPO) CollectionName() string { return "interpretation_runs" }

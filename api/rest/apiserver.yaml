@@ -3321,6 +3321,7 @@ paths:
       - Evaluation-Admin
       summary: 重试失败的测评
       description: 重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问
+      deprecated: true
       operationId: 重试失败的测评
       parameters:
       - type: string
@@ -9483,6 +9484,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/system-governance/events/retry-candidates:
+    get:
+      tags:
+      - System-Governance
+      summary: 系统治理-重试候选
+      description: 返回当前组织可治理的最新业务失败、Outbox 人工重放项与运输死信；仅 qs:admin 可访问
+      operationId: 系统治理重试候选
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 不透明分页游标
+        name: cursor
+        in: query
+      - type: integer
+        default: 50
+        description: 每页条数，1-100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/systemgovernance.RetryCandidatePage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v1/system-governance/overview:
     get:
       tags:
@@ -11985,10 +12044,14 @@ components:
     response.EvaluationRunResponse:
       type: object
       properties:
+        action_request_id:
+          type: string
         assessment_id:
           type: integer
         attempt_no:
           type: integer
+        attempt_origin:
+          type: string
         error_code:
           type: string
         error_message:
@@ -11996,6 +12059,16 @@ components:
         finished_at:
           type: string
         input_snapshot_ref:
+          type: string
+        max_automatic_attempts:
+          type: integer
+        next_attempt_at:
+          type: string
+        remaining_automatic_attempts:
+          type: integer
+        retry_disposition:
+          type: string
+        retry_event_id:
           type: string
         retryable:
           type: boolean
@@ -12117,6 +12190,10 @@ components:
           type: integer
         ReportType:
           type: string
+        Runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.InterpretationRunWire'
         Status:
           type: string
         TemplateVersion:
@@ -12147,8 +12224,12 @@ components:
     response.InterpretationRunWire:
       type: object
       properties:
+        ActionRequestID:
+          type: string
         Attempt:
           type: integer
+        AttemptOrigin:
+          type: string
         Failure:
           $ref: '#/components/schemas/response.InterpretationFailureWire'
         FinishedAt:
@@ -12158,6 +12239,16 @@ components:
         ID:
           type: integer
         LeaseExpiresAt:
+          type: string
+        MaxAutomaticAttempts:
+          type: integer
+        NextAttemptAt:
+          type: string
+        RemainingAutomaticAttempts:
+          type: integer
+        RetryDisposition:
+          type: string
+        RetryEventID:
           type: string
         StartedAt:
           type: string
@@ -12691,10 +12782,14 @@ components:
     response.RetryableFailedRunResponse:
       type: object
       properties:
+        action_request_id:
+          type: string
         assessment_id:
           type: integer
         attempt_no:
           type: integer
+        attempt_origin:
+          type: string
         error_code:
           type: string
         error_message:
@@ -12703,8 +12798,18 @@ components:
           type: string
         input_snapshot_ref:
           type: string
+        max_automatic_attempts:
+          type: integer
+        next_attempt_at:
+          type: string
         org_id:
           type: integer
+        remaining_automatic_attempts:
+          type: integer
+        retry_disposition:
+          type: string
+        retry_event_id:
+          type: string
         retryable:
           type: boolean
         run_id:
@@ -13520,6 +13625,38 @@ components:
           items:
             $ref: '#/components/schemas/systemgovernance.Signal'
         window:
+          type: string
+    systemgovernance.RetryCandidate:
+      type: object
+      properties:
+        action_request_id:
+          type: string
+        attempt:
+          type: integer
+        kind:
+          type: string
+        last_error_kind:
+          type: string
+        next_attempt_at:
+          type: string
+        resource_id:
+          type: string
+        retry_disposition:
+          type: string
+        retry_event_id:
+          type: string
+        store:
+          type: string
+        updated_at:
+          type: string
+    systemgovernance.RetryCandidatePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/systemgovernance.RetryCandidate'
+        next_cursor:
           type: string
     systemgovernance.Severity:
       type: string

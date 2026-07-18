@@ -8,17 +8,24 @@ import (
 
 // EvaluationRunResponse is the REST view of one evaluation run attempt.
 type EvaluationRunResponse struct {
-	RunID            string     `json:"run_id"`
-	AssessmentID     uint64     `json:"assessment_id"`
-	AttemptNo        int        `json:"attempt_no"`
-	Status           string     `json:"status"`
-	Retryable        bool       `json:"retryable"`
-	ErrorCode        string     `json:"error_code,omitempty"`
-	ErrorMessage     string     `json:"error_message,omitempty"`
-	StartedAt        time.Time  `json:"started_at"`
-	FinishedAt       *time.Time `json:"finished_at,omitempty"`
-	TraceID          string     `json:"trace_id,omitempty"`
-	InputSnapshotRef string     `json:"input_snapshot_ref,omitempty"`
+	RunID                      string     `json:"run_id"`
+	AssessmentID               uint64     `json:"assessment_id"`
+	AttemptNo                  int        `json:"attempt_no"`
+	Status                     string     `json:"status"`
+	Retryable                  bool       `json:"retryable"`
+	ErrorCode                  string     `json:"error_code,omitempty"`
+	ErrorMessage               string     `json:"error_message,omitempty"`
+	StartedAt                  time.Time  `json:"started_at"`
+	FinishedAt                 *time.Time `json:"finished_at,omitempty"`
+	TraceID                    string     `json:"trace_id,omitempty"`
+	InputSnapshotRef           string     `json:"input_snapshot_ref,omitempty"`
+	AttemptOrigin              string     `json:"attempt_origin,omitempty"`
+	RetryDisposition           string     `json:"retry_disposition,omitempty"`
+	MaxAutomaticAttempts       int        `json:"max_automatic_attempts,omitempty"`
+	RemainingAutomaticAttempts int        `json:"remaining_automatic_attempts,omitempty"`
+	NextAttemptAt              *time.Time `json:"next_attempt_at,omitempty"`
+	RetryEventID               string     `json:"retry_event_id,omitempty"`
+	ActionRequestID            string     `json:"action_request_id,omitempty"`
 }
 
 // EvaluationRunListResponse lists evaluation runs for one assessment.
@@ -55,6 +62,9 @@ func NewEvaluationRunResponse(result *evaluationoperator.Run) *EvaluationRunResp
 		FinishedAt:       result.FinishedAt,
 		TraceID:          result.TraceID,
 		InputSnapshotRef: result.InputSnapshotRef,
+		AttemptOrigin:    result.AttemptOrigin, RetryDisposition: result.RetryDisposition,
+		MaxAutomaticAttempts: result.MaxAutomaticAttempts, RemainingAutomaticAttempts: result.RemainingAutomaticAttempts,
+		NextAttemptAt: result.NextAttemptAt, RetryEventID: result.RetryEventID, ActionRequestID: result.ActionRequestID,
 	}
 }
 
@@ -93,6 +103,9 @@ func NewRetryableFailedRunListResponse(result *evaluationoperator.RetryableFaile
 				FinishedAt:       item.FinishedAt,
 				TraceID:          item.TraceID,
 				InputSnapshotRef: item.InputSnapshotRef,
+				AttemptOrigin:    item.AttemptOrigin, RetryDisposition: item.RetryDisposition,
+				MaxAutomaticAttempts: item.MaxAutomaticAttempts, RemainingAutomaticAttempts: item.RemainingAutomaticAttempts,
+				NextAttemptAt: item.NextAttemptAt, RetryEventID: item.RetryEventID, ActionRequestID: item.ActionRequestID,
 			},
 			OrgID: item.OrgID,
 		})

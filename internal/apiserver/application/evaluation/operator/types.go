@@ -113,17 +113,24 @@ type HighRiskFactors struct {
 }
 
 type Run struct {
-	RunID            string
-	AssessmentID     uint64
-	AttemptNo        int
-	Status           string
-	Retryable        bool
-	ErrorCode        string
-	ErrorMessage     string
-	StartedAt        time.Time
-	FinishedAt       *time.Time
-	TraceID          string
-	InputSnapshotRef string
+	RunID                      string
+	AssessmentID               uint64
+	AttemptNo                  int
+	Status                     string
+	Retryable                  bool
+	ErrorCode                  string
+	ErrorMessage               string
+	StartedAt                  time.Time
+	FinishedAt                 *time.Time
+	TraceID                    string
+	InputSnapshotRef           string
+	AttemptOrigin              string
+	RetryDisposition           string
+	MaxAutomaticAttempts       int
+	RemainingAutomaticAttempts int
+	NextAttemptAt              *time.Time
+	RetryEventID               string
+	ActionRequestID            string
 }
 type RunList struct{ Items []*Run }
 type RetryableFailedRun struct {

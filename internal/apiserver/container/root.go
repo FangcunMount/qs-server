@@ -19,6 +19,7 @@ import (
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -137,6 +138,7 @@ func (c *Container) loadedModules() []Module {
 
 // NewContainerWithOptions 创建带配置的容器
 func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, opts ContainerOptions) *Container {
+	configureRetryPolicies(opts.SystemGovernance)
 	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
 	c.eventSubsystem = opts.EventSubsystem
 	c.cacheOptions = opts.Cache
@@ -160,6 +162,20 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.silent = opts.Silent
 
 	return c
+}
+
+func configureRetryPolicies(opts *apiserveroptions.SystemGovernanceOptions) {
+	defaults := apiserveroptions.NewSystemGovernanceOptions().Retry
+	retry := defaults
+	if opts != nil && opts.Retry != nil {
+		retry = opts.Retry
+	}
+	toPolicy := func(version string, value *apiserveroptions.RetryPolicyOptions) retrygovernance.Policy {
+		return retrygovernance.Policy{Version: version, MaxAutomaticAttempts: value.MaxAutomaticAttempts, BaseDelay: value.BaseDelay, MaxDelay: value.MaxDelay, JitterFraction: value.JitterFraction}
+	}
+	if err := retrygovernance.ConfigurePolicies(toPolicy("business-retry/v1", retry.Business), toPolicy("outbox-publish-retry/v1", retry.Outbox)); err != nil {
+		panic(err)
+	}
 }
 
 // Initialize 初始化容器

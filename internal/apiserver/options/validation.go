@@ -28,6 +28,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
+	errs = append(errs, validateRetryGovernance(o.SystemGovernance)...)
 
 	errs = append(errs, redisruntime.ValidateRuntimeOptions(
 		o.RedisRuntime,
@@ -45,6 +46,29 @@ func (o *Options) Validate() []error {
 		"redis_runtime",
 	)...)
 
+	return errs
+}
+
+func validateRetryGovernance(opts *SystemGovernanceOptions) []error {
+	if opts == nil || opts.Retry == nil {
+		return nil
+	}
+	var errs []error
+	for name, policy := range map[string]*RetryPolicyOptions{"business": opts.Retry.Business, "outbox": opts.Retry.Outbox} {
+		if policy == nil {
+			errs = append(errs, fmt.Errorf("system_governance.retry.%s is required", name))
+			continue
+		}
+		if policy.MaxAutomaticAttempts < 1 {
+			errs = append(errs, fmt.Errorf("system_governance.retry.%s.max_automatic_attempts must be greater than 0", name))
+		}
+		if policy.BaseDelay <= 0 || policy.MaxDelay < policy.BaseDelay {
+			errs = append(errs, fmt.Errorf("system_governance.retry.%s delays are invalid", name))
+		}
+		if policy.JitterFraction < 0 || policy.JitterFraction > 1 {
+			errs = append(errs, fmt.Errorf("system_governance.retry.%s.jitter_fraction must be between 0 and 1", name))
+		}
+	}
 	return errs
 }
 

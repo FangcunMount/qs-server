@@ -49,10 +49,12 @@ type Module struct {
 	TesteeService            evaluationtestee.Service
 	OperatorQuery            evaluationoperator.QueryService
 	OperatorRecovery         evaluationoperator.RecoveryService
+	GovernedRetry            evaluationoperator.GovernedRetryService
 	ScaleAnalysis            evaluationoperator.ScaleAnalysisService
 	WorkerService            evaluationworker.Service
 	OperatorExecutionService evaluationoperator.BatchExecutionService
 	SchedulerService         evaluationscheduler.Service
+	LeaseRecoverer           evaluationscheduler.LeaseRecoverer
 
 	outcomeRepository         domainoutcome.Repository
 	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
@@ -176,6 +178,9 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithEvaluationCommitter(evaluationCommitter),
 		)
 		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
+		if reader, ok := infra.runRepo.(evaluationrun.ExpiredLeaseReader); ok {
+			m.LeaseRecoverer = evaluationscheduler.NewLeaseRecoverer(reader, m.WorkerService)
+		}
 		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine, normalized.TesteeAccessChecker)
 	}
 	return nil
@@ -217,7 +222,8 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader, infra.assessmentReader, normalized.ScaleCatalog)
 	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
-	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
+	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
+	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker, m.GovernedRetry)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.workbenchLatestRiskReader = infra.latestRiskReader
 }

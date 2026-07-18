@@ -165,6 +165,14 @@ message ExecuteEvaluationResponse {
   string failure_message = 9;
   string trace_id = 10;
   string input_snapshot_ref = 11;
+  string retry_disposition = 12;
+  string attempt_origin = 13;
+  int32 current_attempt = 14;
+  int32 max_automatic_attempts = 15;
+  int32 remaining_automatic_attempts = 16;
+  string next_attempt_at = 17;
+  string retry_event_id = 18;
+  string action_request_id = 19;
 }
 
 message ListMyAssessmentsRequest {

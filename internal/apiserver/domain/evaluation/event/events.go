@@ -13,7 +13,8 @@ import (
 // 从 eventcatalog 包导入，保持事件类型的单一来源
 
 const (
-	TypeRequested        = eventcatalog.EvaluationRequested        // 测评请求事件
+	TypeRequested        = eventcatalog.EvaluationRequested // 测评请求事件
+	TypeRetryRequested   = eventcatalog.EvaluationRetryRequested
 	TypeOutcomeCommitted = eventcatalog.EvaluationOutcomeCommitted // 测评结果提交事件
 	TypeFailed           = eventcatalog.EvaluationFailed           // 测评失败事件
 )
@@ -55,10 +56,23 @@ type RequestedInput struct {
 	ModelCode         string
 	ModelVersion      string
 	RequestedAt       time.Time
+	EventID           string
+	ExpectedAttempt   int
+	AttemptOrigin     string
+	ActionRequestID   string
+	Mode              string
 }
 
 // NewRequestedEvent 创建测评请求事件
 func NewRequestedEvent(in RequestedInput) RequestedEvent {
+	return newRequestedEvent(TypeRequested, in)
+}
+
+func NewRetryRequestedEvent(in RequestedInput) RequestedEvent {
+	return newRequestedEvent(TypeRetryRequested, in)
+}
+
+func newRequestedEvent(eventType string, in RequestedInput) RequestedEvent {
 	data := RequestedData{
 		OrgID:             in.OrgID,
 		AssessmentID:      in.AssessmentID,
@@ -72,8 +86,18 @@ func NewRequestedEvent(in RequestedInput) RequestedEvent {
 		ModelAlgorithm:    in.ModelAlgorithm,
 		ModelCode:         in.ModelCode,
 		ModelVersion:      in.ModelVersion,
+		ExpectedAttempt:   in.ExpectedAttempt,
+		AttemptOrigin:     in.AttemptOrigin,
+		ActionRequestID:   in.ActionRequestID,
+		Mode:              in.Mode,
 	}
-	return event.New(TypeRequested, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
+	if in.EventID == "" {
+		return event.New(eventType, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
+	}
+	return RequestedEvent{BaseEvent: event.BaseEvent{
+		ID: in.EventID, EventTypeValue: eventType, OccurredAtValue: in.RequestedAt,
+		AggregateTypeValue: AggregateType, AggregateIDValue: strconv.FormatInt(in.AssessmentID, 10),
+	}, Data: data}
 }
 
 // NewFailedEvent 创建测评失败事件

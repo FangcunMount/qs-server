@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 var (
@@ -13,7 +15,8 @@ var (
 	// ErrInputSnapshotConflict indicates that a run is being associated with two input snapshots.
 	ErrInputSnapshotConflict = errors.New("evaluation run input snapshot conflict")
 	// ErrInvalidClaim indicates malformed claim ownership or lease timing.
-	ErrInvalidClaim = errors.New("invalid evaluation run claim")
+	ErrInvalidClaim         = errors.New("invalid evaluation run claim")
+	ErrInvalidRetrySchedule = errors.New("invalid evaluation retry schedule")
 )
 
 // ID identifies one Evaluation execution attempt in an Assessment lifecycle.
@@ -33,6 +36,8 @@ type EvaluationRun struct {
 	leaseExpiresAt   *time.Time
 	startedAt        time.Time
 	finishedAt       *time.Time
+	origin           retrygovernance.AttemptOrigin
+	retryDecision    *retrygovernance.Decision
 }
 
 type ClaimInput struct {
@@ -53,6 +58,8 @@ type ReconstructInput struct {
 	LeaseExpiresAt   *time.Time
 	StartedAt        time.Time
 	FinishedAt       *time.Time
+	Origin           retrygovernance.AttemptOrigin
+	RetryDecision    *retrygovernance.Decision
 }
 
 func Reconstruct(input ReconstructInput) EvaluationRun {
@@ -61,7 +68,8 @@ func Reconstruct(input ReconstructInput) EvaluationRun {
 		failure: cloneFailure(input.Failure), traceID: input.TraceID,
 		inputSnapshotRef: input.InputSnapshotRef, claimToken: input.ClaimToken,
 		leaseExpiresAt: cloneTime(input.LeaseExpiresAt), startedAt: input.StartedAt,
-		finishedAt: cloneTime(input.FinishedAt),
+		finishedAt: cloneTime(input.FinishedAt), origin: input.Origin,
+		retryDecision: cloneRetryDecision(input.RetryDecision),
 	}
 }
 
@@ -75,6 +83,52 @@ func (r EvaluationRun) ClaimToken() string         { return r.claimToken }
 func (r EvaluationRun) LeaseExpiresAt() *time.Time { return cloneTime(r.leaseExpiresAt) }
 func (r EvaluationRun) StartedAt() time.Time       { return r.startedAt }
 func (r EvaluationRun) FinishedAt() *time.Time     { return cloneTime(r.finishedAt) }
+func (r EvaluationRun) Origin() retrygovernance.AttemptOrigin {
+	if r.origin == "" {
+		return retrygovernance.AttemptOriginInitial
+	}
+	return r.origin
+}
+func (r EvaluationRun) RetryDecision() *retrygovernance.Decision {
+	return cloneRetryDecision(r.retryDecision)
+}
+
+func (r *EvaluationRun) AttachRetryEvent(eventID string) error {
+	if r == nil || r.attempt.Status != StatusFailed || r.retryDecision == nil || r.retryDecision.Disposition != retrygovernance.DispositionAutomatic || eventID == "" {
+		return ErrInvalidRetrySchedule
+	}
+	if r.retryDecision.RetryEventID != "" && r.retryDecision.RetryEventID != eventID {
+		return ErrInvalidRetrySchedule
+	}
+	r.retryDecision.RetryEventID = eventID
+	return nil
+}
+
+func (r *EvaluationRun) AuthorizeOneRetry(origin retrygovernance.AttemptOrigin, requestID, eventID string, at time.Time) error {
+	if r == nil || r.attempt.Status != StatusFailed || requestID == "" || eventID == "" || at.IsZero() {
+		return ErrInvalidRetrySchedule
+	}
+	if r.retryDecision == nil {
+		return ErrInvalidRetrySchedule
+	}
+	switch origin {
+	case retrygovernance.AttemptOriginManual:
+		if r.retryDecision.Disposition != retrygovernance.DispositionManualRequired {
+			return ErrInvalidRetrySchedule
+		}
+	case retrygovernance.AttemptOriginForce:
+		if r.retryDecision.Disposition != retrygovernance.DispositionTerminal {
+			return ErrInvalidRetrySchedule
+		}
+	default:
+		return ErrInvalidRetrySchedule
+	}
+	r.retryDecision.Disposition = retrygovernance.DispositionAutomatic
+	r.retryDecision.NextAttemptAt = &at
+	r.retryDecision.RetryEventID = eventID
+	r.retryDecision.ActionRequestID = requestID
+	return nil
+}
 
 // Claim assigns exclusive execution ownership until leaseExpiresAt. A pending
 // attempt becomes running; an expired running attempt can be reclaimed without
@@ -83,6 +137,7 @@ func (r *EvaluationRun) Claim(input ClaimInput) error {
 	if r == nil || input.Token == "" || input.ClaimedAt.IsZero() || !input.LeaseExpiresAt.After(input.ClaimedAt) {
 		return ErrInvalidClaim
 	}
+	wasRunning := r.attempt.Status == StatusRunning
 	if r.attempt.Status == StatusPending {
 		if err := r.Start(input.ClaimedAt); err != nil {
 			return err
@@ -94,6 +149,9 @@ func (r *EvaluationRun) Claim(input ClaimInput) error {
 	r.traceID = input.TraceID
 	lease := input.LeaseExpiresAt
 	r.leaseExpiresAt = &lease
+	if wasRunning {
+		r.origin = retrygovernance.AttemptOriginLeaseRecovery
+	}
 	return nil
 }
 
@@ -116,12 +174,21 @@ func NewEvaluationRunWithAttempt(assessmentID uint64, attemptNo int) EvaluationR
 		runID:        ID(strconv.FormatUint(assessmentID, 10) + ":" + strconv.Itoa(attemptNo)),
 		assessmentID: assessmentID,
 		attempt:      Attempt{Number: attemptNo, Status: StatusPending},
+		origin:       retrygovernance.AttemptOriginInitial,
 	}
 }
 
 // NextEvaluationRun creates the next attempt after a retryable failure.
 func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
-	return NewEvaluationRunWithAttempt(latest.assessmentID, latest.attempt.Number+1)
+	return NextEvaluationRunWithOrigin(latest, retrygovernance.AttemptOriginAutomatic)
+}
+
+func NextEvaluationRunWithOrigin(latest EvaluationRun, origin retrygovernance.AttemptOrigin) EvaluationRun {
+	next := NewEvaluationRunWithAttempt(latest.assessmentID, latest.attempt.Number+1)
+	if origin.IsValid() {
+		next.origin = origin
+	}
+	return next
 }
 
 // AttachInputSnapshot records the stable audit reference for a running attempt.
@@ -180,6 +247,8 @@ func (r *EvaluationRun) Fail(now time.Time, failure Failure) error {
 	}
 	r.attempt.Status = StatusFailed
 	r.failure = cloneFailure(&failure)
+	decision := retrygovernance.BusinessPolicy().DecideFailure(failure.Retryable, r.attempt.Number, now)
+	r.retryDecision = &decision
 	r.finishedAt = &now
 	r.leaseExpiresAt = nil
 	return nil
@@ -207,5 +276,14 @@ func cloneTime(value *time.Time) *time.Time {
 		return nil
 	}
 	copy := *value
+	return &copy
+}
+
+func cloneRetryDecision(value *retrygovernance.Decision) *retrygovernance.Decision {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	copy.NextAttemptAt = cloneTime(value.NextAttemptAt)
 	return &copy
 }

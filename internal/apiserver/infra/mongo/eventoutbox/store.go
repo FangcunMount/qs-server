@@ -12,6 +12,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -23,20 +24,24 @@ const mongoOutboxIndexCreationTimeout = 30 * time.Second
 
 // OutboxPO stores domain events until they are durably published.
 type OutboxPO struct {
-	EventID       string    `bson:"event_id"`
-	EventType     string    `bson:"event_type"`
-	AggregateType string    `bson:"aggregate_type"`
-	AggregateID   string    `bson:"aggregate_id"`
-	TopicName     string    `bson:"topic_name"`
-	PayloadJSON   string    `bson:"payload_json"`
-	Status        string    `bson:"status"`
-	AttemptCount  int       `bson:"attempt_count"`
-	NextAttemptAt time.Time `bson:"next_attempt_at"`
-	LastError     string    `bson:"last_error,omitempty"`
-	CreatedAt     time.Time `bson:"created_at"`
-	UpdatedAt     time.Time `bson:"updated_at"`
-	PublishedAt   time.Time `bson:"published_at,omitempty"`
-	ClaimToken    string    `bson:"claim_token,omitempty"`
+	EventID               string    `bson:"event_id"`
+	EventType             string    `bson:"event_type"`
+	AggregateType         string    `bson:"aggregate_type"`
+	AggregateID           string    `bson:"aggregate_id"`
+	OrgID                 *int64    `bson:"org_id,omitempty"`
+	TopicName             string    `bson:"topic_name"`
+	PayloadJSON           string    `bson:"payload_json"`
+	Status                string    `bson:"status"`
+	AttemptCount          int       `bson:"attempt_count"`
+	RetryDisposition      string    `bson:"retry_disposition,omitempty"`
+	NextAttemptAt         time.Time `bson:"next_attempt_at"`
+	LastError             string    `bson:"last_error,omitempty"`
+	LastErrorKind         string    `bson:"last_error_kind,omitempty"`
+	ManualReplayRequestID string    `bson:"manual_replay_request_id,omitempty"`
+	CreatedAt             time.Time `bson:"created_at"`
+	UpdatedAt             time.Time `bson:"updated_at"`
+	PublishedAt           time.Time `bson:"published_at,omitempty"`
+	ClaimToken            string    `bson:"claim_token,omitempty"`
 }
 
 func (OutboxPO) CollectionName() string {
@@ -102,6 +107,10 @@ func mongoOutboxIndexModels() []mongo.IndexModel {
 		{
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}},
 			Options: options.Index().SetName("idx_status_next_attempt_at"),
+		},
+		{
+			Keys:    bson.D{{Key: "org_id", Value: 1}, {Key: "status", Value: 1}, {Key: "retry_disposition", Value: 1}, {Key: "next_attempt_at", Value: 1}},
+			Options: options.Index().SetName("idx_outbox_org_retry_due"),
 		},
 		{
 			Keys: bson.D{
@@ -179,6 +188,27 @@ func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return s.stageWithSession(txCtx, events)
 }
 
+func (s *Store) StageAt(ctx context.Context, dueAt time.Time, events ...event.DomainEvent) error {
+	txCtx, ok := ctx.(mongo.SessionContext)
+	if !ok {
+		return ErrActiveSessionTransactionRequired
+	}
+	docs, err := s.buildDocuments(events)
+	if err != nil {
+		return err
+	}
+	items := make([]interface{}, 0, len(docs))
+	for _, doc := range docs {
+		doc.NextAttemptAt = dueAt
+		items = append(items, doc)
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	_, err = s.coll.InsertMany(txCtx, items)
+	return err
+}
+
 func (s *Store) stageWithSession(ctx mongo.SessionContext, events []event.DomainEvent) error {
 	docs, err := s.buildDocuments(events)
 	if err != nil {
@@ -216,6 +246,7 @@ func (s *Store) buildDocumentsAt(events []event.DomainEvent, now time.Time) ([]*
 			EventType:     record.EventType,
 			AggregateType: record.AggregateType,
 			AggregateID:   record.AggregateID,
+			OrgID:         outboxcore.OrgIDFromPayloadJSON(record.PayloadJSON),
 			TopicName:     record.TopicName,
 			PayloadJSON:   record.PayloadJSON,
 			Status:        record.Status,
@@ -296,8 +327,9 @@ type pendingClaimQuery struct {
 func pendingClaimQueries(now time.Time, tiers [][]string) []pendingClaimQuery {
 	sortByCreatedAt := bson.D{{Key: "created_at", Value: 1}}
 	base := bson.M{
-		"status":          outboxcore.StatusPending,
-		"next_attempt_at": bson.M{"$lte": now},
+		"status":            outboxcore.StatusPending,
+		"next_attempt_at":   bson.M{"$lte": now},
+		"retry_disposition": bson.M{"$ne": retrygovernance.DispositionManualRequired},
 	}
 	if len(tiers) == 0 {
 		return []pendingClaimQuery{{filter: base, sort: sortByCreatedAt}}
@@ -346,8 +378,9 @@ func normalizePriorityEventTypes(eventTypes []string) []string {
 
 func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	return s.claimBatchByFilter(ctx, bson.M{
-		"status":          status,
-		"next_attempt_at": bson.M{"$lte": now},
+		"status":            status,
+		"next_attempt_at":   bson.M{"$lte": now},
+		"retry_disposition": bson.M{"$ne": retrygovernance.DispositionManualRequired},
 	}, bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "created_at", Value: 1}}, limit, now)
 }
 
@@ -379,7 +412,7 @@ func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishe
 			"published_at": transition.PublishedAt,
 			"updated_at":   transition.UpdatedAt,
 		},
-		"$unset": bson.M{"claim_token": ""},
+		"$unset": bson.M{"claim_token": "", "retry_disposition": ""},
 	})
 	if err != nil {
 		return err

@@ -6,21 +6,48 @@ import (
 	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 var ErrClaimLost = errors.New("evaluation run claim lost")
 
 type ClaimRequest struct {
-	AssessmentID uint64
-	Token        string
-	ClaimedAt    time.Time
-	LeaseUntil   time.Time
-	TraceID      string
+	AssessmentID    uint64
+	Token           string
+	ClaimedAt       time.Time
+	LeaseUntil      time.Time
+	TraceID         string
+	RetryEventID    string
+	ExpectedAttempt int
+	Origin          retrygovernance.AttemptOrigin
+	ActionRequestID string
 }
 
 type ClaimResult struct {
 	Run     evalrun.EvaluationRun
 	Claimed bool
+}
+
+type RetryAuthorizationRequest struct {
+	AssessmentID    uint64
+	ExpectedAttempt int
+	Origin          retrygovernance.AttemptOrigin
+	RequestID       string
+	EventID         string
+	AuthorizedAt    time.Time
+}
+
+type RetryAuthorizer interface {
+	AuthorizeRetry(context.Context, RetryAuthorizationRequest) (*evalrun.EvaluationRun, error)
+}
+
+type ExpiredLease struct {
+	AssessmentID uint64
+	RunID        evalrun.ID
+}
+
+type ExpiredLeaseReader interface {
+	ListExpiredLeases(context.Context, time.Time, int) ([]ExpiredLease, error)
 }
 
 // RetryableFailedRun is a failed run scoped to an organization for operating queries.

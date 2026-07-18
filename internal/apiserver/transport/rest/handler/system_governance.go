@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,40 @@ import (
 type SystemGovernanceHandler struct {
 	BaseHandler
 	facade systemgov.Facade
+}
+
+// RetryCandidates returns an organization-scoped, bounded governance worklist.
+// @Summary 系统治理-重试候选
+// @Description 返回当前组织可治理的最新业务失败、Outbox 人工重放项与运输死信；仅 qs:admin 可访问
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param cursor query string false "不透明分页游标"
+// @Param limit query int false "每页条数，1-100" default(50)
+// @Success 200 {object} core.Response{data=systemgovernance.RetryCandidatePage}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/events/retry-candidates [get]
+func (h *SystemGovernanceHandler) RetryCandidates(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		parsed, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
+			return
+		}
+		limit = parsed
+	}
+	result, err := h.facade.ListRetryCandidates(c.Request.Context(), orgID, c.Query("cursor"), limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
 }
 
 // NewSystemGovernanceHandler creates a governance handler.

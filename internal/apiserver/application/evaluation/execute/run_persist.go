@@ -8,6 +8,7 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 func (s *service) claimEvaluationRun(
@@ -24,13 +25,20 @@ func (s *service) claimEvaluationRun(
 	if lease <= 0 {
 		lease = defaultEvaluationRunLease
 	}
-	result, err := s.runRepo.Claim(ctx, evaluationrun.ClaimRequest{
+	request := evaluationrun.ClaimRequest{
 		AssessmentID: assessmentID,
 		Token:        claimToken,
 		ClaimedAt:    now,
 		LeaseUntil:   now.Add(lease),
 		TraceID:      traceID,
-	})
+	}
+	if authorization, ok := retrygovernance.AuthorizationFromContext(ctx); ok {
+		request.RetryEventID = authorization.EventID
+		request.ExpectedAttempt = authorization.ExpectedAttempt
+		request.Origin = authorization.Origin
+		request.ActionRequestID = authorization.ActionRequestID
+	}
+	result, err := s.runRepo.Claim(ctx, request)
 	if err != nil {
 		return evaluationrun.ClaimResult{}, fmt.Errorf("claim evaluation run: %w", err)
 	}

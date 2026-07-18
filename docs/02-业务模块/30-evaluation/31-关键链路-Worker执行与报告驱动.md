@@ -150,12 +150,12 @@ Worker 使用持久化回执决定 ACK/NACK：
 | 回执 | Handler 行为 | 后续 |
 | --- | --- | --- |
 | `status=evaluated` | ACK | 等待 outcome committed 事件驱动报告 |
-| `status=failed, retryable=true` | 返回 error / NACK | MQ 重投递，新 attempt |
-| `status=failed, retryable=false` | ACK | 终态失败，不无限重投 |
+| `status=failed, retry_disposition=automatic` | ACK | 失败事务中的 `evaluation.retry.requested` 驱动下一 attempt |
+| `status=failed, retry_disposition=manual_required/terminal` | ACK | 等待治理动作或保持终态，不由 MQ 创建 attempt |
 | `status=already_evaluated`（兼容回执） | ACK | 当前 Worker Service 通常重读为 `evaluated` |
 | nil/未知回执 | error / NACK | 防止不确定状态被误 ACK |
 
-gRPC transport 将 application error 映射为 Internal，但 Worker Service 会在 Engine 返回失败后尽量读取已持久化 Run，从而把 Retryable、FailureKind 和 RunID 交给 handler 做 settlement。
+gRPC transport 返回包含 RetryDisposition、attempt 上限、next_attempt_at 与 retry_event_id 的 additive 回执。只有 gRPC 不可达、解码失败或尚无持久化恢复记录的未分类错误才由 MQ NACK。
 
 ## 10. 阶段七：驱动 Interpretation
 

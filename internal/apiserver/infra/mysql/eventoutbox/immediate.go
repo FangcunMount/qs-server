@@ -16,6 +16,7 @@ func (s *Store) GetPublishableEvent(ctx context.Context, eventID string, now tim
 	var row OutboxPO
 	err := s.db.WithContext(ctx).
 		Where("event_id = ? AND status IN ? AND next_attempt_at <= ?", eventID, []string{outboxcore.StatusPending, outboxcore.StatusFailed}, now).
+		Where("retry_disposition IS NULL OR retry_disposition <> ?", "manual_required").
 		First(&row).Error
 	if err == gorm.ErrRecordNotFound {
 		return outboxport.PendingEvent{}, false, nil
@@ -25,6 +26,7 @@ func (s *Store) GetPublishableEvent(ctx context.Context, eventID string, now tim
 	}
 	pending, err := outboxcore.DecodePendingEvent(row.EventID, row.PayloadJSON)
 	if err != nil {
+		_ = s.markPermanentFailure(ctx, row.EventID, "decode outbox payload: "+err.Error(), "encoding", now)
 		return outboxport.PendingEvent{}, false, err
 	}
 	return pending, true, nil
@@ -38,9 +40,10 @@ func (s *Store) MarkEventsPublished(ctx context.Context, eventIDs []string, publ
 	return s.db.WithContext(ctx).Model(&OutboxPO{}).
 		Where("event_id IN ?", eventIDs).
 		Updates(map[string]interface{}{
-			"status":       transition.Status,
-			"published_at": transition.PublishedAt,
-			"updated_at":   transition.UpdatedAt,
+			"status":            transition.Status,
+			"published_at":      transition.PublishedAt,
+			"retry_disposition": nil,
+			"updated_at":        transition.UpdatedAt,
 		}).Error
 }
 

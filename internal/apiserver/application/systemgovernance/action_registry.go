@@ -37,6 +37,10 @@ func (r *ActionRegistry) Get(actionID string) (ActionDescriptor, bool) {
 }
 
 func defaultActions(enabled map[string]bool) []ActionDescriptor {
+	manualActionsEnabled := true
+	if value, configured := enabled["retry.manual_actions"]; configured {
+		manualActionsEnabled = value
+	}
 	return []ActionDescriptor{
 		{
 			ID:                   "cache.reload_policy",
@@ -99,12 +103,21 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 			},
 		},
 		{
-			ID:        "events.replay_pending",
-			Domain:    DomainEvents,
-			Label:     "Replay pending outbox events",
-			RiskLevel: "high",
-			Enabled:   false,
-			Planned:   true,
+			ID:                   "events.replay_pending",
+			Domain:               DomainEvents,
+			Label:                "Replay pending outbox events",
+			RiskLevel:            "high",
+			Enabled:              manualActionsEnabled,
+			RequiresConfirmation: true,
+			InputSchema:          replayPendingSchema(),
+		},
+		governedRetryAction("evaluation.retry", DomainEvents, "Retry evaluation", "medium", manualActionsEnabled),
+		governedRetryAction("evaluation.force_retry", DomainEvents, "Force retry terminal evaluation", "high", manualActionsEnabled),
+		governedRetryAction("interpretation.retry", DomainEvents, "Retry interpretation", "medium", manualActionsEnabled),
+		governedRetryAction("interpretation.force_retry", DomainEvents, "Force retry terminal interpretation", "high", manualActionsEnabled),
+		{
+			ID: "events.replay_delivery", Domain: DomainEvents, Label: "Replay transport dead letter", RiskLevel: "high",
+			Enabled: manualActionsEnabled, RequiresConfirmation: true, InputSchema: replayDeliverySchema(),
 		},
 		{
 			ID: "resilience.release_lock", Domain: DomainResilience, Label: "Relinquish leader lease", RiskLevel: "high",
@@ -115,6 +128,53 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 			ID: "resilience.tune_rate_limit", Domain: DomainResilience, Label: "Tune rate limit parameters", RiskLevel: "medium",
 			Enabled: enabled["resilience.tune_rate_limit"], Planned: !enabled["resilience.tune_rate_limit"], RequiresConfirmation: true,
 			InputSchema: map[string]interface{}{"type": "object", "required": []string{"mode", "component", "budget", "expected_version"}},
+		},
+	}
+}
+
+func replayDeliverySchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object", "required": []string{"targets", "reason"},
+		"properties": map[string]interface{}{
+			"reason": map[string]interface{}{"type": "string", "minLength": 1},
+			"targets": map[string]interface{}{
+				"type": "array", "minItems": 1, "maxItems": 100,
+				"items": map[string]interface{}{
+					"type": "object", "required": []string{"id", "expected_delivery_attempts"},
+					"properties": map[string]interface{}{
+						"id":                         map[string]interface{}{"type": "integer", "minimum": 1},
+						"expected_delivery_attempts": map[string]interface{}{"type": "integer", "minimum": 1},
+					},
+				},
+			},
+		},
+	}
+}
+
+func governedRetryAction(id string, domain Domain, label, risk string, enabled bool) ActionDescriptor {
+	return ActionDescriptor{
+		ID: id, Domain: domain, Label: label, RiskLevel: risk, Enabled: enabled, RequiresConfirmation: true,
+		InputSchema: map[string]interface{}{
+			"type": "object", "required": []string{"resource_id", "expected_attempt", "reason"},
+			"properties": map[string]interface{}{
+				"resource_id":      map[string]interface{}{"type": "string"},
+				"expected_attempt": map[string]interface{}{"type": "integer", "minimum": 1},
+				"reason":           map[string]interface{}{"type": "string", "minLength": 1},
+			},
+		},
+	}
+}
+
+func replayPendingSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object", "required": []string{"store", "targets", "reason"},
+		"properties": map[string]interface{}{
+			"store":  map[string]interface{}{"type": "string"},
+			"reason": map[string]interface{}{"type": "string", "minLength": 1},
+			"targets": map[string]interface{}{
+				"type": "array", "minItems": 1, "maxItems": 100,
+				"items": map[string]interface{}{"type": "object", "required": []string{"event_id", "expected_attempt_count"}},
+			},
 		},
 	}
 }

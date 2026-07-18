@@ -157,10 +157,10 @@ InterpretReport
 | 新成功或已有成品 | `success=true, generated` + GenerationID/ReportID | ACK |
 | 其他 worker 持有 active lease | `success=true, processing` + GenerationID/RunID | ACK |
 | 已持久 non-retryable failure | `success=false, failed, retryable=false` | ACK |
-| 已持久 retryable failure | `success=false, failed, retryable=true` | NACK |
+| 已持久 retryable failure | `success=false, failed` + RetryDecision | ACK；由 `interpretation.retry.requested` 驱动下一 attempt |
 | 连接/超时/未分类内部错误 | gRPC error 或 internal failed response | NACK |
 
-ACK `processing` 的前提是另一个调用者仍在 active lease 内完成工作。当前没有独立 lease sweeper，如持有者崩溃且后续没有新 Generate 调用，Generation 可能长时间保持 generating。
+ACK `processing` 的前提是另一个调用者仍在 active lease 内完成工作。Evaluation consistency reconcile runner 同时调用 Interpretation lease recoverer；租约到期后 reclaim 原 attempt，不消耗新的业务预算。
 
 ## 11. 阶段九：终态事件驱动后置投影
 

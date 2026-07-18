@@ -9,6 +9,7 @@ import (
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type LifecycleMapper struct{}
@@ -60,6 +61,15 @@ func (m *LifecycleMapper) RunToPO(domain *interpretationrun.InterpretationRun) *
 		StartedAt:      domain.StartedAt(),
 		LeaseExpiresAt: domain.LeaseExpiresAt(),
 		FinishedAt:     domain.FinishedAt(),
+		AttemptOrigin:  string(domain.Origin()),
+	}
+	if decision := domain.RetryDecision(); decision != nil {
+		po.RetryDisposition = string(decision.Disposition)
+		po.NextAttemptAt = decision.NextAttemptAt
+		po.PolicyMaxAttempts = decision.MaxAutomaticAttempts
+		po.RetryPolicyVersion = decision.PolicyVersion
+		po.RetryEventID = decision.RetryEventID
+		po.ActionRequestID = decision.ActionRequestID
 	}
 	if failure := domain.Failure(); failure != nil {
 		po.Failure = &InterpretationFailurePO{Kind: string(failure.Kind), Code: failure.Code, SafeMessage: failure.SafeMessage, Retryable: failure.Retryable}
@@ -75,7 +85,7 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 	if po.Failure != nil {
 		failure = &interpretationrun.Failure{Kind: interpretationrun.FailureKind(po.Failure.Kind), Code: po.Failure.Code, SafeMessage: po.Failure.SafeMessage, Retryable: po.Failure.Retryable}
 	}
-	return interpretationrun.Restore(interpretationrun.RestoreInput{
+	restore := interpretationrun.RestoreInput{
 		ID:             po.DomainID,
 		GenerationID:   meta.FromUint64(po.GenerationID),
 		Attempt:        po.Attempt,
@@ -85,7 +95,25 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 		StartedAt:      po.StartedAt,
 		LeaseExpiresAt: po.LeaseExpiresAt,
 		FinishedAt:     po.FinishedAt,
-	})
+		Origin:         retrygovernance.AttemptOrigin(po.AttemptOrigin),
+	}
+	if po.RetryDisposition != "" {
+		restore.RetryDecision = &retrygovernance.Decision{
+			Disposition: retrygovernance.Disposition(po.RetryDisposition), Attempt: po.Attempt,
+			MaxAutomaticAttempts:       po.PolicyMaxAttempts,
+			RemainingAutomaticAttempts: max(po.PolicyMaxAttempts-po.Attempt, 0),
+			NextAttemptAt:              po.NextAttemptAt, PolicyVersion: po.RetryPolicyVersion,
+			RetryEventID: po.RetryEventID, ActionRequestID: po.ActionRequestID,
+		}
+	} else if failure != nil {
+		decisionAt := po.UpdatedAt
+		if po.FinishedAt != nil {
+			decisionAt = *po.FinishedAt
+		}
+		decision := retrygovernance.BusinessPolicy().DecideFailure(failure.Retryable, po.Attempt, decisionAt)
+		restore.RetryDecision = &decision
+	}
+	return interpretationrun.Restore(restore)
 }
 
 func (m *LifecycleMapper) ReportToPO(domain *domainreport.InterpretReport) *InterpretReportPO {

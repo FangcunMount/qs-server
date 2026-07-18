@@ -105,7 +105,7 @@ func (s *Store) pendingFromDocuments(ctx context.Context, docs []OutboxPO) ([]ou
 		pending, err := outboxcore.DecodePendingEvent(po.EventID, po.PayloadJSON)
 		if err != nil {
 			transition := outboxcore.NewDecodeFailureTransition(err, time.Now())
-			_ = s.MarkEventFailed(ctx, po.EventID, transition.LastError, transition.NextAttemptAt)
+			_ = s.markPermanentFailure(ctx, po.EventID, transition.LastError, "encoding", time.Now())
 			continue
 		}
 		claimed = append(claimed, pending)

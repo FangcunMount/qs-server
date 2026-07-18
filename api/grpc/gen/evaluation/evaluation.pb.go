@@ -1086,20 +1086,28 @@ func (x *ExecuteEvaluationRequest) GetAssessmentId() uint64 {
 }
 
 type ExecuteEvaluationResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Status           string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Model            *ModelIdentity         `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
-	PrimaryScore     *ScoreValue            `protobuf:"bytes,3,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
-	Level            *ResultLevel           `protobuf:"bytes,4,opt,name=level,proto3" json:"level,omitempty"`
-	OutcomeId        string                 `protobuf:"bytes,5,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
-	Retryable        bool                   `protobuf:"varint,6,opt,name=retryable,proto3" json:"retryable,omitempty"`
-	RunId            string                 `protobuf:"bytes,7,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	FailureKind      string                 `protobuf:"bytes,8,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`
-	FailureMessage   string                 `protobuf:"bytes,9,opt,name=failure_message,json=failureMessage,proto3" json:"failure_message,omitempty"`
-	TraceId          string                 `protobuf:"bytes,10,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	InputSnapshotRef string                 `protobuf:"bytes,11,opt,name=input_snapshot_ref,json=inputSnapshotRef,proto3" json:"input_snapshot_ref,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	Status                     string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Model                      *ModelIdentity         `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	PrimaryScore               *ScoreValue            `protobuf:"bytes,3,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
+	Level                      *ResultLevel           `protobuf:"bytes,4,opt,name=level,proto3" json:"level,omitempty"`
+	OutcomeId                  string                 `protobuf:"bytes,5,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
+	Retryable                  bool                   `protobuf:"varint,6,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	RunId                      string                 `protobuf:"bytes,7,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	FailureKind                string                 `protobuf:"bytes,8,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`
+	FailureMessage             string                 `protobuf:"bytes,9,opt,name=failure_message,json=failureMessage,proto3" json:"failure_message,omitempty"`
+	TraceId                    string                 `protobuf:"bytes,10,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	InputSnapshotRef           string                 `protobuf:"bytes,11,opt,name=input_snapshot_ref,json=inputSnapshotRef,proto3" json:"input_snapshot_ref,omitempty"`
+	RetryDisposition           string                 `protobuf:"bytes,12,opt,name=retry_disposition,json=retryDisposition,proto3" json:"retry_disposition,omitempty"`
+	AttemptOrigin              string                 `protobuf:"bytes,13,opt,name=attempt_origin,json=attemptOrigin,proto3" json:"attempt_origin,omitempty"`
+	CurrentAttempt             int32                  `protobuf:"varint,14,opt,name=current_attempt,json=currentAttempt,proto3" json:"current_attempt,omitempty"`
+	MaxAutomaticAttempts       int32                  `protobuf:"varint,15,opt,name=max_automatic_attempts,json=maxAutomaticAttempts,proto3" json:"max_automatic_attempts,omitempty"`
+	RemainingAutomaticAttempts int32                  `protobuf:"varint,16,opt,name=remaining_automatic_attempts,json=remainingAutomaticAttempts,proto3" json:"remaining_automatic_attempts,omitempty"`
+	NextAttemptAt              string                 `protobuf:"bytes,17,opt,name=next_attempt_at,json=nextAttemptAt,proto3" json:"next_attempt_at,omitempty"`
+	RetryEventId               string                 `protobuf:"bytes,18,opt,name=retry_event_id,json=retryEventId,proto3" json:"retry_event_id,omitempty"`
+	ActionRequestId            string                 `protobuf:"bytes,19,opt,name=action_request_id,json=actionRequestId,proto3" json:"action_request_id,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *ExecuteEvaluationResponse) Reset() {
@@ -1205,6 +1213,62 @@ func (x *ExecuteEvaluationResponse) GetTraceId() string {
 func (x *ExecuteEvaluationResponse) GetInputSnapshotRef() string {
 	if x != nil {
 		return x.InputSnapshotRef
+	}
+	return ""
+}
+
+func (x *ExecuteEvaluationResponse) GetRetryDisposition() string {
+	if x != nil {
+		return x.RetryDisposition
+	}
+	return ""
+}
+
+func (x *ExecuteEvaluationResponse) GetAttemptOrigin() string {
+	if x != nil {
+		return x.AttemptOrigin
+	}
+	return ""
+}
+
+func (x *ExecuteEvaluationResponse) GetCurrentAttempt() int32 {
+	if x != nil {
+		return x.CurrentAttempt
+	}
+	return 0
+}
+
+func (x *ExecuteEvaluationResponse) GetMaxAutomaticAttempts() int32 {
+	if x != nil {
+		return x.MaxAutomaticAttempts
+	}
+	return 0
+}
+
+func (x *ExecuteEvaluationResponse) GetRemainingAutomaticAttempts() int32 {
+	if x != nil {
+		return x.RemainingAutomaticAttempts
+	}
+	return 0
+}
+
+func (x *ExecuteEvaluationResponse) GetNextAttemptAt() string {
+	if x != nil {
+		return x.NextAttemptAt
+	}
+	return ""
+}
+
+func (x *ExecuteEvaluationResponse) GetRetryEventId() string {
+	if x != nil {
+		return x.RetryEventId
+	}
+	return ""
+}
+
+func (x *ExecuteEvaluationResponse) GetActionRequestId() string {
+	if x != nil {
+		return x.ActionRequestId
 	}
 	return ""
 }
@@ -1893,7 +1957,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12%\n" +
 	"\x0eauto_submitted\x18\x03 \x01(\bR\rautoSubmitted\"?\n" +
 	"\x18ExecuteEvaluationRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xb9\x03\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xa8\x06\n" +
 	"\x19ExecuteEvaluationResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x05model\x18\x02 \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
@@ -1907,7 +1971,15 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0ffailure_message\x18\t \x01(\tR\x0efailureMessage\x12\x19\n" +
 	"\btrace_id\x18\n" +
 	" \x01(\tR\atraceId\x12,\n" +
-	"\x12input_snapshot_ref\x18\v \x01(\tR\x10inputSnapshotRef\"\xea\x02\n" +
+	"\x12input_snapshot_ref\x18\v \x01(\tR\x10inputSnapshotRef\x12+\n" +
+	"\x11retry_disposition\x18\f \x01(\tR\x10retryDisposition\x12%\n" +
+	"\x0eattempt_origin\x18\r \x01(\tR\rattemptOrigin\x12'\n" +
+	"\x0fcurrent_attempt\x18\x0e \x01(\x05R\x0ecurrentAttempt\x124\n" +
+	"\x16max_automatic_attempts\x18\x0f \x01(\x05R\x14maxAutomaticAttempts\x12@\n" +
+	"\x1cremaining_automatic_attempts\x18\x10 \x01(\x05R\x1aremainingAutomaticAttempts\x12&\n" +
+	"\x0fnext_attempt_at\x18\x11 \x01(\tR\rnextAttemptAt\x12$\n" +
+	"\x0eretry_event_id\x18\x12 \x01(\tR\fretryEventId\x12*\n" +
+	"\x11action_request_id\x18\x13 \x01(\tR\x0factionRequestId\"\xea\x02\n" +
 	"\x18ListMyAssessmentsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x12\n" +

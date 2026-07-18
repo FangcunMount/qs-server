@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type ID = meta.ID
@@ -70,6 +71,8 @@ type InterpretationRun struct {
 	startedAt      *time.Time
 	leaseExpiresAt *time.Time
 	finishedAt     *time.Time
+	origin         retrygovernance.AttemptOrigin
+	retryDecision  *retrygovernance.Decision
 }
 
 func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, error) {
@@ -79,7 +82,7 @@ func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, erro
 	if attempt < 1 {
 		return nil, fmt.Errorf("interpretation run attempt must be positive")
 	}
-	return &InterpretationRun{id: id, generationID: generationID, attempt: attempt, status: StatusPending}, nil
+	return &InterpretationRun{id: id, generationID: generationID, attempt: attempt, status: StatusPending, origin: retrygovernance.AttemptOriginInitial}, nil
 }
 
 // Restore rehydrates a persisted execution attempt while validating its
@@ -124,6 +127,8 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 		startedAt:      copyTimePtr(input.StartedAt),
 		leaseExpiresAt: copyTimePtr(input.LeaseExpiresAt),
 		finishedAt:     copyTimePtr(input.FinishedAt),
+		origin:         input.Origin,
+		retryDecision:  copyRetryDecision(input.RetryDecision),
 	}
 	if input.Failure != nil {
 		failure := *input.Failure
@@ -142,16 +147,26 @@ type RestoreInput struct {
 	StartedAt      *time.Time
 	LeaseExpiresAt *time.Time
 	FinishedAt     *time.Time
+	Origin         retrygovernance.AttemptOrigin
+	RetryDecision  *retrygovernance.Decision
 }
 
 func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
+	return NextWithOrigin(id, latest, retrygovernance.AttemptOriginAutomatic)
+}
+
+func NextWithOrigin(id meta.ID, latest *InterpretationRun, origin retrygovernance.AttemptOrigin) (*InterpretationRun, error) {
 	if latest == nil {
 		return nil, fmt.Errorf("latest interpretation run is required")
 	}
 	if latest.status != StatusFailed {
 		return nil, fmt.Errorf("next interpretation run requires a failed latest run")
 	}
-	return NewPending(id, latest.generationID, latest.attempt+1)
+	next, err := NewPending(id, latest.generationID, latest.attempt+1)
+	if err == nil && origin.IsValid() {
+		next.origin = origin
+	}
+	return next, err
 }
 
 func (r *InterpretationRun) Start(at time.Time, traceID string) error {
@@ -219,6 +234,8 @@ func (r *InterpretationRun) Fail(at time.Time, failure Failure) error {
 	}
 	r.status = StatusFailed
 	r.failure = &failure
+	decision := retrygovernance.BusinessPolicy().DecideFailure(failure.Retryable, r.attempt, at)
+	r.retryDecision = &decision
 	r.leaseExpiresAt = nil
 	r.finishedAt = copyTime(at)
 	return nil
@@ -250,7 +267,74 @@ func (r *InterpretationRun) HasActiveLease(at time.Time) bool {
 	return r != nil && r.status == StatusRunning && r.leaseExpiresAt != nil && r.leaseExpiresAt.After(at)
 }
 
+// ReclaimExpiredLease authorizes another worker to continue the same attempt.
+// It deliberately does not advance attempt or replace startedAt: a process
+// crash is transport/recovery work, not a new business execution budget.
+func (r *InterpretationRun) ReclaimExpiredLease(at time.Time, traceID string, leaseExpiresAt time.Time) error {
+	if r == nil || r.status != StatusRunning {
+		return fmt.Errorf("only a running interpretation run can reclaim a lease")
+	}
+	if at.IsZero() || leaseExpiresAt.IsZero() || !leaseExpiresAt.After(at) {
+		return fmt.Errorf("interpretation recovery lease is invalid")
+	}
+	if r.leaseExpiresAt == nil || r.leaseExpiresAt.After(at) {
+		return fmt.Errorf("interpretation run lease has not expired")
+	}
+	r.traceID = traceID
+	r.leaseExpiresAt = copyTime(leaseExpiresAt)
+	r.origin = retrygovernance.AttemptOriginLeaseRecovery
+	return nil
+}
+
 func (r *InterpretationRun) FinishedAt() *time.Time { return copyTimePtr(r.finishedAt) }
+
+func (r *InterpretationRun) Origin() retrygovernance.AttemptOrigin {
+	if r == nil || r.origin == "" {
+		return retrygovernance.AttemptOriginInitial
+	}
+	return r.origin
+}
+
+func (r *InterpretationRun) RetryDecision() *retrygovernance.Decision {
+	if r == nil {
+		return nil
+	}
+	return copyRetryDecision(r.retryDecision)
+}
+
+func (r *InterpretationRun) AttachRetryEvent(eventID string) error {
+	if r == nil || r.status != StatusFailed || r.retryDecision == nil || r.retryDecision.Disposition != retrygovernance.DispositionAutomatic || eventID == "" {
+		return ErrInvalidRetrySchedule
+	}
+	if r.retryDecision.RetryEventID != "" && r.retryDecision.RetryEventID != eventID {
+		return fmt.Errorf("interpretation retry event is immutable")
+	}
+	r.retryDecision.RetryEventID = eventID
+	return nil
+}
+
+func (r *InterpretationRun) AuthorizeOneRetry(origin retrygovernance.AttemptOrigin, requestID, eventID string, at time.Time) error {
+	if r == nil || r.status != StatusFailed || r.retryDecision == nil || requestID == "" || eventID == "" || at.IsZero() {
+		return ErrInvalidRetrySchedule
+	}
+	switch origin {
+	case retrygovernance.AttemptOriginManual:
+		if r.retryDecision.Disposition != retrygovernance.DispositionManualRequired {
+			return ErrInvalidRetrySchedule
+		}
+	case retrygovernance.AttemptOriginForce:
+		if r.retryDecision.Disposition != retrygovernance.DispositionTerminal {
+			return ErrInvalidRetrySchedule
+		}
+	default:
+		return ErrInvalidRetrySchedule
+	}
+	r.retryDecision.Disposition = retrygovernance.DispositionAutomatic
+	r.retryDecision.NextAttemptAt = copyTime(at)
+	r.retryDecision.RetryEventID = eventID
+	r.retryDecision.ActionRequestID = requestID
+	return nil
+}
 
 func copyTime(value time.Time) *time.Time { return &value }
 
@@ -259,5 +343,14 @@ func copyTimePtr(value *time.Time) *time.Time {
 		return nil
 	}
 	copy := *value
+	return &copy
+}
+
+func copyRetryDecision(value *retrygovernance.Decision) *retrygovernance.Decision {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	copy.NextAttemptAt = copyTimePtr(value.NextAttemptAt)
 	return &copy
 }

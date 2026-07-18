@@ -393,6 +393,7 @@ func (h *EvaluationOperatorHandler) BatchEvaluate(c *gin.Context) {
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Failure 429 {object} core.ErrResponse
+// @Deprecated
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
 func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

@@ -20,7 +20,8 @@ func (s *Store) ClaimEventsByIDs(ctx context.Context, eventIDs []string, now tim
 
 	staleBefore := now.Add(-s.publishingStaleFor)
 	dueFilter := bson.M{
-		"event_id": bson.M{"$in": eventIDs},
+		"event_id":          bson.M{"$in": eventIDs},
+		"retry_disposition": bson.M{"$ne": "manual_required"},
 		"$or": []bson.M{
 			{
 				"status":          outboxcore.StatusPending,

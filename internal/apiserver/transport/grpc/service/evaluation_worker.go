@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"google.golang.org/grpc"
@@ -29,11 +30,23 @@ func (s *EvaluationWorkerService) ExecuteEvaluation(ctx context.Context, req *pb
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 	logger.L(ctx).Infow("gRPC: received evaluation execution request", "assessment_id", req.AssessmentId)
+	ctx = withRetryAuthorization(ctx)
 	result, err := s.service.Execute(ctx, evaluationworker.Command{AssessmentID: req.AssessmentId})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	resp := &pb.ExecuteEvaluationResponse{Status: result.Status, Retryable: result.Retryable, RunId: result.RunID, FailureKind: result.FailureKind, FailureMessage: result.FailureMessage, TraceId: result.TraceID, InputSnapshotRef: result.InputSnapshotRef}
+	resp := &pb.ExecuteEvaluationResponse{
+		Status: result.Status, Retryable: result.Retryable, RunId: result.RunID,
+		FailureKind: result.FailureKind, FailureMessage: result.FailureMessage,
+		TraceId: result.TraceID, InputSnapshotRef: result.InputSnapshotRef,
+		RetryDisposition: result.RetryDisposition, AttemptOrigin: result.AttemptOrigin,
+		CurrentAttempt: int32(result.CurrentAttempt), MaxAutomaticAttempts: int32(result.MaxAutomaticAttempts),
+		RemainingAutomaticAttempts: int32(result.RemainingAutomaticAttempts), RetryEventId: result.RetryEventID,
+		ActionRequestId: result.ActionRequestID,
+	}
+	if result.NextAttemptAt != nil {
+		resp.NextAttemptAt = result.NextAttemptAt.UTC().Format(time.RFC3339Nano)
+	}
 	if result.Outcome != nil {
 		resp.OutcomeId = result.Outcome.ID
 		resp.Model = &pb.ModelIdentity{Kind: result.Outcome.ModelKind, SubKind: result.Outcome.SubKind, Algorithm: result.Outcome.Algorithm, Code: result.Outcome.ModelCode, Version: result.Outcome.Version, Title: result.Outcome.Title}

@@ -1,6 +1,7 @@
 package assessment
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -10,10 +11,12 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 const (
 	EventTypeRequested        = evaldomainevent.TypeRequested
+	EventTypeRetryRequested   = evaldomainevent.TypeRetryRequested
 	EventTypeOutcomeCommitted = evaldomainevent.TypeOutcomeCommitted
 	EventTypeFailed           = evaldomainevent.TypeFailed
 )
@@ -60,6 +63,29 @@ func NewEvaluationRequestedEvent(
 		in.ModelVersion = modelRef.Version()
 	}
 	return evaldomainevent.NewRequestedEvent(in)
+}
+
+// NewEvaluationRetryRequestedEvent creates a deterministic retry wake-up.
+func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin retrygovernance.AttemptOrigin, actionRequestID string, requestedAt time.Time) EvaluationRequestedEvent {
+	if a == nil {
+		return EvaluationRequestedEvent{}
+	}
+	eventID := fmt.Sprintf("eval-retry:%d:%d:%s", a.ID(), expectedAttempt, origin)
+	if actionRequestID != "" {
+		eventID += ":" + actionRequestID
+	}
+	in := evaldomainevent.RequestedInput{
+		EventID: eventID,
+		OrgID:   a.OrgID(), AssessmentID: int64(a.ID()), TesteeID: a.TesteeID().Uint64(),
+		QuestionnaireCode: string(a.QuestionnaireRef().Code()), QuestionnaireVer: a.QuestionnaireRef().Version(),
+		AnswerSheetID: strconv.FormatInt(int64(a.AnswerSheetRef().ID()), 10), RequestedAt: requestedAt,
+		ExpectedAttempt: expectedAttempt, AttemptOrigin: string(origin), ActionRequestID: actionRequestID, Mode: "next_attempt",
+	}
+	if modelRef := a.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
+		in.ModelKind, in.ModelCode, in.ModelVersion = modelRef.Kind().String(), modelRef.Code().String(), modelRef.Version()
+		in.ModelSubKind, in.ModelAlgorithm = string(modelRef.SubKind()), string(modelRef.Algorithm())
+	}
+	return evaldomainevent.NewRetryRequestedEvent(in)
 }
 
 func NewEvaluationFailedEvent(

@@ -5,6 +5,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -19,6 +20,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
+
+var ErrAutomaticRetryPaused = errors.New("automatic business retry paused by emergency switch")
 
 // HandlerFunc 处理器函数类型
 type HandlerFunc func(ctx context.Context, eventType string, payload []byte) error
@@ -79,6 +82,7 @@ type Dependencies struct {
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           ReportStatusWriter
+	DisableAutomaticRetry          bool
 }
 
 // HandlerFactory 处理器工厂函数

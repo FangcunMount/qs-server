@@ -59,4 +59,8 @@ message GenerateReportFromAssessmentResponse {
   bool success = 1; string status = 2; string message = 3; bool retryable = 4;
   string run_id = 5; string failure_kind = 6; string generation_id = 7;
   string report_id = 8; string failure_code = 9;
+  string retry_disposition = 10; string attempt_origin = 11;
+  int32 current_attempt = 12; int32 max_automatic_attempts = 13;
+  int32 remaining_automatic_attempts = 14; string next_attempt_at = 15;
+  string retry_event_id = 16; string action_request_id = 17;
 }

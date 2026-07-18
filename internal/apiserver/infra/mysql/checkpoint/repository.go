@@ -10,6 +10,7 @@ import (
 	domainstatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -28,8 +29,64 @@ func NewRunRepository(db *gorm.DB) evaluationrun.Repository {
 }
 
 var (
-	_ evaluationrun.Repository = (*Repository)(nil)
+	_ evaluationrun.Repository         = (*Repository)(nil)
+	_ evaluationrun.RetryAuthorizer    = (*Repository)(nil)
+	_ evaluationrun.ExpiredLeaseReader = (*Repository)(nil)
 )
+
+func (r *Repository) ListExpiredLeases(ctx context.Context, now time.Time, limit int) ([]evaluationrun.ExpiredLease, error) {
+	if r == nil || r.db == nil || limit <= 0 {
+		return nil, nil
+	}
+	var rows []RuntimeCheckpointPO
+	if err := r.db.WithContext(ctx).
+		Where("scope = ? AND status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND deleted_at IS NULL", scopeEvaluationRun, evalrun.StatusRunning.String(), now).
+		Order("lease_expires_at ASC, id ASC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	result := make([]evaluationrun.ExpiredLease, 0, len(rows))
+	for _, row := range rows {
+		if row.AssessmentID != nil {
+			result = append(result, evaluationrun.ExpiredLease{AssessmentID: *row.AssessmentID, RunID: evalrun.ID(row.ResourceID)})
+		}
+	}
+	return result, nil
+}
+
+func (r *Repository) AuthorizeRetry(ctx context.Context, request evaluationrun.RetryAuthorizationRequest) (*evalrun.EvaluationRun, error) {
+	if r == nil || r.db == nil || request.AssessmentID == 0 || request.ExpectedAttempt < 1 {
+		return nil, fmt.Errorf("invalid evaluation retry authorization")
+	}
+	db := checkpointDB(ctx, r.db)
+	var po RuntimeCheckpointPO
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("scope = ? AND assessment_id = ? AND deleted_at IS NULL", scopeEvaluationRun, request.AssessmentID).
+		Order("attempt_no DESC, id DESC").First(&po).Error; err != nil {
+		return nil, err
+	}
+	run := runFromPO(po)
+	if run.Attempt().Number != request.ExpectedAttempt {
+		return nil, evaluationrun.ErrClaimLost
+	}
+	if err := run.AuthorizeOneRetry(request.Origin, request.RequestID, request.EventID, request.AuthorizedAt); err != nil {
+		return nil, err
+	}
+	updated := runToPO(run)
+	result := db.Model(&RuntimeCheckpointPO{}).
+		Where("id = ? AND attempt_no = ? AND retry_disposition = ? AND deleted_at IS NULL", po.ID, request.ExpectedAttempt, po.RetryDisposition).
+		Updates(map[string]interface{}{
+			"retry_disposition": updated.RetryDisposition, "next_attempt_at": updated.NextAttemptAt,
+			"retry_event_id": updated.RetryEventID, "action_request_id": updated.ActionRequestID,
+			"updated_at": request.AuthorizedAt,
+		})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected != 1 {
+		return nil, evaluationrun.ErrClaimLost
+	}
+	return &run, nil
+}
 
 func (r *Repository) Claim(ctx context.Context, request evaluationrun.ClaimRequest) (evaluationrun.ClaimResult, error) {
 	if r == nil || r.db == nil {
@@ -81,11 +138,16 @@ func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimR
 				return nil
 			}
 		case evalrun.StatusFailed:
-			if !run.Retryable() {
+			decision := run.RetryDecision()
+			if (!run.Retryable() && request.Origin != retrygovernance.AttemptOriginForce) || decision == nil || decision.Disposition != retrygovernance.DispositionAutomatic ||
+				decision.NextAttemptAt == nil || decision.NextAttemptAt.After(request.ClaimedAt) ||
+				request.ExpectedAttempt != attempt.Number || request.RetryEventID == "" || request.RetryEventID != decision.RetryEventID ||
+				!request.Origin.IsValid() || request.Origin == retrygovernance.AttemptOriginInitial || request.Origin == retrygovernance.AttemptOriginLeaseRecovery ||
+				request.ActionRequestID != decision.ActionRequestID {
 				result = evaluationrun.ClaimResult{Run: run}
 				return nil
 			}
-			run = evalrun.NextEvaluationRun(run)
+			run = evalrun.NextEvaluationRunWithOrigin(run, request.Origin)
 		case evalrun.StatusSucceeded:
 			result = evaluationrun.ClaimResult{Run: run}
 			return nil
@@ -143,16 +205,23 @@ func (r *Repository) SaveClaimed(ctx context.Context, run evalrun.EvaluationRun)
 
 func claimUpdates(po *RuntimeCheckpointPO) map[string]interface{} {
 	return map[string]interface{}{
-		"status":             po.Status,
-		"started_at":         po.StartedAt,
-		"finished_at":        po.FinishedAt,
-		"error_code":         po.ErrorCode,
-		"error_message":      po.ErrorMessage,
-		"retryable":          po.Retryable,
-		"trace_id":           po.TraceID,
-		"input_snapshot_ref": po.InputSnapshotRef,
-		"claim_token":        po.ClaimToken,
-		"lease_expires_at":   po.LeaseExpiresAt,
+		"status":               po.Status,
+		"started_at":           po.StartedAt,
+		"finished_at":          po.FinishedAt,
+		"error_code":           po.ErrorCode,
+		"error_message":        po.ErrorMessage,
+		"retryable":            po.Retryable,
+		"attempt_origin":       po.AttemptOrigin,
+		"retry_disposition":    po.RetryDisposition,
+		"next_attempt_at":      po.NextAttemptAt,
+		"policy_max_attempts":  po.PolicyMaxAttempts,
+		"retry_policy_version": po.RetryPolicyVersion,
+		"retry_event_id":       po.RetryEventID,
+		"action_request_id":    po.ActionRequestID,
+		"trace_id":             po.TraceID,
+		"input_snapshot_ref":   po.InputSnapshotRef,
+		"claim_token":          po.ClaimToken,
+		"lease_expires_at":     po.LeaseExpiresAt,
 	}
 }
 
@@ -222,8 +291,15 @@ func (r *Repository) ListRetryableFailed(ctx context.Context, params evaluationr
 		Table("runtime_checkpoint AS rc").
 		Select("rc.*, a.org_id").
 		Joins("INNER JOIN assessment AS a ON a.id = rc.assessment_id").
+		Joins(`INNER JOIN (
+			SELECT assessment_id, MAX(attempt_no) AS latest_attempt
+			FROM runtime_checkpoint
+			WHERE scope = ? AND deleted_at IS NULL
+			GROUP BY assessment_id
+		) AS latest ON latest.assessment_id = rc.assessment_id AND latest.latest_attempt = rc.attempt_no`, scopeEvaluationRun).
 		Where("rc.scope = ? AND rc.status = ? AND rc.retryable = ? AND rc.deleted_at IS NULL",
 			scopeEvaluationRun, evalrun.StatusFailed.String(), true).
+		Where("a.status = ?", "failed").
 		Where("a.org_id = ?", params.OrgID)
 	if params.Cursor > 0 {
 		query = query.Where("rc.id < ?", params.Cursor)
@@ -358,6 +434,27 @@ func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
 		po.ClaimToken = &claimToken
 	}
 	po.LeaseExpiresAt = run.LeaseExpiresAt()
+	origin := string(run.Origin())
+	po.AttemptOrigin = &origin
+	if decision := run.RetryDecision(); decision != nil {
+		disposition := string(decision.Disposition)
+		maxAttempts := uint(decision.MaxAutomaticAttempts)
+		po.RetryDisposition = &disposition
+		po.NextAttemptAt = decision.NextAttemptAt
+		po.PolicyMaxAttempts = &maxAttempts
+		if decision.PolicyVersion != "" {
+			version := decision.PolicyVersion
+			po.RetryPolicyVersion = &version
+		}
+		if decision.RetryEventID != "" {
+			eventID := decision.RetryEventID
+			po.RetryEventID = &eventID
+		}
+		if decision.ActionRequestID != "" {
+			requestID := decision.ActionRequestID
+			po.ActionRequestID = &requestID
+		}
+	}
 	if failure := run.Failure(); failure != nil {
 		code := failure.Kind.String()
 		message := failure.Message
@@ -383,6 +480,9 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 	if po.ClaimToken != nil {
 		input.ClaimToken = *po.ClaimToken
 	}
+	if po.AttemptOrigin != nil {
+		input.Origin = retrygovernance.AttemptOrigin(*po.AttemptOrigin)
+	}
 	if po.ErrorCode != nil || po.ErrorMessage != nil {
 		failure := evalrun.Failure{Retryable: po.Retryable}
 		if po.ErrorCode != nil {
@@ -392,6 +492,34 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 			failure.Message = *po.ErrorMessage
 		}
 		input.Failure = &failure
+		if po.RetryDisposition != nil {
+			decision := retrygovernance.Decision{Disposition: retrygovernance.Disposition(*po.RetryDisposition), Attempt: int(po.AttemptNo)}
+			if po.PolicyMaxAttempts != nil {
+				decision.MaxAutomaticAttempts = int(*po.PolicyMaxAttempts)
+			}
+			decision.RemainingAutomaticAttempts = decision.MaxAutomaticAttempts - decision.Attempt
+			if decision.RemainingAutomaticAttempts < 0 {
+				decision.RemainingAutomaticAttempts = 0
+			}
+			decision.NextAttemptAt = po.NextAttemptAt
+			if po.RetryPolicyVersion != nil {
+				decision.PolicyVersion = *po.RetryPolicyVersion
+			}
+			if po.RetryEventID != nil {
+				decision.RetryEventID = *po.RetryEventID
+			}
+			if po.ActionRequestID != nil {
+				decision.ActionRequestID = *po.ActionRequestID
+			}
+			input.RetryDecision = &decision
+		} else {
+			decisionAt := po.UpdatedAt
+			if po.FinishedAt != nil {
+				decisionAt = *po.FinishedAt
+			}
+			decision := retrygovernance.BusinessPolicy().DecideFailure(failure.Retryable, int(po.AttemptNo), decisionAt)
+			input.RetryDecision = &decision
+		}
 	}
 	return evalrun.Reconstruct(input)
 }

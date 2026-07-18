@@ -3057,6 +3057,7 @@ const docTemplate = `{
                     "Evaluation-Admin"
                 ],
                 "summary": "重试失败的测评",
+                "deprecated": true,
                 "parameters": [
                     {
                         "type": "string",
@@ -9109,6 +9110,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/system-governance/events/retry-candidates": {
+            "get": {
+                "description": "返回当前组织可治理的最新业务失败、Outbox 人工重放项与运输死信；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-重试候选",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "不透明分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "每页条数，1-100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.RetryCandidatePage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/overview": {
             "get": {
                 "description": "聚合事件、缓存、承压保护诊断信号与近窗口指标可用性；仅 qs:admin 可访问",
@@ -12735,11 +12796,17 @@ const docTemplate = `{
         "response.EvaluationRunResponse": {
             "type": "object",
             "properties": {
+                "action_request_id": {
+                    "type": "string"
+                },
                 "assessment_id": {
                     "type": "integer"
                 },
                 "attempt_no": {
                     "type": "integer"
+                },
+                "attempt_origin": {
+                    "type": "string"
                 },
                 "error_code": {
                     "type": "string"
@@ -12751,6 +12818,21 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "input_snapshot_ref": {
+                    "type": "string"
+                },
+                "max_automatic_attempts": {
+                    "type": "integer"
+                },
+                "next_attempt_at": {
+                    "type": "string"
+                },
+                "remaining_automatic_attempts": {
+                    "type": "integer"
+                },
+                "retry_disposition": {
+                    "type": "string"
+                },
+                "retry_event_id": {
                     "type": "string"
                 },
                 "retryable": {
@@ -12929,6 +13011,12 @@ const docTemplate = `{
                 "ReportType": {
                     "type": "string"
                 },
+                "Runs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.InterpretationRunWire"
+                    }
+                },
                 "Status": {
                     "type": "string"
                 },
@@ -12975,8 +13063,14 @@ const docTemplate = `{
         "response.InterpretationRunWire": {
             "type": "object",
             "properties": {
+                "ActionRequestID": {
+                    "type": "string"
+                },
                 "Attempt": {
                     "type": "integer"
+                },
+                "AttemptOrigin": {
+                    "type": "string"
                 },
                 "Failure": {
                     "$ref": "#/definitions/response.InterpretationFailureWire"
@@ -12991,6 +13085,21 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "LeaseExpiresAt": {
+                    "type": "string"
+                },
+                "MaxAutomaticAttempts": {
+                    "type": "integer"
+                },
+                "NextAttemptAt": {
+                    "type": "string"
+                },
+                "RemainingAutomaticAttempts": {
+                    "type": "integer"
+                },
+                "RetryDisposition": {
+                    "type": "string"
+                },
+                "RetryEventID": {
                     "type": "string"
                 },
                 "StartedAt": {
@@ -13777,11 +13886,17 @@ const docTemplate = `{
         "response.RetryableFailedRunResponse": {
             "type": "object",
             "properties": {
+                "action_request_id": {
+                    "type": "string"
+                },
                 "assessment_id": {
                     "type": "integer"
                 },
                 "attempt_no": {
                     "type": "integer"
+                },
+                "attempt_origin": {
+                    "type": "string"
                 },
                 "error_code": {
                     "type": "string"
@@ -13795,8 +13910,23 @@ const docTemplate = `{
                 "input_snapshot_ref": {
                     "type": "string"
                 },
+                "max_automatic_attempts": {
+                    "type": "integer"
+                },
+                "next_attempt_at": {
+                    "type": "string"
+                },
                 "org_id": {
                     "type": "integer"
+                },
+                "remaining_automatic_attempts": {
+                    "type": "integer"
+                },
+                "retry_disposition": {
+                    "type": "string"
+                },
+                "retry_event_id": {
+                    "type": "string"
                 },
                 "retryable": {
                     "type": "boolean"
@@ -15016,6 +15146,55 @@ const docTemplate = `{
                     }
                 },
                 "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.RetryCandidate": {
+            "type": "object",
+            "properties": {
+                "action_request_id": {
+                    "type": "string"
+                },
+                "attempt": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "last_error_kind": {
+                    "type": "string"
+                },
+                "next_attempt_at": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "retry_disposition": {
+                    "type": "string"
+                },
+                "retry_event_id": {
+                    "type": "string"
+                },
+                "store": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.RetryCandidatePage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.RetryCandidate"
+                    }
+                },
+                "next_cursor": {
                     "type": "string"
                 }
             }

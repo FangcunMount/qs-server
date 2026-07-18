@@ -9,9 +9,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	uuid "github.com/satori/go.uuid"
@@ -19,11 +22,39 @@ import (
 
 // ActionExecutor 运行enabled governance actions。
 type ActionExecutor struct {
-	registry   *ActionRegistry
-	governance statisticsApp.GovernanceFacade
-	reloader   CachePolicyReloader
-	resilience control.Governor
-	audit      ActionAuditStore
+	registry       *ActionRegistry
+	governance     statisticsApp.GovernanceFacade
+	reloader       CachePolicyReloader
+	resilience     control.Governor
+	audit          ActionAuditStore
+	eventReplays   map[string]outboxport.ManualReplayAuthorizer
+	deliveryReplay DeliveryReplayStore
+	eventPublisher event.EventPublisher
+	handlers       map[string]ActionHandler
+}
+
+type ActionHandler func(context.Context, int64, string, map[string]interface{}) (map[string]interface{}, error)
+
+func (e *ActionExecutor) BindEventReplayStores(stores map[string]outboxport.ManualReplayAuthorizer) *ActionExecutor {
+	if e != nil {
+		e.eventReplays = stores
+	}
+	return e
+}
+
+func (e *ActionExecutor) BindActionHandlers(handlers map[string]ActionHandler) *ActionExecutor {
+	if e != nil {
+		e.handlers = handlers
+	}
+	return e
+}
+
+func (e *ActionExecutor) BindDeliveryReplay(store DeliveryReplayStore, publisher event.EventPublisher) *ActionExecutor {
+	if e != nil {
+		e.deliveryReplay = store
+		e.eventPublisher = publisher
+	}
+	return e
 }
 
 func NewActionExecutorWithResilience(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloader CachePolicyReloader, resilience control.Governor, audits ...ActionAuditStore) *ActionExecutor {
@@ -126,9 +157,94 @@ func (e *ActionExecutor) Run(
 	case "resilience.release_lock":
 		result, err := e.runReleaseLock(ctx, orgID, requestID, req.Input)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
+	case "events.replay_pending":
+		result, err := e.runReplayPending(ctx, orgID, requestID, req.Input)
+		return finalizeActionRun(requestID, actionID, startedAt, result, err)
+	case "events.replay_delivery":
+		result, err := e.runReplayDelivery(ctx, orgID, requestID, req.Input)
+		return finalizeActionRun(requestID, actionID, startedAt, result, err)
 	default:
+		if handler := e.handlers[actionID]; handler != nil {
+			result, err := handler(ctx, orgID, requestID, req.Input)
+			return finalizeActionRun(requestID, actionID, startedAt, result, err)
+		}
 		return nil, errors.WithCode(code.ErrInvalidArgument, "action %s is not executable in v1", actionID)
 	}
+}
+
+type replayDeliveryInput struct {
+	Targets []DeliveryReplayTarget `json:"targets"`
+	Reason  string                 `json:"reason"`
+}
+
+func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
+	if e.deliveryReplay == nil || e.eventPublisher == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "delivery replay is not configured")
+	}
+	var request replayDeliveryInput
+	if err := decodeActionInput(input, &request); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(request.Reason) == "" || len(request.Targets) == 0 || len(request.Targets) > 100 {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "reason and 1..100 targets are required")
+	}
+	authorized, err := e.deliveryReplay.AuthorizeReplay(ctx, orgID, requestID, request.Targets, time.Now())
+	if err != nil {
+		return nil, errors.WithCode(code.ErrConflict, "%s", err.Error())
+	}
+	results := make([]map[string]interface{}, 0, len(authorized))
+	for _, item := range authorized {
+		pending, decodeErr := outboxcore.DecodePendingEvent(item.EventID, item.PayloadJSON)
+		if decodeErr == nil {
+			decodeErr = e.eventPublisher.Publish(ctx, pending.Event)
+		}
+		now := time.Now()
+		if decodeErr != nil {
+			_ = e.deliveryReplay.FailReplay(ctx, item.ID, requestID, decodeErr.Error(), now)
+			return nil, errors.WithCode(code.ErrInternalServerError, "replay delivery %d: %s", item.ID, decodeErr.Error())
+		}
+		if err := e.deliveryReplay.CompleteReplay(ctx, item.ID, requestID, now); err != nil {
+			return nil, errors.WithCode(code.ErrInternalServerError, "complete delivery replay %d: %s", item.ID, err.Error())
+		}
+		results = append(results, map[string]interface{}{"id": item.ID, "event_id": pending.Event.EventID(), "replayed": true})
+	}
+	return map[string]interface{}{"replayed": len(results), "items": results}, nil
+}
+
+type replayPendingInput struct {
+	Store   string                          `json:"store"`
+	Targets []outboxport.ManualReplayTarget `json:"targets"`
+	Reason  string                          `json:"reason"`
+}
+
+func (e *ActionExecutor) runReplayPending(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
+	var request replayPendingInput
+	if err := decodeActionInput(input, &request); err != nil {
+		return nil, err
+	}
+	if request.Store == "" || strings.TrimSpace(request.Reason) == "" || len(request.Targets) == 0 || len(request.Targets) > 100 {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "store, reason and 1..100 targets are required")
+	}
+	store := e.eventReplays[request.Store]
+	if store == nil {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "outbox store %s is not replayable", request.Store)
+	}
+	for _, target := range request.Targets {
+		if target.EventID == "" || target.ExpectedAttemptCount < 1 {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "event_id and positive expected_attempt_count are required")
+		}
+	}
+	results, err := store.AuthorizeManualReplay(ctx, orgID, requestID, request.Targets, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	authorized := 0
+	for _, result := range results {
+		if result.Authorized {
+			authorized++
+		}
+	}
+	return map[string]interface{}{"store": request.Store, "authorized": authorized, "items": results}, nil
 }
 
 func newActionAuditRecord(ctx context.Context, orgID int64, requestID, actionID string, input map[string]interface{}, startedAt time.Time) ActionAuditRecord {

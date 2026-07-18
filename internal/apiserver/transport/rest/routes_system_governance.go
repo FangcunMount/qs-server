@@ -14,6 +14,7 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	governance := internalV1.Group("/system-governance", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	governance.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Overview)...)
 	governance.GET("/events", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Events)...)
+	governance.GET("/events/retry-candidates", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.RetryCandidates)...)
 	governance.GET("/cache", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Cache)...)
 	governance.GET("/resilience", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Resilience)...)
 	governance.GET("/actions", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Actions)...)

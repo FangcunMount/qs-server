@@ -1,0 +1,25 @@
+[
+  {
+    "createIndexes": "interpretation_runs",
+    "indexes": [
+      {
+        "key": { "status": 1, "retry_disposition": 1, "next_attempt_at": 1 },
+        "name": "idx_interpretation_run_retry_due"
+      },
+      {
+        "key": { "action_request_id": 1 },
+        "name": "idx_interpretation_run_action_request",
+        "sparse": true
+      }
+    ]
+  },
+  {
+    "createIndexes": "domain_event_outbox",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "status": 1, "retry_disposition": 1, "next_attempt_at": 1 },
+        "name": "idx_outbox_org_retry_due"
+      }
+    ]
+  }
+]

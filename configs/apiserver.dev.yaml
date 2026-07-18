@@ -420,6 +420,19 @@ backpressure:
 # -------------------------------------------------------
 # Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
 system_governance:
+  retry:
+    manual_actions_enabled: true
+    lease_reconcile_enabled: true
+    business:
+      max_automatic_attempts: 3
+      base_delay: 30s
+      max_delay: 5m
+      jitter_fraction: 0
+    outbox:
+      max_automatic_attempts: 30
+      base_delay: 10s
+      max_delay: 1h
+      jitter_fraction: 0.2
   # 高风险韧性动作默认关闭，开发环境按动作显式启用。
   resilience:
     tune_rate_limit: false

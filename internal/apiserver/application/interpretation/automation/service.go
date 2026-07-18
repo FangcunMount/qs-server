@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type Actor struct {
@@ -30,13 +31,16 @@ type Status string
 const (
 	StatusGenerated  Status = "generated"
 	StatusProcessing Status = "processing"
+	StatusBlocked    Status = "blocked"
 )
 
 type Result struct {
-	Status       Status
-	GenerationID meta.ID
-	RunID        meta.ID
-	ReportID     meta.ID
+	Status        Status
+	GenerationID  meta.ID
+	RunID         meta.ID
+	ReportID      meta.ID
+	AttemptOrigin retrygovernance.AttemptOrigin
+	RetryDecision *retrygovernance.Decision
 }
 
 type Service interface {
@@ -77,6 +81,8 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 	result := &Result{}
 	if executed.Status == interpretationexecution.ExecuteStatusProcessing {
 		result.Status = StatusProcessing
+	} else if executed.Status == interpretationexecution.ExecuteStatusBlocked {
+		result.Status = StatusBlocked
 	} else {
 		result.Status = StatusGenerated
 	}
@@ -85,6 +91,8 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 	}
 	if executed.Run != nil {
 		result.RunID = executed.Run.ID()
+		result.AttemptOrigin = executed.Run.Origin()
+		result.RetryDecision = executed.Run.RetryDecision()
 	}
 	if executed.InterpretReport != nil {
 		result.ReportID = executed.InterpretReport.ID()
@@ -96,12 +104,14 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 }
 
 type Failure struct {
-	GenerationID meta.ID
-	RunID        meta.ID
-	Kind         run.FailureKind
-	Code         string
-	SafeMessage  string
-	Retryable    bool
+	GenerationID  meta.ID
+	RunID         meta.ID
+	Kind          run.FailureKind
+	Code          string
+	SafeMessage   string
+	Retryable     bool
+	AttemptOrigin retrygovernance.AttemptOrigin
+	RetryDecision *retrygovernance.Decision
 }
 
 func FailureFrom(err error) (Failure, bool) {
@@ -110,11 +120,13 @@ func FailureFrom(err error) (Failure, bool) {
 		return Failure{}, false
 	}
 	return Failure{
-		GenerationID: failed.GenerationID,
-		RunID:        failed.RunID,
-		Kind:         failed.Failure.Kind,
-		Code:         failed.Failure.Code,
-		SafeMessage:  failed.Failure.SafeMessage,
-		Retryable:    failed.Failure.Retryable,
+		GenerationID:  failed.GenerationID,
+		RunID:         failed.RunID,
+		Kind:          failed.Failure.Kind,
+		Code:          failed.Failure.Code,
+		SafeMessage:   failed.Failure.SafeMessage,
+		Retryable:     failed.Failure.Retryable,
+		AttemptOrigin: failed.Origin,
+		RetryDecision: failed.Decision,
 	}, true
 }

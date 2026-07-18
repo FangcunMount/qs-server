@@ -16,6 +16,7 @@ import (
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type executorBuilder struct {
@@ -39,8 +40,9 @@ func (b *executorBuilder) Build(context.Context, interpinput.InterpretationInput
 }
 
 type eventStagerStub struct {
-	events [][]event.DomainEvent
-	err    error
+	events    [][]event.DomainEvent
+	scheduled [][]event.DomainEvent
+	err       error
 }
 
 func (s *eventStagerStub) Stage(_ context.Context, events ...event.DomainEvent) error {
@@ -48,6 +50,14 @@ func (s *eventStagerStub) Stage(_ context.Context, events ...event.DomainEvent) 
 		return s.err
 	}
 	s.events = append(s.events, append([]event.DomainEvent(nil), events...))
+	return nil
+}
+
+func (s *eventStagerStub) StageAt(_ context.Context, _ time.Time, events ...event.DomainEvent) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.scheduled = append(s.scheduled, append([]event.DomainEvent(nil), events...))
 	return nil
 }
 
@@ -137,6 +147,9 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 	if generationRecord == nil || generationRecord.Status() != domaingeneration.StatusFailed || len(stager.events) != 1 || stager.events[0][0].EventType() != domaininterpretation.EventTypeReportFailed {
 		t.Fatalf("generation=%#v events=%#v", generationRecord, stager.events)
 	}
+	if len(stager.scheduled) != 1 || len(stager.scheduled[0]) != 1 || stager.scheduled[0][0].EventType() != domaininterpretation.EventTypeRetryRequested {
+		t.Fatalf("scheduled retry events=%#v", stager.scheduled)
+	}
 	failed, ok := stager.events[0][0].(domaininterpretation.ReportFailedOutcomeEvent)
 	if !ok {
 		t.Fatalf("failed event type=%T", stager.events[0][0])
@@ -146,7 +159,15 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 		t.Fatalf("failed payload=%#v aggregate=%s/%s", payload, failed.AggregateType(), failed.AggregateID())
 	}
 	builder.err = nil
-	result, err := service.Execute(context.Background(), executorInput(), "retry")
+	nextAttemptAt := failedError.Decision.NextAttemptAt
+	if nextAttemptAt == nil {
+		t.Fatal("automatic retry is missing next attempt time")
+	}
+	service.now = func() time.Time { return *nextAttemptAt }
+	retryCtx := retrygovernance.WithAuthorization(context.Background(), retrygovernance.Authorization{
+		EventID: failedError.Decision.RetryEventID, ExpectedAttempt: failedError.Decision.Attempt, Origin: retrygovernance.AttemptOriginAutomatic,
+	})
+	result, err := service.Execute(retryCtx, executorInput(), "retry")
 	if err != nil {
 		t.Fatal(err)
 	}

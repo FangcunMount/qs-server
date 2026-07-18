@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 func TestInterpretationRunRecordsOneAttemptAndCreatesNextOnlyAfterFailure(t *testing.T) {
@@ -19,6 +20,9 @@ func TestInterpretationRunRecordsOneAttemptAndCreatesNextOnlyAfterFailure(t *tes
 	failure := Failure{Kind: FailureKindTemplate, Code: "template_unavailable", SafeMessage: "报告模板暂不可用", Retryable: true}
 	if err := first.Fail(now.Add(time.Second), failure); err != nil {
 		t.Fatal(err)
+	}
+	if got := first.RetryDecision(); got == nil || got.Disposition != retrygovernance.DispositionAutomatic {
+		t.Fatalf("retry decision = %#v", got)
 	}
 	second, err := Next(meta.FromUint64(12), first)
 	if err != nil {
@@ -86,5 +90,29 @@ func TestInterpretationRunLeaseExpiresAndIsClearedAtTerminalState(t *testing.T) 
 	}
 	if r.LeaseExpiresAt() != nil || r.HasActiveLease(now.Add(45*time.Second)) {
 		t.Fatal("terminal run retained active lease")
+	}
+}
+
+func TestInterpretationRunManualAuthorizationDoesNotResetBudget(t *testing.T) {
+	now := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	run, err := NewPending(meta.FromUint64(13), meta.FromUint64(9), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := run.StartWithLease(now.Add(-time.Minute), "trace", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.Fail(now, Failure{Kind: FailureKindBuild, Code: "failed", SafeMessage: "failed", Retryable: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.AuthorizeOneRetry(retrygovernance.AttemptOriginManual, "request-1", "event-1", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	decision := run.RetryDecision()
+	if decision.Disposition != retrygovernance.DispositionAutomatic || decision.RemainingAutomaticAttempts != 0 || decision.ActionRequestID != "request-1" {
+		t.Fatalf("authorized decision=%#v", decision)
+	}
+	if err := run.AuthorizeOneRetry(retrygovernance.AttemptOriginManual, "request-2", "event-2", now.Add(2*time.Second)); err == nil {
+		t.Fatal("second authorization unexpectedly succeeded")
 	}
 }

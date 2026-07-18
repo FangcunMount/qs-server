@@ -7,7 +7,6 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
-	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -31,21 +30,38 @@ type SubscriptionRuntime interface {
 type MessageEventExtractor = eventruntime.MessageEventExtractor
 type MessageSettlementPolicy = eventruntime.MessageSettlementPolicy
 
+type SubscriberOptions struct {
+	MaxInFlight int
+	MaxAttempts int
+	DeadLetters DeadLetterRecorder
+}
+
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
+	return CreateSubscriberWithOptions(cfg, logger, SubscriberOptions{MaxInFlight: maxInFlight, MaxAttempts: 8})
+}
+
+func CreateSubscriberWithOptions(cfg *config.MessagingConfig, logger *slog.Logger, opts SubscriberOptions) (basemessaging.Subscriber, error) {
 	switch cfg.Provider {
 	case "nsq":
 		nsqCfg := nsq.NewConfig()
-		if maxInFlight > 0 {
-			nsqCfg.MaxInFlight = maxInFlight
+		if opts.MaxInFlight > 0 {
+			nsqCfg.MaxInFlight = opts.MaxInFlight
 		}
-		return cbnsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg)
+		if opts.MaxAttempts > 0 {
+			nsqCfg.MaxAttempts = uint16(opts.MaxAttempts)
+		}
+		return newGovernedNSQSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg, opts.DeadLetters)
 	case "rabbitmq":
-		return rabbitmq.NewSubscriber(cfg.RabbitMQURL)
+		return newGovernedRabbitSubscriber(cfg.RabbitMQURL, opts)
 	default:
 		logger.Warn("unknown messaging provider, using NSQ as default",
 			slog.String("provider", cfg.Provider),
 		)
-		return cbnsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nil)
+		nsqCfg := nsq.NewConfig()
+		if opts.MaxAttempts > 0 {
+			nsqCfg.MaxAttempts = uint16(opts.MaxAttempts)
+		}
+		return newGovernedNSQSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg, opts.DeadLetters)
 	}
 }
 

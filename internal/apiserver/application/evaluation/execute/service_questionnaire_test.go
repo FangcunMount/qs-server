@@ -44,15 +44,26 @@ func (r *engineRecordingTxRunner) WithinTransaction(ctx context.Context, fn func
 }
 
 type engineRecordingEventStager struct {
-	ctxHadTxMarker bool
-	eventTypes     []string
-	err            error
+	ctxHadTxMarker      bool
+	eventTypes          []string
+	scheduledEventTypes []string
+	scheduledAt         time.Time
+	err                 error
 }
 
 func (s *engineRecordingEventStager) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	s.ctxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
 	for _, evt := range events {
 		s.eventTypes = append(s.eventTypes, evt.EventType())
+	}
+	return s.err
+}
+
+func (s *engineRecordingEventStager) StageAt(ctx context.Context, dueAt time.Time, events ...event.DomainEvent) error {
+	s.ctxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
+	s.scheduledAt = dueAt
+	for _, evt := range events {
+		s.scheduledEventTypes = append(s.scheduledEventTypes, evt.EventType())
 	}
 	return s.err
 }

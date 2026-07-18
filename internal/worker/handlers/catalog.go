@@ -9,6 +9,9 @@ func NewRegistry() *Registry {
 		"evaluation_requested_handler": func(deps *Dependencies) HandlerFunc {
 			return handleEvaluationRequested(deps)
 		},
+		"evaluation_retry_requested_handler": func(deps *Dependencies) HandlerFunc {
+			return handleEvaluationRequested(deps)
+		},
 		"evaluation_outcome_committed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleEvaluationOutcomeCommitted(deps)
 		},
@@ -23,6 +26,9 @@ func NewRegistry() *Registry {
 		},
 		"interpretation_report_failed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleInterpretationReportFailed(deps)
+		},
+		"interpretation_retry_requested_handler": func(deps *Dependencies) HandlerFunc {
+			return handleInterpretationRetryRequested(deps)
 		},
 		"assessment_model_changed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAssessmentModelChanged(deps)

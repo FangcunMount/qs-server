@@ -3,12 +3,14 @@ package eventoutbox
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -16,20 +18,24 @@ import (
 )
 
 type OutboxPO struct {
-	ID            uint64     `gorm:"primaryKey;autoIncrement"`
-	EventID       string     `gorm:"column:event_id;size:64;not null;uniqueIndex:uk_event_id"`
-	EventType     string     `gorm:"column:event_type;size:128;not null"`
-	AggregateType string     `gorm:"column:aggregate_type;size:64;not null"`
-	AggregateID   string     `gorm:"column:aggregate_id;size:64;not null"`
-	TopicName     string     `gorm:"column:topic_name;size:128;not null"`
-	PayloadJSON   string     `gorm:"column:payload_json;type:longtext;not null"`
-	Status        string     `gorm:"column:status;size:32;not null;index:idx_status_next_attempt_at,priority:1"`
-	AttemptCount  int        `gorm:"column:attempt_count;not null;default:0"`
-	NextAttemptAt time.Time  `gorm:"column:next_attempt_at;not null;index:idx_status_next_attempt_at,priority:2"`
-	LastError     *string    `gorm:"column:last_error;type:text"`
-	CreatedAt     time.Time  `gorm:"column:created_at;not null"`
-	UpdatedAt     time.Time  `gorm:"column:updated_at;not null"`
-	PublishedAt   *time.Time `gorm:"column:published_at"`
+	ID                    uint64     `gorm:"primaryKey;autoIncrement"`
+	EventID               string     `gorm:"column:event_id;size:64;not null;uniqueIndex:uk_event_id"`
+	EventType             string     `gorm:"column:event_type;size:128;not null"`
+	AggregateType         string     `gorm:"column:aggregate_type;size:64;not null"`
+	AggregateID           string     `gorm:"column:aggregate_id;size:64;not null"`
+	OrgID                 *int64     `gorm:"column:org_id"`
+	TopicName             string     `gorm:"column:topic_name;size:128;not null"`
+	PayloadJSON           string     `gorm:"column:payload_json;type:longtext;not null"`
+	Status                string     `gorm:"column:status;size:32;not null;index:idx_status_next_attempt_at,priority:1"`
+	AttemptCount          int        `gorm:"column:attempt_count;not null;default:0"`
+	RetryDisposition      *string    `gorm:"column:retry_disposition;size:32"`
+	NextAttemptAt         time.Time  `gorm:"column:next_attempt_at;not null;index:idx_status_next_attempt_at,priority:2"`
+	LastError             *string    `gorm:"column:last_error;type:text"`
+	LastErrorKind         *string    `gorm:"column:last_error_kind;size:32"`
+	ManualReplayRequestID *string    `gorm:"column:manual_replay_request_id;size:64"`
+	CreatedAt             time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt             time.Time  `gorm:"column:updated_at;not null"`
+	PublishedAt           *time.Time `gorm:"column:published_at"`
 }
 
 func (OutboxPO) TableName() string {
@@ -79,6 +85,24 @@ func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	return s.stageWithDB(tx, events)
 }
 
+func (s *Store) StageAt(ctx context.Context, dueAt time.Time, events ...event.DomainEvent) error {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return err
+	}
+	rows, err := s.buildRows(events)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		row.NextAttemptAt = dueAt
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return tx.Create(&rows).Error
+}
+
 func (s *Store) stageWithDB(tx *gorm.DB, events []event.DomainEvent) error {
 	if tx == nil {
 		return mysql.ErrActiveTransactionRequired
@@ -113,6 +137,7 @@ func (s *Store) buildRowsAt(events []event.DomainEvent, now time.Time) ([]*Outbo
 			EventType:     record.EventType,
 			AggregateType: record.AggregateType,
 			AggregateID:   record.AggregateID,
+			OrgID:         outboxcore.OrgIDFromPayloadJSON(record.PayloadJSON),
 			TopicName:     record.TopicName,
 			PayloadJSON:   record.PayloadJSON,
 			Status:        record.Status,
@@ -189,12 +214,27 @@ func (s *Store) pendingFromRows(ctx context.Context, rows []*OutboxPO) ([]outbox
 		pending, err := outboxcore.DecodePendingEvent(row.EventID, row.PayloadJSON)
 		if err != nil {
 			transition := outboxcore.NewDecodeFailureTransition(err, time.Now())
-			_ = s.MarkEventFailed(ctx, row.EventID, transition.LastError, transition.NextAttemptAt)
+			_ = s.markPermanentFailure(ctx, row.EventID, transition.LastError, "encoding", time.Now())
 			continue
 		}
 		claimed = append(claimed, pending)
 	}
 	return claimed, nil
+}
+
+func (s *Store) markPermanentFailure(ctx context.Context, eventID, lastError, errorKind string, failedAt time.Time) error {
+	result := s.db.WithContext(ctx).Model(&OutboxPO{}).Where("event_id = ?", eventID).Updates(map[string]interface{}{
+		"status": outboxcore.StatusFailed, "last_error": lastError, "last_error_kind": errorKind,
+		"attempt_count": gorm.Expr("attempt_count + 1"), "retry_disposition": string(retrygovernance.DispositionManualRequired),
+		"next_attempt_at": failedAt, "updated_at": failedAt,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("outbox event %q not found", eventID)
+	}
+	return nil
 }
 
 func (s *Store) dueEventsSelectionQuery(tx *gorm.DB, now time.Time) *gorm.DB {
@@ -205,7 +245,8 @@ func (s *Store) dueEventsSelectionQuery(tx *gorm.DB, now time.Time) *gorm.DB {
 			outboxcore.StatusPending, now,
 			outboxcore.StatusFailed, now,
 			outboxcore.StatusPublishing, staleBefore,
-		)
+		).
+		Where("retry_disposition IS NULL OR retry_disposition <> ?", retrygovernance.DispositionManualRequired)
 }
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
@@ -213,9 +254,10 @@ func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishe
 	result := s.db.WithContext(ctx).Model(&OutboxPO{}).
 		Where("event_id = ?", eventID).
 		Updates(map[string]interface{}{
-			"status":       transition.Status,
-			"published_at": transition.PublishedAt,
-			"updated_at":   transition.UpdatedAt,
+			"status":            transition.Status,
+			"published_at":      transition.PublishedAt,
+			"retry_disposition": nil,
+			"updated_at":        transition.UpdatedAt,
 		})
 	if result.Error != nil {
 		return result.Error
@@ -224,6 +266,40 @@ func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishe
 		return fmt.Errorf("outbox event %q not found", eventID)
 	}
 	return nil
+}
+
+func (s *Store) MarkEventsFailedGoverned(ctx context.Context, failures []outboxport.FailedMark, failedAt time.Time) ([]outboxport.GovernedFailedMark, error) {
+	if s == nil || s.db == nil || len(failures) == 0 {
+		return nil, nil
+	}
+	ordered := append([]outboxport.FailedMark(nil), failures...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].EventID < ordered[j].EventID })
+	results := make([]outboxport.GovernedFailedMark, 0, len(ordered))
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, failure := range ordered {
+			var row OutboxPO
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("event_id = ?", failure.EventID).First(&row).Error; err != nil {
+				return err
+			}
+			nextCount := row.AttemptCount + 1
+			decision := retrygovernance.OutboxPolicy().DecideFailureForKey(true, nextCount, failedAt, failure.EventID)
+			nextAt := failedAt
+			if decision.NextAttemptAt != nil {
+				nextAt = *decision.NextAttemptAt
+			}
+			if err := tx.Model(&OutboxPO{}).Where("id = ? AND attempt_count = ?", row.ID, row.AttemptCount).Updates(map[string]interface{}{
+				"status": outboxcore.StatusFailed, "last_error": failure.LastError,
+				"last_error_kind": "publish", "attempt_count": nextCount,
+				"retry_disposition": string(decision.Disposition), "next_attempt_at": nextAt,
+				"updated_at": failedAt,
+			}).Error; err != nil {
+				return err
+			}
+			results = append(results, outboxport.GovernedFailedMark{EventID: failure.EventID, EventType: failure.EventType, AttemptCount: nextCount, Disposition: decision.Disposition, NextAttemptAt: decision.NextAttemptAt})
+		}
+		return nil
+	})
+	return results, err
 }
 
 func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {

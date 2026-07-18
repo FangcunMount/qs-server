@@ -6,6 +6,7 @@ import (
 
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 // FailedError reports a terminal InterpretationRun failure that has already
@@ -15,6 +16,8 @@ type FailedError struct {
 	GenerationID domaingeneration.ID
 	RunID        interpretationrun.ID
 	Failure      interpretationrun.Failure
+	Origin       retrygovernance.AttemptOrigin
+	Decision     *retrygovernance.Decision
 }
 
 func (e *FailedError) Error() string {

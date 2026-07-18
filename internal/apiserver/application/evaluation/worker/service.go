@@ -5,6 +5,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"time"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
@@ -29,14 +30,22 @@ type Outcome struct {
 }
 
 type Result struct {
-	Status           string
-	Outcome          *Outcome
-	RunID            string
-	Retryable        bool
-	FailureKind      string
-	FailureMessage   string
-	TraceID          string
-	InputSnapshotRef string
+	Status                     string
+	Outcome                    *Outcome
+	RunID                      string
+	Retryable                  bool
+	FailureKind                string
+	FailureMessage             string
+	TraceID                    string
+	InputSnapshotRef           string
+	RetryDisposition           string
+	AttemptOrigin              string
+	CurrentAttempt             int
+	MaxAutomaticAttempts       int
+	RemainingAutomaticAttempts int
+	NextAttemptAt              *time.Time
+	RetryEventID               string
+	ActionRequestID            string
 }
 
 func (r Result) ShouldRetry() bool { return r.Status == "failed" && r.Retryable }
@@ -101,6 +110,16 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 		result.TraceID = latest.TraceID()
 		result.InputSnapshotRef = latest.InputSnapshotRef()
 		result.Retryable = latest.Retryable()
+		result.AttemptOrigin = string(latest.Origin())
+		result.CurrentAttempt = latest.Attempt().Number
+		if decision := latest.RetryDecision(); decision != nil {
+			result.RetryDisposition = string(decision.Disposition)
+			result.MaxAutomaticAttempts = decision.MaxAutomaticAttempts
+			result.RemainingAutomaticAttempts = decision.RemainingAutomaticAttempts
+			result.NextAttemptAt = decision.NextAttemptAt
+			result.RetryEventID = decision.RetryEventID
+			result.ActionRequestID = decision.ActionRequestID
+		}
 		if failure := latest.Failure(); failure != nil {
 			result.FailureKind = failure.Kind.String()
 			result.FailureMessage = failure.Message

@@ -1,6 +1,7 @@
 package systemgovernance
 
 import (
+	"context"
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -18,6 +19,43 @@ type EventsView struct {
 	Summary     EventDrainSummary           `json:"summary"`
 	OutboxRows  []EventOutboxRow            `json:"outbox_rows,omitempty"`
 	TypeRows    []EventTypeRow              `json:"event_type_rows,omitempty"`
+	Retry       RetryGovernanceSummary      `json:"retry_governance"`
+}
+
+type RetryGovernanceSummary struct {
+	Automatic            int64 `json:"automatic"`
+	ManualRequired       int64 `json:"manual_required"`
+	Terminal             int64 `json:"terminal"`
+	OutboxAutomatic      int64 `json:"outbox_automatic"`
+	OutboxManual         int64 `json:"outbox_manual_required"`
+	BlockedRetryEvents   int64 `json:"blocked_retry_events"`
+	TransportDeadLetters int64 `json:"transport_dead_letters"`
+}
+
+type RetryGovernanceReader interface {
+	ReadRetryGovernance(context.Context) (RetryGovernanceSummary, error)
+}
+
+type RetryCandidate struct {
+	Kind            string     `json:"kind"`
+	Store           string     `json:"store"`
+	ResourceID      string     `json:"resource_id"`
+	Attempt         int        `json:"attempt"`
+	Disposition     string     `json:"retry_disposition"`
+	NextAttemptAt   *time.Time `json:"next_attempt_at,omitempty"`
+	RetryEventID    string     `json:"retry_event_id,omitempty"`
+	ActionRequestID string     `json:"action_request_id,omitempty"`
+	LastErrorKind   string     `json:"last_error_kind,omitempty"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+type RetryCandidatePage struct {
+	Items      []RetryCandidate `json:"items"`
+	NextCursor string           `json:"next_cursor,omitempty"`
+}
+
+type RetryCandidateReader interface {
+	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (RetryCandidatePage, error)
 }
 
 // EventTypeStatusGroup 分组按事件类型 积压 行 用于 一个outbox 存储。

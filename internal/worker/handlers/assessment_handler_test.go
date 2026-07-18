@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,6 +34,25 @@ func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
 	}
 	if client.resp.GetStatus() != "evaluated" || client.resp.GetRunId() != "42:1" || client.resp.GetOutcomeId() != "9001" {
 		t.Fatalf("evaluate response = %#v, want status/run/outcome fields", client.resp)
+	}
+}
+
+func TestAutomaticEvaluationRetryEmergencySwitchDoesNotBlockManualRetry(t *testing.T) {
+	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated", RunId: "42:4", OutcomeId: "9001"}}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	deps.DisableAutomaticRetry = true
+	handler := handleEvaluationRequested(deps)
+	if err := handler(t.Context(), eventcatalog.EvaluationRetryRequested, mustBuildEvaluationRetryPayload(t, "automatic")); !errors.Is(err, ErrAutomaticRetryPaused) {
+		t.Fatalf("automatic retry error = %v, want emergency pause", err)
+	}
+	if client.evaluateCalls != 0 {
+		t.Fatalf("automatic retry calls = %d, want 0", client.evaluateCalls)
+	}
+	if err := handler(t.Context(), eventcatalog.EvaluationRetryRequested, mustBuildEvaluationRetryPayload(t, "manual")); err != nil {
+		t.Fatal(err)
+	}
+	if client.evaluateCalls != 1 {
+		t.Fatalf("manual retry calls = %d, want 1", client.evaluateCalls)
 	}
 }
 
@@ -94,6 +114,24 @@ func mustBuildEvaluationRequestedPayload(t *testing.T, assessmentID int64) []byt
 		"id": "evt-evaluation-requested", "eventType": eventcatalog.EvaluationRequested, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
 		"data": map[string]any{
 			"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "questionnaire_code": "QNR-001", "questionnaire_version": "1.0.0", "answersheet_id": "456", "model_code": "model-1", "requested_at": now,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
+}
+
+func mustBuildEvaluationRetryPayload(t *testing.T, origin string) []byte {
+	t.Helper()
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	payload, err := json.Marshal(map[string]any{
+		"id": "eval-retry:42:3:" + origin, "eventType": eventcatalog.EvaluationRetryRequested,
+		"occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
+		"data": map[string]any{
+			"org_id": 18, "assessment_id": 42, "testee_id": 99, "questionnaire_code": "QNR-001",
+			"questionnaire_version": "1.0.0", "answersheet_id": "456", "model_code": "model-1",
+			"requested_at": now, "expected_attempt": 3, "attempt_origin": origin, "mode": "next_attempt",
 		},
 	})
 	if err != nil {

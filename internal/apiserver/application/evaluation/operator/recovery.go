@@ -2,11 +2,14 @@ package operator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	uuid "github.com/satori/go.uuid"
 )
 
 type EventStager interface {
@@ -22,10 +25,15 @@ type recoveryService struct {
 	tx          apptransaction.Runner
 	events      EventStager
 	authorizer  authorizer
+	governed    GovernedRetryService
 }
 
-func NewRecoveryService(assessments domainassessment.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker) RecoveryService {
-	return &recoveryService{assessments: assessments, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}}
+func NewRecoveryService(assessments domainassessment.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker, governed ...GovernedRetryService) RecoveryService {
+	service := &recoveryService{assessments: assessments, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}}
+	if len(governed) > 0 {
+		service.governed = governed[0]
+	}
+	return service
 }
 
 func (s *recoveryService) Retry(ctx context.Context, actor Actor, id uint64) (*Assessment, error) {
@@ -39,22 +47,22 @@ func (s *recoveryService) Retry(ctx context.Context, actor Actor, id uint64) (*A
 	if !a.Status().IsFailed() {
 		return nil, evalerrors.AssessmentInvalidStatus("只能重试失败的测评")
 	}
-	if err := a.RetryFromFailed(); err != nil {
-		return nil, evalerrors.WrapAssessmentInvalidStatus(err, "重置测评状态失败")
+	if s.governed == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation retry governance is not configured")
 	}
-	err = s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.assessments.Save(txCtx, a); err != nil {
-			return err
-		}
-		events := a.Events()
-		if len(events) == 0 {
-			return nil
-		}
-		return s.events.Stage(txCtx, events...)
-	})
+	latest, err := s.governed.Latest(ctx, id)
 	if err != nil {
-		return nil, evalerrors.Database(err, "保存测评失败")
+		return nil, evalerrors.Database(err, "读取最新测评尝试失败")
 	}
-	a.ClearEvents()
+	if latest == nil || latest.RetryDecision() == nil || latest.RetryDecision().Disposition != retrygovernance.DispositionManualRequired {
+		return nil, evalerrors.AssessmentInvalidStatus("最新失败尝试不需要人工重试")
+	}
+	requestID := fmt.Sprintf("legacy-evaluation-retry-%s", uuid.Must(uuid.NewV4(), nil).String())
+	if _, err := s.governed.Authorize(ctx, actor, GovernedRetryCommand{
+		AssessmentID: id, ExpectedAttempt: latest.Attempt().Number, Origin: retrygovernance.AttemptOriginManual,
+		RequestID: requestID, Reason: "legacy evaluation retry endpoint",
+	}); err != nil {
+		return nil, err
+	}
 	return assessmentFromDomain(a)
 }

@@ -5,6 +5,7 @@ import "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 const (
 	EventTypeReportGenerated = eventcatalog.InterpretationReportGenerated
 	EventTypeReportFailed    = eventcatalog.InterpretationReportFailed
+	EventTypeRetryRequested  = eventcatalog.InterpretationRetryRequested
 )
 
 // AggregateType is the durable aggregate root for terminal interpretation

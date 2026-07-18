@@ -9,6 +9,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"google.golang.org/grpc/metadata"
 )
 
 func handleInterpretationReportGenerated(deps *Dependencies) HandlerFunc {
@@ -44,6 +45,30 @@ func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
 			}
 		}
 		return nil
+	}
+}
+
+func handleInterpretationRetryRequested(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, _ string, payload []byte) error {
+		var data eventoutcome.InterpretationRetryRequestedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse interpretation retry requested event: %w", err)
+		}
+		if deps.DisableAutomaticRetry && data.AttemptOrigin == "automatic" {
+			deps.Logger.Warn("automatic interpretation retry disabled by emergency switch", "event_id", env.ID, "generation_id", data.GenerationID)
+			return ErrAutomaticRetryPaused
+		}
+		if deps.InterpretationAutomationClient == nil {
+			return fmt.Errorf("interpretation automation client is not available")
+		}
+		callCtx := metadata.AppendToOutgoingContext(ctx, "x-event-id", env.ID)
+		callCtx = outgoingRetryAuthorization(callCtx, env.ID, data.ExpectedAttempt, data.AttemptOrigin, data.ActionRequestID, data.Mode)
+		resp, err := deps.InterpretationAutomationClient.GenerateReportFromOutcome(callCtx, data.OutcomeID)
+		if err != nil {
+			return fmt.Errorf("retry interpretation generation: %w", err)
+		}
+		return handleGenerateReportResponse(resp)
 	}
 }
 

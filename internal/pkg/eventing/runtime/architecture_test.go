@@ -117,6 +117,11 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			"EvaluationRequested",
 			"NewEvaluationRequestedEvent",
 		},
+		eventcatalog.EvaluationRetryRequested: {
+			eventcatalog.EvaluationRetryRequested,
+			"EvaluationRetryRequested",
+			"NewEvaluationRetryRequestedEvent",
+		},
 		eventcatalog.EvaluationOutcomeCommitted: {
 			eventcatalog.EvaluationOutcomeCommitted,
 			"EvaluationOutcomeCommitted",
@@ -136,6 +141,11 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			eventcatalog.InterpretationReportFailed,
 			"ReportFailedOutcome",
 			"NewInterpretationReportFailedEvent",
+		},
+		eventcatalog.InterpretationRetryRequested: {
+			eventcatalog.InterpretationRetryRequested,
+			"InterpretationRetryRequested",
+			"NewInterpretationRetryRequestedEvent",
 		},
 	}
 

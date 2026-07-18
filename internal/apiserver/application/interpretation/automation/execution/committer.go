@@ -12,6 +12,8 @@ import (
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 // EventStager stores terminal Interpretation events in the transaction that
@@ -162,6 +164,20 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 		FailureKind: string(request.Failure.Kind), FailureCode: request.Failure.Code, Retryable: request.Failure.Retryable,
 		SafeReason: request.Failure.SafeMessage, FailedAt: failedAt,
 	})}
+	var retryEvent event.DomainEvent
+	var retryAt time.Time
+	if decision := runToCommit.RetryDecision(); decision != nil && decision.Disposition == retrygovernance.DispositionAutomatic && decision.NextAttemptAt != nil {
+		retryAt = *decision.NextAttemptAt
+		retry := domaininterpretation.NewInterpretationRetryRequestedEvent(domaininterpretation.RetryRequestedEventInput{
+			OrgID: request.Association.OrgID, GenerationID: generationToCommit.ID().String(), RunID: runToCommit.ID().String(),
+			AssessmentID: request.Association.AssessmentID.String(), OutcomeID: request.OutcomeID.String(), TesteeID: request.Association.TesteeID,
+			ExpectedAttempt: runToCommit.Attempt(), AttemptOrigin: string(retrygovernance.AttemptOriginAutomatic), Mode: "next_attempt", RequestedAt: retryAt,
+		})
+		if err := runToCommit.AttachRetryEvent(retry.EventID()); err != nil {
+			return nil, err
+		}
+		retryEvent = retry
+	}
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.runs.Save(txCtx, runToCommit); err != nil {
 			return err
@@ -169,11 +185,24 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 		if err := c.generations.Save(txCtx, generationToCommit, expectedVersion); err != nil {
 			return err
 		}
-		return c.stage(txCtx, events)
+		if err := c.stage(txCtx, events); err != nil {
+			return err
+		}
+		if retryEvent != nil {
+			scheduled, ok := c.stager.(outboxport.ScheduledStager)
+			if !ok {
+				return fmt.Errorf("interpretation retry requires scheduled outbox staging")
+			}
+			return scheduled.StageAt(txCtx, retryAt, retryEvent)
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
 	c.enqueueAfterCommit(ctx, events, failedAt)
+	if retryEvent != nil {
+		c.enqueueAfterCommit(ctx, []event.DomainEvent{retryEvent}, retryAt)
+	}
 	return &CommitResult{Generation: generationToCommit, Run: runToCommit}, nil
 }
 
@@ -245,6 +274,7 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 	return interpretationrun.Restore(interpretationrun.RestoreInput{
 		ID: source.ID(), GenerationID: source.GenerationID(), Attempt: source.Attempt(), Status: source.Status(), Failure: source.Failure(), TraceID: source.TraceID(),
 		StartedAt: source.StartedAt(), LeaseExpiresAt: source.LeaseExpiresAt(), FinishedAt: source.FinishedAt(),
+		Origin: source.Origin(), RetryDecision: source.RetryDecision(),
 	})
 }
 

@@ -34,14 +34,19 @@ type Generation struct {
 	Version                              uint64
 	CreatedAt, UpdatedAt                 time.Time
 	LatestRun                            *Run
+	Runs                                 []Run
 	Report                               *Report
 }
 type Run struct {
-	ID, GenerationID                      uint64
-	Attempt                               int
-	Status, TraceID                       string
-	Failure                               *Failure
-	StartedAt, LeaseExpiresAt, FinishedAt *time.Time
+	ID, GenerationID                                 uint64
+	Attempt                                          int
+	Status, TraceID                                  string
+	Failure                                          *Failure
+	StartedAt, LeaseExpiresAt, FinishedAt            *time.Time
+	AttemptOrigin, RetryDisposition                  string
+	MaxAutomaticAttempts, RemainingAutomaticAttempts int
+	NextAttemptAt                                    *time.Time
+	RetryEventID, ActionRequestID                    string
 }
 type Failure struct {
 	Kind, Code, SafeMessage string
@@ -172,6 +177,20 @@ func (s *service) mapGenerations(ctx context.Context, items []*domaingeneration.
 				return nil, err
 			}
 			item.LatestRun = mapRun(r)
+			if history, ok := s.runs.(domainrun.HistoryReader); ok {
+				runs, err := history.ListByGenerationID(ctx, g.ID(), 100)
+				if err != nil {
+					return nil, err
+				}
+				item.Runs = make([]Run, 0, len(runs))
+				for _, runRecord := range runs {
+					if mapped := mapRun(runRecord); mapped != nil {
+						item.Runs = append(item.Runs, *mapped)
+					}
+				}
+			} else if item.LatestRun != nil {
+				item.Runs = []Run{*item.LatestRun}
+			}
 		}
 		if g.Status() == domaingeneration.StatusGenerated {
 			report, err := s.reports.FindByGenerationID(ctx, g.ID())
@@ -189,6 +208,15 @@ func mapRun(r *domainrun.InterpretationRun) *Run {
 		return nil
 	}
 	result := &Run{ID: r.ID().Uint64(), GenerationID: r.GenerationID().Uint64(), Attempt: r.Attempt(), Status: string(r.Status()), TraceID: r.TraceID(), StartedAt: r.StartedAt(), LeaseExpiresAt: r.LeaseExpiresAt(), FinishedAt: r.FinishedAt()}
+	result.AttemptOrigin = string(r.Origin())
+	if decision := r.RetryDecision(); decision != nil {
+		result.RetryDisposition = string(decision.Disposition)
+		result.MaxAutomaticAttempts = decision.MaxAutomaticAttempts
+		result.RemainingAutomaticAttempts = decision.RemainingAutomaticAttempts
+		result.NextAttemptAt = decision.NextAttemptAt
+		result.RetryEventID = decision.RetryEventID
+		result.ActionRequestID = decision.ActionRequestID
+	}
 	if f := r.Failure(); f != nil {
 		result.Failure = &Failure{Kind: string(f.Kind), Code: f.Code, SafeMessage: f.SafeMessage, Retryable: f.Retryable}
 	}

@@ -44,3 +44,19 @@ type ReportFailedPayload struct {
 	SafeReason      string    `json:"safe_reason"`
 	FailedAt        time.Time `json:"failed_at"`
 }
+
+// InterpretationRetryRequestedPayload wakes a generation only after its
+// persisted retry decision becomes due.
+type InterpretationRetryRequestedPayload struct {
+	OrgID           int64     `json:"org_id"`
+	GenerationID    string    `json:"generation_id"`
+	RunID           string    `json:"run_id"`
+	AssessmentID    string    `json:"assessment_id"`
+	OutcomeID       string    `json:"outcome_id"`
+	TesteeID        uint64    `json:"testee_id"`
+	ExpectedAttempt int       `json:"expected_attempt"`
+	AttemptOrigin   string    `json:"attempt_origin"`
+	ActionRequestID string    `json:"action_request_id,omitempty"`
+	Mode            string    `json:"mode"`
+	RequestedAt     time.Time `json:"requested_at"`
+}
